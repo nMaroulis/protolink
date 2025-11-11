@@ -1,19 +1,12 @@
-"""Transport layer for agent communication.
+"""Transport module for Protolink framework.
 
-This module provides the transport layer implementation for agent communication,
-including HTTP/HTTPS and WebSocket transports.
+This module provides transport implementations for different communication protocols.
 """
 
-from .http import HTTPTransport, HTTPTransportConfig
-from .websocket import WebSocketTransport, WebSocketTransportConfig
-from .base import Transport, TransportError, MessageHandler
+from protolink.transport.http_transport import HTTPTransport
+from protolink.transport.runtime_transport import RuntimeTransport
 
 __all__ = [
     'HTTPTransport',
-    'HTTPTransportConfig',
-    'WebSocketTransport',
-    'WebSocketTransportConfig',
-    'Transport',
-    'TransportError',
-    'MessageHandler',
+    'RuntimeTransport',
 ]

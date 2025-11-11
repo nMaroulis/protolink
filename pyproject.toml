@@ -2,79 +2,25 @@
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[project]
-name = "protolink"
-version = "0.1.0"
-description = "Agent-to-Agent (A2A) communication protocol implementation"
-authors = [
-    {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"}
-]
-readme = "README.md"
-requires-python = ">=3.10"
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Operating System :: OS Independent",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "License :: OSI Approved :: Apache Software License",
-]
-
-[project.urls]
-Homepage = "https://github.com/nmaroulis/protolink"
-
-
-[project.optional-dependencies]
-http-server = [
-    "fastapi>=0.115.2",
-    "uvicorn>=0.24.0"
-]
-encryption = [
-    "cryptography>=43.0.0"
-]
-grpc = [
-    "grpcio>=1.60",
-    "grpcio-tools>=1.60",
-    "grpcio_reflection>=1.7.0"
-]
-openai = ["openai>=0.27.0"]
-anthropic = ["anthropic>=0.3.0"]
-llama-cpp = ["llama-cpp-python>=0.1.50"]
-llms = ["openai>=0.27.0", "anthropic>=0.3.0", "llama-cpp-python>=0.1.50"]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
-    "pylint>=3.0.0",
-]
-
-all = [
-  "protolink[http-server]",
-  "protolink[encryption]",
-  "protolink[grpc]",
-  "protolink[llms]",
-  "protolink[dev]"
-]
-
-
-[tool.setuptools.packages.find]
-where = ["protolink"]
-
 [tool.black]
 line-length = 88
-target-version = ["py310"]
+target-version = ['py38']
 include = '\.pyi?$'
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
 include_trailing_comma = true
-line_length = 88
+force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
+line_length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["protolink"]
+omit = ["tests/*"]
