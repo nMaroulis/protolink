@@ -1,21 +1,32 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
+
+# Test dependencies
+test_deps = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+]
 
 setup(
     name="protolink",
     version="0.1.0",
     author="Nikolaos Maroulis",
     author_email="nikolaos@maroulis.dev",
-    description="A framework for building and managing agents based on the A2A protocol.",
+    description="A framework for building and managing agents based on the A2A protocol.",  # noqa: E501
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/nMaroulis/protolink",
-    packages=find_packages(where="protolink"),
-    package_dir={"": "protolink"},
+    packages=find_packages(where="."),
+    package_dir={"": "."},
     python_requires=">=3.8",
     install_requires=[],
+    extras_require={
+        "test": test_deps,
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

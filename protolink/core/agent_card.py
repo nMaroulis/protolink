@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+
 @dataclass
 class AgentCard:
     """Agent identity and capability declaration.
-    
+
     Attributes:
         name: Agent name
         description: Agent purpose/description
@@ -20,7 +21,7 @@ class AgentCard:
         "streaming": False,
         "tasks": True
     })
-    
+
     def to_json(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""
         return {
@@ -30,7 +31,7 @@ class AgentCard:
             "version": self.version,
             "capabilities": self.capabilities
         }
-    
+
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> 'AgentCard':
         """Create from JSON format."""

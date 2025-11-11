@@ -2,6 +2,51 @@
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "protolink"
+version = "0.1.0"
+description = "A framework for building and managing agents based on the A2A protocol."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"},
+]
+
+[tool.ruff]
+# Enable all available rules
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "A",   # flake8-builtins
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "YTT", # flake8-2020
+    "FBT", # flake8-boolean-trap
+    "Q",   # flake8-quotes
+    "RUF", # ruff-specific rules
+]
+
+# Allow autofix for all rules
+extend-fixable = ["ALL"]
+
+# Line length (matches black)
+line-length = 88
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
 [tool.black]
 line-length = 88
 target-version = ['py38']
