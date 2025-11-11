@@ -1,13 +1,15 @@
-from dataclasses import dataclass, field
-from typing import Any
-from datetime import datetime
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
 from protolink.core.part import Part
+
 
 @dataclass
 class Message:
     """Single unit of communication between agents.
-    
+
     Attributes:
         id: Unique message identifier
         role: Sender role ('user', 'agent', 'system')
@@ -18,17 +20,17 @@ class Message:
     role: str = "user"
     parts: list[Part] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def add_text(self, text: str) -> 'Message':
         """Add a text part to the message."""
         self.parts.append(Part.text(text))
         return self
-    
+
     def add_part(self, part: Part) -> 'Message':
         """Add a part to the message."""
         self.parts.append(part)
         return self
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -37,7 +39,7 @@ class Message:
             "parts": [p.to_dict() for p in self.parts],
             "timestamp": self.timestamp
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'Message':
         """Create from dictionary."""
@@ -48,12 +50,12 @@ class Message:
             parts=parts,
             timestamp=data.get("timestamp", datetime.now().isoformat())
         )
-    
+
     @classmethod
     def user(cls, text: str) -> 'Message':
         """Create a user message with text (convenience method)."""
         return cls(role="user").add_text(text)
-    
+
     @classmethod
     def agent(cls, text: str) -> 'Message':
         """Create an agent message with text (convenience method)."""

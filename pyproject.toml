@@ -12,6 +12,35 @@ license = {text = "MIT"}
 authors = [
     {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"},
 ]
+dependencies = [
+    # Core dependencies go here
+]
+
+[project.optional-dependencies]
+http = [
+    "httpx>=0.28.1",
+]
+
+llms = [
+    "anthropic>=0.72.0",
+    "llama-cpp-python>=0.3.16",
+    "openai>=2.2.0",
+]
+
+test = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.14.1",
+]
+
+# All optional dependencies
+all = [
+    "httpx>=0.28.1",
+    "anthropic>=0.72.0",
+    "llama-cpp-python>=0.3.16",
+    "openai>=2.2.0",
+]
 
 [tool.ruff]
 # Enable all available rules

@@ -1,14 +1,15 @@
-from dataclasses import dataclass, field
-from typing import Any
-from datetime import datetime
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
+
 from protolink.core.message import Message
 
 
 @dataclass
 class Task:
     """Unit of work exchanged between agents.
-    
+
     Attributes:
         id: Unique task identifier
         state: Current task state (submitted, working, completed, failed)
@@ -21,29 +22,29 @@ class Task:
     messages: list[Message] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def add_message(self, message: Message) -> 'Task':
         """Add a message to the task."""
         self.messages.append(message)
         return self
-    
+
     def update_state(self, state: str) -> 'Task':
         """Update task state."""
         self.state = state
         return self
-    
+
     def complete(self, response_text: str) -> 'Task':
         """Mark task as completed with a response."""
         self.add_message(Message.agent(response_text))
         self.state = "completed"
         return self
-    
+
     def fail(self, error_message: str) -> 'Task':
         """Mark task as failed."""
         self.metadata["error"] = error_message
         self.state = "failed"
         return self
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
@@ -53,7 +54,7 @@ class Task:
             "metadata": self.metadata,
             "created_at": self.created_at
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> 'Task':
         """Create from dictionary."""
@@ -65,7 +66,7 @@ class Task:
             metadata=data.get("metadata", {}),
             created_at=data.get("created_at", datetime.now().isoformat())
         )
-    
+
     @classmethod
     def create(cls, message: Message) -> 'Task':
         """Create a new task with an initial message."""

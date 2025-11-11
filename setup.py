@@ -3,13 +3,32 @@ from setuptools import find_packages, setup
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-# Test dependencies
+# Dependencies
 test_deps = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-mock>=3.10.0",
 ]
+
+# Optional dependency groups
+extra_deps = {
+    "http": [
+        "httpx>=0.24.0",
+    ],
+    "llms": [
+        "openai>=1.0.0",
+        "llama-cpp-python>=0.2.0",
+        "anthropic>=0.7.0",
+    ],
+    # All optional dependencies
+    "all": [
+        "httpx>=0.24.0",
+        "openai>=1.0.0",
+        "llama-cpp-python>=0.2.0",
+        "anthropic>=0.7.0",
+    ]
+}
 
 setup(
     name="protolink",
@@ -26,6 +45,7 @@ setup(
     install_requires=[],
     extras_require={
         "test": test_deps,
+        **extra_deps,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
