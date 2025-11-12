@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: PyTest
+    name: Unit Tests
     runs-on: ubuntu-latest
     
     steps:

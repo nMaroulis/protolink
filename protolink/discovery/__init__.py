@@ -1,5 +1,5 @@
-from protolink.discovery.registry import Registry
+from .registry import Registry
 
 __all__ = [
-    'Registry',
+    "Registry",
 ]
