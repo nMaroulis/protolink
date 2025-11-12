@@ -17,11 +17,11 @@ class Transport(ABC):
     @abstractmethod
     async def send_task(self, agent_url: str, task: Task) -> Task:
         """Send a task to an agent.
-        
+
         Args:
             agent_url: Target agent URL
             task: Task to send
-            
+
         Returns:
             Task with response
         """
@@ -30,11 +30,11 @@ class Transport(ABC):
     @abstractmethod
     async def send_message(self, agent_url: str, message: Message) -> Message:
         """Send a message to an agent.
-        
+
         Args:
             agent_url: Target agent URL
             message: Message to send
-            
+
         Returns:
             Response message
         """
@@ -43,10 +43,10 @@ class Transport(ABC):
     @abstractmethod
     async def get_agent_card(self, agent_url: str) -> AgentCard:
         """Fetch agent card from agent URL.
-        
+
         Args:
             agent_url: Agent URL
-            
+
         Returns:
             AgentCard with agent metadata
         """

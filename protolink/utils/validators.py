@@ -50,7 +50,7 @@ class Validator:
             Tuple of (is_valid, error_message)
         """
         if not message.message_id or not cls._is_valid_id(message.message_id):
-            return False, "Message ID is required and must be alphanumeric with underscores or hyphens"
+            return False, "Message ID is required and must be alphanumeric with underscores or hyphens"  # noqa: E501
 
         if not message.role or not isinstance(message.role, str):
             return False, "Message role is required and must be a string"
@@ -71,7 +71,7 @@ class Validator:
             Tuple of (is_valid, error_message)
         """
         if not task.id or not cls._is_valid_id(task.id):
-            return False, "Task ID is required and must be alphanumeric with underscores or hyphens"
+            return False, "Task ID is required and must be alphanumeric with underscores or hyphens"  # noqa: E501
 
         if not task.task_type or not isinstance(task.task_type, str):
             return False, "Task type is required and must be a string"

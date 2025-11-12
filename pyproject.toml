@@ -57,7 +57,7 @@ dev = [
 
 [tool.ruff]
 # Enable all available rules
-select = [
+lint.select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
     "F",   # pyflakes
@@ -74,7 +74,7 @@ select = [
 ]
 
 # Allow autofix for all rules
-extend-fixable = ["ALL"]
+lint.extend-fixable = ["ALL"]
 
 # Line length (matches black)
 line-length = 88

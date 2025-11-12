@@ -15,7 +15,7 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 class ProtoLinkLogger:
     """Custom logger for Protolink with consistent formatting.
-    
+
     This logger provides methods for different log levels and supports both
     console and file logging.
     """
@@ -29,7 +29,7 @@ class ProtoLinkLogger:
         backup_count: int = 5
     ):
         """Initialize the logger.
-        
+
         Args:
             name: Logger name
             log_level: Logging level (default: INFO)
@@ -62,7 +62,7 @@ class ProtoLinkLogger:
 
     def debug(self, message: str, extra: dict[str, Any] | None = None) -> None:
         """Log a debug message.
-        
+
         Args:
             message: The message to log
             extra: Additional context as a dictionary
@@ -71,7 +71,7 @@ class ProtoLinkLogger:
 
     def info(self, message: str, extra: dict[str, Any] | None = None) -> None:
         """Log an info message.
-        
+
         Args:
             message: The message to log
             extra: Additional context as a dictionary
@@ -80,16 +80,22 @@ class ProtoLinkLogger:
 
     def warning(self, message: str, extra: dict[str, Any] | None = None) -> None:
         """Log a warning message.
-        
+
         Args:
             message: The message to log
             extra: Additional context as a dictionary
         """
         self.logger.warning(message, extra=extra or {})
 
-    def error(self, message: str, exc_info: bool = False, extra: dict[str, Any] | None = None) -> None:
+    def error(
+        self,
+        message: str,
+        *,
+        exc_info: bool = False,
+        extra: dict[str, Any] | None = None
+    ) -> None:
         """Log an error message.
-        
+
         Args:
             message: The message to log
             exc_info: Whether to include exception info
@@ -97,9 +103,15 @@ class ProtoLinkLogger:
         """
         self.logger.error(message, exc_info=exc_info, extra=extra or {})
 
-    def exception(self, message: str, exc_info: bool = True, extra: dict[str, Any] | None = None) -> None:
+    def exception(
+        self,
+        message: str,
+        *,
+        exc_info: bool = True,
+        extra: dict[str, Any] | None = None
+    ) -> None:
         """Log an exception message with traceback.
-        
+
         Args:
             message: The message to log
             exc_info: Whether to include exception info
@@ -114,10 +126,10 @@ default_logger = ProtoLinkLogger()
 # Convenience functions
 def get_logger(name: str = "protolink") -> ProtoLinkLogger:
     """Get a logger instance with the given name.
-    
+
     Args:
         name: The name of the logger
-        
+
     Returns:
         A configured ProtoLinkLogger instance
     """
@@ -131,7 +143,7 @@ def setup_logging(
     backup_count: int = 5
 ) -> None:
     """Set up the default logger configuration.
-    
+
     Args:
         log_level: Logging level (default: INFO)
         log_file: Optional file path for file logging

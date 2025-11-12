@@ -19,7 +19,7 @@ class IDGenerator:
     @staticmethod
     def generate_uuid() -> str:
         """Generate a UUID4 string.
-        
+
         Returns:
             A UUID4 string
         """
@@ -28,10 +28,10 @@ class IDGenerator:
     @classmethod
     def generate_message_id(cls, prefix: str | None = None) -> str:
         """Generate a message ID with optional prefix.
-        
+
         Args:
             prefix: Optional prefix for the ID (default: 'msg_')
-            
+
         Returns:
             A unique message ID string
         """
@@ -41,10 +41,10 @@ class IDGenerator:
     @classmethod
     def generate_task_id(cls, prefix: str | None = None) -> str:
         """Generate a task ID with optional prefix.
-        
+
         Args:
             prefix: Optional prefix for the ID (default: 'task_')
-            
+
         Returns:
             A unique task ID string
         """
@@ -54,10 +54,10 @@ class IDGenerator:
     @classmethod
     def generate_context_id(cls, prefix: str | None = None) -> str:
         """Generate a context ID with optional prefix.
-        
+
         Args:
             prefix: Optional prefix for the ID (default: 'ctx_')
-            
+
         Returns:
             A unique context ID string
         """
@@ -67,10 +67,10 @@ class IDGenerator:
     @classmethod
     def generate_artifact_id(cls, prefix: str | None = None) -> str:
         """Generate an artifact ID with optional prefix.
-        
+
         Args:
             prefix: Optional prefix for the ID (default: 'art_')
-            
+
         Returns:
             A unique artifact ID string
         """

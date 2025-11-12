@@ -10,9 +10,9 @@ from protolink.core.task import Task
 
 class Agent:
     """Base class for creating A2A-compatible agents.
-    
+
     Users should subclass this and implement the handle_task method.
-    
+
     Example:
         class MyAgent(Agent):
             def __init__(self):
@@ -22,12 +22,12 @@ class Agent:
                     url="http://localhost:8000"
                 )
                 super().__init__(card)
-            
+
             def handle_task(self, task: Task) -> Task:
                 # Get the user's message
                 user_message = task.messages[0]
                 user_text = user_message.parts[0].content
-                
+
                 # Process and respond
                 response = f"You said: {user_text}"
                 return task.complete(response)
@@ -35,7 +35,7 @@ class Agent:
 
     def __init__(self, card: AgentCard):
         """Initialize agent with its identity card.
-        
+
         Args:
             card: AgentCard describing this agent
         """
@@ -44,7 +44,7 @@ class Agent:
 
     def get_agent_card(self) -> AgentCard:
         """Return the agent's identity card.
-        
+
         Returns:
             AgentCard with agent metadata
         """
@@ -52,15 +52,15 @@ class Agent:
 
     def handle_task(self, task: Task) -> Task:
         """Process a task and return the result.
-        
+
         This is the core method that users must implement.
-        
+
         Args:
             task: Task to process
-            
+
         Returns:
             Task with updated state and response messages
-            
+
         Raises:
             NotImplementedError: Must be implemented by subclass
         """
@@ -68,10 +68,10 @@ class Agent:
 
     def process(self, message_text: str) -> str:
         """Simple synchronous processing (convenience method).
-        
+
         Args:
             message_text: User input text
-            
+
         Returns:
             Agent response text
         """
@@ -91,7 +91,7 @@ class Agent:
 
     def set_transport(self, transport):
         """Set the transport layer for this agent.
-        
+
         Args:
             transport: Transport instance for communication
         """
@@ -99,14 +99,14 @@ class Agent:
 
     async def send_task_to(self, agent_url: str, task: Task) -> Task:
         """Send a task to another agent.
-        
+
         Args:
             agent_url: URL of the target agent
             task: Task to send
-            
+
         Returns:
             Task with response from target agent
-            
+
         Raises:
             RuntimeError: If no transport is configured
         """
