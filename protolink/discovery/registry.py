@@ -88,8 +88,8 @@ class Registry:
                 match = True
                 for key, value in filter_by.items():
                     # Support nested keys like "capabilities.streaming"
-                    if '.' in key:
-                        parts = key.split('.')
+                    if "." in key:
+                        parts = key.split(".")
                         obj = agent
                         for part in parts[:-1]:
                             obj = getattr(obj, part, {})

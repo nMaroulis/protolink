@@ -21,12 +21,12 @@ class Message:
     parts: list[Part] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def add_text(self, text: str) -> 'Message':
+    def add_text(self, text: str) -> "Message":
         """Add a text part to the message."""
         self.parts.append(Part.text(text))
         return self
 
-    def add_part(self, part: Part) -> 'Message':
+    def add_part(self, part: Part) -> "Message":
         """Add a part to the message."""
         self.parts.append(part)
         return self
@@ -41,7 +41,7 @@ class Message:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'Message':
+    def from_dict(cls, data: dict[str, Any]) -> "Message":
         """Create from dictionary."""
         parts = [Part.from_dict(p) for p in data.get("parts", [])]
         return cls(
@@ -52,11 +52,11 @@ class Message:
         )
 
     @classmethod
-    def user(cls, text: str) -> 'Message':
+    def user(cls, text: str) -> "Message":
         """Create a user message with text (convenience method)."""
         return cls(role="user").add_text(text)
 
     @classmethod
-    def agent(cls, text: str) -> 'Message':
+    def agent(cls, text: str) -> "Message":
         """Create an agent message with text (convenience method)."""
         return cls(role="agent").add_text(text)

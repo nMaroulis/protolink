@@ -23,23 +23,23 @@ class Task:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def add_message(self, message: Message) -> 'Task':
+    def add_message(self, message: Message) -> "Task":
         """Add a message to the task."""
         self.messages.append(message)
         return self
 
-    def update_state(self, state: str) -> 'Task':
+    def update_state(self, state: str) -> "Task":
         """Update task state."""
         self.state = state
         return self
 
-    def complete(self, response_text: str) -> 'Task':
+    def complete(self, response_text: str) -> "Task":
         """Mark task as completed with a response."""
         self.add_message(Message.agent(response_text))
         self.state = "completed"
         return self
 
-    def fail(self, error_message: str) -> 'Task':
+    def fail(self, error_message: str) -> "Task":
         """Mark task as failed."""
         self.metadata["error"] = error_message
         self.state = "failed"
@@ -56,7 +56,7 @@ class Task:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'Task':
+    def from_dict(cls, data: dict[str, Any]) -> "Task":
         """Create from dictionary."""
         messages = [Message.from_dict(m) for m in data.get("messages", [])]
         return cls(
@@ -68,6 +68,6 @@ class Task:
         )
 
     @classmethod
-    def create(cls, message: Message) -> 'Task':
+    def create(cls, message: Message) -> "Task":
         """Create a new task with an initial message."""
         return cls(messages=[message])

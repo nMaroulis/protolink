@@ -1,5 +1,5 @@
 """Tests for the Agent class."""
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -61,8 +61,9 @@ class TestAgent:
     @pytest.mark.asyncio
     async def test_send_task_to(self, agent):
         """Test sending a task to another agent."""
-        # Setup mock transport
-        mock_transport = MagicMock()
+        # Create an AsyncMock for the transport
+        mock_transport = AsyncMock()
+        # Configure the async method to return a Task
         mock_transport.send_task.return_value = Task.create(Message.agent("Response"))
         agent.set_transport(mock_transport)
 
@@ -74,7 +75,7 @@ class TestAgent:
 
         # Verify the response and that transport was called correctly
         assert isinstance(response, Task)
-        mock_transport.send_task.assert_awaited_once_with(
+        mock_transport.send_task.assert_called_once_with(
             "http://other-agent.local",
             task,
         )

@@ -7,10 +7,11 @@ for Protolink objects.
 import json
 from datetime import datetime
 from typing import Any, Type, TypeVar
+
 from protolink.core.message import Message
 from protolink.core.task import Task
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 class Serializer:
     """Serialization helper class for Protolink objects."""
@@ -35,7 +36,7 @@ class Serializer:
             if isinstance(o, datetime):
                 return o.isoformat()
             raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
-            
+
         return json.dumps(obj, default=default_serializer, **kwargs)
 
     @staticmethod
@@ -55,10 +56,10 @@ class Serializer:
             ValueError: If the JSON cannot be deserialized to the target class
         """
         data = json.loads(json_str, **kwargs)
-        
+
         if target_cls is None:
             return data
-            
+
         if target_cls == Message:
             return Message.from_dict(data)
         elif target_cls == Task:
@@ -79,7 +80,7 @@ class Serializer:
         Raises:
             TypeError: If the object cannot be converted to a dictionary
         """
-        if hasattr(obj, 'to_dict'):
+        if hasattr(obj, "to_dict"):
             return obj.to_dict()
         elif isinstance(obj, dict):
             return {k: Serializer.serialize_to_dict(v) for k, v in obj.items()}
@@ -106,8 +107,8 @@ class Serializer:
         """
         if target_cls is None:
             return data
-            
-        if not hasattr(target_cls, 'from_dict'):
+
+        if not hasattr(target_cls, "from_dict"):
             raise ValueError(f"Target class {target_cls.__name__} does not support from_dict")
-            
+
         return target_cls.from_dict(data)

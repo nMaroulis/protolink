@@ -3,13 +3,14 @@ Registry Example
 
 Shows how to use the Registry for agent discovery.
 """
-from protolink.models import AgentCard, Task
-from protolink.discovery import Registry
 from protolink.agent import Agent
+from protolink.discovery import Registry
+from protolink.models import AgentCard, Task
+
 
 class DataAgent(Agent):
     """Agent that processes data."""
-    
+
     def __init__(self):
         card = AgentCard(
             name="data-agent",
@@ -18,14 +19,14 @@ class DataAgent(Agent):
             capabilities={"streaming": False, "tasks": True, "data_analysis": True}
         )
         super().__init__(card)
-    
+
     def handle_task(self, task: Task) -> Task:
         return task.complete("Data processed successfully")
 
 
 class ChatAgent(Agent):
     """Agent for conversations."""
-    
+
     def __init__(self):
         card = AgentCard(
             name="chat-agent",
@@ -34,14 +35,14 @@ class ChatAgent(Agent):
             capabilities={"streaming": True, "tasks": True, "chat": True}
         )
         super().__init__(card)
-    
+
     def handle_task(self, task: Task) -> Task:
         return task.complete("I'm here to chat!")
 
 
 class CodeAgent(Agent):
     """Agent for code generation."""
-    
+
     def __init__(self):
         card = AgentCard(
             name="code-agent",
@@ -50,7 +51,7 @@ class CodeAgent(Agent):
             capabilities={"streaming": False, "tasks": True, "code_generation": True}
         )
         super().__init__(card)
-    
+
     def handle_task(self, task: Task) -> Task:
         return task.complete("def hello(): return 'Hello World'")
 
@@ -60,10 +61,10 @@ def main():
     data_agent = DataAgent()
     chat_agent = ChatAgent()
     code_agent = CodeAgent()
-    
+
     # Create registry
     registry = Registry()
-    
+
     # Register all agents
     print("=== Agent Registry Demo ===\n")
     print("Registering agents...")
@@ -71,7 +72,7 @@ def main():
     registry.register_agent(chat_agent.get_agent_card())
     registry.register_agent(code_agent.get_agent_card())
     print(f"Total agents registered: {registry.count()}\n")
-    
+
     # Discover all agents
     print("All agents in registry:")
     all_agents = registry.discover_agents()
@@ -80,28 +81,28 @@ def main():
         print(f"    URL: {agent.url}")
         print(f"    Capabilities: {agent.capabilities}")
     print()
-    
+
     # Find agents with streaming capability
     print("Agents with streaming capability:")
     streaming_agents = registry.discover_agents(filter_by={"capabilities.streaming": True})
     for agent in streaming_agents:
         print(f"  - {agent.name}")
     print()
-    
+
     # Get specific agent by name
     print("Getting specific agent by name:")
     agent = registry.get_agent("code-agent")
     if agent:
         print(f"  Found: {agent.name} - {agent.description}")
     print()
-    
+
     # List all agent URLs
     print("All agent URLs:")
     urls = registry.list_agents()
     for url in urls:
         print(f"  - {url}")
     print()
-    
+
     # Unregister an agent
     print("Unregistering 'data-agent'...")
     registry.unregister_agent("data-agent")

@@ -19,7 +19,7 @@ class ProtoLinkLogger:
     This logger provides methods for different log levels and supports both
     console and file logging.
     """
-    
+
     def __init__(
         self,
         name: str = "protolink",
@@ -39,27 +39,27 @@ class ProtoLinkLogger:
         """
         self.logger = logging.getLogger(name)
         self.logger.setLevel(log_level)
-        
+
         # Prevent adding multiple handlers
         if not self.logger.handlers:
             formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
-            
+
             # Console handler
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setFormatter(formatter)
             self.logger.addHandler(console_handler)
-            
+
             # File handler if log file is specified
             if log_file:
                 file_handler = RotatingFileHandler(
                     log_file,
                     maxBytes=max_bytes,
                     backupCount=backup_count,
-                    encoding='utf-8'
+                    encoding="utf-8"
                 )
                 file_handler.setFormatter(formatter)
                 self.logger.addHandler(file_handler)
-    
+
     def debug(self, message: str, extra: dict[str, Any] | None = None) -> None:
         """Log a debug message.
         
@@ -68,7 +68,7 @@ class ProtoLinkLogger:
             extra: Additional context as a dictionary
         """
         self.logger.debug(message, extra=extra or {})
-    
+
     def info(self, message: str, extra: dict[str, Any] | None = None) -> None:
         """Log an info message.
         
@@ -77,7 +77,7 @@ class ProtoLinkLogger:
             extra: Additional context as a dictionary
         """
         self.logger.info(message, extra=extra or {})
-    
+
     def warning(self, message: str, extra: dict[str, Any] | None = None) -> None:
         """Log a warning message.
         
@@ -86,7 +86,7 @@ class ProtoLinkLogger:
             extra: Additional context as a dictionary
         """
         self.logger.warning(message, extra=extra or {})
-    
+
     def error(self, message: str, exc_info: bool = False, extra: dict[str, Any] | None = None) -> None:
         """Log an error message.
         
@@ -96,7 +96,7 @@ class ProtoLinkLogger:
             extra: Additional context as a dictionary
         """
         self.logger.error(message, exc_info=exc_info, extra=extra or {})
-    
+
     def exception(self, message: str, exc_info: bool = True, extra: dict[str, Any] | None = None) -> None:
         """Log an exception message with traceback.
         

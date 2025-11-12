@@ -33,7 +33,7 @@ class AgentCard:
         }
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> 'AgentCard':
+    def from_json(cls, data: dict[str, Any]) -> "AgentCard":
         """Create from JSON format."""
         return cls(
             name=data["name"],
