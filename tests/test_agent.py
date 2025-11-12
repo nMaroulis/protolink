@@ -1,6 +1,7 @@
 """Tests for the Agent class."""
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from protolink.agent.agent import Agent
 from protolink.core.agent_card import AgentCard
@@ -57,6 +58,7 @@ class TestAgent:
         agent.set_transport(mock_transport)
         assert agent._transport == mock_transport
 
+    @pytest.mark.asyncio
     async def test_send_task_to(self, agent):
         """Test sending a task to another agent."""
         # Setup mock transport
@@ -66,10 +68,14 @@ class TestAgent:
 
         # Create a test task
         task = Task.create(Message.user("Test"))
-        
+
         # Test sending the task
         response = await agent.send_task_to("http://other-agent.local", task)
-        
+
         # Verify the response and that transport was called correctly
         assert isinstance(response, Task)
-        mock_transport.send_task.assert_awaited_once_with("http://other-agent.local", task)
+        mock_transport.send_task.assert_awaited_once_with(
+            "http://other-agent.local",
+            task,
+        )
+
