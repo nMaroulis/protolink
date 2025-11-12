@@ -26,7 +26,7 @@ class ProtoLinkLogger:
         log_level: int = logging.INFO,
         log_file: str | None = None,
         max_bytes: int = 10 * 1024 * 1024,  # 10MB
-        backup_count: int = 5
+        backup_count: int = 5,
     ):
         """Initialize the logger.
 
@@ -55,7 +55,7 @@ class ProtoLinkLogger:
                     log_file,
                     maxBytes=max_bytes,
                     backupCount=backup_count,
-                    encoding="utf-8"
+                    encoding="utf-8",
                 )
                 file_handler.setFormatter(formatter)
                 self.logger.addHandler(file_handler)
@@ -92,7 +92,7 @@ class ProtoLinkLogger:
         message: str,
         *,
         exc_info: bool = False,
-        extra: dict[str, Any] | None = None
+        extra: dict[str, Any] | None = None,
     ) -> None:
         """Log an error message.
 
@@ -108,7 +108,7 @@ class ProtoLinkLogger:
         message: str,
         *,
         exc_info: bool = True,
-        extra: dict[str, Any] | None = None
+        extra: dict[str, Any] | None = None,
     ) -> None:
         """Log an exception message with traceback.
 
@@ -122,6 +122,7 @@ class ProtoLinkLogger:
 
 # Default logger instance
 default_logger = ProtoLinkLogger()
+
 
 # Convenience functions
 def get_logger(name: str = "protolink") -> ProtoLinkLogger:
@@ -140,7 +141,7 @@ def setup_logging(
     log_level: int = logging.INFO,
     log_file: str | None = None,
     max_bytes: int = 10 * 1024 * 1024,
-    backup_count: int = 5
+    backup_count: int = 5,
 ) -> None:
     """Set up the default logger configuration.
 
@@ -156,5 +157,5 @@ def setup_logging(
         log_level=log_level,
         log_file=log_file,
         max_bytes=max_bytes,
-        backup_count=backup_count
+        backup_count=backup_count,
     )

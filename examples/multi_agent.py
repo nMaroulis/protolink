@@ -3,6 +3,7 @@ Multi-Agent Communication Example
 
 Shows how agents can communicate with each other using InMemoryTransport.
 """
+
 import asyncio
 
 from protolink.agent import Agent
@@ -15,9 +16,7 @@ class GreeterAgent(Agent):
 
     def __init__(self):
         card = AgentCard(
-            name="greeter",
-            description="Greets users warmly",
-            url="local://greeter"
+            name="greeter", description="Greets users warmly", url="local://greeter"
         )
         super().__init__(card)
 
@@ -36,7 +35,7 @@ class TranslatorAgent(Agent):
         card = AgentCard(
             name="translator",
             description="Translates text to uppercase",
-            url="local://translator"
+            url="local://translator",
         )
         super().__init__(card)
 
@@ -55,7 +54,7 @@ class CoordinatorAgent(Agent):
         card = AgentCard(
             name="coordinator",
             description="Coordinates between multiple agents",
-            url="local://coordinator"
+            url="local://coordinator",
         )
         super().__init__(card)
 

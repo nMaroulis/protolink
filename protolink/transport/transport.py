@@ -4,6 +4,7 @@ ProtoLink - Transport Layer
 Transport implementations for agent communication.
 Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
+
 from abc import ABC, abstractmethod
 
 from protolink.core.agent_card import AgentCard

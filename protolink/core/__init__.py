@@ -1,2 +1,1 @@
-"""Core module for Protolink framework.
-"""
+"""Core module for Protolink framework."""

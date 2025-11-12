@@ -3,6 +3,7 @@ ProtoLink - Agent Registry
 
 Registry for agent discovery and catalog management.
 """
+
 from typing import Any
 
 from protolink.core.agent_card import AgentCard

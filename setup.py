@@ -27,7 +27,7 @@ extra_deps = {
         "openai>=1.0.0",
         "llama-cpp-python>=0.2.0",
         "anthropic>=0.7.0",
-    ]
+    ],
 }
 
 setup(

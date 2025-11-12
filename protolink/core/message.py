@@ -16,6 +16,7 @@ class Message:
         parts: list[Part] = field(default_factory=list)
         timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     """
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     role: str = "user"
     parts: list[Part] = field(default_factory=list)
@@ -37,7 +38,7 @@ class Message:
             "id": self.id,
             "role": self.role,
             "parts": [p.to_dict() for p in self.parts],
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
         }
 
     @classmethod
@@ -48,7 +49,7 @@ class Message:
             id=data.get("id", str(uuid.uuid4())),
             role=data.get("role", "user"),
             parts=parts,
-            timestamp=data.get("timestamp", datetime.now().isoformat())
+            timestamp=data.get("timestamp", datetime.now().isoformat()),
         )
 
     @classmethod

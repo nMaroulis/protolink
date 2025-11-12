@@ -13,14 +13,14 @@ class AgentCard:
         version: Agent version
         capabilities: Supported features
     """
+
     name: str
     description: str
     url: str
     version: str = "1.0.0"
-    capabilities: dict[str, Any] = field(default_factory=lambda: {
-        "streaming": False,
-        "tasks": True
-    })
+    capabilities: dict[str, Any] = field(
+        default_factory=lambda: {"streaming": False, "tasks": True}
+    )
 
     def to_json(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""
@@ -29,7 +29,7 @@ class AgentCard:
             "description": self.description,
             "url": self.url,
             "version": self.version,
-            "capabilities": self.capabilities
+            "capabilities": self.capabilities,
         }
 
     @classmethod
@@ -40,5 +40,5 @@ class AgentCard:
             description=data["description"],
             url=data["url"],
             version=data.get("version", "1.0.0"),
-            capabilities=data.get("capabilities", {"streaming": False, "tasks": True})
+            capabilities=data.get("capabilities", {"streaming": False, "tasks": True}),
         )

@@ -10,6 +10,7 @@ class Part:
         type: Content type (e.g., 'text', 'image', 'file')
         content: The actual content data
     """
+
     type: str
     content: Any
 

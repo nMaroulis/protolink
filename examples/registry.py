@@ -3,6 +3,7 @@ Registry Example
 
 Shows how to use the Registry for agent discovery.
 """
+
 from protolink.agent import Agent
 from protolink.discovery import Registry
 from protolink.models import AgentCard, Task
@@ -16,7 +17,7 @@ class DataAgent(Agent):
             name="data-agent",
             description="Processes and analyzes data",
             url="http://localhost:8001",
-            capabilities={"streaming": False, "tasks": True, "data_analysis": True}
+            capabilities={"streaming": False, "tasks": True, "data_analysis": True},
         )
         super().__init__(card)
 
@@ -32,7 +33,7 @@ class ChatAgent(Agent):
             name="chat-agent",
             description="Conversational AI agent",
             url="http://localhost:8002",
-            capabilities={"streaming": True, "tasks": True, "chat": True}
+            capabilities={"streaming": True, "tasks": True, "chat": True},
         )
         super().__init__(card)
 
@@ -48,7 +49,7 @@ class CodeAgent(Agent):
             name="code-agent",
             description="Generates and reviews code",
             url="http://localhost:8003",
-            capabilities={"streaming": False, "tasks": True, "code_generation": True}
+            capabilities={"streaming": False, "tasks": True, "code_generation": True},
         )
         super().__init__(card)
 

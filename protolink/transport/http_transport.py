@@ -70,7 +70,7 @@ class HTTPTransport(Transport):
             "jsonrpc": "2.0",
             "method": method,
             "params": params,
-            "id": self._next_request_id()
+            "id": self._next_request_id(),
         }
 
         response = await client.post(url, json=request)
@@ -94,9 +94,7 @@ class HTTPTransport(Transport):
             Processed task
         """
         result = await self._json_rpc_call(
-            agent_url,
-            "tasks/send",
-            {"task": task.to_dict()}
+            agent_url, "tasks/send", {"task": task.to_dict()}
         )
 
         return Task.from_dict(result.get("task", {}))
@@ -112,9 +110,7 @@ class HTTPTransport(Transport):
             Response message
         """
         result = await self._json_rpc_call(
-            agent_url,
-            "message/send",
-            {"message": message.to_dict()}
+            agent_url, "message/send", {"message": message.to_dict()}
         )
 
         return Message.from_dict(result.get("message", {}))

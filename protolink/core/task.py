@@ -17,6 +17,7 @@ class Task:
         metadata: Additional task metadata
         created_at: Task creation time
     """
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     state: str = "submitted"
     messages: list[Message] = field(default_factory=list)
@@ -52,7 +53,7 @@ class Task:
             "state": self.state,
             "messages": [m.to_dict() for m in self.messages],
             "metadata": self.metadata,
-            "created_at": self.created_at
+            "created_at": self.created_at,
         }
 
     @classmethod
@@ -64,7 +65,7 @@ class Task:
             state=data.get("state", "submitted"),
             messages=messages,
             metadata=data.get("metadata", {}),
-            created_at=data.get("created_at", datetime.now().isoformat())
+            created_at=data.get("created_at", datetime.now().isoformat()),
         )
 
     @classmethod

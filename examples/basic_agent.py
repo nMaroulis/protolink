@@ -3,6 +3,7 @@ Basic Agent Example
 
 Shows how to create a simple agent that echoes user input.
 """
+
 from protolink.agent import Agent
 from protolink.models import AgentCard, Task
 
@@ -14,7 +15,7 @@ class EchoAgent(Agent):
         card = AgentCard(
             name="echo-agent",
             description="An agent that echoes back your messages",
-            url="local://echo-agent"
+            url="local://echo-agent",
         )
         super().__init__(card)
 
@@ -42,11 +43,7 @@ def main():
     print()
 
     # Test the agent with direct processing
-    test_messages = [
-        "Hello, agent!",
-        "How are you?",
-        "This is a test message"
-    ]
+    test_messages = ["Hello, agent!", "How are you?", "This is a test message"]
 
     for msg in test_messages:
         print(f"User: {msg}")

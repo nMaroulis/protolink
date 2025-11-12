@@ -1,4 +1,5 @@
 """Tests for the Agent class."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -16,9 +17,7 @@ class TestAgent:
     def agent_card(self):
         """Create a test agent card."""
         return AgentCard(
-            name="test-agent",
-            description="A test agent",
-            url="http://test-agent.local"
+            name="test-agent", description="A test agent", url="http://test-agent.local"
         )
 
     @pytest.fixture
@@ -43,6 +42,7 @@ class TestAgent:
 
     def test_process_method(self, agent):
         """Test the process method with a simple echo response."""
+
         # Create a test agent that implements handle_task
         class TestAgent(Agent):
             def handle_task(self, task):
@@ -79,4 +79,3 @@ class TestAgent:
             "http://other-agent.local",
             task,
         )
-

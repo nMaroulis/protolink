@@ -13,6 +13,7 @@ from protolink.core.task import Task
 
 T = TypeVar("T")
 
+
 class Serializer:
     """Serialization helper class for Protolink objects."""
 
@@ -30,20 +31,21 @@ class Serializer:
         Raises:
             TypeError: If the object is not JSON serializable
         """
+
         def default_serializer(o):
             if isinstance(o, (Message, Task)):
                 return o.to_dict()
             if isinstance(o, datetime):
                 return o.isoformat()
-            raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")  # noqa: E501
+            raise TypeError(
+                f"Object of type {type(o).__name__} is not JSON serializable"
+            )
 
         return json.dumps(obj, default=default_serializer, **kwargs)
 
     @staticmethod
     def deserialize_from_json(
-        json_str: str,
-        target_cls: Type[T] | None = None,
-        **kwargs
+        json_str: str, target_cls: Type[T] | None = None, **kwargs
     ) -> dict[str, Any] | T:
         """Deserialize a JSON string to an object.
 
@@ -97,8 +99,7 @@ class Serializer:
 
     @staticmethod
     def deserialize_from_dict(
-        data: dict,
-        target_cls: Type[T] | None = None
+        data: dict, target_cls: Type[T] | None = None
     ) -> dict[str, Any] | T:
         """Deserialize a dictionary to an object.
 
@@ -116,6 +117,8 @@ class Serializer:
             return data
 
         if not hasattr(target_cls, "from_dict"):
-            raise ValueError(f"Target class {target_cls.__name__} does not support from_dict")  # noqa: E501
+            raise ValueError(
+                f"Target class {target_cls.__name__} does not support from_dict"
+            )
 
         return target_cls.from_dict(data)
