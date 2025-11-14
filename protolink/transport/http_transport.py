@@ -93,9 +93,7 @@ class HTTPTransport(Transport):
         Returns:
             Processed task
         """
-        result = await self._json_rpc_call(
-            agent_url, "tasks/send", {"task": task.to_dict()}
-        )
+        result = await self._json_rpc_call(agent_url, "tasks/send", {"task": task.to_dict()})
 
         return Task.from_dict(result.get("task", {}))
 
@@ -109,9 +107,7 @@ class HTTPTransport(Transport):
         Returns:
             Response message
         """
-        result = await self._json_rpc_call(
-            agent_url, "message/send", {"message": message.to_dict()}
-        )
+        result = await self._json_rpc_call(agent_url, "message/send", {"message": message.to_dict()})
 
         return Message.from_dict(result.get("message", {}))
 

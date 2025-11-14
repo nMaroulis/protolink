@@ -64,9 +64,7 @@ class Registry:
         """
         return self.agents.get(agent_id)
 
-    def discover_agents(
-        self, filter_by: dict[str, Any] | None = None
-    ) -> list[AgentCard]:
+    def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         """Discover all agents or filter by criteria.
 
         Args:
@@ -94,11 +92,7 @@ class Registry:
                         obj = agent
                         for part in parts[:-1]:
                             obj = getattr(obj, part, {})
-                        actual_value = (
-                            obj.get(parts[-1])
-                            if isinstance(obj, dict)
-                            else getattr(obj, parts[-1], None)
-                        )
+                        actual_value = obj.get(parts[-1]) if isinstance(obj, dict) else getattr(obj, parts[-1], None)
                     else:
                         actual_value = getattr(agent, key, None)
 

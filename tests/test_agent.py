@@ -16,9 +16,7 @@ class TestAgent:
     @pytest.fixture
     def agent_card(self):
         """Create a test agent card."""
-        return AgentCard(
-            name="test-agent", description="A test agent", url="http://test-agent.local"
-        )
+        return AgentCard(name="test-agent", description="A test agent", url="http://test-agent.local")
 
     @pytest.fixture
     def agent(self, agent_card):

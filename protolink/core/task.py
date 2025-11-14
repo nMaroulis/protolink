@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from protolink.core.artifact import Artifact
 from protolink.core.message import Message
 
 
@@ -14,6 +15,7 @@ class Task:
         id: Unique task identifier
         state: Current task state (submitted, working, completed, failed)
         messages: Communication history for this task
+        artifacts: Output artifacts produced by task (NEW in v0.2.0)
         metadata: Additional task metadata
         created_at: Task creation time
     """
@@ -21,12 +23,18 @@ class Task:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     state: str = "submitted"
     messages: list[Message] = field(default_factory=list)
+    artifacts: list[Artifact] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
 
     def add_message(self, message: Message) -> "Task":
         """Add a message to the task."""
         self.messages.append(message)
+        return self
+
+    def add_artifact(self, artifact: Artifact) -> "Task":
+        """Add an artifact to the task (NEW in v0.2.0)."""
+        self.artifacts.append(artifact)
         return self
 
     def update_state(self, state: str) -> "Task":
@@ -52,6 +60,7 @@ class Task:
             "id": self.id,
             "state": self.state,
             "messages": [m.to_dict() for m in self.messages],
+            "artifacts": [a.to_dict() for a in self.artifacts],
             "metadata": self.metadata,
             "created_at": self.created_at,
         }
@@ -60,12 +69,14 @@ class Task:
     def from_dict(cls, data: dict[str, Any]) -> "Task":
         """Create from dictionary."""
         messages = [Message.from_dict(m) for m in data.get("messages", [])]
+        artifacts = [Artifact.from_dict(a) for a in data.get("artifacts", [])]
         return cls(
             id=data.get("id", str(uuid.uuid4())),
             state=data.get("state", "submitted"),
             messages=messages,
+            artifacts=artifacts,
             metadata=data.get("metadata", {}),
-            created_at=data.get("created_at", datetime.now().isoformat()),
+            created_at=data.get("created_at", datetime.now(datetime.timezone.utc).isoformat()),
         )
 
     @classmethod

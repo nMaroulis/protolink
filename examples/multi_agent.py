@@ -15,9 +15,7 @@ class GreeterAgent(Agent):
     """An agent that greets users."""
 
     def __init__(self):
-        card = AgentCard(
-            name="greeter", description="Greets users warmly", url="local://greeter"
-        )
+        card = AgentCard(name="greeter", description="Greets users warmly", url="local://greeter")
         super().__init__(card)
 
     def handle_task(self, task: Task) -> Task:

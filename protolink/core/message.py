@@ -1,9 +1,11 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, TypeAlias
 
 from protolink.core.part import Part
+
+RoleType: TypeAlias = Literal["user", "agent", "system"]
 
 
 @dataclass
@@ -12,13 +14,13 @@ class Message:
 
     Attributes:
         id: Unique message identifier
-        role: Sender role ('user', 'agent', 'system')
+        role: Sender role (user, agent, system)
         parts: list[Part] = field(default_factory=list)
         timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     """
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    role: str = "user"
+    role: RoleType = "user"
     parts: list[Part] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 

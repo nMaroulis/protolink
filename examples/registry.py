@@ -85,9 +85,7 @@ def main():
 
     # Find agents with streaming capability
     print("Agents with streaming capability:")
-    streaming_agents = registry.discover_agents(
-        filter_by={"capabilities.streaming": True}
-    )
+    streaming_agents = registry.discover_agents(filter_by={"capabilities.streaming": True})
     for agent in streaming_agents:
         print(f"  - {agent.name}")
     print()

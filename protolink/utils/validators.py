@@ -52,7 +52,7 @@ class Validator:
         if not message.message_id or not cls._is_valid_id(message.message_id):
             return (
                 False,
-                "Message ID is required and must be alphanumeric with underscores or hyphens",  # noqa: E501
+                "Message ID is required and must be alphanumeric with underscores or hyphens",
             )
 
         if not message.role or not isinstance(message.role, str):
@@ -76,7 +76,7 @@ class Validator:
         if not task.id or not cls._is_valid_id(task.id):
             return (
                 False,
-                "Task ID is required and must be alphanumeric with underscores or hyphens",  # noqa: E501
+                "Task ID is required and must be alphanumeric with underscores or hyphens",
             )
 
         if not task.task_type or not isinstance(task.task_type, str):
