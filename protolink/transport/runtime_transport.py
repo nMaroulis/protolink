@@ -34,12 +34,13 @@ class RuntimeTransport(Transport):
         if agent_id in self.agents:
             del self.agents[agent_id]
 
-    async def send_task(self, agent_url: str, task: Task) -> Task:
+    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
         """Send task to local agent.
 
         Args:
             agent_url: Agent URL or name
             task: Task to send
+            skill: Skill to use for authorization [Not needed]
 
         Returns:
             Processed task
@@ -117,7 +118,7 @@ class RuntimeTransport(Transport):
         else:
             # Fall back to regular handler
             result_task = agent.handle_task(task)
-            from .events import TaskStatusUpdateEvent
+            from protolink.core.events import TaskStatusUpdateEvent
 
             yield TaskStatusUpdateEvent(task_id=result_task.id, new_state="completed", final=True).to_dict()
 

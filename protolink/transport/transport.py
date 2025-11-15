@@ -17,12 +17,13 @@ class Transport(ABC):
     """Abstract base class for transport implementations."""
 
     @abstractmethod
-    async def send_task(self, agent_url: str, task: Task) -> Task:
+    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
         """Send a task to an agent.
 
         Args:
             agent_url: Target agent URL
             task: Task to send
+            skill: Skill to use for authorization
 
         Returns:
             Task with response

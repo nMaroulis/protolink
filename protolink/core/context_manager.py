@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from protolink.core.context import Context
 
@@ -51,7 +51,7 @@ class ContextManager:
         """
         context = self.contexts.get(context_id)
         if context:
-            context.last_accessed = datetime.now(datetime.timezone.utc).isoformat()
+            context.last_accessed = datetime.now(timezone.utc).isoformat()
         return context
 
     def add_message_to_context(self, context_id: str, message) -> bool:

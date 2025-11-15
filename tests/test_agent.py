@@ -76,4 +76,5 @@ class TestAgent:
         mock_transport.send_task.assert_called_once_with(
             "http://other-agent.local",
             task,
+            skill=None,
         )

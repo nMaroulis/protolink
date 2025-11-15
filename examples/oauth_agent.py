@@ -175,7 +175,7 @@ async def example_transport_with_auth():
     """Using authenticated transport for remote calls."""
     print("\n=== v0.3.0: Transport with Authentication ===\n")
 
-    from protolink import JSONRPCTransport
+    from protolink.transport import JSONRPCTransport
 
     # Create agent with auth
     bearer_auth = BearerTokenAuth()

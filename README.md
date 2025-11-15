@@ -15,6 +15,7 @@ A lightweight, production-ready framework for **agent-to-agent communication**, 
 - **A2A Protocol Implementation**: Fully compatible with **Google's A2A specification**
 - **Extended Capabilities**:
   - Simplified Agent Creation and Registration: Agents can be created and registered with just a few lines of code.
+  - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
   - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
   - Enhanced security with **OAuth 2.0** and **API key support**.
   - Advanced agent capabilities and discovery.
@@ -22,7 +23,8 @@ A lightweight, production-ready framework for **agent-to-agent communication**, 
 - **Planned Integrations**:
   - **MCP Tooling**: Model Control Protocol integration for tool usage.
   - Multi-modal agent support.
-  - Advanced orchestration patterns.
+  - **Advanced Orchestration Patterns**
+    - Multi-step workflows, supervisory agents, role routing, and hierarchical control systems.
 
 ## Why Protolink?
 

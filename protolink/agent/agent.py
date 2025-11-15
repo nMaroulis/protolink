@@ -233,15 +233,7 @@ class Agent:
         if not self._transport:
             raise RuntimeError("No transport configured. Call set_transport() first.")
 
-        # NEW v0.3.0: Pass skill for authorization
-        if skill and hasattr(self._transport, "send_task") and hasattr(self._transport.send_task, "__code__"):
-            import inspect
-
-            sig = inspect.signature(self._transport.send_task)
-            if "skill" in sig.parameters:
-                return await self._transport.send_task(agent_url, task, skill=skill)
-
-        return await self._transport.send_task(agent_url, task)
+        return await self._transport.send_task(agent_url, task, skill=skill)
 
     async def send_message_to(self, agent_url: str, message: Message) -> Message:
         """Send a message to another agent.

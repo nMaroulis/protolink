@@ -6,7 +6,7 @@ Manages conversation contexts and sessions for long-running interactions.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -28,8 +28,8 @@ class Context:
     context_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     messages: list = field(default_factory=list)  # List[Message]
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
-    last_accessed: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    last_accessed: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def add_message(self, message) -> "Context":
         """Add a message to this context.
@@ -41,7 +41,7 @@ class Context:
             Self for method chaining
         """
         self.messages.append(message)
-        self.last_accessed = datetime.now(datetime.timezone.utc).isoformat()
+        self.last_accessed = datetime.now(timezone.utc).isoformat()
         return self
 
     def to_dict(self) -> dict:
@@ -64,6 +64,6 @@ class Context:
             context_id=data.get("context_id", str(uuid.uuid4())),
             messages=messages,
             metadata=data.get("metadata", {}),
-            created_at=data.get("created_at", datetime.now(datetime.timezone.utc).isoformat()),
-            last_accessed=data.get("last_accessed", datetime.now(datetime.timezone.utc).isoformat()),
+            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
+            last_accessed=data.get("last_accessed", datetime.now(timezone.utc).isoformat()),
         )

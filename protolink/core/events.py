@@ -6,7 +6,7 @@ Event classes for task streaming and real-time updates.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -31,7 +31,7 @@ class TaskStatusUpdateEvent:
     task_id: str = ""
     previous_state: str | None = None
     new_state: str = ""
-    timestamp: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     final: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -56,7 +56,7 @@ class TaskStatusUpdateEvent:
             task_id=data.get("task_id", ""),
             previous_state=data.get("previous_state"),
             new_state=data.get("new_state", ""),
-            timestamp=data.get("timestamp", datetime.now(datetime.timezone.utc).isoformat()),
+            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
             final=data.get("final", False),
             metadata=data.get("metadata", {}),
         )
@@ -80,7 +80,7 @@ class TaskArtifactUpdateEvent:
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     task_id: str = ""
     artifact: Any = None  # Artifact object
-    timestamp: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -105,7 +105,7 @@ class TaskArtifactUpdateEvent:
             event_id=data.get("event_id", str(uuid.uuid4())),
             task_id=data.get("task_id", ""),
             artifact=data.get("artifact"),
-            timestamp=data.get("timestamp", datetime.now(datetime.timezone.utc).isoformat()),
+            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
             metadata=data.get("metadata", {}),
         )
 
@@ -130,7 +130,7 @@ class TaskProgressEvent:
     task_id: str = ""
     progress: int = 0  # 0-100
     message: str | None = None
-    timestamp: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -153,7 +153,7 @@ class TaskProgressEvent:
             task_id=data.get("task_id", ""),
             progress=data.get("progress", 0),
             message=data.get("message"),
-            timestamp=data.get("timestamp", datetime.now(datetime.timezone.utc).isoformat()),
+            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
             metadata=data.get("metadata", {}),
         )
 
@@ -180,7 +180,7 @@ class TaskErrorEvent:
     error_code: str = ""
     error_message: str = ""
     recoverable: bool = False
-    timestamp: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -205,6 +205,6 @@ class TaskErrorEvent:
             error_code=data.get("error_code", ""),
             error_message=data.get("error_message", ""),
             recoverable=data.get("recoverable", False),
-            timestamp=data.get("timestamp", datetime.now(datetime.timezone.utc).isoformat()),
+            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
             metadata=data.get("metadata", {}),
         )
