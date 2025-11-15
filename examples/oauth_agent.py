@@ -28,7 +28,7 @@ class SecureAnalysisAgent(Agent):
             name="secure-analysis",
             description="Secure analysis agent with authorization",
             url="local://secure-analysis",
-            capabilities={"streaming": True, "tasks": True},
+            capabilities={"streaming": True},
             security_schemes={  # NEW in v0.3.0
                 "bearer": {"type": "bearer", "description": "JWT Bearer token authentication"},
                 "oauth2": {"type": "oauth2", "description": "OAuth 2.0 delegated scopes"},

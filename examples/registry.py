@@ -17,7 +17,7 @@ class DataAgent(Agent):
             name="data-agent",
             description="Processes and analyzes data",
             url="http://localhost:8001",
-            capabilities={"streaming": False, "tasks": True, "data_analysis": True},
+            capabilities={"streaming": False},
         )
         super().__init__(card)
 
@@ -33,7 +33,7 @@ class ChatAgent(Agent):
             name="chat-agent",
             description="Conversational AI agent",
             url="http://localhost:8002",
-            capabilities={"streaming": True, "tasks": True, "chat": True},
+            capabilities={"streaming": True},
         )
         super().__init__(card)
 
@@ -49,7 +49,7 @@ class CodeAgent(Agent):
             name="code-agent",
             description="Generates and reviews code",
             url="http://localhost:8003",
-            capabilities={"streaming": False, "tasks": True, "code_generation": True},
+            capabilities={"streaming": False},
         )
         super().__init__(card)
 

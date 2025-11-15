@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.1.0"
+version = "0.3.0"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,9 @@ license = {text = "MIT"}
 authors = [
     {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"},
 ]
-dependencies = []
+
+dependencies = [
+]
 
 [project.optional-dependencies]
 http = [
@@ -25,34 +27,32 @@ llms = [
     "openai>=2.2.0",
 ]
 
+# Database Drivers
+db = [
+]
+
+# All optional dependencies
+all = [
+    "protolink[http]",
+    "protolink[llms]",
+    "protolink[db]",
+]
+
+# Only for testing
 test = [
     "pytest>=8.3.5",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.1",
     "ruff==0.14.4",
+    "pre-commit>=4.4.0",
 ]
 
-# All optional dependencies
-all = [
-    "httpx>=0.28.1",
-    "anthropic>=0.72.0",
-    "llama-cpp-python>=0.3.16",
-    "openai>=2.2.0",
-]
-
+# All dependencies for development
 dev = [
-    "httpx>=0.28.1",
-    "anthropic>=0.72.0",
-    "llama-cpp-python>=0.3.16",
-    "openai>=2.2.0",
-    "pytest>=8.3.5",
-    "pytest-asyncio>=0.24.0",
-    "pytest-cov>=5.0.0",
-    "pytest-mock>=3.14.1",
-    "ruff==0.14.4",
+    "protolink[all]",
+    "protolink[test]",
 ]
-
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
