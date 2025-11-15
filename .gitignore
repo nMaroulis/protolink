@@ -119,3 +119,6 @@ cython_debug/
 
 # uv
 uv.lock
+
+#pypi
+.pypirc
