@@ -1,3 +1,5 @@
+import json
+
 import httpx
 
 from protolink.core.agent_card import AgentCard
@@ -10,13 +12,14 @@ class HTTPTransport(Transport):
     """JSON-RPC 2.0 transport over HTTP/WebSocket.
 
     Implements A2A protocol communication using:
-    - HTTP for synchronous requests
-    - WebSocket for streaming/async (future enhancement)
+        - HTTP for synchronous requests
+        - SSE (Server-Sent Events) for streaming/async (v0.2.0)
 
     Uses JSON-RPC 2.0 for method calls:
-    - tasks/send - Send a task
-    - message/send - Send a message
-    - /.well-known/agent.json - Get agent card
+        - tasks/send - Send a task
+        - tasks/sendSubscribe - Send task with streaming updates (NEW v0.2.0)
+        - message/send - Send a message
+        - /.well-known/agent.json - Get agent card
     """
 
     def __init__(self, timeout: float = 30.0):
@@ -132,6 +135,41 @@ class HTTPTransport(Transport):
             return AgentCard.from_json(data)
         except Exception as e:
             raise Exception(f"Failed to fetch agent card: {e}")  # noqa: B904
+
+    async def subscribe_task(self, agent_url: str, task: Task):
+        """Subscribe to task updates via SSE (NEW in v0.2.0).
+
+        Streams task events using Server-Sent Events format.
+
+        Args:
+            agent_url: Target agent URL
+            task: Task to send
+
+        Yields:
+            Event dictionaries
+        """
+        client = self._get_client()
+
+        request = {
+            "jsonrpc": "2.0",
+            "method": "tasks/sendSubscribe",
+            "params": {"task": task.to_dict()},
+            "id": self._next_request_id(),
+        }
+
+        try:
+            async with client.stream("POST", agent_url, json=request) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    # Parse SSE format: data: {...}
+                    if line.startswith("data:"):
+                        try:
+                            event_data = json.loads(line[5:].strip())
+                            yield event_data
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            raise Exception(f"Streaming failed: {e}")  # noqa: B904
 
     async def close(self):
         """Close the transport and cleanup resources."""

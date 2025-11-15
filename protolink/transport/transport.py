@@ -6,6 +6,7 @@ Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
@@ -50,5 +51,21 @@ class Transport(ABC):
 
         Returns:
             AgentCard with agent metadata
+        """
+        pass
+
+    @abstractmethod
+    async def subscribe_task(self, agent_url: str, task: Task) -> AsyncIterator[dict]:
+        """Subscribe to task updates via streaming (NEW in v0.2.0).
+
+        Streams task events (status updates, artifacts, progress) as they occur.
+        Implements Server-Sent Events (SSE) for real-time updates.
+
+        Args:
+            agent_url: Target agent URL
+            task: Task to send and subscribe to
+
+        Yields:
+            Event dictionaries with updates
         """
         pass

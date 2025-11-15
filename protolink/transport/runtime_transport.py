@@ -90,6 +90,37 @@ class RuntimeTransport(Transport):
 
         return self.agents[agent_url].get_agent_card()
 
+    async def subscribe_task(self, agent_url: str, task: Task):
+        """Subscribe to task updates (NEW in v0.2.0).
+
+        For in-memory transport, yields events directly without streaming.
+
+        Args:
+            agent_url: Agent URL or name
+            task: Task to send
+
+        Yields:
+            Event dictionaries
+        """
+        if agent_url not in self.agents:
+            raise ValueError(f"Agent not found: {agent_url}")
+
+        agent = self.agents[agent_url]
+
+        # Use streaming handler if available
+        if hasattr(agent, "handle_task_streaming"):
+            async for event in agent.handle_task_streaming(task):
+                if hasattr(event, "to_dict"):
+                    yield event.to_dict()
+                else:
+                    yield event
+        else:
+            # Fall back to regular handler
+            result_task = agent.handle_task(task)
+            from .events import TaskStatusUpdateEvent
+
+            yield TaskStatusUpdateEvent(task_id=result_task.id, new_state="completed", final=True).to_dict()
+
     def list_agents(self) -> list:
         """List all registered agents.
 

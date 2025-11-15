@@ -19,6 +19,8 @@ class AgentCard:
     url: str
     version: str = "1.0.0"
     capabilities: dict[str, Any] = field(default_factory=lambda: {"streaming": False, "tasks": True})
+    security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
+    required_scopes: list[str] | None = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""
@@ -28,6 +30,8 @@ class AgentCard:
             "url": self.url,
             "version": self.version,
             "capabilities": self.capabilities,
+            "securitySchemes": self.security_schemes,
+            "requiredScopes": self.required_scopes,
         }
 
     @classmethod
@@ -39,4 +43,6 @@ class AgentCard:
             url=data["url"],
             version=data.get("version", "1.0.0"),
             capabilities=data.get("capabilities", {"streaming": False, "tasks": True}),
+            security_schemes=data.get("securitySchemes", {}),
+            required_scopes=data.get("requiredScopes", []),
         )
