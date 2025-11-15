@@ -32,7 +32,7 @@ extra_deps = {
 
 setup(
     name="protolink",
-    version="0.3.0",
+    version="0.3.1",
     author="Nikolaos Maroulis",
     author_email="nikolaos@maroulis.dev",
     description="A framework for building and managing agents based on the A2A protocol.",

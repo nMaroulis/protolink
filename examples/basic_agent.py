@@ -4,7 +4,7 @@ Basic Agent Example
 Shows how to create a simple agent that echoes user input.
 """
 
-from protolink.agent import Agent
+from protolink.agents import Agent
 from protolink.models import AgentCard, Task
 
 

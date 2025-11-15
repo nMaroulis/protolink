@@ -6,7 +6,7 @@ Shows how agents can communicate with each other using InMemoryTransport.
 
 import asyncio
 
-from protolink.agent import Agent
+from protolink.agents import Agent
 from protolink.models import AgentCard, Message, Task
 from protolink.transport import RuntimeTransport
 

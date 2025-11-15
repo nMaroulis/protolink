@@ -4,7 +4,7 @@ Registry Example
 Shows how to use the Registry for agent discovery.
 """
 
-from protolink.agent import Agent
+from protolink.agents import Agent
 from protolink.discovery import Registry
 from protolink.models import AgentCard, Task
 

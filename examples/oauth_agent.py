@@ -13,7 +13,7 @@ Run with:
 
 import asyncio
 
-from protolink.agent import Agent
+from protolink.agents import Agent
 from protolink.models import AgentCard, Message, Task
 from protolink.security import APIKeyAuth, AuthContext, BearerTokenAuth
 from protolink.transport import RuntimeTransport

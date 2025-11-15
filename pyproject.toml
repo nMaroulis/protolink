@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.3.0"
+version = "0.3.1"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -47,6 +47,7 @@ test = [
     "pytest-mock>=3.14.1",
     "ruff==0.14.4",
     "pre-commit>=4.4.0",
+    "protolink[http]", # For testing HTTP transport
 ]
 
 # All dependencies for development

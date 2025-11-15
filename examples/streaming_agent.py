@@ -13,7 +13,7 @@ Run with:
 
 import asyncio
 
-from protolink.agent import Agent
+from protolink.agents import Agent
 from protolink.core.events import TaskArtifactUpdateEvent, TaskProgressEvent, TaskStatusUpdateEvent
 from protolink.models import AgentCard, Artifact, Message, Task
 from protolink.transport import RuntimeTransport

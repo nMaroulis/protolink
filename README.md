@@ -77,7 +77,7 @@ uv pip install -e ".[dev]"
 ## Quick Start
 
 ```python
-from protolink.agent import Agent
+from protolink.agents import Agent
 
 # Create a new agent
 agent = Agent(name="example_agent")
