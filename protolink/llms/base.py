@@ -1,27 +1,47 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Literal, TypeAlias
+from typing import Any, Literal, TypeAlias
 
-from protolink.core.message import Message
+from protolink.models import Message
 
 LLMType: TypeAlias = Literal["api", "local", "remote"]
 LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp"]
 
 
 class LLM(ABC):
-    """Base class for LLMs."""
+    """Base class for all LLM implementations."""
 
-    def __init__(self, model_type: LLMType, provider: LLMProvider, model_name: str | None = None) -> None:
-        self.model_type = model_type
-        self.provider = provider
-        self.model_name = model_name
+    model_type: LLMType
+    provider: LLMProvider
+    model: str
+    model_params: dict[str, Any]
+    system_prompt: str
+
+    def __init__(self) -> None:
+        self.model_type = self.__class__.model_type
+        self.provider = self.__class__.provider
+        self.model = self.__class__.model
+        self.model_params = self.__class__.model_params
+        self.system_prompt = self.__class__.system_prompt
 
     @abstractmethod
-    def generate(self, messages: list[Message]) -> Message:
-        """Generate a response from the LLM."""
+    def generate_response(self, messages: list[Message]) -> Message:
         raise NotImplementedError
 
     @abstractmethod
-    def generate_stream(self, messages: list[Message]) -> Iterable[Message]:
-        """Generate a response from the LLM."""
+    def generate_stream_response(self, messages: list[Message]) -> Iterable[Message]:
         raise NotImplementedError
+
+    @abstractmethod
+    def set_model_params(self, model_params: dict[str, Any]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_system_prompt(self, system_prompt: str) -> None:
+        raise NotImplementedError
+
+    def __str__(self) -> str:
+        return f"{self.provider} {self.model_type}"
+
+    def __repr__(self) -> str:
+        return self.__str__()

@@ -10,6 +10,7 @@ from protolink.core.agent_card import AgentCard
 from protolink.core.context_manager import ContextManager
 from protolink.core.message import Message
 from protolink.core.task import Task
+from protolink.llms.base import LLM
 from protolink.security.auth import AuthContext, AuthProvider
 
 
@@ -56,7 +57,7 @@ class Agent:
                 )
     """
 
-    def __init__(self, card: AgentCard, auth_provider: AuthProvider | None = None):
+    def __init__(self, card: AgentCard, llm: LLM | None = None, auth_provider: AuthProvider | None = None):
         """Initialize agent with its identity card.
 
         Args:
@@ -65,6 +66,7 @@ class Agent:
         self.card = card
         self._transport = None
         self.context_manager = ContextManager()
+        self.llm = llm
         self.auth_provider = auth_provider
         self._auth_context = None
 
@@ -75,6 +77,9 @@ class Agent:
             AgentCard with agent metadata
         """
         return self.card
+
+    def set_llm(self, llm: LLM) -> None:
+        self.llm = llm
 
     def handle_task(self, task: Task) -> Task:
         """Process a task and return the result.

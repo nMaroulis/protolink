@@ -35,6 +35,25 @@ class AgentCapabilities:
 
 
 @dataclass
+class AgentSkill:
+    """Represents a task that an agent can perform.
+
+    Attributes:
+        id: Unique identifier for the task
+        name: Human-readable name of the task
+        description: Detailed description of what the task does
+        tags: List of tags for categorization
+        examples: Example inputs or usage scenarios
+    """
+
+    id: str
+    name: str
+    description: str
+    tags: list[str] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
+
+
+@dataclass
 class AgentCard:
     """Agent identity and capability declaration.
 

@@ -23,9 +23,9 @@ http = [
 ]
 
 llms = [
-    "anthropic>=0.72.0",
+    "anthropic>=0.72.1",
     "llama-cpp-python>=0.3.16",
-    "openai>=2.2.0",
+    "openai>=2.7.2",
 ]
 
 # Database Drivers
