@@ -1,7 +1,8 @@
 """
 ProtoLink - Agent Base Class
 
-Simple agent implementation following Google's A2A protocol.
+Simple agent implementation extending Google's A2A protocol making the Agent component more centralised,
+incorporating both client and server functionalities.
 """
 
 from collections.abc import AsyncIterator

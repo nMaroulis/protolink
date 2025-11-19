@@ -99,7 +99,7 @@ class Task:
             messages=messages,
             artifacts=artifacts,
             metadata=data.get("metadata", {}),
-            created_at=data.get("created_at", datetime.now(datetime.timezone.utc).isoformat()),
+            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
         )
 
     @classmethod

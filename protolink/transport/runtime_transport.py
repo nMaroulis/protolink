@@ -1,3 +1,4 @@
+import inspect
 from collections.abc import Awaitable, Callable
 from typing import Protocol, runtime_checkable
 
@@ -10,6 +11,7 @@ from protolink.transport.transport import Transport
 @runtime_checkable
 class AgentProtocol(Protocol):
     """Protocol for the minimal Agent interface needed by RuntimeTransport."""
+
     card: AgentCard
 
 
@@ -61,7 +63,10 @@ class RuntimeTransport(Transport):
             raise ValueError(f"Agent not found: {agent_url}")
 
         agent = self.agents[agent_url]
-        return agent.handle_task(task)
+        result = agent.handle_task(task)
+        if inspect.isawaitable(result):
+            result = await result
+        return result
 
     async def send_message(self, agent_url: str, message: Message) -> Message:
         """Send message to local agent.
@@ -159,7 +164,9 @@ class RuntimeTransport(Transport):
                     yield event
         else:
             # Fall back to regular handler
-            result_task = await agent.handle_task(task)
+            result_task = agent.handle_task(task)
+            if inspect.isawaitable(result_task):
+                result_task = await result_task
             from protolink.core.events import TaskStatusUpdateEvent
 
             yield TaskStatusUpdateEvent(task_id=result_task.id, new_state="completed", final=True).to_dict()
@@ -183,10 +190,7 @@ class RuntimeTransport(Transport):
             if hasattr(agent, "process_task") and callable(agent.process_task):
                 response = await agent.process_task(task)
                 return Message(
-                    from_=message.to,
-                    to=message.sender,
-                    type="task_response",
-                    content=response.model_dump_json()
+                    from_=message.to, to=message.sender, type="task_response", content=response.model_dump_json()
                 )
             raise NotImplementedError("Agent does not implement process_task")
         return None

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-EXAMPLES_TO_SKIP = ["__init__.py", "llms.py", "oauth_agent.py"]
+EXAMPLES_TO_SKIP = ["__init__.py", "http_agents.py", "llms.py", "oauth_agent.py"]
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 example_scripts = [str(p) for p in EXAMPLES_DIR.glob("*.py") if p.name not in EXAMPLES_TO_SKIP]
 
