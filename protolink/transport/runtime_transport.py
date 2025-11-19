@@ -1,8 +1,16 @@
-from protolink.agents import Agent
+from collections.abc import Awaitable, Callable
+from typing import Protocol, runtime_checkable
+
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
 from protolink.transport.transport import Transport
+
+
+@runtime_checkable
+class AgentProtocol(Protocol):
+    """Protocol for the minimal Agent interface needed by RuntimeTransport."""
+    card: AgentCard
 
 
 class RuntimeTransport(Transport):
@@ -14,9 +22,10 @@ class RuntimeTransport(Transport):
 
     def __init__(self):
         """Initialize in-memory transport."""
-        self.agents: dict[str, Agent] = {}
+        self.agents: dict[str, AgentProtocol] = {}
+        self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
 
-    def register_agent(self, agent: Agent) -> None:
+    def register_agent(self, agent: AgentProtocol) -> None:
         """Register an agent for in-memory communication.
 
         Args:
@@ -91,6 +100,39 @@ class RuntimeTransport(Transport):
 
         return self.agents[agent_url].get_agent_card()
 
+    async def start(self) -> None:
+        """No-op for in-memory transport."""
+        pass
+
+    async def stop(self) -> None:
+        """Clean up resources."""
+        self.agents.clear()
+        self._task_handler = None
+
+    def on_task_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
+        """Register task handler.
+
+        Args:
+            handler: Async function that processes incoming tasks
+        """
+        self._task_handler = handler
+
+    async def _handle_incoming_task(self, task: Task) -> Task:
+        """Process an incoming task.
+
+        Args:
+            task: Task to process
+
+        Returns:
+            Processed task
+
+        Raises:
+            RuntimeError: If no task handler is registered
+        """
+        if not self._task_handler:
+            raise RuntimeError("No task handler registered")
+        return await self._task_handler(task)
+
     async def subscribe_task(self, agent_url: str, task: Task):
         """Subscribe to task updates (NEW in v0.2.0).
 
@@ -117,10 +159,37 @@ class RuntimeTransport(Transport):
                     yield event
         else:
             # Fall back to regular handler
-            result_task = agent.handle_task(task)
+            result_task = await agent.handle_task(task)
             from protolink.core.events import TaskStatusUpdateEvent
 
             yield TaskStatusUpdateEvent(task_id=result_task.id, new_state="completed", final=True).to_dict()
+
+    async def _process_incoming_message(self, message: Message) -> Message | None:
+        """Process incoming message and return response.
+
+        Args:
+            message: Incoming message
+
+        Returns:
+            Response message if any
+        """
+        if message.to not in self.agents:
+            raise ValueError(f"Recipient agent not found: {message.to}")
+
+        agent = self.agents[message.to]
+        if message.type == "task":
+            task = Task.model_validate_json(message.content)
+            # Since we can't call process_task on AgentProtocol, we need to check if it's callable
+            if hasattr(agent, "process_task") and callable(agent.process_task):
+                response = await agent.process_task(task)
+                return Message(
+                    from_=message.to,
+                    to=message.sender,
+                    type="task_response",
+                    content=response.model_dump_json()
+                )
+            raise NotImplementedError("Agent does not implement process_task")
+        return None
 
     def list_agents(self) -> list:
         """List all registered agents.

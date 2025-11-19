@@ -6,8 +6,11 @@ This module provides transport implementations for different communication proto
 from .http_transport import HTTPTransport
 from .json_rpc_transport import JSONRPCTransport
 from .runtime_transport import RuntimeTransport
+from .transport import Transport
 
 __all__ = [
     "HTTPTransport",
-    "JSONRPCTransportRuntimeTransport",
+    "JSONRPCTransport",
+    "RuntimeTransport",
+    "Transport",
 ]

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.3.1"
+version = "0.3.2"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,8 +18,10 @@ dependencies = [
 
 [project.optional-dependencies]
 http = [
+    "fastapi>=0.121.2",
     "grpcio>=1.76.0",
     "httpx>=0.28.1",
+    "uvicorn>=0.38.0",
 ]
 
 llms = [

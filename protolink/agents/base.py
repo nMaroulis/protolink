@@ -6,12 +6,13 @@ Simple agent implementation following Google's A2A protocol.
 
 from collections.abc import AsyncIterator
 
-from protolink.core.agent_card import AgentCard
+from protolink.client.agent_client import AgentClient
 from protolink.core.context_manager import ContextManager
-from protolink.core.message import Message
-from protolink.core.task import Task
 from protolink.llms.base import LLM
+from protolink.models import AgentCard, Message, Task
 from protolink.security.auth import AuthContext, AuthProvider
+from protolink.server import AgentServer
+from protolink.transport import Transport
 
 
 class Agent:
@@ -19,56 +20,64 @@ class Agent:
 
     Users should subclass this and implement the handle_task method.
     Optionally implement handle_task_streaming for real-time updates.
-
-    Example:
-        class MyAgent(Agent):
-            def __init__(self):
-                card = AgentCard(
-                    name="my-agent",
-                    description="A helpful agent",
-                    url="http://localhost:8000"
-                )
-                super().__init__(card)
-
-            def handle_task(self, task: Task) -> Task:
-                # Get the user's message
-                user_message = task.messages[0]
-                user_text = user_message.parts[0].content
-
-                # Process and respond
-                response = f"You said: {user_text}"
-                return task.complete(response)
-
-            # Optional: support streaming
-            async def handle_task_streaming(self, task: Task):
-                from protolink.events import TaskStatusUpdateEvent
-
-                yield TaskStatusUpdateEvent(
-                    task_id=task.id,
-                    new_state='working'
-                )
-
-                # ... do work ...
-
-                yield TaskStatusUpdateEvent(
-                    task_id=task.id,
-                    new_state='completed',
-                    final=True
-                )
     """
 
-    def __init__(self, card: AgentCard, llm: LLM | None = None, auth_provider: AuthProvider | None = None):
-        """Initialize agent with its identity card.
+    def __init__(
+        self,
+        card: AgentCard,
+        llm: LLM | None = None,
+        transport: Transport | None = None,
+        auth_provider: AuthProvider | None = None,
+    ):
+        """Initialize agent with its identity card and transport layer.
 
         Args:
             card: AgentCard describing this agent
+            llm: Optional LLM instance for the agent to use
+            transport: Transport layer for client/server communication
+            auth_provider: Optional authentication provider
         """
         self.card = card
-        self._transport = None
         self.context_manager = ContextManager()
         self.llm = llm
         self.auth_provider = auth_provider
         self._auth_context = None
+
+        # Initialize client and server components
+        if transport is None:
+            self._client, self._server = None, None
+            print("No transport provided, agent will not be able to receive tasks. Call set_transport() to configure.")
+        else:
+            self._client = AgentClient(transport=transport)
+            self._server = AgentServer(transport, self.handle_task)
+
+    async def start(self) -> None:
+        """Start the agent's server component if available."""
+        if self._server:
+            await self._server.start()
+
+    async def stop(self) -> None:
+        """Stop the agent's server component if available."""
+        if self._server:
+            await self._server.stop()
+
+    @property
+    def client(self) -> AgentClient | None:
+        """Get the agent's client component.
+
+        Returns:
+            AgentClient instance if transport was provided, else None
+        """
+        return self._client
+
+    @property
+    def server(self) -> AgentServer | None:
+        """Get the agent's server component.
+
+        Returns:
+            AgentServer instance if transport was provided, else None
+        """
+        return self._server
 
     def get_agent_card(self) -> AgentCard:
         """Return the agent's identity card.
@@ -81,7 +90,7 @@ class Agent:
     def set_llm(self, llm: LLM) -> None:
         self.llm = llm
 
-    def handle_task(self, task: Task) -> Task:
+    async def handle_task(self, task: Task) -> Task:
         """Process a task and return the result.
 
         This is the core method that users must implement.
@@ -95,7 +104,7 @@ class Agent:
         Raises:
             NotImplementedError: Must be implemented by subclass
         """
-        raise NotImplementedError("Subclasses must implement handle_task()")
+        raise NotImplementedError("Agent subclasses must implement handle_task()")
 
     async def verify_request_auth(self, auth_header: str | None = None, skill: str = "default") -> AuthContext | None:
         """NEW in v0.3.0: Verify authentication of incoming request.
@@ -214,13 +223,19 @@ class Agent:
 
         return "No response generated"
 
-    def set_transport(self, transport):
+    def set_transport(self, transport: Transport) -> None:
         """Set the transport layer for this agent.
 
         Args:
             transport: Transport instance for communication
         """
-        self._transport = transport
+        if transport is None:
+            raise ValueError("transport must not be None")
+        if not isinstance(transport, Transport):
+            raise TypeError("transport must be an instance of Transport")
+
+        self._client = AgentClient(transport=transport)
+        self._server = AgentServer(transport, self.handle_task)
 
     async def send_task_to(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
         """Send a task to another agent.
@@ -235,10 +250,10 @@ class Agent:
         Raises:
             RuntimeError: If no transport is configured
         """
-        if not self._transport:
-            raise RuntimeError("No transport configured. Call set_transport() first.")
+        if not self._client:
+            raise RuntimeError("No transport client configured. Call set_transport() first.")
 
-        return await self._transport.send_task(agent_url, task, skill=skill)
+        return await self._client.send_task(agent_url, task, skill=skill)
 
     async def send_message_to(self, agent_url: str, message: Message) -> Message:
         """Send a message to another agent.
@@ -253,10 +268,10 @@ class Agent:
         Raises:
             RuntimeError: If no transport is configured
         """
-        if not self._transport:
-            raise RuntimeError("No transport configured. Call set_transport() first.")
+        if not self._client:
+            raise RuntimeError("No transport client configured. Call set_transport() first.")
 
-        return await self._transport.send_message(agent_url, message)
+        return await self._client.send_message(agent_url, message)
 
     def get_context_manager(self) -> ContextManager:
         """Get the context manager for this agent (NEW in v0.2.0).

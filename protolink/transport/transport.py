@@ -6,7 +6,7 @@ Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
@@ -68,5 +68,32 @@ class Transport(ABC):
 
         Yields:
             Event dictionaries with updates
+        """
+        pass
+
+    @abstractmethod
+    async def start(self) -> None:
+        """Start the transport server.
+
+        For server-side transports, this should start listening for incoming requests.
+        For client-only transports, this can be a no-op.
+        """
+        pass
+
+    @abstractmethod
+    async def stop(self) -> None:
+        """Stop the transport server.
+
+        For server-side transports, this should stop listening and clean up resources.
+        For client-only transports, this can be a no-op.
+        """
+        pass
+
+    @abstractmethod
+    def on_task_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
+        """Register a handler for incoming tasks.
+
+        Args:
+            handler: Async function that processes incoming tasks and returns responses
         """
         pass
