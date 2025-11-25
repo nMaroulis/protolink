@@ -3,7 +3,9 @@ from collections.abc import Awaitable, Callable
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Request
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
@@ -36,7 +38,7 @@ class HTTPTransport(Transport):
         self.auth_provider = auth_provider
         self.auth_context = None
         self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
-        self.app = FastAPI()
+        self.app = Starlette()
         self._setup_routes()
 
     async def authenticate(self, credentials: str) -> None:
@@ -74,15 +76,15 @@ class HTTPTransport(Transport):
     def _setup_routes(self) -> None:
         """Set up FastAPI routes."""
 
-        @self.app.post("/tasks/")
-        async def handle_task(request: Request) -> dict:
+        @self.app.route("/tasks/", methods=["POST"])
+        async def handle_task(request: Request) -> JSONResponse:
             if not self._task_handler:
                 raise RuntimeError("No task handler registered")
 
             task_data = await request.json()
             task = Task.from_dict(task_data)
             result = await self._task_handler(task)
-            return result.to_dict()
+            return JSONResponse(result.to_dict())
 
     async def start(self) -> None:
         """Start the HTTP server."""

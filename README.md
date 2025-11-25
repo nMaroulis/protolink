@@ -18,7 +18,7 @@ A lightweight, production-ready framework for **agent-to-agent communication**, 
 - **A2A Protocol Implementation**: Fully compatible with **Google's A2A specification**
 - **Extended Capabilities**:
   - **Unified Client/Server Agent Model**: Single agent instance handles both client and server responsibilities, reducing complexity.
-  - **Transport Layer Flexibility**: Swap between HTTP, WebSocket, JSON-RPC or in-memory transports with minimal code changes.
+  - **Transport Layer Flexibility**: Swap between *HTTP*, *WebSocket*, *gRPC* or *in-memory* transports with minimal code changes.
   - **Simplified Agent Creation and Registration**: Create and register agents with just a few lines of code.
   - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
   - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
@@ -151,7 +151,24 @@ agent.start()
 
 ### API Documentation
 
-TBD
+#### Transport:
+
+- [HTTPTransport](): Uses HTTP/HTTPS for synchronous requests. (httpx, starlette, uvicorn) / FastAPI variation with Pydantic schema validation.
+- [WebSocketTransport](): Uses WebSocket for streaming requests. (httpx, websockets)
+- [JSONRPCTransport](): TBD
+- [GRPCTransport](): TBD
+- RuntimeTransport(): Simple in-process, in-memory transport.
+
+#### LLMs:
+
+- [OpenAILLM](): Uses OpenAI API for synchronous requests.
+- [AnthropicLLM](): Uses Anthropic API for synchronous requests.
+- [LlamaCPPLLM](): Uses local Llama.cpp for synchronous requests.
+
+#### Tools:
+
+- [Native Tool](): Uses native tools.
+- [MCPToolAdapter](): Connects to MCP Server and registers MCP tools as native tools.
 
 ## License
 

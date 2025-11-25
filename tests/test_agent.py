@@ -39,6 +39,9 @@ class DummyTransport(Transport):
     def on_task_received(self, handler):
         self.handler = handler
 
+    def validate_agent_url(self, agent_url: str) -> bool:
+        return True
+
 
 class TestAgent:
     """Test cases for the Agent class."""

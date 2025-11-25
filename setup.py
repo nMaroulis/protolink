@@ -15,6 +15,9 @@ test_deps = [
 extra_deps = {
     "http": [
         "httpx>=0.24.0",
+        "starlette>=0.49.3",
+        "uvicorn>=0.38.0",
+        "websockets>=15.0",
     ],
     "llms": [
         "openai>=1.0.0",
@@ -24,6 +27,9 @@ extra_deps = {
     # All optional dependencies
     "all": [
         "httpx>=0.24.0",
+        "starlette>=0.49.3",
+        "uvicorn>=0.38.0",
+        "websockets>=15.0",
         "openai>=1.0.0",
         "llama-cpp-python>=0.2.0",
         "anthropic>=0.7.0",
@@ -32,7 +38,7 @@ extra_deps = {
 
 setup(
     name="protolink",
-    version="0.3.3",
+    version="0.3.4",
     author="Nikolaos Maroulis",
     author_email="nikolaos@maroulis.dev",
     description="A framework for building and managing agents based on the A2A protocol.",
