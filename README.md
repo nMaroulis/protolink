@@ -7,12 +7,27 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 <div align="center">
-  <img src="assets/logo_rounded.png" alt="Protolink Logo" width="100">
+  <img src="assets/banner.png" alt="Protolink Logo" width="60%">
 </div>
 
 
-A lightweight, production-ready framework for **agent-to-agent communication**, implementing and extending Google's [Agent-to-Agent Communication (A2A) protocol](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com). Designed to be the go-to Python library for building **interoperable agent systems** with minimal boilerplate.
+A lightweight, production-ready framework for **agent-to-agent communication**, implementing from scratch and extending Google's [Agent-to-Agent Communication (A2A) protocol](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com). Designed to be the go-to Python library for building **interoperable agent systems** with minimal boilerplate, supporting **native integration** with **LLMs** and **Tools** (native & [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)).
 
+## Features
+
+- **A2A Protocol Implementation**: Fully compatible with **Google's A2A specification**
+- **Extended Capabilities**:
+  - **Unified Client/Server Agent Model**: Single agent instance handles both client and server responsibilities, reducing complexity.
+  - **Transport Layer Flexibility**: Swap between HTTP, WebSocket, JSON-RPC or in-memory transports with minimal code changes.
+  - **Simplified Agent Creation and Registration**: Create and register agents with just a few lines of code.
+  - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
+  - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
+  - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
+  - **Enhanced Security**: **OAuth 2.0** and **API key support**.
+  - Built-in support for streaming and async operations.
+- **Planned Integrations**:
+  - **Advanced Orchestration Patterns**
+    - Multi-step workflows, supervisory agents, role routing, and hierarchical control systems.
 
 ## Architecture
 
@@ -44,23 +59,7 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
    - Simple interface-based design
    - No complex configuration needed for common use cases
 
-## Features
 
-- **A2A Protocol Implementation**: Fully compatible with **Google's A2A specification**
-- **Extended Capabilities**:
-  - **Unified Client/Server Model**: Single agent instance handles both client and server responsibilities, reducing complexity.
-  - **Transport Layer Flexibility**: Swap between HTTP, WebSocket, or in-memory transports with minimal code changes.
-  - **Simplified Agent Creation and Registration**: Create and register agents with just a few lines of code.
-  - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
-  - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
-  - Enhanced security with **OAuth 2.0** and **API key support**.
-  - Advanced agent capabilities and discovery.
-  - Built-in support for streaming and async operations.
-- **Planned Integrations**:
-  - **MCP Tooling**: Model Control Protocol integration for tool usage.
-  - Multi-modal agent support.
-  - **Advanced Orchestration Patterns**
-    - Multi-step workflows, supervisory agents, role routing, and hierarchical control systems.
 
 ## Why Protolink? 🚀
 
@@ -116,6 +115,8 @@ uv pip install -e ".[dev]"
 from protolink.agents import Agent
 from protolink.models import AgentCard
 from protolink.transport import HTTPTransport
+from protolink.tools import MCPToolAdapter
+from protolink.llms.api import OpenAILLM
 
 # Define the agent card
 agent_card = AgentCard(
@@ -126,8 +127,21 @@ agent_card = AgentCard(
 # Initialize the transport
 transport = HTTPTransport()
 
+# OpenAI API LLM
+llm = OpenAILLM(model="gpt-5.1")
+
 # Initialize the agent
-agent = Agent(agent_card, transport)
+agent = Agent(agent_card, transport, llm)
+
+# Add Native tool
+@agent.tool(name="add", description="Add two numbers")
+async def add_numbers(a: int, b: int):
+    return a + b
+
+# Add MCP tool
+mcp_tool = MCPToolAdapter(mcp_client, "multiply")
+agent.add_tool(mcp_tool)
+
 
 # Start the agent
 agent.start()

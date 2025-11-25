@@ -18,6 +18,8 @@ class HTTPTransport(Transport):
     ):
         """Initialize HTTP REST transport.
 
+        Currently only supports HTTP and not HTTPS with SSL.
+
         Args:
             host: Host to bind the server to
             port: Port to listen on
@@ -134,3 +136,19 @@ class HTTPTransport(Transport):
             headers["Authorization"] = f"Bearer {self.auth_context.token}"
 
         return headers
+
+    def validate_agent_url(self, agent_url: str) -> bool:
+        """Validate an agent URL.
+
+        Args:
+            agent_url: Agent URL to validate
+
+        Returns:
+            True if the URL is valid, False otherwise
+        """
+        allowed = {
+            f"http://{self.host}:{self.port}",
+            f"https://{self.host}:{self.port}",
+        }
+
+        return agent_url in allowed

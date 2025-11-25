@@ -13,6 +13,7 @@ from protolink.llms.base import LLM
 from protolink.models import AgentCard, Message, Task
 from protolink.security.auth import AuthContext, AuthProvider
 from protolink.server import AgentServer
+from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport
 
 
@@ -41,6 +42,8 @@ class Agent:
         self.card = card
         self.context_manager = ContextManager()
         self.llm = llm
+        self.tools: dict[str, BaseTool] = {}
+        self.skills: dict[str, str] = {}
         self.auth_provider = auth_provider
         self._auth_context = None
 
@@ -51,6 +54,7 @@ class Agent:
         else:
             self._client = AgentClient(transport=transport)
             self._server = AgentServer(transport, self.handle_task)
+            self._server.validate_agent_url(self.card.url)
 
     async def start(self) -> None:
         """Start the agent's server component if available."""
@@ -281,6 +285,28 @@ class Agent:
             ContextManager instance
         """
         return self.context_manager
+
+    def add_tool(self, tool: BaseTool):
+        """Register a Tool instance with the agent."""
+        self.tools[tool.name] = tool
+        self.skills[tool.name] = tool.description
+
+    def tool(self, name: str, description: str):
+        """Decorator helper for defining inline tool functions."""
+
+        # decorator for Native functions
+        def decorator(func):
+            self.add_tool(Tool(name=name, description=description, func=func))
+            return func
+
+        return decorator
+
+    async def call_tool(self, tool_name: str, **kwargs):
+        """Invoke a registered tool by name with provided kwargs."""
+        tool = self.tools.get(tool_name, None)
+        if not tool:
+            raise ValueError(f"Tool {tool_name} not found")
+        return await tool(**kwargs)
 
     def __repr__(self) -> str:
         return f"Agent(name='{self.card.name}', url='{self.card.url}')"

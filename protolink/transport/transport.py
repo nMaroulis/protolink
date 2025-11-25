@@ -97,3 +97,15 @@ class Transport(ABC):
             handler: Async function that processes incoming tasks and returns responses
         """
         pass
+
+    @abstractmethod
+    def validate_agent_url(self, agent_url: str) -> bool:
+        """Validate an agent URL.
+
+        Args:
+            agent_url: Agent URL to validate
+
+        Returns:
+            True if the URL is valid, False otherwise
+        """
+        pass

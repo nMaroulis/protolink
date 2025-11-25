@@ -202,3 +202,14 @@ class RuntimeTransport(Transport):
             List of agent URLs
         """
         return list(self.agents.keys())
+
+    def validate_agent_url(self, agent_url: str) -> bool:
+        """Validate an agent URL.
+
+        Args:
+            agent_url: Agent URL to validate
+
+        Returns:
+            True if the URL is valid, False otherwise
+        """
+        return True

@@ -52,3 +52,8 @@ class AgentServer:
 
         await self._transport.stop()
         self._is_running = False
+
+    def validate_agent_url(self, agent_url: str) -> None:
+        """Validate the agent URL."""
+        if not self._transport.validate_agent_url(agent_url):
+            raise ValueError("Agent and Transport URL mismatch")

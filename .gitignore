@@ -50,14 +50,9 @@ coverage.xml
 *.mo
 *.pot
 
-# Django stuff:
 *.log
 local_settings.py
 db.sqlite3
-
-# Flask stuff:
-instance/
-.webassets-cache
 
 # Scrapy stuff:
 .scrapy
@@ -116,6 +111,9 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Mac OS
+.DS_Store
 
 # uv
 uv.lock
