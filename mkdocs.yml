@@ -1,0 +1,15 @@
+site_name: Protolink
+site_description: "Agent-to-agent communication framework for interoperable agent systems"
+repo_url: https://github.com/nMaroulis/protolink
+
+theme:
+  name: material
+
+nav:
+  - Home: docs/index.md
+  - Getting Started: docs/getting-started.md
+  - Agents: docs/agents.md
+  - Transports: docs/transports.md
+  - LLMs: docs/llms.md
+  - Tools: docs/tools.md
+  - Examples: docs/examples.md
