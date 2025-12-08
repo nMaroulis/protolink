@@ -99,23 +99,3 @@ class AnthropicLLM(APILLM):
                         content=current_content,
                         finish_reason=None,
                     )
-
-
-if __name__ == "__main__":
-    # Example usage
-    llm = AnthropicLLM()
-    print(f"Initialized {llm.provider} with model: {llm.model}")
-
-    # Test with a simple message
-    messages = [Message(role="user", content="Hello, how are you?")]
-
-    # Test non-streaming
-    print("\nTesting non-streaming response:")
-    response = llm.generate_response(messages)
-    print(f"Response: {response.content}")
-
-    # Test streaming
-    print("\nTesting streaming response:")
-    for chunk in llm.generate_stream_response(messages):
-        print(chunk.content, end="", flush=True)
-    print("\n")

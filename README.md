@@ -160,10 +160,15 @@ agent.start()
 - RuntimeTransport(): Simple in-process, in-memory transport.
 
 #### LLMs:
+Protolink seperates the LLMs in 3 distinct types: [API, local, server].
+- **API**, calls the API, requires an API key:
+  - [OpenAILLM](): Uses **OpenAI API** for sync & async requests.
+  - [AnthropicLLM](): Uses **Anthropic API** for sync & async requests.
+- **Local**, runs the model in runtime:
+  - [LlamaCPPLLM](): Uses **local runtime llama.cpp** for sync & async requests.
+- **Server**, connects to an LLM Server, deployed locally or remotely:
+  - [OllamaLLM](): Uses **Ollama** for sync & async requests.
 
-- [OpenAILLM](): Uses OpenAI API for synchronous requests.
-- [AnthropicLLM](): Uses Anthropic API for synchronous requests.
-- [LlamaCPPLLM](): Uses local Llama.cpp for synchronous requests.
 
 #### Tools:
 

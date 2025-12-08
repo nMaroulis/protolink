@@ -4,8 +4,8 @@ from typing import Any, Literal, TypeAlias
 
 from protolink.models import Message
 
-LLMType: TypeAlias = Literal["api", "local", "remote"]
-LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp"]
+LLMType: TypeAlias = Literal["api", "local", "server"]
+LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp", "ollama"]
 
 
 class LLM(ABC):
