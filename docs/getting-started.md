@@ -36,6 +36,9 @@ uv add "protolink[llms]"
 uv add "protolink[dev]"
 ```
 
+!!! info "Optional extras"
+    You usually only need the extras that match your use case. For example, `protolink[http]` for web transports or `protolink[llms]` when integrating LLM backends.
+
 For development from source:
 
 ```bash

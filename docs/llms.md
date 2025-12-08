@@ -29,6 +29,9 @@ Configuration depends on the specific backend, but the general pattern is:
    uv add "protolink[llms]"
    ```
 
+   !!! info "Choosing LLM extras"
+       If you only need a subset of backends, you can install more targeted extras once they are exposed (for example, only OpenAI or only local backends).
+
 2. **Instantiate the LLM** with the desired model and credentials:
 
    ```python
@@ -40,6 +43,9 @@ Configuration depends on the specific backend, but the general pattern is:
        # api_key is typically read from the environment, e.g. OPENAI_API_KEY
    )
    ```
+
+   !!! warning "API keys"
+       Never commit API keys to version control. Read them from environment variables or a secure secrets manager.
 
 3. **Pass the LLM to your Agent**:
 

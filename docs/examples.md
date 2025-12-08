@@ -21,3 +21,6 @@ Additional examples illustrate other capabilities:
 
 You can run and adapt these scripts as starting points for your own agent systems.
 
+!!! tip "New here?"
+    Start with `examples/basic_agent.py` to understand the core concepts, then move on to `examples/http_agents.py` for HTTP-based setups.
+

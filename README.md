@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 <div align="center">
-  <img src="assets/banner.png" alt="Protolink Logo" width="60%">
+  <img src="docs/assets/banner.png" alt="Protolink Logo" width="60%">
 </div>
 
 

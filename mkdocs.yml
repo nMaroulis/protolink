@@ -1,15 +1,60 @@
-site_name: Protolink
+site_name: protolink
 site_description: "Agent-to-agent communication framework for interoperable agent systems"
 repo_url: https://github.com/nMaroulis/protolink
+repo_name: nMaroulis/protolink
+
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nMaroulis/protolink
+    - icon: fontawesome/solid/book
+      link: https://pypi.org/project/protolink/
+  generator: false
+  copyright:
+    text: "© 2025 Nikolaos Maroulis. MIT licensed."
 
 theme:
   name: material
+  logo: assets/logo_sm.png
+  favicon: assets/logo_sm.png
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.code.copy
+    - navigation.footer
+
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - toc:
+      permalink: true
 
 nav:
-  - Home: docs/index.md
-  - Getting Started: docs/getting-started.md
-  - Agents: docs/agents.md
-  - Transports: docs/transports.md
-  - LLMs: docs/llms.md
-  - Tools: docs/tools.md
-  - Examples: docs/examples.md
+  - Overview:
+      - Home: index.md
+      - Getting Started: getting-started.md
+  - Core:
+      - Agents: agents.md
+      - Transports: transports.md
+      - LLMs: llms.md
+      - Tools: tools.md
+  - Examples:
+      - Examples: examples.md
