@@ -10,6 +10,9 @@ from openai.types.chat import ChatCompletion, ChatCompletionChunk
 from protolink.llms.api.base import APILLM
 from protolink.llms.base import LLMProvider
 from protolink.models import Message
+from protolink.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class OpenAILLM(APILLM):
@@ -91,3 +94,12 @@ class OpenAILLM(APILLM):
             if delta.content:
                 current_content += delta.content
                 yield Message(role="assistant", content=current_content, finish_reason=None)
+
+    def validate_connection(self) -> bool:
+        try:
+            # Check that the configured model is available / accessible
+            self._client.models.retrieve(self.model)
+            return True
+        except Exception as e:
+            logger.warning(f"OpenAI connection validation failed for model {self.model}: {e}")
+            return False

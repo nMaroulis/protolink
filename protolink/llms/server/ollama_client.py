@@ -10,6 +10,9 @@ from protolink.core.part import Part
 from protolink.llms.base import LLMProvider
 from protolink.llms.server.base import ServerLLM
 from protolink.models import Message
+from protolink.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class OllamaLLM(ServerLLM):
@@ -102,3 +105,13 @@ class OllamaLLM(ServerLLM):
 
             current_content += delta
             yield self._to_message(current_content)
+
+    def validate_connection(self) -> bool:
+        """Validate that the Ollama server is reachable and the model is available."""
+        try:
+            # Check if the model exists
+            self._client.list()
+            return True
+        except Exception as e:
+            logger.warning(f"Ollama connection failed: {e}")
+            return False

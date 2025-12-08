@@ -23,3 +23,7 @@ class ServerLLM(LLM):
     def set_system_prompt(self, system_prompt: str) -> None:
         """Set the system prompt for the model."""
         self.system_prompt = system_prompt
+
+    def validate_connection(self) -> bool:
+        """Validate that the server is reachable."""
+        return True

@@ -45,3 +45,7 @@ class LLM(ABC):
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    @abstractmethod
+    def validate_connection(self) -> bool:
+        raise NotImplementedError

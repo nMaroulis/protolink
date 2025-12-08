@@ -15,6 +15,9 @@ from protolink.security.auth import AuthContext, AuthProvider
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport
+from protolink.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Agent:
@@ -50,11 +53,17 @@ class Agent:
         # Initialize client and server components
         if transport is None:
             self._client, self._server = None, None
-            print("No transport provided, agent will not be able to receive tasks. Call set_transport() to configure.")
+            logger.warning(
+                "No transport provided, agent will not be able to receive tasks. Call set_transport() to configure."
+            )
         else:
             self._client = AgentClient(transport=transport)
             self._server = AgentServer(transport, self.handle_task)
             self._server.validate_agent_url(self.card.url)
+
+        # LLM Validation
+        if self.llm is not None:
+            _ = self.llm.validate_connection()
 
     async def start(self) -> None:
         """Start the agent's server component if available."""
@@ -93,7 +102,9 @@ class Agent:
         return self.card
 
     def set_llm(self, llm: LLM) -> None:
+        """Sets the Agent's LLM and validates the connection."""
         self.llm = llm
+        _ = self.llm.validate_connection()
 
     async def handle_task(self, task: Task) -> Task:
         """Process a task and return the result.

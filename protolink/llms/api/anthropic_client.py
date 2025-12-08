@@ -12,6 +12,9 @@ from anthropic.types.message_stream_event import MessageStreamEvent
 from protolink.llms.api.base import APILLM
 from protolink.llms.base import LLMProvider
 from protolink.models import Message
+from protolink.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AnthropicLLM(APILLM):
@@ -99,3 +102,12 @@ class AnthropicLLM(APILLM):
                         content=current_content,
                         finish_reason=None,
                     )
+
+    def validate_connection(self) -> bool:
+        try:
+            # Check that the configured model is available / accessible
+            self._client.models.retrieve(self.model)
+            return True
+        except Exception as e:
+            logger.warning(f"Anthropic connection validation failed for model {self.model}: {e}")
+            return False

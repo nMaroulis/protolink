@@ -21,3 +21,7 @@ class APILLM(LLM):
     def set_system_prompt(self, system_prompt: str) -> None:
         """Set the system prompt for the model."""
         self.system_prompt = system_prompt
+
+    def validate_connection(self) -> bool:
+        """Validate API connection - to be implemented by subclasses."""
+        raise NotImplementedError
