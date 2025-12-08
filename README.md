@@ -153,14 +153,17 @@ agent.start()
 
 #### Transport:
 
-- [HTTPTransport](): Uses HTTP/HTTPS for synchronous requests. (httpx, starlette, uvicorn) / FastAPI variation with Pydantic schema validation.
-- [WebSocketTransport](): Uses WebSocket for streaming requests. (httpx, websockets)
+- [HTTPTransport](): Uses HTTP/HTTPS for synchronous requests. Two ASGI implementations are available.
+  - Lightweight: `starlette`, `httpx` & `uvicorn`
+  - Advanced | Schema Validation: `fastapi`, `pydantic` & `uvicorn`
+- [WebSocketTransport](): Uses WebSocket for streaming requests. [`websockets`]
 - [JSONRPCTransport](): TBD
 - [GRPCTransport](): TBD
-- RuntimeTransport(): Simple in-process, in-memory transport.
+- RuntimeTransport(): Simple **in-process, in-memory transport**.
 
 #### LLMs:
-Protolink seperates the LLMs in 3 distinct types: [API, local, server].
+Protolink separates LLMs into three types: `api`, `local`, and `server`.
+The following are the Protolink wrappers for each type. If you want to use another model, you can use it directly without going through Protolink’s `LLM` class.
 - **API**, calls the API, requires an API key:
   - [OpenAILLM](): Uses **OpenAI API** for sync & async requests.
   - [AnthropicLLM](): Uses **Anthropic API** for sync & async requests.
@@ -168,7 +171,7 @@ Protolink seperates the LLMs in 3 distinct types: [API, local, server].
   - [LlamaCPPLLM](): Uses **local runtime llama.cpp** for sync & async requests.
 - **Server**, connects to an LLM Server, deployed locally or remotely:
   - [OllamaLLM](): Uses **Ollama** for sync & async requests.
-
+-
 
 #### Tools:
 
