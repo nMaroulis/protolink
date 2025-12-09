@@ -7,6 +7,7 @@ class APILLM(LLM):
     """Base class for API-based LLM implementations."""
 
     model_type: LLMType = "api"
+    base_url: str | None = None
     provider: LLMProvider
 
     def __init__(self) -> None:

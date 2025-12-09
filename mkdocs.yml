@@ -36,6 +36,7 @@ theme:
     - navigation.tracking
     - content.code.copy
     - navigation.footer
+    - navigation.expand
 
 
 markdown_extensions:
@@ -46,6 +47,10 @@ markdown_extensions:
   - pymdownx.superfences
   - toc:
       permalink: true
+
+plugins:
+  - search
+  - meta
 
 nav:
   - Overview:

@@ -37,7 +37,7 @@ uv add "protolink[dev]"
 ```
 
 !!! info "Optional extras"
-    You usually only need the extras that match your use case. For example, `protolink[http]` for web transports or `protolink[llms]` when integrating LLM backends.
+    You usually only need the extras that match your use case. For example, `protolink[http]` for web transports. The `protolink[llms]` will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is advised to install manually the libraries that are needed for your project.
 
 For development from source:
 
