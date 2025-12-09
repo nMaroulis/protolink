@@ -13,7 +13,7 @@ class FriendlyAgent(Agent):
     """Simple agent that replies with a templated message."""
 
     def __init__(self, name: str, description: str, port: int) -> None:
-        transport = HTTPTransport(host="127.0.0.1", port=port)
+        transport = HTTPTransport(host="127.0.0.1", port=port, backend="starlette")
         card = AgentCard(name=name, description=description, url=f"http://127.0.0.1:{port}")
         super().__init__(card, transport=transport)
 
