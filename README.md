@@ -13,6 +13,8 @@
 
 A lightweight, production-ready framework for **agent-to-agent communication**, implementing from scratch and extending Google's [Agent-to-Agent Communication (A2A) protocol](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com). Designed to be the go-to Python library for building **interoperable agent systems** with minimal boilerplate, supporting **native integration** with **LLMs** and **Tools** (native & [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)).
 
+Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
+
 ## Features
 
 - **A2A Protocol Implementation**: Fully compatible with **Google's A2A specification**
@@ -149,6 +151,7 @@ agent.start()
 
 ## Documentation
 
+Follow the API documentation here: [Documentation](https://nmaroulis.github.io/protolink/)
 ### API Documentation
 
 #### Transport:
@@ -171,7 +174,6 @@ The following are the Protolink wrappers for each type. If you want to use anoth
   - [LlamaCPPLLM](): Uses **local runtime llama.cpp** for sync & async requests.
 - **Server**, connects to an LLM Server, deployed locally or remotely:
   - [OllamaLLM](): Uses **Ollama** for sync & async requests.
--
 
 #### Tools:
 
