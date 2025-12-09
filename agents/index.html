@@ -264,7 +264,9 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
         
           
           <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
@@ -622,7 +624,9 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -815,6 +819,304 @@
 <li><strong>gRPC / JSON‑RPC (planned)</strong>: additional transports for more structured or high‑performance communication.</li>
 </ul>
 <p>From the framework’s perspective, all of these are implementations of the same transport interface, so you can swap them with minimal code changes.</p>
+<hr />
+<h1 id="agent-api-reference">Agent API Reference<a class="headerlink" href="#agent-api-reference" title="Permanent link">&para;</a></h1>
+<p>This section provides a detailed API reference for the <code>Agent</code> base class in <code>protolink.agents.base</code>. The <code>Agent</code> class is the core component for creating A2A-compatible agents, serving as both client and server.</p>
+<div class="admonition info">
+<p class="admonition-title">Unified Agent Model</p>
+<p>Unlike the original A2A specification, Protolink's <code>Agent</code> combines client and server functionality in a single class. You can send tasks/messages to other agents while also serving incoming requests.</p>
+</div>
+<h2 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>card</code></td>
+<td><code>AgentCard</code></td>
+<td>—</td>
+<td><strong>Required.</strong> The agent's metadata card containing name, description, and other identifying information.</td>
+</tr>
+<tr>
+<td><code>llm</code></td>
+<td><code>LLM \| None</code></td>
+<td><code>None</code></td>
+<td>Optional language model instance for AI-powered task processing.</td>
+</tr>
+<tr>
+<td><code>transport</code></td>
+<td><code>Transport \| None</code></td>
+<td><code>None</code></td>
+<td>Optional transport for communication. If not provided, you must set one later via <code>set_transport()</code>.</td>
+</tr>
+<tr>
+<td><code>auth_provider</code></td>
+<td><code>AuthProvider \| None</code></td>
+<td><code>None</code></td>
+<td>Optional authentication provider for securing agent communications.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentCard</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTTPTransport</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLM</span>
+
+<span class="n">card</span> <span class="o">=</span> <span class="n">AgentCard</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;my_agent&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Example agent&quot;</span><span class="p">)</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">)</span>
+<span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPTransport</span><span class="p">()</span>
+
+<span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card</span><span class="o">=</span><span class="n">card</span><span class="p">,</span> <span class="n">llm</span><span class="o">=</span><span class="n">llm</span><span class="p">,</span> <span class="n">transport</span><span class="o">=</span><span class="n">transport</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="lifecycle-methods">Lifecycle Methods<a class="headerlink" href="#lifecycle-methods" title="Permanent link">&para;</a></h2>
+<p>These methods control the agent's server component lifecycle.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>start()</code></td>
+<td>—</td>
+<td><code>None</code></td>
+<td>Starts the agent's server component if a transport is configured.</td>
+</tr>
+<tr>
+<td><code>stop()</code></td>
+<td>—</td>
+<td><code>None</code></td>
+<td>Stops the agent's server component and cleans up resources.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Transport Required</p>
+<p>The <code>start()</code> method requires a transport to be configured. If no transport was provided during construction, call <code>set_transport()</code> first.</p>
+</div>
+<h2 id="transport-management">Transport Management<a class="headerlink" href="#transport-management" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_transport()</code></td>
+<td><code>transport: Transport</code></td>
+<td><code>None</code></td>
+<td>Sets or updates the transport used by this agent.</td>
+</tr>
+<tr>
+<td><code>client</code> (property)</td>
+<td>—</td>
+<td><code>AgentClient</code></td>
+<td>Returns the client instance for sending requests to other agents.</td>
+</tr>
+<tr>
+<td><code>server</code> (property)</td>
+<td>—</td>
+<td><code>Server \| None</code></td>
+<td>Returns the server instance if one is available via the transport.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="task-and-message-handling">Task and Message Handling<a class="headerlink" href="#task-and-message-handling" title="Permanent link">&para;</a></h2>
+<h3 id="core-task-processing">Core Task Processing<a class="headerlink" href="#core-task-processing" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handle_task()</code></td>
+<td><code>task: Task</code></td>
+<td><code>Task</code></td>
+<td><strong>Abstract method.</strong> Subclasses must implement this to define how tasks are processed.</td>
+</tr>
+<tr>
+<td><code>handle_task_streaming()</code></td>
+<td><code>task: Task</code></td>
+<td><code>AsyncIterator[Task]</code></td>
+<td>Optional streaming handler for real-time task updates. Default raises <code>NotImplementedError</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="communication-methods">Communication Methods<a class="headerlink" href="#communication-methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>send_task_to()</code></td>
+<td><code>agent_url: str</code>, <code>task: Task</code>, <code>skill: str \| None = None</code></td>
+<td><code>Task</code></td>
+<td>Sends a task to another agent and returns the processed result.</td>
+</tr>
+<tr>
+<td><code>send_message_to()</code></td>
+<td><code>agent_url: str</code>, <code>message: Message</code></td>
+<td><code>Message</code></td>
+<td>Sends a message to another agent and returns the response.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Authentication</p>
+<p>All outgoing requests are automatically signed if an <code>auth_provider</code> is configured. Incoming requests are verified against the same provider.</p>
+</div>
+<h2 id="tool-management">Tool Management<a class="headerlink" href="#tool-management" title="Permanent link">&para;</a></h2>
+<p>Tools allow agents to execute external functions and APIs.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_tool()</code></td>
+<td><code>tool: BaseTool</code></td>
+<td><code>None</code></td>
+<td>Registers a tool with the agent.</td>
+</tr>
+<tr>
+<td><code>tool()</code></td>
+<td><code>name: str</code>, <code>description: str</code></td>
+<td><code>decorator</code></td>
+<td>Decorator for registering Python functions as tools.</td>
+</tr>
+<tr>
+<td><code>call_tool()</code></td>
+<td><code>tool_name: str</code>, <code>**kwargs</code></td>
+<td><code>Any</code></td>
+<td>Executes a registered tool by name with provided arguments.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="c1"># Using the decorator approach</span>
+<span class="nd">@agent</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span><span class="s2">&quot;calculate&quot;</span><span class="p">,</span> <span class="s2">&quot;Performs basic calculations&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate</span><span class="p">(</span><span class="n">operation</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;add&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+    <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;multiply&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">b</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported operation: </span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Direct tool registration</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseTool</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">WeatherTool</span><span class="p">(</span><span class="n">BaseTool</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">location</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="c1"># Weather API logic here</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="mi">72</span><span class="p">,</span> <span class="s2">&quot;conditions&quot;</span><span class="p">:</span> <span class="s2">&quot;sunny&quot;</span><span class="p">}</span>
+
+<span class="n">agent</span><span class="o">.</span><span class="n">add_tool</span><span class="p">(</span><span class="n">WeatherTool</span><span class="p">())</span>
+</code></pre></div>
+<h2 id="utility-methods">Utility Methods<a class="headerlink" href="#utility-methods" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_agent_card()</code></td>
+<td>—</td>
+<td><code>AgentCard</code></td>
+<td>Returns the agent's metadata card.</td>
+</tr>
+<tr>
+<td><code>set_llm()</code></td>
+<td><code>llm: LLM</code></td>
+<td><code>None</code></td>
+<td>Updates the agent's language model instance.</td>
+</tr>
+<tr>
+<td><code>verify_auth()</code></td>
+<td><code>request: Request</code></td>
+<td><code>bool</code></td>
+<td>Verifies authentication for incoming requests if an auth provider is configured.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="abstract-methods">Abstract Methods<a class="headerlink" href="#abstract-methods" title="Permanent link">&para;</a></h2>
+<p>Subclasses of <code>Agent</code> must implement the following methods:</p>
+<ul>
+<li><strong><code>handle_task(task: Task) -&gt; Task</code></strong>: Defines the core logic for processing incoming tasks.</li>
+</ul>
+<div class="admonition example">
+<p class="admonition-title">Minimal Agent Implementation</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentCard</span><span class="p">,</span> <span class="n">Task</span><span class="p">,</span> <span class="n">Message</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">EchoAgent</span><span class="p">(</span><span class="n">Agent</span><span class="p">):</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="n">Task</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Task</span><span class="p">:</span>
+        <span class="c1"># Echo back all messages</span>
+        <span class="n">response_messages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">message</span> <span class="ow">in</span> <span class="n">task</span><span class="o">.</span><span class="n">messages</span><span class="p">:</span>
+            <span class="n">response_messages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">Message</span><span class="p">(</span>
+                    <span class="n">content</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Echo: </span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">content</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">role</span><span class="o">=</span><span class="s2">&quot;assistant&quot;</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Task</span><span class="p">(</span>
+            <span class="n">messages</span><span class="o">=</span><span class="n">response_messages</span><span class="p">,</span>
+            <span class="n">parent_task_id</span><span class="o">=</span><span class="n">task</span><span class="o">.</span><span class="n">id</span>
+        <span class="p">)</span>
+</code></pre></div>
+</div>
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
+<p>The <code>Agent</code> class includes several error handling patterns:</p>
+<ul>
+<li><strong>Missing Transport</strong>: Raises <code>ValueError</code> if trying to start without a transport.</li>
+<li><strong>Authentication Failures</strong>: Returns <code>401</code> or <code>403</code> responses for invalid auth.</li>
+<li><strong>Tool Errors</strong>: Tool execution errors are propagated to the caller.</li>
+<li><strong>Task Processing</strong>: Errors in <code>handle_task()</code> are caught and returned as error messages to the sender.</li>
+</ul>
+<h2 id="authentication-integration">Authentication Integration<a class="headerlink" href="#authentication-integration" title="Permanent link">&para;</a></h2>
+<p>When an <code>auth_provider</code> is configured, the agent automatically:</p>
+<ol>
+<li><strong>Signs outgoing requests</strong> with appropriate authentication headers</li>
+<li><strong>Verifies incoming requests</strong> using the same auth mechanism</li>
+<li><strong>Returns appropriate HTTP status codes</strong> for auth failures (401, 403)</li>
+</ol>
+<p>Supported auth providers include API key authentication, OAuth, and custom implementations.</p>
 
 
 
@@ -926,7 +1228,7 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "content.code.copy", "navigation.footer"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "content.code.copy", "navigation.footer", "navigation.expand"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
