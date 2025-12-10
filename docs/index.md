@@ -1,5 +1,10 @@
-# Protolink
-
+<style>
+.md-content .md-typeset h1 { display: none; }
+</style>
+<!-- SEO: Protolink - Agent-to-Agent Communication Framework | Lightweight Production-Ready A2A Protocol Extension -->
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="80%">
+</div>
 > A lightweight, production-ready framework for **agent-to-agent communication**, built on and extending Google's A2A protocol.
 
 [Get Started](getting-started.md){ .md-button .md-button--primary }

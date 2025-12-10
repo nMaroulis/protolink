@@ -6,15 +6,37 @@ Protolink integrates with various LLM backends.
 
 Protolink groups LLM backends into three broad categories:
 
-- **API** — calls a remote API and requires an API key:
-  - `OpenAILLM`: uses the **OpenAI API** for sync & async requests.
-  - `AnthropicLLM`: uses the **Anthropic API** for sync & async requests.
+<div align="center" style="font-family: 'Courier New', monospace; color:#888; font-size:14px; margin-bottom:12px;">
+  [ API ]   [ Server ]   [ Local ]
+</div>
+<div align="center" style="
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:30px;
+">
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/openai.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/anthropic_black.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/gemini.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/deepseek.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/ollama_light.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="55" class="hover-icon" />
+</div>
+<style>
+  .hover-icon{ transition: transform .15s ease; }
+  .hover-icon:hover{ transform: translateY(-4px) scale(1.08); }
+</style>
 
-- **Local** — runs the model directly in your runtime:
-  - `LlamaCPPLLM`: uses a local **llama.cpp** runtime for sync & async requests.
+- **API** — calls a remote API and requires an API key:
+    - `OpenAILLM`: uses the **OpenAI API** for sync & async requests.
+    - `AnthropicLLM`: uses the **Anthropic API** for sync & async requests.
 
 - **Server** — connects to an LLM server, locally or remotely:
-  - `OllamaLLM`: connects to an **Ollama** server for sync & async requests.
+    - `OllamaLLM`: connects to an **Ollama** server for sync & async requests.
+
+- **Local** — runs the model directly in your runtime:
+    - `LlamaCPPLLM`: uses a local **llama.cpp** runtime for sync & async requests.
+
 
 You can also use other LLM clients directly without going through Protolink’s `LLM` wrappers if you prefer.
 
@@ -29,8 +51,8 @@ Configuration depends on the specific backend, but the general pattern is:
    uv add "protolink[llms]"
    ```
 
-   !!! info "Choosing LLM extras"
-       If you only need a subset of backends, you can install more targeted extras once they are exposed (for example, only OpenAI or only local backends).
+!!! info "Choosing LLM extras"
+    If you only need a subset of LLMs (e.g. OpenAI API), it is advised to **install them manually** instead of using the `llms` extra, which will intall all the supported libraries.
 
 2. **Instantiate the LLM** with the desired model and credentials:
 
@@ -44,8 +66,8 @@ Configuration depends on the specific backend, but the general pattern is:
    )
    ```
 
-   !!! warning "API keys"
-       Never commit API keys to version control. Read them from environment variables or a secure secrets manager.
+!!! warning "API keys"
+    Never commit API keys to version control. Read them from environment variables or a secure secrets manager.
 
 3. **Pass the LLM to your Agent**:
 
@@ -103,9 +125,10 @@ This section provides a detailed API reference for all LLM classes in Protolink.
     ```
 
 !!! info "LLM Hierarchy"
-    - **`LLM`** (abstract base class)
-    - **`APILLM`** (base for API-based LLMs)
-    - **`ServerLLM`** (base for server-based LLMs)
+    - **`LLM`** - abstract base class
+    - **`APILLM`** - base for API-based LLMs
+    - **`ServerLLM`** - base for server-based LLMs
+    -  **`LocalLLM`** - base for local runtime LLMs
     - **Concrete implementations**: `OpenAILLM`, `AnthropicLLM`, `OllamaLLM`, etc.
 
 ## Base LLM Class

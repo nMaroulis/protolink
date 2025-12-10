@@ -61,5 +61,6 @@ nav:
       - Transports: transports.md
       - LLMs: llms.md
       - Tools: tools.md
+      - Models: models.md
   - Examples:
       - Examples: examples.md

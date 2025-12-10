@@ -165,8 +165,32 @@ Follow the API documentation here: [Documentation](https://nmaroulis.github.io/p
 - RuntimeTransport(): Simple **in-process, in-memory transport**.
 
 #### LLMs:
+
 Protolink separates LLMs into three types: `api`, `local`, and `server`.
 The following are the Protolink wrappers for each type. If you want to use another model, you can use it directly without going through Protolink’s `LLM` class.
+
+<div align="center" style="font-family: 'Courier New', monospace; color:#888; font-size:14px; margin-bottom:12px;">
+  [ API ]   [ Server ]   [ Local ]
+</div>
+<div align="center" style="
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:30px;
+">
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/openai.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/anthropic_black.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/gemini.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/deepseek.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/ollama_light.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="55" class="hover-icon" />
+</div>
+<style>
+  .hover-icon{ transition: transform .15s ease; }
+  .hover-icon:hover{ transform: translateY(-4px) scale(1.08); }
+</style>
+
+
 - **API**, calls the API, requires an API key:
   - [OpenAILLM](): Uses **OpenAI API** for sync & async requests.
   - [AnthropicLLM](): Uses **Anthropic API** for sync & async requests.
@@ -179,6 +203,7 @@ The following are the Protolink wrappers for each type. If you want to use anoth
 
 - [Native Tool](): Uses native tools.
 - [MCPToolAdapter](): Connects to MCP Server and registers MCP tools as native tools.
+
 
 ## License
 

@@ -11,8 +11,8 @@ High‑level ideas:
 - **Unified model**: a single `Agent` instance can send and receive messages.
 - **AgentCard**: a small model describing the agent (name, description, metadata).
 - **Modules**:
-  - **LLMs** (e.g. `OpenAILLM`, `AnthropicLLM`, `LlamaCPPLLM`, `OllamaLLM`).
-  - **Tools** (native Python functions or MCP‑backed tools).
+    - **LLMs** (e.g. `OpenAILLM`, `AnthropicLLM`, `LlamaCPPLLM`, `OllamaLLM`).
+    - **Tools** (native Python functions or MCP‑backed tools).
 - **Transport abstraction**: agents communicate over transports such as HTTP, WebSocket, gRPC, or the in‑process runtime transport.
 
 ## Creating an Agent
@@ -71,9 +71,9 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `llm` | `LLM \| None` | `None` | Optional language model instance for AI-powered task processing. |
-| `transport` | `Transport \| None` | `None` | Optional transport for communication. If not provided, you must set one later via `set_transport()`. |
-| `auth_provider` | `AuthProvider \| None` | `None` | Optional authentication provider for securing agent communications. |
+| `llm` | `LLM | None` | `None` | Optional language model instance for AI-powered task processing. |
+| `transport` | `Transport | None` | `None` | Optional transport for communication. If not provided, you must set one later via `set_transport()`. |
+| `auth_provider` | `AuthProvider | None` | `None` | Optional authentication provider for securing agent communications. |
 
 ```python
 from protolink.agents import Agent
