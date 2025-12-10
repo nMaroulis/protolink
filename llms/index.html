@@ -591,6 +591,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -754,22 +782,47 @@
 <p>Protolink integrates with various LLM backends.</p>
 <h2 id="llm-types">LLM Types<a class="headerlink" href="#llm-types" title="Permanent link">&para;</a></h2>
 <p>Protolink groups LLM backends into three broad categories:</p>
+<div align="center" style="font-family: 'Courier New', monospace; color:#888; font-size:14px; margin-bottom:12px;">
+  [ API ]   [ Server ]   [ Local ]
+</div>
+<div align="center" style="
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:30px;
+">
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/openai.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/anthropic_black.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/gemini.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/deepseek.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/ollama_light.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="55" class="hover-icon" />
+</div>
+<style>
+  .hover-icon{ transition: transform .15s ease; }
+  .hover-icon:hover{ transform: translateY(-4px) scale(1.08); }
+</style>
+
 <ul>
-<li><strong>API</strong> — calls a remote API and requires an API key:</li>
+<li>
+<p><strong>API</strong> — calls a remote API and requires an API key:</p>
+<ul>
 <li><code>OpenAILLM</code>: uses the <strong>OpenAI API</strong> for sync &amp; async requests.</li>
-<li>
-<p><code>AnthropicLLM</code>: uses the <strong>Anthropic API</strong> for sync &amp; async requests.</p>
-</li>
-<li>
-<p><strong>Local</strong> — runs the model directly in your runtime:</p>
-</li>
-<li>
-<p><code>LlamaCPPLLM</code>: uses a local <strong>llama.cpp</strong> runtime for sync &amp; async requests.</p>
+<li><code>AnthropicLLM</code>: uses the <strong>Anthropic API</strong> for sync &amp; async requests.</li>
+</ul>
 </li>
 <li>
 <p><strong>Server</strong> — connects to an LLM server, locally or remotely:</p>
-</li>
+<ul>
 <li><code>OllamaLLM</code>: connects to an <strong>Ollama</strong> server for sync &amp; async requests.</li>
+</ul>
+</li>
+<li>
+<p><strong>Local</strong> — runs the model directly in your runtime:</p>
+<ul>
+<li><code>LlamaCPPLLM</code>: uses a local <strong>llama.cpp</strong> runtime for sync &amp; async requests.</li>
+</ul>
+</li>
 </ul>
 <p>You can also use other LLM clients directly without going through Protolink’s <code>LLM</code> wrappers if you prefer.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
@@ -780,8 +833,10 @@
 <div class="highlight"><pre><span></span><code><span class="c1"># All supported LLM backends</span>
 uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;protolink[llms]&quot;</span>
 </code></pre></div>
-<p>!!! info "Choosing LLM extras"
-       If you only need a subset of backends, you can install more targeted extras once they are exposed (for example, only OpenAI or only local backends).</p>
+<div class="admonition info">
+<p class="admonition-title">Choosing LLM extras</p>
+<p>If you only need a subset of LLMs (e.g. OpenAI API), it is advised to <strong>install them manually</strong> instead of using the <code>llms</code> extra, which will intall all the supported libraries.</p>
+</div>
 <ol>
 <li><strong>Instantiate the LLM</strong> with the desired model and credentials:</li>
 </ol>
@@ -793,8 +848,10 @@ uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;prot
     <span class="c1"># api_key is typically read from the environment, e.g. OPENAI_API_KEY</span>
 <span class="p">)</span>
 </code></pre></div>
-<p>!!! warning "API keys"
-       Never commit API keys to version control. Read them from environment variables or a secure secrets manager.</p>
+<div class="admonition warning">
+<p class="admonition-title">API keys</p>
+<p>Never commit API keys to version control. Read them from environment variables or a secure secrets manager.</p>
+</div>
 <ol>
 <li><strong>Pass the LLM to your Agent</strong>:</li>
 </ol>
@@ -809,6 +866,700 @@ uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;prot
 <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">agent_card</span><span class="p">,</span> <span class="n">transport</span><span class="p">,</span> <span class="n">llm</span><span class="p">)</span>
 </code></pre></div>
 <p>For local and server‑style LLMs (<code>LlamaCPPLLM</code>, <code>OllamaLLM</code>), configuration additionally includes paths to model files or server URLs. Refer to the corresponding example scripts in <code>examples/llms.py</code> for concrete usage patterns.</p>
+<hr />
+<h1 id="llm-api-reference">LLM API Reference<a class="headerlink" href="#llm-api-reference" title="Permanent link">&para;</a></h1>
+<p>This section provides a detailed API reference for all LLM classes in Protolink. All LLM implementations inherit from the base <code>LLM</code> class and provide a consistent interface for generating responses.</p>
+<div class="admonition success">
+<p class="admonition-title">Unified LLM Interface</p>
+<p><strong>Protolink provides a single, consistent API for all LLM providers.</strong> Whether you're using OpenAI, Anthropic, Ollama, or local models, you interact with them through the same methods: <code>generate_response()</code>, <code>generate_stream_response()</code>, and configuration helpers. This unified approach means you can swap LLM providers without changing your application code - just update the initialization and you're done!</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Why Use Protolink's LLM Wrappers?</p>
+<ul>
+<li><strong>Provider Agnostic</strong>: Switch between OpenAI, Anthropic, Ollama, and future providers with minimal code changes</li>
+<li><strong>Consistent Interface</strong>: Same method signatures and behavior across all implementations</li>
+<li><strong>Built-in Features</strong>: Connection validation, parameter validation, and error handling out of the box</li>
+<li><strong>Extensible</strong>: Easy to add new LLM providers while maintaining compatibility</li>
+<li><strong>Production Ready</strong>: Robust error handling and logging for real-world applications</li>
+</ul>
+</div>
+<div class="admonition example">
+<p class="admonition-title">Provider Switching in Action</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># The same code works with ANY LLM provider</span>
+
+<span class="c1"># Choose your provider - just change the import and initialization!</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLM</span>    <span class="c1"># or AnthropicLLM</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">OllamaLLM</span>  <span class="c1"># or any other provider</span>
+
+<span class="c1"># Initialize your chosen LLM</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.7</span><span class="p">)</span>
+<span class="c1"># llm = AnthropicLLM(model=&quot;claude-3-sonnet&quot;, temperature=0.7)</span>
+<span class="c1"># llm = OllamaLLM(model=&quot;llama3&quot;, temperature=0.7)</span>
+
+<span class="c1"># The rest of your code stays EXACTLY the same!</span>
+<span class="n">messages</span> <span class="o">=</span> <span class="p">[</span><span class="n">Message</span><span class="p">(</span><span class="n">role</span><span class="o">=</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="n">content</span><span class="o">=</span><span class="s2">&quot;Hello!&quot;</span><span class="p">)]</span>
+<span class="n">response</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate_response</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+
+<span class="c1"># Streaming also works identically</span>
+<span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate_stream_response</span><span class="p">(</span><span class="n">messages</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">chunk</span><span class="o">.</span><span class="n">content</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+</div>
+<div class="admonition info">
+<p class="admonition-title">LLM Hierarchy</p>
+<ul>
+<li><strong><code>LLM</code></strong> - abstract base class</li>
+<li><strong><code>APILLM</code></strong> - base for API-based LLMs</li>
+<li><strong><code>ServerLLM</code></strong> - base for server-based LLMs</li>
+<li><strong><code>LocalLLM</code></strong> - base for local runtime LLMs</li>
+<li><strong>Concrete implementations</strong>: <code>OpenAILLM</code>, <code>AnthropicLLM</code>, <code>OllamaLLM</code>, etc.</li>
+</ul>
+</div>
+<h2 id="base-llm-class">Base LLM Class<a class="headerlink" href="#base-llm-class" title="Permanent link">&para;</a></h2>
+<p>The <code>LLM</code> class defines the common interface that all LLM implementations must follow.</p>
+<h3 id="attributes">Attributes<a class="headerlink" href="#attributes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model_type</code></td>
+<td><code>LLMType</code></td>
+<td>The type of LLM (<code>"api"</code>, <code>"local"</code>, or <code>"server"</code>).</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td><code>LLMProvider</code></td>
+<td>The provider name (<code>"openai"</code>, <code>"anthropic"</code>, <code>"ollama"</code>, etc.).</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>str</code></td>
+<td>The model name/identifier.</td>
+</tr>
+<tr>
+<td><code>model_params</code></td>
+<td><code>dict[str, Any]</code></td>
+<td>Model-specific parameters (temperature, max_tokens, etc.).</td>
+</tr>
+<tr>
+<td><code>system_prompt</code></td>
+<td><code>str</code></td>
+<td>Default system prompt for the model.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="core-methods">Core Methods<a class="headerlink" href="#core-methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Message</code></td>
+<td>Generate a single response from the model.</td>
+</tr>
+<tr>
+<td><code>generate_stream_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Iterable[Message]</code></td>
+<td>Generate a streaming response, yielding messages as they're generated.</td>
+</tr>
+<tr>
+<td><code>set_model_params()</code></td>
+<td><code>model_params: dict[str, Any]</code></td>
+<td><code>None</code></td>
+<td>Update model parameters.</td>
+</tr>
+<tr>
+<td><code>set_system_prompt()</code></td>
+<td><code>system_prompt: str</code></td>
+<td><code>None</code></td>
+<td>Set the system prompt for the model.</td>
+</tr>
+<tr>
+<td><code>validate_connection()</code></td>
+<td>—</td>
+<td><code>bool</code></td>
+<td>Validate that the LLM connection is working.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Abstract Methods</p>
+<p>The <code>LLM</code> base class is abstract. You should use one of the concrete implementations like <code>OpenAILLM</code> or <code>AnthropicLLM</code>.</p>
+</div>
+<h2 id="api-based-llms">API-based LLMs<a class="headerlink" href="#api-based-llms" title="Permanent link">&para;</a></h2>
+<p>API-based LLMs connect to external services and require API keys or authentication.</p>
+<h3 id="apillm-base-class">APILLM Base Class<a class="headerlink" href="#apillm-base-class" title="Permanent link">&para;</a></h3>
+<p>Base class for all API-based LLM implementations.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_model_params()</code></td>
+<td><code>model_params: dict[str, Any]</code></td>
+<td><code>None</code></td>
+<td>Update existing model parameters, ignoring invalid keys.</td>
+</tr>
+<tr>
+<td><code>set_system_prompt()</code></td>
+<td><code>system_prompt: str</code></td>
+<td><code>None</code></td>
+<td>Set the system prompt for the model.</td>
+</tr>
+<tr>
+<td><code>validate_connection()</code></td>
+<td>—</td>
+<td><code>bool</code></td>
+<td><strong>Abstract.</strong> Validate API connection (implemented by subclasses).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="openaillm">OpenAILLM<a class="headerlink" href="#openaillm" title="Permanent link">&para;</a></h3>
+<p>OpenAI API implementation using the official OpenAI client.</p>
+<h4 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api_key</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>OpenAI API key. If not provided, uses <code>OPENAI_API_KEY</code> environment variable.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>str \| None</code></td>
+<td><code>"gpt-5"</code></td>
+<td>OpenAI model name.</td>
+</tr>
+<tr>
+<td><code>model_params</code></td>
+<td><code>dict[str, Any] \| None</code></td>
+<td><code>None</code></td>
+<td>Model parameters (temperature, max_tokens, etc.).</td>
+</tr>
+<tr>
+<td><code>base_url</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Custom base URL for OpenAI-compatible APIs.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLM</span>
+
+<span class="c1"># Basic usage</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">)</span>
+
+<span class="c1"># With custom parameters</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4-turbo&quot;</span><span class="p">,</span>
+    <span class="n">model_params</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="mf">0.7</span><span class="p">,</span>
+        <span class="s2">&quot;max_tokens&quot;</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="mf">0.9</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+
+<span class="c1"># With custom base URL (for OpenAI-compatible APIs)</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;custom-model&quot;</span><span class="p">,</span>
+    <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;https://api.custom-provider.com/v1&quot;</span><span class="p">,</span>
+    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;your-api-key&quot;</span>
+<span class="p">)</span>
+</code></pre></div>
+<h4 id="default-model-parameters">Default Model Parameters<a class="headerlink" href="#default-model-parameters" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range/Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>temperature</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td><code>0.0</code> to <code>2.0</code> - Controls randomness</td>
+</tr>
+<tr>
+<td><code>top_p</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td>Nucleus sampling parameter</td>
+</tr>
+<tr>
+<td><code>n</code></td>
+<td><code>int</code></td>
+<td><code>1</code></td>
+<td>Number of completions to generate</td>
+</tr>
+<tr>
+<td><code>stream</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Whether to stream responses</td>
+</tr>
+<tr>
+<td><code>stop</code></td>
+<td><code>str \| list[str] \| None</code></td>
+<td><code>None</code></td>
+<td>Stop sequences</td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Maximum tokens to generate</td>
+</tr>
+<tr>
+<td><code>presence_penalty</code></td>
+<td><code>float</code></td>
+<td><code>0.0</code></td>
+<td><code>-2.0</code> to <code>2.0</code> - Presence penalty</td>
+</tr>
+<tr>
+<td><code>frequency_penalty</code></td>
+<td><code>float</code></td>
+<td><code>0.0</code></td>
+<td><code>-2.0</code> to <code>2.0</code> - Frequency penalty</td>
+</tr>
+<tr>
+<td><code>logit_bias</code></td>
+<td><code>dict \| None</code></td>
+<td><code>None</code></td>
+<td>Token bias dictionary</td>
+</tr>
+</tbody>
+</table>
+<h4 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Message</code></td>
+<td>Generate a single response using OpenAI's API.</td>
+</tr>
+<tr>
+<td><code>generate_stream_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Iterable[Message]</code></td>
+<td>Generate streaming response, yielding partial messages.</td>
+</tr>
+<tr>
+<td><code>validate_connection()</code></td>
+<td>—</td>
+<td><code>bool</code></td>
+<td>Check if the model is available and API key is valid.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">API Key Required</p>
+<p>OpenAI requires a valid API key. Set the <code>OPENAI_API_KEY</code> environment variable or pass the <code>api_key</code> parameter.</p>
+</div>
+<h3 id="anthropicllm">AnthropicLLM<a class="headerlink" href="#anthropicllm" title="Permanent link">&para;</a></h3>
+<p>Anthropic Claude API implementation using the official Anthropic client.</p>
+<h4 id="constructor_1">Constructor<a class="headerlink" href="#constructor_1" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api_key</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Anthropic API key. If not provided, uses <code>ANTHROPIC_API_KEY</code> environment variable.</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>str \| None</code></td>
+<td><code>"claude-sonnet-4-20250514"</code></td>
+<td>Claude model name.</td>
+</tr>
+<tr>
+<td><code>model_params</code></td>
+<td><code>dict[str, Any] \| None</code></td>
+<td><code>None</code></td>
+<td>Model parameters (temperature, max_tokens, etc.).</td>
+</tr>
+<tr>
+<td><code>base_url</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Custom base URL for Anthropic-compatible APIs.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnthropicLLM</span>
+
+<span class="c1"># Basic usage</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">AnthropicLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;claude-3-5-sonnet-20241022&quot;</span><span class="p">)</span>
+
+<span class="c1"># With custom parameters</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">AnthropicLLM</span><span class="p">(</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;claude-3-5-haiku-20241022&quot;</span><span class="p">,</span>
+    <span class="n">model_params</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="s2">&quot;max_tokens&quot;</span><span class="p">:</span> <span class="mi">2000</span><span class="p">,</span>
+        <span class="s2">&quot;top_p&quot;</span><span class="p">:</span> <span class="mf">0.8</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+</code></pre></div>
+<h4 id="default-model-parameters_1">Default Model Parameters<a class="headerlink" href="#default-model-parameters_1" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range/Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_tokens</code></td>
+<td><code>int</code></td>
+<td><code>4096</code></td>
+<td>Maximum tokens to generate</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td><code>0.0</code> to <code>1.0</code> - Controls randomness</td>
+</tr>
+<tr>
+<td><code>top_p</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td>Nucleus sampling parameter</td>
+</tr>
+<tr>
+<td><code>top_k</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Top-k sampling parameter</td>
+</tr>
+<tr>
+<td><code>stop_sequences</code></td>
+<td><code>list[str] \| None</code></td>
+<td><code>None</code></td>
+<td>Stop sequences</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict \| None</code></td>
+<td><code>None</code></td>
+<td>Additional metadata</td>
+</tr>
+</tbody>
+</table>
+<h4 id="methods_1">Methods<a class="headerlink" href="#methods_1" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Message</code></td>
+<td>Generate a single response using Anthropic's API.</td>
+</tr>
+<tr>
+<td><code>generate_stream_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Iterable[Message]</code></td>
+<td>Generate streaming response, yielding partial messages.</td>
+</tr>
+<tr>
+<td><code>validate_connection()</code></td>
+<td>—</td>
+<td><code>bool</code></td>
+<td>Check if the model is available and API key is valid.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">API Key Required</p>
+<p>Anthropic requires a valid API key. Set the <code>ANTHROPIC_API_KEY</code> environment variable or pass the <code>api_key</code> parameter.</p>
+</div>
+<h2 id="server-based-llms">Server-based LLMs<a class="headerlink" href="#server-based-llms" title="Permanent link">&para;</a></h2>
+<p>Server-based LLMs connect to local or remote LLM servers.</p>
+<h3 id="serverllm-base-class">ServerLLM Base Class<a class="headerlink" href="#serverllm-base-class" title="Permanent link">&para;</a></h3>
+<p>Base class for all server-based LLM implementations.</p>
+<h4 id="constructor_2">Constructor<a class="headerlink" href="#constructor_2" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>base_url</code></td>
+<td><code>str</code></td>
+<td>—</td>
+<td><strong>Required.</strong> URL of the LLM server.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="methods_2">Methods<a class="headerlink" href="#methods_2" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_model_params()</code></td>
+<td><code>model_params: dict[str, Any]</code></td>
+<td><code>None</code></td>
+<td>Update existing model parameters, ignoring invalid keys.</td>
+</tr>
+<tr>
+<td><code>set_system_prompt()</code></td>
+<td><code>system_prompt: str</code></td>
+<td><code>None</code></td>
+<td>Set the system prompt for the model.</td>
+</tr>
+<tr>
+<td><code>validate_connection()</code></td>
+<td>—</td>
+<td><code>bool</code></td>
+<td>Validate that the server is reachable.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ollamallm">OllamaLLM<a class="headerlink" href="#ollamallm" title="Permanent link">&para;</a></h3>
+<p>Ollama server implementation for connecting to local or remote Ollama instances.</p>
+<h4 id="constructor_3">Constructor<a class="headerlink" href="#constructor_3" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>base_url</code></td>
+<td><code>str \| None</code></td>
+<td><code>None</code></td>
+<td>Ollama server URL. If not provided, uses <code>OLLAMA_HOST</code> environment variable.</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td><code>dict[str, str] \| None</code></td>
+<td><code>None</code></td>
+<td>Additional HTTP headers (including auth).</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>str \| None</code></td>
+<td><code>"gemma3"</code></td>
+<td>Ollama model name.</td>
+</tr>
+<tr>
+<td><code>model_params</code></td>
+<td><code>dict[str, Any] \| None</code></td>
+<td><code>None</code></td>
+<td>Model parameters (temperature, etc.).</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">OllamaLLM</span>
+
+<span class="c1"># Local Ollama server</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OllamaLLM</span><span class="p">(</span>
+    <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;http://localhost:11434&quot;</span><span class="p">,</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;llama3&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Remote Ollama with authentication</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OllamaLLM</span><span class="p">(</span>
+    <span class="n">base_url</span><span class="o">=</span><span class="s2">&quot;https://ollama.example.com&quot;</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="s2">&quot;Bearer your-token&quot;</span><span class="p">},</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;codellama&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Using environment variables</span>
+<span class="c1"># Set OLLAMA_HOST=http://localhost:11434</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OllamaLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;mistral&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h4 id="default-model-parameters_2">Default Model Parameters<a class="headerlink" href="#default-model-parameters_2" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>temperature</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td>Controls randomness (range depends on model).</td>
+</tr>
+</tbody>
+</table>
+<h4 id="methods_3">Methods<a class="headerlink" href="#methods_3" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Message</code></td>
+<td>Generate a single response using Ollama's API.</td>
+</tr>
+<tr>
+<td><code>generate_stream_response()</code></td>
+<td><code>messages: list[Message]</code></td>
+<td><code>Iterable[Message]</code></td>
+<td>Generate streaming response, yielding partial messages.</td>
+</tr>
+<tr>
+<td><code>validate_connection()</code></td>
+<td>—</td>
+<td><code>bool</code></td>
+<td>Check if Ollama server is reachable and has models available.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Ollama Server Required</p>
+<p>OllamaLLM requires a running Ollama server. Install Ollama and start it with <code>ollama serve</code>.</p>
+</div>
+<h2 id="usage-examples">Usage Examples<a class="headerlink" href="#usage-examples" title="Permanent link">&para;</a></h2>
+<h3 id="basic-llm-usage">Basic LLM Usage<a class="headerlink" href="#basic-llm-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLM</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Message</span>
+
+<span class="c1"># Initialize LLM</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create messages</span>
+<span class="n">messages</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">Message</span><span class="p">(</span><span class="n">role</span><span class="o">=</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="n">content</span><span class="o">=</span><span class="s2">&quot;Hello, how are you?&quot;</span><span class="p">)</span>
+<span class="p">]</span>
+
+<span class="c1"># Generate response</span>
+<span class="n">response</span> <span class="o">=</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate_response</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="streaming-responses">Streaming Responses<a class="headerlink" href="#streaming-responses" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate streaming response</span>
+<span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">llm</span><span class="o">.</span><span class="n">generate_stream_response</span><span class="p">(</span><span class="n">messages</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">chunk</span><span class="o">.</span><span class="n">content</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="updating-parameters">Updating Parameters<a class="headerlink" href="#updating-parameters" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Update model parameters</span>
+<span class="n">llm</span><span class="o">.</span><span class="n">set_model_params</span><span class="p">({</span>
+    <span class="s2">&quot;temperature&quot;</span><span class="p">:</span> <span class="mf">0.7</span><span class="p">,</span>
+    <span class="s2">&quot;max_tokens&quot;</span><span class="p">:</span> <span class="mi">500</span>
+<span class="p">})</span>
+
+<span class="c1"># Update system prompt</span>
+<span class="n">llm</span><span class="o">.</span><span class="n">set_system_prompt</span><span class="p">(</span><span class="s2">&quot;You are a helpful coding assistant.&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="connection-validation">Connection Validation<a class="headerlink" href="#connection-validation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Validate connection before use</span>
+<span class="k">if</span> <span class="n">llm</span><span class="o">.</span><span class="n">validate_connection</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;LLM is ready!&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;LLM connection failed.&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
+<p>All LLM implementations include error handling for common issues:</p>
+<ul>
+<li><strong>Authentication Errors</strong>: Missing or invalid API keys</li>
+<li><strong>Connection Errors</strong>: Network issues or unavailable servers</li>
+<li><strong>Model Errors</strong>: Invalid model names or unavailable models</li>
+<li><strong>Parameter Errors</strong>: Invalid parameter values</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Connection Validation</p>
+<p>Always call <code>validate_connection()</code> before using an LLM to ensure it's properly configured and reachable.</p>
+</div>
+<h2 id="type-aliases">Type Aliases<a class="headerlink" href="#type-aliases" title="Permanent link">&para;</a></h2>
+<p>The LLM module defines several type aliases for clarity:</p>
+<div class="highlight"><pre><span></span><code><span class="n">LLMType</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;api&quot;</span><span class="p">,</span> <span class="s2">&quot;local&quot;</span><span class="p">,</span> <span class="s2">&quot;server&quot;</span><span class="p">]</span>
+<span class="n">LLMProvider</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;openai&quot;</span><span class="p">,</span> <span class="s2">&quot;anthropic&quot;</span><span class="p">,</span> <span class="s2">&quot;google&quot;</span><span class="p">,</span> <span class="s2">&quot;llama.cpp&quot;</span><span class="p">,</span> <span class="s2">&quot;ollama&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p>These are used throughout the LLM implementations to ensure type safety and clarity.</p>
 
 
 

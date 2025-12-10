@@ -602,6 +602,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -780,9 +808,11 @@
 <ul>
 <li><strong>Unified model</strong>: a single <code>Agent</code> instance can send and receive messages.</li>
 <li><strong>AgentCard</strong>: a small model describing the agent (name, description, metadata).</li>
-<li><strong>Modules</strong>:</li>
+<li><strong>Modules</strong>:<ul>
 <li><strong>LLMs</strong> (e.g. <code>OpenAILLM</code>, <code>AnthropicLLM</code>, <code>LlamaCPPLLM</code>, <code>OllamaLLM</code>).</li>
 <li><strong>Tools</strong> (native Python functions or MCP‑backed tools).</li>
+</ul>
+</li>
 <li><strong>Transport abstraction</strong>: agents communicate over transports such as HTTP, WebSocket, gRPC, or the in‑process runtime transport.</li>
 </ul>
 <h2 id="creating-an-agent">Creating an Agent<a class="headerlink" href="#creating-an-agent" title="Permanent link">&para;</a></h2>
@@ -845,19 +875,19 @@
 </tr>
 <tr>
 <td><code>llm</code></td>
-<td><code>LLM \| None</code></td>
+<td><code>LLM | None</code></td>
 <td><code>None</code></td>
 <td>Optional language model instance for AI-powered task processing.</td>
 </tr>
 <tr>
 <td><code>transport</code></td>
-<td><code>Transport \| None</code></td>
+<td><code>Transport | None</code></td>
 <td><code>None</code></td>
 <td>Optional transport for communication. If not provided, you must set one later via <code>set_transport()</code>.</td>
 </tr>
 <tr>
 <td><code>auth_provider</code></td>
-<td><code>AuthProvider \| None</code></td>
+<td><code>AuthProvider | None</code></td>
 <td><code>None</code></td>
 <td>Optional authentication provider for securing agent communications.</td>
 </tr>
