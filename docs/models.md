@@ -228,10 +228,10 @@ Type alias for supported MIME types in Protolink. These are used to specify the 
 #### SecuritySchemeType
 Type alias for supported security schemes in Protolink. These are used to specify the **authentication methods** that agents can use.
 
-| Category | MIME Types |
+| Category | Security Schemes |
 |----------|------------|
 | **API key** | `apiKey` |
-| **HTTP** bearer / basic / digest| `http` |
+| **HTTP** (bearer/basic/digest) | `http` |
 | **full OAuth OAuth2** | `oauth2` |
 | **Certificates** | `mutualTLS` |
 | **OIDC auto-discovery** | `openIdConnect` |

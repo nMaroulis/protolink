@@ -84,7 +84,7 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
 | `llm` | `LLM | None` | `None` | Optional language model instance for AI-powered task processing. |
 | `transport` | `Transport | None` | `None` | Optional transport for communication. If not provided, you must set one later via `set_transport()`. |
-| `auth_provider` | `AuthProvider | None` | `None` | Optional authentication provider for securing agent communications. |
+| `authenticator` | `Authenticator | None` | `None` | Optional authentication provider for securing agent communications. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 
 ```python
@@ -137,7 +137,7 @@ These methods control the agent's server component lifecycle.
 | `send_message_to()` | `agent_url: str`, `message: Message` | `Message` | Sends a message to another agent and returns the response. |
 
 !!! note "Authentication"
-    All outgoing requests are automatically signed if an `auth_provider` is configured. Incoming requests are verified against the same provider.
+    All outgoing requests are automatically signed if an `authenticator` is configured. Incoming requests are verified against the same provider.
 
 ## Skills Management
 
@@ -270,7 +270,7 @@ The `Agent` class includes several error handling patterns:
 
 ## Authentication Integration
 
-When an `auth_provider` is configured, the agent automatically:
+When an `authenticator` is configured, the agent automatically:
 
 1. **Signs outgoing requests** with appropriate authentication headers
 2. **Verifies incoming requests** using the same auth mechanism

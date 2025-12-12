@@ -1,7 +1,7 @@
 """
 ProtoLink - Security & Authentication (v0.3.0)
 
-OAuth 2.0, Bearer tokens, and scope-based authorization for enterprise deployments.
+OAuth 2.0, Bearer tokens authorization for enterprise deployments.
 """
 
 import json
@@ -12,16 +12,14 @@ from typing import Any
 
 
 @dataclass
-class AuthContext:
+class SecurityContext:
     """Authenticated principal context.
 
-    Represents an authenticated user, agent, or service with their
-    authorized scopes and token information.
+    Represents an authenticated user, agent, or service with their token information.
 
     Attributes:
         principal_id: Identifier of authenticated entity (user, agent, service)
         token: Authentication token (JWT, OAuth token, etc.)
-        scopes: List of authorized scopes (e.g., ["skill:write", "data:read"])
         expires_at: When token expires (ISO format)
         issued_at: When token was issued (ISO format)
         metadata: Additional auth metadata
@@ -29,21 +27,9 @@ class AuthContext:
 
     principal_id: str
     token: str
-    scopes: list[str] = field(default_factory=list)
     expires_at: str | None = None
     issued_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
-
-    def has_scope(self, required_scope: str) -> bool:
-        """Check if context has required scope.
-
-        Args:
-            required_scope: Scope to check (e.g., "skill:analyze")
-
-        Returns:
-            True if scope is authorized
-        """
-        return required_scope in self.scopes or "*" in self.scopes
 
     def is_expired(self) -> bool:
         """Check if token is expired.
@@ -62,11 +48,13 @@ class AuthContext:
         return {
             "principal_id": self.principal_id,
             "token": self.token,
-            "scopes": self.scopes,
             "expires_at": self.expires_at,
             "issued_at": self.issued_at,
             "metadata": self.metadata,
         }
+
+
+# TODO(): Import from types
 
 
 @dataclass
@@ -79,13 +67,11 @@ class SecurityScheme:
     Attributes:
         scheme_type: Type of scheme ("bearer", "oauth2", "api_key")
         description: Human-readable description
-        scopes: Available scopes for this scheme
         metadata: Additional scheme metadata
     """
 
     scheme_type: str  # "bearer", "oauth2", "api_key"
     description: str
-    scopes: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -93,27 +79,25 @@ class SecurityScheme:
         return {
             "type": self.scheme_type,
             "description": self.description,
-            "scopes": self.scopes,
             "metadata": self.metadata,
         }
 
 
-class AuthProvider(ABC):
+class Authenticator(ABC):
     """Abstract authentication provider.
 
-    Implementations provide authentication methods (Bearer, OAuth2, etc.)
-    and authorization checking based on scopes and skills.
+    Implementations provide authentication methods (Bearer, OAuth2, etc.).
     """
 
     @abstractmethod
-    async def authenticate(self, credentials: str) -> AuthContext:
+    async def authenticate(self, credentials: str) -> SecurityContext:
         """Authenticate a principal with provided credentials.
 
         Args:
             credentials: Raw credentials (token, api key, etc.)
 
         Returns:
-            AuthContext if successful
+            SecurityContext if successful
 
         Raises:
             Exception: If authentication fails
@@ -121,20 +105,7 @@ class AuthProvider(ABC):
         pass
 
     @abstractmethod
-    async def authorize(self, context: AuthContext, skill: str) -> bool:
-        """Check if context is authorized to execute skill.
-
-        Args:
-            context: Authenticated context
-            skill: Skill identifier (e.g., "analyze", "execute")
-
-        Returns:
-            True if authorized, False otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def refresh_token(self, context: AuthContext) -> AuthContext:
+    async def refresh_token(self, context: SecurityContext) -> SecurityContext:
         """Refresh an authentication context (if supported).
 
         Args:
@@ -149,7 +120,7 @@ class AuthProvider(ABC):
         pass
 
 
-class BearerTokenAuth(AuthProvider):
+class BearerTokenAuth(Authenticator):
     """Bearer token authentication (JWT or opaque).
 
     Validates bearer tokens against a secret or verification endpoint.
@@ -173,7 +144,7 @@ class BearerTokenAuth(AuthProvider):
         self.secret = secret
         self.algorithm = algorithm
 
-    async def authenticate(self, credentials: str) -> AuthContext:
+    async def authenticate(self, credentials: str) -> SecurityContext:
         """Authenticate bearer token.
 
         Args:
@@ -183,6 +154,7 @@ class BearerTokenAuth(AuthProvider):
             AuthContext extracted from token
         """
         try:
+            # TODO(): Implement proper JWT validation
             # For demo: parse JWT format (in production, use PyJWT)
             # Expected format: header.payload.signature
             parts = credentials.split(".")
@@ -196,33 +168,16 @@ class BearerTokenAuth(AuthProvider):
             payload_bytes = base64.urlsafe_b64decode(payload_str)
             payload = json.loads(payload_bytes)
 
-            return AuthContext(
+            return SecurityContext(
                 principal_id=payload.get("sub", "unknown"),
                 token=credentials,
-                scopes=payload.get("scopes", []),
                 expires_at=payload.get("exp"),
                 metadata=payload.get("metadata", {}),
             )
         except Exception as e:
             raise Exception(f"Token authentication failed: {e}")  # noqa: B904
 
-    async def authorize(self, context: AuthContext, skill: str) -> bool:
-        """Check if context has scope for skill.
-
-        Args:
-            context: Authenticated context
-            skill: Skill name
-
-        Returns:
-            True if authorized
-        """
-        if context.is_expired():
-            return False
-
-        required_scope = f"skill:{skill}"
-        return context.has_scope(required_scope)
-
-    async def refresh_token(self, context: AuthContext) -> AuthContext:
+    async def refresh_token(self, context: SecurityContext) -> SecurityContext:
         """Bearer tokens typically don't refresh.
 
         Args:
@@ -234,7 +189,7 @@ class BearerTokenAuth(AuthProvider):
         return context
 
 
-class OAuth2DelegationAuth(AuthProvider):
+class OAuth2DelegationAuth(Authenticator):
     """OAuth 2.0 token exchange with delegated scopes.
 
     Exchanges a broad-scoped token for an agent-specific token
@@ -252,21 +207,19 @@ class OAuth2DelegationAuth(AuthProvider):
         context = await auth.authenticate(user_token)
     """
 
-    def __init__(self, exchange_endpoint: str, client_id: str, client_secret: str, scope_prefix: str = "skill:"):
+    def __init__(self, exchange_endpoint: str, client_id: str, client_secret: str):
         """Initialize OAuth 2.0 delegation auth.
 
         Args:
             exchange_endpoint: Token exchange endpoint URL
             client_id: OAuth client ID
             client_secret: OAuth client secret
-            scope_prefix: Prefix for skill scopes
         """
         self.exchange_endpoint = exchange_endpoint
         self.client_id = client_id
         self.client_secret = client_secret
-        self.scope_prefix = scope_prefix
 
-    async def authenticate(self, credentials: str) -> AuthContext:
+    async def authenticate(self, credentials: str) -> SecurityContext:
         """Exchange user token for delegated agent token.
 
         Args:
@@ -295,33 +248,16 @@ class OAuth2DelegationAuth(AuthProvider):
 
                 result = response.json()
 
-                return AuthContext(
+                return SecurityContext(
                     principal_id=result.get("sub", "unknown"),
                     token=result.get("access_token", ""),
-                    scopes=result.get("scope", "").split(),
                     expires_at=result.get("expires_in"),
                     metadata=result.get("metadata", {}),
                 )
         except Exception as e:
             raise Exception(f"OAuth delegation failed: {e}")  # noqa: B904
 
-    async def authorize(self, context: AuthContext, skill: str) -> bool:
-        """Check if context has delegated scope for skill.
-
-        Args:
-            context: Authenticated context with delegated scopes
-            skill: Skill name
-
-        Returns:
-            True if authorized via delegated scope
-        """
-        if context.is_expired():
-            return False
-
-        required_scope = f"{self.scope_prefix}{skill}"
-        return context.has_scope(required_scope)
-
-    async def refresh_token(self, context: AuthContext) -> AuthContext:
+    async def refresh_token(self, context: SecurityContext) -> SecurityContext:
         """Refresh delegated token.
 
         Args:
@@ -335,7 +271,7 @@ class OAuth2DelegationAuth(AuthProvider):
         return context
 
 
-class APIKeyAuth(AuthProvider):
+class APIKeyAuth(Authenticator):
     """Simple API key authentication.
 
     Validates API keys against a list of known keys.
@@ -347,11 +283,11 @@ class APIKeyAuth(AuthProvider):
 
         Args:
             valid_keys: Dict mapping keys to scope lists
-                       e.g., {"key-123": ["skill:*"]}
+                       e.g., {"key-123": ["abc..."]}
         """
         self.valid_keys = valid_keys
 
-    async def authenticate(self, credentials: str) -> AuthContext:
+    async def authenticate(self, credentials: str) -> SecurityContext:
         """Validate API key.
 
         Args:
@@ -363,23 +299,9 @@ class APIKeyAuth(AuthProvider):
         if credentials not in self.valid_keys:
             raise Exception("Invalid API key")
 
-        scopes = self.valid_keys[credentials]
-        return AuthContext(principal_id=f"api-key-{credentials[:8]}", token=credentials, scopes=scopes)
+        return SecurityContext(principal_id=f"api-key-{credentials[:8]}", token=credentials)
 
-    async def authorize(self, context: AuthContext, skill: str) -> bool:
-        """Check if context has scope for skill.
-
-        Args:
-            context: Authenticated context
-            skill: Skill name
-
-        Returns:
-            True if authorized
-        """
-        required_scope = f"skill:{skill}"
-        return context.has_scope(required_scope)
-
-    async def refresh_token(self, context: AuthContext) -> AuthContext:
+    async def refresh_token(self, context: SecurityContext) -> SecurityContext:
         """API keys don't refresh.
 
         Args:

@@ -45,13 +45,12 @@ class RuntimeTransport(Transport):
         if agent_id in self.agents:
             del self.agents[agent_id]
 
-    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
+    async def send_task(self, agent_url: str, task: Task) -> Task:
         """Send task to local agent.
 
         Args:
             agent_url: Agent URL or name
             task: Task to send
-            skill: Skill to use for authorization [Not needed]
 
         Returns:
             Processed task

@@ -12,7 +12,7 @@ from protolink.client.agent_client import AgentClient
 from protolink.core.context_manager import ContextManager
 from protolink.llms.base import LLM
 from protolink.models import AgentCard, AgentSkill, Message, Task
-from protolink.security.auth import AuthContext, AuthProvider
+from protolink.security.auth import Authenticator, SecurityContext
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport
@@ -33,7 +33,7 @@ class Agent:
         card: AgentCard | dict[str, Any],
         llm: LLM | None = None,
         transport: Transport | None = None,
-        auth_provider: AuthProvider | None = None,
+        authenticator: Authenticator | None = None,
         skills: Literal["auto", "fixed"] = "auto",
     ):
         """Initialize agent with its identity card and transport layer.
@@ -42,7 +42,7 @@ class Agent:
             card: AgentCard describing this agent
             llm: Optional LLM instance for the agent to use
             transport: Transport layer for client/server communication
-            auth_provider: Optional authentication provider
+            authenticator: Optional authentication provider
             skills: Skills mode - "auto" to automatically detect and add skills, "fixed" to use only the skills defined
             by the user in the AgentCard.
         """
@@ -53,8 +53,8 @@ class Agent:
         self.llm = llm
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
-        self.auth_provider = auth_provider
-        self._auth_context = None
+        self.authenticator = authenticator
+        self._security_context: SecurityContext | None = None
 
         # Initialize client and server components
         if transport is None:
@@ -132,61 +132,6 @@ class Agent:
         """
         raise NotImplementedError("Agent subclasses must implement handle_task()")
 
-    async def verify_request_auth(self, auth_header: str | None = None, skill: str = "default") -> AuthContext | None:
-        """NEW in v0.3.0: Verify authentication of incoming request.
-
-        Args:
-            auth_header: Authorization header (e.g., "Bearer token")
-            skill: Skill being requested for scope verification
-
-        Returns:
-            AuthContext if verified, None if no auth required
-
-        Raises:
-            PermissionError: If auth fails or insufficient scopes
-        """
-        if not self.auth_provider:
-            # No auth configured, request always allowed
-            return None
-
-        if not auth_header:
-            raise PermissionError("Authentication required but no credentials provided")
-
-        # Extract bearer token
-        if not auth_header.startswith("Bearer "):
-            raise PermissionError("Invalid authorization header format")
-
-        token = auth_header[7:]  # Remove "Bearer "
-
-        # Authenticate
-        try:
-            context = await self.auth_provider.authenticate(token)
-        except Exception as e:
-            raise PermissionError(f"Authentication failed: {e}")  # noqa: B904
-
-        # Check if expired
-        if context.is_expired():
-            raise PermissionError("Token expired")
-
-        # Authorize for skill
-        if skill != "default":
-            try:
-                if not await self.auth_provider.authorize(context, skill):
-                    raise PermissionError(f"Not authorized for skill: {skill}")
-            except Exception as e:
-                raise PermissionError(f"Authorization failed: {e}")  # noqa: B904
-
-        self._auth_context = context
-        return context
-
-    def get_auth_context(self) -> AuthContext | None:
-        """Get current authenticated context (NEW v0.3.0).
-
-        Returns:
-            AuthContext if authenticated, None otherwise
-        """
-        return self._auth_context
-
     async def handle_task_streaming(self, task: Task) -> AsyncIterator:
         """Process a task with streaming updates (NEW in v0.2.0).
 
@@ -263,7 +208,7 @@ class Agent:
         self._client = AgentClient(transport=transport)
         self._server = AgentServer(transport, self.handle_task)
 
-    async def send_task_to(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
+    async def send_task_to(self, agent_url: str, task: Task) -> Task:
         """Send a task to another agent.
 
         Args:
@@ -279,7 +224,7 @@ class Agent:
         if not self._client:
             raise RuntimeError("No transport client configured. Call set_transport() first.")
 
-        return await self._client.send_task(agent_url, task, skill=skill)
+        return await self._client.send_task(agent_url, task)
 
     async def send_message_to(self, agent_url: str, message: Message) -> Message:
         """Send a message to another agent.
@@ -306,6 +251,56 @@ class Agent:
             ContextManager instance
         """
         return self.context_manager
+
+    ####################
+    ## Authentication
+    ####################
+    async def verify_request_auth(self, auth_header: str | None = None) -> SecurityContext | None:
+        """NEW in v0.3.0: Verify authentication of incoming request.
+
+        Args:
+            auth_header: Authorization header (e.g., "Bearer token")
+            skill: Skill being requested for scope verification
+
+        Returns:
+            AuthContext if verified, None if no auth required
+
+        Raises:
+            PermissionError: If auth fails or insufficient scopes
+        """
+        if not self.authenticator:
+            # No auth configured, request always allowed
+            return None
+
+        if not auth_header:
+            raise PermissionError("Authentication required but no credentials provided")
+
+        # Extract bearer token
+        if not auth_header.startswith("Bearer "):
+            raise PermissionError("Invalid authorization header format")
+
+        token = auth_header[7:]  # Remove "Bearer "
+
+        # Authenticate
+        try:
+            context = await self.authenticator.authenticate(token)
+        except Exception as e:
+            raise PermissionError(f"Authentication failed: {e}")  # noqa: B904
+
+        # Check if expired
+        if context.is_expired():
+            raise PermissionError("Token expired")
+
+        self._security_context = context
+        return context
+
+    def get_security_context(self) -> SecurityContext | None:
+        """Get current authenticated context (NEW v0.3.0).
+
+        Returns:
+            SecurityContext if authenticated, None otherwise
+        """
+        return self._security_context
 
     ####################
     ## Tool Management

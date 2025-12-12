@@ -17,7 +17,7 @@ class DummyTransport(Transport):
     def __init__(self):
         self.handler = None
 
-    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
+    async def send_task(self, agent_url: str, task: Task) -> Task:
         return task
 
     async def send_message(self, agent_url: str, message: Message) -> Message:
@@ -112,5 +112,4 @@ class TestAgent:
         transport.send_task.assert_awaited_once_with(
             "http://other-agent.local",
             task,
-            skill=None,
         )

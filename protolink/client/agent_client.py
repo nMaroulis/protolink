@@ -6,8 +6,8 @@ class AgentClient:
     def __init__(self, transport: Transport):
         self.transport = transport
 
-    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
-        return await self.transport.send_task(agent_url, task, skill=skill)
+    async def send_task(self, agent_url: str, task: Task) -> Task:
+        return await self.transport.send_task(agent_url, task)
 
     async def send_message(self, agent_url: str, message: Message) -> Message:
         return await self.transport.send_message(agent_url, message)

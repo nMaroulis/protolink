@@ -11,7 +11,7 @@ from websockets.exceptions import ConnectionClosed
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
-from protolink.security.auth import AuthProvider
+from protolink.security.auth import Authenticator
 from protolink.transport.transport import Transport
 
 
@@ -25,29 +25,29 @@ class WebSocketTransport(Transport):
         host: str = "0.0.0.0",
         port: int = 8765,
         timeout: float = 30.0,
-        auth_provider: AuthProvider | None = None,
+        authenticator: Authenticator | None = None,
     ):
         self.host = host
         self.port = port
         self.timeout = timeout
-        self.auth_provider = auth_provider
-        self.auth_context = None
+        self.authenticator = authenticator
+        self.security_context = None
         self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
         # websockets.server.serve() returns a Serve object that exposes close()/wait_closed()
         self._server: Any | None = None
         self._http_client: httpx.AsyncClient | None = None
 
     async def authenticate(self, credentials: str) -> None:
-        if not self.auth_provider:
-            raise RuntimeError("No auth provider configured")
-        self.auth_context = await self.auth_provider.authenticate(credentials)
+        if not self.authenticator:
+            raise RuntimeError("No authenticator configured")
+        self.security_context = await self.authenticator.authenticate(credentials)
 
-    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
+    async def send_task(self, agent_url: str, task: Task) -> Task:
         ws_url = self._build_ws_url(agent_url)
         headers = self._build_headers()
 
         async with connect(ws_url, extra_headers=headers, open_timeout=self.timeout, close_timeout=self.timeout) as ws:
-            payload = {"type": "task", "task": task.to_dict(), "skill": skill}
+            payload = {"type": "task", "task": task.to_dict()}
             await ws.send(json.dumps(payload))
 
             async for raw in ws:
@@ -132,9 +132,8 @@ class WebSocketTransport(Transport):
             await self._send_error(websocket, "Missing task payload")
             return
 
-        skill = payload.get("skill")
         try:
-            await self._verify_request_auth(websocket, skill)
+            await self._verify_request_auth(websocket)
         except PermissionError as exc:
             await self._send_error(websocket, str(exc))
             return
@@ -143,8 +142,8 @@ class WebSocketTransport(Transport):
         result = await self._task_handler(task)
         await websocket.send(json.dumps({"type": "task_result", "task": result.to_dict()}))
 
-    async def _verify_request_auth(self, websocket: ServerConnection, skill: str | None) -> None:
-        if not self.auth_provider:
+    async def _verify_request_auth(self, websocket: ServerConnection) -> None:
+        if not self.authenticator:
             return
 
         auth_header = websocket.request_headers.get("Authorization")
@@ -152,12 +151,7 @@ class WebSocketTransport(Transport):
             raise PermissionError("Authentication required")
 
         token = auth_header[7:]
-        context = await self.auth_provider.authenticate(token)
-
-        if skill:
-            authorized = await self.auth_provider.authorize(context, skill)
-            if not authorized:
-                raise PermissionError(f"Not authorized for skill: {skill}")
+        self.security_context = await self.authenticator.authenticate(token)
 
     def _build_ws_url(self, agent_url: str) -> str:
         url = agent_url
@@ -190,8 +184,8 @@ class WebSocketTransport(Transport):
 
     def _build_headers(self) -> dict[str, str]:
         headers: dict[str, str] = {}
-        if self.auth_context:
-            headers["Authorization"] = f"Bearer {self.auth_context.token}"
+        if self.security_context:
+            headers["Authorization"] = f"Bearer {self.security_context.token}"
         return headers
 
     async def _ensure_http_client(self) -> httpx.AsyncClient:

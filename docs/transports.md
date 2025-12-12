@@ -240,7 +240,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `host: str = "0.0.0.0"`, `port: int = 8000`, `timeout: float = 30.0`, `auth_provider: AuthProvider \| None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False` | `None` | Configure host/port, request timeout, optional authentication provider, backend implementation, and whether to enable FastAPI/Pydantic schema validation. |
+| `__init__` | `host: str = "0.0.0.0"`, `port: int = 8000`, `timeout: float = 30.0`, `authenticator: Authenticator \| None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False` | `None` | Configure host/port, request timeout, optional authentication provider, backend implementation, and whether to enable FastAPI/Pydantic schema validation. |
 | `start` | `self` | `Awaitable[None]` | Start the selected backend, register the `/tasks/` route and create the internal `httpx.AsyncClient`. Must be awaited before serving HTTP traffic. |
 | `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
 
@@ -257,7 +257,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `AuthProvider` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
+| `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `Authenticator` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
 | `_build_headers` | `skill: str \| None = None` | `dict[str, str]` | Internal helper that constructs HTTP headers (including `Authorization` when an auth context is present). Exposed here for completeness; you normally do not need to call it directly. |
 | `validate_agent_url` | `agent_url: str` | `bool` | Return `True` if the URL is considered local to this transport's host/port (e.g. for allow‑listing), `False` otherwise. |
 

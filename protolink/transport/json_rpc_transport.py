@@ -6,7 +6,7 @@ import httpx
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
-from protolink.security.auth import AuthProvider
+from protolink.security.auth import Authenticator
 from protolink.transport.transport import Transport
 
 
@@ -24,18 +24,18 @@ class JSONRPCTransport(Transport):
         - /.well-known/agent.json - Get agent card
     """
 
-    def __init__(self, timeout: float = 30.0, auth_provider: AuthProvider | None = None):
+    def __init__(self, timeout: float = 30.0, authenticator: Authenticator | None = None):
         """Initialize JSON-RPC transport.
 
         Args:
             timeout: Request timeout in seconds
-            auth_provider: AuthProvider for request authentication (NEW v0.3.0)
+            authenticator: Authenticator for request authentication (NEW v0.3.0)
         """
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
         self._request_id = 0
-        self.auth_provider = auth_provider
-        self.auth_context = None
+        self.authenticator = authenticator
+        self.security_context = None
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -64,10 +64,10 @@ class JSONRPCTransport(Transport):
         Args:
             credentials: Token or API key for authentication
         """
-        if not self.auth_provider:
+        if not self.authenticator:
             raise RuntimeError("No auth provider configured")
 
-        self.auth_context = await self.auth_provider.authenticate(credentials)
+        self.security_context = await self.authenticator.authenticate(credentials)
 
     async def _json_rpc_call(self, url: str, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Make a JSON-RPC 2.0 call.
@@ -76,7 +76,6 @@ class JSONRPCTransport(Transport):
             url: Target URL
             method: RPC method name
             params: Method parameters
-            skill: Skill name for authorization check (NEW v0.3.0)
 
         Returns:
             Result from RPC call
@@ -84,10 +83,6 @@ class JSONRPCTransport(Transport):
         Raises:
             Exception: If RPC call fails
         """
-
-        if self.auth_provider and self.auth_context:
-            if "skill" in params and not await self.auth_provider.authorize(self.auth_context, params["skill"]):
-                raise PermissionError(f"Not authorized for skill: {params['skill']}")
 
         client = self._get_client()
 
@@ -99,8 +94,8 @@ class JSONRPCTransport(Transport):
         }
 
         headers = {}
-        if self.auth_context:
-            headers["Authorization"] = f"Bearer {self.auth_context.token}"
+        if self.security_context:
+            headers["Authorization"] = f"Bearer {self.security_context.token}"
 
         response = await client.post(url, json=request, headers=headers)
         response.raise_for_status()
@@ -112,18 +107,17 @@ class JSONRPCTransport(Transport):
 
         return result.get("result", {})
 
-    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
+    async def send_task(self, agent_url: str, task: Task) -> Task:
         """Send task via JSON-RPC.
 
         Args:
             agent_url: Target agent URL
             task: Task to send
-            skill: Skill to use for authorization
 
         Returns:
             Processed task
         """
-        result = await self._json_rpc_call(agent_url, "tasks/send", {"task": task.to_dict(), "skill": skill})
+        result = await self._json_rpc_call(agent_url, "tasks/send", {"task": task.to_dict()})
 
         return Task.from_dict(result.get("task", {}))
 
@@ -185,8 +179,8 @@ class JSONRPCTransport(Transport):
         }
 
         headers = {}
-        if self.auth_context:
-            headers["Authorization"] = f"Bearer {self.auth_context.token}"
+        if self.security_context:
+            headers["Authorization"] = f"Bearer {self.security_context.token}"
 
         try:
             async with client.stream("POST", agent_url, json=request, headers=headers) as response:

@@ -13,7 +13,7 @@ import httpx
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
-from protolink.security.auth import AuthProvider
+from protolink.security.auth import Authenticator
 from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
 from protolink.transport.transport import Transport
 
@@ -32,7 +32,7 @@ class HTTPTransport(Transport):
         Port the HTTP server listens on.
     timeout:
         Request timeout (in seconds) for the internal HTTP client.
-    auth_provider:
+    authenticator:
         Optional authentication provider used to obtain auth context.
     backend:
         Name of the HTTP backend implementation to use. Currently
@@ -47,7 +47,7 @@ class HTTPTransport(Transport):
         host: str = "0.0.0.0",
         port: int = 8000,
         timeout: float = 30.0,
-        auth_provider: AuthProvider | None = None,
+        authenticator: Authenticator | None = None,
         backend: BackendName = "starlette",
         *,
         validate_schema: bool = False,
@@ -55,8 +55,8 @@ class HTTPTransport(Transport):
         self.host: str = host
         self.port: int = port
         self.timeout: float = timeout
-        self.auth_provider: AuthProvider | None = auth_provider
-        self.auth_context: object | None = None
+        self.authenticator: Authenticator | None = authenticator
+        self.security_context: object | None = None
         self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
         self._client: httpx.AsyncClient | None = None
 
@@ -69,7 +69,7 @@ class HTTPTransport(Transport):
         self.app = self.backend.app
 
     async def authenticate(self, credentials: str) -> None:
-        """Authenticate using the configured :class:`AuthProvider`.
+        """Authenticate using the configured :class:`Authenticator`.
 
         Raises
         ------
@@ -77,16 +77,16 @@ class HTTPTransport(Transport):
             If no authentication provider has been configured.
         """
 
-        if not self.auth_provider:
-            raise RuntimeError("No auth provider configured")
+        if not self.authenticator:
+            raise RuntimeError("No Authenticator configured")
 
-        self.auth_context = await self.auth_provider.authenticate(credentials)
+        self.security_context = await self.authenticator.authenticate(credentials)
 
-    async def send_task(self, agent_url: str, task: Task, skill: str | None = None) -> Task:
+    async def send_task(self, agent_url: str, task: Task) -> Task:
         """Send a ``Task`` to a remote agent and return the resulting task."""
 
         client = await self._ensure_client()
-        headers = self._build_headers(skill)
+        headers = self._build_headers()
         url = f"{agent_url.rstrip('/')}/tasks/"
         response = await client.post(url, json=task.to_dict(), headers=headers)
         response.raise_for_status()
@@ -147,7 +147,7 @@ class HTTPTransport(Transport):
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
-    def _build_headers(self, skill: str | None = None) -> dict[str, str]:
+    def _build_headers(self) -> dict[str, str]:
         """Build HTTP headers for an outgoing request.
 
         Includes authentication headers when an auth context is present.
@@ -155,8 +155,8 @@ class HTTPTransport(Transport):
 
         headers: dict[str, str] = {}
 
-        if self.auth_context:
-            headers["Authorization"] = f"Bearer {self.auth_context.token}"
+        if self.authenticator and self.security_context:
+            headers["Authorization"] = f"Bearer {self.security_context.token}"
 
         return headers
 
