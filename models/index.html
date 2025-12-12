@@ -694,6 +694,62 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#type-aliases-in-agentcard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Aliases in AgentCard
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Type Aliases in AgentCard">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mimetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MimeType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#securityschemetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SecuritySchemeType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1676,6 +1732,62 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#type-aliases-in-agentcard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type Aliases in AgentCard
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Type Aliases in AgentCard">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mimetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MimeType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#securityschemetype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SecuritySchemeType
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2338,6 +2450,7 @@
 <p>This section provides detailed API documentation for the core data models in Protolink. These models represent the fundamental data structures used throughout the framework for agent communication, task management, and data exchange.</p>
 <h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="#mimetype">MimeType</a></li>
 <li><a href="#agentcard">AgentCard</a></li>
 <li><a href="#agentcapabilities">AgentCapabilities</a></li>
 <li><a href="#agentskill">AgentSkill</a></li>
@@ -2359,8 +2472,9 @@
     <span class="n">protocol_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protolink_version</span>
     <span class="n">capabilities</span><span class="p">:</span> <span class="n">AgentCapabilities</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">AgentCapabilities</span><span class="p">)</span>
     <span class="n">skills</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">AgentSkill</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">input_formats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MimeType</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;text/plain&quot;</span><span class="p">])</span>
+    <span class="n">output_formats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MimeType</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;text/plain&quot;</span><span class="p">])</span>
     <span class="n">security_schemes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
-    <span class="n">required_scopes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
 </code></pre></div>
 <p>Agent identity and capability declaration. This is the main metadata card that describes an agent's identity, capabilities, and security requirements.</p>
 <h3 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h3>
@@ -2417,16 +2531,22 @@
 <td>List of skills the agent can perform</td>
 </tr>
 <tr>
-<td><code>security_schemes</code></td>
-<td><code>dict[str, dict[str, Any]] | None</code></td>
-<td><code>{}</code></td>
-<td>Authentication schemes</td>
+<td><code>input_formats</code></td>
+<td><code>list[MimeType]</code></td>
+<td><code>["text/plain"]</code></td>
+<td>Supported input MIME types</td>
 </tr>
 <tr>
-<td><code>required_scopes</code></td>
-<td><code>list[str] | None</code></td>
-<td><code>[]</code></td>
-<td>Required OAuth scopes</td>
+<td><code>output_formats</code></td>
+<td><code>list[MimeType]</code></td>
+<td><code>["text/plain"]</code></td>
+<td>Supported output MIME types</td>
+</tr>
+<tr>
+<td><code>security_schemes</code></td>
+<td><code>dict[SecuritySchemeType, dict[str, Any]] | None</code></td>
+<td><code>{}</code></td>
+<td>Authentication schemes</td>
 </tr>
 </tbody>
 </table>
@@ -2471,6 +2591,8 @@
     <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Provides weather information&quot;</span><span class="p">,</span>
     <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://api.example.com/weather&quot;</span><span class="p">,</span>
     <span class="n">version</span><span class="o">=</span><span class="s2">&quot;1.2.0&quot;</span><span class="p">,</span>
+    <span class="n">input_formats</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;text/plain&quot;</span><span class="p">,</span> <span class="s2">&quot;application/json&quot;</span><span class="p">],</span>
+    <span class="n">output_formats</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;text/plain&quot;</span><span class="p">,</span> <span class="s2">&quot;application/json&quot;</span><span class="p">,</span> <span class="s2">&quot;text/markdown&quot;</span><span class="p">],</span>
     <span class="n">capabilities</span><span class="o">=</span><span class="n">AgentCapabilities</span><span class="p">(</span>
         <span class="n">streaming</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">tool_calling</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -2488,13 +2610,14 @@
     <span class="n">streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">push_notifications</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">state_transition_history</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">has_llm</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">max_concurrency</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="n">message_batching</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">tool_calling</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">multi_step_reasoning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">timeout_support</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">delegation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="n">rag_support</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">rag</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">code_execution</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 </code></pre></div>
 <p>Defines the capabilities and limitations of an agent. This extends the A2A specification with additional capability flags.</p>
@@ -2526,6 +2649,12 @@
 <td><code>bool</code></td>
 <td><code>False</code></td>
 <td>Provides detailed task state history</td>
+</tr>
+<tr>
+<td><code>has_llm</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Has an LLM component for AI processing</td>
 </tr>
 <tr>
 <td><code>max_concurrency</code></td>
@@ -2564,7 +2693,7 @@
 <td>Can delegate tasks to other agents</td>
 </tr>
 <tr>
-<td><code>rag_support</code></td>
+<td><code>rag</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
 <td>Supports Retrieval-Augmented Generation</td>
@@ -2636,6 +2765,77 @@
     <span class="p">]</span>
 <span class="p">)</span>
 </code></pre></div>
+<hr />
+<h3 id="type-aliases-in-agentcard">Type Aliases in AgentCard<a class="headerlink" href="#type-aliases-in-agentcard" title="Permanent link">&para;</a></h3>
+<h4 id="mimetype">MimeType<a class="headerlink" href="#mimetype" title="Permanent link">&para;</a></h4>
+<p>Type alias for supported MIME types in Protolink. These are used to specify the <strong>input</strong> and <strong>output</strong> <strong>formats</strong> that agents can handle.</p>
+<h3 id="supported-types">Supported Types<a class="headerlink" href="#supported-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>MIME Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Text</strong></td>
+<td><code>text/plain</code>, <code>text/markdown</code>, <code>text/html</code></td>
+</tr>
+<tr>
+<td><strong>Structured Data</strong></td>
+<td><code>application/json</code></td>
+</tr>
+<tr>
+<td><strong>Images</strong></td>
+<td><code>image/png</code>, <code>image/jpeg</code>, <code>image/webp</code></td>
+</tr>
+<tr>
+<td><strong>Audio</strong></td>
+<td><code>audio/wav</code>, <code>audio/mpeg</code>, <code>audio/ogg</code></td>
+</tr>
+<tr>
+<td><strong>Video</strong></td>
+<td><code>video/mp4</code>, <code>video/webm</code></td>
+</tr>
+<tr>
+<td><strong>Documents</strong></td>
+<td><code>application/pdf</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="securityschemetype">SecuritySchemeType<a class="headerlink" href="#securityschemetype" title="Permanent link">&para;</a></h4>
+<p>Type alias for supported security schemes in Protolink. These are used to specify the <strong>authentication methods</strong> that agents can use.</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Security Schemes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>API key</strong></td>
+<td><code>apiKey</code></td>
+</tr>
+<tr>
+<td><strong>HTTP</strong> (bearer/basic/digest)</td>
+<td><code>http</code></td>
+</tr>
+<tr>
+<td><strong>full OAuth OAuth2</strong></td>
+<td><code>oauth2</code></td>
+</tr>
+<tr>
+<td><strong>Certificates</strong></td>
+<td><code>mutualTLS</code></td>
+</tr>
+<tr>
+<td><strong>OIDC auto-discovery</strong></td>
+<td><code>openIdConnect</code></td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="task">Task<a class="headerlink" href="#task" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="nd">@dataclass</span>

@@ -1746,7 +1746,7 @@
 <tbody>
 <tr>
 <td><code>__init__</code></td>
-<td><code>host: str = "0.0.0.0"</code>, <code>port: int = 8000</code>, <code>timeout: float = 30.0</code>, <code>auth_provider: AuthProvider \| None = None</code>, <code>backend: Literal["starlette", "fastapi"] = "starlette"</code>, <code>validate_schema: bool = False</code></td>
+<td><code>host: str = "0.0.0.0"</code>, <code>port: int = 8000</code>, <code>timeout: float = 30.0</code>, <code>authenticator: Authenticator \| None = None</code>, <code>backend: Literal["starlette", "fastapi"] = "starlette"</code>, <code>validate_schema: bool = False</code></td>
 <td><code>None</code></td>
 <td>Configure host/port, request timeout, optional authentication provider, backend implementation, and whether to enable FastAPI/Pydantic schema validation.</td>
 </tr>
@@ -1816,7 +1816,7 @@
 <td><code>authenticate</code></td>
 <td><code>credentials: str</code></td>
 <td><code>Awaitable[None]</code></td>
-<td>Use the configured <code>AuthProvider</code> to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers.</td>
+<td>Use the configured <code>Authenticator</code> to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers.</td>
 </tr>
 <tr>
 <td><code>_build_headers</code></td>

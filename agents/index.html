@@ -897,8 +897,8 @@
 <td>Optional transport for communication. If not provided, you must set one later via <code>set_transport()</code>.</td>
 </tr>
 <tr>
-<td><code>auth_provider</code></td>
-<td><code>AuthProvider | None</code></td>
+<td><code>authenticator</code></td>
+<td><code>Authenticator | None</code></td>
 <td><code>None</code></td>
 <td>Optional authentication provider for securing agent communications.</td>
 </tr>
@@ -1035,7 +1035,7 @@
 </table>
 <div class="admonition note">
 <p class="admonition-title">Authentication</p>
-<p>All outgoing requests are automatically signed if an <code>auth_provider</code> is configured. Incoming requests are verified against the same provider.</p>
+<p>All outgoing requests are automatically signed if an <code>authenticator</code> is configured. Incoming requests are verified against the same provider.</p>
 </div>
 <h2 id="skills-management">Skills Management<a class="headerlink" href="#skills-management" title="Permanent link">&para;</a></h2>
 <p>Skills represent the capabilities that an agent can perform. Skills are stored in the <code>AgentCard</code> and can be automatically detected or added.</p>
@@ -1211,7 +1211,7 @@
 <li><strong>Task Processing</strong>: Errors in <code>handle_task()</code> are caught and returned as error messages to the sender.</li>
 </ul>
 <h2 id="authentication-integration">Authentication Integration<a class="headerlink" href="#authentication-integration" title="Permanent link">&para;</a></h2>
-<p>When an <code>auth_provider</code> is configured, the agent automatically:</p>
+<p>When an <code>authenticator</code> is configured, the agent automatically:</p>
 <ol>
 <li><strong>Signs outgoing requests</strong> with appropriate authentication headers</li>
 <li><strong>Verifies incoming requests</strong> using the same auth mechanism</li>
