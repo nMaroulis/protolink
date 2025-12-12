@@ -600,6 +600,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#_validate_fieldsdata-dictstr-any-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _validate_fields(data: dict[str, Any]) -&gt; None
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1571,6 +1582,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#_validate_fieldsdata-dictstr-any-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _validate_fields(data: dict[str, Any]) -&gt; None
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2419,10 +2441,10 @@
 <span class="n">json_data</span> <span class="o">=</span> <span class="n">card</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>  <span class="c1"># &quot;weather_agent&quot;</span>
 </code></pre></div></p>
+<hr />
 <h4 id="from_jsondata-dictstr-any-agentcard-classmethod"><code>from_json(data: dict[str, Any]) -&gt; AgentCard</code> <code>classmethod</code><a class="headerlink" href="#from_jsondata-dictstr-any-agentcard-classmethod" title="Permanent link">&para;</a></h4>
-<p>Create an AgentCard from JSON data.</p>
-<p><strong>Parameters:</strong>
-<div class="highlight"><pre><span></span><code><span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>  <span class="c1"># JSON dictionary containing agent card data</span>
+<p>Create an AgentCard from JSON data. This method can also handle regular Python dictionaries and includes basic field validation via <code>_validate_fields</code>.
+<div class="highlight"><pre><span></span><code><span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>  <span class="c1"># JSON dictionary or Python dict containing agent card data</span>
 </code></pre></div></p>
 <p><strong>Returns:</strong>
 <div class="highlight"><pre><span></span><code><span class="n">AgentCard</span>  <span class="c1"># New AgentCard instance</span>
@@ -2434,6 +2456,12 @@
     <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="s2">&quot;https://api.example.com/weather&quot;</span>
 <span class="p">}</span>
 <span class="n">card</span> <span class="o">=</span> <span class="n">AgentCard</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+</code></pre></div></p>
+<hr />
+<h4 id="_validate_fieldsdata-dictstr-any-none"><code>_validate_fields(data: dict[str, Any]) -&gt; None</code><a class="headerlink" href="#_validate_fieldsdata-dictstr-any-none" title="Permanent link">&para;</a></h4>
+<p>Validate the fields of the AgentCard.</p>
+<p><strong>Returns:</strong>
+<div class="highlight"><pre><span></span><code><span class="kc">None</span>
 </code></pre></div></p>
 <h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentCard</span><span class="p">,</span> <span class="n">AgentCapabilities</span>
