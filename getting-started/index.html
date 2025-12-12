@@ -485,7 +485,7 @@
   <span class="md-ellipsis">
     
   
-    Core
+    API Reference
   
 
     
@@ -501,7 +501,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Core
+    API Reference
   
 
           </label>
@@ -522,34 +522,6 @@
     
   
     Agents
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../transports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Transports
   
 
     
@@ -598,6 +570,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../tools/" class="md-nav__link">
         
   
@@ -626,14 +626,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../models/" class="md-nav__link">
+      <a href="../transports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Models
+    Transports
   
 
     
@@ -862,7 +862,7 @@ uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;prot
 </code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">Optional extras</p>
-<p>You usually only need the extras that match your use case. For example, <code>protolink[http]</code> for web transports. The <code>protolink[llms]</code> will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is advised to install manually the libraries that are needed for your project.</p>
+<p>You usually only need the extras that match your use case. The <code>protolink[llms]</code> will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is <strong>advised to install manually the libraries that are needed for your project</strong>.</p>
 </div>
 <p>For development from source:</p>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/nmaroulis/protolink.git
@@ -890,7 +890,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 
 
 <span class="c1"># OpenAI API LLM</span>
-<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-5.1&quot;</span><span class="p">)</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-5.2&quot;</span><span class="p">)</span>
 
 
 <span class="c1"># Initialize the agent</span>

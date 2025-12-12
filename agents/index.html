@@ -14,7 +14,7 @@
         <link rel="prev" href="../getting-started/">
       
       
-        <link rel="next" href="../transports/">
+        <link rel="next" href="../llms/">
       
       
         
@@ -388,7 +388,7 @@
   <span class="md-ellipsis">
     
   
-    Core
+    API Reference
   
 
     
@@ -404,7 +404,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Core
+    API Reference
   
 
           </label>
@@ -525,14 +525,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../transports/" class="md-nav__link">
+      <a href="../llms/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Transports
+    LLMs
   
 
     
@@ -553,14 +553,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../llms/" class="md-nav__link">
+      <a href="../models/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLMs
+    Models
   
 
     
@@ -609,14 +609,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../models/" class="md-nav__link">
+      <a href="../transports/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Models
+    Transports
   
 
     
@@ -835,7 +835,7 @@
 <span class="p">)</span>
 
 <span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPTransport</span><span class="p">()</span>
-<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-5.1&quot;</span><span class="p">)</span>
+<span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-5.2&quot;</span><span class="p">)</span>
 
 <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">agent_card</span><span class="p">,</span> <span class="n">transport</span><span class="p">,</span> <span class="n">llm</span><span class="p">)</span>
 </code></pre></div>
@@ -890,6 +890,12 @@
 <td><code>AuthProvider | None</code></td>
 <td><code>None</code></td>
 <td>Optional authentication provider for securing agent communications.</td>
+</tr>
+<tr>
+<td><code>skills</code></td>
+<td><code>Literal["auto", "fixed"]</code></td>
+<td><code>"auto"</code></td>
+<td>Skills mode - <code>"auto"</code> to automatically detect and add skills, <code>"fixed"</code> to use only the skills defined by the user in the AgentCard.</td>
 </tr>
 </tbody>
 </table>
@@ -1020,6 +1026,60 @@
 <p class="admonition-title">Authentication</p>
 <p>All outgoing requests are automatically signed if an <code>auth_provider</code> is configured. Incoming requests are verified against the same provider.</p>
 </div>
+<h2 id="skills-management">Skills Management<a class="headerlink" href="#skills-management" title="Permanent link">&para;</a></h2>
+<p>Skills represent the capabilities that an agent can perform. Skills are stored in the <code>AgentCard</code> and can be automatically detected or added.</p>
+<h3 id="skills-modes">Skills Modes<a class="headerlink" href="#skills-modes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"auto"</code></td>
+<td>Automatically detects skills from tools and public methods, and adds them to the AgentCard</td>
+</tr>
+<tr>
+<td><code>"fixed"</code></td>
+<td>Uses only the skills explicitly defined in the AgentCard</td>
+</tr>
+</tbody>
+</table>
+<h3 id="skill-detection">Skill Detection<a class="headerlink" href="#skill-detection" title="Permanent link">&para;</a></h3>
+<p>When using <code>"auto"</code> mode, the agent detects skills from:</p>
+<ol>
+<li><strong>Tools</strong>: Each registered tool becomes a skill</li>
+<li><strong>Public Methods</strong>: Optional detection of public methods (controlled by <code>include_public_methods</code> parameter)</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="c1"># Auto-detect skills from tools only</span>
+<span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card</span><span class="p">,</span> <span class="n">skills</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+
+<span class="c1"># Use only skills defined in AgentCard</span>
+<span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card</span><span class="p">,</span> <span class="n">skills</span><span class="o">=</span><span class="s2">&quot;fixed&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="skills-in-agentcard">Skills in AgentCard<a class="headerlink" href="#skills-in-agentcard" title="Permanent link">&para;</a></h3>
+<p>Skills are persisted in the AgentCard and serialized when the card is exported to JSON:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentCard</span><span class="p">,</span> <span class="n">AgentSkill</span>
+
+<span class="c1"># Create skills manually in AgentCard</span>
+<span class="n">card</span> <span class="o">=</span> <span class="n">AgentCard</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;weather_agent&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Weather information agent&quot;</span><span class="p">,</span>
+    <span class="n">skills</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">AgentSkill</span><span class="p">(</span>
+            <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;get_weather&quot;</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Get current weather for a location&quot;</span><span class="p">,</span>
+            <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;weather&quot;</span><span class="p">,</span> <span class="s2">&quot;forecast&quot;</span><span class="p">],</span>
+            <span class="n">examples</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;What&#39;s the weather in New York?&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+
+<span class="c1"># Use fixed mode to only use these skills</span>
+<span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card</span><span class="p">,</span> <span class="n">skills</span><span class="o">=</span><span class="s2">&quot;fixed&quot;</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="tool-management">Tool Management<a class="headerlink" href="#tool-management" title="Permanent link">&para;</a></h2>
 <p>Tools allow agents to execute external functions and APIs.</p>
 <table>
@@ -1036,13 +1096,13 @@
 <td><code>add_tool()</code></td>
 <td><code>tool: BaseTool</code></td>
 <td><code>None</code></td>
-<td>Registers a tool with the agent.</td>
+<td>Registers a tool with the agent and automatically adds it as a skill to the AgentCard.</td>
 </tr>
 <tr>
 <td><code>tool()</code></td>
 <td><code>name: str</code>, <code>description: str</code></td>
 <td><code>decorator</code></td>
-<td>Decorator for registering Python functions as tools.</td>
+<td>Decorator for registering Python functions as tools (automatically adds as skills).</td>
 </tr>
 <tr>
 <td><code>call_tool()</code></td>
@@ -1193,13 +1253,13 @@
         
         
           
-          <a href="../transports/" class="md-footer__link md-footer__link--next" aria-label="Next: Transports">
+          <a href="../llms/" class="md-footer__link md-footer__link--next" aria-label="Next: LLMs">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Transports
+                LLMs
               </div>
             </div>
             <div class="md-footer__button md-icon">

@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../tools/">
+        <link rel="prev" href="../llms/">
       
       
-        <link rel="next" href="../examples/">
+        <link rel="next" href="../tools/">
       
       
         
@@ -388,7 +388,7 @@
   <span class="md-ellipsis">
     
   
-    Core
+    API Reference
   
 
     
@@ -404,7 +404,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Core
+    API Reference
   
 
           </label>
@@ -445,34 +445,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../transports/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Transports
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../llms/" class="md-nav__link">
         
   
@@ -481,34 +453,6 @@
     
   
     LLMs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tools/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Tools
   
 
     
@@ -1381,6 +1325,62 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2334,7 +2334,9 @@
     <span class="n">description</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">url</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;1.0.0&quot;</span>
+    <span class="n">protocol_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protolink_version</span>
     <span class="n">capabilities</span><span class="p">:</span> <span class="n">AgentCapabilities</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">AgentCapabilities</span><span class="p">)</span>
+    <span class="n">skills</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">AgentSkill</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">security_schemes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
     <span class="n">required_scopes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
 </code></pre></div>
@@ -2375,10 +2377,22 @@
 <td>Agent version</td>
 </tr>
 <tr>
+<td><code>protocol_version</code></td>
+<td><code>str</code></td>
+<td><code>protolink_version</code></td>
+<td>Protolink Protocol version</td>
+</tr>
+<tr>
 <td><code>capabilities</code></td>
 <td><code>AgentCapabilities</code></td>
 <td><code>AgentCapabilities()</code></td>
 <td>Supported features</td>
+</tr>
+<tr>
+<td><code>skills</code></td>
+<td><code>list[AgentSkill]</code></td>
+<td><code>[]</code></td>
+<td>List of skills the agent can perform</td>
 </tr>
 <tr>
 <td><code>security_schemes</code></td>
@@ -2540,8 +2554,7 @@
 <div class="highlight"><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">AgentSkill</span><span class="p">:</span>
     <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
     <span class="n">tags</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">examples</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
 </code></pre></div>
@@ -2561,38 +2574,31 @@
 <td><code>id</code></td>
 <td><code>str</code></td>
 <td>—</td>
-<td><strong>Required.</strong> Unique identifier for the skill</td>
-</tr>
-<tr>
-<td><code>name</code></td>
-<td><code>str</code></td>
-<td>—</td>
-<td><strong>Required.</strong> Human-readable name</td>
+<td><strong>Required.</strong> Unique Human-readable identifier for the task</td>
 </tr>
 <tr>
 <td><code>description</code></td>
 <td><code>str</code></td>
-<td>—</td>
-<td><strong>Required.</strong> Detailed description</td>
+<td><code>""</code></td>
+<td><strong><em>Optional</em></strong> Detailed description of what the task does</td>
 </tr>
 <tr>
 <td><code>tags</code></td>
 <td><code>list[str]</code></td>
 <td><code>[]</code></td>
-<td>Tags for categorization</td>
+<td><strong><em>Optional</em></strong> Tags for categorization</td>
 </tr>
 <tr>
 <td><code>examples</code></td>
 <td><code>list[str]</code></td>
 <td><code>[]</code></td>
-<td>Example inputs or usage scenarios</td>
+<td><strong><em>Optional</em></strong> Example inputs or usage scenarios</td>
 </tr>
 </tbody>
 </table>
 <h3 id="example_1">Example<a class="headerlink" href="#example_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="n">skill</span> <span class="o">=</span> <span class="n">AgentSkill</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;weather_forecast&quot;</span><span class="p">,</span>
-    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Weather Forecast&quot;</span><span class="p">,</span>
     <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Get weather forecast for any location&quot;</span><span class="p">,</span>
     <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;weather&quot;</span><span class="p">,</span> <span class="s2">&quot;forecast&quot;</span><span class="p">,</span> <span class="s2">&quot;location&quot;</span><span class="p">],</span>
     <span class="n">examples</span><span class="o">=</span><span class="p">[</span>
@@ -3280,7 +3286,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../tools/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Tools">
+          <a href="../llms/" class="md-footer__link md-footer__link--prev" aria-label="Previous: LLMs">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3290,20 +3296,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Tools
+                LLMs
               </div>
             </div>
           </a>
         
         
           
-          <a href="../examples/" class="md-footer__link md-footer__link--next" aria-label="Next: Examples">
+          <a href="../tools/" class="md-footer__link md-footer__link--next" aria-label="Next: Tools">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Examples
+                Tools
               </div>
             </div>
             <div class="md-footer__button md-icon">
