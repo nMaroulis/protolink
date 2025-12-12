@@ -56,11 +56,11 @@ nav:
   - Overview:
       - Home: index.md
       - Getting Started: getting-started.md
-  - Core:
+  - API Reference:
       - Agents: agents.md
-      - Transports: transports.md
       - LLMs: llms.md
-      - Tools: tools.md
       - Models: models.md
+      - Tools: tools.md
+      - Transports: transports.md
   - Examples:
       - Examples: examples.md

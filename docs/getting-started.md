@@ -37,7 +37,7 @@ uv add "protolink[dev]"
 ```
 
 !!! info "Optional extras"
-    You usually only need the extras that match your use case. For example, `protolink[http]` for web transports. The `protolink[llms]` will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is advised to install manually the libraries that are needed for your project.
+    You usually only need the extras that match your use case. The `protolink[llms]` will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is **advised to install manually the libraries that are needed for your project**.
 
 For development from source:
 
@@ -71,7 +71,7 @@ transport = HTTPTransport()
 
 
 # OpenAI API LLM
-llm = OpenAILLM(model="gpt-5.1")
+llm = OpenAILLM(model="gpt-5.2")
 
 
 # Initialize the agent

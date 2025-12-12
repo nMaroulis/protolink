@@ -38,7 +38,7 @@ agent_card = AgentCard(
 )
 
 transport = HTTPTransport()
-llm = OpenAILLM(model="gpt-5.1")
+llm = OpenAILLM(model="gpt-5.2")
 
 agent = Agent(agent_card, transport, llm)
 ```
@@ -74,6 +74,7 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `llm` | `LLM | None` | `None` | Optional language model instance for AI-powered task processing. |
 | `transport` | `Transport | None` | `None` | Optional transport for communication. If not provided, you must set one later via `set_transport()`. |
 | `auth_provider` | `AuthProvider | None` | `None` | Optional authentication provider for securing agent communications. |
+| `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 
 ```python
 from protolink.agents import Agent
@@ -127,14 +128,65 @@ These methods control the agent's server component lifecycle.
 !!! note "Authentication"
     All outgoing requests are automatically signed if an `auth_provider` is configured. Incoming requests are verified against the same provider.
 
+## Skills Management
+
+Skills represent the capabilities that an agent can perform. Skills are stored in the `AgentCard` and can be automatically detected or added.
+
+### Skills Modes
+
+| Mode | Description |
+|------|-------------|
+| `"auto"` | Automatically detects skills from tools and public methods, and adds them to the AgentCard |
+| `"fixed"` | Uses only the skills explicitly defined in the AgentCard |
+
+### Skill Detection
+
+When using `"auto"` mode, the agent detects skills from:
+
+1. **Tools**: Each registered tool becomes a skill
+2. **Public Methods**: Optional detection of public methods (controlled by `include_public_methods` parameter)
+
+```python
+# Auto-detect skills from tools only
+agent = Agent(card, skills="auto")
+
+# Use only skills defined in AgentCard
+agent = Agent(card, skills="fixed")
+```
+
+### Skills in AgentCard
+
+Skills are persisted in the AgentCard and serialized when the card is exported to JSON:
+
+```python
+from protolink.models import AgentCard, AgentSkill
+
+# Create skills manually in AgentCard
+card = AgentCard(
+    name="weather_agent",
+    description="Weather information agent",
+    skills=[
+        AgentSkill(
+            id="get_weather",
+            description="Get current weather for a location",
+            tags=["weather", "forecast"],
+            examples=["What's the weather in New York?"]
+        )
+    ]
+)
+
+# Use fixed mode to only use these skills
+agent = Agent(card, skills="fixed")
+```
+
 ## Tool Management
 
 Tools allow agents to execute external functions and APIs.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `add_tool()` | `tool: BaseTool` | `None` | Registers a tool with the agent. |
-| `tool()` | `name: str`, `description: str` | `decorator` | Decorator for registering Python functions as tools. |
+| `add_tool()` | `tool: BaseTool` | `None` | Registers a tool with the agent and automatically adds it as a skill to the AgentCard. |
+| `tool()` | `name: str`, `description: str` | `decorator` | Decorator for registering Python functions as tools (automatically adds as skills). |
 | `call_tool()` | `tool_name: str`, `**kwargs` | `Any` | Executes a registered tool by name with provided arguments. |
 
 ```python

@@ -6,11 +6,12 @@ incorporating both client and server functionalities.
 """
 
 from collections.abc import AsyncIterator
+from typing import Literal
 
 from protolink.client.agent_client import AgentClient
 from protolink.core.context_manager import ContextManager
 from protolink.llms.base import LLM
-from protolink.models import AgentCard, Message, Task
+from protolink.models import AgentCard, AgentSkill, Message, Task
 from protolink.security.auth import AuthContext, AuthProvider
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
@@ -33,6 +34,7 @@ class Agent:
         llm: LLM | None = None,
         transport: Transport | None = None,
         auth_provider: AuthProvider | None = None,
+        skills: Literal["auto", "fixed"] = "auto",
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -41,12 +43,14 @@ class Agent:
             llm: Optional LLM instance for the agent to use
             transport: Transport layer for client/server communication
             auth_provider: Optional authentication provider
+            skills: Skills mode - "auto" to automatically detect and add skills, "fixed" to use only the skills defined
+            by the user in the AgentCard.
         """
         self.card = card
         self.context_manager = ContextManager()
         self.llm = llm
         self.tools: dict[str, BaseTool] = {}
-        self.skills: dict[str, str] = {}
+        self.skills: Literal["auto", "fixed"] = skills
         self.auth_provider = auth_provider
         self._auth_context = None
 
@@ -64,6 +68,9 @@ class Agent:
         # LLM Validation
         if self.llm is not None:
             _ = self.llm.validate_connection()
+
+        # Resolve and add necessairy skills
+        self._resolve_skills(skills)
 
     async def start(self) -> None:
         """Start the agent's server component if available."""
@@ -297,10 +304,11 @@ class Agent:
         """
         return self.context_manager
 
-    def add_tool(self, tool: BaseTool):
+    def add_tool(self, tool: BaseTool) -> None:
         """Register a Tool instance with the agent."""
         self.tools[tool.name] = tool
-        self.skills[tool.name] = tool.description
+        skill = AgentSkill(id=tool.name, description=tool.description or f"Tool: {tool.name}")
+        self._add_skill_to_agent_card(skill)
 
     def tool(self, name: str, description: str):
         """Decorator helper for defining inline tool functions."""
@@ -318,6 +326,65 @@ class Agent:
         if not tool:
             raise ValueError(f"Tool {tool_name} not found")
         return await tool(**kwargs)
+
+    ####################
+    ## Skill Management
+    ####################
+    def _resolve_skills(self, skills_mode: Literal["auto", "fixed"]) -> None:
+        """Resolve skills parameter based on mode and update agent card.
+
+        Args:
+            skills_mode: "auto" to detect and add skills, "fixed" to use only AgentCard skills
+        """
+        if skills_mode == "auto":
+            # Add auto-detected skills to agent card
+            auto_skills = self._auto_detect_skills()
+            for skill in auto_skills:
+                self._add_skill_to_agent_card(skill)
+        # "fixed" mode - just use card skills as-is
+
+    def _add_skill_to_agent_card(self, skill: AgentSkill) -> None:
+        """Add a skill to the agent card, avoiding duplicates.
+
+        Args:
+            skill: AgentSkill to add to the card
+        """
+        # Check if skill with same ID already exists
+        existing_ids = {existing_skill.id for existing_skill in self.card.skills}
+        if skill.id not in existing_ids:
+            self.card.skills.append(skill)
+
+    def _auto_detect_skills(self, *, include_public_methods: bool = False) -> list[AgentSkill]:
+        """Automatically detect skills from available tools and methods.
+
+        Args:
+            include_public_methods: Whether to automatically detect skills from public methods of the agent.
+                When True, scans all public methods (those not starting with '_') and creates
+                AgentSkill objects from them. When False, only detects skills from registered tools.
+                Defaults to False to avoid unintended exposure of all public methods as skills.
+
+        Returns:
+            List of AgentSkill objects detected from the agent
+        """
+        detected_skills = []
+        # TODO(): Get LLM's skills.
+        # Detect skills from tools
+        for tool_name, tool in self.tools.items():
+            skill = AgentSkill(id=tool_name, description=tool.description or f"Tool: {tool_name}")
+            detected_skills.append(skill)
+
+        # Detect skills from public methods (excluding internal methods)
+        if include_public_methods:
+            for attr_name in dir(self):
+                if not attr_name.startswith("_") and callable(getattr(self, attr_name)):
+                    # Skip methods from base class and common methods
+                    if attr_name not in ["handle_task", "handle_task_streaming", "add_tool", "tool", "call_tool"]:
+                        method = getattr(self, attr_name)
+                        description = method.__doc__ or f"Method: {attr_name}"
+                        skill = AgentSkill(id=attr_name, description=description.strip())
+                        detected_skills.append(skill)
+
+        return detected_skills
 
     def __repr__(self) -> str:
         return f"Agent(name='{self.card.name}', url='{self.card.url}')"

@@ -25,7 +25,9 @@ class AgentCard:
     description: str
     url: str
     version: str = "1.0.0"
+    protocol_version: str = protolink_version
     capabilities: AgentCapabilities = field(default_factory=AgentCapabilities)
+    skills: list[AgentSkill] = field(default_factory=list)
     security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
     required_scopes: list[str] | None = field(default_factory=list)
 ```
@@ -40,7 +42,9 @@ Agent identity and capability declaration. This is the main metadata card that d
 | `description` | `str` | — | **Required.** Agent purpose/description |
 | `url` | `str` | — | **Required.** Service endpoint URL |
 | `version` | `str` | `"1.0.0"` | Agent version |
+| `protocol_version` | `str` | `protolink_version` | Protolink Protocol version |
 | `capabilities` | `AgentCapabilities` | `AgentCapabilities()` | Supported features |
+| `skills` | `list[AgentSkill]` | `[]` | List of skills the agent can perform |
 | `security_schemes` | `dict[str, dict[str, Any]] | None` | `{}` | Authentication schemes |
 | `required_scopes` | `list[str] | None` | `[]` | Required OAuth scopes |
 
@@ -153,8 +157,7 @@ Defines the capabilities and limitations of an agent. This extends the A2A speci
 @dataclass
 class AgentSkill:
     id: str
-    name: str
-    description: str
+    description: str = ""
     tags: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 ```
@@ -165,18 +168,16 @@ Represents a task that an agent can perform. Skills are used to advertise specif
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `id` | `str` | — | **Required.** Unique identifier for the skill |
-| `name` | `str` | — | **Required.** Human-readable name |
-| `description` | `str` | — | **Required.** Detailed description |
-| `tags` | `list[str]` | `[]` | Tags for categorization |
-| `examples` | `list[str]` | `[]` | Example inputs or usage scenarios |
+| `id` | `str` | — | **Required.** Unique Human-readable identifier for the task |
+| `description` | `str` | `""` | ***Optional*** Detailed description of what the task does |
+| `tags` | `list[str]` | `[]` | ***Optional*** Tags for categorization |
+| `examples` | `list[str]` | `[]` | ***Optional*** Example inputs or usage scenarios |
 
 ### Example
 
 ```python
 skill = AgentSkill(
     id="weather_forecast",
-    name="Weather Forecast",
     description="Get weather forecast for any location",
     tags=["weather", "forecast", "location"],
     examples=[

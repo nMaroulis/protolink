@@ -61,7 +61,7 @@ Configuration depends on the specific backend, but the general pattern is:
 
 
    llm = OpenAILLM(
-       model="gpt-5.1",
+       model="gpt-5.2",
        # api_key is typically read from the environment, e.g. OPENAI_API_KEY
    )
    ```

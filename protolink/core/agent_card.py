@@ -1,6 +1,8 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from protolink import __version__ as protolink_version
+
 
 @dataclass
 class AgentCapabilities:
@@ -39,16 +41,14 @@ class AgentSkill:
     """Represents a task that an agent can perform.
 
     Attributes:
-        id: Unique identifier for the task
-        name: Human-readable name of the task
-        description: Detailed description of what the task does
-        tags: List of tags for categorization
-        examples: Example inputs or usage scenarios
+        id: Unique Human-readable identifier for the task
+        description: Detailed description of what the task does [Optional]
+        tags: List of tags for categorization [Optional]
+        examples: Example inputs or usage scenarios [Optional]
     """
 
     id: str
-    name: str
-    description: str
+    description: str = ""
     tags: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 
@@ -62,14 +62,20 @@ class AgentCard:
         description: Agent purpose/description
         url: Service endpoint URL
         version: Agent version
+        protocol_version: Protolink Protocol version
         capabilities: Supported features
+        skills: List of skills the agent can perform
+        security_schemes: Security schemes for authentication
+        required_scopes: Required scopes for authentication
     """
 
     name: str
     description: str
     url: str
     version: str = "1.0.0"
+    protocol_version: str = protolink_version
     capabilities: AgentCapabilities = field(default_factory=AgentCapabilities)
+    skills: list[AgentSkill] = field(default_factory=list)
     security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
     required_scopes: list[str] | None = field(default_factory=list)
 
@@ -80,7 +86,9 @@ class AgentCard:
             "description": self.description,
             "url": self.url,
             "version": self.version,
+            "protocolVersion": self.protocol_version,
             "capabilities": asdict(self.capabilities) if self.capabilities else {},
+            "skills": [asdict(skill) for skill in self.skills],
             "securitySchemes": self.security_schemes,
             "requiredScopes": self.required_scopes,
         }
@@ -90,13 +98,16 @@ class AgentCard:
         """Create from JSON format."""
         capabilities_data = data.get("capabilities", {})
         capabilities = AgentCapabilities(**capabilities_data) if capabilities_data else AgentCapabilities()
+        skills = [AgentSkill(**skill_data) for skill_data in data.get("skills", [])]
 
         return cls(
             name=data["name"],
             description=data["description"],
             url=data["url"],
             version=data.get("version", "1.0.0"),
+            protocol_version=data.get("protocolVersion", protolink_version),
             capabilities=capabilities,
+            skills=skills,
             security_schemes=data.get("securitySchemes", {}),
             required_scopes=data.get("requiredScopes", []),
         )
