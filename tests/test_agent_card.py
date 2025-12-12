@@ -14,7 +14,6 @@ def test_agent_card_initialization():
     assert isinstance(card.capabilities, AgentCapabilities)
     assert card.capabilities.streaming is False
     assert card.security_schemes == {}
-    assert card.required_scopes == []
 
 
 def test_agent_card_custom_values():
@@ -27,7 +26,6 @@ def test_agent_card_custom_values():
         version="2.0.0",
         capabilities=capabilities,
         security_schemes={"apiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key"}},
-        required_scopes=["read:data", "write:data"],
     )
 
     assert card.version == "2.0.0"
@@ -35,7 +33,6 @@ def test_agent_card_custom_values():
     assert card.capabilities.streaming is True
     assert card.capabilities.tool_calling is True
     assert card.security_schemes == {"apiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key"}}
-    assert card.required_scopes == ["read:data", "write:data"]
 
 
 def test_to_json():
@@ -47,7 +44,6 @@ def test_to_json():
         url="http://json-test.local",
         capabilities=capabilities,
         security_schemes={"bearer": {"type": "http", "scheme": "bearer"}},
-        required_scopes=["read:data"],
     )
 
     json_data = card.to_json()
@@ -59,7 +55,6 @@ def test_to_json():
     assert json_data["capabilities"]["streaming"] is True
     assert json_data["capabilities"]["tool_calling"] is True
     assert json_data["securitySchemes"] == {"bearer": {"type": "http", "scheme": "bearer"}}
-    assert json_data["requiredScopes"] == ["read:data"]
 
 
 def test_from_json():
@@ -71,7 +66,6 @@ def test_from_json():
         "version": "3.0.0",
         "capabilities": {"streaming": True, "tool_calling": True},
         "securitySchemes": {"oauth2": {"type": "oauth2"}},
-        "requiredScopes": ["read:data"],
     }
 
     card = AgentCard.from_json(json_data)
@@ -84,7 +78,6 @@ def test_from_json():
     assert card.capabilities.streaming is True
     assert card.capabilities.tool_calling is True
     assert card.security_schemes == {"oauth2": {"type": "oauth2"}}
-    assert card.required_scopes == ["read:data"]
 
 
 def test_from_json_missing_fields():
@@ -98,4 +91,3 @@ def test_from_json_missing_fields():
     assert isinstance(card.capabilities, AgentCapabilities)
     assert card.capabilities.streaming is False  # Default value
     assert card.security_schemes == {}  # Default empty dict
-    assert card.required_scopes == []  # Default empty list

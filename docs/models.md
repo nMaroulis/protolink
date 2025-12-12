@@ -31,7 +31,6 @@ class AgentCard:
     input_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     output_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
-    required_scopes: list[str] | None = field(default_factory=list)
 ```
 
 Agent identity and capability declaration. This is the main metadata card that describes an agent's identity, capabilities, and security requirements.
@@ -49,8 +48,7 @@ Agent identity and capability declaration. This is the main metadata card that d
 | `skills` | `list[AgentSkill]` | `[]` | List of skills the agent can perform |
 | `input_formats` | `list[MimeType]` | `["text/plain"]` | Supported input MIME types |
 | `output_formats` | `list[MimeType]` | `["text/plain"]` | Supported output MIME types |
-| `security_schemes` | `dict[str, dict[str, Any]] | None` | `{}` | Authentication schemes |
-| `required_scopes` | `list[str] | None` | `[]` | Required OAuth scopes |
+| `security_schemes` | `dict[SecuritySchemeType, dict[str, Any]] | None` | `{}` | Authentication schemes |
 
 ### Methods
 
@@ -210,6 +208,8 @@ skill = AgentSkill(
 
 ---
 
+### Type Aliases in AgentCard
+
 #### MimeType
 
 Type alias for supported MIME types in Protolink. These are used to specify the **input** and **output** **formats** that agents can handle.
@@ -225,6 +225,16 @@ Type alias for supported MIME types in Protolink. These are used to specify the 
 | **Video** | `video/mp4`, `video/webm` |
 | **Documents** | `application/pdf` |
 
+#### SecuritySchemeType
+Type alias for supported security schemes in Protolink. These are used to specify the **authentication methods** that agents can use.
+
+| Category | MIME Types |
+|----------|------------|
+| **API key** | `apiKey` |
+| **HTTP** bearer / basic / digest| `http` |
+| **full OAuth OAuth2** | `oauth2` |
+| **Certificates** | `mutualTLS` |
+| **OIDC auto-discovery** | `openIdConnect` |
 
 ---
 

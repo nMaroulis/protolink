@@ -33,7 +33,6 @@ class SecureAnalysisAgent(Agent):
                 "bearer": {"type": "bearer", "description": "JWT Bearer token authentication"},
                 "oauth2": {"type": "oauth2", "description": "OAuth 2.0 delegated scopes"},
             },
-            required_scopes=["skill:analyze"],  # NEW in v0.3.0
         )
         super().__init__(card, auth_provider=auth_provider)
 
@@ -204,7 +203,6 @@ async def example_agent_card_discovery():
     print(f"Agent: {card.name}")
     print(f"Description: {card.description}")
     print(f"Capabilities: {card.capabilities}")
-    print(f"Required scopes: {card.required_scopes}")
     print("\nSecurity schemes:")
     for scheme_name, scheme_info in card.security_schemes.items():
         print(f"  - {scheme_name}: {scheme_info['description']}")

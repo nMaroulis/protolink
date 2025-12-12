@@ -64,6 +64,7 @@ class AgentSkill:
             self.examples = []
 
 
+# Supported Agent IO formats
 MimeType: TypeAlias = Literal[
     # Text
     "text/plain",
@@ -86,6 +87,15 @@ MimeType: TypeAlias = Literal[
     "application/pdf",
 ]
 
+# Supported security schemes
+SecuritySchemeType: TypeAlias = Literal[
+    "apiKey",  # API key
+    "http",  # bearer / basic / digest
+    "oauth2",  # full OAuth OAuth2
+    "mutualTLS",  # certificates
+    "openIdConnect",  # OIDC auto-discovery
+]
+
 
 @dataclass
 class AgentCard:
@@ -102,7 +112,6 @@ class AgentCard:
         input_formats: List of supported input formats
         output_formats: List of supported output formats
         security_schemes: Security schemes for authentication
-        required_scopes: Required scopes for authentication
     """
 
     name: str
@@ -114,8 +123,7 @@ class AgentCard:
     skills: list[AgentSkill] = field(default_factory=list)
     input_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     output_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
-    security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
-    required_scopes: list[str] | None = field(default_factory=list)
+    security_schemes: dict[SecuritySchemeType, dict[str, Any]] | None = field(default_factory=dict)
 
     def to_json(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""
@@ -130,7 +138,6 @@ class AgentCard:
             "inputFormats": self.input_formats,
             "outputFormats": self.output_formats,
             "securitySchemes": self.security_schemes,
-            "requiredScopes": self.required_scopes,
         }
 
     @classmethod
@@ -154,7 +161,6 @@ class AgentCard:
             input_formats=data.get("inputFormats", ["text/plain"]),
             output_formats=data.get("outputFormats", ["text/plain"]),
             security_schemes=data.get("securitySchemes", {}),
-            required_scopes=data.get("requiredScopes", []),
         )
 
     @staticmethod
