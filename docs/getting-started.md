@@ -22,19 +22,55 @@ pip install protolink
 
 Protolink exposes several extras to enable additional functionality:
 
-```bash
-# Install with all optional dependencies
-uv add "protolink[all]"
 
-# HTTP support (for web-based agents)
-uv add "protolink[http]"
+=== "uv"
 
-# All supported LLM libraries
-uv add "protolink[llms]"
+    ```bash
+    # Install with all optional dependencies
+    uv add "protolink[all]"
 
-# Development (all extras + testing tools)
-uv add "protolink[dev]"
-```
+    # HTTP support (for web-based agents)
+    uv add "protolink[http]"
+
+    # All supported LLM libraries
+    uv add "protolink[llms]"
+
+    # Development (all extras + testing tools)
+    uv add "protolink[dev]"
+    ```
+
+=== "pip"
+
+    ```bash
+    # Install with all optional dependencies
+    pip install -e "protolink[all]"
+
+    # HTTP support (for web-based agents)
+    pip install -e "protolink[http]"
+
+    # All supported LLM libraries
+    pip install -e "protolink[llms]"
+
+    # Development (all extras + testing tools)
+    pip install -e "protolink[dev]"
+    ```
+
+=== "uv & pip"
+    *Because.. why not?*
+    
+    ```bash
+    # Install with all optional dependencies
+    uv pip install -e "protolink[all]"
+
+    # HTTP support (for web-based agents)
+    uv pip install -e "protolink[http]"
+
+    # All supported LLM libraries
+    uv pip install -e "protolink[llms]"
+
+    # Development (all extras + testing tools)
+    uv pip install -e "protolink[dev]"
+    ```
 
 !!! info "Optional extras"
     You usually only need the extras that match your use case. The `protolink[llms]` will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is **advised to install manually the libraries that are needed for your project**.

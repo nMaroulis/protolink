@@ -37,7 +37,7 @@ theme:
     - content.code.copy
     - navigation.footer
     - navigation.expand
-
+    - navigation.top
 
 markdown_extensions:
   - admonition
@@ -47,6 +47,8 @@ markdown_extensions:
   - pymdownx.superfences
   - toc:
       permalink: true
+  - pymdownx.tabbed:
+      alternate_style: true
 
 plugins:
   - search
