@@ -66,13 +66,13 @@ json_data = card.to_json()
 print(json_data["name"])  # "weather_agent"
 ```
 
+---
+
 #### `from_json(data: dict[str, Any]) -> AgentCard` `classmethod`
 
-Create an AgentCard from JSON data.
-
-**Parameters:**
+Create an AgentCard from JSON data. This method can also handle regular Python dictionaries and includes basic field validation via `_validate_fields`.
 ```python
-data: dict[str, Any]  # JSON dictionary containing agent card data
+data: dict[str, Any]  # JSON dictionary or Python dict containing agent card data
 ```
 
 **Returns:**
@@ -89,6 +89,18 @@ json_data = {
 }
 card = AgentCard.from_json(json_data)
 ```
+
+---
+
+#### `_validate_fields(data: dict[str, Any]) -> None`
+
+Validate the fields of the AgentCard.
+
+**Returns:**
+```python
+None
+```
+
 
 ### Example
 

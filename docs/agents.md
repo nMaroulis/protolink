@@ -31,16 +31,27 @@ from protolink.models import AgentCard
 from protolink.transport import HTTPTransport
 from protolink.llms.api import OpenAILLM
 
-
+# Agent card can be an AgentCard object or a dict for simplicity, both are handled the same way.
+# Option 1: Using AgentCard object
 agent_card = AgentCard(
     name="example_agent",
     description="A dummy agent",
 )
 
+# Option 2: Using dictionary (simpler)
+card_dict = {
+    "name": "example_agent",
+    "description": "A dummy agent",
+    "url": "http://localhost:8000"
+}
+
 transport = HTTPTransport()
 llm = OpenAILLM(model="gpt-5.2")
 
+# Both approaches work
 agent = Agent(agent_card, transport, llm)
+# OR
+agent = Agent(card_dict, transport, llm)
 ```
 
 You can then attach tools and start the agent.

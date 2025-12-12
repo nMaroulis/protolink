@@ -6,7 +6,7 @@ incorporating both client and server functionalities.
 """
 
 from collections.abc import AsyncIterator
-from typing import Literal
+from typing import Any, Literal
 
 from protolink.client.agent_client import AgentClient
 from protolink.core.context_manager import ContextManager
@@ -30,7 +30,7 @@ class Agent:
 
     def __init__(
         self,
-        card: AgentCard,
+        card: AgentCard | dict[str, Any],
         llm: LLM | None = None,
         transport: Transport | None = None,
         auth_provider: AuthProvider | None = None,
@@ -46,7 +46,9 @@ class Agent:
             skills: Skills mode - "auto" to automatically detect and add skills, "fixed" to use only the skills defined
             by the user in the AgentCard.
         """
-        self.card = card
+
+        # Field Validation is handled by the AgentCard dataclass.
+        self.card = AgentCard.from_json(card) if isinstance(card, dict) else card
         self.context_manager = ContextManager()
         self.llm = llm
         self.tools: dict[str, BaseTool] = {}

@@ -2,6 +2,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from protolink import __version__ as protolink_version
+from protolink.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -96,6 +99,9 @@ class AgentCard:
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> "AgentCard":
         """Create from JSON format."""
+
+        cls._validate_fields(data)
+
         capabilities_data = data.get("capabilities", {})
         capabilities = AgentCapabilities(**capabilities_data) if capabilities_data else AgentCapabilities()
         skills = [AgentSkill(**skill_data) for skill_data in data.get("skills", [])]
@@ -111,3 +117,11 @@ class AgentCard:
             security_schemes=data.get("securitySchemes", {}),
             required_scopes=data.get("requiredScopes", []),
         )
+
+    @staticmethod
+    def _validate_fields(data: dict[str, Any]) -> None:
+        """Validate fields."""
+        required_fields = ["name", "description", "url"]
+        for f in required_fields:
+            if f not in data:
+                raise ValueError(f"AgentCard :: Missing required field: {f}")

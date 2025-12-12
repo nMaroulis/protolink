@@ -12,6 +12,13 @@ class EchoAgent(Agent):
     """A simple agent that echoes back user messages."""
 
     def __init__(self):
+        # Directly as a dict.
+        # card = {
+        #     "name":"echo-agent",
+        #     "description":"An agent that echoes back your messages",
+        #     "url":"local://echo-agent",
+        # }
+        # OR
         card = AgentCard(
             name="echo-agent",
             description="An agent that echoes back your messages",
