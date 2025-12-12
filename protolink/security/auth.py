@@ -1,5 +1,5 @@
 """
-ProtoLink - Security & Authentication (v0.3.0)
+ProtoLink - Security & Authentication
 
 OAuth 2.0, Bearer tokens authorization for enterprise deployments.
 """
@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+
+from protolink.types import SecuritySchemeType
 
 
 @dataclass
@@ -54,9 +56,6 @@ class SecurityContext:
         }
 
 
-# TODO(): Import from types
-
-
 @dataclass
 class SecurityScheme:
     """Security scheme definition for an agent.
@@ -70,7 +69,7 @@ class SecurityScheme:
         metadata: Additional scheme metadata
     """
 
-    scheme_type: str  # "bearer", "oauth2", "api_key"
+    scheme_type: SecuritySchemeType
     description: str
     metadata: dict[str, Any] = field(default_factory=dict)
 

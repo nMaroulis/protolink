@@ -64,5 +64,6 @@ nav:
       - Models: models.md
       - Tools: tools.md
       - Transports: transports.md
+      - Types: types.md
   - Examples:
       - Examples: examples.md
