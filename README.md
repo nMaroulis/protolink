@@ -199,4 +199,4 @@ MIT
 
 ## Contributing
 
-TBD
+All contributions are more than welcome! Please see [CONTRIBUTING.md](https://github.com/nMaroulis/protolink/blob/main/CONTRIBUTING.md) for more information.

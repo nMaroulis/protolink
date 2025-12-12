@@ -5,10 +5,24 @@ This module contains shared type aliases used throughout the Protolink framework
 Centralizing types improves reusability, discoverability, and maintainability.
 """
 
-
 from typing import Literal, TypeAlias
 
 BackendType: TypeAlias = Literal["starlette", "fastapi"]
+
+
+HttpAuthScheme = Literal[
+    "bearer",  # OAuth access token
+    "basic",  # username:password
+    "digest",  # challenge-response
+    "hmac",  # custom HMAC headers (some APIs put it under http)
+    "negotiate",  # Kerberos / SPNEGO
+    "ntlm",  # NT LAN Manager protocol
+    # Vendor-specific
+    "aws4auth",  # AWS SigV4
+    "hawk",  # HAWK MAC authentication
+    "edgegrid",  # Akamai
+]
+
 
 LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp", "ollama"]
 

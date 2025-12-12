@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from protolink.types import SecuritySchemeType
+from protolink.types import HttpAuthScheme, SecuritySchemeType
 
 
 @dataclass
@@ -64,19 +64,25 @@ class SecurityScheme:
     Used in AgentCard to declare security capabilities.
 
     Attributes:
-        scheme_type: Type of scheme ("bearer", "oauth2", "api_key")
+        auth_type: Type of scheme ("http", "oauth2", "api_key")
+        auth_scheme: Type of HTTP auth scheme ("bearer", "basic", "digest", etc.)
         description: Human-readable description
         metadata: Additional scheme metadata
+
+    Example:
+        { auth_type = "http", auth_scheme = "bearer" }
     """
 
-    scheme_type: SecuritySchemeType
+    auth_type: SecuritySchemeType
+    auth_scheme: HttpAuthScheme | None
     description: str
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
-            "type": self.scheme_type,
+            "type": self.auth_type,
+            "scheme": self.auth_scheme,
             "description": self.description,
             "metadata": self.metadata,
         }
