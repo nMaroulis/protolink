@@ -561,6 +561,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#module-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#native-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -576,6 +587,17 @@
     <span class="md-ellipsis">
       
         MCP Tools
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tool-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool Tags
       
     </span>
   </a>
@@ -737,6 +759,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#module-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#native-tools" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -752,6 +785,17 @@
     <span class="md-ellipsis">
       
         MCP Tools
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tool-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tool Tags
       
     </span>
   </a>
@@ -780,6 +824,18 @@
 
 <h1 id="tools">Tools<a class="headerlink" href="#tools" title="Permanent link">&para;</a></h1>
 <p>Tools extend agent capabilities with additional functions.</p>
+<h2 id="module-structure">Module Structure<a class="headerlink" href="#module-structure" title="Permanent link">&para;</a></h2>
+<p>The tools module is organized as follows:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Core tool interfaces</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseTool</span><span class="p">,</span> <span class="n">Tool</span>
+
+<span class="c1"># Tool adapters for external integrations  </span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
+</code></pre></div>
+<ul>
+<li><strong><code>protolink.tools</code></strong>: Core tool interfaces and native tool implementation</li>
+<li><strong><code>protolink.tools.adapters</code></strong>: Adapters for integrating external tool systems</li>
+</ul>
 <h2 id="native-tools">Native Tools<a class="headerlink" href="#native-tools" title="Permanent link">&para;</a></h2>
 <p><strong>Native tools</strong> are regular Python callables that you register on an agent. They are exposed over the transport so that other agents (or clients) can invoke them.</p>
 <p>To register a native tool, decorate an async function with <code>@agent.tool</code>:</p>
@@ -800,13 +856,25 @@
 <li>Register it on the agent.</li>
 </ol>
 <p>Example pattern:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
 
 
 <span class="n">mcp_tool</span> <span class="o">=</span> <span class="n">MCPToolAdapter</span><span class="p">(</span><span class="n">mcp_client</span><span class="p">,</span> <span class="s2">&quot;multiply&quot;</span><span class="p">)</span>
 <span class="n">agent</span><span class="o">.</span><span class="n">add_tool</span><span class="p">(</span><span class="n">mcp_tool</span><span class="p">)</span>
 </code></pre></div>
 <p>The MCP adapter lets you reuse existing MCP tools as if they were native tools, keeping a consistent interface on the agent side.</p>
+<h2 id="tool-tags">Tool Tags<a class="headerlink" href="#tool-tags" title="Permanent link">&para;</a></h2>
+<p>Tools can be categorized using tags for better organization and discovery:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@agent</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;calculate&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Performs calculations&quot;</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;math&quot;</span><span class="p">,</span> <span class="s2">&quot;utility&quot;</span><span class="p">])</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">calculate</span><span class="p">(</span><span class="n">operation</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;add&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+    <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;multiply&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">b</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported operation: </span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Tags are automatically propagated to the agent's skills and can be used for filtering and categorization.</p>
 
 
 
