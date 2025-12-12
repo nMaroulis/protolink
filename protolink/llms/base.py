@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Any, Literal, TypeAlias
+from typing import Any
 
 from protolink.models import Message
-
-LLMType: TypeAlias = Literal["api", "local", "server"]
-LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp", "ollama"]
+from protolink.types import LLMProvider, LLMType
 
 
 class LLM(ABC):

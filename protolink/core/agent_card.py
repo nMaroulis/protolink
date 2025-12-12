@@ -1,7 +1,8 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal, TypeAlias
+from typing import Any
 
 from protolink import __version__ as protolink_version
+from protolink.types import MimeType, SecuritySchemeType
 from protolink.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -62,39 +63,6 @@ class AgentSkill:
             self.tags = []
         if self.examples is None:
             self.examples = []
-
-
-# Supported Agent IO formats
-MimeType: TypeAlias = Literal[
-    # Text
-    "text/plain",
-    "text/markdown",
-    "text/html",
-    # JSON / structured
-    "application/json",
-    # Images
-    "image/png",
-    "image/jpeg",
-    "image/webp",
-    # Audio
-    "audio/wav",
-    "audio/mpeg",
-    "audio/ogg",
-    # Video (rare, but supported)
-    "video/mp4",
-    "video/webm",
-    # Files for RAG
-    "application/pdf",
-]
-
-# Supported security schemes
-SecuritySchemeType: TypeAlias = Literal[
-    "apiKey",  # API key
-    "http",  # bearer / basic / digest
-    "oauth2",  # full OAuth OAuth2
-    "mutualTLS",  # certificates
-    "openIdConnect",  # OIDC auto-discovery
-]
 
 
 @dataclass

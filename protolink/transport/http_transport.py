@@ -6,7 +6,6 @@ or FastAPI backend for the server side.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Literal, TypeAlias
 
 import httpx
 
@@ -16,8 +15,7 @@ from protolink.core.task import Task
 from protolink.security.auth import Authenticator
 from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
 from protolink.transport.transport import Transport
-
-BackendName: TypeAlias = Literal["starlette", "fastapi"]
+from protolink.types import BackendType
 
 
 class HTTPTransport(Transport):
@@ -48,7 +46,7 @@ class HTTPTransport(Transport):
         port: int = 8000,
         timeout: float = 30.0,
         authenticator: Authenticator | None = None,
-        backend: BackendName = "starlette",
+        backend: BackendType = "starlette",
         *,
         validate_schema: bool = False,
     ) -> None:

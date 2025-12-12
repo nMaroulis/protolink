@@ -1,11 +1,10 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal, TypeAlias
+from typing import Any
 
 from protolink.core.part import Part
-
-RoleType: TypeAlias = Literal["user", "agent", "system"]
+from protolink.types import RoleType
 
 
 @dataclass
