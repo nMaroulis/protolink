@@ -118,7 +118,7 @@ uv pip install -e ".[dev]"
 from protolink.agents import Agent
 from protolink.models import AgentCard
 from protolink.transport import HTTPTransport
-from protolink.tools import MCPToolAdapter
+from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
 
 # Define the agent card

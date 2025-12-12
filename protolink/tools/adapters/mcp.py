@@ -5,6 +5,7 @@ class MCPToolAdapter(BaseTool):
     def __init__(self, mcp_client, tool_name: str, description: str | None = None):
         self.name = tool_name
         self.description = description or f"MCP tool {tool_name}"
+
         self.mcp_client = mcp_client
 
     async def __call__(self, **kwargs):

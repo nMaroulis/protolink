@@ -91,7 +91,7 @@ Below is a minimal example that wires together an agent, HTTP transport, an Open
 from protolink.agents import Agent
 from protolink.models import AgentCard
 from protolink.transport import HTTPTransport
-from protolink.tools import MCPToolAdapter
+from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
 
 

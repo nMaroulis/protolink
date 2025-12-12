@@ -55,6 +55,13 @@ class AgentSkill:
     tags: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 
+    def __post_init__(self):
+        """Validate fields after initialization."""
+        if self.tags is None:
+            self.tags = []
+        if self.examples is None:
+            self.examples = []
+
 
 @dataclass
 class AgentCard:

@@ -2,6 +2,21 @@
 
 Tools extend agent capabilities with additional functions.
 
+## Module Structure
+
+The tools module is organized as follows:
+
+```python
+# Core tool interfaces
+from protolink.tools import BaseTool, Tool
+
+# Tool adapters for external integrations  
+from protolink.tools.adapters import MCPToolAdapter
+```
+
+- **`protolink.tools`**: Core tool interfaces and native tool implementation
+- **`protolink.tools.adapters`**: Adapters for integrating external tool systems
+
 ## Native Tools
 
 **Native tools** are regular Python callables that you register on an agent. They are exposed over the transport so that other agents (or clients) can invoke them.
@@ -32,7 +47,7 @@ High‑level flow:
 Example pattern:
 
 ```python
-from protolink.tools import MCPToolAdapter
+from protolink.tools.adapters import MCPToolAdapter
 
 
 mcp_tool = MCPToolAdapter(mcp_client, "multiply")
@@ -40,4 +55,21 @@ agent.add_tool(mcp_tool)
 ```
 
 The MCP adapter lets you reuse existing MCP tools as if they were native tools, keeping a consistent interface on the agent side.
+
+## Tool Tags
+
+Tools can be categorized using tags for better organization and discovery:
+
+```python
+@agent.tool(name="calculate", description="Performs calculations", tags=["math", "utility"])
+async def calculate(operation: str, a: float, b: float) -> float:
+    if operation == "add":
+        return a + b
+    elif operation == "multiply":
+        return a * b
+    else:
+        raise ValueError(f"Unsupported operation: {operation}")
+```
+
+Tags are automatically propagated to the agent's skills and can be used for filtering and categorization.
 

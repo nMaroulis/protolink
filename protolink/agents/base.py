@@ -306,18 +306,22 @@ class Agent:
         """
         return self.context_manager
 
+    ####################
+    ## Tool Management
+    ####################
+
     def add_tool(self, tool: BaseTool) -> None:
         """Register a Tool instance with the agent."""
         self.tools[tool.name] = tool
-        skill = AgentSkill(id=tool.name, description=tool.description or f"Tool: {tool.name}")
+        skill = AgentSkill(id=tool.name, description=tool.description or f"Tool: {tool.name}", tags=tool.tags)
         self._add_skill_to_agent_card(skill)
 
-    def tool(self, name: str, description: str):
+    def tool(self, name: str, description: str, tags: list[str] | None = None):
         """Decorator helper for defining inline tool functions."""
 
         # decorator for Native functions
         def decorator(func):
-            self.add_tool(Tool(name=name, description=description, func=func))
+            self.add_tool(Tool(name=name, description=description, tags=tags, func=func))
             return func
 
         return decorator
@@ -332,6 +336,7 @@ class Agent:
     ####################
     ## Skill Management
     ####################
+
     def _resolve_skills(self, skills_mode: Literal["auto", "fixed"]) -> None:
         """Resolve skills parameter based on mode and update agent card.
 
@@ -372,7 +377,7 @@ class Agent:
         # TODO(): Get LLM's skills.
         # Detect skills from tools
         for tool_name, tool in self.tools.items():
-            skill = AgentSkill(id=tool_name, description=tool.description or f"Tool: {tool_name}")
+            skill = AgentSkill(id=tool_name, description=tool.description or f"Tool: {tool_name}", tags=tool.tags)
             detected_skills.append(skill)
 
         # Detect skills from public methods (excluding internal methods)
