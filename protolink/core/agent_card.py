@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Literal, TypeAlias
 
 from protolink import __version__ as protolink_version
 from protolink.utils.logging import get_logger
@@ -21,7 +21,7 @@ class AgentCapabilities:
         multi_step_reasoning: Whether the agent can perform multi-step reasoning
         timeout_support: Whether the agent respects timeouts for operations
         delegation: Whether the agent can delegate tasks to other agents
-        rag_support: Whether the agent supports Retrieval-Augmented Generation
+        rag: Whether the agent supports Retrieval-Augmented Generation
         code_execution: Whether the agent has access to a safe execution sandbox
     """
 
@@ -29,13 +29,14 @@ class AgentCapabilities:
     push_notifications: bool = False
     state_transition_history: bool = False
     # Extensions to A2A spec
+    has_llm: bool = False
     max_concurrency: int = 1
     message_batching: bool = False
     tool_calling: bool = False
     multi_step_reasoning: bool = False
     timeout_support: bool = False
     delegation: bool = False
-    rag_support: bool = False
+    rag: bool = False
     code_execution: bool = False
 
 
@@ -63,6 +64,29 @@ class AgentSkill:
             self.examples = []
 
 
+MimeType: TypeAlias = Literal[
+    # Text
+    "text/plain",
+    "text/markdown",
+    "text/html",
+    # JSON / structured
+    "application/json",
+    # Images
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    # Audio
+    "audio/wav",
+    "audio/mpeg",
+    "audio/ogg",
+    # Video (rare, but supported)
+    "video/mp4",
+    "video/webm",
+    # Files for RAG
+    "application/pdf",
+]
+
+
 @dataclass
 class AgentCard:
     """Agent identity and capability declaration.
@@ -75,6 +99,8 @@ class AgentCard:
         protocol_version: Protolink Protocol version
         capabilities: Supported features
         skills: List of skills the agent can perform
+        input_formats: List of supported input formats
+        output_formats: List of supported output formats
         security_schemes: Security schemes for authentication
         required_scopes: Required scopes for authentication
     """
@@ -86,6 +112,8 @@ class AgentCard:
     protocol_version: str = protolink_version
     capabilities: AgentCapabilities = field(default_factory=AgentCapabilities)
     skills: list[AgentSkill] = field(default_factory=list)
+    input_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
+    output_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
     required_scopes: list[str] | None = field(default_factory=list)
 
@@ -99,6 +127,8 @@ class AgentCard:
             "protocolVersion": self.protocol_version,
             "capabilities": asdict(self.capabilities) if self.capabilities else {},
             "skills": [asdict(skill) for skill in self.skills],
+            "inputFormats": self.input_formats,
+            "outputFormats": self.output_formats,
             "securitySchemes": self.security_schemes,
             "requiredScopes": self.required_scopes,
         }
@@ -121,6 +151,8 @@ class AgentCard:
             protocol_version=data.get("protocolVersion", protolink_version),
             capabilities=capabilities,
             skills=skills,
+            input_formats=data.get("inputFormats", ["text/plain"]),
+            output_formats=data.get("outputFormats", ["text/plain"]),
             security_schemes=data.get("securitySchemes", {}),
             required_scopes=data.get("requiredScopes", []),
         )

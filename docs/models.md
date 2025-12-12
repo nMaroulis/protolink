@@ -4,6 +4,7 @@ This section provides detailed API documentation for the core data models in Pro
 
 ## Table of Contents
 
+- [MimeType](#mimetype)
 - [AgentCard](#agentcard)
 - [AgentCapabilities](#agentcapabilities)
 - [AgentSkill](#agentskill)
@@ -15,7 +16,6 @@ This section provides detailed API documentation for the core data models in Pro
 - [Context](#context)
 
 ---
-
 ## AgentCard
 
 ```python
@@ -28,6 +28,8 @@ class AgentCard:
     protocol_version: str = protolink_version
     capabilities: AgentCapabilities = field(default_factory=AgentCapabilities)
     skills: list[AgentSkill] = field(default_factory=list)
+    input_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
+    output_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
     required_scopes: list[str] | None = field(default_factory=list)
 ```
@@ -45,6 +47,8 @@ Agent identity and capability declaration. This is the main metadata card that d
 | `protocol_version` | `str` | `protolink_version` | Protolink Protocol version |
 | `capabilities` | `AgentCapabilities` | `AgentCapabilities()` | Supported features |
 | `skills` | `list[AgentSkill]` | `[]` | List of skills the agent can perform |
+| `input_formats` | `list[MimeType]` | `["text/plain"]` | Supported input MIME types |
+| `output_formats` | `list[MimeType]` | `["text/plain"]` | Supported output MIME types |
 | `security_schemes` | `dict[str, dict[str, Any]] | None` | `{}` | Authentication schemes |
 | `required_scopes` | `list[str] | None` | `[]` | Required OAuth scopes |
 
@@ -112,6 +116,8 @@ card = AgentCard(
     description="Provides weather information",
     url="https://api.example.com/weather",
     version="1.2.0",
+    input_formats=["text/plain", "application/json"],
+    output_formats=["text/plain", "application/json", "text/markdown"],
     capabilities=AgentCapabilities(
         streaming=True,
         tool_calling=True,
@@ -133,13 +139,14 @@ class AgentCapabilities:
     streaming: bool = False
     push_notifications: bool = False
     state_transition_history: bool = False
+    has_llm: bool = False
     max_concurrency: int = 1
     message_batching: bool = False
     tool_calling: bool = False
     multi_step_reasoning: bool = False
     timeout_support: bool = False
     delegation: bool = False
-    rag_support: bool = False
+    rag: bool = False
     code_execution: bool = False
 ```
 
@@ -152,13 +159,14 @@ Defines the capabilities and limitations of an agent. This extends the A2A speci
 | `streaming` | `bool` | `False` | Supports Server-Sent Events (SSE) streaming |
 | `push_notifications` | `bool` | `False` | Supports push notifications (webhooks) |
 | `state_transition_history` | `bool` | `False` | Provides detailed task state history |
+| `has_llm` | `bool` | `False` | Has an LLM component for AI processing |
 | `max_concurrency` | `int` | `1` | Maximum concurrent tasks |
 | `message_batching` | `bool` | `False` | Processes multiple messages per request |
 | `tool_calling` | `bool` | `False` | Can call external tools/APIs |
 | `multi_step_reasoning` | `bool` | `False` | Performs multi-step reasoning |
 | `timeout_support` | `bool` | `False` | Respects operation timeouts |
 | `delegation` | `bool` | `False` | Can delegate tasks to other agents |
-| `rag_support` | `bool` | `False` | Supports Retrieval-Augmented Generation |
+| `rag` | `bool` | `False` | Supports Retrieval-Augmented Generation |
 | `code_execution` | `bool` | `False` | Has access to safe execution sandbox |
 
 ---
@@ -199,6 +207,24 @@ skill = AgentSkill(
     ]
 )
 ```
+
+---
+
+#### MimeType
+
+Type alias for supported MIME types in Protolink. These are used to specify the **input** and **output** **formats** that agents can handle.
+
+### Supported Types
+
+| Category | MIME Types |
+|----------|------------|
+| **Text** | `text/plain`, `text/markdown`, `text/html` |
+| **Structured Data** | `application/json` |
+| **Images** | `image/png`, `image/jpeg`, `image/webp` |
+| **Audio** | `audio/wav`, `audio/mpeg`, `audio/ogg` |
+| **Video** | `video/mp4`, `video/webm` |
+| **Documents** | `application/pdf` |
+
 
 ---
 

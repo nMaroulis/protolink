@@ -69,7 +69,8 @@ class Agent:
 
         # LLM Validation
         if self.llm is not None:
-            _ = self.llm.validate_connection()
+            if self.llm.validate_connection():
+                self.card.capabilities.has_llm = True  # Override even if defined by the user.
 
         # Resolve and add necessairy skills
         self._resolve_skills(skills)

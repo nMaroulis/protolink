@@ -48,4 +48,5 @@ class LLM(ABC):
 
     @abstractmethod
     def validate_connection(self) -> bool:
+        """Validate the connection to the LLM API, should handle the logging."""
         raise NotImplementedError
