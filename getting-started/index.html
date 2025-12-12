@@ -848,6 +848,9 @@ pip<span class="w"> </span>install<span class="w"> </span>protolink
 </code></pre></div>
 <h3 id="optional-dependencies">Optional Dependencies<a class="headerlink" href="#optional-dependencies" title="Permanent link">&para;</a></h3>
 <p>Protolink exposes several extras to enable additional functionality:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">uv</label><label for="__tabbed_1_2">pip</label><label for="__tabbed_1_3">uv &amp; pip</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="c1"># Install with all optional dependencies</span>
 uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;protolink[all]&quot;</span>
 
@@ -860,6 +863,38 @@ uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;prot
 <span class="c1"># Development (all extras + testing tools)</span>
 uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;protolink[dev]&quot;</span>
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Install with all optional dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[all]&quot;</span>
+
+<span class="c1"># HTTP support (for web-based agents)</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[http]&quot;</span>
+
+<span class="c1"># All supported LLM libraries</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[llms]&quot;</span>
+
+<span class="c1"># Development (all extras + testing tools)</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[dev]&quot;</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p><em>Because.. why not?</em></p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Install with all optional dependencies</span>
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[all]&quot;</span>
+
+<span class="c1"># HTTP support (for web-based agents)</span>
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[http]&quot;</span>
+
+<span class="c1"># All supported LLM libraries</span>
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[llms]&quot;</span>
+
+<span class="c1"># Development (all extras + testing tools)</span>
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;protolink[dev]&quot;</span>
+</code></pre></div>
+</div>
+</div>
+</div>
 <div class="admonition info">
 <p class="admonition-title">Optional extras</p>
 <p>You usually only need the extras that match your use case. The <code>protolink[llms]</code> will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is <strong>advised to install manually the libraries that are needed for your project</strong>.</p>
@@ -938,6 +973,12 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
           
 <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
         </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
         
       </main>
       
@@ -1030,7 +1071,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "content.code.copy", "navigation.footer", "navigation.expand"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "content.code.copy", "navigation.footer", "navigation.expand", "navigation.top"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
       <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
