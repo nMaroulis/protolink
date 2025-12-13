@@ -6,19 +6,18 @@ or FastAPI backend for the server side.
 """
 
 from collections.abc import Awaitable, Callable
+from typing import ClassVar
 
 import httpx
 
-from protolink.core.agent_card import AgentCard
-from protolink.core.message import Message
-from protolink.core.task import Task
+from protolink.models import AgentCard, Message, Task
 from protolink.security.auth import Authenticator
-from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
-from protolink.transport.transport import Transport
-from protolink.types import BackendType
+from protolink.transport.agent.backends import BackendInterface, FastAPIBackend, StarletteBackend
+from protolink.transport.agent.base import AgentTransport
+from protolink.types import BackendType, TransportType
 
 
-class HTTPTransport(Transport):
+class HTTPAgentTransport(AgentTransport):
     """HTTP-based transport for Protolink agents.
 
     Parameters
@@ -50,6 +49,7 @@ class HTTPTransport(Transport):
         *,
         validate_schema: bool = False,
     ) -> None:
+        self.transport_type: ClassVar[TransportType] = "http"
         self.host: str = host
         self.port: int = port
         self.timeout: float = timeout
@@ -80,6 +80,10 @@ class HTTPTransport(Transport):
 
         self.security_context = await self.authenticator.authenticate(credentials)
 
+    # ------------------------------------------------------------------
+    # Client-side handlers (Agent logic)
+    # ------------------------------------------------------------------
+
     async def send_task(self, agent_url: str, task: Task) -> Task:
         """Send a ``Task`` to a remote agent and return the resulting task."""
 
@@ -100,7 +104,7 @@ class HTTPTransport(Transport):
         raise RuntimeError("No response messages returned by agent")
 
     async def get_agent_card(self, agent_url: str) -> AgentCard:
-        """Fetch the remote agent's :class:`AgentCard` description."""
+        """Fetch the agent's :class:`AgentCard` description directly from the Agent."""
 
         client = await self._ensure_client()
         url = f"{agent_url.rstrip('/')}/.well-known/agent.json"
@@ -112,6 +116,10 @@ class HTTPTransport(Transport):
         """Subscribe to a long-running task (not yet implemented)."""
 
         raise NotImplementedError("HTTP streaming is not implemented yet")
+
+    # ------------------------------------------------------------------
+    # Server-side handlers (Agent logic)
+    # ------------------------------------------------------------------
 
     async def start(self) -> None:
         """Start the HTTP server and initialize the HTTP client."""
@@ -144,6 +152,10 @@ class HTTPTransport(Transport):
         if not self._client:
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
+
+    # ------------------------------------------------------------------
+    # Utility
+    # ------------------------------------------------------------------
 
     def _build_headers(self) -> dict[str, str]:
         """Build HTTP headers for an outgoing request.

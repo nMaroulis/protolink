@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from protolink.models import Task
-from protolink.transport import Transport
+from protolink.transport.agent import AgentTransport
 
 
 class AgentServer:
@@ -13,7 +13,7 @@ class AgentServer:
 
     def __init__(
         self,
-        transport: Transport,
+        transport: AgentTransport,
         task_handler: Callable[[Task], Awaitable[Task]] | None = None,
     ) -> None:
         if transport is None:

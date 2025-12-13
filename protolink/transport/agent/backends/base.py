@@ -18,7 +18,7 @@ class BackendInterface:
 
     app: Any  # Underlying ASGI application instance (Starlette or FastAPI)
 
-    def setup_routes(self, transport: "HTTPTransport") -> None:  # noqa: F821, UP037
+    def setup_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821, UP037
         """Register all HTTP routes for the given transport instance."""
 
         raise NotImplementedError()

@@ -1,4 +1,4 @@
-"""FastAPI-based HTTP backend used by :class:`HTTPTransport`.
+"""FastAPI-based HTTP backend used by :class:`HTTPAgentTransport`.
 
 This module provides a concrete implementation of :class:`BackendInterface`
 backed by a FastAPI application. It is responsible only for:
@@ -14,7 +14,7 @@ import asyncio
 from typing import Any
 
 from protolink.core.task import Task
-from protolink.transport.backends.base import BackendInterface
+from protolink.transport.agent.backends.base import BackendInterface
 
 
 class FastAPIBackend(BackendInterface):
@@ -36,7 +36,7 @@ class FastAPIBackend(BackendInterface):
         self._server_task: asyncio.Task[None] | None = None
         self._server_instance: Any = None
 
-    def setup_routes(self, transport: "HTTPTransport") -> None:  # noqa: F821
+    def setup_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
         """Register HTTP routes on the FastAPI application.
 
         The handler delegates incoming HTTP requests to the private

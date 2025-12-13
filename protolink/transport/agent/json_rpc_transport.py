@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 
@@ -8,6 +8,7 @@ from protolink.core.message import Message
 from protolink.core.task import Task
 from protolink.security.auth import Authenticator
 from protolink.transport.transport import Transport
+from protolink.types import TransportType
 
 
 class JSONRPCTransport(Transport):
@@ -31,6 +32,7 @@ class JSONRPCTransport(Transport):
             timeout: Request timeout in seconds
             authenticator: Authenticator for request authentication (NEW v0.3.0)
         """
+        self.transport_type: ClassVar[TransportType] = "json-rpc"
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
         self._request_id = 0

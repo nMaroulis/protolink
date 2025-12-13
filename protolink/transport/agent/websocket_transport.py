@@ -1,6 +1,6 @@
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 import httpx
@@ -13,6 +13,7 @@ from protolink.core.message import Message
 from protolink.core.task import Task
 from protolink.security.auth import Authenticator
 from protolink.transport.transport import Transport
+from protolink.types import TransportType
 
 
 class WebSocketTransport(Transport):
@@ -27,6 +28,7 @@ class WebSocketTransport(Transport):
         timeout: float = 30.0,
         authenticator: Authenticator | None = None,
     ):
+        self.transport_type: ClassVar[TransportType] = "websocket"
         self.host = host
         self.port = port
         self.timeout = timeout

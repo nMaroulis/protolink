@@ -1,20 +1,20 @@
 """
-ProtoLink - Transport Layer
+ProtoLink - Agent to Agent (A2A) Transport Layer
 
-Transport implementations for agent communication.
+Agent-to-Agent (A2A) transport implementations for agent communication.
 Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable
 
-from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
+from protolink.transport.base import Transport
 
 
-class Transport(ABC):
-    """Abstract base class for transport implementations."""
+class AgentTransport(Transport):
+    """Abstract base class for agent transport implementations."""
 
     @abstractmethod
     async def send_task(self, agent_url: str, task: Task) -> Task:
@@ -39,18 +39,6 @@ class Transport(ABC):
 
         Returns:
             Response message
-        """
-        pass
-
-    @abstractmethod
-    async def get_agent_card(self, agent_url: str) -> AgentCard:
-        """Fetch agent card from agent URL.
-
-        Args:
-            agent_url: Agent URL
-
-        Returns:
-            AgentCard with agent metadata
         """
         pass
 

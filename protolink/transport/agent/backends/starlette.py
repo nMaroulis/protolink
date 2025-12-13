@@ -10,7 +10,7 @@ import asyncio
 from typing import Any
 
 from protolink.core.task import Task
-from protolink.transport.backends.base import BackendInterface
+from protolink.transport.agent.backends.base import BackendInterface
 
 
 class StarletteBackend(BackendInterface):

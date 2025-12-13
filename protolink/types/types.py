@@ -9,7 +9,6 @@ from typing import Literal, TypeAlias
 
 BackendType: TypeAlias = Literal["starlette", "fastapi"]
 
-
 HttpAuthScheme = Literal[
     "bearer",  # OAuth access token
     "basic",  # username:password
@@ -63,3 +62,5 @@ SecuritySchemeType: TypeAlias = Literal[
     "mutualTLS",  # certificates
     "openIdConnect",  # OIDC auto-discovery
 ]
+
+TransportType: TypeAlias = Literal["http", "websocket", "sse", "json-rpc", "grpc", "runtime"]

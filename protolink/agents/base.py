@@ -8,14 +8,17 @@ incorporating both client and server functionalities.
 from collections.abc import AsyncIterator
 from typing import Any, Literal
 
+from protolink.client import RegistryClient
 from protolink.client.agent_client import AgentClient
 from protolink.core.context_manager import ContextManager
+from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.models import AgentCard, AgentSkill, Message, Task
 from protolink.security.auth import Authenticator, SecurityContext
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
-from protolink.transport import Transport
+from protolink.transport.agent import AgentTransport
+from protolink.transport.registry import HTTPRegistryTransport
 from protolink.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -32,7 +35,8 @@ class Agent:
         self,
         card: AgentCard | dict[str, Any],
         llm: LLM | None = None,
-        transport: Transport | None = None,
+        transport: AgentTransport | None = None,
+        registry: Registry | RegistryClient | str | None = None,
         authenticator: Authenticator | None = None,
         skills: Literal["auto", "fixed"] = "auto",
     ):
@@ -42,6 +46,9 @@ class Agent:
             card: AgentCard describing this agent
             llm: Optional LLM instance for the agent to use
             transport: Transport layer for client/server communication
+            registry: Optional registry for agent discovery. The Agent uses the RegistryClient to communicate with the
+                Registry. If a Registry class is passed, its RegistryClient will be extracted. If a string is passed, it
+                will be used as the registry URL. (default HTTPRegistryTransport)
             authenticator: Optional authentication provider
             skills: Skills mode - "auto" to automatically detect and add skills, "fixed" to use only the skills defined
             by the user in the AgentCard.
@@ -56,6 +63,19 @@ class Agent:
         self.authenticator = authenticator
         self._security_context: SecurityContext | None = None
 
+        # Initilize Registry Client
+        self.registry_client: RegistryClient | None = None
+        if registry:
+            if isinstance(registry, Registry):
+                self.registry_client = registry.get_client()
+            elif isinstance(registry, str):
+                # defaults to HTTPRegistryTransport
+                self.registry_client = RegistryClient(HTTPRegistryTransport(url=registry))
+            elif isinstance(registry, RegistryClient):
+                self.registry_client = registry
+            else:
+                raise ValueError("Invalid registry type")
+
         # Initialize client and server components
         if transport is None:
             self._client, self._server = None, None
@@ -66,6 +86,9 @@ class Agent:
             self._client = AgentClient(transport=transport)
             self._server = AgentServer(transport, self.handle_task)
             self._server.validate_agent_url(self.card.url)
+            # Transport and AgentCard URL must match.
+            if getattr(transport, "url", None) != self.card.url:
+                raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
 
         # LLM Validation
         if self.llm is not None:
@@ -194,7 +217,7 @@ class Agent:
 
         return "No response generated"
 
-    def set_transport(self, transport: Transport) -> None:
+    def set_transport(self, transport: AgentTransport | None) -> None:
         """Set the transport layer for this agent.
 
         Args:
@@ -202,8 +225,8 @@ class Agent:
         """
         if transport is None:
             raise ValueError("transport must not be None")
-        if not isinstance(transport, Transport):
-            raise TypeError("transport must be an instance of Transport")
+        if not isinstance(transport, AgentTransport):
+            raise TypeError("transport must be an instance of AgentTransport")
 
         self._client = AgentClient(transport=transport)
         self._server = AgentServer(transport, self.handle_task)
@@ -252,9 +275,37 @@ class Agent:
         """
         return self.context_manager
 
-    ####################
-    ## Authentication
-    ####################
+    # ----------------------------------------------------------------------
+    # Registry
+    # ----------------------------------------------------------------------
+
+    def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+        """Discover agents in the registry.
+
+        Args:
+            filter_by: Optional filter criteria (e.g., {"capabilities.streaming": True})
+
+        Returns:
+            List of matching AgentCard objects
+        """
+        return self.registry_client.discover(filter_by=filter_by)
+
+    def register(self) -> None:
+        """Register this agent in the global registry.
+
+        Raises:
+            ValueError: If agent with same URL or name already exists
+        """
+        self.registry_client.register(self.get_agent_card())
+
+    def unregister(self) -> None:
+        """Unregister this agent from the global registry."""
+        self.registry_client.unregister(self.get_agent_card().url)
+
+    # ----------------------------------------------------------------------
+    # Authentication
+    # ----------------------------------------------------------------------
+
     async def verify_request_auth(self, auth_header: str | None = None) -> SecurityContext | None:
         """NEW in v0.3.0: Verify authentication of incoming request.
 
@@ -302,9 +353,9 @@ class Agent:
         """
         return self._security_context
 
-    ####################
-    ## Tool Management
-    ####################
+    # ----------------------------------------------------------------------
+    # Tool Management
+    # ----------------------------------------------------------------------
 
     def add_tool(self, tool: BaseTool) -> None:
         """Register a Tool instance with the agent."""
@@ -329,9 +380,9 @@ class Agent:
             raise ValueError(f"Tool {tool_name} not found")
         return await tool(**kwargs)
 
-    ####################
-    ## Skill Management
-    ####################
+    # ----------------------------------------------------------------------
+    # Skill Management
+    # ----------------------------------------------------------------------
 
     def _resolve_skills(self, skills_mode: Literal["auto", "fixed"]) -> None:
         """Resolve skills parameter based on mode and update agent card.

@@ -10,9 +10,17 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%">
 </div>
+ProtoLink is a lightweight Python framework for **autonomous, LLM-powered agents** that communicate directly, manage context, and integrate tools seamlessly. Build **distributed multi-agent systems** with minimal boilerplate and production-ready reliability.
 
 
-A lightweight, production-ready framework for **agent-to-agent communication**, implementing from scratch and extending Google's [Agent-to-Agent Communication (A2A) protocol](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com). Designed to be the go-to Python library for building **interoperable agent systems** with minimal boilerplate, supporting **native integration** with **LLMs** and **Tools** (native & [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)).
+ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where AI agents **communicate directly with each other**.
+
+Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
+
+ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **true agent-to-agent collaboration**.
+
+The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
+
 
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
 
@@ -22,7 +30,7 @@ Follow the API documentation here 📚 [documentation](https://nmaroulis.github.
 - **Extended Capabilities**:
   - **Unified Client/Server Agent Model**: Single agent instance handles both client and server responsibilities, reducing complexity.
   - **Transport Layer Flexibility**: Swap between *HTTP*, *WebSocket*, *gRPC* or *in-memory* transports with minimal code changes.
-  - **Simplified Agent Creation and Registration**: Create and register agents with just a few lines of code.
+  - **Simplified Agent Creation and Registration**: Create and register **autonomous AI agents** with just a few lines of code.
   - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
   - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
   - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
@@ -31,6 +39,20 @@ Follow the API documentation here 📚 [documentation](https://nmaroulis.github.
 - **Planned Integrations**:
   - **Advanced Orchestration Patterns**
     - Multi-step workflows, supervisory agents, role routing, and hierarchical control systems.
+
+### Protolink vs Google A2A 💡
+
+ProtoLink implements Google’s A2A protocol at the **wire level**, while providing a higher-level agent runtime that unifies client, server, transport, tools, and LLMs into a single composable abstraction **the Agent**.
+
+| Concept   | Google A2A              | ProtoLink       |
+| --------- | ----------------------- | --------------- |
+| Agent     | Protocol-level concept  | Runtime object  |
+| Transport | External server concern | Agent-owned     |
+| Client    | Separate                | Built-in        |
+| LLM       | Out of scope            | First-class     |
+| Tools     | Out of scope            | Native + MCP    |
+| UX        | Enterprise infra        | Developer-first |
+
 
 ## Architecture
 
@@ -49,8 +71,8 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
 
 #### Key Benefits
 
-1. **Simplified Development**: No need to manage separate client/server codebases
-2. **Reduced Boilerplate**: Common functionality is handled by the base [Agent]() class
+1. **Simplified Development**: Manage a single agent runtime without separate client/server codebases.
+2. **Reduced Boilerplate**: Common functionality is handled by the base [Agent]() class, letting you focus on agent logic.
 3. **Flexible Deployment**: Start with a single process, scale to distributed when needed
 4. **Unified State Management**: Shared context between client and server operations
 5. **Maintainability**: 
@@ -65,11 +87,11 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
 
 
 ## Why Protolink? 🚀
-
+- **Real Multi-Agent Systems**: Build **autonomous agents** with embedded LLMs, tools, and memory that communicate directly.
 - **Simple API**: Built from the ground-up for **minimal boilerplate**, letting you focus on agent logic rather than infrastructure.
 - **Developer Friendly**: Clean abstractions and direct code paths make debugging and maintenance a breeze.
-- **Production Ready**: Built from the ground up with performance and reliability in mind.
-- **Extensible**: Easily add new transport layers and protocols.
+- **Production Ready**: Designed for **performance, reliability, and scalability** in real-world deployments.
+- **Extensible & Interoperable**: Add new agents, transports, or protocols easily; compatible with **A2A** and **MCP** standards.
 - **Community Focused**: Designed for the open-source community with clear contribution guidelines.
 
 
@@ -121,14 +143,17 @@ from protolink.transport import HTTPTransport
 from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
 
+agent_url = "http://127.0.0.1:8020"
+
 # Define the agent card
 agent_card = AgentCard(
     name="example_agent",
     description="A dummy agent",
+    url=agent_url,
 )
 
 # Initialize the transport
-transport = HTTPTransport()
+transport = HTTPTransport(url=agent_url)
 
 # OpenAI API LLM
 llm = OpenAILLM(model="gpt-5.2")

@@ -2,7 +2,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from protolink import __version__ as protolink_version
-from protolink.types import MimeType, SecuritySchemeType
+from protolink.types import MimeType, SecuritySchemeType, TransportType
 from protolink.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -85,6 +85,7 @@ class AgentCard:
     name: str
     description: str
     url: str
+    transport: TransportType = "http"
     version: str = "1.0.0"
     protocol_version: str = protolink_version
     capabilities: AgentCapabilities = field(default_factory=AgentCapabilities)
