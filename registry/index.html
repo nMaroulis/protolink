@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../registry/">
+        <link rel="prev" href="../models/">
       
       
-        <link rel="next" href="../transports/">
+        <link rel="next" href="../tools/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Tools - protolink</title>
+        <title>Registry - protolink</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#tools" class="md-skip">
+        <a href="#registry" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Tools
+              Registry
             
           </span>
         </div>
@@ -498,34 +498,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../registry/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Registry
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -545,7 +517,7 @@
   <span class="md-ellipsis">
     
   
-    Tools
+    Registry
   
 
     
@@ -563,7 +535,7 @@
   <span class="md-ellipsis">
     
   
-    Tools
+    Registry
   
 
     
@@ -589,46 +561,52 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#module-structure" class="md-nav__link">
+  <a href="#core-concepts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module Structure
+        Core Concepts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registry_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registry
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#native-tools" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#agent-registration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Native Tools
+        Agent Registration
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#mcp-tools" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#agent-discovery" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MCP Tools
+        Agent Discovery
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#tool-tags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tool Tags
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -636,6 +614,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -815,46 +821,52 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#module-structure" class="md-nav__link">
+  <a href="#core-concepts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module Structure
+        Core Concepts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registry_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registry
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#native-tools" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#agent-registration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Native Tools
+        Agent Registration
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#mcp-tools" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#agent-discovery" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MCP Tools
+        Agent Discovery
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#tool-tags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tool Tags
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -878,59 +890,169 @@
   
 
 
-<h1 id="tools">Tools<a class="headerlink" href="#tools" title="Permanent link">&para;</a></h1>
-<p>Tools extend agent capabilities with additional functions.</p>
-<h2 id="module-structure">Module Structure<a class="headerlink" href="#module-structure" title="Permanent link">&para;</a></h2>
-<p>The tools module is organized as follows:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Core tool interfaces</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseTool</span><span class="p">,</span> <span class="n">Tool</span>
-
-<span class="c1"># Tool adapters for external integrations  </span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
-</code></pre></div>
+<h1 id="registry">Registry<a class="headerlink" href="#registry" title="Permanent link">&para;</a></h1>
+<p>The <strong>Registry</strong> is the discovery and coordination layer of Protolink.<br />
+It allows agents to <strong>register themselves</strong>, <strong>discover other agents</strong>, and <strong>interact autonomously</strong> over a shared transport.</p>
+<p>At a high level:</p>
 <ul>
-<li><strong><code>protolink.tools</code></strong>: Core tool interfaces and native tool implementation</li>
-<li><strong><code>protolink.tools.adapters</code></strong>: Adapters for integrating external tool systems</li>
+<li>Agents <strong>announce their existence</strong> to a Registry</li>
+<li>Other agents can <strong>discover agents dynamically</strong></li>
+<li>The Registry runs as a <strong>server</strong> and exposes a transport-backed API</li>
+<li>Agents can operate <strong>autonomously</strong>, without manual function calls</li>
 </ul>
-<h2 id="native-tools">Native Tools<a class="headerlink" href="#native-tools" title="Permanent link">&para;</a></h2>
-<p><strong>Native tools</strong> are regular Python callables that you register on an agent. They are exposed over the transport so that other agents (or clients) can invoke them.</p>
-<p>To register a native tool, decorate an async function with <code>@agent.tool</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
-
-
-<span class="nd">@agent</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Add two numbers&quot;</span><span class="p">)</span>
-<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">add_numbers</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+<div class="admonition success">
+<p class="admonition-title">Why a Registry?</p>
+<p>The Registry enables <strong>dynamic, decentralized agent systems</strong>.<br />
+Agents don’t need hard-coded references to each other — they discover peers at runtime and coordinate through messages.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Inspiration</p>
+<p>The Registry is inspired by <a href="https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/">Google's A2A paper</a>, which introduces a similar concept for agent-to-agent discovery.</p>
+</div>
+<h2 id="core-concepts">Core Concepts<a class="headerlink" href="#core-concepts" title="Permanent link">&para;</a></h2>
+<h3 id="registry_1">Registry<a class="headerlink" href="#registry_1" title="Permanent link">&para;</a></h3>
+<p>The Registry is a <strong>long-running service</strong> responsible for:</p>
+<ul>
+<li>Tracking active agents</li>
+<li>Storing their <code>AgentCard</code> metadata</li>
+<li>Exposing discovery endpoints via a transport</li>
+<li>Acting as the entry point for multi-agent systems</li>
+</ul>
+<p>The Registry does <strong>not execute agent logic</strong>.<br />
+It only provides <strong>discovery, metadata, and routing primitives</strong>.</p>
+<hr />
+<h3 id="agent-registration">Agent Registration<a class="headerlink" href="#agent-registration" title="Permanent link">&para;</a></h3>
+<p>Each agent registers itself by sending its <code>AgentCard</code> to the Registry when it starts.</p>
+<p>An <code>AgentCard</code> typically includes:</p>
+<ul>
+<li>Agent name</li>
+<li>Description</li>
+<li>Capabilities / skills</li>
+<li>Transport URL</li>
+<li>Optional metadata</li>
+</ul>
+<p>Once registered, the agent becomes discoverable by other agents.</p>
+<div class="admonition note">
+<p class="admonition-title">Dynamic Systems</p>
+<p>Agents may join or leave at any time.<br />
+The Registry reflects the current state of the system dynamically.</p>
+</div>
+<hr />
+<h3 id="agent-discovery">Agent Discovery<a class="headerlink" href="#agent-discovery" title="Permanent link">&para;</a></h3>
+<p>Agents query the Registry to discover other agents.</p>
+<p>Discovery supports <strong>optional filtering</strong>, for example:</p>
+<ul>
+<li>By name</li>
+<li>By capability</li>
+<li>By arbitrary metadata</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">agents</span> <span class="o">=</span> <span class="k">await</span> <span class="n">registry</span><span class="o">.</span><span class="n">discover</span><span class="p">(</span><span class="n">filters</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;search&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;domain&quot;</span><span class="p">:</span> <span class="s2">&quot;finance&quot;</span>
+<span class="p">})</span>
 </code></pre></div>
-<p>Native tools are ideal for business logic, data access, or any capability you want your agents to expose.</p>
-<h2 id="mcp-tools">MCP Tools<a class="headerlink" href="#mcp-tools" title="Permanent link">&para;</a></h2>
-<p>Protolink can also expose tools from an <strong>MCP (Model Context Protocol) server</strong> using the <code>MCPToolAdapter</code>.</p>
-<p>High‑level flow:</p>
-<ol>
-<li>Connect to an MCP server using an MCP client (not shown here).</li>
-<li>Wrap an MCP tool with <code>MCPToolAdapter</code>.</li>
-<li>Register it on the agent.</li>
-</ol>
-<p>Example pattern:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
-
-
-<span class="n">mcp_tool</span> <span class="o">=</span> <span class="n">MCPToolAdapter</span><span class="p">(</span><span class="n">mcp_client</span><span class="p">,</span> <span class="s2">&quot;multiply&quot;</span><span class="p">)</span>
-<span class="n">agent</span><span class="o">.</span><span class="n">add_tool</span><span class="p">(</span><span class="n">mcp_tool</span><span class="p">)</span>
+<h1 id="registry_2">Registry<a class="headerlink" href="#registry_2" title="Permanent link">&para;</a></h1>
+<p>The <strong>Registry</strong> is the discovery and coordination layer of Protolink.<br />
+It allows agents to <strong>register themselves</strong>, <strong>discover other agents</strong>, and <strong>interact autonomously</strong> over a shared transport.</p>
+<p>At a high level:</p>
+<ul>
+<li>Agents <strong>announce their existence</strong> to a Registry</li>
+<li>Other agents can <strong>discover agents dynamically</strong></li>
+<li>The Registry runs as a <strong>server</strong> and exposes a transport-backed API</li>
+<li>Agents can operate <strong>autonomously</strong>, without manual function calls</li>
+</ul>
+<div class="admonition success">
+<p class="admonition-title">Why a Registry?</p>
+<p>The Registry enables <strong>dynamic, decentralized agent systems</strong>.<br />
+Agents don’t need hard-coded references to each other — they discover peers at runtime and coordinate through messages.</p>
+</div>
+<hr />
+<h2 id="core-concepts_1">Core Concepts<a class="headerlink" href="#core-concepts_1" title="Permanent link">&para;</a></h2>
+<h3 id="registry_3">Registry<a class="headerlink" href="#registry_3" title="Permanent link">&para;</a></h3>
+<p>The Registry is a <strong>long-running service</strong> responsible for:</p>
+<ul>
+<li>Tracking active agents</li>
+<li>Storing their <code>AgentCard</code> metadata</li>
+<li>Exposing discovery endpoints via a transport</li>
+<li>Acting as the entry point for multi-agent systems</li>
+</ul>
+<p>The Registry does <strong>not execute agent logic</strong>.<br />
+It only provides <strong>discovery, metadata, and routing primitives</strong>.</p>
+<hr />
+<h3 id="agent-registration_1">Agent Registration<a class="headerlink" href="#agent-registration_1" title="Permanent link">&para;</a></h3>
+<p>Each agent registers itself by sending its <code>AgentCard</code> to the Registry when it starts.</p>
+<p>An <code>AgentCard</code> typically includes:</p>
+<ul>
+<li>Agent name</li>
+<li>Description</li>
+<li>Capabilities / skills</li>
+<li>Transport URL</li>
+<li>Optional metadata</li>
+</ul>
+<p>Once registered, the agent becomes discoverable by other agents.</p>
+<div class="admonition note">
+<p class="admonition-title">Dynamic Systems</p>
+<p>Agents may join or leave at any time.<br />
+The Registry reflects the current state of the system dynamically.</p>
+</div>
+<hr />
+<h3 id="agent-discovery_1">Agent Discovery<a class="headerlink" href="#agent-discovery_1" title="Permanent link">&para;</a></h3>
+<p>Agents query the Registry to discover other agents.</p>
+<p>Discovery supports <strong>optional filtering</strong>, for example:</p>
+<ul>
+<li>By name</li>
+<li>By capability</li>
+<li>By arbitrary metadata</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">agents</span> <span class="o">=</span> <span class="k">await</span> <span class="n">registry</span><span class="o">.</span><span class="n">discover</span><span class="p">(</span><span class="n">filters</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="s2">&quot;search&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;domain&quot;</span><span class="p">:</span> <span class="s2">&quot;finance&quot;</span>
+<span class="p">})</span>
 </code></pre></div>
-<p>The MCP adapter lets you reuse existing MCP tools as if they were native tools, keeping a consistent interface on the agent side.</p>
-<h2 id="tool-tags">Tool Tags<a class="headerlink" href="#tool-tags" title="Permanent link">&para;</a></h2>
-<p>Tools can be categorized using tags for better organization and discovery:</p>
-<div class="highlight"><pre><span></span><code><span class="nd">@agent</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;calculate&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Performs calculations&quot;</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;math&quot;</span><span class="p">,</span> <span class="s2">&quot;utility&quot;</span><span class="p">])</span>
-<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">calculate</span><span class="p">(</span><span class="n">operation</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-    <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;add&quot;</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
-    <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;multiply&quot;</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">b</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported operation: </span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="admonition tip">
+<p class="admonition-title">Filters are Optional</p>
+<p>Calling discover() with no filters returns all registered agents.</p>
+</div>
+<h3 id="transport-integration">Transport Integration<a class="headerlink" href="#transport-integration" title="Permanent link">&para;</a></h3>
+<p>The Registry is transport-agnostic.
+It relies on a Transport implementation to expose its API.</p>
+<p>Currently supported:</p>
+<ul>
+<li>HTTPTransport</li>
+</ul>
+<p>The transport is responsible for:</p>
+<ul>
+<li>Binding to a host and port</li>
+<li>Exposing registry endpoints</li>
+<li>Handling request/response lifecycle</li>
+</ul>
+<hr />
+<h3 id="starting-the-registry">Starting the Registry<a class="headerlink" href="#starting-the-registry" title="Permanent link">&para;</a></h3>
+<p>The Registry is started via its transport</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTTPTransport</span>
+
+<span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPTransport</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">)</span>
+<span class="n">registry</span> <span class="o">=</span> <span class="n">Registry</span><span class="p">(</span><span class="n">transport</span><span class="p">)</span>
+
+<span class="k">await</span> <span class="n">registry</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 </code></pre></div>
-<p>Tags are automatically propagated to the agent's skills and can be used for filtering and categorization.</p>
+<p>This starts a registry server that agents can connect to.</p>
+<div class="admonition info">
+<p class="admonition-title">Single Source of Truth</p>
+<p>The Registry’s public URL is derived from the transport and used by agents for registration and discovery.</p>
+</div>
+<hr />
+<h3 id="url-handling">URL Handling<a class="headerlink" href="#url-handling" title="Permanent link">&para;</a></h3>
+<p>Both <strong>Agents</strong> and the <strong>Registry</strong> expose a url property.</p>
+<ul>
+<li>The Transport owns host and port</li>
+<li>The url is a derived, canonical representation</li>
+</ul>
+<p>To avoid duplication, transports provide helpers to <strong>derive host and port from a URL</strong>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPTransport</span><span class="o">.</span><span class="n">from_url</span><span class="p">(</span><span class="s2">&quot;http://localhost:8000&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>This ensures consistent configuration across agents and registry instances.</p>
 
 
 
@@ -966,7 +1088,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../registry/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Registry">
+          <a href="../models/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Models">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -976,20 +1098,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Registry
+                Models
               </div>
             </div>
           </a>
         
         
           
-          <a href="../transports/" class="md-footer__link md-footer__link--next" aria-label="Next: Transports">
+          <a href="../tools/" class="md-footer__link md-footer__link--next" aria-label="Next: Tools">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Transports
+                Tools
               </div>
             </div>
             <div class="md-footer__button md-icon">
