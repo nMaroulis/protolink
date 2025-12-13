@@ -137,7 +137,7 @@ uv pip install -e ".[dev]"
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPTransport
+from protolink.transport import HTTPAgentTransport
 from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
 
@@ -151,7 +151,7 @@ agent_card = AgentCard(
 )
 
 # Initialize the transport
-transport = HTTPTransport(url=agent_url)
+transport = HTTPAgentTransport(url=agent_url)
 
 # OpenAI API LLM
 llm = OpenAILLM(model="gpt-5.2")
@@ -180,13 +180,20 @@ Follow the API documentation here: [Documentation](https://nmaroulis.github.io/p
 
 #### Transport:
 
-- [HTTPTransport](): Uses HTTP/HTTPS for synchronous requests. Two ASGI implementations are available.
+Agent-to-Agent
+
+- [HTTPAgentTransport](): Uses HTTP/HTTPS for synchronous requests. Two ASGI implementations are available.
   - Lightweight: `starlette`, `httpx` & `uvicorn`
   - Advanced | Schema Validation: `fastapi`, `pydantic` & `uvicorn`
-- [WebSocketTransport](): Uses WebSocket for streaming requests. [`websockets`]
-- [JSONRPCTransport](): TBD
-- [GRPCTransport](): TBD
-- RuntimeTransport(): Simple **in-process, in-memory transport**.
+- [WebSocketAgentTransport](): Uses WebSocket for streaming requests. [`websockets`]
+- [JSONRPCAgentTransport](): TBD
+- [GRPCAgentTransport](): TBD
+- [RuntimeAgentTransport](): Simple **in-process, in-memory transport**.
+
+Agent-to-Registry
+
+- [HTTPRegistryTransport](): Uses HTTP/HTTPS for synchronous requests.
+
 
 #### LLMs:
 

@@ -1,6 +1,6 @@
 """HTTP transport implementation for talking to remote Protolink agents.
 
-This module exposes :class:`HTTPTransport`, which sends and receives
+This module exposes :class:`HTTPAgentTransport`, which sends and receives
 ``Task`` and ``Message`` objects over plain HTTP using either a Starlette
 or FastAPI backend for the server side.
 """

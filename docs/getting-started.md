@@ -90,7 +90,7 @@ Below is a minimal example that wires together an agent, HTTP transport, an Open
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPTransport
+from protolink.transport import HTTPAgentTransport
 from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
 
@@ -103,7 +103,7 @@ agent_card = AgentCard(
 
 
 # Initialize the transport
-transport = HTTPTransport()
+transport = HTTPAgentTransport()
 
 
 # OpenAI API LLM
@@ -132,7 +132,7 @@ agent.start()
 This example demonstrates the core pieces of Protolink:
 
 - **AgentCard** to describe the agent.
-- **Transport** (here `HTTPTransport`) to handle communication.
+- **Transport** (here `HTTPAgentTransport`) to handle A2A (agent-to-agent) communication.
 - **LLM** backend (`OpenAILLM`).
 - **Native tools** (Python functions decorated with `@agent.tool`).
 - **MCP tools** registered via `MCPToolAdapter`.

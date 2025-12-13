@@ -1,4 +1,4 @@
-"""Starlette-based HTTP backend used by :class:`HTTPTransport`.
+"""Starlette-based HTTP backend used by :class:`HTTPAgentTransport`.
 
 This module provides a concrete implementation of :class:`BackendInterface`
 backed by a Starlette application. It is responsible for wiring HTTP
@@ -27,7 +27,7 @@ class StarletteBackend(BackendInterface):
         self._server_task: asyncio.Task[None] | None = None
         self._server_instance: Any = None
 
-    def setup_routes(self, transport: "HTTPTransport") -> None:  # noqa: F821
+    def setup_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
         """Register HTTP routes on the Starlette application.
 
         The handler delegates incoming HTTP requests to the private

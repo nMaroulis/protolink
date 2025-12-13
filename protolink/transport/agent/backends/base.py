@@ -6,7 +6,7 @@ from typing import Any
 
 This small protocol-like base class is implemented by concrete backends such
 as :class:`StarletteBackend` and :class:`FastAPIBackend`. It defines the
-minimal surface area required by :class:`HTTPTransport` to:
+minimal surface area required by :class:`HTTPAgentTransport` to:
 
 * register HTTP routes on the underlying ASGI application
 * start and stop the HTTP server
@@ -14,7 +14,7 @@ minimal surface area required by :class:`HTTPTransport` to:
 
 
 class BackendInterface:
-    """Abstract interface for HTTP server backends used by ``HTTPTransport``."""
+    """Abstract interface for HTTP server backends used by ``HTTPAgentTransport``."""
 
     app: Any  # Underlying ASGI application instance (Starlette or FastAPI)
 

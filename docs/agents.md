@@ -28,7 +28,7 @@ Example:
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPTransport
+from protolink.transport import HTTPAgentTransport
 from protolink.llms.api import OpenAILLM
 
 # Agent card can be an AgentCard object or a dict for simplicity, both are handled the same way.
@@ -45,7 +45,7 @@ card_dict = {
     "url": "http://localhost:8000"
 }
 
-transport = HTTPTransport()
+transport = HTTPAgentTransport()
 llm = OpenAILLM(model="gpt-5.2")
 
 # Both approaches work
@@ -62,8 +62,8 @@ Agents communicate over a chosen transport.
 
 Common patterns:
 
-- **RuntimeTransport**: multiple agents in the same process share an in‑memory transport, which is ideal for local testing and composition.
-- **HTTPTransport / WebSocketTransport**: agents expose HTTP or WebSocket endpoints so that other agents (or external clients) can send requests.
+- **RuntimeAgentTransport**: multiple agents in the same process share an in‑memory transport, which is ideal for local testing and composition.
+- **HTTPAgentTransport / WebSocketAgentTransport**: agents expose HTTP or WebSocket endpoints so that other agents (or external clients) can send requests.
 - **gRPC / JSON‑RPC (planned)**: additional transports for more structured or high‑performance communication.
 
 From the framework’s perspective, all of these are implementations of the same transport interface, so you can swap them with minimal code changes.
@@ -90,12 +90,13 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPTransport
+from protolink.transport import HTTPAgentTransport
 from protolink.llms.api import OpenAILLM
 
-card = AgentCard(name="my_agent", description="Example agent")
+url = "http://localhost:8020"
+card = AgentCard(name="my_agent", description="Example agent", url=url)
 llm = OpenAILLM(model="gpt-4")
-transport = HTTPTransport()
+transport = HTTPAgentTransport(url=url)
 
 agent = Agent(card=card, llm=llm, transport=transport)
 ```
