@@ -7,11 +7,11 @@ from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
 from protolink.security.auth import Authenticator
-from protolink.transport.transport import Transport
+from protolink.transport.agent.base import AgentTransport
 from protolink.types import TransportType
 
 
-class JSONRPCTransport(Transport):
+class JSONRPCTransport(AgentTransport):
     """JSON-RPC 2.0 transport over HTTP/WebSocket.
 
     Implements A2A protocol communication using:

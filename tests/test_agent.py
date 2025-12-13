@@ -8,10 +8,10 @@ from protolink.agents import Agent
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
-from protolink.transport import Transport
+from protolink.transport import AgentTransport
 
 
-class DummyTransport(Transport):
+class DummyTransport(AgentTransport):
     """Minimal transport implementation for testing purposes."""
 
     def __init__(self):

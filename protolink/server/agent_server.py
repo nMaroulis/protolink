@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from protolink.models import Task
-from protolink.transport.agent import AgentTransport
+from protolink.transport import AgentTransport
 
 
 class AgentServer:

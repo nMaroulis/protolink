@@ -12,11 +12,11 @@ from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
 from protolink.security.auth import Authenticator
-from protolink.transport.transport import Transport
+from protolink.transport.agent.base import AgentTransport
 from protolink.types import TransportType
 
 
-class WebSocketTransport(Transport):
+class WebSocketAgentTransport(AgentTransport):
     """Transport implementation that communicates over WebSockets."""
 
     WS_PATH = "/ws"

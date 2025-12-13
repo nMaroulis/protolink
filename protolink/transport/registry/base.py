@@ -5,6 +5,7 @@ Agent-to-Registry (A2R) transport implementations for agent communication.
 """
 
 from abc import abstractmethod
+from typing import Any
 
 from protolink.models import AgentCard
 from protolink.transport.base import Transport
@@ -24,7 +25,7 @@ class RegistryTransport(Transport):
         ...
 
     @abstractmethod
-    async def discover(self, filters: dict | None = None) -> list[AgentCard]:
+    async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         """Return all agents registered with the registry."""
         ...
 

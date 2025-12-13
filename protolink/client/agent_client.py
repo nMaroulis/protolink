@@ -1,5 +1,5 @@
 from protolink.models import Message, Task
-from protolink.transport.agent import AgentTransport
+from protolink.transport import AgentTransport
 
 
 class AgentClient:

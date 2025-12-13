@@ -5,7 +5,7 @@ from typing import ClassVar, Protocol, runtime_checkable
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
 from protolink.core.task import Task
-from protolink.transport.transport import Transport
+from protolink.transport.agent.base import AgentTransport
 from protolink.types import TransportType
 
 
@@ -16,7 +16,7 @@ class AgentProtocol(Protocol):
     card: AgentCard
 
 
-class RuntimeTransport(Transport):
+class RuntimeAgentTransport(AgentTransport):
     """In-memory transport for local agent communication.
 
     Agents communicate directly without network overhead.

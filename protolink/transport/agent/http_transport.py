@@ -7,6 +7,7 @@ or FastAPI backend for the server side.
 
 from collections.abc import Awaitable, Callable
 from typing import ClassVar
+from urllib.parse import urlparse
 
 import httpx
 
@@ -41,8 +42,7 @@ class HTTPAgentTransport(AgentTransport):
 
     def __init__(
         self,
-        host: str = "0.0.0.0",
-        port: int = 8000,
+        url: str,
         timeout: float = 30.0,
         authenticator: Authenticator | None = None,
         backend: BackendType = "starlette",
@@ -50,8 +50,8 @@ class HTTPAgentTransport(AgentTransport):
         validate_schema: bool = False,
     ) -> None:
         self.transport_type: ClassVar[TransportType] = "http"
-        self.host: str = host
-        self.port: int = port
+        self.url = url
+        self._set_from_url(url)
         self.timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
         self.security_context: object | None = None
@@ -190,3 +190,10 @@ class HTTPAgentTransport(AgentTransport):
         }
 
         return agent_url in allowed
+
+    # TODO(): Do this in the backend
+    def _set_from_url(self, url: str) -> None:
+        """Populate host, port, and canonical url from a full URL."""
+        parsed = urlparse(url.rstrip("/"))
+        self.host = parsed.hostname
+        self.port = parsed.port

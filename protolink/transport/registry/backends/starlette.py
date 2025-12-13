@@ -1,5 +1,3 @@
-# protolink/transport/registry/backends/starlette.py
-
 import asyncio
 from typing import Any
 
@@ -21,7 +19,7 @@ class StarletteRegistryBackend(RegistryBackendInterface):
 
         @self.app.route("/agents/", methods=["POST"])
         async def register_agent(request: Request):
-            card = AgentCard.from_dict(await request.json())
+            card = AgentCard.from_json(await request.json())
             await transport._register_local(card)
             return JSONResponse({"status": "registered"})
 
@@ -36,9 +34,9 @@ class StarletteRegistryBackend(RegistryBackendInterface):
 
         @self.app.route("/agents/", methods=["GET"])
         async def discover_agents(request: Request):
-            filters = dict(request.query_params)
-            cards = await transport._discover_local(filters)
-            return JSONResponse([c.to_dict() for c in cards])
+            filter_by = dict(request.query_params)
+            cards = await transport._discover_local(filter_by)
+            return JSONResponse([c.to_json() for c in cards])
 
         @self.app.route("/.well-known/registry.json", methods=["GET"])
         async def registry_metadata(_: Request):

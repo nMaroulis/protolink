@@ -15,14 +15,14 @@ import re
 
 from protolink.agents import Agent
 from protolink.models import AgentCard, Message, Task
-from protolink.transport import HTTPTransport
+from protolink.transport import HTTPAgentTransport
 
 
 class MathAgent(Agent):
     """Agent that exposes a simple addition tool."""
 
     def __init__(self, port: int = 8020) -> None:
-        transport = HTTPTransport(host="127.0.0.1", port=port)
+        transport = HTTPAgentTransport(url=f"http://127.0.0.1:{port}")
         card = AgentCard(
             name="math-agent",
             description="Adds two integers via a registered tool",
@@ -54,7 +54,7 @@ class QuestionAgent(Agent):
     """Agent that receives user text and delegates math requests."""
 
     def __init__(self, math_agent_url: str, port: int = 8021) -> None:
-        transport = HTTPTransport(host="127.0.0.1", port=port)
+        transport = HTTPAgentTransport(url=f"http://127.0.0.1:{port}")
         card = AgentCard(
             name="question-agent",
             description="Routes user math questions to a dedicated math agent",
@@ -88,7 +88,7 @@ async def main() -> None:
     await asyncio.gather(math_agent.start(), question_agent.start())
 
     # Simulate a user sending a task to the question agent over HTTP.
-    user_transport = HTTPTransport()
+    user_transport = HTTPAgentTransport(url="http://0.0.0.0:8022")
     try:
         user_task = Task.create(Message.user("dummy what is 2 + 3"))
         response_task = await user_transport.send_task(question_agent.card.url, user_task)

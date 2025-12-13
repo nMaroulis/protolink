@@ -1,6 +1,5 @@
-# protolink/transport/registry/http.py
-
-from typing import ClassVar
+from typing import Any, ClassVar
+from urllib.parse import urlparse
 
 import httpx
 
@@ -18,17 +17,12 @@ class HTTPRegistryTransport(RegistryTransport):
     def __init__(
         self,
         *,
-        host: str = "0.0.0.0",
-        port: int = 9000,
-        registry_url: str | None = None,
+        url: str,
         timeout: float = 10.0,
     ) -> None:
-        self.host = host
-        self.port = port
+        self.url = url
+        self._set_from_url(url)
         self.timeout = timeout
-
-        # If registry_url is None → this instance IS the registry
-        self.registry_url = registry_url.rstrip("/") if registry_url else f"http://{host}:{port}"
 
         self.backend = StarletteRegistryBackend()
         self.app = self.backend.app
@@ -68,28 +62,28 @@ class HTTPRegistryTransport(RegistryTransport):
     async def register(self, card: AgentCard) -> None:
         client = await self._ensure_client()
         response = await client.post(
-            f"{self.registry_url}/agents/",
-            json=card.to_dict(),
+            f"{self.url}/agents/",
+            json=card.to_json(),
         )
         response.raise_for_status()
 
     async def unregister(self, agent_url: str) -> None:
         client = await self._ensure_client()
         response = await client.delete(
-            f"{self.registry_url}/agents/",
+            f"{self.url}/agents/",
             params={"agent_url": agent_url},
         )
         response.raise_for_status()
 
-    async def discover(self, filters: dict | None = None) -> list[AgentCard]:
+    async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         client = await self._ensure_client()
         response = await client.get(
-            f"{self.registry_url}/agents/",
-            params=filters or {},
+            f"{self.url}/agents/",
+            params=filter_by or {},
         )
         response.raise_for_status()
 
-        return [AgentCard.from_dict(c) for c in response.json()]
+        return [AgentCard.from_json(c) for c in response.json()]
 
     # ------------------------------------------------------------------
     # Server-side handlers (Registry logic)
@@ -101,11 +95,21 @@ class HTTPRegistryTransport(RegistryTransport):
     async def _unregister_local(self, agent_url: str) -> None:
         self._agents.pop(agent_url, None)
 
-    async def _discover_local(self, filters: dict) -> list[AgentCard]:
-        if not filters:
+    async def _discover_local(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+        if not filter_by:
             return list(self._agents.values())
 
         def match(card: AgentCard) -> bool:
-            return all(getattr(card, k, None) == v for k, v in filters.items())
+            return all(getattr(card, k, None) == v for k, v in filter_by.items())
 
         return [c for c in self._agents.values() if match(c)]
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    # TODO(): Do this in the backend
+    def _set_from_url(self, url: str) -> None:
+        """Populate host, port, and canonical url from a full URL."""
+        parsed = urlparse(url.rstrip("/"))
+        self.host = parsed.hostname
+        self.port = parsed.port

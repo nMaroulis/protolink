@@ -62,6 +62,7 @@ nav:
       - Agents: agents.md
       - LLMs: llms.md
       - Models: models.md
+      - Registry: registry.md
       - Tools: tools.md
       - Transports: transports.md
       - Types: types.md

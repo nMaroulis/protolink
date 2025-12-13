@@ -17,8 +17,7 @@ from protolink.models import AgentCard, AgentSkill, Message, Task
 from protolink.security.auth import Authenticator, SecurityContext
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
-from protolink.transport.agent import AgentTransport
-from protolink.transport.registry import HTTPRegistryTransport
+from protolink.transport import AgentTransport, HTTPRegistryTransport
 from protolink.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -70,7 +69,7 @@ class Agent:
                 self.registry_client = registry.get_client()
             elif isinstance(registry, str):
                 # defaults to HTTPRegistryTransport
-                self.registry_client = RegistryClient(HTTPRegistryTransport(url=registry))
+                self.registry_client = RegistryClient(transport=HTTPRegistryTransport(url=registry))
             elif isinstance(registry, RegistryClient):
                 self.registry_client = registry
             else:
@@ -98,15 +97,23 @@ class Agent:
         # Resolve and add necessairy skills
         self._resolve_skills(skills)
 
-    async def start(self) -> None:
+    async def start(self, *, register: bool = True) -> None:
         """Start the agent's server component if available."""
+        # Start the Agent server
         if self._server:
             await self._server.start()
+        # Register to the Registry
+        if register and self.registry_client:
+            await self.registry_client.register(self.card)
 
     async def stop(self) -> None:
         """Stop the agent's server component if available."""
+        # Stop the Agent Server
         if self._server:
             await self._server.stop()
+        # Unregister from the Registry
+        if self.registry_client:
+            await self.registry_client.unregister(self.card.url)
 
     @property
     def client(self) -> AgentClient | None:

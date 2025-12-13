@@ -1,5 +1,7 @@
+from typing import Any
+
 from protolink.models import AgentCard
-from protolink.transport.registry import RegistryTransport
+from protolink.transport import RegistryTransport
 
 # ----------------------------------------------------------------------
 # Agent-to-Registry Communication
@@ -16,5 +18,5 @@ class RegistryClient:
     async def unregister(self, agent_url: str) -> None:
         await self.transport.unregister(agent_url)
 
-    async def discover(self, filters: dict | None = None) -> list[AgentCard]:
-        return await self.transport.discover(filters)
+    async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+        return await self.transport.discover(filter_by)
