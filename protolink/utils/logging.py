@@ -206,21 +206,39 @@ class ProtoLinkLogger:
         self.logger.exception(message, exc_info=exc_info, extra=extra or {})
 
 
+def _verbosity_to_log_level(verbose: int) -> int:
+    """
+    Map verbosity level to logging level.
+
+    0 -> WARNING
+    1 -> INFO
+    2+ -> DEBUG
+    """
+    if verbose <= 0:
+        return logging.WARNING
+    if verbose == 1:
+        return logging.INFO
+    return logging.DEBUG
+
+
 # Default logger instance
 default_logger = ProtoLinkLogger()
 
 
 # Convenience functions
-def get_logger(name: str = "protolink") -> ProtoLinkLogger:
-    """Get a logger instance with the given name.
+def get_logger(name: str = "protolink", verbose: int = 1) -> ProtoLinkLogger:
+    """
+    Get a logger instance with the given name.
 
     Args:
         name: The name of the logger
+        verbose: verbosity level (0=WARNING, 1=INFO, 2+=DEBUG)
 
     Returns:
         A configured ProtoLinkLogger instance
     """
-    return ProtoLinkLogger(name)
+    log_level = _verbosity_to_log_level(verbose)
+    return ProtoLinkLogger(name, log_level=log_level)
 
 
 def setup_logging(

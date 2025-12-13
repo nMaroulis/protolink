@@ -11,6 +11,8 @@ class Tool(BaseTool):
 
     name: str
     description: str
+    input_schema: dict[str, Any] | None
+    output_schema: dict[str, Any] | None
     tags: list[str] | None
 
     func: Callable[..., Any]

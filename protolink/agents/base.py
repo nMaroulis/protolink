@@ -370,12 +370,28 @@ class Agent:
         skill = AgentSkill(id=tool.name, description=tool.description or f"Tool: {tool.name}", tags=tool.tags)
         self._add_skill_to_agent_card(skill)
 
-    def tool(self, name: str, description: str, tags: list[str] | None = None):
+    def tool(
+        self,
+        name: str,
+        description: str,
+        input_schema: dict[str, Any] | None = None,
+        output_schema: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+    ):
         """Decorator helper for defining inline tool functions."""
 
         # decorator for Native functions
         def decorator(func):
-            self.add_tool(Tool(name=name, description=description, tags=tags, func=func))
+            self.add_tool(
+                Tool(
+                    name=name,
+                    description=description,
+                    input_schema=input_schema,
+                    output_schema=output_schema,
+                    tags=tags,
+                    func=func,
+                )
+            )
             return func
 
         return decorator

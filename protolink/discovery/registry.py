@@ -4,6 +4,7 @@ from typing import Any
 from protolink.client.registry_client import RegistryClient
 from protolink.models import AgentCard
 from protolink.transport import HTTPRegistryTransport, RegistryTransport
+from protolink.utils.logging import get_logger
 
 
 class Registry:
@@ -15,7 +16,16 @@ class Registry:
         # Registry server is now running
     """
 
-    def __init__(self, transport: RegistryTransport | None = None, url: str | None = None):
+    def __init__(self, transport: RegistryTransport | None = None, url: str | None = None, verbose: int = 1):
+        """Initialize the registry.
+
+        Args:
+            transport: RegistryTransport instance
+            url: Registry URL
+            verbose: Verbosity level [0: Warning, 2: Info, 3: Debug]
+        """
+        self.logger = get_logger(__name__, verbose)
+
         # Create default HTTP transport if none provided
         if transport is None:
             transport = HTTPRegistryTransport(url=url)
@@ -62,6 +72,14 @@ class Registry:
 
     async def _register_local(self, card: AgentCard) -> None:
         self._agents[card.url] = card
+
+        self.logger.info(
+            "Agent Card Registered:",
+            extra={
+                "agent_url": card.url,
+                "card": card.to_json(),
+            },
+        )
 
     async def _unregister_local(self, agent_url: str) -> None:
         self._agents.pop(agent_url, None)
