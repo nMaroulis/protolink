@@ -57,6 +57,7 @@ plugins:
 nav:
   - Overview:
       - Home: index.md
+      - Concept: concept.md
       - Getting Started: getting-started.md
   - API Reference:
       - Agents: agents.md

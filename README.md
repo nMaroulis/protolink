@@ -10,10 +10,8 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%">
 </div>
-ProtoLink is a lightweight Python framework for **autonomous, LLM-powered agents** that communicate directly, manage context, and integrate tools seamlessly. Build **distributed multi-agent systems** with minimal boilerplate and production-ready reliability.
 
-
-ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where AI agents **communicate directly with each other**.
+ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and integrate tools seamlessly. Build **distributed multi-agent systems** with minimal boilerplate and production-ready reliability.
 
 Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
