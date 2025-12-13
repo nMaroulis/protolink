@@ -992,7 +992,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 <p>Below is a minimal example that wires together an agent, HTTP transport, an OpenAI LLM, and both native and MCP tools:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">protolink.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentCard</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTTPTransport</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTTPAgentTransport</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">protolink.llms.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenAILLM</span>
 
@@ -1005,7 +1005,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 
 
 <span class="c1"># Initialize the transport</span>
-<span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPTransport</span><span class="p">()</span>
+<span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPAgentTransport</span><span class="p">()</span>
 
 
 <span class="c1"># OpenAI API LLM</span>
@@ -1033,7 +1033,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 <p>This example demonstrates the core pieces of Protolink:</p>
 <ul>
 <li><strong>AgentCard</strong> to describe the agent.</li>
-<li><strong>Transport</strong> (here <code>HTTPTransport</code>) to handle communication.</li>
+<li><strong>Transport</strong> (here <code>HTTPAgentTransport</code>) to handle A2A (agent-to-agent) communication.</li>
 <li><strong>LLM</strong> backend (<code>OpenAILLM</code>).</li>
 <li><strong>Native tools</strong> (Python functions decorated with <code>@agent.tool</code>).</li>
 <li><strong>MCP tools</strong> registered via <code>MCPToolAdapter</code>.</li>
