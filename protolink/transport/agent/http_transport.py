@@ -55,7 +55,12 @@ class HTTPAgentTransport(AgentTransport):
         self.timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
         self.security_context: object | None = None
+        # Handlers that are called for different Server Requests
+        # POST /tasks/
         self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
+        # GET /.well-known/agent.json
+        self._agent_card_handler: Callable | None = None
+
         self._client: httpx.AsyncClient | None = None
 
         # Select backend implementation.
@@ -90,27 +95,57 @@ class HTTPAgentTransport(AgentTransport):
         client = await self._ensure_client()
         headers = self._build_headers()
         url = f"{agent_url.rstrip('/')}/tasks/"
-        response = await client.post(url, json=task.to_dict(), headers=headers)
-        response.raise_for_status()
-        return Task.from_dict(response.json())
+
+        try:
+            response = await client.post(url, json=task.to_dict(), headers=headers)
+            response.raise_for_status()
+            return Task.from_dict(response.json())
+        except httpx.ConnectError as e:
+            raise ConnectionError(
+                f"Failed to connect to agent at {agent_url}. Make sure the agent is running and accessible."
+            ) from e
+        except httpx.RemoteProtocolError as e:
+            raise ConnectionError(
+                f"Protocol error when communicating with agent at {agent_url}. "
+                f"The target may not be a proper HTTP server or may be misconfigured."
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"Agent at {agent_url} returned HTTP {e.response.status_code}: {e.response.text}") from e
 
     async def send_message(self, agent_url: str, message: Message) -> Message:
         """Convenience wrapper around :meth:`send_task` for a single message."""
 
         task = Task.create(message)
-        result_task = await self.send_task(agent_url, task)
-        if result_task.messages:
-            return result_task.messages[-1]
-        raise RuntimeError("No response messages returned by agent")
+        try:
+            result_task = await self.send_task(agent_url, task)
+            if result_task.messages:
+                return result_task.messages[-1]
+            raise RuntimeError("No response messages returned by agent")
+        except (ConnectionError, RuntimeError) as e:
+            # Re-raise with more context about the message operation
+            raise type(e)(f"Failed to send message to agent at {agent_url}: {e!s}") from e
 
     async def get_agent_card(self, agent_url: str) -> AgentCard:
         """Fetch the agent's :class:`AgentCard` description directly from the Agent."""
 
         client = await self._ensure_client()
         url = f"{agent_url.rstrip('/')}/.well-known/agent.json"
-        response = await client.get(url)
-        response.raise_for_status()
-        return AgentCard.from_json(response.json())
+
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
+            return AgentCard.from_json(response.json())
+        except httpx.ConnectError as e:
+            raise ConnectionError(
+                f"Failed to connect to agent at {agent_url}. Make sure the agent is running and accessible."
+            ) from e
+        except httpx.RemoteProtocolError as e:
+            raise ConnectionError(
+                f"Protocol error when communicating with agent at {agent_url}. "
+                f"The target may not be a proper HTTP server or may be misconfigured."
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"Agent at {agent_url} returned HTTP {e.response.status_code}: {e.response.text}") from e
 
     async def subscribe_task(self, agent_url: str, task: Task) -> None:
         """Subscribe to a long-running task (not yet implemented)."""
@@ -126,6 +161,9 @@ class HTTPAgentTransport(AgentTransport):
 
         if not self._task_handler:
             raise RuntimeError("No task handler registered")
+
+        if not self._agent_card_handler:
+            raise RuntimeError("No agent card handler registered")
 
         self.backend.setup_routes(self)
         await self.backend.start(self.host, self.port)
@@ -145,6 +183,11 @@ class HTTPAgentTransport(AgentTransport):
         """Register a callback that will handle incoming tasks."""
 
         self._task_handler = handler
+
+    def on_get_agent_card_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
+        """Wrapper for on_task_received that specifically handles GET /.well-known/agent.json requests."""
+
+        self._agent_card_handler = handler
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         """Return an initialized :class:`httpx.AsyncClient` instance."""

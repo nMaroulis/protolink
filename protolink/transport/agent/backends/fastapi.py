@@ -13,7 +13,10 @@ Business logic stays in the transport and the agents.
 import asyncio
 from typing import Any
 
+from pydantic import Field
+
 from protolink.core.task import Task
+from protolink.transport._deps import _require_fastapi
 from protolink.transport.agent.backends.base import BackendInterface
 
 
@@ -29,88 +32,96 @@ class FastAPIBackend(BackendInterface):
     """
 
     def __init__(self, *, validate_schema: bool = False) -> None:
-        from fastapi import FastAPI
+        FastAPI, _, _, _ = _require_fastapi(validate_schema=validate_schema)  # noqa: N806
 
         self.validate_schema: bool = validate_schema
         self.app = FastAPI()
         self._server_task: asyncio.Task[None] | None = None
         self._server_instance: Any = None
 
+    # ----------------------------------------------------------------------
+    # Setup Routes - Define Agent Server URIs
+    # ----------------------------------------------------------------------
+
     def setup_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
-        """Register HTTP routes on the FastAPI application.
+        """Register all HTTP routes on the FastAPI application."""
+        self._setup_task_routes(transport)
+        self._setup_agent_card_routes(transport)
 
-        The handler delegates incoming HTTP requests to the private
-        ``_task_handler`` callback on the associated transport instance.
-        """
+    def _setup_task_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
+        """Register `/tasks/` POST endpoint."""
 
-        from fastapi import Request
-        from fastapi.responses import JSONResponse
-        from pydantic import BaseModel
+        _, Request, JSONResponse, BaseModel = _require_fastapi(validate_schema=self.validate_schema)  # noqa: N806
 
         if self.validate_schema:
 
             class PartSchema(BaseModel):
-                """HTTP representation of a content part within a message or artifact."""
-
                 type: str
                 content: Any
 
             class MessageSchema(BaseModel):
-                """HTTP representation of a single chat message.
-
-                Mirrors :class:`protolink.core.message.Message.to_dict`.
-                """
-
                 id: str
                 role: str
                 parts: list[PartSchema]
                 timestamp: str
 
             class ArtifactSchema(BaseModel):
-                """HTTP representation of a :class:`Artifact`."""
-
                 artifact_id: str
                 parts: list[PartSchema]
-                metadata: dict[str, Any] = {}
+                metadata: dict[str, Any] = Field(default_factory=dict)
                 created_at: str
 
             class TaskSchema(BaseModel):
-                """HTTP representation of a :class:`Task`.
-
-                Mirrors :meth:`Task.to_dict`, including nested messages
-                and artifacts.
-                """
-
                 id: str
                 state: str
                 messages: list[MessageSchema]
-                artifacts: list[ArtifactSchema] = []
-                metadata: dict[str, Any] = {}
+                artifacts: list[ArtifactSchema] = Field(default_factory=list)
+                metadata: dict[str, Any] = Field(default_factory=dict)
                 created_at: str
 
             @self.app.post("/tasks/")
-            async def handle_task(task: TaskSchema):
-                """Handle a task request validated by Pydantic models."""
-
+            async def handle_task(task: TaskSchema) -> JSONResponse:
                 if not transport._task_handler:
                     raise RuntimeError("No task handler registered")
 
                 internal_task = Task.from_dict(task.model_dump())
                 result = await transport._task_handler(internal_task)
+
                 return JSONResponse(result.to_dict())
+
         else:
 
             @self.app.post("/tasks/")
-            async def handle_task(request: Request):
-                """Handle a task request using the raw JSON payload."""
-
+            async def handle_task(request: Request) -> JSONResponse:
                 if not transport._task_handler:
                     raise RuntimeError("No task handler registered")
 
                 data = await request.json()
                 task = Task.from_dict(data)
                 result = await transport._task_handler(task)
+
                 return JSONResponse(result.to_dict())
+
+    def _setup_agent_card_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
+        """Register agent card discovery endpoints.
+
+        Both `/` and `/.well-known/agent.json` return the agent card.
+        """
+
+        _, Request, JSONResponse, _ = _require_fastapi()  # noqa: N806
+
+        @self.app.get("/")
+        @self.app.get("/.well-known/agent.json")
+        async def get_agent_card(request: Request) -> JSONResponse:
+            if not transport._agent_card_handler:
+                raise RuntimeError("No agent card handler registered")
+
+            result = transport._agent_card_handler()
+            return JSONResponse(result.to_json())
+
+    # ----------------------------------------------------------------------
+    # ASGI Server Lifecycle
+    # ----------------------------------------------------------------------
 
     async def start(self, host: str, port: int) -> None:
         """Start the FastAPI-backed HTTP server.

@@ -60,30 +60,101 @@ class HTTPRegistryTransport(RegistryTransport):
     # ------------------------------------------------------------------
 
     async def register(self, card: AgentCard) -> None:
-        client = await self._ensure_client()
-        response = await client.post(
-            f"{self.url}/agents/",
-            json=card.to_json(),
-        )
-        response.raise_for_status()
+        """Register an agent to the registry.
+
+        Args:
+            card: AgentCard to register
+
+        Raises:
+            ConnectionError: If registry is not reachable
+            RuntimeError: If registration fails for other reasons
+        """
+        try:
+            client = await self._ensure_client()
+            response = await client.post(
+                f"{self.url}/agents/",
+                json=card.to_json(),
+            )
+            response.raise_for_status()
+        except httpx.ConnectError as e:
+            raise ConnectionError(
+                f"Failed to connect to registry at {self.url}. Make sure the registry server is running and accessible."
+            ) from e
+        except httpx.RemoteProtocolError as e:
+            raise ConnectionError(
+                f"Protocol error when communicating with registry at {self.url}. "
+                f"The target may not be a proper HTTP server or may be misconfigured."
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(
+                f"Registry at {self.url} returned HTTP {e.response.status_code}: {e.response.text}"
+            ) from e
 
     async def unregister(self, agent_url: str) -> None:
-        client = await self._ensure_client()
-        response = await client.delete(
-            f"{self.url}/agents/",
-            params={"agent_url": agent_url},
-        )
-        response.raise_for_status()
+        """Unregister an agent from the registry.
+
+        Args:
+            agent_url: URL of the agent to unregister
+
+        Raises:
+            ConnectionError: If registry is not reachable
+            RuntimeError: If unregistration fails for other reasons
+        """
+        try:
+            client = await self._ensure_client()
+            response = await client.delete(
+                f"{self.url}/agents/",
+                params={"agent_url": agent_url},
+            )
+            response.raise_for_status()
+        except httpx.ConnectError as e:
+            raise ConnectionError(
+                f"Failed to connect to registry at {self.url}. Make sure the registry server is running and accessible."
+            ) from e
+        except httpx.RemoteProtocolError as e:
+            raise ConnectionError(
+                f"Protocol error when communicating with registry at {self.url}. "
+                f"The target may not be a proper HTTP server or may be misconfigured."
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(
+                f"Registry at {self.url} returned HTTP {e.response.status_code}: {e.response.text}"
+            ) from e
 
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
-        client = await self._ensure_client()
-        response = await client.get(
-            f"{self.url}/agents/",
-            params=filter_by or {},
-        )
-        response.raise_for_status()
+        """Discover agents in the registry.
 
-        return [AgentCard.from_json(c) for c in response.json()]
+        Args:
+            filter_by: Optional filter criteria
+
+        Returns:
+            List of AgentCard objects
+
+        Raises:
+            ConnectionError: If registry is not reachable
+            RuntimeError: If discovery fails for other reasons
+        """
+        try:
+            client = await self._ensure_client()
+            response = await client.get(
+                f"{self.url}/agents/",
+                params=filter_by or {},
+            )
+            response.raise_for_status()
+            return [AgentCard.from_json(c) for c in response.json()]
+        except httpx.ConnectError as e:
+            raise ConnectionError(
+                f"Failed to connect to registry at {self.url}. Make sure the registry server is running and accessible."
+            ) from e
+        except httpx.RemoteProtocolError as e:
+            raise ConnectionError(
+                f"Protocol error when communicating with registry at {self.url}. "
+                f"The target may not be a proper HTTP server or may be misconfigured."
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(
+                f"Registry at {self.url} returned HTTP {e.response.status_code}: {e.response.text}"
+            ) from e
 
     # ------------------------------------------------------------------
     # Server-side handlers (Registry logic)

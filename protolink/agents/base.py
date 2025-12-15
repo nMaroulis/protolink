@@ -8,8 +8,7 @@ incorporating both client and server functionalities.
 from collections.abc import AsyncIterator
 from typing import Any, Literal
 
-from protolink.client import RegistryClient
-from protolink.client.agent_client import AgentClient
+from protolink.clients import AgentClient, RegistryClient
 from protolink.core.context_manager import ContextManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
@@ -83,7 +82,7 @@ class Agent:
             )
         else:
             self._client = AgentClient(transport=transport)
-            self._server = AgentServer(transport, self.handle_task)
+            self._server = AgentServer(transport, task_handler=self.handle_task, agent_card_handler=self.get_agent_card)
             self._server.validate_agent_url(self.card.url)
             # Transport and AgentCard URL must match.
             if getattr(transport, "url", None) != self.card.url:
@@ -101,10 +100,22 @@ class Agent:
         """Start the agent's server component if available."""
         # Start the Agent server
         if self._server:
-            await self._server.start()
+            try:
+                await self._server.start()
+            except Exception as e:
+                logger.exception(f"Unexpected error during server start: {e}")
+                raise
         # Register to the Registry
         if register and self.registry_client:
-            await self.registry_client.register(self.card)
+            try:
+                await self.registry_client.register(self.card)
+            except ConnectionError as e:
+                logger.exception(
+                    f"Failed to register with registry: {e}. Agent will continue running but won't be discoverable."
+                )
+            except Exception as e:
+                logger.exception(f"Unexpected error during registry registration: {e}")
+                raise
 
     async def stop(self) -> None:
         """Stop the agent's server component if available."""
@@ -114,6 +125,10 @@ class Agent:
         # Unregister from the Registry
         if self.registry_client:
             await self.registry_client.unregister(self.card.url)
+
+    # ----------------------------------------------------------------------
+    # Agent to Agent Communication - Client & Server
+    # ----------------------------------------------------------------------
 
     @property
     def client(self) -> AgentClient | None:
@@ -133,19 +148,9 @@ class Agent:
         """
         return self._server
 
-    def get_agent_card(self) -> AgentCard:
-        """Return the agent's identity card.
-
-        Returns:
-            AgentCard with agent metadata
-        """
-        return self.card
-
-    def set_llm(self, llm: LLM) -> None:
-        """Sets the Agent's LLM and validates the connection."""
-        self.llm = llm
-        _ = self.llm.validate_connection()
-
+    # ----------------------------------------------------------------------
+    # Message & Task handling
+    # ----------------------------------------------------------------------
     async def handle_task(self, task: Task) -> Task:
         """Process a task and return the result.
 
@@ -224,19 +229,9 @@ class Agent:
 
         return "No response generated"
 
-    def set_transport(self, transport: AgentTransport | None) -> None:
-        """Set the transport layer for this agent.
-
-        Args:
-            transport: Transport instance for communication
-        """
-        if transport is None:
-            raise ValueError("transport must not be None")
-        if not isinstance(transport, AgentTransport):
-            raise TypeError("transport must be an instance of AgentTransport")
-
-        self._client = AgentClient(transport=transport)
-        self._server = AgentServer(transport, self.handle_task)
+    # ----------------------------------------------------------------------
+    # Message & Task Sending
+    # ----------------------------------------------------------------------
 
     async def send_task_to(self, agent_url: str, task: Task) -> Task:
         """Send a task to another agent.
@@ -273,6 +268,10 @@ class Agent:
             raise RuntimeError("No transport client configured. Call set_transport() first.")
 
         return await self._client.send_message(agent_url, message)
+
+    # ----------------------------------------------------------------------
+    # Context Management
+    # ----------------------------------------------------------------------
 
     def get_context_manager(self) -> ContextManager:
         """Get the context manager for this agent (NEW in v0.2.0).
@@ -462,6 +461,36 @@ class Agent:
                         detected_skills.append(skill)
 
         return detected_skills
+
+    # ----------------------------------------------------------------------
+    # Getters & Setters
+    # ----------------------------------------------------------------------
+    def get_agent_card(self) -> AgentCard:
+        """Return the agent's identity card.
+
+        Returns:
+            AgentCard with agent metadata
+        """
+        return self.card
+
+    def set_transport(self, transport: AgentTransport | None) -> None:
+        """Set the transport layer for this agent.
+
+        Args:
+            transport: Transport instance for communication
+        """
+        if transport is None:
+            raise ValueError("transport must not be None")
+        if not isinstance(transport, AgentTransport):
+            raise TypeError("transport must be an instance of AgentTransport")
+
+        self._client = AgentClient(transport=transport)
+        self._server = AgentServer(transport, self.handle_task)
+
+    def set_llm(self, llm: LLM) -> None:
+        """Sets the Agent's LLM and validates the connection."""
+        self.llm = llm
+        _ = self.llm.validate_connection()
 
     def __repr__(self) -> str:
         return f"Agent(name='{self.card.name}', url='{self.card.url}')"

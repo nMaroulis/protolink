@@ -10,6 +10,7 @@ import asyncio
 from typing import Any
 
 from protolink.core.task import Task
+from protolink.transport._deps import _require_starlette
 from protolink.transport.agent.backends.base import BackendInterface
 
 
@@ -21,33 +22,62 @@ class StarletteBackend(BackendInterface):
     """
 
     def __init__(self) -> None:
-        from starlette.applications import Starlette
+        Starlette, _, _ = _require_starlette()  # noqa: N806
 
         self.app = Starlette()
         self._server_task: asyncio.Task[None] | None = None
         self._server_instance: Any = None
 
+    # ----------------------------------------------------------------------
+    # Setup Routes - Define Agent Server URIs
+    # ----------------------------------------------------------------------
+
     def setup_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
-        """Register HTTP routes on the Starlette application.
+        """Register all HTTP routes on the Starlette application.
 
-        The handler delegates incoming HTTP requests to the private
-        ``_task_handler`` callback on the associated transport instance.
+        This method wires the public HTTP API to the internal transport handlers.
+        Each route is registered via a dedicated helper for clarity and separation
+        of concerns.
         """
+        self._setup_task_routes(transport)
+        self._setup_agent_card_routes(transport)
 
-        from starlette.requests import Request
-        from starlette.responses import JSONResponse
+    def _setup_task_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
+        """Register `/tasks/` POST endpoint."""
+
+        _, Request, JSONResponse = _require_starlette()  # noqa: N806
 
         @self.app.route("/tasks/", methods=["POST"])
-        async def handle_task(request: Request):  # type: ignore[unused-ignore]
-            """Handle a task request using the raw JSON payload."""
-
+        async def handle_task(request: Request) -> JSONResponse:
             if not transport._task_handler:
                 raise RuntimeError("No task handler registered")
 
             task_data = await request.json()
             task = Task.from_dict(task_data)
             result = await transport._task_handler(task)
+
             return JSONResponse(result.to_dict())
+
+    def _setup_agent_card_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
+        """Register agent card discovery endpoints.
+
+        Both `/` and `/.well-known/agent.json` return the agent card.
+        """
+
+        _, Request, JSONResponse = _require_starlette()  # noqa: N806
+
+        @self.app.route("/", methods=["GET"])
+        @self.app.route("/.well-known/agent.json", methods=["GET"])
+        async def get_agent_card(request: Request) -> JSONResponse:
+            if not transport._agent_card_handler:
+                raise RuntimeError("No agent card handler registered")
+
+            result = transport._agent_card_handler()
+            return JSONResponse(result.to_json())
+
+    # ----------------------------------------------------------------------
+    # ASGI Server Lifecycle
+    # ----------------------------------------------------------------------
 
     async def start(self, host: str, port: int) -> None:
         """Start the Starlette-backed HTTP server.
