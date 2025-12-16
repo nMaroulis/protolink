@@ -1,7 +1,7 @@
 # protolink/registry/registry.py
 from typing import Any
 
-from protolink.clients import RegistryClient
+from protolink.client import RegistryClient
 from protolink.models import AgentCard
 from protolink.transport import HTTPRegistryTransport, RegistryTransport
 from protolink.utils.logging import get_logger

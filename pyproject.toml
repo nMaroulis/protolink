@@ -34,6 +34,7 @@ http = [
 
 llms = [
     "anthropic>=0.72.1",
+    "google-genai>=1.55.0",
     "llama-cpp-python>=0.3.16",
     "ollama>=0.6.1",
     "openai>=2.7.2",

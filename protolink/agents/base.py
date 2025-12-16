@@ -8,7 +8,7 @@ incorporating both client and server functionalities.
 from collections.abc import AsyncIterator
 from typing import Any, Literal
 
-from protolink.clients import AgentClient, RegistryClient
+from protolink.client import AgentClient, RegistryClient
 from protolink.core.context_manager import ContextManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
