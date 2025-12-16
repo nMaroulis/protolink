@@ -1,6 +1,6 @@
 # Tools
 
-Tools extend agent capabilities with additional functions.
+Tools extend agent capabilities with additional functions. The tools can be used by the LLM or directly by the agent.
 
 ## Module Structure
 
@@ -21,7 +21,7 @@ from protolink.tools.adapters import MCPToolAdapter
 
 **Native tools** are regular Python callables that you register on an agent. They are exposed over the transport so that other agents (or clients) can invoke them.
 
-To register a native tool, decorate an async function with `@agent.tool`:
+To register a native tool, **decorate** an async function with `@agent.tool`:
 
 ```python
 from protolink.agents import Agent

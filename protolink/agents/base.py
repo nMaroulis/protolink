@@ -13,7 +13,6 @@ from protolink.core.context_manager import ContextManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.models import AgentCard, AgentSkill, Message, Task
-from protolink.security.auth import Authenticator, SecurityContext
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
 from protolink.transport import AgentTransport, HTTPRegistryTransport
@@ -32,10 +31,9 @@ class Agent:
     def __init__(
         self,
         card: AgentCard | dict[str, Any],
-        llm: LLM | None = None,
         transport: AgentTransport | None = None,
         registry: Registry | RegistryClient | str | None = None,
-        authenticator: Authenticator | None = None,
+        llm: LLM | None = None,
         skills: Literal["auto", "fixed"] = "auto",
     ):
         """Initialize agent with its identity card and transport layer.
@@ -47,7 +45,6 @@ class Agent:
             registry: Optional registry for agent discovery. The Agent uses the RegistryClient to communicate with the
                 Registry. If a Registry class is passed, its RegistryClient will be extracted. If a string is passed, it
                 will be used as the registry URL. (default HTTPRegistryTransport)
-            authenticator: Optional authentication provider
             skills: Skills mode - "auto" to automatically detect and add skills, "fixed" to use only the skills defined
             by the user in the AgentCard.
         """
@@ -58,8 +55,6 @@ class Agent:
         self.llm = llm
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
-        self.authenticator = authenticator
-        self._security_context: SecurityContext | None = None
 
         # Initilize Registry Client
         self.registry_client: RegistryClient | None = None
@@ -309,57 +304,6 @@ class Agent:
         self.registry_client.unregister(self.get_agent_card().url)
 
     # ----------------------------------------------------------------------
-    # Authentication
-    # ----------------------------------------------------------------------
-
-    async def verify_request_auth(self, auth_header: str | None = None) -> SecurityContext | None:
-        """NEW in v0.3.0: Verify authentication of incoming request.
-
-        Args:
-            auth_header: Authorization header (e.g., "Bearer token")
-            skill: Skill being requested for scope verification
-
-        Returns:
-            AuthContext if verified, None if no auth required
-
-        Raises:
-            PermissionError: If auth fails or insufficient scopes
-        """
-        if not self.authenticator:
-            # No auth configured, request always allowed
-            return None
-
-        if not auth_header:
-            raise PermissionError("Authentication required but no credentials provided")
-
-        # Extract bearer token
-        if not auth_header.startswith("Bearer "):
-            raise PermissionError("Invalid authorization header format")
-
-        token = auth_header[7:]  # Remove "Bearer "
-
-        # Authenticate
-        try:
-            context = await self.authenticator.authenticate(token)
-        except Exception as e:
-            raise PermissionError(f"Authentication failed: {e}")  # noqa: B904
-
-        # Check if expired
-        if context.is_expired():
-            raise PermissionError("Token expired")
-
-        self._security_context = context
-        return context
-
-    def get_security_context(self) -> SecurityContext | None:
-        """Get current authenticated context (NEW v0.3.0).
-
-        Returns:
-            SecurityContext if authenticated, None otherwise
-        """
-        return self._security_context
-
-    # ----------------------------------------------------------------------
     # Tool Management
     # ----------------------------------------------------------------------
 
@@ -465,6 +409,7 @@ class Agent:
     # ----------------------------------------------------------------------
     # Getters & Setters
     # ----------------------------------------------------------------------
+
     def get_agent_card(self) -> AgentCard:
         """Return the agent's identity card.
 
@@ -491,6 +436,10 @@ class Agent:
         """Sets the Agent's LLM and validates the connection."""
         self.llm = llm
         _ = self.llm.validate_connection()
+
+    # ----------------------------------------------------------------------
+    # Private Methods
+    # ----------------------------------------------------------------------
 
     def __repr__(self) -> str:
         return f"Agent(name='{self.card.name}', url='{self.card.url}')"
