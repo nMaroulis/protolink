@@ -907,7 +907,7 @@
 
 
 <h1 id="tools">Tools<a class="headerlink" href="#tools" title="Permanent link">&para;</a></h1>
-<p>Tools extend agent capabilities with additional functions.</p>
+<p>Tools extend agent capabilities with additional functions. The tools can be used by the LLM or directly by the agent.</p>
 <h2 id="module-structure">Module Structure<a class="headerlink" href="#module-structure" title="Permanent link">&para;</a></h2>
 <p>The tools module is organized as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Core tool interfaces</span>
@@ -922,7 +922,7 @@
 </ul>
 <h2 id="native-tools">Native Tools<a class="headerlink" href="#native-tools" title="Permanent link">&para;</a></h2>
 <p><strong>Native tools</strong> are regular Python callables that you register on an agent. They are exposed over the transport so that other agents (or clients) can invoke them.</p>
-<p>To register a native tool, decorate an async function with <code>@agent.tool</code>:</p>
+<p>To register a native tool, <strong>decorate</strong> an async function with <code>@agent.tool</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
 
 
