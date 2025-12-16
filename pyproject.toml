@@ -8,10 +8,14 @@ version = "0.4.1"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"},
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["protolink*"]
 
 [project.urls]
 Documentation = "https://nmaroulis.github.io/protolink/"
