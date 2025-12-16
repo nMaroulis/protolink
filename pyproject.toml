@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.4.0"
+version = "0.4.1"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,6 +12,10 @@ license = {text = "MIT"}
 authors = [
     {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"},
 ]
+
+[project.urls]
+Documentation = "https://nmaroulis.github.io/protolink/"
+Repository = "https://github.com/nMaroulis/protolink"
 
 [project.optional-dependencies]
 http = [

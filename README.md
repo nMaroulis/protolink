@@ -21,7 +21,7 @@ ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-p
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
-> **Focus on your agent logic** - ProtoLink handles communication, LLM integration, and tool management for you.
+> **Focus on your agent logic** - ProtoLink handles communication, authentication, LLM integration, and tool management for you.
 
 
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
