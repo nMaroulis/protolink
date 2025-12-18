@@ -39,7 +39,7 @@ This will install the library in editable mode along with the development extras
 
 ## Development Workflow
 
-The preferred way to contribute is via the standard GitHub fork-and-pull-request workflow.
+The preferred way to contribute is via the **standard GitHub fork-and-pull-request** workflow.
 
 1. **Fork the repository** on GitHub
 
@@ -80,7 +80,7 @@ The preferred way to contribute is via the standard GitHub fork-and-pull-request
 6. **Run the test suite**:
 
    ```bash
-   pytest
+   pytest -v tests
    ```
 
 7. (Optional) **Preview documentation changes**:
@@ -116,6 +116,8 @@ Protolink uses **Ruff** for linting and formatting.
 
 If `ruff` reports issues you are unsure how to fix, feel free to ask in the Pull Request.
 
+This project follows **PEP 604**. Please use the `X | Y` union type syntax (e.g. `str | None`) rather than `typing.Union` or `typing.Optional`.
+
 ---
 
 ## Tests
@@ -127,7 +129,7 @@ If `ruff` reports issues you are unsure how to fix, feel free to ask in the Pull
 Run tests with:
 
 ```bash
-pytest
+pytest -v tests
 ```
 
 If your change requires additional test fixtures or helper utilities, place them in the appropriate `tests/` module.
