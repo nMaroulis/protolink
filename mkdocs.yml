@@ -69,3 +69,5 @@ nav:
       - Types: types.md
   - Examples:
       - Examples: examples.md
+  - Resources:
+      - Relevant Projects: relevant.md
