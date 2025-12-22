@@ -60,6 +60,8 @@ class HTTPAgentTransport(AgentTransport):
         self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
         # GET /.well-known/agent.json
         self._agent_card_handler: Callable | None = None
+        # GET /status
+        self._agent_status_handler: Callable[[], Awaitable[str]] | None = None
 
         self._client: httpx.AsyncClient | None = None
 
@@ -184,10 +186,15 @@ class HTTPAgentTransport(AgentTransport):
 
         self._task_handler = handler
 
-    def on_get_agent_card_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
+    def on_get_agent_card_received(self, handler: Callable) -> None:
         """Wrapper for on_task_received that specifically handles GET /.well-known/agent.json requests."""
 
         self._agent_card_handler = handler
+
+    def on_get_agent_status_received(self, handler: Callable[[], Awaitable[str]]) -> None:
+        """Register a callback that will handle incoming agent status requests."""
+
+        self._agent_status_handler = handler
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         """Return an initialized :class:`httpx.AsyncClient` instance."""

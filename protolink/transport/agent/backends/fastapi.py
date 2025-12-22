@@ -32,7 +32,7 @@ class FastAPIBackend(BackendInterface):
     """
 
     def __init__(self, *, validate_schema: bool = False) -> None:
-        FastAPI, _, _, _ = _require_fastapi(validate_schema=validate_schema)  # noqa: N806
+        FastAPI, _, _, _, _ = _require_fastapi(validate_schema=validate_schema)  # noqa: N806
 
         self.validate_schema: bool = validate_schema
         self.app = FastAPI()
@@ -47,11 +47,12 @@ class FastAPIBackend(BackendInterface):
         """Register all HTTP routes on the FastAPI application."""
         self._setup_task_routes(transport)
         self._setup_agent_card_routes(transport)
+        self._setup_agent_status_routes(transport)
 
     def _setup_task_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
         """Register `/tasks/` POST endpoint."""
 
-        _, Request, JSONResponse, BaseModel = _require_fastapi(validate_schema=self.validate_schema)  # noqa: N806
+        _, Request, JSONResponse, _, BaseModel = _require_fastapi(validate_schema=self.validate_schema)  # noqa: N806
 
         if self.validate_schema:
 
@@ -108,7 +109,7 @@ class FastAPIBackend(BackendInterface):
         Both `/` and `/.well-known/agent.json` return the agent card.
         """
 
-        _, Request, JSONResponse, _ = _require_fastapi()  # noqa: N806
+        _, Request, JSONResponse, _, _ = _require_fastapi()  # noqa: N806
 
         @self.app.get("/")
         @self.app.get("/.well-known/agent.json")
@@ -118,6 +119,22 @@ class FastAPIBackend(BackendInterface):
 
             result = transport._agent_card_handler()
             return JSONResponse(result.to_json())
+
+    def _setup_agent_status_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
+        """Register agent status endpoint.
+
+        GET /status returns agent status.
+        """
+
+        _, Request, _, HTMLResponse, _ = _require_fastapi()  # noqa: N806
+
+        @self.app.get("/status")
+        async def get_agent_status(request: Request) -> HTMLResponse:
+            if not transport._agent_status_handler:
+                raise RuntimeError("No agent status handler registered")
+
+            result = transport._agent_status_handler()
+            return HTMLResponse(result)
 
     # ----------------------------------------------------------------------
     # ASGI Server Lifecycle

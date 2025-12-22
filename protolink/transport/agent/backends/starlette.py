@@ -22,7 +22,7 @@ class StarletteBackend(BackendInterface):
     """
 
     def __init__(self) -> None:
-        Starlette, _, _ = _require_starlette()  # noqa: N806
+        Starlette, _, _, _ = _require_starlette()  # noqa: N806
 
         self.app = Starlette()
         self._server_task: asyncio.Task[None] | None = None
@@ -41,11 +41,12 @@ class StarletteBackend(BackendInterface):
         """
         self._setup_task_routes(transport)
         self._setup_agent_card_routes(transport)
+        self._setup_agent_status_routes(transport)
 
     def _setup_task_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
         """Register `/tasks/` POST endpoint."""
 
-        _, Request, JSONResponse = _require_starlette()  # noqa: N806
+        _, Request, JSONResponse, _ = _require_starlette()  # noqa: N806
 
         @self.app.route("/tasks/", methods=["POST"])
         async def handle_task(request: Request) -> JSONResponse:
@@ -64,7 +65,7 @@ class StarletteBackend(BackendInterface):
         Both `/` and `/.well-known/agent.json` return the agent card.
         """
 
-        _, Request, JSONResponse = _require_starlette()  # noqa: N806
+        _, Request, JSONResponse, _ = _require_starlette()  # noqa: N806
 
         @self.app.route("/", methods=["GET"])
         @self.app.route("/.well-known/agent.json", methods=["GET"])
@@ -74,6 +75,22 @@ class StarletteBackend(BackendInterface):
 
             result = transport._agent_card_handler()
             return JSONResponse(result.to_json())
+
+    def _setup_agent_status_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
+        """Register agent status endpoint.
+
+        GET /status returns agent status.
+        """
+
+        _, Request, _, HTMLResponse = _require_starlette()  # noqa: N806
+
+        @self.app.route("/status", methods=["GET"])
+        async def get_agent_status(request: Request) -> HTMLResponse:
+            if not transport._agent_status_handler:
+                raise RuntimeError("No agent status handler registered")
+
+            result = transport._agent_status_handler()
+            return HTMLResponse(result)
 
     # ----------------------------------------------------------------------
     # ASGI Server Lifecycle

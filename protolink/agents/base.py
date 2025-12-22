@@ -5,6 +5,7 @@ Simple agent implementation extending Google's A2A protocol making the Agent com
 incorporating both client and server functionalities.
 """
 
+import time
 from collections.abc import AsyncIterator
 from typing import Any, Literal
 
@@ -17,6 +18,7 @@ from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
 from protolink.transport import AgentTransport, HTTPRegistryTransport
 from protolink.utils.logging import get_logger
+from protolink.utils.renderers import to_status_html
 
 logger = get_logger(__name__)
 
@@ -77,7 +79,12 @@ class Agent:
             )
         else:
             self._client = AgentClient(transport=transport)
-            self._server = AgentServer(transport, task_handler=self.handle_task, agent_card_handler=self.get_agent_card)
+            self._server = AgentServer(
+                transport,
+                task_handler=self.handle_task,
+                agent_card_handler=self.get_agent_card,
+                agent_status_handler=self.get_agent_status_html,
+            )
             self._server.validate_agent_url(self.card.url)
             # Transport and AgentCard URL must match.
             if getattr(transport, "url", None) != self.card.url:
@@ -90,6 +97,13 @@ class Agent:
 
         # Resolve and add necessairy skills
         self._resolve_skills(skills)
+
+        # Uptime
+        self.start_time: float | None = None
+
+    # ----------------------------------------------------------------------
+    # Agent Lifecycle Init - A2A Server Operations
+    # ----------------------------------------------------------------------
 
     async def start(self, *, register: bool = True) -> None:
         """Start the agent's server component if available."""
@@ -111,6 +125,7 @@ class Agent:
             except Exception as e:
                 logger.exception(f"Unexpected error during registry registration: {e}")
                 raise
+        self.start_time = time.time()
 
     async def stop(self) -> None:
         """Stop the agent's server component if available."""
@@ -144,7 +159,7 @@ class Agent:
         return self._server
 
     # ----------------------------------------------------------------------
-    # Message & Task handling
+    # Message & Task handling - A2A Server Operations
     # ----------------------------------------------------------------------
     async def handle_task(self, task: Task) -> Task:
         """Process a task and return the result.
@@ -225,7 +240,7 @@ class Agent:
         return "No response generated"
 
     # ----------------------------------------------------------------------
-    # Message & Task Sending
+    # Message & Task Sending - A2A Client Operations
     # ----------------------------------------------------------------------
 
     async def send_task_to(self, agent_url: str, task: Task) -> Task:
@@ -417,6 +432,14 @@ class Agent:
             AgentCard with agent metadata
         """
         return self.card
+
+    def get_agent_status_html(self) -> str:
+        """Return the agent's status as HTML.
+
+        Returns:
+            HTML string with agent status information
+        """
+        return to_status_html(agent=self.card, start_time=self.start_time)
 
     def set_transport(self, transport: AgentTransport | None) -> None:
         """Set the transport layer for this agent.

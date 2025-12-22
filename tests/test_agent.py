@@ -56,6 +56,9 @@ class DummyTransport(AgentTransport):
     def on_get_agent_card_received(self, handler):
         self._agent_card_handler = handler
 
+    def on_get_agent_status_received(self, handler):
+        pass
+
 
 class DummyLLM(LLM):
     """Mock LLM for testing."""

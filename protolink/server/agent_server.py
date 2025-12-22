@@ -16,6 +16,7 @@ class AgentServer:
         transport: AgentTransport,
         task_handler: Callable[[Task], Awaitable[Task]] | None = None,
         agent_card_handler: Callable[[], Awaitable[AgentCard]] | None = None,
+        agent_status_handler: Callable[[], Awaitable[str]] | None = None,
     ) -> None:
         if transport is None:
             raise ValueError("AgentServer requires a transport instance")
@@ -23,6 +24,7 @@ class AgentServer:
         self._transport = transport
         self._task_handler = None
         self._agent_card_handler = None
+        self._agent_status_handler = None
         self._is_running = False
 
         if task_handler is not None:
@@ -30,6 +32,9 @@ class AgentServer:
 
         if agent_card_handler is not None:
             self.set_agent_card_handler(agent_card_handler)
+
+        if agent_status_handler is not None:
+            self.set_agent_status_handler(agent_status_handler)
 
     def set_task_handler(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
         """Register the coroutine used to process incoming tasks."""
@@ -42,6 +47,12 @@ class AgentServer:
 
         self._agent_card_handler = handler
         self._transport.on_get_agent_card_received(handler)
+
+    def set_agent_status_handler(self, handler: Callable[[], Awaitable[str]]) -> None:
+        """Register the coroutine used to expose Agent Information and Status."""
+
+        self._agent_status_handler = handler
+        self._transport.on_get_agent_status_received(handler)
 
     async def start(self) -> None:
         """Start the underlying transport."""
