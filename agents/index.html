@@ -1023,6 +1023,11 @@
 <span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card_dict</span><span class="p">,</span> <span class="n">transport</span><span class="p">,</span> <span class="n">llm</span><span class="p">)</span>
 </code></pre></div>
 <p>You can then attach tools and start the agent.</p>
+<p>Once the Agent has been initiated, it automatically exposes a web interface at <code>/status</code> where it exposes the agent's information.</p>
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="50%">
+</div>
+
 <h2 id="agent-to-agent-communication">Agent-to-Agent Communication<a class="headerlink" href="#agent-to-agent-communication" title="Permanent link">&para;</a></h2>
 <p>Agents communicate over a chosen transport.</p>
 <p>Common patterns:</p>
