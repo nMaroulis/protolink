@@ -88,7 +88,11 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
    - Simple interface-based design
    - No complex configuration needed for common use cases
 
+Once the Agent has been initiated, it automatically exposes a web interface at `/status` where it exposes the agent's information.
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="50%">
+</div>
 
 ## Why Protolink? 🚀
 - **Real Multi-Agent Systems**: Build **autonomous agents** with embedded LLMs, tools, and memory that communicate directly.

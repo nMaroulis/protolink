@@ -61,6 +61,12 @@ agent = Agent(card_dict, transport, llm)
 
 You can then attach tools and start the agent.
 
+Once the Agent has been initiated, it automatically exposes a web interface at `/status` where it exposes the agent's information.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="50%">
+</div>
+
 ## Agent-to-Agent Communication
 
 Agents communicate over a chosen transport.

@@ -34,18 +34,29 @@ def _now_utc() -> str:
 
 
 def to_status_html(agent: AgentCard, start_time: float) -> str:
-    """Render a stylish agent status page with logo, ping, favicon, and uptime."""
+    def _fmt(value: str | None, default: str = "—") -> str:
+        from html import escape
+
+        return escape(value) if value else default
+
+    def _list(items: list[str], empty: str = "None") -> str:
+        if not items:
+            return f"<li><em>{empty}</em></li>"
+        return "".join(f"<li>{escape(item)}</li>" for item in items)
+
+    import json
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>{escape(agent.name)} · Agent Status</title>
+<title>{_fmt(agent.name)} · Agent Status</title>
 <link rel="icon" href="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/logo_sm.png" />
 <style>
 :root {{
   --bg: #070b1a;
-  --card: rgba(17, 22, 42, 0.85);
+  --card-base: rgba(17, 22, 42, 0.85);
   --border: rgba(56, 189, 248, 0.25);
   --text: #e5e7eb;
   --muted: #9ca3af;
@@ -72,13 +83,21 @@ body {{
 .logo img:hover {{ opacity: 1; }}
 .card {{
   width: min(520px, 92vw);
-  background: var(--card);
-  backdrop-filter: blur(10px);
+  background: var(--card-base);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 26px 28px;
   box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.02);
-  transition: transform .2s ease, box-shadow .2s ease;
+  transition: transform .2s ease, box-shadow .2s ease, background-position 5s linear;
+  background: linear-gradient(135deg, #11162a, #0b3a55, #11162a);
+  background-size: 400% 400%;
+  animation: gradientShift 30s ease infinite;
+}}
+@keyframes gradientShift {{
+  0% {{ background-position: 0% 50%; }}
+  50% {{ background-position: 100% 50%; }}
+  100% {{ background-position: 0% 50%; }}
 }}
 .card:hover {{ transform: translateY(-2px); box-shadow: 0 30px 80px rgba(0,0,0,.7); }}
 header {{
@@ -100,16 +119,16 @@ header h1 {{ font-size: 1.3rem; margin: 0; font-weight: 600; letter-spacing: .2p
 }}
 .status::before {{
   content: "";
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: currentColor;
-  box-shadow: 0 0 0 0 rgba(34,197,94,.7);
-  animation: pulse 2s infinite;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulse 1.8s infinite;
 }}
 @keyframes pulse {{
   0% {{ box-shadow: 0 0 0 0 rgba(34,197,94,.7); }}
-  70% {{ box-shadow: 0 0 0 8px rgba(34,197,94,0); }}
+  50% {{ box-shadow: 0 0 12px 6px rgba(34,197,94,0.2); }}
   100% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0); }}
 }}
 .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin-bottom: 20px; }}
@@ -119,7 +138,7 @@ section {{ margin-top: 18px; }}
 section h2 {{ font-size: .75rem; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }}
 ul {{ margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }}
 ul li {{ background: var(--accent-soft); border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; font-size: .75rem; }}
-.actions {{ margin-top: 22px; display: flex; align-items: center; gap: 12px; }}
+.actions {{ margin-top: 22px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }}
 button {{
   background: linear-gradient(135deg, transparent, rgba(56,189,248,.08));
   border: 1px solid var(--border);
@@ -134,13 +153,17 @@ button:hover {{ border-color: var(--accent); color: var(--accent); box-shadow: 0
 button:disabled {{ opacity: .6; cursor: not-allowed; }}
 .ping-result {{ font-size: .75rem; color: var(--muted); }}
 footer {{ margin-top: 22px; display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px; }}
-.uptime {{ font-size: .75rem; color: var(--accent); }}
-
+.uptime {{
+  font-size: .75rem;
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent);
+  transition: text-shadow .3s ease;
+}}
+.uptime:hover {{ text-shadow: 0 0 12px var(--accent), 0 0 24px var(--accent-soft); }}
 </style>
 </head>
 <body>
   <div class="card">
-
     <header>
       <div class="logo">
         <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/logo_sm.png" alt="Protolink logo" />
@@ -149,33 +172,39 @@ footer {{ margin-top: 22px; display: flex; justify-content: space-between; font-
       <div id="status" class="status">RUNNING</div>
     </header>
 
+    <p style="color: var(--muted); font-size:.85rem; margin-bottom:16px;">{_fmt(agent.description)}</p>
+
     <div class="grid">
-      <div>
-        <div class="label">Version</div>
-        <div class="value">{_fmt(agent.version)}</div>
-      </div>
-      <div>
-        <div class="label">Protocol</div>
-        <div class="value">{_fmt(agent.protocol_version)}</div>
-      </div>
-      <div>
-        <div class="label">Transport</div>
-        <div class="value">{_fmt(agent.transport.upper())}</div>
-      </div>
-      <div>
-        <div class="label">Endpoint</div>
-        <div class="value">{_fmt(agent.url)}</div>
-      </div>
+      <div><div class="label">Version</div><div class="value">{_fmt(agent.version)}</div></div>
+      <div><div class="label">Protocol</div><div class="value">{_fmt(agent.protocol_version)}</div></div>
+      <div><div class="label">Transport</div><div class="value">{_fmt(agent.transport.upper())}</div></div>
+      <div><div class="label">Endpoint</div><div class="value">{_fmt(agent.url)}</div></div>
     </div>
 
     <section>
-      <h2>Skills</h2>
-      <ul>{_list([s.name for s in agent.skills], empty="No skills declared")}</ul>
+      <h2>Capabilities</h2>
+      <ul>{_list([str(c) for c in agent.capabilities.enabled() or []], empty="None")}</ul>
+    </section>
+
+    <section style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div>
+        <h2>Input Formats</h2>
+        <ul>{_list(agent.input_formats, empty="text/plain")}</ul>
+      </div>
+      <div>
+        <h2>Output Formats</h2>
+        <ul>{_list(agent.output_formats, empty="text/plain")}</ul>
+      </div>
     </section>
 
     <section>
-      <h2>Formats</h2>
-      <ul>{_list(agent.input_formats + agent.output_formats, empty="text/plain")}</ul>
+      <h2>Security Schemes</h2>
+      <ul>{_list([f"{k}: {json.dumps(v)}" for k, v in (agent.security_schemes or {}).items()], empty="None")}</ul>
+    </section>
+
+    <section>
+      <h2>Skills</h2>
+      <ul>{_list([s.id for s in agent.skills], empty="No skills declared")}</ul>
     </section>
 
     <div class="actions">

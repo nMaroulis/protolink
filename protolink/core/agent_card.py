@@ -40,6 +40,20 @@ class AgentCapabilities:
     rag: bool = False
     code_execution: bool = False
 
+    def as_dict(self) -> dict[str, Any]:
+        """Return all capabilities as a dict."""
+        return asdict(self)
+
+    def enabled(self) -> list[str]:
+        """Return a list of enabled capabilities (truthy ones)."""
+        result = []
+        for k, v in asdict(self).items():
+            if isinstance(v, bool) and v:
+                result.append(k)
+            elif isinstance(v, int) and v > 0:
+                result.append(f"{k}: {v}")
+        return result
+
 
 @dataclass
 class AgentSkill:
