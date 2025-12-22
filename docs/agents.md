@@ -15,6 +15,11 @@ High‑level ideas:
     - **Tools** (native Python functions or MCP‑backed tools).
 - **Transport abstraction**: agents communicate over transports such as HTTP, WebSocket, gRPC, or the in‑process runtime transport.
 
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
+</div>
+
 ## Creating an Agent
 
 A minimal agent consists of three pieces:
