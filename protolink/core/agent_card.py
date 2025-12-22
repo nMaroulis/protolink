@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, TypedDict
 
 from protolink import __version__ as protolink_version
 from protolink.types import MimeType, SecuritySchemeType, TransportType
@@ -80,6 +80,9 @@ class AgentCard:
         input_formats: List of supported input formats
         output_formats: List of supported output formats
         security_schemes: Security schemes for authentication
+        tags: List of tags for categorization. These tags can be used for filtering
+            during discovery (Protolink extension to A2A spec) [Optional]
+            E.g. "finance", "travel", "math" etc.
     """
 
     name: str
@@ -93,6 +96,7 @@ class AgentCard:
     input_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     output_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     security_schemes: dict[SecuritySchemeType, dict[str, Any]] | None = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""
@@ -107,6 +111,7 @@ class AgentCard:
             "inputFormats": self.input_formats,
             "outputFormats": self.output_formats,
             "securitySchemes": self.security_schemes,
+            "tags": self.tags,
         }
 
     @classmethod
@@ -130,6 +135,7 @@ class AgentCard:
             input_formats=data.get("inputFormats", ["text/plain"]),
             output_formats=data.get("outputFormats", ["text/plain"]),
             security_schemes=data.get("securitySchemes", {}),
+            tags=data.get("tags", []),
         )
 
     @staticmethod
@@ -139,3 +145,18 @@ class AgentCard:
         for f in required_fields:
             if f not in data:
                 raise ValueError(f"AgentCard :: Missing required field: {f}")
+
+
+class AgentCardArgs(TypedDict, total=False):
+    name: str
+    description: str
+    url: str
+    transport: TransportType
+    version: str = "1.0.0"
+    protocol_version: str
+    capabilities: AgentCapabilities
+    skills: list[AgentSkill]
+    input_formats: list[MimeType]
+    output_formats: list[MimeType]
+    security_schemes: dict[SecuritySchemeType, dict[str, Any]] | None
+    tags: list[str]

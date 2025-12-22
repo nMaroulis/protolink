@@ -42,7 +42,7 @@ Follow the API documentation here 📚 [documentation](https://nmaroulis.github.
   - **Advanced Orchestration Patterns**
     - Multi-step workflows, supervisory agents, role routing, and hierarchical control systems.
 
-### Protolink vs Google A2A 💡
+## 💡 Protolink vs Google's A2A
 
 ProtoLink implements Google’s A2A protocol at the **wire level**, while providing a higher-level agent runtime that unifies client, server, transport, tools, and LLMs into a single composable abstraction **the Agent**.
 
@@ -55,10 +55,7 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
 | Tools     | Out of scope            | Native + MCP    |
 | UX        | Enterprise infra        | Developer-first |
 
-
-## Architecture
-
-### Centralized Agent & Transport Layer Design
+### Architecture - Centralized Agent & Transport Layer Design
 
 Protolink takes a **centralized agent** approach compared to Google's A2A protocol, which separates client and server concerns. Here's how it differs:
 
@@ -70,6 +67,10 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
 | **Complexity** | Higher (needs orchestration) | Lower (simpler to reason about) |
 | **Flexibility** | Runtime configuration via providers | Code-based implementation |
 | **Use Case** | Large-scale, distributed systems | Both simple and complex agent systems |
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="60%">
+</div>
 
 #### Key Benefits
 
