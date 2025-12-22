@@ -69,7 +69,7 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
 | **Use Case** | Large-scale, distributed systems | Both simple and complex agent systems |
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="60%">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
 </div>
 
 #### Key Benefits
