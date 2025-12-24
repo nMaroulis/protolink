@@ -88,12 +88,6 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
    - Simple interface-based design
    - No complex configuration needed for common use cases
 
-Once the Agent has been initiated, it automatically exposes a web interface at `/status` where it exposes the agent's information.
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="50%">
-</div>
-
 ## Why Protolink? 🚀
 - **Real Multi-Agent Systems**: Build **autonomous agents** with embedded LLMs, tools, and memory that communicate directly.
 - **Simple API**: Built from the ground-up for **minimal boilerplate**, letting you focus on agent logic rather than infrastructure.
@@ -142,7 +136,7 @@ cd protolink
 uv pip install -e ".[dev]"
 ```
 
-## Quick Start
+## Hello World Example
 
 ```python
 from protolink.agents import Agent
@@ -182,6 +176,12 @@ agent.add_tool(mcp_tool)
 # Start the agent
 agent.start()
 ```
+
+Once the Agent has been initiated, it automatically exposes a web interface at `/status` where it exposes the agent's information.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="50%">
+</div>
 
 ## Documentation
 

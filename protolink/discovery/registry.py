@@ -1,10 +1,13 @@
 # protolink/registry/registry.py
+import time
 from typing import Any
 
 from protolink.client import RegistryClient
 from protolink.models import AgentCard
+from protolink.server import RegistryServer
 from protolink.transport import HTTPRegistryTransport, RegistryTransport
 from protolink.utils.logging import get_logger
+from protolink.utils.renderers import to_registry_status_html
 
 
 class Registry:
@@ -28,49 +31,66 @@ class Registry:
 
         # Create default HTTP transport if none provided
         if transport is None:
-            transport = HTTPRegistryTransport(url=url)
-
-        self.transport = transport
-        self.client = RegistryClient(self.transport)
+            if url is None:
+                raise ValueError("At least one of transport or url must be provided")
+            else:
+                self.logger.info(f"Creating default HTTPRegistryTransport using the provided URL: {url}")
+                transport = HTTPRegistryTransport(url=url)
 
         # Local store for agent cards
         self._agents: dict[str, AgentCard] = {}
 
-        # Wire server-side handlers
-        self.transport._register_local = self._register_local
-        self.transport._unregister_local = self._unregister_local
-        self.transport._discover_local = self._discover_local
+        self.start_time: float | None = None
+
+        # Setup registry client
+        self._client = RegistryClient(transport)
+
+        # Setup registry server
+        self._server = RegistryServer(
+            transport,
+            register_handler=self.handle_register,
+            unregister_handler=self.handle_unregister,
+            discover_handler=self.handle_discover,
+            status_handler=self.handle_status_html,
+        )
 
     # ------------------------------------------------------------------
-    # Lifecycle
+    # Registry Server Lifecycle
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
         """Start the registry server via the transport."""
-        await self.transport.start()
+        if self._server:
+            try:
+                await self._server.start()
+            except Exception as e:
+                self.logger.exception(f"Unexpected error during server start: {e}")
+                raise
+        self.start_time = time.time()
 
     async def stop(self) -> None:
         """Stop the registry server via the transport."""
-        await self.transport.stop()
+        if self._server:
+            await self._server.stop()
 
     # ------------------------------------------------------------------
     # Client API (agents call these)
     # ------------------------------------------------------------------
 
     async def register(self, card: AgentCard) -> None:
-        await self.client.register(card)
+        await self._client.register(card)
 
     async def unregister(self, agent_url: str) -> None:
-        await self.client.unregister(agent_url)
+        await self._client.unregister(agent_url)
 
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
-        return await self.client.discover(filter_by)
+        return await self._client.discover(filter_by)
 
     # ------------------------------------------------------------------
     # Server-side handlers
     # ------------------------------------------------------------------
 
-    async def _register_local(self, card: AgentCard) -> None:
+    async def handle_register(self, card: AgentCard) -> None:
         self._agents[card.url] = card
 
         self.logger.info(
@@ -81,10 +101,10 @@ class Registry:
             },
         )
 
-    async def _unregister_local(self, agent_url: str) -> None:
+    async def handle_unregister(self, agent_url: str) -> None:
         self._agents.pop(agent_url, None)
 
-    async def _discover_local(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+    async def handle_discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         if not filter_by:
             return list(self._agents.values())
 
@@ -92,6 +112,14 @@ class Registry:
             return all(getattr(card, k, None) == v for k, v in filter_by.items())
 
         return [c for c in self._agents.values() if match(c)]
+
+    def handle_status_html(self) -> str:
+        """Return the registry's status as HTML.
+
+        Returns:
+            HTML string with registry status information
+        """
+        return to_registry_status_html("Registry", "HTTP", self._agents, self.start_time)
 
     # ------------------------------------------------------------------
     # Utilities

@@ -2,8 +2,7 @@
 """
 HTML and text renderers for Protolink agents.
 
-These utilities provide human-readable representations of AgentCard
-instances without introducing UI frameworks or runtime dependencies.
+These utilities provide human-readable representations of AgentCard instances without introducing UI frameworks or runtime dependencies.
 """
 
 from __future__ import annotations
@@ -38,13 +37,6 @@ def to_status_html(agent: AgentCard, start_time: float) -> str:
         from html import escape
 
         return escape(value) if value else default
-
-    def _list(items: list[str], empty: str = "None") -> str:
-        if not items:
-            return f"<li><em>{empty}</em></li>"
-        return "".join(f"<li>{escape(item)}</li>" for item in items)
-
-    import json
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -199,7 +191,7 @@ footer {{ margin-top: 22px; display: flex; justify-content: space-between; font-
 
     <section>
       <h2>Security Schemes</h2>
-      <ul>{_list([f"{k}: {json.dumps(v)}" for k, v in (agent.security_schemes or {}).items()], empty="None")}</ul>
+      <ul>{_list([f"{k}: {v}" for k, v in (agent.security_schemes or {}).items()], empty="None")}</ul>
     </section>
 
     <section>
@@ -262,6 +254,573 @@ async function ping() {{
   }}
 }}
 </script>
+</body>
+</html>
+"""
+
+
+def to_registry_status_html(
+    name: str,
+    transport: str,
+    agents: dict,
+    start_time: float,
+) -> str:
+    from html import escape
+
+    def _fmt(v: str | None, default: str = "—") -> str:
+        return escape(v) if v else default
+
+    rows = []
+    for k, v in agents.items():
+        aid = escape(v.name.lower().replace(" ", "-"))
+        rows.append(f"""
+        <div class="agent-row">
+          <div class="agent-main">
+            <div class="agent-name">{_fmt(v.name)}</div>
+            <div class="agent-desc">{_fmt(v.description)}</div>
+            <div class="agent-url">
+              <a href="{_fmt(k)}/status" target="_blank">
+                {_fmt(k)}/status
+              </a>
+            </div>
+          </div>
+
+          <div class="agent-actions">
+            <span id="status-{aid}" class="status unknown">UNKNOWN</span>
+            <span id="latency-{aid}" class="latency">—</span>
+            <button onclick="pingAgent('{_fmt(k)}', '{aid}')">Ping</button>
+          </div>
+        </div>
+        """)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{_fmt(name)} · Registry Status</title>
+
+<style>
+:root {{
+  --bg: #070b1a;
+  --card: rgba(17, 22, 42, 0.82);
+
+  --border: rgba(45,212,191,.18);
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+
+  --accent: #2dd4bf;              /* soft teal */
+  --accent-soft: rgba(45,212,191,.12);
+
+  --ok: #22c55e;
+  --fail: #ef4444;
+}}
+
+* {{ box-sizing: border-box; }}
+
+body {{
+  margin: 0;
+  background:
+    radial-gradient(800px 380px at 20% -10%, #11162a, transparent),
+    radial-gradient(600px 320px at 85% 10%, rgba(45,212,191,.08), transparent),
+    var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}}
+
+.card {{
+  width: min(840px, 94vw);
+  background: var(--card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 26px 28px;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,.6),
+    inset 0 0 0 1px rgba(255,255,255,.02);
+}}
+
+header {{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}}
+
+header h1 {{
+  font-size: 1.35rem;
+  margin: 0;
+  font-weight: 600;
+}}
+
+header .meta {{
+  font-size: .72rem;
+  letter-spacing: .08em;
+  color: var(--accent);
+}}
+
+.agent-row {{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}}
+
+.agent-row:last-child {{
+  border-bottom: none;
+}}
+
+.agent-name {{
+  font-size: .95rem;
+  font-weight: 600;
+}}
+
+.agent-desc {{
+  font-size: .8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}}
+
+.agent-url {{
+  font-size: .75rem;
+  margin-top: 4px;
+}}
+
+.agent-url a {{
+  color: var(--accent);
+  text-decoration: none;
+}}
+
+.agent-url a:hover {{
+  text-decoration: underline;
+}}
+
+.agent-actions {{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}}
+
+.status {{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .7rem;
+  font-weight: 600;
+}}
+
+.status::before {{
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}}
+
+.status.ok {{
+  color: var(--ok);
+}}
+
+.status.fail {{
+  color: var(--fail);
+}}
+
+.status.unknown {{
+  color: var(--muted);
+}}
+
+.latency {{
+  font-size: .7rem;
+  color: var(--muted);
+  min-width: 48px;
+  text-align: right;
+}}
+
+button {{
+  background: linear-gradient(135deg, transparent, var(--accent-soft));
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: .75rem;
+  transition: all .15s ease;
+}}
+
+button:hover {{
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}}
+
+footer {{
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  font-size: .7rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}}
+</style>
+
+<script>
+let registryStart = {start_time};
+
+function updateUptime() {{
+  const diff = Math.floor(Date.now()/1000 - registryStart);
+  const h = Math.floor(diff/3600);
+  const m = Math.floor((diff%3600)/60);
+  const s = diff%60;
+  document.getElementById("uptime").textContent = `${{h}}h ${{m}}m ${{s}}s`;
+}}
+
+setInterval(updateUptime, 1000);
+updateUptime();
+
+async function pingAgent(url, id) {{
+  const status = document.getElementById("status-" + id);
+  const latencyEl = document.getElementById("latency-" + id);
+
+  status.textContent = "PINGING…";
+  status.className = "status unknown";
+  latencyEl.textContent = "—";
+
+  const t0 = performance.now();
+  try {{
+    await fetch(url + "/", {{ method: "GET", mode: "no-cors" }});
+    const t1 = performance.now();
+
+    status.textContent = "RUNNING";
+    status.className = "status ok";
+    latencyEl.textContent = `${{Math.round(t1 - t0)}} ms`;
+
+  }} catch {{
+    status.textContent = "OFFLINE";
+    status.className = "status fail";
+  }}
+}}
+
+window.onload = () => {{
+  document.querySelectorAll("[id^='status-']").forEach(el => {{
+    const id = el.id.replace("status-", "");
+    el.nextElementSibling?.nextElementSibling?.click();
+  }});
+}};
+</script>
+
+
+</head>
+<body>
+  <div class="card">
+    <header>
+      <h1>{_fmt(name)}</h1>
+      <div class="meta">{_fmt(transport.upper())} REGISTRY</div>
+    </header>
+
+    {"".join(rows)}
+
+    <footer>
+      <span>{len(agents)} agents · uptime <span id="uptime">0s</span></span>
+      <span>{_now_utc()}</span>
+    </footer>
+  </div>
+</body>
+</html>
+"""
+
+
+def to_registry_status_html1(
+    name: str,
+    transport: str,
+    agents: dict,
+    start_time: float,
+) -> str:
+    rows = []
+    for k, v in agents.items():
+        aid = escape(v.name.lower().replace(" ", "-"))
+        rows.append(f"""
+        <div class="agent-row">
+          <div class="agent-main">
+            <div class="agent-name">{_fmt(v.name)}</div>
+            <div class="agent-desc">{_fmt(v.description)}</div>
+            <div class="agent-url">
+              <a href="{_fmt(k)}/status" target="_blank">
+                {_fmt(k)}/status
+              </a>
+            </div>
+          </div>
+
+          <div class="agent-actions">
+            <span id="status-{aid}" class="status unknown">UNKNOWN</span>
+            <span id="latency-{aid}" class="latency">—</span>
+            <button onclick="pingAgent('{_fmt(k)}', '{aid}')">Ping</button>
+          </div>
+        </div>
+        """)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{_fmt(name)} · Registry Status</title>
+
+<style>
+:root {{
+  --bg: #070717;
+  --card: rgba(18, 16, 34, .88);
+
+  --border: rgba(139,92,246,.25);
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+
+  --accent: #8b5cf6;          /* purple */
+  --accent-soft: rgba(139,92,246,.14);
+
+  --ok: #8b5cf6;
+  --fail: #ef4444;
+}}
+
+* {{ box-sizing: border-box; }}
+
+body {{
+  margin: 0;
+  background:
+    radial-gradient(900px 420px at 15% -10%, rgba(139,92,246,.10), transparent),
+    radial-gradient(700px 380px at 85% 15%, rgba(99,102,241,.08), transparent),
+    var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}}
+
+.card {{
+  width: min(820px, 94vw);
+  background: var(--card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 26px 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.55);
+}}
+
+header {{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}}
+
+header h1 {{
+  font-size: 1.4rem;
+  margin: 0;
+  font-weight: 600;
+}}
+
+header .meta {{
+  font-size: .72rem;
+  letter-spacing: .06em;
+  color: var(--accent);
+}}
+
+.agent-row {{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}}
+
+.agent-row:last-child {{
+  border-bottom: none;
+}}
+
+.agent-name {{
+  font-size: .95rem;
+  font-weight: 600;
+}}
+
+.agent-desc {{
+  font-size: .8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}}
+
+.agent-url {{
+  font-size: .75rem;
+  margin-top: 4px;
+}}
+
+.agent-url a {{
+  color: var(--accent);
+  text-decoration: none;
+}}
+
+.agent-url a:hover {{
+  text-decoration: underline;
+}}
+
+.agent-actions {{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}}
+
+.status {{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .7rem;
+  font-weight: 600;
+}}
+
+.status::before {{
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}}
+
+.status.ok {{
+  color: var(--ok);
+}}
+
+.status.ok::before {{
+  animation: pulse-ok 1.8s infinite;
+}}
+
+.status.fail {{
+  color: var(--fail);
+}}
+
+.status.fail::before {{
+  animation: pulse-fail 1.8s infinite;
+}}
+
+.status.unknown {{
+  color: var(--muted);
+}}
+
+.latency {{
+  font-size: .7rem;
+  color: var(--muted);
+  min-width: 48px;
+  text-align: right;
+}}
+
+button {{
+  background: linear-gradient(135deg, transparent, var(--accent-soft));
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: .75rem;
+  transition: all .15s ease;
+}}
+
+button:hover {{
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}}
+
+footer {{
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  font-size: .7rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}}
+
+@keyframes pulse-ok {{
+  0% {{ box-shadow: 0 0 0 0 rgba(139,92,246,.6); }}
+  50% {{ box-shadow: 0 0 10px 5px rgba(139,92,246,.2); }}
+  100% {{ box-shadow: 0 0 0 0 rgba(139,92,246,0); }}
+}}
+
+@keyframes pulse-fail {{
+  0% {{ box-shadow: 0 0 0 0 rgba(239,68,68,.6); }}
+  50% {{ box-shadow: 0 0 10px 5px rgba(239,68,68,.2); }}
+  100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0); }}
+}}
+</style>
+
+<script>
+let registryStart = {start_time};
+
+function updateUptime() {{
+  const diff = Math.floor(Date.now()/1000 - registryStart);
+  const h = Math.floor(diff/3600);
+  const m = Math.floor((diff%3600)/60);
+  const s = diff%60;
+  document.getElementById("uptime").textContent = `${{h}}h ${{m}}m ${{s}}s`;
+}}
+
+setInterval(updateUptime, 1000);
+updateUptime();
+
+async function pingAgent(url, id) {{
+  const status = document.getElementById("status-" + id);
+  const latencyEl = document.getElementById("latency-" + id);
+
+  status.textContent = "PINGING…";
+  status.className = "status unknown";
+  latencyEl.textContent = "—";
+
+  const t0 = performance.now();
+  try {{
+    await fetch(url + "/", {{ method: "GET", mode: "no-cors" }});
+    const t1 = performance.now();
+
+    status.textContent = "RUNNING";
+    status.className = "status ok";
+    latencyEl.textContent = `${{Math.round(t1 - t0)}} ms`;
+
+  }} catch {{
+    status.textContent = "OFFLINE";
+    status.className = "status fail";
+  }}
+}}
+
+window.onload = () => {{
+  document.querySelectorAll("[id^='status-']").forEach(el => {{
+    const id = el.id.replace("status-", "");
+    el.nextElementSibling?.nextElementSibling?.click();
+  }});
+}};
+</script>
+
+</head>
+<body>
+  <div class="card">
+    <header>
+      <h1>{_fmt(name)}</h1>
+      <div class="meta">{_fmt(transport.upper())} REGISTRY</div>
+    </header>
+
+    {"".join(rows)}
+
+    <footer>
+      <span>{len(agents)} agents · uptime <span id="uptime">0s</span></span>
+      <span>{_now_utc()}</span>
+    </footer>
+  </div>
 </body>
 </html>
 """

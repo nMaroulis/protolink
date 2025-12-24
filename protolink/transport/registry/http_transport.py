@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
@@ -29,8 +30,15 @@ class HTTPRegistryTransport(RegistryTransport):
 
         self._client: httpx.AsyncClient | None = None
 
-        # In-memory registry store (server-side)
-        self._agents: dict[str, AgentCard] = {}
+        # Handlers that are called for different Server Requests
+        # POST /agents/
+        self._register_handler: Callable[[AgentCard], Awaitable[None]] | None = None
+        # DELETE /agents/
+        self._unregister_handler: Callable[[str], Awaitable[None]] | None = None
+        # GET /agents/
+        self._discover_handler: Callable[[dict[str, Any]], Awaitable[list[AgentCard]]] | None = None
+        # GET /status/
+        self._status_handler: Callable[[], Awaitable[str]] | None = None
 
         # TTL for registry entries (server-side)
         self.ttl_seconds = 30
@@ -160,24 +168,22 @@ class HTTPRegistryTransport(RegistryTransport):
     # Server-side handlers (Registry logic)
     # ------------------------------------------------------------------
 
-    async def _register_local(self, card: AgentCard) -> None:
-        self._agents[card.url] = card
+    def on_register_received(self, handler: Callable[[AgentCard], Awaitable[None]]) -> None:
+        self._register_handler = handler
 
-    async def _unregister_local(self, agent_url: str) -> None:
-        self._agents.pop(agent_url, None)
+    def on_unregister_received(self, handler: Callable[[str], Awaitable[None]]) -> None:
+        self._unregister_handler = handler
 
-    async def _discover_local(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
-        if not filter_by:
-            return list(self._agents.values())
+    def on_discover_received(self, handler: Callable[[dict[str, Any]], Awaitable[list[AgentCard]]]) -> None:
+        self._discover_handler = handler
 
-        def match(card: AgentCard) -> bool:
-            return all(getattr(card, k, None) == v for k, v in filter_by.items())
-
-        return [c for c in self._agents.values() if match(c)]
+    def on_status_received(self, handler: Callable[[], Awaitable[str]]) -> None:
+        self._status_handler = handler
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
     # TODO(): Do this in the backend
     def _set_from_url(self, url: str) -> None:
         """Populate host, port, and canonical url from a full URL."""

@@ -102,7 +102,7 @@ class Agent:
         self.start_time: float | None = None
 
     # ----------------------------------------------------------------------
-    # Agent Lifecycle Init - A2A Server Operations
+    # Agent Server Lifecycle - A2A Operations
     # ----------------------------------------------------------------------
 
     async def start(self, *, register: bool = True) -> None:

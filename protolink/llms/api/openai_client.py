@@ -67,8 +67,6 @@ class OpenAILLM(APILLM):
         """Convert OpenAI completion to internal Message format."""
 
         output_text: str = ""
-        print(type(response))
-        print(response)
         for item in response.output or []:
             # item: ResponseOutputMessage
             if item.type != "message":

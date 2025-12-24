@@ -1,5 +1,7 @@
-from .agent_server import AgentServer
+from .agent import AgentServer
+from .registry import RegistryServer
 
 __all__ = [
     "AgentServer",
+    "RegistryServer",
 ]

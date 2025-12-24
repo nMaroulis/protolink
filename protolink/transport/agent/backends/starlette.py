@@ -36,8 +36,7 @@ class StarletteBackend(BackendInterface):
         """Register all HTTP routes on the Starlette application.
 
         This method wires the public HTTP API to the internal transport handlers.
-        Each route is registered via a dedicated helper for clarity and separation
-        of concerns.
+        Each route is registered via a dedicated helper for clarity and separation of concerns.
         """
         self._setup_task_routes(transport)
         self._setup_agent_card_routes(transport)
