@@ -69,7 +69,13 @@ class TestRegistry:
     @pytest.fixture
     def http_transport(self):
         """Create an HTTP transport for testing."""
-        return HTTPRegistryTransport(url="http://localhost:9000")
+        import socket
+
+        # Find a random available port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            port = s.getsockname()[1]
+        return HTTPRegistryTransport(url=f"http://localhost:{port}")
 
     @pytest.fixture
     def agent_card(self):

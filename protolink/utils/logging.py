@@ -228,7 +228,7 @@ default_logger = ProtoLinkLogger()
 # Convenience functions
 def get_logger(name: str = "protolink", verbose: int = 1) -> ProtoLinkLogger:
     """
-    Get a logger instance with the given name.
+    Get a logger instance with the given name. Instead of using a logger singleton.
 
     Args:
         name: The name of the logger

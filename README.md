@@ -138,6 +138,9 @@ uv pip install -e ".[dev]"
 
 ## Hello World Example
 
+👉 The example found in the jupyter notebooks here: [Hello World Example](https://github.com/nMaroulis/protolink/tree/main/examples/notebooks/basic_example)
+
+
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
@@ -220,17 +223,19 @@ The following are the Protolink wrappers for each type. If you want to use anoth
 
 
 - **API**, calls the API, requires an API key:
-  - [OpenAILLM](): Uses **OpenAI API** for sync & async requests.
-  - [AnthropicLLM](): Uses **Anthropic API** for sync & async requests.
+  - [OpenAILLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py): Uses **OpenAI API** for sync & async requests.
+  - [AnthropicLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py): Uses **Anthropic API** for sync & async requests.
+  - [GeminiLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/gemini_client.py): Uses **Gemini API** for sync & async requests.
+  - [DeepSeekLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/deepseek_client.py): Uses **DeepSeek API** for sync & async requests.
 - **Local**, runs the model in runtime:
-  - [LlamaCPPLLM](): Uses **local runtime llama.cpp** for sync & async requests.
+  - [LlamaCPPLLM]() - **TBD**: Uses **local runtime llama.cpp** for sync & async requests.
 - **Server**, connects to an LLM Server, deployed locally or remotely:
-  - [OllamaLLM](): Uses **Ollama** for sync & async requests.
+  - [OllamaLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/ollama_client.py): Uses **Ollama** for sync & async requests.
 
 #### Tools:
 
-- [Native Tool](): Uses native tools.
-- [MCPToolAdapter](): Connects to MCP Server and registers MCP tools as native tools.
+- [Native Tool](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py): Uses native tools.
+- [MCPToolAdapter](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp.py) - **TBD**: Connects to MCP Server and registers MCP tools as native tools.
 
 
 ## License
