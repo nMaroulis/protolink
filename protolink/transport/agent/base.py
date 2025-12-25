@@ -6,7 +6,7 @@ Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
 
 from abc import abstractmethod
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator
 
 from protolink.core.message import Message
 from protolink.core.task import Task
@@ -73,15 +73,6 @@ class AgentTransport(Transport):
 
         For server-side transports, this should stop listening and clean up resources.
         For client-only transports, this can be a no-op.
-        """
-        pass
-
-    @abstractmethod
-    def on_task_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
-        """Register a handler for incoming tasks.
-
-        Args:
-            handler: Async function that processes incoming tasks and returns responses
         """
         pass
 

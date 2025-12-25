@@ -130,7 +130,21 @@ These methods control the agent's server component lifecycle.
 |------|------------|---------|-------------|
 | `set_transport()` | `transport: Transport` | `None` | Sets or updates the transport used by this agent. |
 | `client` (property) | — | `AgentClient` | Returns the client instance for sending requests to other agents. |
-| `server` (property) | — | `Server \| None` | Returns the server instance if one is available via the transport. |
+| `server` (property) | — | `AgentServer \| None` | Returns the server instance if one is available via the transport. |
+
+#### Agent Transport Layers
+
+| Layer          | Responsibility                                 |
+| -------------- | ---------------------------------------------- |
+| Agent          | Domain logic (what to do with a Task)          |
+| AgentServer    | Wiring & lifecycle (server orchestration)      |
+| AgentTransport | Protocol abstraction (HTTP vs WS vs gRPC)      |
+| Backend        | Framework-specific routing (Starlette/FastAPI) |
+
+e.g.
+
+`Agent.handle_task() -> AgentServer.set_task_handler() -> AgentTransport.on_task_received() -> Backend route calls transport._task_handler()`
+
 
 ## Task and Message Handling
 

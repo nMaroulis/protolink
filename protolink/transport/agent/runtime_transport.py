@@ -115,14 +115,6 @@ class RuntimeAgentTransport(AgentTransport):
         self.agents.clear()
         self._task_handler = None
 
-    def on_task_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
-        """Register task handler.
-
-        Args:
-            handler: Async function that processes incoming tasks
-        """
-        self._task_handler = handler
-
     async def _handle_incoming_task(self, task: Task) -> Task:
         """Process an incoming task.
 

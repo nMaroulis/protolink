@@ -79,12 +79,8 @@ class Agent:
             )
         else:
             self._client = AgentClient(transport=transport)
-            self._server = AgentServer(
-                transport,
-                task_handler=self.handle_task,
-                agent_card_handler=self.get_agent_card,
-                agent_status_handler=self.get_agent_status_html,
-            )
+            # Exposes AgentProtocol to Server
+            self._server = AgentServer(transport, self)
             self._server.validate_agent_url(self.card.url)
             # Transport and AgentCard URL must match.
             if getattr(transport, "url", None) != self.card.url:
@@ -118,13 +114,14 @@ class Agent:
         if register and self.registry_client:
             try:
                 await self.registry_client.register(self.card)
+                logger.info(f"Registered to registry: {self.card.url}")
             except ConnectionError as e:
                 logger.exception(
-                    f"Failed to register with registry: {e}. Agent will continue running but won't be discoverable."
+                    f"Failed to register to registry: {e}. Agent will continue running but won't be discoverable."
                 )
             except Exception as e:
                 logger.exception(f"Unexpected error during registry registration: {e}")
-                raise
+
         self.start_time = time.time()
 
     async def stop(self) -> None:
@@ -453,7 +450,7 @@ class Agent:
             raise TypeError("transport must be an instance of AgentTransport")
 
         self._client = AgentClient(transport=transport)
-        self._server = AgentServer(transport, self.handle_task)
+        self._server = AgentServer(transport, self)
 
     def set_llm(self, llm: LLM) -> None:
         """Sets the Agent's LLM and validates the connection."""

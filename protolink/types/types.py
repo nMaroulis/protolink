@@ -24,6 +24,7 @@ HttpAuthScheme = Literal[
     "edgegrid",  # Akamai
 ]
 
+HttpMethod: TypeAlias = Literal["GET", "POST", "DELETE", "PUT", "PATCH"]
 
 LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp", "ollama"]
 

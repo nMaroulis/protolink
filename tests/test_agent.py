@@ -47,17 +47,8 @@ class DummyTransport(AgentTransport):
     async def stop(self) -> None:  # pragma: no cover
         pass
 
-    def on_task_received(self, handler):
-        self.handler = handler
-
     def validate_agent_url(self, agent_url: str) -> bool:
         return True
-
-    def on_get_agent_card_received(self, handler):
-        self._agent_card_handler = handler
-
-    def on_get_agent_status_received(self, handler):
-        pass
 
 
 class DummyLLM(LLM):
@@ -145,7 +136,6 @@ class TestAgent:
         agent.set_transport(transport)
         assert agent.client is not None
         assert agent.server is not None
-        assert transport.handler == agent.handle_task
 
     @pytest.mark.asyncio
     async def test_send_task_to(self, agent):

@@ -2,6 +2,7 @@ from .types import (
     AgentRoleType,
     BackendType,
     HttpAuthScheme,
+    HttpMethod,
     LLMProvider,
     LLMType,
     MimeType,
@@ -13,7 +14,8 @@ from .types import (
 __all__ = [
     "AgentRoleType",
     "BackendType",
-    "HttpAuthScheme",
+    "HttpAuthSchemes",
+    "HttpMethod",
     "LLMProvider",
     "LLMType",
     "MimeType",

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from protolink.models import EndpointSpec
+
 """Common interface for HTTP transport backends.
 
 This small protocol-like base class is implemented by concrete backends such
@@ -18,7 +20,7 @@ class BackendInterface:
 
     app: Any  # Underlying ASGI application instance (Starlette or FastAPI)
 
-    def setup_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821, UP037
+    def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
         """Register all HTTP routes for the given transport instance."""
 
         raise NotImplementedError()

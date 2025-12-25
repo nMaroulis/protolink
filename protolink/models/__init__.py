@@ -1,4 +1,5 @@
 from protolink.core.agent_card import AgentCard, AgentSkill
+from protolink.core.agent_handler import EndpointSpec
 from protolink.core.artifact import Artifact
 from protolink.core.context import Context
 from protolink.core.message import Message
@@ -10,6 +11,7 @@ __all__ = [
     "AgentSkill",
     "Artifact",
     "Context",
+    "EndpointSpec",
     "Message",
     "Part",
     "Task",

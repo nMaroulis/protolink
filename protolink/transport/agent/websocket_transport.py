@@ -99,9 +99,6 @@ class WebSocketAgentTransport(AgentTransport):
             await self._http_client.aclose()
             self._http_client = None
 
-    def on_task_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
-        self._task_handler = handler
-
     def validate_agent_url(self, agent_url: str) -> bool:
         parsed = urlparse(agent_url)
         if parsed.scheme not in {"ws", "wss"}:

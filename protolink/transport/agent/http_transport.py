@@ -5,13 +5,12 @@ This module exposes :class:`HTTPAgentTransport`, which sends and receives
 or FastAPI backend for the server side.
 """
 
-from collections.abc import Awaitable, Callable
 from typing import ClassVar
 from urllib.parse import urlparse
 
 import httpx
 
-from protolink.models import AgentCard, Message, Task
+from protolink.models import AgentCard, EndpointSpec, Message, Task
 from protolink.security.auth import Authenticator
 from protolink.transport.agent.backends import BackendInterface, FastAPIBackend, StarletteBackend
 from protolink.transport.agent.base import AgentTransport
@@ -56,13 +55,6 @@ class HTTPAgentTransport(AgentTransport):
         self.authenticator: Authenticator | None = authenticator
         self.security_context: object | None = None
         # Handlers that are called for different Server Requests
-        # POST /tasks/
-        self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
-        # GET /.well-known/agent.json
-        self._agent_card_handler: Callable | None = None
-        # GET /status
-        self._agent_status_handler: Callable[[], Awaitable[str]] | None = None
-
         self._client: httpx.AsyncClient | None = None
 
         # Select backend implementation.
@@ -158,16 +150,15 @@ class HTTPAgentTransport(AgentTransport):
     # Server-side handlers (Agent logic)
     # ------------------------------------------------------------------
 
+    def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
+        """Setup the routes for the HTTP server."""
+
+        self.backend.setup_routes(endpoints)
+
     async def start(self) -> None:
         """Start the HTTP server and initialize the HTTP client."""
 
-        if not self._task_handler:
-            raise RuntimeError("No task handler registered")
-
-        if not self._agent_card_handler:
-            raise RuntimeError("No agent card handler registered")
-
-        self.backend.setup_routes(self)
+        # Start the HTTP server
         await self.backend.start(self.host, self.port)
 
         # Initialize HTTP client
@@ -180,21 +171,6 @@ class HTTPAgentTransport(AgentTransport):
         if self._client:
             await self._client.aclose()
             self._client = None
-
-    def on_task_received(self, handler: Callable[[Task], Awaitable[Task]]) -> None:
-        """Register a callback that will handle incoming tasks."""
-
-        self._task_handler = handler
-
-    def on_get_agent_card_received(self, handler: Callable) -> None:
-        """Wrapper for on_task_received that specifically handles GET /.well-known/agent.json requests."""
-
-        self._agent_card_handler = handler
-
-    def on_get_agent_status_received(self, handler: Callable[[], Awaitable[str]]) -> None:
-        """Register a callback that will handle incoming agent status requests."""
-
-        self._agent_status_handler = handler
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         """Return an initialized :class:`httpx.AsyncClient` instance."""

@@ -10,6 +10,7 @@ import asyncio
 from typing import Any
 
 from protolink.core.task import Task
+from protolink.models import EndpointSpec
 from protolink.transport._deps import _require_starlette
 from protolink.transport.agent.backends.base import BackendInterface
 
@@ -32,64 +33,32 @@ class StarletteBackend(BackendInterface):
     # Setup Routes - Define Agent Server URIs
     # ----------------------------------------------------------------------
 
-    def setup_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
-        """Register all HTTP routes on the Starlette application.
+    def _register_endpoint(self, ep: EndpointSpec) -> None:
+        _, Request, JSONResponse, HTMLResponse = _require_starlette()  # noqa: N806
 
-        This method wires the public HTTP API to the internal transport handlers.
-        Each route is registered via a dedicated helper for clarity and separation of concerns.
-        """
-        self._setup_task_routes(transport)
-        self._setup_agent_card_routes(transport)
-        self._setup_agent_status_routes(transport)
+        async def route(request: Request):
+            if ep.method == "POST":
+                payload = await request.json() if ep.is_async else request.json()
+                result = (
+                    await ep.handler(Task.from_dict(payload)) if ep.is_async else ep.handler(Task.from_dict(payload))
+                )
+            else:
+                result = await ep.handler() if ep.is_async else ep.handler()
 
-    def _setup_task_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
-        """Register `/tasks/` POST endpoint."""
-
-        _, Request, JSONResponse, _ = _require_starlette()  # noqa: N806
-
-        @self.app.route("/tasks/", methods=["POST"])
-        async def handle_task(request: Request) -> JSONResponse:
-            if not transport._task_handler:
-                raise RuntimeError("No task handler registered")
-
-            task_data = await request.json()
-            task = Task.from_dict(task_data)
-            result = await transport._task_handler(task)
-
-            return JSONResponse(result.to_dict())
-
-    def _setup_agent_card_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
-        """Register agent card discovery endpoints.
-
-        Both `/` and `/.well-known/agent.json` return the agent card.
-        """
-
-        _, Request, JSONResponse, _ = _require_starlette()  # noqa: N806
-
-        @self.app.route("/", methods=["GET"])
-        @self.app.route("/.well-known/agent.json", methods=["GET"])
-        async def get_agent_card(request: Request) -> JSONResponse:
-            if not transport._agent_card_handler:
-                raise RuntimeError("No agent card handler registered")
-
-            result = transport._agent_card_handler()
+            if ep.content_type == "html":
+                return HTMLResponse(result)
             return JSONResponse(result.to_json())
 
-    def _setup_agent_status_routes(self, transport: "HTTPAgentTransport") -> None:  # noqa: F821
-        """Register agent status endpoint.
+        self.app.add_route(ep.path, route, methods=[ep.method])
 
-        GET /status returns agent status.
+    def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
+        """Register all HTTP routes on the Starlette application.
+
+        This method wires the public HTTP API to the internal agent handlers.
+        Each route is registered via a dedicated helper for clarity and separation of concerns.
         """
-
-        _, Request, _, HTMLResponse = _require_starlette()  # noqa: N806
-
-        @self.app.route("/status", methods=["GET"])
-        async def get_agent_status(request: Request) -> HTMLResponse:
-            if not transport._agent_status_handler:
-                raise RuntimeError("No agent status handler registered")
-
-            result = transport._agent_status_handler()
-            return HTMLResponse(result)
+        for ep in endpoints:
+            self._register_endpoint(ep)
 
     # ----------------------------------------------------------------------
     # ASGI Server Lifecycle
