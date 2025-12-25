@@ -1,4 +1,5 @@
 from .types import (
+    AgentRoleType,
     BackendType,
     HttpAuthScheme,
     LLMProvider,
@@ -10,6 +11,7 @@ from .types import (
 )
 
 __all__ = [
+    "AgentRoleType",
     "BackendType",
     "HttpAuthScheme",
     "LLMProvider",

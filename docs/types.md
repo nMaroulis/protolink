@@ -4,6 +4,7 @@ This section provides detailed documentation for the type aliases used throughou
 
 ## Table of Contents
 
+- [AgentRoleType](#agentroletype)
 - [BackendType](#backendtype)
 - [LLMProvider](#llmprovider)
 - [LLMType](#llmtype)
@@ -12,6 +13,107 @@ This section provides detailed documentation for the type aliases used throughou
 - [SecuritySchemeType](#securityschemetype)
 
 ---
+
+## AgentRoleType
+
+```python
+AgentRoleType: TypeAlias = Literal["gateway", "observer", "orchastrator", "worker"]
+```
+
+**Agent roles** define an agent’s **responsibility in the system topology**, not its
+capabilities, tools, memory, or internal implementation.
+
+Roles are **protocol-level contracts** and are intentionally minimal and stable.
+
+---
+
+### Orchestrator
+
+**Purpose:** Control and coordination of the agent system.
+
+The Orchestrator owns the **global flow of execution**. It decides which agent
+acts next, when a task is complete, and how failures are handled.
+
+**Responsibilities**
+- Interpret high-level goals
+- Select and invoke worker agents
+- Manage branching, retries, and termination
+- Aggregate or route intermediate results
+
+**Non-responsibilities**
+- Performing domain work
+- Calling tools for execution
+- Enforcing security or protocol boundaries
+
+---
+
+### Worker
+
+**Purpose:** Execute tasks and produce outputs.
+
+A Worker performs concrete work when invoked by an Orchestrator. Workers have
+no authority over system flow and do not make global decisions.
+
+**Responsibilities**
+- Execute assigned tasks
+- Generate outputs (text, structured data, actions)
+- Use tools, memory, or retrieval as needed
+
+**Non-responsibilities**
+- Choosing which agent runs next
+- Managing task lifecycle
+- Acting as a system entry or exit point
+
+---
+
+### Observer
+
+**Purpose:** Observe system behavior without influencing it.
+
+An Observer has read-only visibility into agent interactions. It exists for
+monitoring, evaluation, auditing, and human-in-the-loop inspection.
+
+**Responsibilities**
+- Log events and messages
+- Collect metrics and traces
+- Evaluate outputs or system behavior
+- Support auditing and compliance
+
+**Non-responsibilities**
+- Modifying messages
+- Influencing routing or decisions
+- Executing tasks
+
+---
+
+### Gateway
+
+**Purpose:** Define the boundary between external systems and the A2A network.
+
+A Gateway is an edge agent responsible for ingress and egress. It translates
+external protocols into A2A messages and enforces trust and security policies.
+
+**Responsibilities**
+- Accept inbound requests from external systems
+- Translate protocols (e.g. HTTP, WebSocket, gRPC) into A2A messages
+- Authenticate and authorize requests
+- Enforce rate limits, validation, and redaction
+- Emit final responses back to external systems
+
+**Non-responsibilities**
+- Task planning or execution
+- Agent routing or coordination
+- Evaluating correctness of results
+
+---
+
+### Design Notes
+
+- Roles describe **why an agent exists**, not how it works.
+- Tools, memory, retrieval, and reasoning are **capabilities**, not roles.
+- Systems may omit roles they do not need.
+- Custom roles may be layered on top, but these roles should remain stable.
+
 
 ## BackendType
 

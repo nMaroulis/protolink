@@ -31,6 +31,8 @@ class AgentCard:
     input_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     output_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
+    role: AgentRoleType = "worker"
+    tags: list[str] = field(default_factory=list)
 ```
 
 Agent identity and capability declaration. This is the main metadata card that describes an agent's identity, capabilities, and security requirements.
@@ -49,6 +51,8 @@ Agent identity and capability declaration. This is the main metadata card that d
 | `input_formats` | `list[MimeType]` | `["text/plain"]` | Supported input MIME types |
 | `output_formats` | `list[MimeType]` | `["text/plain"]` | Supported output MIME types |
 | `security_schemes` | `dict[SecuritySchemeType, dict[str, Any]] | None` | `{}` | Authentication schemes |
+| `role` | `AgentRoleType` | `"worker"` | Agent role is a protocol-level contract that defines the agent's responsibility in the system topology (Extends A2A spec) |
+| `tags` | `list[str]` | `[]` | List of tags for categorization. These tags can be used for filtering during discovery (Protolink extension to A2A spec) E.g. "finance", "travel", "math" etc. (Extends A2A spec) |
 
 ### Methods
 

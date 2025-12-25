@@ -7,6 +7,8 @@ Centralizing types improves reusability, discoverability, and maintainability.
 
 from typing import Literal, TypeAlias
 
+AgentRoleType: TypeAlias = Literal["gateway", "observer", "orchastrator", "worker"]
+
 BackendType: TypeAlias = Literal["starlette", "fastapi"]
 
 HttpAuthScheme = Literal[

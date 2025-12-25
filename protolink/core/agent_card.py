@@ -2,7 +2,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, TypedDict
 
 from protolink import __version__ as protolink_version
-from protolink.types import MimeType, SecuritySchemeType, TransportType
+from protolink.types import AgentRoleType, MimeType, SecuritySchemeType, TransportType
 from protolink.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -94,6 +94,7 @@ class AgentCard:
         input_formats: List of supported input formats
         output_formats: List of supported output formats
         security_schemes: Security schemes for authentication
+        role: Agent role is a protocol-level contract that defines the agent's responsibility in the system topology
         tags: List of tags for categorization. These tags can be used for filtering
             during discovery (Protolink extension to A2A spec) [Optional]
             E.g. "finance", "travel", "math" etc.
@@ -110,6 +111,7 @@ class AgentCard:
     input_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     output_formats: list[MimeType] = field(default_factory=lambda: ["text/plain"])
     security_schemes: dict[SecuritySchemeType, dict[str, Any]] | None = field(default_factory=dict)
+    role: AgentRoleType = "worker"
     tags: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
