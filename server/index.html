@@ -14,7 +14,7 @@
         <link rel="prev" href="../registry/">
       
       
-        <link rel="next" href="../transports/">
+        <link rel="next" href="../tool/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Tools - protolink</title>
+        <title>Server - protolink</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#tools" class="md-skip">
+        <a href="#server-api-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Tools
+              Server
             
           </span>
         </div>
@@ -445,14 +445,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../agents/" class="md-nav__link">
+      <a href="../agent/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Agents
+    Agent
   
 
     
@@ -473,14 +473,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../llms/" class="md-nav__link">
+      <a href="../client/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLMs
+    Client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -573,7 +601,7 @@
   <span class="md-ellipsis">
     
   
-    Tools
+    Server
   
 
     
@@ -591,7 +619,7 @@
   <span class="md-ellipsis">
     
   
-    Tools
+    Server
   
 
     
@@ -617,10 +645,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#module-structure" class="md-nav__link">
+  <a href="#concept" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module Structure
+        Concept
       
     </span>
   </a>
@@ -628,35 +656,141 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#native-tools" class="md-nav__link">
+  <a href="#agentserver" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Native Tools
+        AgentServer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AgentServer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsibilities
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#mcp-tools" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MCP Tools
+        Endpoints
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#tool-tags" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tool Tags
+        Usage
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registryserver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RegistryServer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RegistryServer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#responsibilities_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#endpoints_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#endpointspec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EndpointSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -676,14 +810,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../transports/" class="md-nav__link">
+      <a href="../tool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Transports
+    Tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transport/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transport
   
 
     
@@ -927,10 +1089,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#module-structure" class="md-nav__link">
+  <a href="#concept" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module Structure
+        Concept
       
     </span>
   </a>
@@ -938,35 +1100,141 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#native-tools" class="md-nav__link">
+  <a href="#agentserver" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Native Tools
+        AgentServer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AgentServer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsibilities
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#mcp-tools" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MCP Tools
+        Endpoints
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#tool-tags" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tool Tags
+        Usage
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registryserver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RegistryServer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RegistryServer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#responsibilities_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#endpoints_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#endpointspec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EndpointSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -990,59 +1258,151 @@
   
 
 
-<h1 id="tools">Tools<a class="headerlink" href="#tools" title="Permanent link">&para;</a></h1>
-<p>Tools extend agent capabilities with additional functions. The tools can be used by the LLM or directly by the agent.</p>
-<h2 id="module-structure">Module Structure<a class="headerlink" href="#module-structure" title="Permanent link">&para;</a></h2>
-<p>The tools module is organized as follows:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Core tool interfaces</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseTool</span><span class="p">,</span> <span class="n">Tool</span>
-
-<span class="c1"># Tool adapters for external integrations  </span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
-</code></pre></div>
+<h1 id="server-api-reference">Server API Reference<a class="headerlink" href="#server-api-reference" title="Permanent link">&para;</a></h1>
+<p>Servers in Protolink act as the <strong>coordination layer</strong> between business logic (Agents or Registries) and the underlying Transport mechanism. They are responsible for wiring endpoints, managing lifecycle, and ensuring that the core logic remains transport-agnostic.</p>
+<h2 id="concept">Concept<a class="headerlink" href="#concept" title="Permanent link">&para;</a></h2>
+<p>A <strong>Server</strong> does <strong>not</strong> implement networking itself. Instead, it:
+1.  <strong>Defines Endpoints</strong>: Declares the API surface (paths, methods, handlers).
+2.  <strong>Binds Handlers</strong>: Connects these endpoints to the implementation (Agent or Registry).
+3.  <strong>Manages Lifecycle</strong>: Starts and stops the underlying transport.</p>
+<p>This separation allows an Agent to run over HTTP, WebSocket, or in-memory transports without changing a single line of agent code.</p>
+<hr />
+<h2 id="agentserver">AgentServer<a class="headerlink" href="#agentserver" title="Permanent link">&para;</a></h2>
+<p>The <code>AgentServer</code> exposes an <code>Agent</code> over a Transport.</p>
+<h3 id="responsibilities">Responsibilities<a class="headerlink" href="#responsibilities" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong><code>protolink.tools</code></strong>: Core tool interfaces and native tool implementation</li>
-<li><strong><code>protolink.tools.adapters</code></strong>: Adapters for integrating external tool systems</li>
+<li>Exposing the Task submission endpoint.</li>
+<li>Serving the Agent's identity card (<code>/.well-known/agent.json</code>).</li>
+<li>Providing a status page.</li>
 </ul>
-<h2 id="native-tools">Native Tools<a class="headerlink" href="#native-tools" title="Permanent link">&para;</a></h2>
-<p><strong>Native tools</strong> are regular Python callables that you register on an agent. They are exposed over the transport so that other agents (or clients) can invoke them.</p>
-<p>To register a native tool, <strong>decorate</strong> an async function with <code>@agent.tool</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.agents</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
+<h3 id="endpoints">Endpoints<a class="headerlink" href="#endpoints" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/tasks/</code></td>
+<td><code>POST</code></td>
+<td><strong>Task Submission</strong>. Accepts a <code>Task</code> object, processes it via the Agent, and returns the result.</td>
+</tr>
+<tr>
+<td><code>/.well-known/agent.json</code></td>
+<td><code>GET</code></td>
+<td><strong>Agent Discovery</strong>. Returns the <code>AgentCard</code> describing this agent.</td>
+</tr>
+<tr>
+<td><code>/status</code></td>
+<td><code>GET</code></td>
+<td><strong>Status Page</strong>. Returns a human-readable HTML status dashboard.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
+<p>The <code>Agent</code> class automatically creates an <code>AgentServer</code> internally when a transport is provided. You rarely need to instantiate <code>AgentServer</code> directly.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># AgentServer is created internally here</span>
+<span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card</span><span class="o">=</span><span class="n">card</span><span class="p">,</span> <span class="n">transport</span><span class="o">=</span><span class="n">transport</span><span class="p">)</span>
 
-
-<span class="nd">@agent</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Add two numbers&quot;</span><span class="p">)</span>
-<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">add_numbers</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+<span class="c1"># This calls agent.server.start()</span>
+<span class="k">await</span> <span class="n">agent</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 </code></pre></div>
-<p>Native tools are ideal for business logic, data access, or any capability you want your agents to expose.</p>
-<h2 id="mcp-tools">MCP Tools<a class="headerlink" href="#mcp-tools" title="Permanent link">&para;</a></h2>
-<p>Protolink can also expose tools from an <strong>MCP (Model Context Protocol) server</strong> using the <code>MCPToolAdapter</code>.</p>
-<p>High‑level flow:</p>
+<hr />
+<h2 id="registryserver">RegistryServer<a class="headerlink" href="#registryserver" title="Permanent link">&para;</a></h2>
+<p>The <code>RegistryServer</code> exposes a <code>Registry</code> over a Transport.</p>
+<h3 id="responsibilities_1">Responsibilities<a class="headerlink" href="#responsibilities_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Handling agent registration and deregistration.</li>
+<li>Serving the discovery endpoint for finding agents.</li>
+<li>Providing a status page.</li>
+</ul>
+<h3 id="endpoints_1">Endpoints<a class="headerlink" href="#endpoints_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/agents/</code></td>
+<td><code>POST</code></td>
+<td><strong>Register</strong>. Registers an agent with the registry. Body: <code>AgentCard</code>.</td>
+</tr>
+<tr>
+<td><code>/agents/</code></td>
+<td><code>DELETE</code></td>
+<td><strong>Unregister</strong>. Removes an agent. Query Param: <code>agent_url</code>.</td>
+</tr>
+<tr>
+<td><code>/agents/</code></td>
+<td><code>GET</code></td>
+<td><strong>Discover</strong>. Returns a list of agents matching filter criteria. Query Param: <code>filter_by</code> (JSON).</td>
+</tr>
+<tr>
+<td><code>/status</code></td>
+<td><code>GET</code></td>
+<td><strong>Status Page</strong>. Returns a human-readable HTML status dashboard.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="usage_1">Usage<a class="headerlink" href="#usage_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.discovery.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">Registry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTTPRegistryTransport</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">protolink.server.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegistryServer</span>
+
+<span class="c1"># Create Logic</span>
+<span class="n">registry</span> <span class="o">=</span> <span class="n">Registry</span><span class="p">()</span>
+
+<span class="c1"># Create Transport</span>
+<span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPRegistryTransport</span><span class="p">(</span><span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">)</span>
+
+<span class="c1"># Create Server (wiring)</span>
+<span class="n">server</span> <span class="o">=</span> <span class="n">RegistryServer</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">transport</span><span class="p">)</span>
+
+<span class="c1"># Start</span>
+<span class="k">await</span> <span class="n">server</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</code></pre></div>
+<hr />
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<p>The server architecture relies on the <code>EndpointSpec</code> model to define routes in a generic way.</p>
+<h3 id="endpointspec">EndpointSpec<a class="headerlink" href="#endpointspec" title="Permanent link">&para;</a></h3>
+<p>The <code>EndpointSpec</code> class (defined in <code>protolink.core.endpoint_handler</code>) is the <strong>contract</strong> between a Server and a Transport.</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">EndpointSpec</span><span class="p">:</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>              <span class="c1"># Internal unique name for the endpoint</span>
+    <span class="n">path</span><span class="p">:</span> <span class="nb">str</span>              <span class="c1"># URL path (e.g. &quot;/tasks/&quot;)</span>
+    <span class="n">method</span><span class="p">:</span> <span class="n">HttpMethod</span>     <span class="c1"># HTTP Method (GET, POST, etc.)</span>
+    <span class="n">handler</span><span class="p">:</span> <span class="n">Callable</span>      <span class="c1"># Async function to process the request</span>
+
+    <span class="c1"># Configuration</span>
+    <span class="n">content_type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;html&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span>
+    <span class="n">streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;request_response&quot;</span><span class="p">,</span> <span class="s2">&quot;stream&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;request_response&quot;</span>
+
+    <span class="c1"># Request Parsing</span>
+    <span class="n">request_parser</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">request_source</span><span class="p">:</span> <span class="n">RequestSourceType</span> <span class="o">=</span> <span class="s2">&quot;none&quot;</span>
+</code></pre></div>
+<h3 id="how-it-works">How it Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Connect to an MCP server using an MCP client (not shown here).</li>
-<li>Wrap an MCP tool with <code>MCPToolAdapter</code>.</li>
-<li>Register it on the agent.</li>
+<li><strong>Transport-Agnostic Definition</strong>: The Server creates a list of <code>EndpointSpec</code> objects describing what it needs to expose.</li>
+<li><strong>Transport Implementation</strong>: The Transport iterates over these specs and registers them with its underlying web framework (e.g., Starlette or FastAPI).</li>
+<li><strong>Request Handling</strong>:<ul>
+<li>The Transport receives a raw HTTP request.</li>
+<li>It extracts data based on <code>request_source</code> (e.g., reads the body JSON).</li>
+<li>It passes this data to the <code>request_parser</code> (if defined) to convert it into a domain object.</li>
+<li>It calls the <code>handler</code> with the domain object.</li>
+<li>It serializes the result back to the wire format.</li>
+</ul>
+</li>
 </ol>
-<p>Example pattern:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">protolink.tools.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPToolAdapter</span>
-
-
-<span class="n">mcp_tool</span> <span class="o">=</span> <span class="n">MCPToolAdapter</span><span class="p">(</span><span class="n">mcp_client</span><span class="p">,</span> <span class="s2">&quot;multiply&quot;</span><span class="p">)</span>
-<span class="n">agent</span><span class="o">.</span><span class="n">add_tool</span><span class="p">(</span><span class="n">mcp_tool</span><span class="p">)</span>
-</code></pre></div>
-<p>The MCP adapter lets you reuse existing MCP tools as if they were native tools, keeping a consistent interface on the agent side.</p>
-<h2 id="tool-tags">Tool Tags<a class="headerlink" href="#tool-tags" title="Permanent link">&para;</a></h2>
-<p>Tools can be categorized using tags for better organization and discovery:</p>
-<div class="highlight"><pre><span></span><code><span class="nd">@agent</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;calculate&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Performs calculations&quot;</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;math&quot;</span><span class="p">,</span> <span class="s2">&quot;utility&quot;</span><span class="p">])</span>
-<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">calculate</span><span class="p">(</span><span class="n">operation</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-    <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;add&quot;</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
-    <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;multiply&quot;</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">b</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported operation: </span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p>Tags are automatically propagated to the agent's skills and can be used for filtering and categorization.</p>
+<p>This design ensures that your Agent logic deals only with <code>Task</code> and <code>Message</code> objects, never raw HTTP requests, while the Transport handles the nitty-gritty of networking protocols.</p>
 
 
 
@@ -1095,13 +1455,13 @@
         
         
           
-          <a href="../transports/" class="md-footer__link md-footer__link--next" aria-label="Next: Transports">
+          <a href="../tool/" class="md-footer__link md-footer__link--next" aria-label="Next: Tool">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Transports
+                Tool
               </div>
             </div>
             <div class="md-footer__button md-icon">

@@ -14,7 +14,7 @@
         <link rel="prev" href="../getting-started/">
       
       
-        <link rel="next" href="../llms/">
+        <link rel="next" href="../client/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Agents - protolink</title>
+        <title>Agent - protolink</title>
       
     
     
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Agents
+              Agent
             
           </span>
         </div>
@@ -461,7 +461,7 @@
   <span class="md-ellipsis">
     
   
-    Agents
+    Agent
   
 
     
@@ -479,7 +479,7 @@
   <span class="md-ellipsis">
     
   
-    Agents
+    Agent
   
 
     
@@ -553,14 +553,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../llms/" class="md-nav__link">
+      <a href="../client/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    LLMs
+    Client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -637,14 +665,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../tools/" class="md-nav__link">
+      <a href="../server/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Tools
+    Server
   
 
     
@@ -665,14 +693,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../transports/" class="md-nav__link">
+      <a href="../tool/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Transports
+    Tool
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transport/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transport
   
 
     
@@ -1062,22 +1118,22 @@
 <td><strong>Required.</strong> The agent's metadata card containing name, description, and other identifying information.</td>
 </tr>
 <tr>
-<td><code>llm</code></td>
-<td><code>LLM | None</code></td>
-<td><code>None</code></td>
-<td>Optional language model instance for AI-powered task processing.</td>
-</tr>
-<tr>
 <td><code>transport</code></td>
-<td><code>Transport | None</code></td>
+<td><code>AgentTransport \| None</code></td>
 <td><code>None</code></td>
 <td>Optional transport for communication. If not provided, you must set one later via <code>set_transport()</code>.</td>
 </tr>
 <tr>
-<td><code>authenticator</code></td>
-<td><code>Authenticator | None</code></td>
+<td><code>registry</code></td>
+<td><code>Registry \| RegistryClient \| str \| None</code></td>
 <td><code>None</code></td>
-<td>Optional authentication provider for securing agent communications.</td>
+<td>Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string (defaults to HTTPRegistryTransport).</td>
+</tr>
+<tr>
+<td><code>llm</code></td>
+<td><code>LLM \| None</code></td>
+<td><code>None</code></td>
+<td>Optional language model instance for the agent to use.</td>
 </tr>
 <tr>
 <td><code>skills</code></td>
@@ -1097,7 +1153,7 @@
 <span class="n">llm</span> <span class="o">=</span> <span class="n">OpenAILLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4&quot;</span><span class="p">)</span>
 <span class="n">transport</span> <span class="o">=</span> <span class="n">HTTPAgentTransport</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">)</span>
 
-<span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card</span><span class="o">=</span><span class="n">card</span><span class="p">,</span> <span class="n">llm</span><span class="o">=</span><span class="n">llm</span><span class="p">,</span> <span class="n">transport</span><span class="o">=</span><span class="n">transport</span><span class="p">)</span>
+<span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">card</span><span class="o">=</span><span class="n">card</span><span class="p">,</span> <span class="n">transport</span><span class="o">=</span><span class="n">transport</span><span class="p">,</span> <span class="n">llm</span><span class="o">=</span><span class="n">llm</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="lifecycle-methods">Lifecycle Methods<a class="headerlink" href="#lifecycle-methods" title="Permanent link">&para;</a></h2>
 <p>These methods control the agent's server component lifecycle.</p>
@@ -1113,9 +1169,9 @@
 <tbody>
 <tr>
 <td><code>start()</code></td>
-<td>—</td>
+<td><code>register: bool = True</code></td>
 <td><code>None</code></td>
-<td>Starts the agent's server component if a transport is configured.</td>
+<td>Starts the agent's server component if a transport is configured. Optionally registers with the registry (default True).</td>
 </tr>
 <tr>
 <td><code>stop()</code></td>
@@ -1155,11 +1211,40 @@
 <tr>
 <td><code>server</code> (property)</td>
 <td>—</td>
-<td><code>Server \| None</code></td>
+<td><code>AgentServer \| None</code></td>
 <td>Returns the server instance if one is available via the transport.</td>
 </tr>
 </tbody>
 </table>
+<h4 id="agent-transport-layers">Agent Transport Layers<a class="headerlink" href="#agent-transport-layers" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent</td>
+<td>Domain logic (what to do with a Task)</td>
+</tr>
+<tr>
+<td>AgentServer</td>
+<td>Wiring &amp; lifecycle (server orchestration)</td>
+</tr>
+<tr>
+<td>AgentTransport</td>
+<td>Protocol abstraction (HTTP vs WS vs gRPC)</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>Framework-specific routing (Starlette/FastAPI)</td>
+</tr>
+</tbody>
+</table>
+<p>e.g.</p>
+<p><code>Agent.handle_task() -&gt; AgentServer.set_task_handler() -&gt; AgentTransport.on_task_received() -&gt; Backend route calls transport._task_handler()</code></p>
 <h2 id="task-and-message-handling">Task and Message Handling<a class="headerlink" href="#task-and-message-handling" title="Permanent link">&para;</a></h2>
 <h3 id="core-task-processing">Core Task Processing<a class="headerlink" href="#core-task-processing" title="Permanent link">&para;</a></h3>
 <table>
@@ -1181,8 +1266,14 @@
 <tr>
 <td><code>handle_task_streaming()</code></td>
 <td><code>task: Task</code></td>
-<td><code>AsyncIterator[Task]</code></td>
-<td>Optional streaming handler for real-time task updates. Default raises <code>NotImplementedError</code>.</td>
+<td><code>AsyncIterator</code></td>
+<td>Optional method for agents that want to emit real-time updates. Default implementation calls <code>handle_task</code> and emits status functionality events.</td>
+</tr>
+<tr>
+<td><code>process()</code></td>
+<td><code>message_text: str</code></td>
+<td><code>str</code></td>
+<td>Convenience method for synchronous processing of user text input. Wraps input in a Task and returns response text.</td>
 </tr>
 </tbody>
 </table>
@@ -1199,7 +1290,7 @@
 <tbody>
 <tr>
 <td><code>send_task_to()</code></td>
-<td><code>agent_url: str</code>, <code>task: Task</code>, <code>skill: str \| None = None</code></td>
+<td><code>agent_url: str</code>, <code>task: Task</code></td>
 <td><code>Task</code></td>
 <td>Sends a task to another agent and returns the processed result.</td>
 </tr>
@@ -1211,10 +1302,6 @@
 </tr>
 </tbody>
 </table>
-<div class="admonition note">
-<p class="admonition-title">Authentication</p>
-<p>All outgoing requests are automatically signed if an <code>authenticator</code> is configured. Incoming requests are verified against the same provider.</p>
-</div>
 <h2 id="skills-management">Skills Management<a class="headerlink" href="#skills-management" title="Permanent link">&para;</a></h2>
 <p>Skills represent the capabilities that an agent can perform. Skills are stored in the <code>AgentCard</code> and can be automatically detected or added.</p>
 <h3 id="skills-modes">Skills Modes<a class="headerlink" href="#skills-modes" title="Permanent link">&para;</a></h3>
@@ -1321,6 +1408,37 @@
 
 <span class="n">agent</span><span class="o">.</span><span class="n">add_tool</span><span class="p">(</span><span class="n">WeatherTool</span><span class="p">())</span>
 </code></pre></div>
+<h2 id="registry-discovery">Registry &amp; Discovery<a class="headerlink" href="#registry-discovery" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Parameters</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>discover_agents()</code></td>
+<td><code>filter_by: dict \| None = None</code></td>
+<td><code>list[AgentCard]</code></td>
+<td>Discover agents in the registry matching the filter criteria.</td>
+</tr>
+<tr>
+<td><code>register()</code></td>
+<td>—</td>
+<td><code>None</code></td>
+<td>Registers this agent in the global registry.</td>
+</tr>
+<tr>
+<td><code>unregister()</code></td>
+<td>—</td>
+<td><code>None</code></td>
+<td>Unregisters this agent from the global registry.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="utility-methods">Utility Methods<a class="headerlink" href="#utility-methods" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1334,9 +1452,9 @@
 <tbody>
 <tr>
 <td><code>get_agent_card()</code></td>
-<td>—</td>
-<td><code>AgentCard</code></td>
-<td>Returns the agent's metadata card.</td>
+<td><code>as_json: bool = True</code></td>
+<td><code>AgentCard \| dict</code></td>
+<td>Returns the agent's identity card.</td>
 </tr>
 <tr>
 <td><code>set_llm()</code></td>
@@ -1345,10 +1463,10 @@
 <td>Updates the agent's language model instance.</td>
 </tr>
 <tr>
-<td><code>verify_auth()</code></td>
-<td><code>request: Request</code></td>
-<td><code>bool</code></td>
-<td>Verifies authentication for incoming requests if an auth provider is configured.</td>
+<td><code>get_context_manager()</code></td>
+<td>—</td>
+<td><code>ContextManager</code></td>
+<td>Returns the context manager for this agent.</td>
 </tr>
 </tbody>
 </table>
@@ -1388,14 +1506,6 @@
 <li><strong>Tool Errors</strong>: Tool execution errors are propagated to the caller.</li>
 <li><strong>Task Processing</strong>: Errors in <code>handle_task()</code> are caught and returned as error messages to the sender.</li>
 </ul>
-<h2 id="authentication-integration">Authentication Integration<a class="headerlink" href="#authentication-integration" title="Permanent link">&para;</a></h2>
-<p>When an <code>authenticator</code> is configured, the agent automatically:</p>
-<ol>
-<li><strong>Signs outgoing requests</strong> with appropriate authentication headers</li>
-<li><strong>Verifies incoming requests</strong> using the same auth mechanism</li>
-<li><strong>Returns appropriate HTTP status codes</strong> for auth failures (401, 403)</li>
-</ol>
-<p>Supported auth providers include API key authentication, OAuth, and custom implementations.</p>
 
 
 
@@ -1448,13 +1558,13 @@
         
         
           
-          <a href="../llms/" class="md-footer__link md-footer__link--next" aria-label="Next: LLMs">
+          <a href="../client/" class="md-footer__link md-footer__link--next" aria-label="Next: Client">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                LLMs
+                Client
               </div>
             </div>
             <div class="md-footer__button md-icon">
