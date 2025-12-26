@@ -27,12 +27,26 @@ _Current release: see [protolink on PyPI](https://pypi.org/project/protolink/)._
 
 ## Contents
 
+### Overview
+- [Concept](concept.md)
 - [Getting Started](getting-started.md)
-- [Agents](agents.md)
-- [Transports](transports.md)
-- [LLMs](llms.md)
-- [Tools](tools.md)
+
+### API Reference
+- [Agent](agent.md)
+- [Client](client.md)
+- [LLM](llm.md)
+- [Models](models.md)
+- [Registry](registry.md)
+- [Server](server.md)
+- [Tool](tool.md)
+- [Transport](transport.md)
+- [Types](types.md)
+
+### Examples
 - [Examples](examples.md)
+
+### Resources
+- [Relevant Projects](relevant.md)
 
 ## What is Protolink ?
 
@@ -63,13 +77,13 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
 ## What you can do with Protolink
 
 - **Build agents quickly**  
-  See [Getting Started](getting-started.md) and [Agents](agents.md) for the core concepts and basic setup.
+  See [Getting Started](getting-started.md) and [Agents](agent.md) for the core concepts and basic setup.
 
 - **Choose your transport**  
-  Explore [Transports](transports.md) to switch between HTTP, WebSocket, runtime, and future transports with minimal code changes.
+  Explore [Transports](transport.md) to switch between HTTP, WebSocket, runtime, and future transports with minimal code changes.
 
 - **Plug in LLMs & tools**  
-  Use [LLMs](llms.md) and [Tools](tools.md) to wire in language models and both native & MCP tools as agent modules.
+  Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and both native & MCP tools as agent modules.
 
 
 ## Key ideas:
