@@ -57,6 +57,10 @@ class DummyRegistryTransport(RegistryTransport):
     def on_status_received(self, handler):
         self._status_handler = handler
 
+    def setup_routes(self, endpoints: list) -> None:
+        """Setup routes - dummy implementation for testing."""
+        pass
+
 
 class TestRegistry:
     """Test cases for the Registry class."""
@@ -244,7 +248,7 @@ class TestRegistry:
 
         # Filter by name
         filter_by = {"name": "test-agent"}
-        result = await registry.handle_discover(filter_by)
+        result = await registry.handle_discover(filter_by, as_json=False)
         assert len(result) == 1
         assert result[0] == agent_card
 
@@ -396,11 +400,11 @@ class TestRegistry:
 
         # Filter by name and version
         filter_by = {"name": "agent1", "version": "1.0.0"}
-        result = asyncio.run(registry.handle_discover(filter_by))
+        result = asyncio.run(registry.handle_discover(filter_by, as_json=False))
         assert len(result) == 1
         assert result[0] == agent1
 
         # Filter by non-matching combination
         filter_by = {"name": "agent1", "version": "2.0.0"}
-        result = asyncio.run(registry.handle_discover(filter_by))
+        result = asyncio.run(registry.handle_discover(filter_by, as_json=False))
         assert len(result) == 0

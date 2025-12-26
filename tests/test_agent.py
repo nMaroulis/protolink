@@ -109,7 +109,7 @@ class TestAgent:
 
     def test_get_agent_card(self, agent, agent_card):
         """Test get_agent_card returns the correct card."""
-        assert agent.get_agent_card() == agent_card
+        assert agent.get_agent_card(as_json=False) == agent_card
 
     @pytest.mark.asyncio
     async def test_handle_task_not_implemented(self, agent):
