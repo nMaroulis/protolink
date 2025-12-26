@@ -2,7 +2,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from protolink.types import HttpMethod
+from protolink.types import HttpMethod, RequestSourceType
 
 
 @dataclass(frozen=True)
@@ -15,4 +15,4 @@ class EndpointSpec:
     streaming: bool = False
     mode: Literal["request_response", "stream"] = "request_response"
     request_parser: Callable[[Any], Any] | None = None
-    request_source: Literal["none", "body", "query_params", "form", "headers", "path_params"] = "none"
+    request_source: RequestSourceType = "none"

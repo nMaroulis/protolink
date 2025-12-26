@@ -11,7 +11,7 @@ AgentRoleType: TypeAlias = Literal["gateway", "observer", "orchastrator", "worke
 
 BackendType: TypeAlias = Literal["starlette", "fastapi"]
 
-HttpAuthScheme = Literal[
+HttpAuthScheme: TypeAlias = Literal[
     "bearer",  # OAuth access token
     "basic",  # username:password
     "digest",  # challenge-response
@@ -29,7 +29,6 @@ HttpMethod: TypeAlias = Literal["GET", "POST", "DELETE", "PUT", "PATCH"]
 LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp", "ollama"]
 
 LLMType: TypeAlias = Literal["api", "local", "server"]
-
 
 # Supported Agent IO formats
 MimeType: TypeAlias = Literal[
@@ -53,6 +52,9 @@ MimeType: TypeAlias = Literal[
     # Files for RAG
     "application/pdf",
 ]
+
+# Supported request sources for endpoints
+RequestSourceType: TypeAlias = Literal["none", "body", "query_params", "form", "headers", "path_params"]
 
 # Supported roles in Messages
 RoleType: TypeAlias = Literal["user", "agent", "system"]
