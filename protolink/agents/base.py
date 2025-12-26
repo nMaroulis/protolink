@@ -309,11 +309,11 @@ class Agent:
         Raises:
             ValueError: If agent with same URL or name already exists
         """
-        self.registry_client.register(self.get_agent_card())
+        self.registry_client.register(self.get_agent_card(as_json=False))
 
     def unregister(self) -> None:
         """Unregister this agent from the global registry."""
-        self.registry_client.unregister(self.get_agent_card().url)
+        self.registry_client.unregister(self.get_agent_card(as_json=False).url)
 
     # ----------------------------------------------------------------------
     # Tool Management
@@ -422,13 +422,13 @@ class Agent:
     # Getters & Setters
     # ----------------------------------------------------------------------
 
-    def get_agent_card(self) -> AgentCard:
+    def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's identity card.
 
         Returns:
             AgentCard with agent metadata
         """
-        return self.card
+        return self.card.to_json() if as_json else self.card
 
     def get_agent_status_html(self) -> str:
         """Return the agent's status as HTML.

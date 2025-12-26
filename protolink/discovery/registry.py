@@ -46,13 +46,7 @@ class Registry:
         self._client = RegistryClient(transport)
 
         # Setup registry server
-        self._server = RegistryServer(
-            transport,
-            register_handler=self.handle_register,
-            unregister_handler=self.handle_unregister,
-            discover_handler=self.handle_discover,
-            status_handler=self.handle_status_html,
-        )
+        self._server = RegistryServer(self, transport)
 
     # ------------------------------------------------------------------
     # Registry Server Lifecycle
@@ -104,14 +98,14 @@ class Registry:
     async def handle_unregister(self, agent_url: str) -> None:
         self._agents.pop(agent_url, None)
 
-    async def handle_discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+    async def handle_discover(
+        self, filter_by: dict[str, Any] | None = None, *, as_json: bool = True
+    ) -> list[dict[str, Any]] | list[AgentCard]:
+        """Handle an incoming discover request by an Agent. It returns the AgentCard objects as a Dict."""
         if not filter_by:
             return list(self._agents.values())
 
-        def match(card: AgentCard) -> bool:
-            return all(getattr(card, k, None) == v for k, v in filter_by.items())
-
-        return [c for c in self._agents.values() if match(c)]
+        return [c.to_json() if as_json else c for c in self._agents.values() if self._match(filter_by, c)]
 
     def handle_status_html(self) -> str:
         """Return the registry's status as HTML.
@@ -124,6 +118,9 @@ class Registry:
     # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
+
+    def _match(self, filter_by: dict[str, Any], card: AgentCard) -> bool:
+        return all(getattr(card, k, None) == v for k, v in filter_by.items())
 
     def list_urls(self) -> list[str]:
         return list(self._agents.keys())

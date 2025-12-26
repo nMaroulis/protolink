@@ -12,3 +12,11 @@ def is_async_callable(fn: Callable[..., Any]) -> bool:
     """
 
     return inspect.iscoroutinefunction(fn)
+
+
+def callable_expects_input(handler: Callable) -> bool:
+    """Check if Callable expects input parameters."""
+    sig = inspect.signature(handler)
+    # Skip 'self' parameter for instance methods
+    params = list(sig.parameters.values())[1:] if inspect.ismethod(handler) else list(sig.parameters.values())
+    return len(params) > 0

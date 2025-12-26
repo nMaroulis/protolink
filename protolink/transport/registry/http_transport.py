@@ -1,11 +1,10 @@
-from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 import httpx
 
-from protolink.models import AgentCard
-from protolink.transport.registry.backends.starlette import StarletteRegistryBackend
+from protolink.models import AgentCard, EndpointSpec
+from protolink.transport.backends.starlette import StarletteBackend
 from protolink.transport.registry.base import RegistryTransport
 from protolink.types import TransportType
 
@@ -25,20 +24,10 @@ class HTTPRegistryTransport(RegistryTransport):
         self._set_from_url(url)
         self.timeout = timeout
 
-        self.backend = StarletteRegistryBackend()
+        self.backend = StarletteBackend()
         self.app = self.backend.app
 
         self._client: httpx.AsyncClient | None = None
-
-        # Handlers that are called for different Server Requests
-        # POST /agents/
-        self._register_handler: Callable[[AgentCard], Awaitable[None]] | None = None
-        # DELETE /agents/
-        self._unregister_handler: Callable[[str], Awaitable[None]] | None = None
-        # GET /agents/
-        self._discover_handler: Callable[[dict[str, Any]], Awaitable[list[AgentCard]]] | None = None
-        # GET /status/
-        self._status_handler: Callable[[], Awaitable[str]] | None = None
 
         # TTL for registry entries (server-side)
         self.ttl_seconds = 30
@@ -48,8 +37,10 @@ class HTTPRegistryTransport(RegistryTransport):
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        self.backend.setup_routes(self)
+        # Start the HTTP server
         await self.backend.start(self.host, self.port)
+
+        # Initialize the HTTP client
         self._client = httpx.AsyncClient(timeout=self.timeout)
 
     async def stop(self) -> None:
@@ -168,17 +159,10 @@ class HTTPRegistryTransport(RegistryTransport):
     # Server-side handlers (Registry logic)
     # ------------------------------------------------------------------
 
-    def on_register_received(self, handler: Callable[[AgentCard], Awaitable[None]]) -> None:
-        self._register_handler = handler
+    def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
+        """Setup the routes for the HTTP server."""
 
-    def on_unregister_received(self, handler: Callable[[str], Awaitable[None]]) -> None:
-        self._unregister_handler = handler
-
-    def on_discover_received(self, handler: Callable[[dict[str, Any]], Awaitable[list[AgentCard]]]) -> None:
-        self._discover_handler = handler
-
-    def on_status_received(self, handler: Callable[[], Awaitable[str]]) -> None:
-        self._status_handler = handler
+        self.backend.setup_routes(endpoints)
 
     # ------------------------------------------------------------------
     # Internal helpers

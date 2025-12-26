@@ -13,11 +13,10 @@ It does **not** implement networking itself. Instead, it:
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
 from protolink.models import AgentCard, EndpointSpec, Task
 from protolink.transport import AgentTransport
-from protolink.utils.inspect import is_async_callable
 
 
 class AgentInterface(Protocol):
@@ -31,7 +30,7 @@ class AgentInterface(Protocol):
     async def handle_task(self, task: Task) -> Task:
         """Handle an incoming task and return the updated task."""
 
-    async def get_agent_card(self) -> AgentCard:
+    async def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's public metadata and capabilities."""
 
     async def get_agent_status_html(self) -> str:
@@ -57,6 +56,17 @@ class AgentServer:
         self._agent = agent
         self._is_running = False
 
+    # ------------------------------------------------------------------
+    # Request Parsers
+    # ------------------------------------------------------------------
+
+    async def task_parser(self, request: Any) -> Task:
+        return Task.from_dict(request)
+
+    # ------------------------------------------------------------------
+    # Endpoints
+    # ------------------------------------------------------------------
+
     def _build_endpoints(self) -> None:
         """Register agent endpoints with the transport.
 
@@ -71,22 +81,23 @@ class AgentServer:
                     path="/tasks/",
                     method="POST",
                     handler=self._agent.handle_task,
-                    is_async=is_async_callable(self._agent.handle_task),
+                    request_source="body",
+                    request_parser=self.task_parser,
                 ),
                 EndpointSpec(
                     name="agent_card",
                     path="/.well-known/agent.json",
                     method="GET",
                     handler=self._agent.get_agent_card,
-                    is_async=is_async_callable(self._agent.get_agent_card),
+                    request_source="none",
                 ),
                 EndpointSpec(
                     name="status",
                     path="/status",
                     method="GET",
                     handler=self._agent.get_agent_status_html,
+                    request_source="none",
                     content_type="html",
-                    is_async=is_async_callable(self._agent.get_agent_status_html),
                 ),
             ]
         )

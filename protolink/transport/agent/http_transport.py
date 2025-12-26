@@ -12,8 +12,8 @@ import httpx
 
 from protolink.models import AgentCard, EndpointSpec, Message, Task
 from protolink.security.auth import Authenticator
-from protolink.transport.agent.backends import BackendInterface, FastAPIBackend, StarletteBackend
 from protolink.transport.agent.base import AgentTransport
+from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
 from protolink.types import BackendType, TransportType
 
 
@@ -62,8 +62,6 @@ class HTTPAgentTransport(AgentTransport):
             self.backend: BackendInterface = FastAPIBackend(validate_schema=validate_schema)
         else:
             self.backend = StarletteBackend()
-
-        self.app = self.backend.app
 
     async def authenticate(self, credentials: str) -> None:
         """Authenticate using the configured :class:`Authenticator`.
@@ -147,7 +145,7 @@ class HTTPAgentTransport(AgentTransport):
         raise NotImplementedError("HTTP streaming is not implemented yet")
 
     # ------------------------------------------------------------------
-    # Server-side handlers (Agent logic)
+    # Server-side handlers (Agent logic) - Lifecycle
     # ------------------------------------------------------------------
 
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None:

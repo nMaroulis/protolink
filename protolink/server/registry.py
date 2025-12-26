@@ -2,81 +2,114 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Protocol
 
-from protolink.models import AgentCard
+from protolink.models import AgentCard, EndpointSpec
 from protolink.transport import RegistryTransport
+
+
+class RegistryInterface(Protocol):
+    """Public interface a Registry must implement to be served.
+
+    This protocol defines the minimal surface required by an RegistryServer.
+    Registries are not required to inherit from this protocol explicitly; structural typing (duck typing) is sufficient.
+    """
+
+    async def handle_register(self, card: AgentCard) -> dict[str, str]:
+        """Handle an incoming register request by an Agent."""
+
+    async def handle_unregister(self, agent_url: str) -> dict[str, str]:
+        """Handle an incoming unregister request by an Agent."""
+
+    async def handle_discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+        """Return a the Registry's list of registered Agents."""
+
+    def handle_status_html(self) -> str:
+        """Return a human-readable HTML status page."""
 
 
 class RegistryServer:
     """Thin wrapper that wires a task handler into a transport."""
 
-    def __init__(
-        self,
-        transport: RegistryTransport,
-        register_handler: Callable[[AgentCard], Awaitable[None]] | None = None,
-        unregister_handler: Callable[[str], Awaitable[None]] | None = None,
-        discover_handler: Callable[[dict[str, Any]], Awaitable[list[AgentCard]]] | None = None,
-        status_handler: Callable[[], Awaitable[str]] | None = None,
-    ) -> None:
+    def __init__(self, registry: RegistryInterface, transport: RegistryTransport) -> None:
         if transport is None:
             raise ValueError("RegistryServer requires a transport instance")
 
         self._transport = transport
-        self._register_handler = None
-        self._unregister_handler = None
-        self._discover_handler = None
-        self._status_handler = None
+        self._registry = registry
         self._is_running = False
 
-        if register_handler is not None:
-            self.set_register_handler(register_handler)
+    # ------------------------------------------------------------------
+    # Request Parsers
+    # ------------------------------------------------------------------
 
-        if unregister_handler is not None:
-            self.set_unregister_handler(unregister_handler)
+    async def register_parser(self, request: Any) -> AgentCard:
+        return AgentCard.from_json(request)
 
-        if discover_handler is not None:
-            self.set_discover_handler(discover_handler)
+    async def unregister_parser(self, request: Any) -> str:
+        return request.get("agent_url")
 
-        if status_handler is not None:
-            self.set_status_handler(status_handler)
+    async def discover_parser(self, request: Any) -> dict[str, Any] | None:
+        return request.get("filter_by")
 
-    def set_register_handler(self, handler: Callable[[AgentCard], Awaitable[None]]) -> None:
-        """Register the coroutine used to process incoming register requests from agents."""
+    # ------------------------------------------------------------------
+    # Endpoints
+    # ------------------------------------------------------------------
 
-        self._register_handler = handler
-        self._transport.on_register_received(handler)
+    def _build_endpoints(self) -> None:
+        """Register registry endpoints with the transport.
 
-    def set_unregister_handler(self, handler: Callable[[str], Awaitable[None]]) -> None:
-        """Register the coroutine used to process incoming unregister requests from agents."""
+        This method declares the public API surface of the registry and binds each endpoint to the corresponding
+        registry handler.
+        """
 
-        self._unregister_handler = handler
-        self._transport.on_unregister_received(handler)
+        self._transport.setup_routes(
+            [
+                EndpointSpec(
+                    name="register",
+                    path="/agents/",
+                    method="POST",
+                    handler=self._registry.handle_register,
+                    request_source="body",
+                    request_parser=self.register_parser,
+                ),
+                EndpointSpec(
+                    name="unregister",
+                    path="/agents/",
+                    method="DELETE",
+                    handler=self._registry.handle_unregister,
+                    request_source="query_params",
+                    request_parser=self.unregister_parser,
+                ),
+                EndpointSpec(
+                    name="discover",
+                    path="/agents/",
+                    method="GET",
+                    handler=self._registry.handle_discover,
+                    request_source="query_params",
+                    request_parser=self.discover_parser,
+                ),
+                EndpointSpec(
+                    name="status",
+                    path="/status",
+                    method="GET",
+                    handler=self._registry.handle_status_html,
+                    request_source="none",
+                    content_type="html",
+                ),
+            ]
+        )
 
-    def set_discover_handler(self, handler: Callable[[dict[str, Any]], Awaitable[list[AgentCard]]]) -> None:
-        """Register the coroutine used to process incoming discover requests from agents."""
-
-        self._discover_handler = handler
-        self._transport.on_discover_received(handler)
-
-    def set_status_handler(self, handler: Callable[[], Awaitable[str]]) -> None:
-        """Register the coroutine used to process incoming status requests from agents."""
-        self._status_handler = handler
-        self._transport.on_status_received(handler)
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     async def start(self) -> None:
         """Start the underlying transport."""
 
         if self._is_running:
             return
-
-        if not self._register_handler:
-            raise RuntimeError("No register handler registered. Call set_register_handler() first.")
-
-        if not self._unregister_handler:
-            raise RuntimeError("No unregister handler registered. Call set_unregister_handler() first.")
-
+        self._build_endpoints()
         await self._transport.start()
         self._is_running = True
 
