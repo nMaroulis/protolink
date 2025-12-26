@@ -4,15 +4,16 @@ This section provides detailed API documentation for the core data models in Pro
 
 ## Table of Contents
 
-- [MimeType](#mimetype)
 - [AgentCard](#agentcard)
 - [AgentCapabilities](#agentcapabilities)
 - [AgentSkill](#agentskill)
 - [Task](#task)
 - [TaskState](#taskstate)
 - [Message](#message)
+- [Message](#message)
 - [Part](#part)
 - [Artifact](#artifact)
+- [EndpointSpec](#endpointspec)
 - [Context](#context)
 
 ---
@@ -813,6 +814,42 @@ artifact.add_part(Part("chart", chart_image_data))
 artifact.metadata["type"] = "analysis_report"
 artifact.metadata["version"] = "1.0"
 ```
+
+---
+
+---
+
+## EndpointSpec
+
+```python
+@dataclass(frozen=True)
+class EndpointSpec:
+    name: str
+    path: str
+    method: HttpMethod
+    handler: Callable[..., Awaitable]
+    content_type: Literal["json", "html"] = "json"
+    streaming: bool = False
+    mode: Literal["request_response", "stream"] = "request_response"
+    request_parser: Callable[[Any], Any] | None = None
+    request_source: RequestSourceType = "none"
+```
+
+Defines the contract for a server endpoint. This model bridges the gap between the server implementation (Agent/Registry) and the underlying transport.
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|-----|---------|-------------|
+| `name` | `str` | — | **Required.** Unique internal name for the endpoint |
+| `path` | `str` | — | **Required.** URL path (e.g., `/tasks/`) |
+| `method` | `HttpMethod` | — | **Required.** HTTP method (GET, POST, etc.) |
+| `handler` | `Callable` | — | **Required.** Async function that handles the request |
+| `content_type` | `str` | `"json"` | Response content type (`json` or `html`) |
+| `streaming` | `bool` | `False` | Whether the endpoint supports streaming responses |
+| `mode` | `str` | `"request_response"` | Interaction mode (`request_response` or `stream`) |
+| `request_parser` | `Callable` | `None` | Optional function to parse raw request data |
+| `request_source` | `RequestSourceType` | `"none"` | Source of request data (`body`, `query_params`, etc.) |
 
 ---
 

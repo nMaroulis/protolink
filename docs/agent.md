@@ -93,9 +93,9 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `llm` | `LLM | None` | `None` | Optional language model instance for AI-powered task processing. |
-| `transport` | `Transport | None` | `None` | Optional transport for communication. If not provided, you must set one later via `set_transport()`. |
-| `authenticator` | `Authenticator | None` | `None` | Optional authentication provider for securing agent communications. |
+| `transport` | `AgentTransport \| None` | `None` | Optional transport for communication. If not provided, you must set one later via `set_transport()`. |
+| `registry` | `Registry \| RegistryClient \| str \| None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string (defaults to HTTPRegistryTransport). |
+| `llm` | `LLM \| None` | `None` | Optional language model instance for the agent to use. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 
 ```python
@@ -109,7 +109,7 @@ card = AgentCard(name="my_agent", description="Example agent", url=url)
 llm = OpenAILLM(model="gpt-4")
 transport = HTTPAgentTransport(url=url)
 
-agent = Agent(card=card, llm=llm, transport=transport)
+agent = Agent(card=card, transport=transport, llm=llm)
 ```
 
 ## Lifecycle Methods
@@ -118,7 +118,7 @@ These methods control the agent's server component lifecycle.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `start()` | — | `None` | Starts the agent's server component if a transport is configured. |
+| `start()` | `register: bool = True` | `None` | Starts the agent's server component if a transport is configured. Optionally registers with the registry (default True). |
 | `stop()` | — | `None` | Stops the agent's server component and cleans up resources. |
 
 !!! warning "Transport Required"
@@ -153,17 +153,17 @@ e.g.
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `handle_task()` | `task: Task` | `Task` | **Abstract method.** Subclasses must implement this to define how tasks are processed. |
-| `handle_task_streaming()` | `task: Task` | `AsyncIterator[Task]` | Optional streaming handler for real-time task updates. Default raises `NotImplementedError`. |
+| `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Optional method for agents that want to emit real-time updates. Default implementation calls `handle_task` and emits status functionality events. |
+| `process()` | `message_text: str` | `str` | Convenience method for synchronous processing of user text input. Wraps input in a Task and returns response text. |
 
 ### Communication Methods
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `send_task_to()` | `agent_url: str`, `task: Task`, `skill: str \| None = None` | `Task` | Sends a task to another agent and returns the processed result. |
+| `send_task_to()` | `agent_url: str`, `task: Task` | `Task` | Sends a task to another agent and returns the processed result. |
 | `send_message_to()` | `agent_url: str`, `message: Message` | `Message` | Sends a message to another agent and returns the response. |
 
-!!! note "Authentication"
-    All outgoing requests are automatically signed if an `authenticator` is configured. Incoming requests are verified against the same provider.
+
 
 ## Skills Management
 
@@ -248,13 +248,21 @@ class WeatherTool(BaseTool):
 agent.add_tool(WeatherTool())
 ```
 
+## Registry & Discovery
+
+| Name | Parameters | Returns | Description |
+|------|------------|---------|-------------|
+| `discover_agents()` | `filter_by: dict \| None = None` | `list[AgentCard]` | Discover agents in the registry matching the filter criteria. |
+| `register()` | — | `None` | Registers this agent in the global registry. |
+| `unregister()` | — | `None` | Unregisters this agent from the global registry. |
+
 ## Utility Methods
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `get_agent_card()` | — | `AgentCard` | Returns the agent's metadata card. |
+| `get_agent_card()` | `as_json: bool = True` | `AgentCard \| dict` | Returns the agent's identity card. |
 | `set_llm()` | `llm: LLM` | `None` | Updates the agent's language model instance. |
-| `verify_auth()` | `request: Request` | `bool` | Verifies authentication for incoming requests if an auth provider is configured. |
+| `get_context_manager()` | — | `ContextManager` | Returns the context manager for this agent. |
 
 ## Abstract Methods
 
@@ -294,12 +302,4 @@ The `Agent` class includes several error handling patterns:
 - **Tool Errors**: Tool execution errors are propagated to the caller.
 - **Task Processing**: Errors in `handle_task()` are caught and returned as error messages to the sender.
 
-## Authentication Integration
 
-When an `authenticator` is configured, the agent automatically:
-
-1. **Signs outgoing requests** with appropriate authentication headers
-2. **Verifies incoming requests** using the same auth mechanism
-3. **Returns appropriate HTTP status codes** for auth failures (401, 403)
-
-Supported auth providers include API key authentication, OAuth, and custom implementations.

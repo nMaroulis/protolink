@@ -2,6 +2,21 @@
 
 This section links to example projects and code snippets in the repository.
 
+!!! tip "New here?"
+    Start with the **Jupyter Notebooks** in `examples/notebooks/basic_example`! They provide the easiest and best interactive introduction to running the Registry and Agents.
+
+## Jupyter Notebooks (Recommended)
+
+The best way to get started is by running the interactive notebooks located in [`examples/notebooks/basic_example`](https://github.com/nMaroulis/protolink/tree/main/examples/notebooks/basic_example).
+
+These notebooks demonstrate a full multi-agent system with a Registry, a Weather Agent, and an Alert Agent:
+
+- **[`registry.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/registry.ipynb)**: Learn how to set up the Registry service for agent discovery.
+- **[`weather_agent.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/weather_agent.ipynb)**: Build an agent that provides data (simulated weather info) and registers itself.
+- **[`alert_agent.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/alert_agent.ipynb)**: Build an agent that discovers the weather agent, consumes its data, and sends alerts.
+
+Run them in order to see the agents discover and interact with each other on your local machine.
+
 ## HTTP Agents
 
 The repository includes several examples under the `examples/` directory. For HTTP‑based agents:
@@ -20,9 +35,6 @@ Additional examples illustrate other capabilities:
 - `examples/oauth_agent.py` — demonstrates OAuth 2.0 and API‑key based security in front of agents.
 
 You can run and adapt these scripts as starting points for your own agent systems.
-
-!!! tip "New here?"
-    Start with `examples/basic_agent.py` to understand the core concepts, then move on to `examples/http_agents.py` for HTTP-based setups.
 
 
 <h3 style="text-align: center;"> 🎉🎉 Congratulations, You made it! 🎉🎉 </h3>

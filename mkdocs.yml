@@ -60,12 +60,14 @@ nav:
       - Concept: concept.md
       - Getting Started: getting-started.md
   - API Reference:
-      - Agents: agents.md
-      - LLMs: llms.md
+      - Agent: agent.md
+      - Client: client.md
+      - LLM: llm.md
       - Models: models.md
       - Registry: registry.md
-      - Tools: tools.md
-      - Transports: transports.md
+      - Server: server.md
+      - Tool: tool.md
+      - Transport: transport.md
       - Types: types.md
   - Examples:
       - Examples: examples.md

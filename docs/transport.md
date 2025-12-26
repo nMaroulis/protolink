@@ -1,12 +1,14 @@
-# Transports
+# Transport
 
-Protolink supports multiple transports for **agent-to-agent** and **agent-to-registry** communication. A **transport** is responsible for delivering `Task` and `Message` objects between components and for exposing an API surface (HTTP, WebSocket, in‑memory, etc.).
+Protolink implements a **pluggable transport layer** that decouples the agent's cognitive logic from the underlying communication protocol. This architectural pattern allows the same agent instance to effectively "exist" across multiple mediums—whether serving HTTP requests, holding a stateful WebSocket connection, or communicating over a fast in-memory channel—without changing a single line of business logic.
 
-At a high level, all transports implement the same conceptual operations:
+At its core, the Transport abstraction behaves as a **protocol adapter pattern**, normalizing disparate wire formats into standard `Task` and `Message` domain objects.
 
-- **Send work**: send a `Task` or `Message` to another agent or registry.
-- **Receive work**: expose an endpoint / callback to handle incoming requests.
-- **Lifecycle**: start and stop the underlying server or runtime.
+All transports implement a consistent interface:
+
+- **Ingress bridge**: Maps transport-specific events (HTTP POST, WS frames) to the internal `handle_task` implementation.
+- **Egress signaling**: Provides asynchronous primitives (`send_task`, `send_message`) to dispatch standard units of work to remote peers.
+- **Lifecycle management**: Handles the startup/shutdown sequence of underlying I/O reactors (e.g., `uvicorn` loops or connection pools).
 
 ## Transport Categories
 
@@ -88,19 +90,31 @@ The rest of this page dives into the API of each transport in more detail.
     - `GET /.well-known/agent.json` — served by the agent itself, not the transport, but typically used together.
   - Uses a backend implementation of `BackendInterface` to manage the ASGI app and `uvicorn` server.
 
-### Backends: Starlette vs FastAPI
 
-`HTTPAgentTransport` delegates server behavior to a **backend** implementing `BackendInterface`:
+### Backend Architecture
 
-- **StarletteBackend** (default)
-  - Minimal Starlette app with a single `POST /tasks/` route.
-  - No extra request validation beyond what `Task.from_dict()` does.
-  - Best when you want low overhead and trust callers to send valid payloads.
+`HTTPAgentTransport` separates the network transport logic from the underlying server implementation using the `BackendInterface`.
 
-- **FastAPIBackend**
-  - FastAPI app with optional Pydantic models mirroring the `Task`/`Message`/`Artifact` structures.
-  - When `validate_schema=True`, incoming requests are validated against these models before being converted with `Task.from_dict()`.
-  - Best when you want schema validation and better generated OpenAPI / docs.
+```python
+class BackendInterface(ABC):
+    @abstractmethod
+    def setup_routes(self, endpoints: list[EndpointSpec]) -> None: ...
+    @abstractmethod
+    async def start(self, host: str, port: int) -> None: ...
+    @abstractmethod
+    async def stop(self) -> None: ...
+```
+
+This interface is implemented by two backends located in `protolink/transport/backends/`:
+
+1.  **StarletteBackend** (`starlette.py`):
+    - Default lightweight implementation using standard Starlette.
+    - Minimal overhead, no extra validation.
+    
+2.  **FastAPIBackend** (`fastapi.py`):
+    - Uses FastAPI to provide schema validation.
+    - When `validate_schema=True` is passed to the transport, incoming requests are checked against Pydantic models before processing.
+
 
 Backend and validation are selected via the `HTTPAgentTransport` constructor:
 

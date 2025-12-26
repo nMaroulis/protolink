@@ -6,11 +6,15 @@ This section provides detailed documentation for the type aliases used throughou
 
 - [AgentRoleType](#agentroletype)
 - [BackendType](#backendtype)
+- [HttpAuthScheme](#httpauthscheme)
+- [HttpMethod](#httpmethod)
 - [LLMProvider](#llmprovider)
 - [LLMType](#llmtype)
 - [MimeType](#mimetype)
+- [RequestSourceType](#requestsourcetype)
 - [RoleType](#roletype)
 - [SecuritySchemeType](#securityschemetype)
+- [TransportType](#transporttype)
 
 ---
 
@@ -145,6 +149,43 @@ transport = HTTPAgentTransport(backend="fastapi", validate_schema=True)
 
 ---
 
+## HttpAuthScheme
+
+```python
+HttpAuthScheme: TypeAlias = Literal[
+    "bearer", "basic", "digest", "hmac", "negotiate", "ntlm",
+    "aws4auth", "hawk", "edgegrid"
+]
+```
+
+Type alias for supported HTTP authentication schemes.
+
+### Supported Schemes
+
+| Scheme | Description |
+|--------|-------------|
+| **bearer** | OAuth access token |
+| **basic** | Basic Auth (username:password) |
+| **digest** | Digest Auth (challenge-response) |
+| **hmac** | Custom HMAC headers |
+| **negotiate** | Kerberos / SPNEGO |
+| **ntlm** | NT LAN Manager protocol |
+| **aws4auth** | AWS SigV4 (Vendor) |
+| **hawk** | HAWK MAC authentication (Vendor) |
+| **edgegrid** | Akamai (Vendor) |
+
+---
+
+## HttpMethod
+
+```python
+HttpMethod: TypeAlias = Literal["GET", "POST", "DELETE", "PUT", "PATCH"]
+```
+
+Type alias for supported HTTP methods.
+
+---
+
 ## LLMProvider
 
 ```python
@@ -237,6 +278,27 @@ card = AgentCard(
 
 ---
 
+## RequestSourceType
+
+```python
+RequestSourceType: TypeAlias = Literal["none", "body", "query_params", "form", "headers", "path_params"]
+```
+
+Type alias for supported request sources for endpoint parameter extraction.
+
+### Sources
+
+| Source | Description |
+|--------|-------------|
+| **none** | No request extraction |
+| **body** | Extract from request body (JSON) |
+| **query_params** | Extract from URL query parameters |
+| **form** | Extract from form data |
+| **headers** | Extract from HTTP headers |
+| **path_params** | Extract from URL path parameters |
+
+---
+
 ## RoleType
 
 ```python
@@ -299,6 +361,27 @@ card = AgentCard(
     }
 )
 ```
+
+---
+
+## TransportType
+
+```python
+TransportType: TypeAlias = Literal["http", "websocket", "sse", "json-rpc", "grpc", "runtime"]
+```
+
+Type alias for supported transport protocols.
+
+### Supported Transports
+
+| Transport | Description |
+|-----------|-------------|
+| **http** | Standard HTTP transport |
+| **websocket** | WebSocket transport for bidirectional comms |
+| **sse** | Server-Sent Events |
+| **json-rpc** | JSON-RPC over HTTP/WS |
+| **grpc** | gRPC transport |
+| **runtime** | In-memory transport for local agent composition |
 
 ---
 
