@@ -103,8 +103,8 @@ class TestRegistry:
         assert isinstance(registry._server._transport, HTTPTransport)
 
     def test_initialization_without_transport_or_url(self):
-        """Test registry initialization fails without transport or URL."""
-        with pytest.raises(ValueError, match="At least one of transport or url must be provided"):
+        """Test registry initialization fails without URL when using default transport."""
+        with pytest.raises(ValueError, match="url must be provided if transport is a TransportType"):
             Registry()
 
     def test_initialization_with_verbose(self):
