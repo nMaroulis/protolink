@@ -17,7 +17,7 @@ from typing import Any, Protocol
 
 from protolink.models import AgentCard, Task
 from protolink.server.endpoint_handler import EndpointSpec
-from protolink.transport import AgentTransport
+from protolink.transport import Transport
 
 
 class AgentInterface(Protocol):
@@ -49,7 +49,7 @@ class AgentServer:
     It intentionally contains no transport-specific or agent-specific logic.
     """
 
-    def __init__(self, transport: AgentTransport, agent: AgentInterface) -> None:
+    def __init__(self, transport: Transport, agent: AgentInterface) -> None:
         if transport is None:
             raise ValueError("AgentServer requires a transport instance")
 

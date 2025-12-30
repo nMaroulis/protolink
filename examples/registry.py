@@ -3,7 +3,7 @@ import asyncio
 from protolink.agents import Agent
 from protolink.discovery import Registry
 from protolink.models import AgentCard, Message, Task
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 
 
 # ----------------------------------------------------------------------
@@ -72,7 +72,7 @@ async def start_registry() -> Registry:
 # ----------------------------------------------------------------------
 async def setup_agent(name: str, port: int) -> AutonomousAgent:
     card = AgentCard(name=name, url=f"http://localhost:{port}", description="Does all the work", skills=[])
-    transport = HTTPAgentTransport(url=f"http://localhost:{port}")
+    transport = HTTPTransport(url=f"http://localhost:{port}")
     agent = AutonomousAgent(card=card, transport=transport, registry="http://localhost:9000")
     await agent.start()  # starts server and autonomous loop
     print(f"[{name}] Started and registered to registry.")

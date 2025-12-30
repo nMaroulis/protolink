@@ -1,6 +1,6 @@
 """HTTP transport implementation for talking to remote Protolink agents.
 
-This module exposes :class:`HTTPAgentTransport`, which sends and receives
+This module exposes :class:`HTTPTransport`, which sends and receives
 ``Task`` and ``Message`` objects over plain HTTP using either a Starlette
 or FastAPI backend for the server side.
 """
@@ -14,12 +14,12 @@ from pydantic import BaseModel
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator
 from protolink.server.endpoint_handler import EndpointSpec
-from protolink.transport.agent.base import AgentTransport
 from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
+from protolink.transport.base import Transport
 from protolink.types import BackendType, TransportType
 
 
-class HTTPAgentTransport(AgentTransport):
+class HTTPTransport(Transport):
     """HTTP-based transport for Protolink agents.
 
     Parameters
@@ -97,6 +97,13 @@ class HTTPAgentTransport(AgentTransport):
             else:
                 # TODO: Fallback/Error? Assuming dict or compatible
                 kwargs["json"] = data
+        elif request_spec.request_source == "query_params" and data is not None:
+            # Send data as query parameters
+            if isinstance(data, dict):
+                kwargs["params"] = data
+            else:
+                # For single values like agent_url, wrap in dict
+                kwargs["params"] = {"agent_url": data}
 
         try:
             response = await client.request(request_spec.method, url, **kwargs)

@@ -1,5 +1,5 @@
 from protolink.models import AgentCard, ClientRequestSpec, Message, Task
-from protolink.transport import AgentTransport
+from protolink.transport import Transport
 
 
 class AgentClient:
@@ -21,7 +21,7 @@ class AgentClient:
         request_source="none",
     )
 
-    def __init__(self, transport: AgentTransport) -> None:
+    def __init__(self, transport: Transport) -> None:
         self.transport = transport
 
     # ----------------------------------------------------------------------

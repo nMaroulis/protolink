@@ -65,15 +65,8 @@ class StarletteBackend(BackendInterface):
             if ep.content_type == "html":
                 return HTMLResponse(result)
 
-            # Auto-serialize models or objects
-            if hasattr(result, "to_dict"):
-                result = result.to_dict()
-            elif hasattr(result, "model_dump"):
-                result = result.model_dump()
-            elif isinstance(result, list):
-                result = [item.model_dump() for item in result]
-
-            return JSONResponse(result)
+            serialized_result = self._serialize_result(result)
+            return JSONResponse(serialized_result)
 
         self.app.add_route(ep.path, route, methods=[ep.method])
 
@@ -114,3 +107,20 @@ class StarletteBackend(BackendInterface):
             finally:
                 self._server_task = None
                 self._server_instance = None
+
+    # ----------------------------------------------------------------------
+    # Utilities
+    # ----------------------------------------------------------------------
+
+    def _serialize_result(self, result):
+        """Auto-serialize models or objects."""
+        if hasattr(result, "to_json"):
+            return result.to_json()
+        elif hasattr(result, "to_dict"):
+            return result.to_dict()
+        elif hasattr(result, "model_dump"):
+            return result.model_dump()
+        elif isinstance(result, list):
+            return [self._serialize_result(item) for item in result]
+        else:
+            return result

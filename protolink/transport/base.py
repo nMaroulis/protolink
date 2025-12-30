@@ -1,14 +1,35 @@
 """
-ProtoLink - Transport Layer
+ProtoLink - Agent to Agent (A2A) Transport Layer
 
-Transport layer for Agent-to-Agent (A2A), Agent-to-Registry (A2R), and Registry-to-Agent (R2A) communication.
+Agent-to-Agent (A2A) transport implementations for agent communication.
+Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
 
 from abc import ABC, abstractmethod
+from typing import Any
+
+from protolink.client.request_spec import ClientRequestSpec
 
 
 class Transport(ABC):
     """Abstract base class for transport implementations."""
+
+    @abstractmethod
+    async def send(
+        self, request_spec: ClientRequestSpec, base_url: str, data: Any = None, params: dict | None = None
+    ) -> Any:
+        """Send a generic request to an agent endpoint.
+
+        Args:
+            request_spec: The request specification (method, path, parser).
+            base_url: The base URL of the agent (e.g. "http://localhost:8080").
+            data: The payload to send (for body).
+            params: Query parameters (for GET requests etc).
+
+        Returns:
+            The parsed response.
+        """
+        pass
 
     @abstractmethod
     async def start(self) -> None:

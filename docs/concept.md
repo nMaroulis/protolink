@@ -108,7 +108,7 @@ The server:
 
 ## Transport Layer
 
-The `AgentTransport` is the **lowest layer** in the system.  
+The `Transport` is the **lowest layer** in the system.  
 
 It encapsulates:
 
@@ -134,9 +134,9 @@ The dependency graph is strictly **one-way**:
 
 Agent
  ├── AgentClient
- │    └── AgentTransport
+ │    └── Transport
  └── AgentServer
-      └── AgentTransport
+      └── Transport
 
 
 
@@ -164,15 +164,15 @@ Architecturally, it **mirrors the agent model**.
 - **Registry** — logical registry service  
 - **RegistryClient** — outgoing discovery requests  
 - **RegistryServer** — incoming registry API  
-- **RegistryTransport** — protocol implementation  
+- **Transport** — protocol implementation  
 
 ### Registry Dependency Graph
 
 Registry
  ├── RegistryClient
- │    └── RegistryTransport
+ │    └── Transport
  └── RegistryServer
-      └── RegistryTransport
+      └── Transport
 
 
 
@@ -522,7 +522,7 @@ Protolink is inspired by Google’s **A2A (Agent-to-Agent)** concepts, but adds 
 | **Communication** | Agent-to-Agent messages | **AgentClient / AgentServer** with pluggable transports | Explicit client/server layer reduces boilerplate and separates network logic from business logic. |
 | **Discovery** | Registry / Service Directory | **Registry, RegistryClient, RegistryServer** | Symmetric design; agents never talk to the registry directly except through `RegistryClient`. |
 | **Task Handling** | Internal message routing | `handle_task` logic inside the Agent | Agents remain autonomous; external orchestration is optional. |
-| **Protocol** | Implicit (HTTP, WS, etc.) | **AgentTransport** layer handles protocol, serialization, runtime | Protocol-agnostic and swappable without touching agent logic. |
+| **Protocol** | Implicit (HTTP, WS, etc.) | **Transport** layer handles protocol, serialization, runtime | Protocol-agnostic and swappable without touching agent logic. |
 | **Extensibility** | Limited by A2A spec | **Tools, LLMs, and custom skills** | Agents can mix AI and deterministic tools seamlessly. |
 | **Boilerplate** | Manual wiring, repetitive | Minimal; agent owns clients and servers, which own transports | Focuses on developer productivity and clarity. |
 | **Autonomy** | Agents are actors, often invoked manually | Agents run autonomously, discover peers, schedule and execute tasks | Protolink pushes complexity down into infrastructure layers. |

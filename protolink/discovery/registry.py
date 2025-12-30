@@ -5,7 +5,7 @@ from typing import Any
 from protolink.client import RegistryClient
 from protolink.models import AgentCard
 from protolink.server import RegistryServer
-from protolink.transport import HTTPRegistryTransport, RegistryTransport
+from protolink.transport import HTTPTransport, Transport
 from protolink.utils.logging import get_logger
 from protolink.utils.renderers import to_registry_status_html
 
@@ -19,11 +19,11 @@ class Registry:
         # Registry server is now running
     """
 
-    def __init__(self, transport: RegistryTransport | None = None, url: str | None = None, verbose: int = 1):
+    def __init__(self, transport: Transport | None = None, url: str | None = None, verbose: int = 1):
         """Initialize the registry.
 
         Args:
-            transport: RegistryTransport instance
+            transport: Transport instance
             url: Registry URL
             verbose: Verbosity level [0: Warning, 2: Info, 3: Debug]
         """
@@ -34,8 +34,8 @@ class Registry:
             if url is None:
                 raise ValueError("At least one of transport or url must be provided")
             else:
-                self.logger.info(f"Creating default HTTPRegistryTransport using the provided URL: {url}")
-                transport = HTTPRegistryTransport(url=url)
+                self.logger.info(f"Creating default HTTPTransport using the provided URL: {url}")
+                transport = HTTPTransport(url=url)
 
         # Local store for agent cards
         self._agents: dict[str, AgentCard] = {}

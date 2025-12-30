@@ -13,10 +13,10 @@ from protolink.core.message import Message
 from protolink.core.task import Task
 from protolink.llms.base import LLM
 from protolink.tools import BaseTool
-from protolink.transport import AgentTransport
+from protolink.transport import Transport
 
 
-class DummyTransport(AgentTransport):
+class DummyTransport(Transport):
     """Minimal transport implementation for testing purposes."""
 
     def __init__(self, url="http://test-transport.local"):
@@ -28,16 +28,16 @@ class DummyTransport(AgentTransport):
     def url(self):
         return self._url
 
-    async def send(self, endpoint, base_url, data=None, params=None) -> Any:
-        # For testing, we might want to return different things based on endpoint
-        if endpoint.name == "send_task":
+    async def send(self, request_spec: Any, base_url: str, data: Any = None, params: dict | None = None) -> Any:
+        # For testing, we might want to return different things based on request_spec
+        if request_spec.name == "send_task":
             # Return the task assuming it was echo'd or similar
             if data:
                 return data
             return Task.create(Message.agent("dummy"))
-        elif endpoint.name == "send_message":
+        elif request_spec.name == "send_message":
             return Message.agent("dummy")
-        elif endpoint.name == "get_agent_card":
+        elif request_spec.name == "get_agent_card":
             return AgentCard(name="dummy", description="dummy", url="local://dummy")
         return None
 
@@ -46,9 +46,6 @@ class DummyTransport(AgentTransport):
 
     async def stop(self) -> None:  # pragma: no cover
         pass
-
-    def validate_agent_url(self, agent_url: str) -> bool:
-        return True
 
 
 class DummyLLM(LLM):
@@ -190,7 +187,7 @@ class TestAgent:
         """Test agent initialization with registry URL string."""
         with (
             patch("protolink.agents.base.RegistryClient") as mock_client_class,
-            patch("protolink.agents.base.HTTPRegistryTransport") as mock_transport,
+            patch("protolink.agents.base.HTTPTransport") as mock_transport,
         ):
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance
@@ -353,7 +350,7 @@ class TestAgent:
         with pytest.raises(ValueError, match="transport must not be None"):
             agent.set_transport(None)
 
-        with pytest.raises(TypeError, match="transport must be an instance of AgentTransport"):
+        with pytest.raises(TypeError, match="transport must be an instance of Transport"):
             agent.set_transport("invalid")
 
     def test_agent_repr(self, agent):

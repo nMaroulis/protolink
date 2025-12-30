@@ -9,10 +9,10 @@ import pytest
 
 from protolink.discovery.registry import Registry
 from protolink.models import AgentCard
-from protolink.transport import HTTPRegistryTransport, RegistryTransport
+from protolink.transport import HTTPTransport, Transport
 
 
-class DummyRegistryTransport(RegistryTransport):
+class DummyTransport(Transport):
     """Minimal registry transport implementation for testing purposes."""
 
     def __init__(self, url="http://test-registry.local"):
@@ -27,23 +27,17 @@ class DummyRegistryTransport(RegistryTransport):
     def url(self):
         return self._url
 
+    async def send(self, request_spec: Any, base_url: str, data: Any = None, params: dict | None = None) -> Any:
+        # Mock generic response for registry operations
+        if request_spec.name == "discover":
+            return []
+        return None
+
     async def start(self) -> None:
         self._started = True
 
     async def stop(self) -> None:
         self._started = False
-
-    async def register(self, card: AgentCard) -> None:
-        """Register an agent with the registry."""
-        pass
-
-    async def unregister(self, agent_url: str) -> None:
-        """Unregister an agent from the registry."""
-        pass
-
-    async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
-        """Return all agents registered with the registry."""
-        return []
 
     def on_register_received(self, handler):
         self._register_handler = handler
@@ -68,7 +62,7 @@ class TestRegistry:
     @pytest.fixture
     def dummy_transport(self):
         """Create a dummy transport for testing."""
-        return DummyRegistryTransport()
+        return DummyTransport()
 
     @pytest.fixture
     def http_transport(self):
@@ -79,7 +73,7 @@ class TestRegistry:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("", 0))
             port = s.getsockname()[1]
-        return HTTPRegistryTransport(url=f"http://localhost:{port}")
+        return HTTPTransport(url=f"http://localhost:{port}")
 
     @pytest.fixture
     def agent_card(self):
@@ -106,7 +100,7 @@ class TestRegistry:
         registry = Registry(url="http://localhost:9000")
         assert registry._client is not None
         assert registry._server is not None
-        assert isinstance(registry._server._transport, HTTPRegistryTransport)
+        assert isinstance(registry._server._transport, HTTPTransport)
 
     def test_initialization_without_transport_or_url(self):
         """Test registry initialization fails without transport or URL."""

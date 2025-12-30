@@ -7,60 +7,42 @@ At its core, the Transport abstraction behaves as a **protocol adapter pattern**
 All transports implement a consistent interface:
 
 - **Ingress bridge**: Maps transport-specific events (HTTP POST, WS frames) to the internal `handle_task` implementation.
-- **Egress signaling**: Provides a generic `send` primitive to dispatch requests defined by `ClientEndpoint` specifications.
+- **Egress signaling**: Provides a generic `send` primitive to dispatch requests defined by `ClientRequestSpec` specifications.
 - **Lifecycle management**: Handles the startup/shutdown sequence of underlying I/O reactors (e.g., `uvicorn` loops or connection pools).
 
 ## Relationship with Client Layer
 
 The **Transport** layer is low-level and typically not used directly by application code. Instead, developers use the high-level **[Client](client.md)** layer (specifically `AgentClient`), which wraps a transport instance and provides convenient, typed methods like `send_task` and `send_message`.
 
-## Transport Categories
-
-Protolink separates transports into two distinct categories:
-
-### Agent Transports (`AgentTransport`)
-Handle **agent-to-agent** communication via a single generic `send` method.
-
-### Registry Transports (`RegistryTransport`)  
-Handle **agent-to-registry** communication for discovery and coordination.
-
-This separation ensures clean boundaries and allows different transports to be optimized for their specific use cases.
-
 ## Supported Transports
 
-### Agent-to-Agent Transports
+All transports inherit from the base `Transport` class.
 
-- **HTTPAgentTransport**
+- **HTTPTransport**
   - Uses HTTP/HTTPS for synchronous request/response.
+  - Used for both Agent-to-Agent and Agent-to-Registry communication.
   - Backed by ASGI frameworks:
     - `Starlette` + `httpx` + `uvicorn` (lightweight default backend).
     - `FastAPI` + `pydantic` + `uvicorn` (with optional request validation).
   - Great default choice for web‑based agents, simple deployments, and interoperable APIs.
 
-- **WebSocketAgentTransport**
+- **WebSocketTransport**
   - Uses WebSocket for streaming requests and responses.
   - Built on top of libraries like `websockets` (and `httpx` for HTTP parts where applicable).
   - Useful for real‑time, bidirectional communication or token‑level streaming.
 
-- **RuntimeAgentTransport**
+- **RuntimeTransport**
   - Simple **in‑process, in‑memory transport**.
   - Allows multiple agents to communicate within the same Python process.
-  - Ideal for local development, testing, and tightly‑coupled agent systems.
-
-### Agent-to-Registry Transports
-
-- **HTTPRegistryTransport**
-  - Uses HTTP/HTTPS for registry operations (registration, discovery, heartbeat).
-  - Backed by ASGI frameworks similar to `HTTPAgentTransport`.
-  - Handles registry-specific endpoints and protocols.
+  - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
 
 ### Planned Transports
 
-- **JSONRPCAgentTransport** (TBD)
+- **JSONRPCTransport** (TBD)
   - Planned JSON‑RPC based transport for agents.
   - Intended for structured, RPC‑style interactions.
 
-- **GRPCAgentTransport** (TBD)
+- **GRPCTransport** (TBD)
   - Planned gRPC transport for agents.
   - Intended for high‑performance, strongly‑typed communication.
 
@@ -68,36 +50,35 @@ This separation ensures clean boundaries and allows different transports to be o
 
 Some rough guidelines:
 
-- Use **RuntimeAgentTransport** for local experiments, tests, or when all agents live in the same process.
-- Use **HTTPAgentTransport** when you want a simple, interoperable API surface (e.g. calling agents from other services or frontends).
-- Use **WebSocketAgentTransport** when you need streaming and interactive sessions.
-- Use **HTTPRegistryTransport** for registry communication (the primary choice currently).
-- Plan for **JSONRPCAgentTransport** or **GRPCAgentTransport** if you need stricter schemas or higher performance across services.
+- Use **RuntimeTransport** for local experiments, tests, or when all agents live in the same process.
+- Use **HTTPTransport** when you want a simple, interoperable API surface (e.g. calling agents from other services or frontends) and for communicating with the Registry.
+- Use **WebSocketTransport** when you need streaming and interactive sessions.
+- Plan for **JSONRPCTransport** or **GRPCTransport** if you need stricter schemas or higher performance across services.
 
 The rest of this page dives into the API of each transport in more detail.
 
 ---
 
-## HTTPAgentTransport
+## HTTPTransport
 
-`HTTPAgentTransport` is the main network transport for **agent-to-agent** communication in Protolink. It exposes a simple JSON HTTP API compatible with the rest of the framework.
+`HTTPTransport` is the main network transport for communication in Protolink. It handles both Agent-to-Agent JSON HTTP APIs and Registry operations.
 
 ### Overview
 
 - **Client side**
-  - Uses `httpx.AsyncClient` to send JSON requests to other agents.
-  - Implements the generic `send` method to dispatch requests defined by `ClientEndpoint`.
+  - Uses `httpx.AsyncClient` to send JSON requests to other agents or registries.
+  - Implements the generic `send` method to dispatch requests defined by `ClientRequestSpec`.
 
 - **Server side**
-  - Uses an ASGI app (Starlette or FastAPI) to expose:
+  - Uses an ASGI app (Starlette or FastAPI) to expose endpoints like:
     - `POST /tasks/` — submit a `Task` to the agent.
-    - `GET /.well-known/agent.json` — served by the agent itself, not the transport, but typically used together.
+    - `GET /.well-known/agent.json` — agent metadata.
+    - Registry endpoints (if acting as a registry).
   - Uses a backend implementation of `BackendInterface` to manage the ASGI app and `uvicorn` server.
-
 
 ### Backend Architecture
 
-`HTTPAgentTransport` separates the network transport logic from the underlying server implementation using the `BackendInterface`.
+`HTTPTransport` separates the network transport logic from the underlying server implementation using the `BackendInterface`.
 
 ```python
 class BackendInterface(ABC):
@@ -120,27 +101,27 @@ This interface is implemented by two backends located in `protolink/transport/ba
     - When `validate_schema=True` is passed to the transport, incoming requests are checked against Pydantic models before processing.
 
 
-Backend and validation are selected via the `HTTPAgentTransport` constructor:
+Backend and validation are selected via the `HTTPTransport` constructor:
 
 ```python
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 
 # Starlette backend (default)
-transport = HTTPAgentTransport()
+transport = HTTPTransport()
 
 # Explicit Starlette backend
-transport = HTTPAgentTransport(backend="starlette")
+transport = HTTPTransport(backend="starlette")
 
 # FastAPI backend without schema validation
-transport = HTTPAgentTransport(backend="fastapi", validate_schema=False)
+transport = HTTPTransport(backend="fastapi", validate_schema=False)
 
 # FastAPI backend with full schema validation
-transport = HTTPAgentTransport(backend="fastapi", validate_schema=True)
+transport = HTTPTransport(backend="fastapi", validate_schema=True)
 ```
 
 ### Wire Format
 
-`HTTPAgentTransport` sends and receives JSON payloads that match the core models' `to_dict()` methods. A typical `Task` request body looks like this:
+`HTTPTransport` sends and receives JSON payloads that match the core models' `to_dict()` methods. A typical `Task` request body looks like this:
 
 ```json
 {
@@ -233,7 +214,7 @@ The tables below document each object type.
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard, Task, Message
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 
 
 class EchoAgent(Agent):
@@ -244,7 +225,7 @@ class EchoAgent(Agent):
             description="Echoes back the last user message", 
             url=url,
         )
-        transport = HTTPAgentTransport(url=url)
+        transport = HTTPTransport(url=url)
         super().__init__(card, transport=transport)
 
     async def handle_task(self, task: Task) -> Task:
@@ -260,7 +241,7 @@ Then run the agent and call it from another agent or client using `send_task_to`
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard, Task, Message
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 
 
 # Agent that calls other agents
@@ -268,7 +249,7 @@ class CallerAgent(Agent):
     def __init__(self, target_url: str) -> None:
         url = "http://localhost:8021"
         card = AgentCard(name="caller", description="Calls other agents", url=url)
-        transport = HTTPAgentTransport(url=url)
+        transport = HTTPTransport(url=url)
         super().__init__(card, transport=transport)
         self.target_url = target_url
 
@@ -284,9 +265,9 @@ async def call_remote(url: str) -> None:
     print("Response:", result.messages[-1].parts[0].content)
 ```
 
-### HTTPAgentTransport API Reference
+### HTTPTransport API Reference
 
-The most important public methods on `HTTPAgentTransport` are summarized below.
+The most important public methods on `HTTPTransport` are summarized below.
 
 #### Constructor & lifecycle
 
@@ -301,7 +282,7 @@ The most important public methods on `HTTPAgentTransport` are summarized below.
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `on_task_received` | `handler: Callable[[Task], Awaitable[Task]]` | `None` | Register the callback that will handle incoming tasks on `POST /tasks/`. This must be set before `start()` when running as a server. |
-| `send` | `endpoint: ClientEndpoint`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Awaitable[Any]` | Send a generic request to the agent. This is the low-level primitive used by `AgentClient`. |
+| `send` | `request_spec: ClientRequestSpec`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Awaitable[Any]` | Send a generic request to the agent. This is the low-level primitive used by `AgentClient`. |
 
 #### Auth & utilities
 
@@ -313,52 +294,9 @@ The most important public methods on `HTTPAgentTransport` are summarized below.
 
 ---
 
-## HTTPRegistryTransport
+## RuntimeTransport
 
-`HTTPRegistryTransport` is the main network transport for **agent-to-registry** communication in Protolink. It handles registry operations like agent registration, discovery, and heartbeat.
-
-### Overview
-
-- **Client side**
-  - Uses `httpx.AsyncClient` to communicate with the registry server.
-  - Provides helpers for registration, discovery, and heartbeat operations.
-
-- **Server side**
-  - Uses an ASGI app (Starlette or FastAPI) to expose registry endpoints:
-    - `POST /agents/` — register an agent
-    - `GET /agents/` — discover agents
-    - `POST /agents/{agent_id}/heartbeat` — send heartbeat
-  - Uses a backend implementation of `BackendInterface` to manage the ASGI app and `uvicorn` server.
-
-### Typical Usage
-
-```python
-from protolink.registry import Registry
-from protolink.transport import HTTPRegistryTransport
-
-# Initialize registry transport
-transport = HTTPRegistryTransport(url="http://localhost:9020")
-registry = Registry(transport)
-
-# Start the registry server
-await registry.start()
-
-# Agents can now register and discover
-```
-
-### HTTPRegistryTransport API Reference
-
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 30.0`, `backend: Literal["starlette", "fastapi"] = "starlette"` | `None` | Configure URL, request timeout, and backend implementation. |
-| `start` | `self` | `Awaitable[None]` | Start the registry server with the selected backend. |
-| `stop` | `self` | `Awaitable[None]` | Stop the registry server and clean up resources. |
-
----
-
-## RuntimeAgentTransport
-
-`RuntimeAgentTransport` is an in‑process, in‑memory transport used primarily for tests, local experimentation, and tightly‑coupled multi‑agent systems.
+`RuntimeTransport` is an in‑process, in‑memory transport used primarily for tests, local experimentation, and tightly‑coupled multi‑agent systems.
 
 Characteristics:
 
@@ -366,67 +304,32 @@ Characteristics:
 - Multiple agents share the same runtime transport instance.
 - Ideal for composition and unit tests (see `tests/test_agent.py`).
 
-### RuntimeAgentTransport API
+### RuntimeTransport API
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `__init__` | `...` | `None` | Create an in‑memory transport registry for agents that live in the same Python process. |
 | `register` | `agent` | `None` | Add an agent to the runtime transport so it can receive tasks from others. |
 | `unregister` | `agent` | `None` | Remove an agent from the runtime transport. |
-| `send` | `endpoint: ClientEndpoint`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Any \| Awaitable[Any]` | Dispatch a generic request to another agent registered on the same runtime transport instance. |
+| `send` | `request_spec: ClientRequestSpec`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Any \| Awaitable[Any]` | Dispatch a generic request to another agent registered on the same runtime transport instance. |
 | `start` / `stop` | `self` | `None` | Often no‑op or light‑weight setup/teardown. Provided for a consistent lifecycle API with other transports. |
 
 ---
 
-## WebSocketAgentTransport
+## WebSocketTransport
 
-`WebSocketAgentTransport` (when available) provides streaming, bidirectional communication between agents or between agents and external clients.
+`WebSocketTransport` (when available) provides streaming, bidirectional communication between agents or between agents and external clients.
 
 Use it when:
 
 - You need token‑level or chunk‑level streaming.
 - You want long‑lived interactive sessions (chat UIs, dashboards, tools that stream output).
 
-### WebSocketAgentTransport API
+### WebSocketTransport API
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `__init__` | `...` | `None` | Configure host/port and WebSocket settings for streaming connections. |
 | `send_task_stream` | `...` | `AsyncIterator[Task] \| AsyncIterator[Message]` | Send a `Task` and receive a stream of partial results or updates over a single WebSocket connection. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
-
----
-
-## Planned Transports
-
-These transports are **not implemented yet** in the core library. The sections below describe the *intended* design so you can plan ahead, but there is currently no public API to import.
-
-> **Status:** Design sketches only. Do not rely on these in production code.
-
-### JSONRPCAgentTransport (planned)
-
-- JSON‑RPC 2.0 style envelope for structured requests and responses.
-- Strong separation of methods, params, and results.
-- Natural fit for RPC‑style integrations.
-
-#### JSONRPCAgentTransport design
-
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `send_request` | `method: str`, `params: dict` | `Awaitable[dict]` | (Planned) Send a JSON‑RPC request and return the decoded result payload. |
-| `notify` | `method: str`, `params: dict` | `Awaitable[None]` | (Planned) Fire‑and‑forget notification without a response. |
-| `start` / `stop` | `self` | `Awaitable[None]` | (Planned) Start/stop the JSON‑RPC server. |
-
-### GRPCAgentTransport (planned)
-
-- gRPC‑based transport with protobuf definitions for tasks and messages.
-- High‑performance, strongly‑typed, streaming‑friendly.
-
-#### GRPCAgentTransport design
-
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `send_task` | `...` | `Awaitable[...]` | (Planned) Unary RPC for sending tasks. |
-| `send_task_stream` | `...` | `AsyncIterator[...]` | (Planned) Streaming RPC for long‑running tasks and progress updates. |
-| `start` / `stop` | `self` | `Awaitable[None]` | (Planned) Start/stop the gRPC server. |
 

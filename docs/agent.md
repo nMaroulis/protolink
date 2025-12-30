@@ -33,7 +33,7 @@ Example:
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 from protolink.llms.api import OpenAILLM
 
 # Agent card can be an AgentCard object or a dict for simplicity, both are handled the same way.
@@ -50,7 +50,7 @@ card_dict = {
     "url": "http://localhost:8000"
 }
 
-transport = HTTPAgentTransport()
+transport = HTTPTransport()
 llm = OpenAILLM(model="gpt-5.2")
 
 # Both approaches work
@@ -73,8 +73,8 @@ Agents communicate over a chosen transport.
 
 Common patterns:
 
-- **RuntimeAgentTransport**: multiple agents in the same process share an in‑memory transport, which is ideal for local testing and composition.
-- **HTTPAgentTransport / WebSocketAgentTransport**: agents expose HTTP or WebSocket endpoints so that other agents (or external clients) can send requests.
+- **RuntimeTransport**: multiple agents in the same process share an in‑memory transport, which is ideal for local testing and composition.
+- **HTTPTransport / WebSocketTransport**: agents expose HTTP or WebSocket endpoints so that other agents (or external clients) can send requests.
 - **gRPC / JSON‑RPC (planned)**: additional transports for more structured or high‑performance communication.
 
 From the framework’s perspective, all of these are implementations of the same transport interface, so you can swap them with minimal code changes.
@@ -93,21 +93,21 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `transport` | `AgentTransport \| None` | `None` | Optional transport for communication. If not provided, you must set one later via `set_transport()`. |
-| `registry` | `Registry \| RegistryClient \| str \| None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string (defaults to HTTPRegistryTransport). |
+| `transport` | `Transport \| str \| None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via `set_transport()`. |
+| `registry` | `Registry \| RegistryClient \| str \| None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string (defaults to HTTPTransport). |
 | `llm` | `LLM \| None` | `None` | Optional language model instance for the agent to use. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 from protolink.llms.api import OpenAILLM
 
 url = "http://localhost:8020"
 card = AgentCard(name="my_agent", description="Example agent", url=url)
 llm = OpenAILLM(model="gpt-4")
-transport = HTTPAgentTransport(url=url)
+transport = HTTPTransport(url=url)
 
 agent = Agent(card=card, transport=transport, llm=llm)
 ```
@@ -129,7 +129,7 @@ These methods control the agent's server component lifecycle.
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `set_transport()` | `transport: Transport` | `None` | Sets or updates the transport used by this agent. |
-| `client` (property) | — | `AgentClient` | Returns the client instance for sending requests to other agents. |
+| `client` (property) | — | `AgentClient \| None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
 | `server` (property) | — | `AgentServer \| None` | Returns the server instance if one is available via the transport. |
 
 #### Agent Transport Layers
@@ -143,7 +143,7 @@ These methods control the agent's server component lifecycle.
 
 e.g.
 
-`Agent.handle_task() -> AgentServer.set_task_handler() -> AgentTransport.on_task_received() -> Backend route calls transport._task_handler()`
+`Agent.handle_task() -> AgentServer.set_task_handler() -> Transport.on_task_received() -> Backend route calls transport._task_handler()`
 
 
 ## Task and Message Handling

@@ -1,7 +1,8 @@
 from typing import Any
 
+from protolink.client.request_spec import ClientRequestSpec
 from protolink.models import AgentCard
-from protolink.transport import RegistryTransport
+from protolink.transport import Transport
 
 # ----------------------------------------------------------------------
 # Agent-to-Registry Communication
@@ -9,14 +10,47 @@ from protolink.transport import RegistryTransport
 
 
 class RegistryClient:
-    def __init__(self, transport: RegistryTransport):
+    REGISTER_REQUEST = ClientRequestSpec(
+        name="register",
+        path="/agents/",
+        method="POST",
+        request_source="body",
+    )
+
+    UNREGISTER_REQUEST = ClientRequestSpec(
+        name="unregister",
+        path="/agents/",
+        method="DELETE",
+        request_source="body",
+    )
+
+    DISCOVER_REQUEST = ClientRequestSpec(
+        name="discover",
+        path="/agents/",
+        method="GET",
+        request_source="none",
+    )
+
+    def __init__(self, transport: Transport):
         self.transport = transport
 
     async def register(self, card: AgentCard) -> None:
-        await self.transport.register(card)
+        """Register an agent to the registry.
+
+        Args:
+            card: AgentCard to register
+
+        Raises:
+            ConnectionError: If registry is not reachable
+            RuntimeError: If registration fails for other reasons
+        """
+        await self.transport.send(request_spec=self.REGISTER_REQUEST, base_url=self.transport.url, data=card.to_json())
 
     async def unregister(self, agent_url: str) -> None:
-        await self.transport.unregister(agent_url)
+        await self.transport.send(request_spec=self.UNREGISTER_REQUEST, base_url=self.transport.url, data=agent_url)
 
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
-        return await self.transport.discover(filter_by)
+        response = await self.transport.send(
+            request_spec=self.DISCOVER_REQUEST, base_url=self.transport.url, data=filter_by
+        )
+        return [AgentCard.from_json(c) for c in response]

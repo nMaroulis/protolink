@@ -3,7 +3,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from protolink.models import AgentCard, ClientRequestSpec, Message, Task
-from protolink.transport.agent.base import AgentTransport
+from protolink.transport.base import Transport
 from protolink.types import TransportType
 
 
@@ -14,7 +14,7 @@ class AgentProtocol(Protocol):
     card: AgentCard
 
 
-class RuntimeAgentTransport(AgentTransport):
+class RuntimeTransport(Transport):
     """In-memory transport for local agent communication.
 
     Agents communicate directly without network overhead.

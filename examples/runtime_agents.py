@@ -6,13 +6,13 @@ import asyncio
 
 from protolink.agents import Agent
 from protolink.models import AgentCard, Message, Task
-from protolink.transport import RuntimeAgentTransport
+from protolink.transport import RuntimeTransport
 
 
 class FriendlyAgent(Agent):
     """Simple agent that processes runtime transport tasks."""
 
-    def __init__(self, name: str, description: str, transport: RuntimeAgentTransport):
+    def __init__(self, name: str, description: str, transport: RuntimeTransport):
         card = AgentCard(name=name, description=description, url=f"local://{name}")
         super().__init__(card)
         self.set_transport(transport)
@@ -26,7 +26,7 @@ class FriendlyAgent(Agent):
 async def main() -> None:
     """Demonstrate two agents talking over in-memory runtime transport."""
 
-    transport = RuntimeAgentTransport()
+    transport = RuntimeTransport()
     alice = FriendlyAgent("alice", "Greets everyone", transport)
     bob = FriendlyAgent("bob", "Echoes whatever it receives", transport)
 

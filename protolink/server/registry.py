@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 from protolink.models import AgentCard
 from protolink.server.endpoint_handler import EndpointSpec
-from protolink.transport import RegistryTransport
+from protolink.transport import Transport
 
 
 class RegistryInterface(Protocol):
@@ -32,7 +32,7 @@ class RegistryInterface(Protocol):
 class RegistryServer:
     """Thin wrapper that wires a task handler into a transport."""
 
-    def __init__(self, registry: RegistryInterface, transport: RegistryTransport) -> None:
+    def __init__(self, registry: RegistryInterface, transport: Transport) -> None:
         if transport is None:
             raise ValueError("RegistryServer requires a transport instance")
 
@@ -79,7 +79,7 @@ class RegistryServer:
                     path="/agents/",
                     method="DELETE",
                     handler=self._registry.handle_unregister,
-                    request_source="query_params",
+                    request_source="body",
                     request_parser=self.unregister_parser,
                 ),
                 EndpointSpec(

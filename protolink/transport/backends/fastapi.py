@@ -65,15 +65,8 @@ class FastAPIBackend(BackendInterface):
             if ep.content_type == "html":
                 return HTMLResponse(content=result)
 
-            # Auto-serialize models or objects
-            if hasattr(result, "to_dict"):
-                result = result.to_dict()
-            elif hasattr(result, "model_dump"):
-                result = result.model_dump()
-            elif isinstance(result, list):
-                result = [item.model_dump() for item in result]
-
-            return JSONResponse(content=result)
+            serialized_result = self._serialize_result(result)
+            return JSONResponse(content=serialized_result)
 
         self.app.add_api_route(
             ep.path,
@@ -119,3 +112,20 @@ class FastAPIBackend(BackendInterface):
             finally:
                 self._server_task = None
                 self._server_instance = None
+
+    # ----------------------------------------------------------------------
+    # Utilities
+    # ----------------------------------------------------------------------
+
+    def _serialize_result(self, result):
+        """Auto-serialize models or objects."""
+        if hasattr(result, "to_json"):
+            return result.to_json()
+        elif hasattr(result, "to_dict"):
+            return result.to_dict()
+        elif hasattr(result, "model_dump"):
+            return result.model_dump()
+        elif isinstance(result, list):
+            return [self._serialize_result(item) for item in result]
+        else:
+            return result

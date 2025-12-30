@@ -16,7 +16,8 @@ from protolink.llms.base import LLM
 from protolink.models import AgentCard, AgentSkill, Message, Task
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
-from protolink.transport import AgentTransport, HTTPRegistryTransport
+from protolink.transport import HTTPTransport, Transport, get_transport
+from protolink.types import TransportType
 from protolink.utils.logging import get_logger
 from protolink.utils.renderers import to_status_html
 
@@ -33,8 +34,9 @@ class Agent:
     def __init__(
         self,
         card: AgentCard | dict[str, Any],
-        transport: AgentTransport | None = None,
-        registry: Registry | RegistryClient | str | None = None,
+        transport: TransportType | Transport | None = None,
+        registry: TransportType | Registry | RegistryClient | None = None,
+        registry_url: str | None = None,
         llm: LLM | None = None,
         skills: Literal["auto", "fixed"] = "auto",
     ):
@@ -46,7 +48,7 @@ class Agent:
             transport: Transport layer for client/server communication
             registry: Optional registry for agent discovery. The Agent uses the RegistryClient to communicate with the
                 Registry. If a Registry class is passed, its RegistryClient will be extracted. If a string is passed, it
-                will be used as the registry URL. (default HTTPRegistryTransport)
+                will be used as the registry URL. (default HTTPTransport)
             skills: Skills mode - "auto" to automatically detect and add skills, "fixed" to use only the skills defined
             by the user in the AgentCard.
         """
@@ -64,8 +66,8 @@ class Agent:
             if isinstance(registry, Registry):
                 self.registry_client = registry.get_client()
             elif isinstance(registry, str):
-                # defaults to HTTPRegistryTransport
-                self.registry_client = RegistryClient(transport=HTTPRegistryTransport(url=registry))
+                # defaults to HTTPTransport
+                self.registry_client = RegistryClient(transport=HTTPTransport(url=registry))
             elif isinstance(registry, RegistryClient):
                 self.registry_client = registry
             else:
@@ -77,14 +79,21 @@ class Agent:
             logger.warning(
                 "No transport provided, agent will not be able to receive tasks. Call set_transport() to configure."
             )
-        else:
-            self._client = AgentClient(transport=transport)
-            # Exposes AgentProtocol to Server
-            self._server = AgentServer(transport, self)
-            self._server.validate_agent_url(self.card.url)
+        elif isinstance(transport, str):
+            transport = get_transport(transport, url=self.card.url)
+        elif isinstance(transport, Transport):
             # Transport and AgentCard URL must match.
             if getattr(transport, "url", None) != self.card.url:
                 raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
+            transport = transport
+        else:
+            raise ValueError("Invalid transport type")
+
+        if transport:
+            # Initialize Agent-to-Agent Client
+            self._client = AgentClient(transport=transport)
+            # Exposes AgentProtocol to Server
+            self._server = AgentServer(transport=transport, agent=self)
 
         # LLM Validation
         if self.llm is not None:
@@ -158,6 +167,7 @@ class Agent:
     # ----------------------------------------------------------------------
     # Message & Task handling - A2A Server Operations
     # ----------------------------------------------------------------------
+
     async def handle_task(self, task: Task) -> Task:
         """Process a task and return the result.
 
@@ -436,7 +446,7 @@ class Agent:
         """
         return to_status_html(agent=self.card, start_time=self.start_time)
 
-    def set_transport(self, transport: AgentTransport | None) -> None:
+    def set_transport(self, transport: Transport | None) -> None:
         """Set the transport layer for this agent.
 
         Args:
@@ -444,8 +454,8 @@ class Agent:
         """
         if transport is None:
             raise ValueError("transport must not be None")
-        if not isinstance(transport, AgentTransport):
-            raise TypeError("transport must be an instance of AgentTransport")
+        if not isinstance(transport, Transport):
+            raise TypeError("transport must be an instance of Transport")
 
         self._client = AgentClient(transport=transport)
         self._server = AgentServer(transport, self)
