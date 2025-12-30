@@ -543,7 +543,7 @@ Protolink is inspired by Google’s **A2A (Agent-to-Agent)** concepts, but adds 
 
 4. **Protocol-Agnostic Transport**  
    - Protolink agents never handle HTTP, WS, or serialization directly.  
-   - All networking is delegated to `AgentTransport` or `RegistryTransport`.
+   - All networking is delegated to `Transport`.
 
 5. **Extensibility with Tools and Skills**  
    - Developers can define custom tools, attach LLMs, or integrate external APIs without touching transport logic.  

@@ -16,7 +16,7 @@ from protolink.llms.base import LLM
 from protolink.models import AgentCard, AgentSkill, Message, Task
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
-from protolink.transport import HTTPTransport, Transport, get_transport
+from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
 from protolink.utils.logging import get_logger
 from protolink.utils.renderers import to_status_html
@@ -60,40 +60,24 @@ class Agent:
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
 
-        # Initilize Registry Client
-        self.registry_client: RegistryClient | None = None
-        if registry:
-            if isinstance(registry, Registry):
-                self.registry_client = registry.get_client()
-            elif isinstance(registry, str):
-                # defaults to HTTPTransport
-                self.registry_client = RegistryClient(transport=HTTPTransport(url=registry))
-            elif isinstance(registry, RegistryClient):
-                self.registry_client = registry
-            else:
-                raise ValueError("Invalid registry type")
-
         # Initialize client and server components
         if transport is None:
             self._client, self._server = None, None
             logger.warning(
                 "No transport provided, agent will not be able to receive tasks. Call set_transport() to configure."
             )
-        elif isinstance(transport, str):
-            transport = get_transport(transport, url=self.card.url)
-        elif isinstance(transport, Transport):
-            # Transport and AgentCard URL must match.
-            if getattr(transport, "url", None) != self.card.url:
-                raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
-            transport = transport
         else:
-            raise ValueError("Invalid transport type")
+            self.set_transport(transport)
 
-        if transport:
-            # Initialize Agent-to-Agent Client
-            self._client = AgentClient(transport=transport)
-            # Exposes AgentProtocol to Server
-            self._server = AgentServer(transport=transport, agent=self)
+        # Initilize Registry Client
+        if not registry:
+            self.registry_client = None
+            logger.warning(
+                "No registry provided, agent will not be able to register to the registry or fetch agents.\n"
+                "Call set_registry() to configure."
+            )
+        else:
+            self.set_registry(registry, registry_url)
 
         # LLM Validation
         if self.llm is not None:
@@ -446,19 +430,60 @@ class Agent:
         """
         return to_status_html(agent=self.card, start_time=self.start_time)
 
-    def set_transport(self, transport: Transport | None) -> None:
+    def set_transport(self, transport: TransportType | Transport | None) -> None:
         """Set the transport layer for this agent.
 
         Args:
             transport: Transport instance for communication
         """
-        if transport is None:
-            raise ValueError("transport must not be None")
-        if not isinstance(transport, Transport):
-            raise TypeError("transport must be an instance of Transport")
 
+        if transport is None:
+            self._client, self._server = None, None
+            raise ValueError("transport must not be None")
+
+        if isinstance(transport, str):
+            transport = get_transport(transport, url=self.card.url)
+        elif isinstance(transport, Transport):
+            # Transport and AgentCard URL must match if transport has a URL.
+            transport_url = getattr(transport, "url", None)
+            if transport_url is not None and transport_url != self.card.url:
+                raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
+            transport = transport
+        else:
+            raise ValueError("Invalid transport type")
+
+        # Initialize Agent-to-Agent Client
         self._client = AgentClient(transport=transport)
-        self._server = AgentServer(transport, self)
+        # Exposes AgentProtocol to Server
+        self._server = AgentServer(transport=transport, agent=self)
+
+    def set_registry(
+        self, registry: TransportType | Registry | RegistryClient | None, registry_url: str | None = None
+    ) -> None:
+        """Set the registry client for this agent.
+
+        Args:
+            registry: RegistryClient instance for communication
+            registry_url: URL of the registry
+        """
+
+        if registry:
+            if isinstance(registry, Registry):
+                self.registry_client = registry.get_client()
+            elif isinstance(registry, str):
+                if registry_url is None:
+                    logger.error("registry_url cannot be None")
+                    return
+                transport = get_transport(registry, url=registry_url)
+                self.registry_client = RegistryClient(transport=transport)
+            elif isinstance(registry, RegistryClient):
+                self.registry_client = registry
+            else:
+                self.registry_client = None
+                logger.error("Invalid registry type")
+        else:
+            self.registry_client = None
+            logger.error("registry argument cannot be None")
 
     def set_llm(self, llm: LLM) -> None:
         """Sets the Agent's LLM and validates the connection."""

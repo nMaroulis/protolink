@@ -66,14 +66,14 @@ The `RegistryServer` exposes a `Registry` over a Transport.
 
 ```python
 from protolink.discovery.registry import Registry
-from protolink.transport import HTTPRegistryTransport
+from protolink.transport import HTTPTransport
 from protolink.server.registry import RegistryServer
 
 # Create Logic
 registry = Registry()
 
 # Create Transport
-transport = HTTPRegistryTransport(port=8000)
+transport = HTTPTransport(url="http://localhost:8000")
 
 # Create Server (wiring)
 server = RegistryServer(registry, transport)

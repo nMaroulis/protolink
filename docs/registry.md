@@ -152,7 +152,7 @@ It relies on a Transport implementation to expose its API.
 
 Currently supported:
 
-- HTTPRegistryTransport
+- `HTTPTransport` (via `protolink.transport.HTTPTransport`)
 
 The transport is responsible for:
 
@@ -167,10 +167,10 @@ The transport is responsible for:
 The Registry is started via its transport
 
 ```python
-from protolink.registry import Registry
-from protolink.transport import HTTPRegistryTransport
+from protolink.discovery.registry import Registry
+from protolink.transport import HTTPTransport
 
-transport = HTTPRegistryTransport(url="http://localhost:9020")
+transport = HTTPTransport(url="http://localhost:9020")
 registry = Registry(transport)
 
 await registry.start()
@@ -192,7 +192,7 @@ Both **Agents** and the **Registry** expose a url property.
 To avoid duplication, transports provide helpers to **derive host and port from a URL**.
 
 ```python
-transport = HTTPRegistryTransport.from_url("http://localhost:8000")
+transport = HTTPTransport(url="http://localhost:8000")
 ```
 
 This ensures consistent configuration across agents and registry instances.

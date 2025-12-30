@@ -138,13 +138,13 @@ Type alias for supported HTTP backend implementations in Protolink transports.
 
 ```python
 from protolink.types import BackendType
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 
 # Use Starlette backend (default)
-transport = HTTPAgentTransport(backend="starlette")
+transport = HTTPTransport(backend="starlette")
 
 # Use FastAPI backend for automatic validation
-transport = HTTPAgentTransport(backend="fastapi", validate_schema=True)
+transport = HTTPTransport(backend="fastapi", validate_schema=True)
 ```
 
 ---
@@ -398,7 +398,7 @@ backend: BackendType = "invalid"  # Type error!
 ### 2. **IDE Support**
 ```python
 # Autocomplete shows valid options
-transport = HTTPAgentTransport(backend="")  # IDE shows: "starlette" | "fastapi"
+transport = HTTPTransport(backend="")  # IDE shows: "starlette" | "fastapi"
 ```
 
 ### 3. **Documentation**
@@ -419,7 +419,7 @@ BackendType = Literal["starlette", "fastapi", "new_backend"]
 # Same type used across multiple modules
 from protolink.types import MimeType
 from protolink.models import AgentCard
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 ```
 
 ---

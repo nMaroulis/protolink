@@ -39,10 +39,10 @@ First, run the [`registry.ipynb`](registry.ipynb) notebook to start the registry
 
 ```python
 from protolink.discovery import Registry
-from protolink.transport import HTTPRegistryTransport
+from protolink.transport import HTTPTransport
 
 REGISTRY_URL = "http://localhost:9000"
-transport = HTTPRegistryTransport(url=REGISTRY_URL)
+transport = HTTPTransport(url=REGISTRY_URL)
 registry = Registry(transport=transport)
 await registry.start()
 ```
@@ -60,7 +60,7 @@ Run the [`weather_agent.ipynb`](weather_agent.ipynb) notebook:
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPAgentTransport
+from protolink.transport import HTTPTransport
 
 URL = "http://localhost:8010"
 REGISTRY_URL = "http://localhost:9000"
@@ -70,7 +70,7 @@ class WeatherAgent(Agent):
         result = await self.call_tool("get_weather", city="Geneva")
         return task.complete(f"Weather data: {result}")
 
-transport = HTTPAgentTransport(url=URL)
+transport = HTTPTransport(url=URL)
 card = AgentCard(url=URL, name="WeatherAgent", description="Produces weather data")
 agent = WeatherAgent(card=card, transport=transport, registry=REGISTRY_URL)
 
@@ -88,7 +88,7 @@ Run the [`alert_agent.ipynb`](alert_agent.ipynb) notebook:
 ```python
 from protolink.agents import Agent
 from protolink.models import Message, Task
-from protolink.transport import HTTPAgentTransport, HTTPRegistryTransport
+from protolink.transport import HTTPTransport
 
 URL = "http://localhost:8020"
 REGISTRY_URL = "http://localhost:9000"
@@ -100,10 +100,10 @@ class AlertAgent(Agent):
             await self.call_tool("alert_tool", message=f"Hot weather in {data['city']}! {data['temperature']}°C")
         return task
 
-transport = HTTPAgentTransport(url=URL)
-registry = HTTPRegistryTransport(url=REGISTRY_URL)
+transport = HTTPTransport(url=URL)
+# Registry client will automatically be created using HTTPTransport if registry=url_string
 card = {"url": URL, "name": "AlertAgent", "description": "Sends alerts based on data"}
-agent = AlertAgent(card=card, transport=transport, registry=registry)
+agent = AlertAgent(card=card, transport=transport, registry=REGISTRY_URL)
 
 @agent.tool(name="alert_tool", description="Send an alert")
 async def send_alert(message: str):
@@ -117,11 +117,11 @@ await agent.start(register=True)
 
 ### Registry
 - **Purpose**: Central service for agent discovery and registration
-- **Transport**: Uses HTTPRegistryTransport for REST API communication
+- **Transport**: Uses HTTPTransport for REST API communication
 - **Endpoints**: Provides agent management and status endpoints
 
 ### Agents
-- **Transport**: Both agents use HTTPAgentTransport for agent-to-agent communication
+- **Transport**: Both agents use HTTPTransport for agent-to-agent communication
 - **Registration**: Agents automatically register with the registry on startup
 - **Tools**: Agents can define native tools using the `@tool` decorator
 - **Task Handling**: Agents implement `handle_task` to process incoming tasks

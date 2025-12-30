@@ -74,11 +74,11 @@ Configuration depends on the specific backend, but the general pattern is:
    ```python
    from protolink.agents import Agent
    from protolink.models import AgentCard
-   from protolink.transport import HTTPAgentTransport
+   from protolink.transport import HTTPTransport
 
    url = "http://localhost:8020"
    agent_card = AgentCard(name="llm_agent", description="Agent backed by an LLM", url=url)
-   transport = HTTPAgentTransport(url=url)
+   transport = HTTPTransport(url=url)
 
    agent = Agent(agent_card, transport, llm)
    ```

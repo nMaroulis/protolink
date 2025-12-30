@@ -75,9 +75,20 @@ Common patterns:
 
 - **RuntimeTransport**: multiple agents in the same process share an in‑memory transport, which is ideal for local testing and composition.
 - **HTTPTransport / WebSocketTransport**: agents expose HTTP or WebSocket endpoints so that other agents (or external clients) can send requests.
-- **gRPC / JSON‑RPC (planned)**: additional transports for more structured or high‑performance communication.
 
-From the framework’s perspective, all of these are implementations of the same transport interface, so you can swap them with minimal code changes.
+#### Agent Transport Layers
+
+| Layer          | Responsibility                                 |
+| -------------- | ---------------------------------------------- |
+| Agent          | Domain logic (what to do with a Task)          |
+| AgentServer    | Wiring & lifecycle (server orchestration)      |
+| Transport      | Protocol abstraction (HTTP vs WS vs gRPC)      |
+| Backend        | Framework-specific routing (Starlette/FastAPI) |
+
+e.g.
+
+`Agent.handle_task() -> AgentServer.set_task_handler() -> Transport.setup_routes() -> Backend creates route`
+
 
 ---
 
@@ -131,20 +142,6 @@ These methods control the agent's server component lifecycle.
 | `set_transport()` | `transport: Transport` | `None` | Sets or updates the transport used by this agent. |
 | `client` (property) | — | `AgentClient \| None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
 | `server` (property) | — | `AgentServer \| None` | Returns the server instance if one is available via the transport. |
-
-#### Agent Transport Layers
-
-| Layer          | Responsibility                                 |
-| -------------- | ---------------------------------------------- |
-| Agent          | Domain logic (what to do with a Task)          |
-| AgentServer    | Wiring & lifecycle (server orchestration)      |
-| AgentTransport | Protocol abstraction (HTTP vs WS vs gRPC)      |
-| Backend        | Framework-specific routing (Starlette/FastAPI) |
-
-e.g.
-
-`Agent.handle_task() -> AgentServer.set_task_handler() -> Transport.on_task_received() -> Backend route calls transport._task_handler()`
-
 
 ## Task and Message Handling
 

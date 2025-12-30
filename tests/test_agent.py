@@ -129,7 +129,7 @@ class TestAgent:
 
     def test_set_transport(self, agent):
         """Test setting the transport."""
-        transport = DummyTransport()
+        transport = DummyTransport(url=agent.card.url)
         agent.set_transport(transport)
         assert agent.client is not None
         assert agent.server is not None
@@ -138,7 +138,7 @@ class TestAgent:
     async def test_send_task_to(self, agent):
         """Test sending a task to another agent."""
         # Create an AsyncMock for the transport
-        transport = DummyTransport()
+        transport = DummyTransport(url=agent.card.url)
         transport.send = AsyncMock(return_value=Task.create(Message.agent("Response")))
         agent.set_transport(transport)
 
@@ -160,7 +160,7 @@ class TestAgent:
     @pytest.mark.asyncio
     async def test_send_message_to(self, agent):
         """Test sending a message to another agent."""
-        transport = DummyTransport()
+        transport = DummyTransport(url=agent.card.url)
         # The transport should return a Task when send_task is called (which send_message uses)
         transport.send = AsyncMock(return_value=Task.create(Message.agent("Response message")))
         agent.set_transport(transport)
@@ -187,18 +187,19 @@ class TestAgent:
         """Test agent initialization with registry URL string."""
         with (
             patch("protolink.agents.base.RegistryClient") as mock_client_class,
-            patch("protolink.agents.base.HTTPTransport") as mock_transport,
+            patch("protolink.agents.base.get_transport") as mock_get_transport,
         ):
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance
             mock_transport_instance = MagicMock()
-            mock_transport.return_value = mock_transport_instance
+            mock_get_transport.return_value = mock_transport_instance
 
-            agent = Agent(agent_card, registry="http://registry.local")
+            # Pass both registry (transport type) and registry_url
+            agent = Agent(agent_card, registry="http", registry_url="http://registry.local")
 
             assert agent.registry_client is not None
             mock_client_class.assert_called_once_with(transport=mock_transport_instance)
-            mock_transport.assert_called_once_with(url="http://registry.local")
+            mock_get_transport.assert_called_once_with("http", url="http://registry.local")
 
     def test_agent_with_registry_instance(self, agent_card):
         """Test agent initialization with Registry instance."""
@@ -218,8 +219,10 @@ class TestAgent:
 
     def test_agent_with_invalid_registry(self, agent_card):
         """Test agent initialization with invalid registry type."""
-        with pytest.raises(ValueError, match="Invalid registry type"):
-            Agent(agent_card, registry=123)
+        # Invalid registry type logs an error but doesn't raise an exception
+        agent = Agent(agent_card, registry=123)
+        # registry_client should be None when invalid type is provided
+        assert agent.registry_client is None
 
     def test_agent_skills_auto_mode(self, agent_card):
         """Test agent with auto skills detection."""
@@ -350,7 +353,7 @@ class TestAgent:
         with pytest.raises(ValueError, match="transport must not be None"):
             agent.set_transport(None)
 
-        with pytest.raises(TypeError, match="transport must be an instance of Transport"):
+        with pytest.raises(ValueError, match="Unknown transport name: invalid"):
             agent.set_transport("invalid")
 
     def test_agent_repr(self, agent):

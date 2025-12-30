@@ -146,21 +146,24 @@ from protolink.agents import Agent
 from protolink.models import AgentCard
 from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
+from protolink.discovery import Registry
 
-agent_url = "http://127.0.0.1:8020"
+# Initialize Registry for A2A Discovery
+registry = Registry(url="http://127.0.0.1:9000", transport="http")
+await registry.start()
 
 # Define the agent card
 agent_card = AgentCard(
     name="example_agent",
     description="A dummy agent",
-    url=agent_url,
+    url="http://127.0.0.1:8020",
 )
 
 # OpenAI API LLM
 llm = OpenAILLM(model="gpt-5.2")
 
 # Initialize the agent
-agent = Agent(agent_card, "http", llm)
+agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
 
 # Add Native tool
 @agent.tool(name="add", description="Add two numbers")
@@ -173,7 +176,7 @@ agent.add_tool(mcp_tool)
 
 
 # Start the agent
-agent.start()
+await agent.start()
 ```
 
 Once the Agent has been initiated, it automatically exposes a web interface at `/status` where it exposes the agent's information.
