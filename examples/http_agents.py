@@ -1,4 +1,4 @@
-"""HTTP transport example with two agents chatting over REST."""
+"""HTTP transport example to verify Agent Client functionality."""
 
 from __future__ import annotations
 
@@ -9,40 +9,85 @@ from protolink.models import AgentCard, Message, Task
 from protolink.transport import HTTPAgentTransport
 
 
-class FriendlyAgent(Agent):
+class EchoAgent(Agent):
     """Simple agent that replies with a templated message."""
 
     def __init__(self, name: str, description: str, port: int) -> None:
-        transport = HTTPAgentTransport(host="127.0.0.1", port=port, backend="starlette")
+        transport = HTTPAgentTransport(url=f"http://127.0.0.1:{port}", backend="starlette")
         card = AgentCard(name=name, description=description, url=f"http://127.0.0.1:{port}")
         super().__init__(card, transport=transport)
 
     async def handle_task(self, task: Task) -> Task:
         user_text = task.messages[-1].parts[0].content
-        return task.complete(f"[{self.card.name}] heard: '{user_text}'")
+        return task.complete(f"[{self.card.name}] echo: {user_text}")
 
 
 async def main() -> None:
-    """Spin up two HTTP agents and send them tasks."""
+    """Spin up agents and verify client functions."""
 
-    alice = FriendlyAgent("alice", "Greets everyone", port=8010)
-    bob = FriendlyAgent("bob", "Echoes whatever it receives", port=8011)
+    # 1. Setup Agents
+    server_port = 8020
+    client_port = 8021
 
-    await asyncio.gather(alice.start(), bob.start())
+    server_agent = EchoAgent("server_agent", "I echo messages", port=server_port)
+    client_agent = EchoAgent("client_agent", "I am the client", port=client_port)
+
+    # Start both
+    await asyncio.gather(server_agent.start(), client_agent.start())
+
+    # Wait briefly for startup
+    await asyncio.sleep(0.5)
+
+    target_url = server_agent.card.url
 
     try:
-        print("=== Alice -> Bob ===")
-        hello = Task.create(Message.user("Hi Bob, how are you?"))
-        bob_reply = await alice.send_task_to(bob.card.url, hello)
-        print(bob_reply.messages[-1].parts[0].content)
+        print(f"\nTarget Agent URL: {target_url}")
 
-        print("\n=== Bob -> Alice ===")
-        ping = Task.create(Message.user("Hey Alice, got your ping!"))
-        alice_reply = await bob.send_task_to(alice.card.url, ping)
-        print(alice_reply.messages[-1].parts[0].content)
+        # ---------------------------------------------------------
+        # Test 1: get_agent_card
+        # Accessing via _client as Agent doesn't expose it directly yet,
+        # but User asked to test client funcs from the agent.
+        # ---------------------------------------------------------
+        print("\n--- Test 1: get_agent_card ---")
+        if client_agent._client:
+            card = await client_agent._client.get_agent_card(target_url)
+            print(f"SUCCESS: Retrieved card for '{card.name}'")
+            print(f"Description: {card.description}")
+        else:
+            print("ERROR: Client agent has no transport client configured.")
 
+        # ---------------------------------------------------------
+        # Test 2: send_message (via Agent.send_message_to)
+        # ---------------------------------------------------------
+        print("\n--- Test 2: send_message_to ---")
+        msg = Message.user("Hello World")
+        response_msg = await client_agent.send_message_to(target_url, msg)
+        print(f"Sent: '{msg.parts[0].content}'")
+        print(f"Received: '{response_msg.parts[0].content}'")
+
+        assert "echo: Hello World" in response_msg.parts[0].content
+        print("SUCCESS: Message echo verified.")
+
+        # ---------------------------------------------------------
+        # Test 3: send_task (via Agent.send_task_to)
+        # ---------------------------------------------------------
+        print("\n--- Test 3: send_task_to ---")
+        task = Task.create(Message.user("Do complex task"))
+        response_task = await client_agent.send_task_to(target_url, task)
+
+        last_msg_content = response_task.messages[-1].parts[0].content
+        print(f"Sent Task ID: {task.id}")
+        print(f"Received Task Result: '{last_msg_content}'")
+
+        assert "echo: Do complex task" in last_msg_content
+        print("SUCCESS: Task echo verified.")
+
+    except Exception as e:
+        print(f"\nFAILED: {e}")
+        raise
     finally:
-        await asyncio.gather(alice.stop(), bob.stop())
+        print("\nShutting down agents...")
+        await asyncio.gather(server_agent.stop(), client_agent.stop())
 
 
 if __name__ == "__main__":

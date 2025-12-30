@@ -248,14 +248,13 @@ class Agent:
             task: Task to send
 
         Returns:
-            Task with response from target agent
+            Task with updated state and response messages
 
         Raises:
-            RuntimeError: If no transport is configured
+            RuntimeError: If agent has no transport configured
         """
         if not self._client:
-            raise RuntimeError("No transport client configured. Call set_transport() first.")
-
+            raise RuntimeError("Agent has no transport configured, cannot send tasks.")
         return await self._client.send_task(agent_url, task)
 
     async def send_message_to(self, agent_url: str, message: Message) -> Message:
@@ -266,14 +265,13 @@ class Agent:
             message: Message to send
 
         Returns:
-            Response message from target agent
+            Response message
 
         Raises:
-            RuntimeError: If no transport is configured
+            RuntimeError: If agent has no transport configured
         """
         if not self._client:
-            raise RuntimeError("No transport client configured. Call set_transport() first.")
-
+            raise RuntimeError("Agent has no transport configured, cannot send messages.")
         return await self._client.send_message(agent_url, message)
 
     # ----------------------------------------------------------------------

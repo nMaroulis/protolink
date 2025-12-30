@@ -6,10 +6,9 @@ Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
 
 from abc import abstractmethod
-from collections.abc import AsyncIterator
+from typing import Any
 
-from protolink.core.message import Message
-from protolink.core.task import Task
+from protolink.models import ClientRequestSpec
 from protolink.transport.base import Transport
 
 
@@ -17,44 +16,31 @@ class AgentTransport(Transport):
     """Abstract base class for agent transport implementations."""
 
     @abstractmethod
-    async def send_task(self, agent_url: str, task: Task) -> Task:
-        """Send a task to an agent.
+    async def send(
+        self, request_spec: ClientRequestSpec, base_url: str, data: Any = None, params: dict | None = None
+    ) -> Any:
+        """Send a generic request to an agent endpoint.
 
         Args:
-            agent_url: Target agent URL
-            task: Task to send
+            request_spec: The request specification (method, path, parser).
+            base_url: The base URL of the agent (e.g. "http://localhost:8080").
+            data: The payload to send (for body).
+            params: Query parameters (for GET requests etc).
 
         Returns:
-            Task with response
+            The parsed response.
         """
         pass
 
     @abstractmethod
-    async def send_message(self, agent_url: str, message: Message) -> Message:
-        """Send a message to an agent.
+    def validate_agent_url(self, agent_url: str) -> bool:
+        """Validate an agent URL.
 
         Args:
-            agent_url: Target agent URL
-            message: Message to send
+            agent_url: Agent URL to validate
 
         Returns:
-            Response message
-        """
-        pass
-
-    @abstractmethod
-    async def subscribe_task(self, agent_url: str, task: Task) -> AsyncIterator[dict]:
-        """Subscribe to task updates via streaming (NEW in v0.2.0).
-
-        Streams task events (status updates, artifacts, progress) as they occur.
-        Implements Server-Sent Events (SSE) for real-time updates.
-
-        Args:
-            agent_url: Target agent URL
-            task: Task to send and subscribe to
-
-        Yields:
-            Event dictionaries with updates
+            True if the URL is valid, False otherwise
         """
         pass
 
@@ -73,17 +59,5 @@ class AgentTransport(Transport):
 
         For server-side transports, this should stop listening and clean up resources.
         For client-only transports, this can be a no-op.
-        """
-        pass
-
-    @abstractmethod
-    def validate_agent_url(self, agent_url: str) -> bool:
-        """Validate an agent URL.
-
-        Args:
-            agent_url: Agent URL to validate
-
-        Returns:
-            True if the URL is valid, False otherwise
         """
         pass

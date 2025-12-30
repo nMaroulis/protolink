@@ -1,7 +1,7 @@
 """Tests for the Agent class."""
 
 import asyncio
-from typing import ClassVar
+from typing import Any, ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -28,18 +28,18 @@ class DummyTransport(AgentTransport):
     def url(self):
         return self._url
 
-    async def send_task(self, agent_url: str, task: Task) -> Task:
-        return task
-
-    async def send_message(self, agent_url: str, message: Message) -> Message:
-        return Message.agent("dummy")
-
-    async def get_agent_card(self, agent_url: str) -> AgentCard:
-        return AgentCard(name="dummy", description="dummy", url="local://dummy")
-
-    async def subscribe_task(self, agent_url: str, task: Task):
-        if False:  # pragma: no cover
-            yield {}
+    async def send(self, endpoint, base_url, data=None, params=None) -> Any:
+        # For testing, we might want to return different things based on endpoint
+        if endpoint.name == "send_task":
+            # Return the task assuming it was echo'd or similar
+            if data:
+                return data
+            return Task.create(Message.agent("dummy"))
+        elif endpoint.name == "send_message":
+            return Message.agent("dummy")
+        elif endpoint.name == "get_agent_card":
+            return AgentCard(name="dummy", description="dummy", url="local://dummy")
+        return None
 
     async def start(self) -> None:  # pragma: no cover
         pass
@@ -142,7 +142,7 @@ class TestAgent:
         """Test sending a task to another agent."""
         # Create an AsyncMock for the transport
         transport = DummyTransport()
-        transport.send_task = AsyncMock(return_value=Task.create(Message.agent("Response")))
+        transport.send = AsyncMock(return_value=Task.create(Message.agent("Response")))
         agent.set_transport(transport)
 
         # Create a test task
@@ -153,16 +153,19 @@ class TestAgent:
 
         # Verify the response and that transport was called correctly
         assert isinstance(response, Task)
-        transport.send_task.assert_awaited_once_with(
-            "http://other-agent.local",
-            task,
-        )
+        # Check that send was called. We can check arguments strictly or loosely.
+        # endpoint, base_url, data=...
+        transport.send.assert_awaited_once()
+        args, kwargs = transport.send.await_args
+        assert args[1] == "http://other-agent.local"  # base_url
+        assert kwargs["data"] == task
 
     @pytest.mark.asyncio
     async def test_send_message_to(self, agent):
         """Test sending a message to another agent."""
         transport = DummyTransport()
-        transport.send_message = AsyncMock(return_value=Message.agent("Response message"))
+        # The transport should return a Task when send_task is called (which send_message uses)
+        transport.send = AsyncMock(return_value=Task.create(Message.agent("Response message")))
         agent.set_transport(transport)
 
         message = Message.user("Test message")
@@ -170,7 +173,10 @@ class TestAgent:
 
         assert isinstance(response, Message)
         assert response.role == "agent"
-        transport.send_message.assert_awaited_once_with("http://other-agent.local", message)
+        transport.send.assert_awaited_once()
+        args, kwargs = transport.send.await_args
+        assert args[1] == "http://other-agent.local"
+        assert kwargs["data"].messages[0].parts[0].content == message.parts[0].content
 
     def test_agent_with_llm(self, agent_card):
         """Test agent initialization with LLM."""

@@ -3,7 +3,8 @@ from urllib.parse import urlparse
 
 import httpx
 
-from protolink.models import AgentCard, EndpointSpec
+from protolink.models import AgentCard
+from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport.backends.starlette import StarletteBackend
 from protolink.transport.registry.base import RegistryTransport
 from protolink.types import TransportType

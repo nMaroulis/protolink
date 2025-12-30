@@ -7,15 +7,19 @@ At its core, the Transport abstraction behaves as a **protocol adapter pattern**
 All transports implement a consistent interface:
 
 - **Ingress bridge**: Maps transport-specific events (HTTP POST, WS frames) to the internal `handle_task` implementation.
-- **Egress signaling**: Provides asynchronous primitives (`send_task`, `send_message`) to dispatch standard units of work to remote peers.
+- **Egress signaling**: Provides a generic `send` primitive to dispatch requests defined by `ClientEndpoint` specifications.
 - **Lifecycle management**: Handles the startup/shutdown sequence of underlying I/O reactors (e.g., `uvicorn` loops or connection pools).
+
+## Relationship with Client Layer
+
+The **Transport** layer is low-level and typically not used directly by application code. Instead, developers use the high-level **[Client](client.md)** layer (specifically `AgentClient`), which wraps a transport instance and provides convenient, typed methods like `send_task` and `send_message`.
 
 ## Transport Categories
 
 Protolink separates transports into two distinct categories:
 
 ### Agent Transports (`AgentTransport`)
-Handle **agent-to-agent** communication for task execution and messaging.
+Handle **agent-to-agent** communication via a single generic `send` method.
 
 ### Registry Transports (`RegistryTransport`)  
 Handle **agent-to-registry** communication for discovery and coordination.
@@ -82,7 +86,7 @@ The rest of this page dives into the API of each transport in more detail.
 
 - **Client side**
   - Uses `httpx.AsyncClient` to send JSON requests to other agents.
-  - Provides helpers to send a full `Task` or a single `Message`.
+  - Implements the generic `send` method to dispatch requests defined by `ClientEndpoint`.
 
 - **Server side**
   - Uses an ASGI app (Starlette or FastAPI) to expose:
@@ -297,9 +301,7 @@ The most important public methods on `HTTPAgentTransport` are summarized below.
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `on_task_received` | `handler: Callable[[Task], Awaitable[Task]]` | `None` | Register the callback that will handle incoming tasks on `POST /tasks/`. This must be set before `start()` when running as a server. |
-| `send_task` | `agent_url: str`, `task: Task`, `skill: str \| None = None` | `Awaitable[Task]` | Send a `Task` to `POST {agent_url}/tasks/` and return the resulting `Task` from the remote agent. The optional `skill` is passed via headers and can be used by agents to route work. |
-| `send_message` | `agent_url: str`, `message: Message` | `Awaitable[Message]` | Convenience wrapper that wraps a single `Message` in a new `Task`, calls `send_task`, and returns the last response message. Ideal for simple request/response interactions. |
-| `get_agent_card` | `agent_url: str` | `Awaitable[AgentCard]` | Fetch the remote agent's `AgentCard` description from `GET {agent_url}/.well-known/agent.json`. Useful for discovery and capability inspection. |
+| `send` | `endpoint: ClientEndpoint`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Awaitable[Any]` | Send a generic request to the agent. This is the low-level primitive used by `AgentClient`. |
 
 #### Auth & utilities
 
@@ -371,7 +373,7 @@ Characteristics:
 | `__init__` | `...` | `None` | Create an in‑memory transport registry for agents that live in the same Python process. |
 | `register` | `agent` | `None` | Add an agent to the runtime transport so it can receive tasks from others. |
 | `unregister` | `agent` | `None` | Remove an agent from the runtime transport. |
-| `send_task` | `agent_id_or_url`, `task: Task` | `Task \| Awaitable[Task]` | Dispatch a `Task` to another agent registered on the same runtime transport instance. |
+| `send` | `endpoint: ClientEndpoint`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Any \| Awaitable[Any]` | Dispatch a generic request to another agent registered on the same runtime transport instance. |
 | `start` / `stop` | `self` | `None` | Often no‑op or light‑weight setup/teardown. Provided for a consistent lifecycle API with other transports. |
 
 ---

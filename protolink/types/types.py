@@ -11,6 +11,13 @@ AgentRoleType: TypeAlias = Literal["gateway", "observer", "orchastrator", "worke
 
 BackendType: TypeAlias = Literal["starlette", "fastapi"]
 
+ContentType: TypeAlias = Literal[
+    "application/json",
+    "application/x-www-form-urlencoded",
+    "multipart/form-data",
+    "text/plain",
+]
+
 HttpAuthScheme: TypeAlias = Literal[
     "bearer",  # OAuth access token
     "basic",  # username:password

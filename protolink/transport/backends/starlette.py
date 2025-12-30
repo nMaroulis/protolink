@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Any
 
-from protolink.models import EndpointSpec
+from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport._deps import _require_starlette
 from protolink.transport.backends.base import BackendInterface
 from protolink.utils.inspect import is_async_callable
@@ -64,6 +64,14 @@ class StarletteBackend(BackendInterface):
             # -------------------------
             if ep.content_type == "html":
                 return HTMLResponse(result)
+
+            # Auto-serialize models or objects
+            if hasattr(result, "to_dict"):
+                result = result.to_dict()
+            elif hasattr(result, "model_dump"):
+                result = result.model_dump()
+            elif isinstance(result, list):
+                result = [item.model_dump() for item in result]
 
             return JSONResponse(result)
 

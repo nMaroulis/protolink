@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from protolink.models import AgentCard, EndpointSpec, Task
+from protolink.models import AgentCard, Task
+from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport import AgentTransport
 
 
@@ -57,13 +58,6 @@ class AgentServer:
         self._is_running = False
 
     # ------------------------------------------------------------------
-    # Request Parsers
-    # ------------------------------------------------------------------
-
-    async def task_parser(self, request: Any) -> Task:
-        return Task.from_dict(request)
-
-    # ------------------------------------------------------------------
     # Endpoints
     # ------------------------------------------------------------------
 
@@ -82,7 +76,7 @@ class AgentServer:
                     method="POST",
                     handler=self._agent.handle_task,
                     request_source="body",
-                    request_parser=self.task_parser,
+                    request_parser=Task.from_dict,
                 ),
                 EndpointSpec(
                     name="agent_card",

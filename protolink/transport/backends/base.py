@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from protolink.models import EndpointSpec
+from protolink.server.endpoint_handler import EndpointSpec
 
 
 class BackendInterface(ABC):

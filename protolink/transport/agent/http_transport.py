@@ -5,13 +5,15 @@ This module exposes :class:`HTTPAgentTransport`, which sends and receives
 or FastAPI backend for the server side.
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 import httpx
+from pydantic import BaseModel
 
-from protolink.models import AgentCard, EndpointSpec, Message, Task
+from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator
+from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport.agent.base import AgentTransport
 from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
 from protolink.types import BackendType, TransportType
@@ -63,95 +65,78 @@ class HTTPAgentTransport(AgentTransport):
         else:
             self.backend = StarletteBackend()
 
-    async def authenticate(self, credentials: str) -> None:
-        """Authenticate using the configured :class:`Authenticator`.
-
-        Raises
-        ------
-        RuntimeError
-            If no authentication provider has been configured.
-        """
-
-        if not self.authenticator:
-            raise RuntimeError("No Authenticator configured")
-
-        self.security_context = await self.authenticator.authenticate(credentials)
-
     # ------------------------------------------------------------------
-    # Client-side handlers (Agent logic)
+    # Client
     # ------------------------------------------------------------------
 
-    async def send_task(self, agent_url: str, task: Task) -> Task:
-        """Send a ``Task`` to a remote agent and return the resulting task."""
-
+    async def send(
+        self, request_spec: ClientRequestSpec, base_url: str, data: Any = None, params: dict[str, Any] | None = None
+    ) -> Any:
+        """Send a request to an agent endpoint."""
         client = await self._ensure_client()
         headers = self._build_headers()
-        url = f"{agent_url.rstrip('/')}/tasks/"
+
+        # Build URL
+        url = f"{base_url.rstrip('/')}{request_spec.path}"
+
+        # Prepare request arguments
+        kwargs: dict[str, Any] = {"headers": headers}
+        if params:
+            kwargs["params"] = params
+
+        if request_spec.request_source == "body" and data is not None:
+            # Handle Pydantic models automatically
+            if hasattr(data, "to_json"):
+                kwargs["json"] = data.to_json()
+            elif hasattr(data, "to_dict"):
+                kwargs["json"] = data.to_dict()
+            elif isinstance(data, BaseModel):
+                kwargs["json"] = data.model_dump()
+            elif isinstance(data, dict):
+                kwargs["json"] = data
+            else:
+                # TODO: Fallback/Error? Assuming dict or compatible
+                kwargs["json"] = data
 
         try:
-            response = await client.post(url, json=task.to_dict(), headers=headers)
+            response = await client.request(request_spec.method, url, **kwargs)
             response.raise_for_status()
-            return Task.from_dict(response.json())
+
+            # Parse response
+            if request_spec.response_parser:
+                return request_spec.response_parser(response.json())
+            return response.json()
+
         except httpx.ConnectError as e:
             raise ConnectionError(
-                f"Failed to connect to agent at {agent_url}. Make sure the agent is running and accessible."
+                f"Failed to connect to agent at {base_url}. Make sure the agent is running and accessible."
             ) from e
         except httpx.RemoteProtocolError as e:
             raise ConnectionError(
-                f"Protocol error when communicating with agent at {agent_url}. "
+                f"Protocol error when communicating with agent at {base_url}. "
                 f"The target may not be a proper HTTP server or may be misconfigured."
             ) from e
         except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"Agent at {agent_url} returned HTTP {e.response.status_code}: {e.response.text}") from e
+            raise RuntimeError(f"Agent at {base_url} returned HTTP {e.response.status_code}: {e.response.text}") from e
 
-    async def send_message(self, agent_url: str, message: Message) -> Message:
-        """Convenience wrapper around :meth:`send_task` for a single message."""
+    async def _ensure_client(self) -> httpx.AsyncClient:
+        """Return an initialized :class:`httpx.AsyncClient` instance."""
 
-        task = Task.create(message)
-        try:
-            result_task = await self.send_task(agent_url, task)
-            if result_task.messages:
-                return result_task.messages[-1]
-            raise RuntimeError("No response messages returned by agent")
-        except (ConnectionError, RuntimeError) as e:
-            # Re-raise with more context about the message operation
-            raise type(e)(f"Failed to send message to agent at {agent_url}: {e!s}") from e
-
-    async def get_agent_card(self, agent_url: str) -> AgentCard:
-        """Fetch the agent's :class:`AgentCard` description directly from the Agent."""
-
-        client = await self._ensure_client()
-        url = f"{agent_url.rstrip('/')}/.well-known/agent.json"
-
-        try:
-            response = await client.get(url)
-            response.raise_for_status()
-            return AgentCard.from_json(response.json())
-        except httpx.ConnectError as e:
-            raise ConnectionError(
-                f"Failed to connect to agent at {agent_url}. Make sure the agent is running and accessible."
-            ) from e
-        except httpx.RemoteProtocolError as e:
-            raise ConnectionError(
-                f"Protocol error when communicating with agent at {agent_url}. "
-                f"The target may not be a proper HTTP server or may be misconfigured."
-            ) from e
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"Agent at {agent_url} returned HTTP {e.response.status_code}: {e.response.text}") from e
-
-    async def subscribe_task(self, agent_url: str, task: Task) -> None:
-        """Subscribe to a long-running task (not yet implemented)."""
-
-        raise NotImplementedError("HTTP streaming is not implemented yet")
+        if not self._client:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
 
     # ------------------------------------------------------------------
-    # Server-side handlers (Agent logic) - Lifecycle
+    # Server Routing
     # ------------------------------------------------------------------
 
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
         """Setup the routes for the HTTP server."""
-
         self.backend.setup_routes(endpoints)
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     async def start(self) -> None:
         """Start the HTTP server and initialize the HTTP client."""
@@ -170,12 +155,23 @@ class HTTPAgentTransport(AgentTransport):
             await self._client.aclose()
             self._client = None
 
-    async def _ensure_client(self) -> httpx.AsyncClient:
-        """Return an initialized :class:`httpx.AsyncClient` instance."""
+    # ------------------------------------------------------------------
+    # Authentication & Security
+    # ------------------------------------------------------------------
 
-        if not self._client:
-            self._client = httpx.AsyncClient(timeout=self.timeout)
-        return self._client
+    async def authenticate(self, credentials: str) -> None:
+        """Authenticate using the configured :class:`Authenticator`.
+
+        Raises
+        ------
+        RuntimeError
+            If no authentication provider has been configured.
+        """
+
+        if not self.authenticator:
+            raise RuntimeError("No Authenticator configured")
+
+        self.security_context = await self.authenticator.authenticate(credentials)
 
     # ------------------------------------------------------------------
     # Utility

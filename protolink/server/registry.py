@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from protolink.models import AgentCard, EndpointSpec
+from protolink.models import AgentCard
+from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport import RegistryTransport
 
 

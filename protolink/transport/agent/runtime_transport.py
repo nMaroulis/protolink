@@ -1,10 +1,8 @@
 import inspect
 from collections.abc import Awaitable, Callable
-from typing import ClassVar, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
-from protolink.core.agent_card import AgentCard
-from protolink.core.message import Message
-from protolink.core.task import Task
+from protolink.models import AgentCard, ClientRequestSpec, Message, Task
 from protolink.transport.agent.base import AgentTransport
 from protolink.types import TransportType
 
@@ -47,64 +45,69 @@ class RuntimeAgentTransport(AgentTransport):
         if agent_id in self.agents:
             del self.agents[agent_id]
 
-    async def send_task(self, agent_url: str, task: Task) -> Task:
-        """Send task to local agent.
+    async def send(
+        self, request_spec: ClientRequestSpec, base_url: str, data: Any = None, params: dict | None = None
+    ) -> Any:
+        """Send a generic request to a local agent.
 
         Args:
-            agent_url: Agent URL or name
-            task: Task to send
+            request_spec: The client request specification.
+            base_url: The base URL (or agent name/ID) of the target agent.
+            data: The data payload for the request.
+            params: Optional query parameters.
 
         Returns:
-            Processed task
+            The response from the agent.
 
         Raises:
-            ValueError: If agent not found
+            ValueError: If agent not found.
+            NotImplementedError: If the endpoint is not supported by RuntimeTransport.
         """
-        if agent_url not in self.agents:
-            raise ValueError(f"Agent not found: {agent_url}")
+        if base_url not in self.agents:
+            raise ValueError(f"Agent not found: {base_url}")
 
-        agent = self.agents[agent_url]
-        result = agent.handle_task(task)
-        if inspect.isawaitable(result):
-            result = await result
-        return result
+        agent = self.agents[base_url]
 
-    async def send_message(self, agent_url: str, message: Message) -> Message:
-        """Send message to local agent.
+        if request_spec.name == "send_task":
+            task = data
+            if isinstance(task, dict):
+                task = Task.from_dict(task)
 
-        Args:
-            agent_url: Agent URL or name
-            message: Message to send
+            result = agent.handle_task(task)
+            if inspect.isawaitable(result):
+                result = await result
 
-        Returns:
-            Response message
-        """
-        # Create a task with the message
-        task = Task.create(message)
-        result_task = await self.send_task(agent_url, task)
+            # Simulate wire serialization for parser compatibility
+            if request_spec.response_parser:
+                if hasattr(result, "to_dict"):
+                    return request_spec.response_parser(result.to_dict())
+                return request_spec.response_parser(result)
+            return result
 
-        # Extract response message
-        if result_task.messages:
-            return result_task.messages[-1]
+        elif request_spec.name == "get_agent_card":
+            card = agent.get_agent_card(as_json=True)
+            if inspect.isawaitable(card):
+                card = await card
 
-        return Message.agent("No response")
+            if request_spec.response_parser:
+                # Mock serialization
+                if hasattr(card, "model_dump"):
+                    card_dict = card.model_dump()
+                elif hasattr(card, "to_dict"):
+                    card_dict = card.to_dict()
+                else:
+                    card_dict = card
+                return request_spec.response_parser(card_dict)
+            return card
 
-    async def get_agent_card(self, agent_url: str) -> AgentCard:
-        """Get agent card from local agent.
+        elif request_spec.name == "status":
+            status = agent.get_agent_status_html()
+            if inspect.isawaitable(status):
+                status = await status
+            return status
 
-        Args:
-            agent_url: Agent URL or name
-
-        Returns:
-            AgentCard
-
-        Raises:
-            ValueError: If agent not found
-        """
-        if agent_url not in self.agents:
-            raise ValueError(f"Agent not found: {agent_url}")
-
-        return self.agents[agent_url].get_agent_card()
+        else:
+            raise NotImplementedError(f"Endpoint {request_spec.name} not supported by RuntimeTransport")
 
     async def start(self) -> None:
         """No-op for in-memory transport."""
