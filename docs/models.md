@@ -57,9 +57,9 @@ Agent identity and capability declaration. This is the main metadata card that d
 
 ### Methods
 
-#### `to_json() -> dict[str, Any]`
+#### `to_dict() -> dict[str, Any]`
 
-Convert the AgentCard to JSON format compatible with the A2A agent card specification.
+Convert the AgentCard to Python Dictionary / JSON format compatible with the A2A agent card specification.
 
 **Returns:**
 ```python
@@ -69,15 +69,15 @@ dict[str, Any]  # JSON dictionary representation
 **Example:**
 ```python
 card = AgentCard(name="weather_agent", description="Weather service")
-json_data = card.to_json()
+json_data = card.to_dict()
 print(json_data["name"])  # "weather_agent"
 ```
 
 ---
 
-#### `from_json(data: dict[str, Any]) -> AgentCard` `classmethod`
+#### `from_dict(data: dict[str, Any]) -> AgentCard` `classmethod`
 
-Create an AgentCard from JSON data. This method can also handle regular Python dictionaries and includes basic field validation via `_validate_fields`.
+Create an AgentCard from Python dict/JSON data. This method can also handle regular Python dictionaries and includes basic field validation via `_validate_fields`.
 ```python
 data: dict[str, Any]  # JSON dictionary or Python dict containing agent card data
 ```
@@ -94,7 +94,7 @@ json_data = {
     "description": "Weather service",
     "url": "https://api.example.com/weather"
 }
-card = AgentCard.from_json(json_data)
+card = AgentCard.from_dict(json_data)
 ```
 
 ---
@@ -128,8 +128,8 @@ card = AgentCard(
     )
 )
 
-# Convert to JSON
-json_data = card.to_json()
+# Convert to Python dict
+json_data = card.to_dict()
 ```
 
 ---

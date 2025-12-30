@@ -17,7 +17,7 @@ class AgentClient:
         name="get_agent_card",
         path="/.well-known/agent.json",
         method="GET",
-        response_parser=AgentCard.from_json,
+        response_parser=AgentCard.from_dict,
         request_source="none",
     )
 

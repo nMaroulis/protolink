@@ -54,7 +54,7 @@ class Agent:
         """
 
         # Field Validation is handled by the AgentCard dataclass.
-        self.card = AgentCard.from_json(card) if isinstance(card, dict) else card
+        self.card = AgentCard.from_dict(card) if isinstance(card, dict) else card
         self.context_manager = ContextManager()
         self.llm = llm
         self.tools: dict[str, BaseTool] = {}
@@ -420,7 +420,7 @@ class Agent:
         Returns:
             AgentCard with agent metadata
         """
-        return self.card.to_json() if as_json else self.card
+        return self.card.to_dict() if as_json else self.card
 
     def get_agent_status_html(self) -> str:
         """Return the agent's status as HTML.

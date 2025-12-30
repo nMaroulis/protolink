@@ -114,7 +114,7 @@ class AgentCard:
     role: AgentRoleType = "worker"
     tags: list[str] = field(default_factory=list)
 
-    def to_json(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""
         return {
             "name": self.name,
@@ -131,8 +131,8 @@ class AgentCard:
         }
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> "AgentCard":
-        """Create from JSON format."""
+    def from_dict(cls, data: dict[str, Any]) -> "AgentCard":
+        """Create from Python dict/JSON data."""
 
         cls._validate_fields(data)
 

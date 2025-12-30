@@ -44,7 +44,7 @@ class RegistryClient:
             ConnectionError: If registry is not reachable
             RuntimeError: If registration fails for other reasons
         """
-        await self.transport.send(request_spec=self.REGISTER_REQUEST, base_url=self.transport.url, data=card.to_json())
+        await self.transport.send(request_spec=self.REGISTER_REQUEST, base_url=self.transport.url, data=card.to_dict())
 
     async def unregister(self, agent_url: str) -> None:
         await self.transport.send(request_spec=self.UNREGISTER_REQUEST, base_url=self.transport.url, data=agent_url)
@@ -53,4 +53,4 @@ class RegistryClient:
         response = await self.transport.send(
             request_spec=self.DISCOVER_REQUEST, base_url=self.transport.url, data=filter_by
         )
-        return [AgentCard.from_json(c) for c in response]
+        return [AgentCard.from_dict(c) for c in response]

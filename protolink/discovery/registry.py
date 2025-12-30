@@ -92,7 +92,7 @@ class Registry:
             "Agent Card Registered:",
             extra={
                 "agent_url": card.url,
-                "card": card.to_json(),
+                "card": card.to_dict(),
             },
         )
 
@@ -106,7 +106,7 @@ class Registry:
         if not filter_by:
             return list(self._agents.values())
 
-        return [c.to_json() if as_json else c for c in self._agents.values() if self._match(filter_by, c)]
+        return [c.to_dict() if as_json else c for c in self._agents.values() if self._match(filter_by, c)]
 
     def handle_status_html(self) -> str:
         """Return the registry's status as HTML.

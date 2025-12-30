@@ -35,7 +35,7 @@ def test_agent_card_custom_values():
     assert card.security_schemes == {"apiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key"}}
 
 
-def test_to_json():
+def test_to_dict():
     """Test conversion to JSON format."""
     capabilities = AgentCapabilities(streaming=True, tool_calling=True)
     card = AgentCard(
@@ -46,7 +46,7 @@ def test_to_json():
         security_schemes={"bearer": {"type": "http", "scheme": "bearer"}},
     )
 
-    json_data = card.to_json()
+    json_data = card.to_dict()
 
     assert json_data["name"] == "json-agent"
     assert json_data["description"] == "Agent for JSON testing"
@@ -57,7 +57,7 @@ def test_to_json():
     assert json_data["securitySchemes"] == {"bearer": {"type": "http", "scheme": "bearer"}}
 
 
-def test_from_json():
+def test_from_dict():
     """Test creation from JSON data."""
     json_data = {
         "name": "from-json",
@@ -68,7 +68,7 @@ def test_from_json():
         "securitySchemes": {"oauth2": {"type": "oauth2"}},
     }
 
-    card = AgentCard.from_json(json_data)
+    card = AgentCard.from_dict(json_data)
 
     assert card.name == "from-json"
     assert card.description == "Agent created from JSON"
@@ -80,11 +80,11 @@ def test_from_json():
     assert card.security_schemes == {"oauth2": {"type": "oauth2"}}
 
 
-def test_from_json_missing_fields():
-    """Test from_json with missing optional fields."""
+def test_from_dict_missing_fields():
+    """Test from_dict with missing optional fields."""
     json_data = {"name": "minimal-agent", "description": "Minimal agent", "url": "http://minimal.local"}
 
-    card = AgentCard.from_json(json_data)
+    card = AgentCard.from_dict(json_data)
 
     assert card.name == "minimal-agent"
     assert card.version == "1.0.0"  # Default value

@@ -45,7 +45,7 @@ class RegistryServer:
     # ------------------------------------------------------------------
 
     async def register_parser(self, request: Any) -> AgentCard:
-        return AgentCard.from_json(request)
+        return AgentCard.from_dict(request)
 
     async def unregister_parser(self, request: Any) -> str:
         return request.get("agent_url")
