@@ -102,8 +102,8 @@ class HTTPTransport(Transport):
             if isinstance(data, dict):
                 kwargs["params"] = data
             else:
-                # For single values like agent_url, wrap in dict
-                kwargs["params"] = {"agent_url": data}
+                # For single values, wrap in dict
+                kwargs["params"] = {"data": str(data)}
 
         try:
             response = await client.request(request_spec.method, url, **kwargs)

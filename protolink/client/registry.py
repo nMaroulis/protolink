@@ -47,7 +47,9 @@ class RegistryClient:
         await self.transport.send(request_spec=self.REGISTER_REQUEST, base_url=self.transport.url, data=card.to_dict())
 
     async def unregister(self, agent_url: str) -> None:
-        await self.transport.send(request_spec=self.UNREGISTER_REQUEST, base_url=self.transport.url, data=agent_url)
+        await self.transport.send(
+            request_spec=self.UNREGISTER_REQUEST, base_url=self.transport.url, data={"agent_url": agent_url}
+        )
 
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         response = await self.transport.send(

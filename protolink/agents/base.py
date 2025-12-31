@@ -295,17 +295,17 @@ class Agent:
         """
         return self.registry_client.discover(filter_by=filter_by)
 
-    def register(self) -> None:
+    async def register(self) -> None:
         """Register this agent in the global registry.
 
         Raises:
             ValueError: If agent with same URL or name already exists
         """
-        self.registry_client.register(self.get_agent_card(as_json=False))
+        await self.registry_client.register(self.get_agent_card(as_json=False))
 
-    def unregister(self) -> None:
+    async def unregister(self) -> None:
         """Unregister this agent from the global registry."""
-        self.registry_client.unregister(self.get_agent_card(as_json=False).url)
+        await self.registry_client.unregister(self.get_agent_card(as_json=False).url)
 
     # ----------------------------------------------------------------------
     # Tool Management

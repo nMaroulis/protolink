@@ -411,18 +411,19 @@ class TestAgent:
         assert discovered[0] == agent_card
         mock_registry_client.discover.assert_called_once_with(filter_by=None)
 
-    def test_register_and_unregister(self, agent_card):
+    @pytest.mark.asyncio
+    async def test_register_and_unregister(self, agent_card):
         """Test manual registration and unregistration."""
         mock_registry_client = MagicMock(spec=RegistryClient)
-        mock_registry_client.register = MagicMock()
-        mock_registry_client.unregister = MagicMock()
+        mock_registry_client.register = AsyncMock()
+        mock_registry_client.unregister = AsyncMock()
 
         agent = Agent(agent_card, registry=mock_registry_client)
 
-        agent.register()
+        await agent.register()
         mock_registry_client.register.assert_called_once_with(agent_card)
 
-        agent.unregister()
+        await agent.unregister()
         mock_registry_client.unregister.assert_called_once_with(agent_card.url)
 
     def test_transport_url_mismatch(self, agent_card):
