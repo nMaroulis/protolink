@@ -31,11 +31,21 @@ class Validator:
         if not agent_card.name or not isinstance(agent_card.name, str):
             return False, "Agent name is required and must be a string"
 
-        if not agent_card.id or not cls._is_valid_uuid(agent_card.id):
-            return False, "Agent ID is required and must be a valid UUID"
+        if not agent_card.description or not isinstance(agent_card.description, str):
+            return False, "Agent description is required and must be a string"
+
+        if not agent_card.url or not isinstance(agent_card.url, str):
+            return False, "Agent URL is required and must be a string"
 
         if not agent_card.version or not isinstance(agent_card.version, str):
             return False, "Agent version is required and must be a string"
+
+        if not agent_card.protocol_version or not isinstance(agent_card.protocol_version, str):
+            return False, "Agent protocol version is required and must be a string"
+
+        # Validate capabilities
+        if not isinstance(agent_card.capabilities, object):
+            return False, "Agent capabilities are required"
 
         return True, ""
 
@@ -49,17 +59,17 @@ class Validator:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        if not message.message_id or not cls._is_valid_id(message.message_id):
-            return (
-                False,
-                "Message ID is required and must be alphanumeric with underscores or hyphens",
-            )
+        if not message.id or not cls._is_valid_uuid(message.id):
+            return False, "Message ID is required and must be a valid UUID"
 
         if not message.role or not isinstance(message.role, str):
             return False, "Message role is required and must be a string"
 
-        if message.context_id and not cls._is_valid_context_id(message.context_id):
-            return False, "Invalid context ID format"
+        if not message.parts or not isinstance(message.parts, list):
+            return False, "Message parts are required and must be a list"
+
+        if not message.timestamp or not isinstance(message.timestamp, str):
+            return False, "Message timestamp is required and must be a string"
 
         return True, ""
 
@@ -73,17 +83,20 @@ class Validator:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        if not task.id or not cls._is_valid_id(task.id):
-            return (
-                False,
-                "Task ID is required and must be alphanumeric with underscores or hyphens",
-            )
+        if not task.id or not cls._is_valid_uuid(task.id):
+            return False, "Task ID is required and must be a valid UUID"
 
-        if not task.task_type or not isinstance(task.task_type, str):
-            return False, "Task type is required and must be a string"
+        if not task.state or not isinstance(task.state, str):
+            return False, "Task state is required and must be a string"
 
-        if task.context_id and not cls._is_valid_context_id(task.context_id):
-            return False, "Invalid context ID format"
+        if not task.messages or not isinstance(task.messages, list):
+            return False, "Task messages are required and must be a list"
+
+        if not task.artifacts or not isinstance(task.artifacts, list):
+            return False, "Task artifacts are required and must be a list"
+
+        if not task.metadata or not isinstance(task.metadata, dict):
+            return False, "Task metadata are required and must be a dict"
 
         return True, ""
 
@@ -97,8 +110,8 @@ class Validator:
         Returns:
             Tuple of (is_valid, error_message)
         """
-        if not task_id or not cls._is_valid_id(task_id):
-            return False, "Task ID must be alphanumeric with underscores or hyphens"
+        if not task_id or not cls._is_valid_uuid(task_id):
+            return False, "Task ID must be a valid UUID"
         return True, ""
 
     @classmethod

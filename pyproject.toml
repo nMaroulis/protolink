@@ -17,6 +17,20 @@ authors = [
 where = ["."]
 include = ["protolink*"]
 
+# Type Checking - ty setup
+[tool.ty.src]
+include = ["protolink"]
+exclude = ["build", "tests"]
+
+[tool.ty.rules]
+# strong rule set
+unresolved-reference = "error"
+invalid-assignment = "error"
+invalid-return-type = "error"
+missing-argument = "error"
+possibly-unresolved-reference = "warn"
+
+
 [project.urls]
 Documentation = "https://nmaroulis.github.io/protolink/"
 Repository = "https://github.com/nMaroulis/protolink"

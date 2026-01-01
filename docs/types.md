@@ -302,7 +302,8 @@ Type alias for supported request sources for endpoint parameter extraction.
 ## RoleType
 
 ```python
-RoleType: TypeAlias = Literal["user", "agent", "system"]
+RoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]
+
 ```
 
 Type alias for supported message roles in agent communication.

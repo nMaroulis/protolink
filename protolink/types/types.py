@@ -64,7 +64,7 @@ MimeType: TypeAlias = Literal[
 RequestSourceType: TypeAlias = Literal["none", "body", "query_params", "form", "headers", "path_params"]
 
 # Supported roles in Messages
-RoleType: TypeAlias = Literal["user", "agent", "system"]
+RoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]
 
 # Supported security schemes
 SecuritySchemeType: TypeAlias = Literal[
