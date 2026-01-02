@@ -120,6 +120,16 @@ This project follows **PEP 604**. Please use the `X | Y` union type syntax (e.g.
 
 ---
 
+## Type Checking
+
+Protolink uses **ty** for type checking. Run type checks with:
+
+```bash
+ty check .
+```
+
+---
+
 ## Tests
 
 - All new features should include tests when possible.
