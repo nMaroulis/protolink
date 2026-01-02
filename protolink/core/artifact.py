@@ -1,9 +1,9 @@
-import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from protolink.core.part import Part
 from protolink.utils import utc_now
+from protolink.utils.id_generator import IDGenerator
 
 
 @dataclass
@@ -14,13 +14,13 @@ class Artifact:
     analysis results, etc. Multiple artifacts can be produced per task.
 
     Attributes:
-        artifact_id: Unique artifact identifier
+        id: Unique artifact identifier
         parts: Content parts of the artifact
         metadata: Artifact metadata (type, size, etc.)
         created_at: When artifact was created
     """
 
-    artifact_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=lambda: IDGenerator.generate_artifact_id())
     parts: list[Part] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: utc_now())
@@ -38,7 +38,7 @@ class Artifact:
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
-            "artifact_id": self.artifact_id,
+            "id": self.id,
             "parts": [p.to_dict() for p in self.parts],
             "metadata": self.metadata,
             "created_at": self.created_at,
@@ -49,7 +49,7 @@ class Artifact:
         """Create from dictionary."""
         parts = [Part.from_dict(p) for p in data.get("parts", [])]
         return cls(
-            artifact_id=data.get("artifact_id", str(uuid.uuid4())),
+            id=data.get("id", IDGenerator.generate_artifact_id()),
             parts=parts,
             metadata=data.get("metadata", {}),
             created_at=data.get("created_at", utc_now()),

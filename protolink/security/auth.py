@@ -7,10 +7,11 @@ OAuth 2.0, Bearer tokens authorization for enterprise deployments.
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from protolink.types import HttpAuthScheme, SecuritySchemeType
+from protolink.utils import utc_now
 
 
 @dataclass
@@ -30,7 +31,7 @@ class SecurityContext:
     principal_id: str
     token: str
     expires_at: str | None = None
-    issued_at: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
+    issued_at: str = field(default_factory=lambda: utc_now())
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_expired(self) -> bool:
@@ -43,7 +44,7 @@ class SecurityContext:
             return False
 
         expires = datetime.fromisoformat(self.expires_at)
-        return datetime.now(datetime.timezone.utc) > expires
+        return datetime.now(timezone.utc) > expires
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""

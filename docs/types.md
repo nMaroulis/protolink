@@ -12,7 +12,7 @@ This section provides detailed documentation for the type aliases used throughou
 - [LLMType](#llmtype)
 - [MimeType](#mimetype)
 - [RequestSourceType](#requestsourcetype)
-- [RoleType](#roletype)
+- [MessageRoleType](#messageroletype)
 - [SecuritySchemeType](#securityschemetype)
 - [TransportType](#transporttype)
 
@@ -299,10 +299,10 @@ Type alias for supported request sources for endpoint parameter extraction.
 
 ---
 
-## RoleType
+## MessageRoleType
 
 ```python
-RoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]
+MessageRoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]
 
 ```
 
@@ -319,7 +319,7 @@ Type alias for supported message roles in agent communication.
 ### Usage Example
 
 ```python
-from protolink.types import RoleType
+from protolink.types import MessageRoleType
 from protolink.models import Message
 
 # Create messages with different roles
@@ -431,7 +431,7 @@ All type aliases are available from the central types module:
 
 ```python
 # Import individual types
-from protolink.types import MimeType, SecuritySchemeType, RoleType
+from protolink.types import MimeType, SecuritySchemeType, MessageRoleType
 
 # Import all types
 from protolink.types import BackendType, LLMProvider, LLMType

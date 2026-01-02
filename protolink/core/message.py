@@ -1,10 +1,10 @@
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 from protolink.core.part import Part
-from protolink.types import RoleType
+from protolink.types import MessageRoleType
+from protolink.utils.datetime import utc_now
+from protolink.utils.id_generator import IDGenerator
 
 
 @dataclass
@@ -18,10 +18,10 @@ class Message:
         timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     """
 
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    role: RoleType = "user"
+    id: str = field(default_factory=lambda: IDGenerator.generate_message_id())
+    role: MessageRoleType = "user"
     parts: list[Part] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = field(default_factory=lambda: utc_now())
 
     def add_text(self, text: str) -> "Message":
         """Add a text part to the message."""
@@ -47,10 +47,10 @@ class Message:
         """Create from dictionary."""
         parts = [Part.from_dict(p) for p in data.get("parts", [])]
         return cls(
-            id=data.get("id", str(uuid.uuid4())),
+            id=data.get("id", IDGenerator.generate_message_id()),
             role=data.get("role", "user"),
             parts=parts,
-            timestamp=data.get("timestamp", datetime.now().isoformat()),
+            timestamp=data.get("timestamp", utc_now()),
         )
 
     @classmethod

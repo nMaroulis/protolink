@@ -191,7 +191,7 @@ The tables below document each object type.
 
 ```json
 {
-  "artifact_id": "a1b2c3",
+  "id": "a1b2c3",
   "parts": [
     {"type": "text", "content": "final report"}
   ],
@@ -202,7 +202,7 @@ The tables below document each object type.
 
 | Field         | Type             | Description                 |
 |-------------- |------------------|-----------------------------|
-| `artifact_id` | `str`            | Unique artifact identifier. |
+| `id` | `str`            | Unique artifact identifier. |
 | `parts`       | `list[Part]`     | Artifact content.           |
 | `metadata`    | `dict[str, Any]` | Artifact metadata.          |
 | `created_at`  | `str`            | ISO‑8601 timestamp.         |

@@ -1,4 +1,3 @@
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -6,6 +5,7 @@ from typing import Any
 from protolink.core.artifact import Artifact
 from protolink.core.message import Message
 from protolink.utils import utc_now
+from protolink.utils.id_generator import IDGenerator
 
 
 class TaskState(Enum):
@@ -32,7 +32,7 @@ _ALLOWED_TRANSITIONS: dict[TaskState, set[TaskState]] = {
 
 @dataclass
 class Task:
-    """Unit of work exchanged between agents.
+    """Shared Unit of work exchanged between agents.
 
     Attributes:
         id: Unique task identifier
@@ -43,7 +43,7 @@ class Task:
         created_at: Task creation time
     """
 
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=lambda: IDGenerator.generate_task_id())
     state: TaskState = TaskState.SUBMITTED
     messages: list[Message] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
@@ -94,7 +94,7 @@ class Task:
         messages = [Message.from_dict(m) for m in data.get("messages", [])]
         artifacts = [Artifact.from_dict(a) for a in data.get("artifacts", [])]
         return cls(
-            id=data.get("id", str(uuid.uuid4())),
+            id=data.get("id", IDGenerator.generate_task_id()),
             state=TaskState(data.get("state", TaskState.SUBMITTED.value)),
             messages=messages,
             artifacts=artifacts,

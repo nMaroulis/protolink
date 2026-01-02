@@ -6,9 +6,9 @@ from .types import (
     HttpMethod,
     LLMProvider,
     LLMType,
+    MessageRoleType,
     MimeType,
     RequestSourceType,
-    RoleType,
     SecuritySchemeType,
     TransportType,
 )
@@ -21,9 +21,9 @@ __all__ = [
     "HttpMethod",
     "LLMProvider",
     "LLMType",
+    "MessageRoleType",
     "MimeType",
     "RequestSourceType",
-    "RoleType",
     "SecuritySchemeType",
     "TransportType",
 ]

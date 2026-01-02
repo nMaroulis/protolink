@@ -505,7 +505,7 @@ Enumeration of possible task states.
 @dataclass
 class Message:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    role: RoleType = "user"
+    role: MessageRoleType = "user"
     parts: list[Part] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 ```
@@ -517,7 +517,7 @@ Single unit of communication between agents. Messages contain one or more parts 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `id` | `str` | `uuid4()` | Unique message identifier |
-| `role` | `RoleType` | `"user"` | Sender role |
+| `role` | `MessageRoleType` | `"user"` | Sender role |
 | `parts` | `list[Part]` | `[]` | Message content parts |
 | `timestamp` | `str` | `now` | Creation timestamp |
 
@@ -747,7 +747,7 @@ file_part = Part("file", {"filename": "report.pdf", "data": pdf_data})
 ```python
 @dataclass
 class Artifact:
-    artifact_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     parts: list[Part] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
@@ -759,7 +759,7 @@ Output produced by a task (v0.2.0+). Artifacts represent results from task execu
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `artifact_id` | `str` | `uuid4()` | Unique artifact identifier |
+| `id` | `str` | `uuid4()` | Unique artifact identifier |
 | `parts` | `list[Part]` | `[]` | Content parts of the artifact |
 | `metadata` | `dict[str, Any]` | `{}` | Artifact metadata |
 | `created_at` | `str` | `utc now` | Creation timestamp |

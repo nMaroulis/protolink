@@ -105,7 +105,7 @@ async def main():
 
         elif event_type == "task_artifact_update":
             artifact = event_data.get("artifact", {})
-            artifact_id = artifact.get("artifact_id", "unknown")
+            artifact_id = artifact.get("id", "unknown")
             print(f"[Event {event_count}] Artifact: {artifact_id}")
             if artifact.get("parts"):
                 part_content = artifact["parts"][0].get("content", "")
