@@ -71,5 +71,7 @@ nav:
       - Types: types.md
   - Examples:
       - Examples: examples.md
+  - Project:
+      - Development & Contribution: development.md
   - Resources:
       - Relevant Projects: relevant.md
