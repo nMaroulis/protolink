@@ -11,7 +11,14 @@ class BackendInterface(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    async def start(self, host: str, port: int) -> None: ...
+    async def start(self, url: str) -> None: ...
 
     @abstractmethod
     async def stop(self) -> None: ...
+
+    def _get_host_port(self, url: str) -> tuple[str | None, int | None]:
+        """Extract host and port from a full URL."""
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url.rstrip("/"))
+        return parsed.hostname, parsed.port

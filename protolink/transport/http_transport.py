@@ -6,7 +6,6 @@ or FastAPI backend for the server side.
 """
 
 from typing import Any, ClassVar
-from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel
@@ -24,22 +23,19 @@ class HTTPTransport(Transport):
 
     Parameters
     ----------
-    host:
-        Host interface for the HTTP server to bind to when running as a
-        server (e.g. ``"0.0.0.0"``).
-    port:
-        Port the HTTP server listens on.
+    url:
+        URL for the HTTP server (e.g. ``"http://localhost:8000"``).
     timeout:
         Request timeout (in seconds) for the internal HTTP client.
     authenticator:
-        Optional authentication provider used to obtain auth context.
+        Optional authenticator for securing requests.
     backend:
-        Name of the HTTP backend implementation to use. Currently
-        ``"starlette"`` (default) and ``"fastapi"`` are supported.
+        Backend implementation to use (``"starlette"`` or ``"fastapi"``).
     validate_schema:
-        When using the FastAPI backend, controls whether incoming
-        requests are validated with Pydantic models.
+        Whether to validate request/response schemas.
     """
+
+    transport_type: ClassVar[TransportType] = "http"
 
     def __init__(
         self,
@@ -50,9 +46,7 @@ class HTTPTransport(Transport):
         *,
         validate_schema: bool = False,
     ) -> None:
-        self.transport_type: ClassVar[TransportType] = "http"
         self._url = url
-        self._set_from_url(url)
         self.timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
         self.security_context: object | None = None
@@ -149,7 +143,7 @@ class HTTPTransport(Transport):
         """Start the HTTP server and initialize the HTTP client."""
 
         # Start the HTTP server
-        await self.backend.start(self.host, self.port)
+        await self.backend.start(self._url)
 
         # Initialize HTTP client
         self._client = httpx.AsyncClient(timeout=self.timeout)
@@ -202,13 +196,6 @@ class HTTPTransport(Transport):
         if self._url.startswith("http://") or self._url.startswith("https://"):
             return True
         return False
-
-    # TODO(): Do this in the backend
-    def _set_from_url(self, url: str) -> None:
-        """Populate host, port, and canonical url from a full URL."""
-        parsed = urlparse(url.rstrip("/"))
-        self.host = parsed.hostname
-        self.port = parsed.port
 
     @property
     def url(self) -> str:

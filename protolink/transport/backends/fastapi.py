@@ -88,8 +88,12 @@ class FastAPIBackend(BackendInterface):
     # ASGI Server Lifecycle
     # ----------------------------------------------------------------------
 
-    async def start(self, host: str, port: int) -> None:
+    async def start(self, url: str) -> None:
         import uvicorn
+
+        host, port = self._get_host_port(url)
+        if not host or not port:
+            raise ValueError(f"Invalid URL: {url}. Missing host or port.")
 
         config = uvicorn.Config(self.app, host=host, port=port, log_level="info")
         server = uvicorn.Server(config)

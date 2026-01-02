@@ -61,11 +61,19 @@ agent = Agent(card_dict, transport, llm)
 
 You can then attach tools and start the agent.
 
-Once the Agent has been initiated, it automatically exposes a web interface at `/status` where it exposes the agent's information.
+Once the **Agent** and **Registry** objects have been initiated, they will automatically expose a web interface at `/status` where they display the registry and agent's information.
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="50%">
-</div>
+
+<table>
+  <tr>
+    <td style="text-align: center;">
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" alt="Registry Status Card" width="90%">
+    </td>
+    <td style="text-align: center;">
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="90%">
+    </td>
+  </tr>
+</table>
 
 ## Agent-to-Agent Communication
 
