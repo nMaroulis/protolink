@@ -30,7 +30,7 @@ class SecurityContext:
     principal_id: str
     token: str
     expires_at: str | None = None
-    issued_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    issued_at: str = field(default_factory=lambda: datetime.now(datetime.timezone.utc).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_expired(self) -> bool:
@@ -43,7 +43,7 @@ class SecurityContext:
             return False
 
         expires = datetime.fromisoformat(self.expires_at)
-        return datetime.utcnow() > expires
+        return datetime.now(datetime.timezone.utc) > expires
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""

@@ -43,7 +43,11 @@ class OllamaLLM(ServerLLM):
                 )
         if headers is None:
             headers = (
-                {"Authorization": "Bearer " + os.environ.get("OLLAMA_API_KEY")} if os.getenv("OLLAMA_API_KEY") else {}
+                {
+                    "Authorization": f"Bearer {os.environ.get('OLLAMA_API_KEY')}",
+                }
+                if os.getenv("OLLAMA_API_KEY")
+                else {}
             )
 
         super().__init__(base_url=base_url)

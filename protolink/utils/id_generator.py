@@ -80,4 +80,4 @@ class IDGenerator:
     @staticmethod
     def _generate_timestamp() -> str:
         """Generate a timestamp string in a compact format."""
-        return datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        return datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M%S")

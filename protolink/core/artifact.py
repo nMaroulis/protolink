@@ -1,9 +1,9 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 from protolink.core.part import Part
+from protolink.utils import utc_now
 
 
 @dataclass
@@ -23,7 +23,7 @@ class Artifact:
     artifact_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     parts: list[Part] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(default_factory=lambda: utc_now())
 
     def add_part(self, part: Part) -> "Artifact":
         """Add content part to artifact."""
@@ -52,5 +52,5 @@ class Artifact:
             artifact_id=data.get("artifact_id", str(uuid.uuid4())),
             parts=parts,
             metadata=data.get("metadata", {}),
-            created_at=data.get("created_at", datetime.utcnow().isoformat()),
+            created_at=data.get("created_at", utc_now()),
         )

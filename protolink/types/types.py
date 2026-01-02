@@ -7,7 +7,7 @@ Centralizing types improves reusability, discoverability, and maintainability.
 
 from typing import Literal, TypeAlias
 
-AgentRoleType: TypeAlias = Literal["gateway", "observer", "orchastrator", "worker"]
+AgentRoleType: TypeAlias = Literal["gateway", "interface", "observer", "orchastrator", "worker"]
 
 BackendType: TypeAlias = Literal["starlette", "fastapi"]
 
@@ -33,7 +33,7 @@ HttpAuthScheme: TypeAlias = Literal[
 
 HttpMethod: TypeAlias = Literal["GET", "POST", "DELETE", "PUT", "PATCH"]
 
-LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "llama.cpp", "ollama"]
+LLMProvider: TypeAlias = Literal["anthropic", "deepseek", "google", "llama.cpp", "openai", "ollama"]
 
 LLMType: TypeAlias = Literal["api", "local", "server"]
 

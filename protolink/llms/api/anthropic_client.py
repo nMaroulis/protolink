@@ -11,7 +11,7 @@ from anthropic.types.message_stream_event import MessageStreamEvent
 
 from protolink.llms.api.base import APILLM
 from protolink.llms.base import LLMProvider
-from protolink.models import Message
+from protolink.models import Message, Part
 from protolink.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -69,8 +69,7 @@ class AnthropicLLM(APILLM):
         """Convert Anthropic response to internal Message format."""
         return Message(
             role="assistant",
-            content=response.content[0].text,
-            finish_reason=response.stop_reason,
+            parts=[Part("assistant", response.content[0].text)],
         )
 
     def generate_response(self, messages: list[Message]) -> Message:

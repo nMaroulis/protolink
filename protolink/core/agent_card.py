@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any, TypedDict
+from typing import Any
 
 from protolink import __version__ as protolink_version
 from protolink.types import AgentRoleType, MimeType, SecuritySchemeType, TransportType
@@ -161,18 +161,3 @@ class AgentCard:
         for f in required_fields:
             if f not in data:
                 raise ValueError(f"AgentCard :: Missing required field: {f}")
-
-
-class AgentCardArgs(TypedDict, total=False):
-    name: str
-    description: str
-    url: str
-    transport: TransportType
-    version: str = "1.0.0"
-    protocol_version: str
-    capabilities: AgentCapabilities
-    skills: list[AgentSkill]
-    input_formats: list[MimeType]
-    output_formats: list[MimeType]
-    security_schemes: dict[SecuritySchemeType, dict[str, Any]] | None
-    tags: list[str]

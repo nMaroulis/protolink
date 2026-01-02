@@ -1,11 +1,11 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
 from protolink.core.artifact import Artifact
 from protolink.core.message import Message
+from protolink.utils import utc_now
 
 
 class TaskState(Enum):
@@ -48,7 +48,7 @@ class Task:
     messages: list[Message] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(default_factory=lambda: utc_now())
 
     def add_message(self, message: Message) -> "Task":
         """Add a message to the task."""
@@ -99,7 +99,7 @@ class Task:
             messages=messages,
             artifacts=artifacts,
             metadata=data.get("metadata", {}),
-            created_at=data.get("created_at", datetime.now(timezone.utc).isoformat()),
+            created_at=data.get("created_at", utc_now()),
         )
 
     @classmethod
