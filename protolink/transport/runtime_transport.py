@@ -199,13 +199,11 @@ class RuntimeTransport(Transport):
         """
         return list(self.agents.keys())
 
-    def validate_agent_url(self, agent_url: str) -> bool:
-        """Validate an agent URL.
-
-        Args:
-            agent_url: Agent URL to validate
-
-        Returns:
-            True if the URL is valid, False otherwise
-        """
+    def validate_url(self) -> bool:
+        """Validate provided URL"""
         return True
+
+    @property
+    def url(self) -> str:
+        """Get the URL of the transport."""
+        return self._url

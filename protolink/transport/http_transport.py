@@ -51,7 +51,7 @@ class HTTPTransport(Transport):
         validate_schema: bool = False,
     ) -> None:
         self.transport_type: ClassVar[TransportType] = "http"
-        self.url = url
+        self._url = url
         self._set_from_url(url)
         self.timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
@@ -197,26 +197,11 @@ class HTTPTransport(Transport):
 
         return headers
 
-    def validate_agent_url(self, agent_url: str) -> bool:
-        """Validate an agent URL.
-
-        Parameters
-        ----------
-        agent_url:
-            Agent URL to validate.
-
-        Returns
-        -------
-        bool
-            ``True`` if the URL is allowed, ``False`` otherwise.
-        """
-
-        allowed = {
-            f"http://{self.host}:{self.port}",
-            f"https://{self.host}:{self.port}",
-        }
-
-        return agent_url in allowed
+    def validate_url(self) -> bool:
+        """Validate provided URL"""
+        if self._url.startswith("http://") or self._url.startswith("https://"):
+            return True
+        return False
 
     # TODO(): Do this in the backend
     def _set_from_url(self, url: str) -> None:
@@ -224,3 +209,8 @@ class HTTPTransport(Transport):
         parsed = urlparse(url.rstrip("/"))
         self.host = parsed.hostname
         self.port = parsed.port
+
+    @property
+    def url(self) -> str:
+        """Get the URL of the transport."""
+        return self._url

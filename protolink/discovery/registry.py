@@ -117,6 +117,14 @@ class Registry:
         return to_registry_status_html("Registry", "HTTP", self._agents, self.start_time)
 
     # ------------------------------------------------------------------
+    # Getters & Setters
+    # ------------------------------------------------------------------
+
+    @property
+    def client(self) -> RegistryClient:
+        return self._client
+
+    # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
 

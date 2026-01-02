@@ -55,6 +55,9 @@ class DummyTransport(Transport):
         """Setup routes - dummy implementation for testing."""
         pass
 
+    def validate_url(self) -> bool:
+        return True
+
 
 class TestRegistry:
     """Test cases for the Registry class."""

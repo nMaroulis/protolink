@@ -42,7 +42,7 @@ class Context:
             Self for method chaining
         """
         self.messages.append(message)
-        self.last_accessed = utc_now()
+        self.last_accessed = str(utc_now())
         return self
 
     def to_dict(self) -> dict:

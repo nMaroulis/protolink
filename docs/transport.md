@@ -290,7 +290,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 | ---- | ---------- | ------- | ----------- |
 | `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `Authenticator` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
 | `_build_headers` | `skill: str \| None = None` | `dict[str, str]` | Internal helper that constructs HTTP headers (including `Authorization` when an auth context is present). Exposed here for completeness; you normally do not need to call it directly. |
-| `validate_agent_url` | `agent_url: str` | `bool` | Return `True` if the URL is considered local to this transport's host/port (e.g. for allow‑listing), `False` otherwise. |
+| `validate_url` | `-` | `-` | Return `True` if the URL is considered local to this transport's host/port (e.g. for allow‑listing), `False` otherwise. |
 
 ---
 

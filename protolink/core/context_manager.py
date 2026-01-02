@@ -51,7 +51,7 @@ class ContextManager:
         """
         context = self.contexts.get(context_id)
         if context:
-            context.last_accessed = utc_now()
+            context.last_accessed = str(utc_now())
         return context
 
     def add_message_to_context(self, context_id: str, message) -> bool:

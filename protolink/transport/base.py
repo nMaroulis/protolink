@@ -48,3 +48,14 @@ class Transport(ABC):
         For client-only transports, this can be a no-op.
         """
         pass
+
+    @abstractmethod
+    def validate_url(self) -> bool:
+        """Validate provided URL"""
+        pass
+
+    @property
+    @abstractmethod
+    def url(self) -> str:
+        """Get the URL of the transport."""
+        pass

@@ -47,6 +47,9 @@ class DummyTransport(Transport):
     async def stop(self) -> None:  # pragma: no cover
         pass
 
+    def validate_url(self) -> bool:
+        return True
+
 
 class DummyLLM(LLM):
     """Mock LLM for testing."""

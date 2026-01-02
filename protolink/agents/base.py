@@ -293,6 +293,9 @@ class Agent:
         Returns:
             List of matching AgentCard objects
         """
+        if not self.registry_client:
+            return []
+
         return self.registry_client.discover(filter_by=filter_by)
 
     async def register(self) -> None:
@@ -301,10 +304,14 @@ class Agent:
         Raises:
             ValueError: If agent with same URL or name already exists
         """
+        if not self.registry_client:
+            return
         await self.registry_client.register(self.get_agent_card(as_json=False))
 
     async def unregister(self) -> None:
         """Unregister this agent from the global registry."""
+        if not self.registry_client:
+            return
         await self.registry_client.unregister(self.get_agent_card(as_json=False).url)
 
     # ----------------------------------------------------------------------
@@ -314,7 +321,9 @@ class Agent:
     def add_tool(self, tool: BaseTool) -> None:
         """Register a Tool instance with the agent."""
         self.tools[tool.name] = tool
-        skill = AgentSkill(id=tool.name, description=tool.description or f"Tool: {tool.name}", tags=tool.tags)
+        skill = AgentSkill(
+            id=tool.name, description=tool.description or f"Tool: {tool.name}", tags=tool.tags if tool.tags else []
+        )
         self._add_skill_to_agent_card(skill)
 
     def tool(
@@ -394,7 +403,9 @@ class Agent:
         # TODO(): Get LLM's skills.
         # Detect skills from tools
         for tool_name, tool in self.tools.items():
-            skill = AgentSkill(id=tool_name, description=tool.description or f"Tool: {tool_name}", tags=tool.tags)
+            skill = AgentSkill(
+                id=tool_name, description=tool.description or f"Tool: {tool_name}", tags=tool.tags if tool.tags else []
+            )
             detected_skills.append(skill)
 
         # Detect skills from public methods (excluding internal methods)
@@ -469,7 +480,7 @@ class Agent:
 
         if registry:
             if isinstance(registry, Registry):
-                self.registry_client = registry.get_client()
+                self.registry_client = registry.client
             elif isinstance(registry, str):
                 if registry_url is None:
                     logger.error("registry_url cannot be None")
