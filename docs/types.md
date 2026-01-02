@@ -11,6 +11,7 @@ This section provides detailed documentation for the type aliases used throughou
 - [LLMProvider](#llmprovider)
 - [LLMType](#llmtype)
 - [MimeType](#mimetype)
+- [PartType](#parttype)
 - [RequestSourceType](#requestsourcetype)
 - [MessageRoleType](#messageroletype)
 - [SecuritySchemeType](#securityschemetype)
@@ -275,6 +276,117 @@ card = AgentCard(
     output_formats=["text/plain", "application/json", "image/jpeg"]
 )
 ```
+
+---
+
+## PartType
+
+```python
+PartType: TypeAlias = Literal[
+    # ---- Core content ----
+    "text",
+    "json",
+    # ---- Files & references ----
+    "file",
+    "bytes",
+    "uri",
+    # ---- Media ----
+    "image",
+    "audio",
+    "video",
+    # ---- Control & meta ----
+    "status",
+    "error",
+    "warning",
+    # ---- Tool interaction ----
+    "tool_call",
+    "tool_result",
+    # ---- Reasoning / observability (optional) ----
+    "trace",
+    "summary",
+    "confidence",
+    # ---- Contracts ----
+    "schema",
+]
+```
+
+**Part content types** define the format and purpose of individual parts within messages, artifacts, and other data structures. Each part has a specific type that determines how its content should be interpreted and processed.
+
+### Core Content Types
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **text** | Plain text content | User messages, simple responses |
+| **json** | Structured data | Tool parameters, configuration objects |
+
+### Files & References
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **file** | File attachment | Documents, images, code files |
+| **bytes** | Raw binary data | File uploads, binary content |
+| **uri** | Resource reference | Links to external resources |
+
+### Media Types
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **image** | Image content | Visual data, screenshots |
+| **audio** | Audio content | Voice messages, audio files |
+| **video** | Video content | Video messages, screen recordings |
+
+### Control & Meta
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **status** | Status updates | Progress indicators, state changes |
+| **error** | Error information | Failure details, error messages |
+| **warning** | Warning information | Non-fatal issues, deprecation notices |
+
+### Tool Interaction
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **tool_call** | Tool invocation request | Function calls with parameters |
+| **tool_result** | Tool execution result | Function return values, tool outputs |
+
+### Reasoning & Observability
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **trace** | Execution trace | Debug information, step-by-step logs |
+| **summary** | Content summary | Condensed results, key points |
+| **confidence** | Confidence score | Reliability indicators, probability scores |
+
+### Contracts
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **schema** | Schema definition | Validation rules, API contracts |
+
+!!! info "Part Structure"
+    Each part consists of:
+    - **type**: One of the PartType values above
+    - **content**: The actual data (varies by type)
+    
+    Example:
+    ```python
+    # Text part
+    Part(type="text", content="Hello, world!")
+    
+    # JSON part
+    Part(type="json", content={"key": "value"})
+    
+    # Error part
+    Part(type="error", content={"code": "validation_error", "message": "Invalid input"})
+    ```
+
+!!! tip "Choosing Part Types"
+    - Use **text** for simple user messages and responses
+    - Use **json** for structured data and tool parameters
+    - Use **file** for binary content with metadata
+    - Use **error** for structured error information
+    - Use **status** for progress and state updates
 
 ---
 

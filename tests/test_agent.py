@@ -325,7 +325,7 @@ class TestAgent:
         """Test default streaming implementation."""
 
         class TestAgent(Agent):
-            def handle_task(self, task):
+            async def handle_task(self, task):
                 return task.complete("Test response")
 
         test_agent = TestAgent(agent.card)
@@ -337,7 +337,11 @@ class TestAgent:
 
         # Should have status update, artifact update (if any), and completion
         assert len(events) >= 2
+
+        # First event should be working status
         assert events[0].new_state == "working"
+
+        # Last event should be completion (not error)
         assert events[-1].new_state == "completed"
 
     def test_get_context_manager(self, agent):

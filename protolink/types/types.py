@@ -66,6 +66,34 @@ RequestSourceType: TypeAlias = Literal["none", "body", "query_params", "form", "
 # Supported roles in Messages
 MessageRoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]
 
+# Supported part content types
+PartType: TypeAlias = Literal[
+    # ---- Core content ----
+    "text",
+    "json",
+    # ---- Files & references ----
+    "file",
+    "bytes",
+    "uri",
+    # ---- Media ----
+    "image",
+    "audio",
+    "video",
+    # ---- Control & meta ----
+    "status",
+    "error",
+    "warning",
+    # ---- Tool interaction ----
+    "tool_call",
+    "tool_result",
+    # ---- Reasoning / observability (optional) ----
+    "trace",
+    "summary",
+    "confidence",
+    # ---- Contracts ----
+    "schema",
+]
+
 # Supported security schemes
 SecuritySchemeType: TypeAlias = Literal[
     "apiKey",  # API key
