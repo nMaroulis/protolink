@@ -54,7 +54,7 @@ class Agent:
         """
 
         # Field Validation is handled by the AgentCard dataclass.
-        self.card = AgentCard.from_dict(card) if isinstance(card, dict) else card
+        self.card: AgentCard = AgentCard.from_dict(card) if isinstance(card, dict) else card
         self.context_manager = ContextManager()
         self.llm = llm
         self.tools: dict[str, BaseTool] = {}
@@ -190,7 +190,7 @@ class Agent:
         yield TaskStatusUpdateEvent(task_id=task.id, previous_state="submitted", new_state="working")
 
         try:
-            result_task = self.handle_task(task)
+            result_task = await self.handle_task(task)
 
             # Emit artifacts if any (NEW in v0.2.0)
             for artifact in result_task.artifacts:
@@ -207,7 +207,7 @@ class Agent:
 
             yield TaskErrorEvent(task_id=task.id, error_code="task_failed", error_message=str(e), recoverable=False)
 
-    def process(self, message_text: str) -> str:
+    async def process(self, message_text: str) -> str:
         """Simple synchronous processing (convenience method).
 
         Args:
@@ -220,7 +220,7 @@ class Agent:
         task = Task.create(Message.user(message_text))
 
         # Process the task
-        result_task = self.handle_task(task)
+        result_task = await self.handle_task(task)
 
         # Extract response
         if result_task.messages:

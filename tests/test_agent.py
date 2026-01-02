@@ -118,16 +118,17 @@ class TestAgent:
         with pytest.raises(NotImplementedError):
             await agent.handle_task(task)
 
-    def test_process_method(self, agent):
+    @pytest.mark.asyncio
+    async def test_process_method(self, agent):
         """Test the process method with a simple echo response."""
 
         # Create a test agent that implements handle_task
         class TestAgent(Agent):
-            def handle_task(self, task):
+            async def handle_task(self, task):
                 return task.complete("Test response")
 
         test_agent = TestAgent(agent.card)
-        response = test_agent.process("Hello")
+        response = await test_agent.process("Hello")
         assert response == "Test response"
 
     def test_set_transport(self, agent):
