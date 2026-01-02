@@ -72,11 +72,21 @@ class Registry:
     # Client API (agents call these)
     # ------------------------------------------------------------------
 
-    async def register(self, card: AgentCard) -> None:
-        await self._client.register(card)
+    async def register(self, card: AgentCard) -> dict[str, str]:
+        try:
+            response = await self._client.register(card)
+        except Exception as e:
+            self.logger.exception(f"Failed to register agent {card.url}: {e}")
+            response = {"status": str(e)}
+        return response
 
-    async def unregister(self, agent_url: str) -> None:
-        await self._client.unregister(agent_url)
+    async def unregister(self, agent_url: str) -> dict[str, str]:
+        try:
+            response = await self._client.unregister(agent_url)
+        except Exception as e:
+            self.logger.exception(f"Failed to unregister agent {agent_url}: {e}")
+            response = {"status": str(e)}
+        return response
 
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         return await self._client.discover(filter_by)
@@ -85,7 +95,7 @@ class Registry:
     # Server-side handlers
     # ------------------------------------------------------------------
 
-    async def handle_register(self, card: AgentCard) -> None:
+    async def handle_register(self, card: AgentCard) -> dict[str, str]:
         self._agents[card.url] = card
 
         self.logger.info(
@@ -95,18 +105,27 @@ class Registry:
                 "card": card.to_dict(),
             },
         )
+        return {"status": "agent registered successfully"}
 
-    async def handle_unregister(self, agent_url: str) -> None:
+    async def handle_unregister(self, agent_url: str) -> dict[str, str]:
         self._agents.pop(agent_url, None)
+        return {"status": "agent unregistered successfully"}
 
     async def handle_discover(
-        self, filter_by: dict[str, Any] | None = None, *, as_json: bool = True
+        self, filter_by: dict[str, Any] | None = None, *, as_json: bool = False
     ) -> list[dict[str, Any]] | list[AgentCard]:
         """Handle an incoming discover request by an Agent. It returns the AgentCard objects as a Dict."""
         if not filter_by:
-            return list(self._agents.values())
+            if as_json:
+                return [c.to_dict() for c in self._agents.values()]
+            else:
+                return list(self._agents.values())
 
-        return [c.to_dict() if as_json else c for c in self._agents.values() if self._match(filter_by, c)]
+        filtered_agents = [c for c in self._agents.values() if self._match(filter_by, c)]
+        if as_json:
+            return [c.to_dict() for c in filtered_agents]
+        else:
+            return filtered_agents
 
     def handle_status_html(self) -> str:
         """Return the registry's status as HTML.

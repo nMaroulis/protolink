@@ -22,7 +22,7 @@ class RegistryInterface(Protocol):
     async def handle_unregister(self, agent_url: str) -> dict[str, str]:
         """Handle an incoming unregister request by an Agent."""
 
-    async def handle_discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+    async def handle_discover(self, filter_by: dict[str, Any] | None = None) -> list[dict[str, Any]] | list[AgentCard]:
         """Return a the Registry's list of registered Agents."""
 
     def handle_status_html(self) -> str:

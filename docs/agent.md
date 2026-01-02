@@ -64,13 +64,25 @@ You can then attach tools and start the agent.
 Once the **Agent** and **Registry** objects have been initiated, they will automatically expose a web interface at `/status` where they display the registry and agent's information.
 
 
-<table>
-  <tr>
-    <td style="text-align: center;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" alt="Registry Status Card" width="90%">
+<table style="border-collapse: collapse; border: none; width: 100%;">
+  <tr style="border: none;">
+    <td style="text-align: center; border: none; padding: 10px; transition: transform 0.3s ease, box-shadow 0.3s ease;">
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" 
+           alt="Registry Status Card" 
+           width="60%" 
+           style="border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease;"
+           onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)';"
+           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';">
     </td>
-    <td style="text-align: center;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="90%">
+  </tr>
+  <tr style="border: none;">
+    <td style="text-align: center; border: none; padding: 10px; transition: transform 0.3s ease, box-shadow 0.3s ease;">
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" 
+           alt="Agent Status Card" 
+           width="60%" 
+           style="border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease;"
+           onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)';"
+           onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';">
     </td>
   </tr>
 </table>

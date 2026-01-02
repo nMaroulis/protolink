@@ -106,7 +106,7 @@ class Agent:
         # Register to the Registry
         if register and self.registry_client:
             try:
-                await self.registry_client.register(self.card)
+                _ = await self.registry_client.register(self.card)
                 logger.info(f"Registered to registry: {self.card.url}")
             except ConnectionError as e:
                 logger.exception(

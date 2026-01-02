@@ -182,12 +182,12 @@ await agent.start()
 Once the **Agent** and **Registry** objects have been initiated, they will automatically expose a web interface at `/status` where they display the registry and agent's information.
 
 <table>
-  <tr>
-    <td style="text-align: center;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" alt="Registry Status Card" width="90%">
+  <tr style="border: none;">
+    <td style="text-align: center; border: none;">
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" alt="Registry Status Card" width="100%">
     </td>
-    <td style="text-align: center;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="90%">
+    <td style="text-align: center; border: none;">
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="100%">
     </td>
   </tr>
 </table>
