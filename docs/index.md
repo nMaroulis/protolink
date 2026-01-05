@@ -28,26 +28,276 @@ _Current release: see [protolink on PyPI](https://pypi.org/project/protolink/)._
 
 ## Contents
 
-### Overview
-- [Concept](concept.md)
-- [Getting Started](getting-started.md)
+<div class="nav-grid">
+  <div class="nav-item">
+    <div class="nav-emoji">📚</div>
+    <div class="nav-content">
+      <a href="concept">Concept</a>
+      <div class="nav-desc">Core concepts and architecture</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-emoji">🚀</div>
+    <div class="nav-content">
+      <a href="getting-started">Getting Started</a>
+      <div class="nav-desc">Quick start guide and setup</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-emoji">🤖</div>
+    <div class="nav-content">
+      <a href="agent">Agent</a>
+      <div class="nav-desc">Agent implementation and lifecycle</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="client">Client</a>
+      <div class="nav-desc">HTTP client and communication</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="llm">LLM</a>
+      <div class="nav-desc">Large Language Model integrations</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="models">Models</a>
+      <div class="nav-desc">Data models and schemas</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="registry">Registry</a>
+      <div class="nav-desc">Agent discovery and registration</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="server">Server</a>
+      <div class="nav-desc">Server implementations</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="tool">Tool</a>
+      <div class="nav-desc">Tool system and adapters</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="transport">Transport</a>
+      <div class="nav-desc">Communication layers</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-content">
+      <a href="types">Types</a>
+      <div class="nav-desc">Type definitions and aliases</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-emoji">💡</div>
+    <div class="nav-content">
+      <a href="examples">Examples</a>
+      <div class="nav-desc">Code examples and tutorials</div>
+    </div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-emoji">🔗</div>
+    <div class="nav-content">
+      <a href="relevant">Relevant Projects</a>
+      <div class="nav-desc">Related tools and projects</div>
+    </div>
+  </div>
+</div>
 
-### API Reference
-- [Agent](agent.md)
-- [Client](client.md)
-- [LLM](llm.md)
-- [Models](models.md)
-- [Registry](registry.md)
-- [Server](server.md)
-- [Tool](tool.md)
-- [Transport](transport.md)
-- [Types](types.md)
+<style>
+.nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
 
-### Examples
-- [Examples](examples.md)
+.nav-item {
+  padding: 0.75rem 1rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #cbd5e1;
+  border-radius: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
 
-### Resources
-- [Relevant Projects](relevant.md)
+.nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.nav-item:hover {
+  border-left-color: #3b82f6;
+  border-color: #bfdbfe;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
+}
+
+.nav-item:hover::before {
+  opacity: 1;
+}
+
+.nav-emoji {
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.nav-item:hover .nav-emoji {
+  background: rgba(59, 130, 246, 0.1);
+  transform: scale(1.1);
+}
+
+.nav-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-item a {
+  color: #334155;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.75rem;
+  transition: color 0.3s ease;
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.nav-item:hover a {
+  color: #1e40af;
+}
+
+.nav-desc {
+  color: #64748b;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  transition: color 0.3s ease;
+}
+
+.nav-item:hover .nav-desc {
+  color: #475569;
+}
+
+/* Add subtle gradient backgrounds for different sections */
+.nav-item:nth-child(1), .nav-item:nth-child(2) {
+  border-left-color: #8b5cf6;
+}
+
+.nav-item:nth-child(1):hover, .nav-item:nth-child(2):hover {
+  border-left-color: #7c3aed;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1);
+}
+
+.nav-item:nth-child(1):hover .nav-emoji, .nav-item:nth-child(2):hover .nav-emoji {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.nav-item:nth-child(3), .nav-item:nth-child(4), .nav-item:nth-child(5), 
+.nav-item:nth-child(6), .nav-item:nth-child(7), .nav-item:nth-child(8), 
+.nav-item:nth-child(9), .nav-item:nth-child(10), .nav-item:nth-child(11) {
+  border-left-color: #06b6d4;
+}
+
+.nav-item:nth-child(3):hover, .nav-item:nth-child(4):hover, .nav-item:nth-child(5):hover,
+.nav-item:nth-child(6):hover, .nav-item:nth-child(7):hover, .nav-item:nth-child(8):hover,
+.nav-item:nth-child(9):hover, .nav-item:nth-child(10):hover, .nav-item:nth-child(11):hover {
+  border-left-color: #0891b2;
+  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.1);
+}
+
+.nav-item:nth-child(3):hover .nav-emoji, .nav-item:nth-child(4):hover .nav-emoji, 
+.nav-item:nth-child(5):hover .nav-emoji, .nav-item:nth-child(6):hover .nav-emoji, 
+.nav-item:nth-child(7):hover .nav-emoji, .nav-item:nth-child(8):hover .nav-emoji, 
+.nav-item:nth-child(9):hover .nav-emoji, .nav-item:nth-child(10):hover .nav-emoji, 
+.nav-item:nth-child(11):hover .nav-emoji {
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.nav-item:nth-child(12) {
+  border-left-color: #10b981;
+}
+
+.nav-item:nth-child(12):hover {
+  border-left-color: #059669;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
+}
+
+.nav-item:nth-child(12):hover .nav-emoji {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.nav-item:nth-child(13) {
+  border-left-color: #f59e0b;
+}
+
+.nav-item:nth-child(13):hover {
+  border-left-color: #d97706;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.1);
+}
+
+.nav-item:nth-child(13):hover .nav-emoji {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+@media (max-width: 768px) {
+  .nav-grid {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+  
+  .nav-item {
+    padding: 0.625rem 0.875rem;
+  }
+  
+  .nav-item:hover {
+    transform: translateY(-1px);
+  }
+  
+  .nav-emoji {
+    width: 24px;
+    height: 24px;
+    font-size: 1.1rem;
+  }
+  
+  .nav-item a {
+    font-size: 0.85rem;
+  }
+  
+  .nav-desc {
+    font-size: 0.7rem;
+  }
+}
+</style>
 
 ## What is Protolink ?
 

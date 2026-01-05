@@ -690,7 +690,7 @@ msg.add_part(Part("image", image_data))
 ```python
 @dataclass
 class Part:
-    type: str
+    type: PartType
     content: Any
 ```
 
@@ -700,7 +700,7 @@ Atomic content unit within a message. Parts represent individual pieces of conte
 
 | Parameter | Type | Description |
 |-----------|-----|-------------|
-| `type` | `str` | Content type (e.g., 'text', 'image', 'file') |
+| `type` | `PartType` | Content type (e.g., 'text', 'image', 'file') |
 | `content` | `Any` | The actual content data |
 
 ### Methods
