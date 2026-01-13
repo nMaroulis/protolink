@@ -13,6 +13,7 @@ It does **not** implement networking itself. Instead, it:
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
 from protolink.models import AgentCard, Task
@@ -30,6 +31,9 @@ class AgentInterface(Protocol):
 
     async def handle_task(self, task: Task) -> Task:
         """Handle an incoming task and return the updated task."""
+
+    def handle_task_streaming(self, task: Task) -> AsyncIterator[Any]:
+        """Stream task events."""
 
     async def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's public metadata and capabilities."""
@@ -68,33 +72,47 @@ class AgentServer:
         binds each endpoint to the corresponding agent handler.
         """
 
-        self._transport.setup_routes(
-            [
+        endpoints = [
+            EndpointSpec(
+                name="task",
+                path="/tasks/",
+                method="POST",
+                handler=self._agent.handle_task,
+                request_source="body",
+                request_parser=Task.from_dict,
+            ),
+            EndpointSpec(
+                name="agent_card",
+                path="/.well-known/agent.json",
+                method="GET",
+                handler=self._agent.get_agent_card,
+                request_source="none",
+            ),
+            EndpointSpec(
+                name="status",
+                path="/status",
+                method="GET",
+                handler=self._agent.get_agent_status_html,
+                request_source="none",
+                content_type="html",
+            ),
+        ]
+
+        if getattr(self._transport, "supports_streaming", False):
+            endpoints.append(
                 EndpointSpec(
-                    name="task",
-                    path="/tasks/",
+                    name="task_stream",
+                    path="/tasks/stream",
                     method="POST",
-                    handler=self._agent.handle_task,
+                    handler=self._agent.handle_task_streaming,
                     request_source="body",
                     request_parser=Task.from_dict,
-                ),
-                EndpointSpec(
-                    name="agent_card",
-                    path="/.well-known/agent.json",
-                    method="GET",
-                    handler=self._agent.get_agent_card,
-                    request_source="none",
-                ),
-                EndpointSpec(
-                    name="status",
-                    path="/status",
-                    method="GET",
-                    handler=self._agent.get_agent_status_html,
-                    request_source="none",
-                    content_type="html",
-                ),
-            ]
-        )
+                    streaming=True,
+                    mode="stream",
+                )
+            )
+
+        self._transport.setup_routes(endpoints)
 
     async def start(self) -> None:
         """Start the agent server.

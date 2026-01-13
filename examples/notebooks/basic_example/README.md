@@ -18,7 +18,7 @@ This directory contains a basic example of how to use ProtoLink to create a mult
 ┌─────────────────┐    HTTP REST API   ┌─────────────────┐
 │   Registry      │◄──────────────────►│  Alert Agent    │
 │  (localhost:    │                    │  (localhost:    │
-│   9000)         │                    │   8020)         │
+│   9010)         │                    │   8020)         │
 └─────────────────┘                    └─────────────────┘
          ▲                                   ▲
          │                                   │
@@ -40,7 +40,7 @@ First, run the [`registry.ipynb`](registry.ipynb) notebook to start the registry
 ```python
 from protolink.discovery import Registry
 
-REGISTRY_URL = "http://localhost:9000"
+REGISTRY_URL = "http://localhost:9010"
 
 # Create and start registry (uses HTTP transport by default)
 registry = Registry(transport="http", url=REGISTRY_URL)
@@ -62,7 +62,7 @@ from protolink.agents import Agent
 from protolink.models import AgentCard, Task
 
 URL = "http://localhost:8010"
-REGISTRY_URL = "http://localhost:9000"
+REGISTRY_URL = "http://localhost:9010"
 
 class WeatherAgent(Agent):
     async def handle_task(self, task: Task):
@@ -90,7 +90,7 @@ from protolink.models import Message, Task
 from protolink.transport import HTTPTransport
 
 URL = "http://localhost:8020"
-REGISTRY_URL = "http://localhost:9000"
+REGISTRY_URL = "http://localhost:9010"
 
 class AlertAgent(Agent):
     async def handle_task(self, task: Task):
@@ -136,7 +136,7 @@ await agent.start(register=True)
 
 Once all agents are running:
 
-1. **Check Registry Status**: Visit `http://localhost:9000/status`
+1. **Check Registry Status**: Visit `http://localhost:9010/status`
 2. **Check Agent Status**: 
    - Weather Agent: `http://localhost:8010/status`
    - Alert Agent: `http://localhost:8020/status`
@@ -144,7 +144,7 @@ Once all agents are running:
 
 ## Ports Used
 
-- **Registry**: 9000
+- **Registry**: 9010
 - **Weather Agent**: 8010  
 - **Alert Agent**: 8020
 

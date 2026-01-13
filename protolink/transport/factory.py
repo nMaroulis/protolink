@@ -9,11 +9,26 @@ if TYPE_CHECKING:
 # We store strings or callables to allow lazy loading.
 _TRANSPORT_REGISTRY: dict[str, type[Transport] | str] = {
     "http": "protolink.transport.http_transport.HTTPTransport",
+    "websocket": "protolink.transport.websocket_transport.WebSocketTransport",
     "runtime": "protolink.transport.runtime_transport.RuntimeTransport",
 }
 
 
 def get_transport(transport: str, **kwargs) -> Transport:
+    """Create a transport instance by name.
+
+    Parameters
+    ----------
+    transport:
+        Registered transport name (case-insensitive), e.g. ``"http"`` or ``"websocket"``.
+    **kwargs:
+        Keyword arguments forwarded to the transport constructor.
+
+    Returns
+    -------
+    Transport
+        Instantiated transport.
+    """
     try:
         entry = _TRANSPORT_REGISTRY[transport.lower()]
     except KeyError:

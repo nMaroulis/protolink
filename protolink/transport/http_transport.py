@@ -36,6 +36,7 @@ class HTTPTransport(Transport):
     """
 
     transport_type: ClassVar[TransportType] = "http"
+    supports_streaming: ClassVar[bool] = False
 
     def __init__(
         self,
