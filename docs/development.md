@@ -325,3 +325,11 @@ Please be respectful and constructive in all interactions. By participating in t
 ---
 
 Thank you for contributing to Protolink! 🚀
+
+
+<h3 style="text-align: center;"> 🎉🎉 Congratulations, You made it! 🎉🎉 </h3>
+<p style="text-align: center;">
+Want to see more? Stay tuned, as the project is actively maintained and everything is changing rapidly! 
+<br/>
+<img style="border: 5px solid #555;" src="https://media.tenor.com/sIzMTGPxIeMAAAAC/well-done.gif" alt="Good Job" width="320px">
+</p>

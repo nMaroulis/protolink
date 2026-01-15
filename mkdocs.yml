@@ -44,7 +44,10 @@ markdown_extensions:
   - codehilite
   - attr_list
   - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
   - toc:
       permalink: true
   - pymdownx.tabbed:
@@ -70,7 +73,9 @@ nav:
       - Transport: transport.md
       - Types: types.md
   - Examples:
-      - Examples: examples.md
+      - Basic Example: examples.md
+      - Ticket Booking Example: ticket_booking_example.md
+
   - Project:
       - Development & Contribution: development.md
   - Resources:

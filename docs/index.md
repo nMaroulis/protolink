@@ -51,48 +51,56 @@ _Current release: see [protolink on PyPI](https://pypi.org/project/protolink/)._
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🌐</div>
     <div class="nav-content">
       <a href="client">Client</a>
       <div class="nav-desc">HTTP client and communication</div>
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🧠</div>
     <div class="nav-content">
       <a href="llm">LLM</a>
       <div class="nav-desc">Large Language Model integrations</div>
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🗂️</div>
     <div class="nav-content">
       <a href="models">Models</a>
       <div class="nav-desc">Data models and schemas</div>
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🗃️</div>
     <div class="nav-content">
       <a href="registry">Registry</a>
       <div class="nav-desc">Agent discovery and registration</div>
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🌐</div>
     <div class="nav-content">
       <a href="server">Server</a>
       <div class="nav-desc">Server implementations</div>
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🔧</div>
     <div class="nav-content">
       <a href="tool">Tool</a>
       <div class="nav-desc">Tool system and adapters</div>
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🌐</div>
     <div class="nav-content">
       <a href="transport">Transport</a>
       <div class="nav-desc">Communication layers</div>
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">🗂️</div>
     <div class="nav-content">
       <a href="types">Types</a>
       <div class="nav-desc">Type definitions and aliases</div>
