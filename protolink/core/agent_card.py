@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, final
 
 from protolink import __version__ as protolink_version
 from protolink.types import AgentRoleType, MimeType, SecuritySchemeType, TransportType
@@ -79,6 +79,7 @@ class AgentSkill:
             self.examples = []
 
 
+@final
 @dataclass
 class AgentCard:
     """Agent identity and capability declaration.

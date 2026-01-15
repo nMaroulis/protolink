@@ -7,6 +7,7 @@ These utilities provide human-readable representations of AgentCard instances wi
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from html import escape
 from typing import TYPE_CHECKING
@@ -20,7 +21,7 @@ def _fmt(value: str | None, default: str = "—") -> str:
     return escape(value) if value else default
 
 
-def _list(items: list[str], empty: str = "None") -> str:
+def _list(items: Iterable[str], empty: str = "None") -> str:
     """Render a list as HTML <li> items."""
     if not items:
         return f"<li><em>{empty}</em></li>"

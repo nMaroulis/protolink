@@ -159,26 +159,30 @@ In real-world scenarios, things don’t always go as planned. Protolink allows t
 This example handles three common failure scenarios:
 
 1. **Tickets or Hotels Unavailable**
-   - Orchestrator queries **alternative dates** from the Vacation Advisor Agent  
-   - Weather is re-validated for new dates via the Weather Agent  
-   - Tickets and hotel availability are re-checked  
-   - If successful, the Orchestrator proceeds with booking  
-   - If no options are available, the Orchestrator notifies the user via Messaging Agent  
+
+      - Orchestrator queries **alternative dates** from the Vacation Advisor Agent  
+      - Weather is re-validated for new dates via the Weather Agent  
+      - Tickets and hotel availability are re-checked  
+      - If successful, the Orchestrator proceeds with booking  
+      - If no options are available, the Orchestrator notifies the user via Messaging Agent  
 
 2. **Bad Weather**
-   - Weather Agent returns warnings for the chosen dates  
-   - Orchestrator requests alternative travel windows from the Vacation Advisor Agent  
-   - Booking agents are only called once a safe window is found  
-   - User receives a summary of recommended changes via Messaging Agent  
+
+      - Weather Agent returns warnings for the chosen dates  
+      - Orchestrator requests alternative travel windows from the Vacation Advisor Agent  
+      - Booking agents are only called once a safe window is found  
+      - User receives a summary of recommended changes via Messaging Agent  
 
 3. **Partial Failures**
-   - For example, ticket booking succeeds but hotel booking fails  
-   - Orchestrator detects partial failure and can:
-     - Retry with alternative hotels
-     - Cancel the ticket (optional) if the trip cannot proceed  
-   - User receives an **updated status and explanation**  
+
+      - For example, ticket booking succeeds but hotel booking fails  
+      - Orchestrator detects partial failure and can:
+      - Retry with alternative hotels
+      - Cancel the ticket (optional) if the trip cannot proceed  
+      - User receives an **updated status and explanation**  
 
 ### 💡 Key Takeaways
+
 - Resilient orchestration: Orchestrator can reroute tasks dynamically
 - Structured retries: Agents respond to failure conditions with actionable alternatives
 - User transparency: Messaging Agent ensures the user is always aware of changes
