@@ -62,3 +62,8 @@ class Message:
     def agent(cls, text: str) -> "Message":
         """Create an agent message with text (convenience method)."""
         return cls(role="agent").add_text(text)
+
+    @classmethod
+    def assistant(cls, text: str) -> "Message":
+        """Create an assistant message with text (convenience method)."""
+        return cls(role="assistant").add_text(text)

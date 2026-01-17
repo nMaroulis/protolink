@@ -14,7 +14,7 @@
 
 > 📌 The framework is currently in **alpha** and is subject to change. 
 
-ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and **integrate tools seamlessly**. Build **distributed multi-agent systems** with minimal boilerplate and production-ready reliability.
+ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and **integrate tools seamlessly**. Build **distributed multi-agent systems** with minimal boilerplate and production-oriented architecture.
 
 Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
@@ -93,7 +93,7 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
 - **Real Multi-Agent Systems**: Build **autonomous agents** with embedded LLMs, tools, and memory that communicate directly.
 - **Simple API**: Built from the ground-up for **minimal boilerplate**, letting you focus on agent logic rather than infrastructure.
 - **Developer Friendly**: Clean abstractions and direct code paths make debugging and maintenance a breeze.
-- **Production Ready**: Designed for **performance, reliability, and scalability** in real-world deployments.
+- **Production Oriented**: Designed for **performance, reliability, and scalability** in real-world deployments.
 - **Extensible & Interoperable**: Add new agents, transports, or protocols easily; compatible with **A2A** and **MCP** standards.
 - **Community Focused**: Designed for the open-source community with clear contribution guidelines.
 
@@ -222,7 +222,6 @@ The following are the Protolink wrappers for each type. If you want to use anoth
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/openai.svg" width="45" alt="OpenAI" title="OpenAI"/>  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/anthropic_black.svg" width="45" alt="Anthropic" />  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/gemini.svg" width="45" alt="Gemini" />  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/deepseek.svg" width="45" alt="DeepSeek" />    <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/ollama_light.svg" width="45" alt="Ollama" />  <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="45" alt="Llama.cpp" />
 </p>
 
-
 - **API**, calls the API, requires an API key:
   - [OpenAILLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py): Uses **OpenAI API** for sync & async requests.
   - [AnthropicLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py): Uses **Anthropic API** for sync & async requests.
@@ -237,6 +236,180 @@ The following are the Protolink wrappers for each type. If you want to use anoth
 
 - [Native Tool](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py): Uses native tools.
 - [MCPToolAdapter](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp.py) - **TBD**: Connects to MCP Server and registers MCP tools as native tools.
+
+
+#### How Protolink Eliminates LLM Orchestration Boilerplate
+
+Protolink treats agentic systems as **distributed programs**, not probabilistic workflows.  
+Every interaction between models, tools, and agents is expressed as an explicit, typed action with deterministic execution semantics. The goal is to replace emergent behavior and prompt-driven control flow with **inspectable, replayable, and verifiable computation**, while preserving the expressive power of modern LLMs.
+
+Protolink provides a **deterministic execution layer** for LLMs, tools, and agents, allowing users to focus purely on business logic instead of orchestration glue.
+
+Building agentic systems usually means wrestling with tool-calling prompts, JSON schemas, output parsing, routing between agents, retries, and error handling. This boilerplate is repetitive, fragile, and completely orthogonal to the problem you actually want to solve.
+
+Protolink removes that complexity by standardizing all interactions through a small set of explicit primitives:
+
+- **Task** — a shared unit of work
+- **Message** — communication within a task
+- **Part** — an atomic, machine-interpretable action or result
+
+Agents never infer behavior implicitly. Instead, they declare intent explicitly using structured Parts such as:
+
+- **tool_call** — execute a local tool
+- **agent_call** — delegate work to another agent
+- **infer** — invoke LLM reasoning
+- **text** — return user-facing output
+
+and more...
+
+From there, the runtime handles everything deterministically.
+
+#### Zero-Boilerplate LLM → Tool → Agent Flow
+
+You do **not** need to:
+
+- Prompt the LLM to decide when to **call tools**
+- **Parse** raw LLM text or JSON
+- Write **routing** or **delegation logic**
+- Implement planners, routers, or state machines
+
+The runtime automatically:
+
+- Builds structured system prompts
+- Injects tool schemas and agent capabilities
+- Enforces strict output contracts
+- Executes declared actions deterministically
+
+Tool calls, agent calls, and LLM invocations only happen when explicitly declared.
+All results are returned as structured Parts — no hidden side effects, no magic.
+From the user’s perspective:
+
+```python
+task = Task.create(
+    Message.user("What's the weather in Geneva?")
+)
+```
+That’s it.
+
+#### Deterministic by Design
+
+This is not a black-box agent framework.
+- No hidden reasoning
+- No implicit planning
+- No speculative execution
+
+Every action is **explicit, inspectable, and replayable**.
+
+If a tool runs, you see a `tool_call`.
+If an agent is contacted, you see an `agent_call`.
+If an LLM is invoked, you see an `infer`.
+
+This makes the system predictable, debuggable, composable, and production-ready.
+
+#### LLM-Agnostic and Provider-Independent
+
+The runtime is **fully LLM-agnostic**.
+Any model — **API-based, self-hosted, or local** can be swapped in without changing behavior or results. OpenAI, Anthropic, local servers, or custom backends all operate through the same unified execution model.
+
+The orchestration stays the same.
+The contracts stay the same.
+Only the model changes.
+
+This lets you evolve providers, costs, latency, or deployment strategy without rewriting your agents.
+
+
+## Task, Message, Artifact, and Part in the Agent System
+
+This project uses a structured, Agent-to-Agent (A2A) style communication model. Understanding how **Tasks**, **Messages**, **Artifacts**, and **Parts** interact is key to using the agent effectively.
+
+### Concepts
+
+### 1. Task
+A **Task** represents a unit of work or a conversation thread between agents.  
+- It contains **Messages** and **Artifacts**.
+- Tracks **metadata** such as state (`submitted`, `working`, `completed`) and execution history.
+- Tasks are sent between agents; each agent executes what is explicitly defined in the task.
+
+### 2. Message
+A **Message** is a communicative unit in a task.
+- Can be sent by a user or an agent.
+- Contains **Parts** representing atomic content.
+- Example roles:
+  - `"user"` — input from a human or another agent
+  - `"agent"` — output from an agent
+
+### 3. Artifact
+An **Artifact** is a container for outputs generated by the agent.
+- Stores **Parts** that result from executing a tool (**tool_call**) or an LLM inference (**infer**).
+- Can include tool results, reasoning traces, or structured outputs.
+- Artifacts allow agents to append results without modifying the original message.
+
+### 4. Part
+A **Part** is the atomic content of a Message or Artifact.
+- Defines **what to do** or **what was produced**.
+- Example Part types (`PartType`):
+  - `"text"`: plain text content
+  - `"json"`: structured data
+  - `"tool_call"`: request to execute a registered tool
+  - `"tool_result"`: result from executing a tool
+  - `"infer"`: input to invoke the agent's LLM
+  - `"status"`, `"error"`, `"image"`, `"audio"`, etc.
+
+### Communication Flow
+
+1. **Task Creation**  
+   A user or agent creates a `Task` with a `Message` containing one or more `Parts`.
+
+2. **Task Execution**  
+   - The receiving agent inspects the **last message or artifact** in the task.
+   - Executes each `Part` sequentially:
+     - `tool_call` → executes a registered tool → produces `tool_result` Part in an Artifact.
+     - `infer` → invokes the agent's LLM → produces output Part in an Artifact.
+
+3. **Appending Outputs**  
+   - Results are appended to the Task as new **Artifacts**.
+   - Lifecycle state transitions (`working`, `completed`, `failed`) are updated in the Task metadata.
+
+4. **Sequential Processing**  
+   - Tasks are processed sequentially at the message/artifact level.
+   - Parallel execution is possible **within the parts of a single message/artifact**, but not across multiple messages/artifacts in the same task.
+
+#### Simple Example
+
+```python
+from protolink.models import Message, Part, Task
+
+# 1️⃣ User creates a Task with a message containing a Part
+task = Task.create(Message.user("What's the weather in Athens?"))
+
+# 2️⃣ Add a tool call Part
+tool_part = Part.tool_call(tool_name="weather_api", args={"city": "Athens"})
+task.add_message(Message.agent(parts=[tool_part]))
+
+# 3️⃣ Agent executes the task
+result_task = await agent.execute_task(task)
+
+# 4️⃣ Outputs are appended as artifacts
+for artifact in result_task.artifacts:
+    for part in artifact.parts:
+        if part.type == "tool_result":
+            print("Tool result:", part.content)
+
+# 5️⃣ If needed, a infer Part can trigger the agent's LLM
+infer_part = Part.infer(prompt="Summarize today's weather in Athens")
+task.add_message(Message.agent(parts=[infer_part]))
+result_task = await agent.execute_task(task)
+```
+
+**Key Notes:**
+
+- Each `Task` maintains the full history of messages and artifacts.
+- Agents execute the **last message or artifact** to determine the next action.
+- Parts inside a message or artifact can be executed in parallel if needed.
+- Agents **do not guess intent**; they execute exactly what is defined in the Parts.
+
+This structured approach ensures predictable, deterministic agent behavior while still supporting multi-step interactions and LLM/tool execution.
+
 
 
 ## License

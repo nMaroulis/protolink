@@ -29,7 +29,7 @@ class OpenAILLM(APILLM):
         "frequency_penalty": 0.0,  # Default is 0.0 (-2.0 to 2.0)
         "logit_bias": None,  # Default is None
     }
-    system_prompt: str = """You are a helpful AI assistant."""
+    system_prompt: str = ""
 
     def __init__(
         self,
@@ -116,6 +116,13 @@ class OpenAILLM(APILLM):
                 role="assistant",
                 parts=[Part("assistant", current_content)],
             )
+
+    def infer_model(self, query: str) -> Part:
+        """Generate a response using the infer model."""
+
+        response = self._client.responses.create(model=self.model, input=query, **self.model_params)
+
+        return Part("infer_response", response.output_text)
 
     def validate_connection(self) -> bool:
         try:

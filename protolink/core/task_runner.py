@@ -1,5 +1,6 @@
 from protolink.core.artifact import Artifact
 from protolink.core.message import Message
+from protolink.core.part import Part
 from protolink.core.task import Task, TaskState
 
 # ----------------------------------------------------------------------
@@ -16,7 +17,7 @@ class TaskLifecycle:
     def begin(self, task: Task) -> Task:
         return task.update_state(TaskState.WORKING)
 
-    def require_input(self, task: Task, message: "Message" | None = None) -> Task:
+    def require_input(self, task: Task, message: Message | None = None) -> Task:
         if message:
             task.add_message(message)
         return task.update_state(TaskState.INPUT_REQUIRED)
@@ -24,8 +25,8 @@ class TaskLifecycle:
     def complete(
         self,
         task: Task,
-        message: "Message" | None = None,
-        artifacts: list["Artifact"] | None = None,
+        message: Message | None = None,
+        artifacts: list[Artifact] | None = None,
     ) -> Task:
         if message:
             task.add_message(message)
@@ -38,7 +39,7 @@ class TaskLifecycle:
         self,
         task: Task,
         error: str,
-        artifacts: list["Artifact"] | None = None,
+        artifacts: list[Artifact] | None = None,
     ) -> Task:
         task.metadata["error"] = error
         if artifacts:
@@ -50,7 +51,7 @@ class TaskLifecycle:
         self,
         task: Task,
         reason: str | None = None,
-        artifacts: list["Artifact"] | None = None,
+        artifacts: list[Artifact] | None = None,
     ) -> Task:
         if reason:
             task.metadata["cancel_reason"] = reason
@@ -62,40 +63,72 @@ class TaskLifecycle:
 
 class TaskRunner:
     """
-    Runs a task by applying direct agent output.
-    Fully decoupled from the agent.
+    Applies protocol-level outputs (Message / Part)
+    to a Task and advances its lifecycle.
+
+    The runner never calls the agent.
+    It only interprets outputs.
     """
 
     def __init__(self, lifecycle: TaskLifecycle | None = None):
         self.lifecycle = lifecycle or TaskLifecycle()
 
-    def run(
+    def apply(
         self,
         task: Task,
-        state: TaskState,
-        message: "Message" | None = None,
-        error: str | None = None,
-        reason: str | None = None,
-        artifacts: list["Artifact"] | None = None,
+        outputs: list[Message | Part],
     ) -> Task:
         """
-        Update task state directly based on agent output.
-        One-way: runner never calls agent.
+        Apply agent outputs to a task and update state accordingly.
         """
-        if task.state not in {TaskState.SUBMITTED, TaskState.WORKING, TaskState.INPUT_REQUIRED}:
+
+        if task.state not in {
+            TaskState.SUBMITTED,
+            TaskState.WORKING,
+            TaskState.INPUT_REQUIRED,
+        }:
             return task
 
-        if state == TaskState.COMPLETED:
-            return self.lifecycle.complete(task, message, artifacts)
+        messages: list[Message] = []
+        artifacts: list[Artifact] = []
+        requires_input = False
+        has_tool_call = False
 
-        if state == TaskState.INPUT_REQUIRED:
-            return self.lifecycle.require_input(task, message)
+        for output in outputs:
+            if isinstance(output, Message):
+                messages.append(output)
 
-        if state == TaskState.FAILED:
-            return self.lifecycle.fail(task, error or "unknown error", artifacts)
+            elif isinstance(output, Part):
+                artifacts.append(Artifact.from_part(output))
 
-        if state == TaskState.CANCELED:
-            return self.lifecycle.cancel(task, reason, artifacts)
+                if output.type == "tool_call":
+                    has_tool_call = True
 
-        # fallback
-        return self.lifecycle.fail(task, "unknown state", artifacts)
+                if output.type == "status" and output.content.get("state") == "input_required":
+                    requires_input = True
+
+                if output.type == "error":
+                    return self.lifecycle.fail(
+                        task,
+                        error=output.content.get("message", "unknown error"),
+                        artifacts=artifacts,
+                    )
+
+        # ---- lifecycle decisions ----
+
+        for msg in messages:
+            task.add_message(msg)
+
+        for art in artifacts:
+            task.add_artifact(art)
+
+        if has_tool_call:
+            return self.lifecycle.begin(task)
+
+        if requires_input:
+            return self.lifecycle.require_input(task)
+
+        if messages or artifacts:
+            return self.lifecycle.complete(task)
+
+        return task

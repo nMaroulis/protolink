@@ -4,6 +4,7 @@ from typing import Any
 
 from protolink.core.artifact import Artifact
 from protolink.core.message import Message
+from protolink.core.part import Part
 from protolink.utils import utc_now
 from protolink.utils.id_generator import IDGenerator
 
@@ -106,3 +107,66 @@ class Task:
     def create(cls, message: Message) -> "Task":
         """Create a new task with an initial message."""
         return cls(messages=[message])
+
+    def get_last_item(self) -> Message | Artifact | None:
+        """
+        Return the most recently appended Message or Artifact in this Task.
+
+        Since messages and artifacts are appended in order, the last item in each list is always the most recent.
+        We compare timestamps of the last Message and last Artifact to determine which is more recent.
+        """
+        if not self.messages and not self.artifacts:
+            return None
+
+        # Get candidates (last items from each collection)
+        candidates = []
+        if self.messages:
+            candidates.append(self.messages[-1])
+        if self.artifacts:
+            candidates.append(self.artifacts[-1])
+
+        # Return single candidate or compare timestamps
+        if len(candidates) == 1:
+            return candidates[0]
+
+        # Sort by timestamp (descending) and return first
+        return max(candidates, key=lambda x: x.timestamp)
+
+    @staticmethod
+    def tool_call(
+        *,
+        tool_name: str,
+        args: dict[str, Any] | None = None,
+        call_id: str | None = None,
+    ) -> Part:
+        """
+        Create a tool_call Part to be executed by an agent.
+
+        This represents an explicit request to invoke a tool.
+        """
+        return Part.tool_call(
+            tool_name=tool_name,
+            args=args or {},
+            call_id=call_id,
+        )
+
+    @staticmethod
+    def infer(
+        *,
+        prompt: str | None = None,
+        user: str | None = None,
+        output_schema: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Part:
+        """
+        Create a infer Part to be executed by the agent's LLM.
+
+        An infer explicitly instructs the agent to invoke its LLM.
+        """
+
+        return Part.infer(
+            prompt=prompt,
+            user=user,
+            output_schema=output_schema,
+            metadata=metadata,
+        )

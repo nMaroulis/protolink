@@ -68,6 +68,8 @@ class AgentSkill:
 
     id: str
     description: str = ""
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 
@@ -77,6 +79,10 @@ class AgentSkill:
             self.tags = []
         if self.examples is None:
             self.examples = []
+        if self.input_schema is None:
+            self.input_schema = {}
+        if self.output_schema is None:
+            self.output_schema = {}
 
 
 @final
@@ -162,3 +168,23 @@ class AgentCard:
         for f in required_fields:
             if f not in data:
                 raise ValueError(f"AgentCard :: Missing required field: {f}")
+
+    @classmethod
+    def get_prompt_format(cls) -> str:
+        """Get the prompt format for this agent."""
+
+        prompt_text: str = f"""
+            name: {cls.name},
+            description: {cls.description},
+        """
+        if cls.skills:
+            prompt_text += "\ntools:\n"
+            for skill in cls.skills:
+                prompt_text += f"""
+                    "name": {skill.id},
+                    "description": {skill.description},
+                    "input_schema": {skill.input_schema}
+                    "output_schema": {skill.output_schema}
+                    \n
+                """
+        return prompt_text

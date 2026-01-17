@@ -17,13 +17,13 @@ class Artifact:
         id: Unique artifact identifier
         parts: Content parts of the artifact
         metadata: Artifact metadata (type, size, etc.)
-        created_at: When artifact was created
+        timestamp: When artifact was created
     """
 
     id: str = field(default_factory=lambda: IDGenerator.generate_artifact_id())
     parts: list[Part] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: utc_now())
+    timestamp: str = field(default_factory=lambda: utc_now())
 
     def add_part(self, part: Part) -> "Artifact":
         """Add content part to artifact."""
@@ -41,7 +41,7 @@ class Artifact:
             "id": self.id,
             "parts": [p.to_dict() for p in self.parts],
             "metadata": self.metadata,
-            "created_at": self.created_at,
+            "timestamp": self.timestamp,
         }
 
     @classmethod
@@ -52,5 +52,5 @@ class Artifact:
             id=data.get("id", IDGenerator.generate_artifact_id()),
             parts=parts,
             metadata=data.get("metadata", {}),
-            created_at=data.get("created_at", utc_now()),
+            timestamp=data.get("timestamp", utc_now()),
         )

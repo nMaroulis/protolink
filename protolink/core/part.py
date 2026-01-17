@@ -5,6 +5,43 @@ from protolink.types import PartType
 
 
 @dataclass
+class ToolCall:
+    """
+    Standardized tool/capability invocation.
+
+    This mirrors Google A2A semantics where an agent requests another agent
+    to execute a specific capability.
+
+    Attributes:
+        tool_name: Canonical name of the tool or capability to invoke.
+                   Example: "weather.get_temperature"
+        args: Arguments passed to the tool.
+        call_id: Optional correlation ID used to match tool_call with
+                 the corresponding tool_result.
+    """
+
+    tool_name: str
+    args: dict[str, Any]
+    call_id: str | None = None
+
+
+@dataclass
+class ToolResult:
+    """
+    Result of a previously issued tool_call.
+
+    Attributes:
+        call_id: Correlation ID matching the originating tool_call.
+        result: Successful result payload (if any).
+        error: Error payload if the tool execution failed.
+    """
+
+    call_id: str
+    result: Any | None = None
+    error: dict | None = None
+
+
+@dataclass
 class Part:
     """Atomic content unit within a message.
 
@@ -18,7 +55,11 @@ class Part:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
-        return asdict(self)
+        content = asdict(self.content) if hasattr(self.content, "__dataclass_fields__") else self.content
+        return {
+            "type": self.type,
+            "content": content,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Part":
@@ -50,4 +91,119 @@ class Part:
         return cls(
             type="status",
             content={"state": state, "message": message},
+        )
+
+    # ------------------------------------------------------------------
+    # Tool interaction
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def tool_call(
+        cls,
+        *,
+        tool_name: str,
+        args: dict[str, Any] | None = None,
+        call_id: str | None = None,
+    ) -> "Part":
+        """
+        Create a tool invocation part.
+
+        In A2A terms, this represents a request to execute a specific
+        agent capability (tool) along with its arguments.
+
+        This part is sent inside a Message and is interpreted by the
+        receiving agent, which routes the call to the appropriate
+        internal handler.
+
+        Args:
+            tool_name: Canonical name of the tool or capability to invoke.
+            args: Arguments for the tool.
+            call_id: Optional correlation ID to match with tool_result.
+
+        Returns:
+            Part: A Part of type "tool_call".
+        """
+        return cls(
+            type="tool_call",
+            content=ToolCall(
+                tool_name=tool_name,
+                args=args or {},
+                call_id=call_id,
+            ),
+        )
+
+    @classmethod
+    def tool_result(
+        cls,
+        *,
+        call_id: str | None = None,
+        result: Any | None = None,
+        error: dict | None = None,
+    ) -> "Part":
+        """
+        Create a tool result part.
+
+        This part is used to return the outcome of a previously issued
+        tool_call. It completes the tool invocation lifecycle.
+
+        In A2A, this corresponds to emitting the execution result of
+        a capability back to the requesting agent.
+
+        Args:
+            call_id: Correlation ID matching the original tool_call.
+            result: Successful result payload.
+            error: Error information if the tool execution failed.
+
+        Returns:
+            Part: A Part of type "tool_result".
+        """
+        return cls(
+            type="tool_result",
+            content=ToolResult(
+                call_id=call_id,
+                result=result,
+                error=error,
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # LLM interaction
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def infer(
+        cls,
+        *,
+        prompt: str | None = None,
+        user: str | None = None,
+        output_schema: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "Part":
+        """
+        Create a infer part.
+
+        This part is used to instruct the agent to invoke its LLM.
+
+        Args:
+            prompt: The prompt to send to the LLM.
+            user: The user to send to the LLM.
+            output_schema: The output schema to use for the LLM.
+            metadata: Additional metadata to include with the infer.
+
+        Returns:
+            Part: A Part of type "infer".
+        """
+        content = {
+            "prompt": prompt,
+            "user": user,
+            "output_schema": output_schema,
+            "metadata": metadata or {},
+        }
+
+        # Remove empty fields
+        content = {k: v for k, v in content.items() if v is not None}
+
+        return cls(
+            type="infer",
+            content=content,
         )

@@ -13,7 +13,7 @@ from protolink.client import AgentClient, RegistryClient
 from protolink.core.context_manager import ContextManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
-from protolink.models import AgentCard, AgentSkill, Message, Task
+from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.server import AgentServer
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
@@ -38,19 +38,29 @@ class Agent:
         registry: TransportType | Registry | RegistryClient | None = None,
         registry_url: str | None = None,
         llm: LLM | None = None,
+        system_prompt: str | None = None,
         skills: Literal["auto", "fixed"] = "auto",
+        *,
+        override_system_prompt: bool = False,
     ):
         """Initialize agent with its identity card and transport layer.
 
         Args:
-            card: AgentCard describing this agent
-            llm: Optional LLM instance for the agent to use
-            transport: Transport layer for client/server communication
-            registry: Optional registry for agent discovery. The Agent uses the RegistryClient to communicate with the
-                Registry. If a Registry class is passed, its RegistryClient will be extracted. If a string is passed, it
-                will be used as the registry URL. (default HTTPTransport)
-            skills: Skills mode - "auto" to automatically detect and add skills, "fixed" to use only the skills defined
-            by the user in the AgentCard.
+            card: AgentCard or dict describing this agent's identity and capabilities
+            transport: Transport instance or transport type string. If a Transport object is provided, it's used
+                directly. If a string is provided (e.g., "http", "websocket"), a new Transport instance is created
+                (transport factory) using the agent's card URL.
+            registry: Registry instance, RegistryClient, or transport type string. If a Registry object is provided,
+                its RegistryClient is extracted. If a RegistryClient is provided, it's used directly.
+                If a string is provided, a new RegistryClient is created using the transport factory with registry_url.
+            registry_url: URL of registry when using string transport type for registry creation.
+            llm: Optional LLM instance for agent reasoning and inference
+            system_prompt: This is used as complementary text in the system prompt, which is responsible for explaining
+                the agent logic and role. The agent calling, tool calling and other A2A functionalities are already
+                predefined, so the LLM already has the knowledge on how to interact with its environment.
+                If you wish to override the system prompt completely, set override_system_prompt to True.
+            skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills
+            override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided
         """
 
         # Field Validation is handled by the AgentCard dataclass.
@@ -59,6 +69,10 @@ class Agent:
         self.llm = llm
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
+
+        # LLM prompt
+        self.system_prompt: str | None = system_prompt
+        self.override_system_prompt: bool = override_system_prompt
 
         # Initialize client and server components
         if transport is None:
@@ -153,20 +167,43 @@ class Agent:
     # ----------------------------------------------------------------------
 
     async def handle_task(self, task: Task) -> Task:
-        """Process a task and return the result.
+        """
+        Default task handler for A2A-compatible agents.
 
-        This is the core method that users must implement.
+        This method provides the standard execution behavior for an agent.
+        Users typically DO NOT need to override this method.
+
+        Default behavior:
+        - Interprets the Task's Parts as explicit execution instructions
+        - Executes all `tool_call` Parts via registered tools
+        - Executes all `infer` Parts via the agent's LLM (if available)
+        - Attaches produced outputs (messages and artifacts) back to the Task
+
+        This method is deterministic and non-heuristic:
+        - No implicit reasoning is performed
+        - The LLM is only invoked when a `infer` Part is present
+        - If no executable Parts are found, the Task is returned unchanged
+
+        When to override:
+        Override this method ONLY if you need custom orchestration logic, such as:
+        - Conditional execution or filtering of Parts
+        - Enforcing execution policies or limits
+        - Custom routing between tools, LLMs, or sub-agents
+        - Short-circuiting execution for specific Task types
+
+        When overriding, users are encouraged to:
+        - Call `super().handle_task(task)` when possible
+        - Preserve explicit execution semantics (avoid hidden heuristics)
+        - Avoid mutating Task state directly; return an updated Task instead
 
         Args:
-            task: Task to process
+            task: The Task to be processed.
 
         Returns:
-            Task with updated state and response messages
-
-        Raises:
-            NotImplementedError: Must be implemented by subclass
+            The updated Task after applying all explicitly requested executions.
         """
-        raise NotImplementedError("Agent subclasses must implement handle_task()")
+
+        return await self.execute_task(task)
 
     async def handle_task_streaming(self, task: Task) -> AsyncIterator:
         """Process a task with streaming updates (NEW in v0.2.0).
@@ -360,6 +397,149 @@ class Agent:
         return await tool(**kwargs)
 
     # ----------------------------------------------------------------------
+    # Task & Tool Execution
+    # ----------------------------------------------------------------------
+
+    async def execute_task(self, task: Task) -> Task:
+        """
+        Execute the next step of a Task by inspecting the most recently
+        appended Message or Artifact and performing the explicitly
+        requested action.
+
+        Execution model:
+        - The agent processes ONE step at a time
+        - Only the most recent Message or Artifact is inspected
+        - No historical scanning or inference is performed
+
+        Supported semantics:
+        - `tool_call` Parts are executed via registered tools
+        - `infer` Parts trigger model inference via the agent's LLM (if available)
+
+        Determinism guarantees:
+        - No intent inference
+        - No fallback behavior
+        - No automatic execution unless explicitly declared
+        - If nothing executable is found, this method is a no-op
+
+        Task lifecycle (state transitions) is NOT handled here.
+        This method only produces outputs and appends them to the Task.
+
+        Args:
+            task: The Task to execute.
+
+        Returns:
+            The same Task instance, augmented with new Messages or Artifacts.
+        """
+
+        last_item = task.get_last_item()
+        if last_item is None:
+            return task
+
+        outputs: list[Part | Message] = []
+
+        # ---- Inspect Parts in the last item only ----
+        for part in last_item.parts:
+            if part.type == "tool_call":
+                outputs.append(await self.execute_tool(part))
+
+            elif part.type == "infer":
+                outputs.extend(await self.call_llm(part))
+
+        # ---- Attach outputs to the Task ----
+        for out in outputs:
+            if isinstance(out, Message):
+                task.add_message(out)
+            else:
+                task.add_artifact(Artifact.add_part(out))
+
+        return task
+
+    async def execute_tool(self, part: Part) -> Part:
+        """
+        Execute a single tool call described by a `tool_call` Part.
+
+        This method:
+        - Resolves the tool from the agent's tool registry
+        - Executes it with the provided arguments
+        - Captures success or failure
+        - Returns a corresponding `tool_result` Part
+
+        The agent runtime is responsible for calling this method.
+        The protocol / lifecycle layers never execute tools directly.
+
+        Args:
+            part: A Part of type "tool_call" containing:
+                - tool_name (str)
+                - args (dict)
+                - call_id (str)
+
+        Returns:
+            A Part of type "tool_result" containing:
+            - call_id: The original tool call identifier
+            - result: The tool output (on success)
+            - error: Error information (on failure)
+        """
+
+        tool_name = part.content["tool_name"]
+        args = part.content.get("args", {})
+        call_id = part.content.get("call_id")
+
+        tool = self.tools.get(tool_name)
+        if not tool:
+            return Part.tool_result(
+                call_id=call_id,
+                error={"message": f"Tool '{tool_name}' not found"},
+            )
+
+        try:
+            result = await tool(**args)
+            return Part.tool_result(call_id=call_id, result=result)
+        except Exception as e:
+            return Part.tool_result(
+                call_id=call_id,
+                error={"message": str(e)},
+            )
+
+    async def call_llm(self, infer_part: Part) -> list[Part]:
+        """
+        Invoke the agent's LLM.
+
+        The LLM may:
+        - return text
+        - return tool_call parts
+        - return infer parts (loop)
+        """
+
+        if not self.llm:
+            return [
+                Part.error(
+                    code="no_llm",
+                    message="Agent has no LLM but received a infer instruction",
+                )
+            ]
+
+        # Get Available Agents
+        agent_cards = ""
+        for i, agent in enumerate(self.discover_agents(), start=1):
+            agent_cards += f"""
+            Agent {i}:
+                {agent.get_prompt_format()}
+            """
+
+        # Build the System Prompt
+        self.llm.build_system_prompt(
+            user_instructions=self.system_prompt,
+            agent_cards=agent_cards,
+            tools=self.get_tools_for_prompt(),
+            override_system_prompt=self.override_system_prompt,
+        )
+        response = await self.llm.infer_model(
+            query=infer_part.content.get("prompt"),
+        )
+
+        return response
+
+    # ----------------------------------------------------------------------
     # Skill Management
     # ----------------------------------------------------------------------
 
@@ -400,11 +580,15 @@ class Agent:
             List of AgentSkill objects detected from the agent
         """
         detected_skills = []
-        # TODO(): Get LLM's skills.
+        # TODO(): Get LLM's skills. e.g. reasoning etc.
         # Detect skills from tools
         for tool_name, tool in self.tools.items():
             skill = AgentSkill(
-                id=tool_name, description=tool.description or f"Tool: {tool_name}", tags=tool.tags if tool.tags else []
+                id=tool_name,
+                description=tool.description or f"Tool: {tool_name}",
+                tags=tool.tags if tool.tags else [],
+                input_schema=tool.input_schema,
+                output_schema=tool.output_schema,
             )
             detected_skills.append(skill)
 
@@ -440,6 +624,24 @@ class Agent:
             HTML string with agent status information
         """
         return to_status_html(agent=self.card, start_time=self.start_time)
+
+    def get_tools_for_prompt(self) -> str | None:
+        """Return a string with a list of the agent's tools to be used in  LLM prompts."""
+
+        if not self.tools:
+            return None
+
+        tool_prompt: str = ""
+        for i, (name, tool) in enumerate(self.tools.items(), start=1):
+            tool_prompt += f"""
+            Tool {i}:
+                "name": {name},
+                "description": {tool.description},
+                "input_schema": {tool.input_schema},
+                "output_schema": {tool.output_schema}
+            \n
+            """
+        return tool_prompt
 
     def set_transport(self, transport: TransportType | Transport | None) -> None:
         """Set the transport layer for this agent.

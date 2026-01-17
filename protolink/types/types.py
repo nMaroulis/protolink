@@ -83,6 +83,9 @@ PartType: TypeAlias = Literal[
     "status",
     "error",
     "warning",
+    # ---- LLM Call ----
+    "infer",
+    "infer_result",
     # ---- Tool interaction ----
     "tool_call",
     "tool_result",
