@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 from logging.handlers import RotatingFileHandler
-from typing import Any
+from typing import Any, ClassVar
 
 # Log format constants
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -102,6 +102,23 @@ class ProtoLinkLogger:
     console and file logging.
     """
 
+    _instances: ClassVar[dict[str, "ProtoLinkLogger"]] = {}
+    _configured: ClassVar[bool] = False
+
+    def __new__(
+        cls,
+        name: str = "protolink",
+        log_level: int = logging.INFO,
+        log_file: str | None = None,
+        max_bytes: int = 10 * 1024 * 1024,  # 10MB
+        backup_count: int = 5,
+    ):
+        """Create or return existing logger instance (singleton pattern)."""
+        if name not in cls._instances:
+            instance = super().__new__(cls)
+            cls._instances[name] = instance
+        return cls._instances[name]
+
     def __init__(
         self,
         name: str = "protolink",
@@ -110,7 +127,7 @@ class ProtoLinkLogger:
         max_bytes: int = 10 * 1024 * 1024,  # 10MB
         backup_count: int = 5,
     ):
-        """Initialize the logger.
+        """Initialize logger.
 
         Args:
             name: Logger name
@@ -119,32 +136,57 @@ class ProtoLinkLogger:
             max_bytes: Maximum log file size in bytes before rotation
             backup_count: Number of backup log files to keep
         """
+        # Only initialize once per instance
+        if hasattr(self, "_initialized"):
+            return
+
         resolved_level = _resolve_log_level(log_level)
         resolved_file = _resolve_log_file(log_file)
 
         self.logger = logging.getLogger(name)
         self.logger.setLevel(resolved_level)
+        # Don't set propagate to False so module names show up in logs
 
-        # Prevent adding multiple handlers
-        if not self.logger.handlers:
-            if _use_json_format():
-                formatter: logging.Formatter = JsonFormatter(datefmt=DATE_FORMAT)
-            else:
-                formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
+        # Configure root logger only once
+        if not self._configured:
+            self._configure_root_logger(resolved_level, resolved_file, max_bytes, backup_count)
+            ProtoLinkLogger._configured = True
 
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setFormatter(formatter)
-            self.logger.addHandler(console_handler)
+        self._initialized = True
 
-            if resolved_file:
-                file_handler = RotatingFileHandler(
-                    resolved_file,
-                    maxBytes=max_bytes,
-                    backupCount=backup_count,
-                    encoding="utf-8",
-                )
-                file_handler.setFormatter(formatter)
-                self.logger.addHandler(file_handler)
+    def _configure_root_logger(
+        self,
+        log_level: int,
+        log_file: str | None,
+        max_bytes: int,
+        backup_count: int,
+    ) -> None:
+        """Configure the root logger with handlers."""
+        # Configure the root protolink logger to handle all child loggers
+        root_logger = logging.getLogger("protolink")
+        root_logger.setLevel(log_level)
+
+        # Clear any existing handlers to prevent duplication
+        root_logger.handlers.clear()
+
+        if _use_json_format():
+            formatter: logging.Formatter = JsonFormatter(datefmt=DATE_FORMAT)
+        else:
+            formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
+
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+
+        if log_file:
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
 
     def debug(self, message: str, extra: dict[str, Any] | None = None) -> None:
         """Log a debug message.

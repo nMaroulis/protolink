@@ -202,7 +202,6 @@ class Agent:
         Returns:
             The updated Task after applying all explicitly requested executions.
         """
-
         return await self.execute_task(task)
 
     async def handle_task_streaming(self, task: Task) -> AsyncIterator:
@@ -443,14 +442,13 @@ class Agent:
                 outputs.append(await self.execute_tool(part))
 
             elif part.type == "infer":
-                outputs.extend(await self.call_llm(part))
-
+                outputs.append(await self.call_llm(part))
         # ---- Attach outputs to the Task ----
         for out in outputs:
             if isinstance(out, Message):
                 task.add_message(out)
             else:
-                task.add_artifact(Artifact.add_part(out))
+                task.add_artifact(Artifact(parts=[out]))
 
         return task
 
@@ -527,16 +525,16 @@ class Agent:
             """
 
         # Build the System Prompt
-        self.llm.build_system_prompt(
+        _ = self.llm.build_system_prompt(
             user_instructions=self.system_prompt,
             agent_cards=agent_cards,
             tools=self.get_tools_for_prompt(),
             override_system_prompt=self.override_system_prompt,
         )
-        response = await self.llm.infer_model(
+
+        response = self.llm.infer_model(
             query=infer_part.content.get("prompt"),
         )
-
         return response
 
     # ----------------------------------------------------------------------
@@ -627,7 +625,6 @@ class Agent:
 
     def get_tools_for_prompt(self) -> str | None:
         """Return a string with a list of the agent's tools to be used in  LLM prompts."""
-
         if not self.tools:
             return None
 
@@ -643,6 +640,15 @@ class Agent:
             """
         return tool_prompt
 
+    def get_transport(self) -> Transport | None:
+        """
+        Get the transport layer for this agent.
+
+        Returns:
+            Transport instance for communication
+        """
+        return self._transport
+
     def set_transport(self, transport: TransportType | Transport | None) -> None:
         """Set the transport layer for this agent.
 
@@ -651,7 +657,7 @@ class Agent:
         """
 
         if transport is None:
-            self._client, self._server = None, None
+            self._transport, self._client, self._server = None, None, None
             raise ValueError("transport must not be None")
 
         if isinstance(transport, str):
@@ -665,6 +671,7 @@ class Agent:
         else:
             raise ValueError("Invalid transport type")
 
+        self._transport = transport
         # Initialize Agent-to-Agent Client
         self._client = AgentClient(transport=transport)
         # Exposes AgentProtocol to Server

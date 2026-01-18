@@ -170,3 +170,21 @@ class Task:
             output_schema=output_schema,
             metadata=metadata,
         )
+
+    # ----------------------------------------------------------------------
+    # Helper funcs
+    # ----------------------------------------------------------------------
+
+    def get_last_part_content(self) -> Any | None:
+        """
+        Get the content of the last part in the most recent Message or Artifact.
+        """
+        last_item = self.get_last_item()
+        if last_item is None:
+            return None
+
+        # Get the last part from the last item
+        if last_item.parts:
+            last_part = last_item.parts[-1]
+            return last_part.content
+        return None
