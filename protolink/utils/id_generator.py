@@ -5,16 +5,19 @@ This module provides functions for generating various types of IDs used in Proto
 
 import uuid
 from datetime import datetime, timezone
+from typing import ClassVar
 
 
 class IDGenerator:
     """ID generation helper class for Protolink."""
 
     # Prefixes for different ID types
-    MSG_PREFIX = "msg_"
-    TASK_PREFIX = "task_"
-    CTX_PREFIX = "ctx_"
-    ARTIFACT_PREFIX = "art_"
+    MSG_PREFIX: ClassVar[str] = "msg_"
+    TASK_PREFIX: ClassVar[str] = "task_"
+    CTX_PREFIX: ClassVar[str] = "ctx_"
+    ARTIFACT_PREFIX: ClassVar[str] = "art_"
+    TOOL_CALL_PREFIX: ClassVar[str] = "tool_call_"
+    TOOL_OUTPUT_PREFIX: ClassVar[str] = "tool_output_"
 
     @staticmethod
     def generate_uuid() -> str:
@@ -75,6 +78,32 @@ class IDGenerator:
             A unique artifact ID string
         """
         prefix = prefix or cls.ARTIFACT_PREFIX
+        return f"{prefix}{IDGenerator._generate_timestamp()}_{uuid.uuid4().hex[:8]}"
+
+    @classmethod
+    def generate_tool_call_id(cls, prefix: str | None = None) -> str:
+        """Generate a tool call ID with optional prefix.
+
+        Args:
+            prefix: Optional prefix for the ID (default: 'tool_call_')
+
+        Returns:
+            A unique tool call ID string
+        """
+        prefix = prefix or cls.TOOL_CALL_PREFIX
+        return f"{prefix}{IDGenerator._generate_timestamp()}_{uuid.uuid4().hex[:8]}"
+
+    @classmethod
+    def generate_tool_output_id(cls, prefix: str | None = None) -> str:
+        """Generate a tool output ID with optional prefix.
+
+        Args:
+            prefix: Optional prefix for the ID (default: 'tool_output_')
+
+        Returns:
+            A unique tool output ID string
+        """
+        prefix = prefix or cls.TOOL_OUTPUT_PREFIX
         return f"{prefix}{IDGenerator._generate_timestamp()}_{uuid.uuid4().hex[:8]}"
 
     @staticmethod

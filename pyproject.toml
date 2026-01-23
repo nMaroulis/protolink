@@ -99,6 +99,10 @@ build = [
 testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "-v"
+filterwarnings = [
+    "ignore::DeprecationWarning:websockets.legacy.*:",
+    "ignore::DeprecationWarning:uvicorn.protocols.websockets.websockets_impl.*:",
+]
 
 [tool.coverage.run]
 source = ["protolink"]

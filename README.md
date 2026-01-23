@@ -356,7 +356,7 @@ A **Part** is the atomic content of a Message or Artifact.
   - `"text"`: plain text content
   - `"json"`: structured data
   - `"tool_call"`: request to execute a registered tool
-  - `"tool_result"`: result from executing a tool
+  - `"tool_output"`: result outputfrom executing a tool
   - `"infer"`: input to invoke the agent's LLM
   - `"status"`, `"error"`, `"image"`, `"audio"`, etc.
 
@@ -368,8 +368,8 @@ A **Part** is the atomic content of a Message or Artifact.
 2. **Task Execution**  
    - The receiving agent inspects the **last message or artifact** in the task.
    - Executes each `Part` sequentially:
-     - `tool_call` → executes a registered tool → produces `tool_result` Part in an Artifact.
-     - `infer` → invokes the agent's LLM → produces output Part in an Artifact.
+     - `tool_call` → executes a registered tool → produces `tool_output` Part in an Artifact.
+     - `infer` → invokes the agent's LLM → produces `infer_output` Part in an Artifact.
 
 3. **Appending Outputs**  
    - Results are appended to the Task as new **Artifacts**.
@@ -397,8 +397,8 @@ result_task = await agent.execute_task(task)
 # 4️⃣ Outputs are appended as artifacts
 for artifact in result_task.artifacts:
     for part in artifact.parts:
-        if part.type == "tool_result":
-            print("Tool result:", part.content)
+        if part.type == "tool_output":
+            print("Tool Output:", part.content)
 
 # 5️⃣ If needed, a infer Part can trigger the agent's LLM
 infer_part = Part.infer(prompt="Summarize today's weather in Athens")

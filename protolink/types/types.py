@@ -88,7 +88,7 @@ PartType: TypeAlias = Literal[
     "infer_result",
     # ---- Tool interaction ----
     "tool_call",
-    "tool_result",
+    "tool_output",
     # ---- Reasoning / observability (optional) ----
     "trace",
     "summary",

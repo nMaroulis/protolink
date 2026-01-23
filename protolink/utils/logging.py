@@ -21,6 +21,7 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 _ENV_LOG_LEVEL = "PROTOLINK_LOG_LEVEL"
 _ENV_LOG_FILE = "PROTOLINK_LOG_FILE"
 _ENV_LOG_FORMAT = "PROTOLINK_LOG_FORMAT"  # "text" or "json"
+_ENV_LOG_PRETTY_NAMES = "PROTOLINK_LOG_PRETTY_NAMES"
 
 
 _STANDARD_RECORD_KEYS = {
@@ -61,10 +62,15 @@ class ColoredFormatter(logging.Formatter):
     LEVEL_WIDTH: ClassVar[int] = 8
     ARROW: ClassVar[str] = " → "
 
+    @staticmethod
+    def _use_pretty_names() -> bool:
+        return os.getenv(_ENV_LOG_PRETTY_NAMES, "1") == "1"
+
     def format(self, record: logging.LogRecord) -> str:
         color = self.COLORS.get(record.levelno, self.RESET)
         record.levelname = record.levelname.center(self.LEVEL_WIDTH)
-        record.name = record.name.replace(".", self.ARROW)
+        if self._use_pretty_names():
+            record.name = record.name.replace(".", self.ARROW)
         message = super().format(record)
         return f"{color}{message}{self.RESET}"
 

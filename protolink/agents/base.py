@@ -460,7 +460,7 @@ class Agent:
         - Resolves the tool from the agent's tool registry
         - Executes it with the provided arguments
         - Captures success or failure
-        - Returns a corresponding `tool_result` Part
+        - Returns a corresponding `tool_output` Part
 
         The agent runtime is responsible for calling this method.
         The protocol / lifecycle layers never execute tools directly.
@@ -472,7 +472,7 @@ class Agent:
                 - call_id (str)
 
         Returns:
-            A Part of type "tool_result" containing:
+            A Part of type "tool_output" containing:
             - call_id: The original tool call identifier
             - result: The tool output (on success)
             - error: Error information (on failure)
@@ -484,16 +484,16 @@ class Agent:
 
         tool = self.tools.get(tool_name)
         if not tool:
-            return Part.tool_result(
+            return Part.tool_output(
                 call_id=call_id,
                 error={"message": f"Tool '{tool_name}' not found"},
             )
 
         try:
             result = await tool(**args)
-            return Part.tool_result(call_id=call_id, result=result)
+            return Part.tool_output(call_id=call_id, result=result)
         except Exception as e:
-            return Part.tool_result(
+            return Part.tool_output(
                 call_id=call_id,
                 error={"message": str(e)},
             )

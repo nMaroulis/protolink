@@ -300,7 +300,7 @@ PartType: TypeAlias = Literal[
     "warning",
     # ---- Tool interaction ----
     "tool_call",
-    "tool_result",
+    "tool_output",
     # ---- Reasoning / observability (optional) ----
     "trace",
     "summary",
@@ -348,7 +348,7 @@ PartType: TypeAlias = Literal[
 | Type | Description | Use Case |
 |-------|-------------|-----------|
 | **tool_call** | Tool invocation request | Function calls with parameters |
-| **tool_result** | Tool execution result | Function return values, tool outputs |
+| **tool_output** | Tool execution result | Function return values, tool outputs |
 
 ### Reasoning & Observability
 

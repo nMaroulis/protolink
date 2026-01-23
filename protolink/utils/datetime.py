@@ -1,4 +1,11 @@
 from datetime import datetime, timezone
+from typing import overload
+
+
+@overload
+def utc_now(*, iso: bool = False) -> datetime: ...
+@overload
+def utc_now(*, iso: bool = True) -> str: ...
 
 
 def utc_now(*, iso: bool = True) -> datetime | str:
@@ -39,11 +46,11 @@ def format_iso8601(dt: datetime | None = None) -> str:
     Examples:
         >>> format_iso8601()
         '2024-01-01T12:00:00+00:00'
-        >>> format_iso8601(utc_now())
+        >>> format_iso8601(utc_now(iso=False))
         '2024-01-01T12:00:00+00:00'
     """
     if dt is None:
-        dt = utc_now()
+        dt = utc_now(iso=False)
     elif dt.tzinfo is None:
         # If naive datetime, assume UTC
         dt = dt.replace(tzinfo=timezone.utc)

@@ -63,14 +63,14 @@ class Serializer:
             return data
 
         if target_cls == Message:
-            return Message.from_dict(data)
+            return Message.from_dict(data)  # type: ignore[return-value]
         elif target_cls == Task:
-            return Task.from_dict(data)
+            return Task.from_dict(data)  # type: ignore[return-value]
         else:
             raise ValueError(f"Unsupported target class: {target_cls.__name__}")
 
     @staticmethod
-    def serialize_to_dict(obj: Any) -> dict:
+    def serialize_to_dict(obj: Any) -> dict[str, Any] | Any:
         """Serialize an object to a dictionary.
 
         Args:
@@ -113,4 +113,4 @@ class Serializer:
         if not hasattr(target_cls, "from_dict"):
             raise ValueError(f"Target class {target_cls.__name__} does not support from_dict")
 
-        return target_cls.from_dict(data)
+        return target_cls.from_dict(data)  # type: ignore[call-arg]

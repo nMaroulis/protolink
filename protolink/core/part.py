@@ -1,7 +1,8 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from protolink.types import PartType
+from protolink.utils.id_generator import IDGenerator
 
 
 @dataclass
@@ -17,18 +18,18 @@ class ToolCall:
                    Example: "weather.get_temperature"
         args: Arguments passed to the tool.
         call_id: Optional correlation ID used to match tool_call with
-                 the corresponding tool_result.
+                 the corresponding tool_output.
     """
 
     tool_name: str
     args: dict[str, Any]
-    call_id: str | None = None
+    call_id: str = field(default_factory=lambda: IDGenerator.generate_tool_call_id())
 
 
 @dataclass
-class ToolResult:
+class ToolOutput:
     """
-    Result of a previously issued tool_call.
+    Output result of a previously issued tool_call.
 
     Attributes:
         call_id: Correlation ID matching the originating tool_call.
@@ -36,7 +37,7 @@ class ToolResult:
         error: Error payload if the tool execution failed.
     """
 
-    call_id: str
+    call_id: str = field(default_factory=lambda: IDGenerator.generate_tool_output_id())
     result: Any | None = None
     error: dict | None = None
 
@@ -118,22 +119,25 @@ class Part:
         Args:
             tool_name: Canonical name of the tool or capability to invoke.
             args: Arguments for the tool.
-            call_id: Optional correlation ID to match with tool_result.
+            call_id: Optional correlation ID to match with tool_output.
 
         Returns:
             Part: A Part of type "tool_call".
         """
+        tool_call = ToolCall(
+            tool_name=tool_name,
+            args=args or {},
+        )
+        if call_id is not None:
+            tool_call.call_id = call_id
+
         return cls(
             type="tool_call",
-            content=ToolCall(
-                tool_name=tool_name,
-                args=args or {},
-                call_id=call_id,
-            ),
+            content=tool_call,
         )
 
     @classmethod
-    def tool_result(
+    def tool_output(
         cls,
         *,
         call_id: str | None = None,
@@ -155,15 +159,15 @@ class Part:
             error: Error information if the tool execution failed.
 
         Returns:
-            Part: A Part of type "tool_result".
+            Part: A Part of type "tool_output".
         """
+        tool_output = ToolOutput(result=result, error=error)
+        if call_id is not None:
+            tool_output.call_id = call_id
+
         return cls(
-            type="tool_result",
-            content=ToolResult(
-                call_id=call_id,
-                result=result,
-                error=error,
-            ),
+            type="tool_output",
+            content=tool_output,
         )
 
     # ------------------------------------------------------------------
