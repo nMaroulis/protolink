@@ -12,7 +12,9 @@ from logging.handlers import RotatingFileHandler
 from typing import Any, ClassVar
 
 # Log format constants
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+DEBUG_LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(filename)s:%(lineno)d:%(funcName)s() | %(message)s"
+DEBUG_DATE_FORMAT = "%H:%M:%S.%f"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -56,9 +58,13 @@ class ColoredFormatter(logging.Formatter):
         logging.CRITICAL: "\033[1;31m",  # bold red
     }
     RESET: ClassVar[str] = "\033[0m"
+    LEVEL_WIDTH: ClassVar[int] = 8
+    ARROW: ClassVar[str] = " → "
 
     def format(self, record: logging.LogRecord) -> str:
         color = self.COLORS.get(record.levelno, self.RESET)
+        record.levelname = record.levelname.center(self.LEVEL_WIDTH)
+        record.name = record.name.replace(".", self.ARROW)
         message = super().format(record)
         return f"{color}{message}{self.RESET}"
 
@@ -192,7 +198,7 @@ class ProtoLinkLogger:
         # Clear any existing handlers to prevent duplication
         root_logger.handlers.clear()
 
-        if not _use_json_format():
+        if _use_json_format():
             formatter: logging.Formatter = JsonFormatter(datefmt=DATE_FORMAT)
         else:
             formatter = ColoredFormatter(LOG_FORMAT, DATE_FORMAT)
