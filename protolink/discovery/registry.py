@@ -99,9 +99,8 @@ class Registry:
         self._agents[card.url] = card
 
         self.logger.info(
-            "Agent Card Registered:",
+            f"Agent {card.name} registered on address {card.url}.",
             extra={
-                "agent_url": card.url,
                 "card": card.to_dict(),
             },
         )

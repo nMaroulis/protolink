@@ -14,18 +14,23 @@
 
 > 📌 The framework is currently in **alpha** and is subject to change. 
 
+
 ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and **integrate tools seamlessly**. Build **distributed multi-agent systems** with minimal boilerplate and production-oriented architecture.
 
 Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
 ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **LLM & tool integration**.
 
+#### 🎯 The Philosophy
+
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
+
+**Tool Execution**, **Agent calling**, and **LLM invocation** are all provided by Protolink. No need to care on how to call tools or other agent's, ProtoLink handles it for you, through **predefined LLM prompts** that provide the **Agent's LLM** the ability to **interact with its environment**, leaving only the logic to you.
 
 > **Focus on your agent logic** - ProtoLink handles communication, authentication, LLM integration, and tool management for you.
 
-
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
+
 
 ## Features
 

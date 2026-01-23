@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import sys
+import warnings
 from logging.handlers import RotatingFileHandler
 from typing import Any, ClassVar
 
@@ -42,6 +43,24 @@ _STANDARD_RECORD_KEYS = {
     "processName",
     "process",
 }
+
+
+class ColoredFormatter(logging.Formatter):
+    """Subtle ANSI-colored formatter for console logs."""
+
+    COLORS: ClassVar[dict[int, str]] = {
+        logging.DEBUG: "\033[90m",  # dim gray
+        logging.INFO: "\033[34m",  # blue
+        logging.WARNING: "\033[33m",  # yellow
+        logging.ERROR: "\033[31m",  # red
+        logging.CRITICAL: "\033[1;31m",  # bold red
+    }
+    RESET: ClassVar[str] = "\033[0m"
+
+    def format(self, record: logging.LogRecord) -> str:
+        color = self.COLORS.get(record.levelno, self.RESET)
+        message = super().format(record)
+        return f"{color}{message}{self.RESET}"
 
 
 class JsonFormatter(logging.Formatter):
@@ -93,6 +112,10 @@ def _use_json_format() -> bool:
         return False
     value = value.lower()
     return value in {"json", "structured"}
+
+
+class ProtoLinkWarning(UserWarning):
+    """Base class for Protolink user-facing warnings."""
 
 
 class ProtoLinkLogger:
@@ -169,10 +192,10 @@ class ProtoLinkLogger:
         # Clear any existing handlers to prevent duplication
         root_logger.handlers.clear()
 
-        if _use_json_format():
+        if not _use_json_format():
             formatter: logging.Formatter = JsonFormatter(datefmt=DATE_FORMAT)
         else:
-            formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
+            formatter = ColoredFormatter(LOG_FORMAT, DATE_FORMAT)
 
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
@@ -246,6 +269,17 @@ class ProtoLinkLogger:
             extra: Additional context as a dictionary
         """
         self.logger.exception(message, exc_info=exc_info, extra=extra or {})
+
+    def warn_user(
+        self,
+        message: str,
+        category: type[UserWarning] = ProtoLinkWarning,
+    ) -> None:
+        """Emit a soft, user-facing warning (not a log).
+
+        This is for optional configuration issues or guidance.
+        """
+        warnings.warn(message, category=category, stacklevel=3)
 
 
 def _verbosity_to_log_level(verbose: int) -> int:

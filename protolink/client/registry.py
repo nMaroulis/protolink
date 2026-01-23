@@ -60,3 +60,7 @@ class RegistryClient:
             request_spec=self.DISCOVER_REQUEST, base_url=self.transport.url, data=filter_by
         )
         return [AgentCard.from_dict(c) for c in response]
+
+    @property
+    def url(self) -> str:
+        return self.transport.url
