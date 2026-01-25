@@ -171,7 +171,8 @@ class LLM(ABC):
 
                 # TODO: Examine tool call result and add to history
                 # self.history.add_tool(content=tool_result, tool_name=tool_name)
-                self.history.add_assistant(f"Tool '{tool_name}' returned: {tool_result}")
+                self.history.add_system(json.dumps({"type": "tool_result", "tool": tool_name, "result": tool_result}))
+
                 continue
 
             elif action == "agent_call":

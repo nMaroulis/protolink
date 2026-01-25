@@ -33,6 +33,21 @@ Example:
   }}
 }}
 
+Important:
+Tool results will be provided to you as SYSTEM messages
+with the following structure:
+
+{
+  "type": "tool_result",
+  "tool": "<tool_name>",
+  "result": <tool_output>
+}
+
+After receiving a tool_result:
+- You MUST decide the next action
+- Either call another tool, another agent, or return a final response
+
+
 You can ONLY call tools that are listed below.
 DO NOT call tools that are not listed or invent new tools.
 
