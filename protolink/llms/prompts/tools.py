@@ -33,6 +33,9 @@ Example:
   }}
 }}
 
-Available tools:
+You can ONLY call tools that are listed below.
+DO NOT call tools that are not listed or invent new tools.
+
+The Following tools are available to you:
 {{tools}}
 """

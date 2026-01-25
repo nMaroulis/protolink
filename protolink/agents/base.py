@@ -498,7 +498,7 @@ class Agent:
                 error={"message": str(e)},
             )
 
-    async def call_llm(self, infer_part: Part) -> list[Part]:
+    async def call_llm(self, infer_part: Part) -> Part:
         """
         Invoke the agent's LLM.
 
@@ -532,8 +532,8 @@ class Agent:
             override_system_prompt=self.override_system_prompt,
         )
 
-        response: Part = self.llm.infer(query=infer_part.content.get("prompt"), tools=self.tools)
-        return [response]
+        response: Part = await self.llm.infer(query=infer_part.content.get("prompt", ""), tools=self.tools)
+        return response
 
     # ----------------------------------------------------------------------
     # Skill Management

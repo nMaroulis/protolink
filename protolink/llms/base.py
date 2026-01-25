@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import Any, ClassVar
@@ -7,6 +8,8 @@ from protolink.llms.history import ConversationHistory
 from protolink.llms.prompts import AGENT_LIST_PROMPT, BASE_INSTRUCTIONS, BASE_SYSTEM_PROMPT, TOOL_CALL_PROMPT
 from protolink.tools import BaseTool
 from protolink.types import LLMProvider, LLMType
+
+MAX_INFER_STEPS: int = 10  # safety against infinite loops
 
 
 class LLM(ABC):
@@ -120,42 +123,90 @@ class LLM(ABC):
     # Agent-LLM Interface - A2A Operations
     # ----------------------------------------------------------------------
 
-    def infer(self, query: str, tools: dict[str, BaseTool]) -> Part:
-        """Generate a response by calling the LLM model.
+    async def infer(self, *, query: str, tools: dict[str, "BaseTool"], streaming: bool = False) -> "Part":
+        """
+        Generate a response by calling the LLM model.
 
-        Should return a Part with PartType 'infer_output'
+        Returns a Part with PartType 'infer_output'.
+        Includes professional error handling, retry logic, and loop safety.
         """
         self.history.add_user(query)
 
-        while True:
-            response = self.call(self.history)
-            action, response_dict = self._parse_infer_response(response)
-            if action == "text":
-                return Part("infer_response", response_dict["content"])
-            elif action == "tool_call":
-                tool_name = response_dict["tool"]
-                tool_args = response_dict["args"]
-                tool = tools[tool_name]
-                tool_result = tool.execute(tool_args)  # ETST
-                self.history.add_tool(tool_result)
+        steps: int = 0
+        while steps < MAX_INFER_STEPS:
+            steps += 1
+            try:
+                if streaming:
+                    raw_response = await self.call_stream(self.history)
+                else:
+                    raw_response = self.call(self.history)
+            except Exception as e:
+                raise RuntimeError(f"LLM call failed at step {steps}: {e}") from e
 
-        return Part("infer_response", self.call(self.history))
+            print("RAW RESPONSE", raw_response)
+            try:
+                action, payload = self._parse_infer_response(raw_response)
+            except ValueError as e:
+                # optional: log or track invalid LLM output
+                # here we retry the LLM a few times
+                if steps < MAX_INFER_STEPS:
+                    continue
+                raise RuntimeError(f"Failed to parse LLM output after {steps} attempts: {e}") from e
+
+            if action == "final":
+                return Part("infer_output", payload["content"])
+            elif action == "tool_call":
+                tool_name = payload.get("tool")
+                tool_args = payload.get("args", {})
+
+                if not tool_name or tool_name not in tools:
+                    raise ValueError(f"Unknown or missing tool: {tool_name}")
+
+                tool = tools[tool_name]
+
+                try:
+                    tool_result = await tool(**tool_args)
+                except Exception as e:
+                    raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
+
+                # TODO: Examine tool call result and add to history
+                # self.history.add_tool(content=tool_result, tool_name=tool_name)
+                self.history.add_assistant(f"Tool '{tool_name}' returned: {tool_result}")
+                continue
+
+            elif action == "agent_call":
+                # propagate agent_call upstream for router/dispatcher
+                # TODO: implement agent_call
+                pass
+            else:
+                raise ValueError(f"Unsupported action type: {action}")
+        raise RuntimeError(f"Maximum inference steps ({MAX_INFER_STEPS}) exceeded without producing final response")
 
     def _parse_infer_response(self, response: str) -> tuple[str, dict[str, Any]]:
-        """Parse the infer response from the LLM."""
-        import json
+        """
+        Parse the infer response from the LLM.
+        Enforces strict JSON, required fields, and allowed types.
+        """
+        try:
+            data = json.loads(response)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}\nRaw response: {response}") from e
 
-        response = json.loads(response)
-        action = response["type"]
+        action = data.get("type")
+        if action not in {"final", "tool_call", "agent_call"}:
+            raise ValueError(f"Unsupported action type: {action}\nRaw response: {response}")
 
-        if action == "text":
-            return action, {"content": response["content"]}
+        if action == "final":
+            content = data.get("content")
+            if not isinstance(content, str):
+                raise ValueError(f"Final response must have a 'content' string.\nRaw response: {response}")
+            return action, {"content": content}
 
-        return action, response
+        # tool_call or agent_call
+        if action in {"tool_call", "agent_call"} and not isinstance(data, dict):
+            raise ValueError(f"{action} response must be a JSON object.\nRaw response: {response}")
 
-    # ----------------------------------------------------------------------
-    # Tool calling
-    # ----------------------------------------------------------------------
+        return action, data
 
     # ----------------------------------------------------------------------
     # Prompt management
@@ -202,7 +253,9 @@ class LLM(ABC):
         else:
             self.system_prompt = BASE_SYSTEM_PROMPT.format(
                 base_instructions=BASE_INSTRUCTIONS,
-                tool_call_prompt=TOOL_CALL_PROMPT.replace("{{tools}}", tools) if tools else "",
+                tool_call_prompt=TOOL_CALL_PROMPT.replace("{{tools}}", tools)
+                if tools
+                else "No tools are available for you to call. You cannot return a tool call response.",
                 agent_call_prompt=AGENT_LIST_PROMPT.replace("{{agent_cards_from_registry}}", agent_cards)
                 if agent_cards
                 else "",
