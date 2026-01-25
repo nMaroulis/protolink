@@ -125,11 +125,50 @@ class LLM(ABC):
 
     async def infer(self, *, query: str, tools: dict[str, "BaseTool"], streaming: bool = False) -> "Part":
         """
-        Generate a response by calling the LLM model.
+        Execute a controlled, multi-step inference loop against the configured LLM.
+
+        Args:
+            query (str):
+                The user-provided task or instruction to be processed by the agent.
+            tools (dict[str, BaseTool]):
+                A mapping of tool names to executable tool instances that the agent may invoke during inference.
+            streaming (bool, optional):
+                Whether to invoke the underlying LLM in streaming mode. Defaults to False.
+
+        Returns:
+            Part:
+                A Part instance of type ``infer_output`` containing the final user-facing response produced by the agent
+
+        Raises:
+            RuntimeError:
+                If the LLM call fails, a tool execution raises, the response cannot be parsed after repeated attempts,
+                or the maximum number of inference steps is exceeded.
+            ValueError:
+                If the LLM declares an invalid action or references an unknown tool.
+
+        Notes:
+
+        This method implements a deterministic agent runtime over a stateless language model. The LLM is invoked
+        iteratively to *declare intent only* using a strict JSON action protocol. Declared actions may include
+        producing a final user-facing response, requesting execution of a registered tool, or delegating work to
+        another agent.
+
+        All side effects (tool execution, agent dispatch, state mutation) are performed by the runtime, never by
+        the LLM itself. Tool results are serialized and injected back into the conversation context using valid LLM
+        roles to maintain provider-agnostic compatibility.
+
+        The loop enforces:
+        - Strict JSON output validation
+        - Explicit action typing
+        - Bounded execution via a maximum step limit
+        - Structured error propagation with step-level diagnostics
+
+        The method terminates only when a valid `final` action is produced or when safety limits are exceeded,
+        in which case a runtime error is raised.
 
         Returns a Part with PartType 'infer_output'.
-        Includes professional error handling, retry logic, and loop safety.
         """
+
         self.history.add_user(query)
 
         steps: int = 0
@@ -143,7 +182,6 @@ class LLM(ABC):
             except Exception as e:
                 raise RuntimeError(f"LLM call failed at step {steps}: {e}") from e
 
-            print("RAW RESPONSE", raw_response)
             try:
                 action, payload = self._parse_infer_response(raw_response)
             except ValueError as e:
@@ -185,8 +223,33 @@ class LLM(ABC):
 
     def _parse_infer_response(self, response: str) -> tuple[str, dict[str, Any]]:
         """
-        Parse the infer response from the LLM.
-        Enforces strict JSON, required fields, and allowed types.
+        Parse, validate, and normalize a raw LLM response for agent execution.
+
+        Args:
+            response (str):
+                The raw string output returned by the language model.
+
+        Returns:
+            tuple[str, dict[str, Any]]:
+                A tuple containing:
+                - The declared action type (e.g. ``final``, ``tool_call``, ``agent_call``)
+                - A normalized payload dictionary for downstream execution
+
+        Raises:
+            ValueError:
+                If the response is not valid JSON, does not declare a supported action, or is missing required fields
+                for the declared action type.
+
+        Notes:
+        This function enforces a hard contract between the LLM and the runtime by requiring the response to be a single,
+        well-formed JSON object declaring exactly one supported action. It validates both the structural integrity of
+        the JSON payload and the semantic correctness of required fields for each action type.
+
+        Unsupported actions, missing fields, or malformed JSON are rejected immediately with explicit errors, enabling
+        robust retry, logging, or failure handling at the orchestration layer.
+
+        The output of this function is guaranteed to be safe for downstream execution logic and free of implicit
+        assumptions or provider-specific artifacts.
         """
         try:
             data = json.loads(response)
