@@ -18,7 +18,11 @@ To call a tool, generate a Part of type "tool_call" using this format:
 Rules:
 - tool_name MUST match an available tool
 - args MUST conform to the tool schema
-- Return ONLY the JSON object, nothing else
+Output Schema Requirements:
+- The response MUST be a single valid JSON object.
+- Do NOT include any additional text, markdown, or explanations.
+- Do NOT wrap the output in code fences.
+- Any deviation from this format is considered an invalid response.
 
 Example:
 {{

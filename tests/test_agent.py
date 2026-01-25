@@ -77,7 +77,7 @@ class DummyLLM(LLM):
     def validate_connection(self) -> bool:
         return True
 
-    def infer_model(self, query: str, tools: dict[str, BaseTool]) -> Part:
+    def infer(self, query: str, tools: dict[str, BaseTool]) -> Part:
         return Part("infer_response", "Mock infer response")
 
 

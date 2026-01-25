@@ -532,7 +532,7 @@ class Agent:
             override_system_prompt=self.override_system_prompt,
         )
 
-        response: Part = self.llm.infer_model(query=infer_part.content.get("prompt"), tools=self.tools)
+        response: Part = self.llm.infer(query=infer_part.content.get("prompt"), tools=self.tools)
         return [response]
 
     # ----------------------------------------------------------------------

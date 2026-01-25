@@ -120,13 +120,42 @@ class LLM(ABC):
     # Agent-LLM Interface - A2A Operations
     # ----------------------------------------------------------------------
 
-    def infer_model(self, query: str, tools: dict[str, BaseTool]) -> Part:
+    def infer(self, query: str, tools: dict[str, BaseTool]) -> Part:
         """Generate a response by calling the LLM model.
 
         Should return a Part with PartType 'infer_output'
         """
         self.history.add_user(query)
+
+        while True:
+            response = self.call(self.history)
+            action, response_dict = self._parse_infer_response(response)
+            if action == "text":
+                return Part("infer_response", response_dict["content"])
+            elif action == "tool_call":
+                tool_name = response_dict["tool"]
+                tool_args = response_dict["args"]
+                tool = tools[tool_name]
+                tool_result = tool.execute(tool_args)  # ETST
+                self.history.add_tool(tool_result)
+
         return Part("infer_response", self.call(self.history))
+
+    def _parse_infer_response(self, response: str) -> tuple[str, dict[str, Any]]:
+        """Parse the infer response from the LLM."""
+        import json
+
+        response = json.loads(response)
+        action = response["type"]
+
+        if action == "text":
+            return action, {"content": response["content"]}
+
+        return action, response
+
+    # ----------------------------------------------------------------------
+    # Tool calling
+    # ----------------------------------------------------------------------
 
     # ----------------------------------------------------------------------
     # Prompt management
