@@ -1,63 +1,137 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, ClassVar
 
+from protolink.core.part import Part
+from protolink.llms.history import ConversationHistory
 from protolink.llms.prompts import AGENT_LIST_PROMPT, BASE_INSTRUCTIONS, BASE_SYSTEM_PROMPT, TOOL_CALL_PROMPT
-from protolink.models import Message, Part
+from protolink.tools import BaseTool
 from protolink.types import LLMProvider, LLMType
 
 
 class LLM(ABC):
-    """Base class for all LLM implementations."""
+    """
+    Abstract base class for all Large Language Model (LLM) implementations.
 
-    model_type: LLMType
-    provider: LLMProvider
-    model: str
-    model_params: dict[str, Any]
-    system_prompt: str
+    This class defines the core interface and shared functionality for any LLM,
+    whether it is API-based (OpenAI, Anthropic, Gemini), server-based (Ollama) or local (LLaMA, MPT, etc.).
 
-    def __init__(self) -> None:
-        self.model_type = self.__class__.model_type
-        self.provider = self.__class__.provider
-        self.model = self.__class__.model
-        self.model_params = self.__class__.model_params
-        # Initiate System Prompt
-        self.system_prompt = self.build_system_prompt()
+    Subclasses are expected to define:
+
+    - `model_type` (ClassVar[LLMType]): Type of the LLM (i.e., "api", "server", "local").
+    - `provider` (ClassVar[LLMProvider]): Name of the model provider (e.g., "openai").
+
+    Instance variables:
+
+    - `model` (str): The identifier of the model to use (e.g., "gpt-4o-mini").
+    - `_model_params` (dict[str, Any]): Model-specific generation parameters. These
+      vary depending on the provider. Examples include:
+        - OpenAI: temperature, top_p, stop, max_tokens
+        - Anthropic: temperature, top_p, max_tokens
+        - Gemini: temperature, top_p, max_output_tokens
+    - `history` (ConversationHistory): Tracks conversation messages for multi-turn
+      interactions.
+    - `system_prompt` (str): Optional system instructions used as context for the
+      model when generating responses. Uses default prompts for agent, tool and llm calling.
+
+    Usage:
+
+        Subclasses should implement at least:
+        - `call(history: ConversationHistory) -> str`: Blocking single-response generation.
+        - `call_stream(history: ConversationHistory) -> Iterable[str]`: Streaming response generation.
+        - `validate_connection() -> bool`: Optional, to verify API connectivity or model availability.
+
+    Example:
+
+        class OpenAILLM(APILLM):
+            provider = "openai"
+            model_type = "api"
+
+            def call(self, history):
+                ...
+    """
+
+    # Class-level metadata (set by subclasses)
+    model_type: ClassVar[LLMType]
+    provider: ClassVar[LLMProvider]
+
+    def __init__(
+        self,
+        model: str,
+        model_params: dict[str, Any],
+    ) -> None:
+        # ---- Instance state ----
+        self.model: str = model
+        self._model_params: dict[str, Any] = model_params
+
+        self.history: ConversationHistory = ConversationHistory()
+        self.system_prompt: str = self.build_system_prompt()
+
+    # ----------------------------------------------------------------------
+    # LLM calling (invocation)
+    # ----------------------------------------------------------------------
 
     @abstractmethod
-    def generate_response(self, messages: list[Message]) -> Message:
-        raise NotImplementedError
+    def call(self, history: ConversationHistory) -> str:
+        """Generate a response from the LLM.
 
-    @abstractmethod
-    def generate_stream_response(self, messages: list[Message]) -> Iterable[Message]:
-        raise NotImplementedError
+        This is the core method that subclasses must implement to call their specific LLM (OpenAI, Anthropic, etc.).
 
-    @abstractmethod
-    def set_model_params(self, model_params: dict[str, Any]) -> None:
-        raise NotImplementedError
+        Args:
+            history: Conversation history containing system, user, assistant, and tool messages
 
-    @abstractmethod
-    def set_system_prompt(self, system_prompt: str) -> None:
-        raise NotImplementedError
-
-    def __str__(self) -> str:
-        return f"{self.provider} {self.model_type}"
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-    @abstractmethod
-    def validate_connection(self) -> bool:
-        """Validate the connection to the LLM API, should handle the logging."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def infer_model(self, query: str) -> Part:
-        """Generate a response using the infer model.
-
-        Should return a Part with PartType 'infer_result'
+        Returns:
+            str: Raw text response from the LLM
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+        """Generate a streaming response from the LLM.
+
+        This method should yield string chunks as they are generated
+        by the LLM API. Useful for real-time responses.
+
+        Args:
+            history: Conversation history containing system, user, assistant, and tool messages
+
+        Yields:
+            str: Streaming response chunks from the LLM
+        """
+        raise NotImplementedError
+
+    def chat(self, user_query: str, *, streaming: bool = False) -> str | Iterable[str]:
+        """
+        High-level convenience method for standard chat usage.
+
+        Args:
+            user_query: The user's query/message
+            streaming: If True, returns an iterator of response chunks
+
+        Returns:
+            str: Complete response if streaming=False
+            Iterable[str]: Iterator of response chunks if streaming=True
+        """
+        self.history.add_user(user_query)
+        if streaming:
+            return self.call_stream(self.history)
+        return self.call(self.history)
+
+    # ----------------------------------------------------------------------
+    # Agent-LLM Interface - A2A Operations
+    # ----------------------------------------------------------------------
+
+    def infer_model(self, query: str, tools: dict[str, BaseTool]) -> Part:
+        """Generate a response by calling the LLM model.
+
+        Should return a Part with PartType 'infer_output'
+        """
+        self.history.add_user(query)
+        return Part("infer_response", self.call(self.history))
+
+    # ----------------------------------------------------------------------
+    # Prompt management
+    # ----------------------------------------------------------------------
 
     def build_system_prompt(
         self,
@@ -106,4 +180,71 @@ class LLM(ABC):
                 else "",
                 user_instructions=user_instructions or "",
             )
+        self.history.reset_to_system(self.system_prompt)
         return self.system_prompt
+
+    # ----------------------------------------------------------------------
+    # Utils
+    # ----------------------------------------------------------------------
+
+    @abstractmethod
+    def validate_connection(self) -> bool:
+        """Validate the connection to the LLM API, server, or local model. Should handle the logging."""
+        raise NotImplementedError
+
+    # ----------------------------------------------------------------------
+    # Setter methods
+    # ----------------------------------------------------------------------
+
+    @property
+    def model_params(self) -> dict[str, Any]:
+        """
+        Model/provider-specific generation parameters.
+        """
+        return self._model_params
+
+    @model_params.setter
+    def model_params(self, value: dict[str, Any]) -> None:
+        """Model Params Setter method.
+        Correct Usage Examples:
+            llm.model_params["temperature"] = 0.2  # allowed
+            llm.model_params = {"temperature": 0.3}  # validated
+        """
+        if not isinstance(value, dict):
+            raise TypeError("model_params must be a dict")
+        self._model_params = value
+
+    def set_system_prompt(self, system_prompt: str) -> None:
+        """Set the system prompt for the LLM.
+
+        Overrides the default system prompt with a custom one.
+
+        Args:
+            system_prompt: New system prompt to use
+        """
+        self.system_prompt = system_prompt
+
+    # ----------------------------------------------------------------------
+    # Callable interface
+    # ----------------------------------------------------------------------
+
+    def __call__(self, history: ConversationHistory) -> str:
+        """Make the LLM instance callable.
+
+        Allows using the LLM as a function: llm(history) -> str
+
+        Args:
+            history: Conversation history to use
+
+        Returns:
+            str: Response from the LLM
+        """
+        return self.call(history)
+
+    def __str__(self) -> str:
+        """String representation of the LLM instance."""
+        return f"{self.provider} {self.model_type}"
+
+    def __repr__(self) -> str:
+        """Detailed string representation of the LLM instance."""
+        return self.__str__()

@@ -13,6 +13,7 @@ from protolink.core.message import Message
 from protolink.core.part import Part
 from protolink.core.task import Task
 from protolink.llms.base import LLM
+from protolink.llms.history import ConversationHistory
 from protolink.tools import BaseTool
 from protolink.transport import Transport
 
@@ -61,22 +62,22 @@ class DummyLLM(LLM):
     model_params: ClassVar[dict] = {}
     system_prompt = ""
 
+    def __init__(self):
+        # Use class-level defaults
+        super().__init__(model=self.model, model_params=self.model_params.copy())
+
+    def call(self, history: ConversationHistory) -> str:
+        """Generate a response from the LLM."""
+        return "Mock response"
+
+    def call_stream(self, history: ConversationHistory):
+        """Generate a streaming response from the LLM."""
+        yield "Mock stream response"
+
     def validate_connection(self) -> bool:
         return True
 
-    async def generate_response(self, messages: list, **kwargs) -> str:
-        return "Mock response"
-
-    async def generate_stream_response(self, messages: list, **kwargs):
-        yield "Mock stream response"
-
-    def set_model_params(self, **params):
-        pass
-
-    def set_system_prompt(self, prompt: str):
-        pass
-
-    def infer_model(self, query: str) -> Part:
+    def infer_model(self, query: str, tools: dict[str, BaseTool]) -> Part:
         return Part("infer_response", "Mock infer response")
 
 

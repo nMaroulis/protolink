@@ -532,10 +532,8 @@ class Agent:
             override_system_prompt=self.override_system_prompt,
         )
 
-        response = self.llm.infer_model(
-            query=infer_part.content.get("prompt"),
-        )
-        return response
+        response: Part = self.llm.infer_model(query=infer_part.content.get("prompt"), tools=self.tools)
+        return [response]
 
     # ----------------------------------------------------------------------
     # Skill Management

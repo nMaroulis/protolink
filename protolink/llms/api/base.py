@@ -1,27 +1,26 @@
-from typing import Any
+from typing import Any, ClassVar
 
-from protolink.llms.base import LLM, LLMProvider, LLMType
+from protolink.llms.base import LLM
+from protolink.types import LLMType
 
 
 class APILLM(LLM):
     """Base class for API-based LLM implementations."""
 
-    model_type: LLMType = "api"
-    base_url: str | None = None
-    provider: LLMProvider
+    model_type: ClassVar[LLMType] = "api"
 
-    def __init__(self) -> None:
-        self.model_type = self.__class__.model_type
-        self.provider = self.__class__.provider
-
-    def set_model_params(self, model_params: dict[str, Any]) -> None:
-        """Update existing model parameters, ignoring any extra keys."""
-        valid_params = {k: v for k, v in model_params.items() if k in self.model_params}
-        self.model_params.update(valid_params)
-
-    def set_system_prompt(self, system_prompt: str) -> None:
-        """Set the system prompt for the model."""
-        self.system_prompt = system_prompt
+    def __init__(
+        self,
+        *,
+        model: str,
+        model_params: dict[str, Any],
+        base_url: str | None = None,
+    ) -> None:
+        self.base_url = base_url
+        super().__init__(
+            model=model,
+            model_params=model_params,
+        )
 
     def validate_connection(self) -> bool:
         """Validate API connection - to be implemented by subclasses."""

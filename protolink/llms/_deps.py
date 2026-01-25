@@ -1,17 +1,29 @@
 """Lazy imports for LLM backends"""
 
 
+def require_anthropic():
+    """Lazy import for Anthropic API."""
+    try:
+        import anthropic
+        from anthropic.types.message_stream_event import MessageStreamEvent
+    except ImportError as exc:
+        raise ImportError(
+            "Anthropic LLM backend requires the 'anthropic' library. Install it with: uv add anthropic or uv add protolink[llms]"  # noqa: E501
+        ) from exc
+    return anthropic, MessageStreamEvent
+
+
 def require_gemini():
     """Lazy import for Google Gemini API."""
     try:
-        import google.generativeai as genai
-        from google.generativeai.types import GenerateContentResponse, GenerationConfig
+        import google.genai as genai
+        from google.genai.types import GenerateContentConfig
     except ImportError as exc:
         raise ImportError(
             "Gemini LLM backend requires the 'google-genai' library. "
             "Install it with: uv add google-genai or uv add protolink[llms]"
         ) from exc
-    return genai, GenerateContentResponse, GenerationConfig
+    return genai, GenerateContentConfig
 
 
 def require_openai():

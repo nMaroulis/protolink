@@ -180,16 +180,13 @@ class HTTPTransport(Transport):
     # ------------------------------------------------------------------
 
     def _build_headers(self) -> dict[str, str]:
-        """Build HTTP headers for an outgoing request.
-
-        Includes authentication headers when an auth context is present.
-        """
-
+        """Build HTTP headers for an outgoing request."""
         headers: dict[str, str] = {}
-
         if self.authenticator and self.security_context:
-            headers["Authorization"] = f"Bearer {self.security_context.token}"
-
+            # Type guard: we know security_context is not None here
+            context = self.security_context
+            if hasattr(context, "token"):
+                headers["Authorization"] = f"Bearer {context.token}"
         return headers
 
     def validate_url(self) -> bool:

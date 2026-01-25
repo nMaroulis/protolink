@@ -201,13 +201,32 @@ class Part:
             "prompt": prompt,
             "user": user,
             "output_schema": output_schema,
-            "metadata": metadata or {},
+            "metadata": metadata,
         }
 
-        # Remove empty fields
+        # Remove None values
         content = {k: v for k, v in content.items() if v is not None}
 
         return cls(
             type="infer",
+            content=content,
+        )
+
+    @classmethod
+    def infer_output(cls, *, content: str | dict[str, Any]) -> "Part":
+        """
+        Create an infer_output part.
+
+        The content contains the output from an LLM inference operation.
+
+        Args:
+            content: The output content, either as a string or dict.
+
+        Returns:
+            Part: A Part of type "infer_output".
+        """
+
+        return cls(
+            type="infer_output",
             content=content,
         )

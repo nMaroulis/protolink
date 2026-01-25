@@ -85,7 +85,7 @@ PartType: TypeAlias = Literal[
     "warning",
     # ---- LLM Call ----
     "infer",
-    "infer_result",
+    "infer_output",
     # ---- Tool interaction ----
     "tool_call",
     "tool_output",
