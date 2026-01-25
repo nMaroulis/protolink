@@ -71,7 +71,7 @@ class AnthropicLLM(APILLM):
 
         return self._parse_output(response)
 
-    def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
         """Generate a streaming response using Anthropic Messages API."""
 
         with self._client.messages.stream(

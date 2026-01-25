@@ -26,6 +26,17 @@ def require_gemini():
     return genai, GenerateContentConfig
 
 
+def require_hugging_face():
+    """Lazy import for HuggingFace Inference API."""
+    try:
+        from huggingface_hub import InferenceClient
+    except ImportError as exc:
+        raise ImportError(
+            "HuggingFace LLM backend requires the 'huggingface-hub' library. Install it with: uv add huggingface-hub or uv add protolink[llms]"  # noqa: E501
+        ) from exc
+    return InferenceClient
+
+
 def require_openai():
     """Lazy import for OpenAI API."""
     try:
@@ -36,3 +47,14 @@ def require_openai():
             "OpenAI LLM backend requires the 'openai' library. Install it with: uv add openai or uv add protolink[llms]"
         ) from exc
     return openai, ChatCompletion, ChatCompletionChunk
+
+
+def require_ollama():
+    """Lazy import for Ollama API."""
+    try:
+        from ollama import Client
+    except ImportError as exc:
+        raise ImportError(
+            "Ollama LLM backend requires the 'ollama' library. Install it with: uv add ollama or uv add protolink[llms]"
+        ) from exc
+    return Client

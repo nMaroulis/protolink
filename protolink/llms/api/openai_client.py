@@ -65,7 +65,7 @@ class OpenAILLM(APILLM):
         response = self._client.responses.create(model=self.model, input=history.messages, **self._model_params)
         return self._parse_output(response)
 
-    def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
         """Generate a streaming response using OpenAI Responses API."""
 
         stream = self._client.responses.create(

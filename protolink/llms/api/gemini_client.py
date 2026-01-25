@@ -76,7 +76,7 @@ class GeminiLLM(APILLM):
         )
         return response.text  # The SDK exposes a .text attribute
 
-    def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
         """Generate a streaming response using Gemini's streaming endpoint."""
         prompt = "\n".join(msg["content"] for msg in history.messages)
 

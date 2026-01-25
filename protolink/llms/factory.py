@@ -3,6 +3,7 @@ from typing import ClassVar
 from protolink.llms.api.anthropic_client import AnthropicLLM
 from protolink.llms.api.deepseek_client import DeepSeekLLM
 from protolink.llms.api.gemini_client import GeminiLLM
+from protolink.llms.api.hugging_face_client import HuggingFaceLLM
 from protolink.llms.api.openai_client import OpenAILLM
 from protolink.llms.base import LLM
 from protolink.llms.server.ollama_client import OllamaLLM
@@ -13,6 +14,7 @@ class LLMClientFactory:
         "anthropic": AnthropicLLM,
         "deepseek": DeepSeekLLM,
         "gemini": GeminiLLM,
+        "huggingface": HuggingFaceLLM,
         "ollama": OllamaLLM,
         "openai": OpenAILLM,
     }

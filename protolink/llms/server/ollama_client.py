@@ -4,117 +4,113 @@ import os
 from collections.abc import Iterable
 from typing import Any, ClassVar
 
-from ollama import Client
-
-from protolink.core.part import Part
-from protolink.llms.base import LLMProvider
+from protolink.llms._deps import require_ollama
+from protolink.llms.history import ConversationHistory
 from protolink.llms.server.base import ServerLLM
-from protolink.models import Message
+from protolink.types import LLMProvider
 from protolink.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 class OllamaLLM(ServerLLM):
-    """Ollama Server implementation of the LLM interface."""
+    """Ollama Server implementation of the LLM interface using ConversationHistory."""
 
-    provider: LLMProvider = "ollama"
-    model: str = "gemma3"
-    model_params: ClassVar[dict[str, Any]] = {
+    provider: ClassVar[LLMProvider] = "ollama"
+    DEFAULT_MODEL: ClassVar[str] = "llama3.2"
+    DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }
-    system_prompt: str = """You are a helpful AI assistant."""
+    system_prompt: str = "You are a helpful AI assistant."
 
     def __init__(
         self,
+        *,
         base_url: str | None = None,
         headers: dict[str, str] | None = None,
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
     ) -> None:
-        if model_params is None:
-            model_params = {}
+        resolved_model = model or self.DEFAULT_MODEL
+        merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
 
-        if base_url is None:
-            base_url = os.getenv("OLLAMA_HOST")
-            if base_url is None:
-                raise ValueError(
-                    "Ollama base URL not provided. Set OLLAMA_HOST environment variable or pass the base_url parameter."
-                )
-        if headers is None:
-            headers = (
-                {
-                    "Authorization": f"Bearer {os.environ.get('OLLAMA_API_KEY')}",
-                }
-                if os.getenv("OLLAMA_API_KEY")
-                else {}
+        super().__init__(model=resolved_model, model_params=merged_params, base_url=base_url)
+
+        # Resolve base_url and headers
+        self.base_url = base_url or os.getenv("OLLAMA_HOST")
+        if not self.base_url:
+            raise ValueError(
+                "Ollama base URL not provided. Set OLLAMA_HOST environment variable or pass the base_url parameter."
             )
 
-        super().__init__(base_url=base_url)
+        if headers is None:
+            api_key = os.getenv("OLLAMA_API_KEY")
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
-        self._client = Client(host=self.base_url, headers=headers)
+        # Initialize the client
+        ollama_client = require_ollama()
+        self._client = ollama_client(host=self.base_url, headers=headers)
 
-        if model:
-            self.model = model
+        if not self.validate_connection():
+            raise ValueError("Ollama connection failed. Check OLLAMA_HOST, OLLAMA_API_KEY, or server availability.")
 
-        self.model_params.update(model_params)
+    # ----------------------------------------------------------------------
+    # LLM calling (invocation)
+    # ----------------------------------------------------------------------
 
-    def _format_messages(self, messages: list[Message]) -> list[dict[str, str]]:
-        formatted: list[dict[str, str]] = []
-
-        if self.system_prompt:
-            formatted.append({"role": "system", "content": self.system_prompt})
-
-        for msg in messages:
-            if not msg.parts:
-                continue
-            formatted.append({"role": msg.role, "content": msg.parts[0].content})
-
-        return formatted
-
-    def _to_message(self, content: str) -> Message:
-        return Message(role="assistant", parts=[Part.text(content)])
-
-    def generate_response(self, messages: list[Message]) -> Message:
-        formatted_messages = self._format_messages(messages)
+    def call(self, history: ConversationHistory) -> str:
+        """Generate a single non-streaming response from Ollama."""
+        formatted_messages = self._format_history(history)
 
         response: dict[str, Any] = self._client.chat(
             model=self.model,
             messages=formatted_messages,
-            **self.model_params,
+            **self._model_params,
         )
 
-        content = response.get("message", {}).get("content", "")
-        return self._to_message(content)
+        return self._parse_output(response)
 
-    def generate_stream_response(self, messages: list[Message]) -> Iterable[Message]:
-        formatted_messages = self._format_messages(messages)
+    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+        """Generate a streaming response from Ollama."""
+        formatted_messages = self._format_history(history)
 
         stream = self._client.chat(
             model=self.model,
             messages=formatted_messages,
             stream=True,
-            **self.model_params,
+            **self._model_params,
         )
 
-        current_content = ""
         for chunk in stream:
-            message = chunk.get("message")
-            if not message:
-                continue
-
-            delta = message.get("content", "")
+            delta = chunk.get("message", {}).get("content", "")
             if not delta:
                 continue
+            yield delta
 
-            current_content += delta
-            yield self._to_message(current_content)
+    # ----------------------------------------------------------------------
+    # Utils
+    # ----------------------------------------------------------------------
+
+    def _format_history(self, history: ConversationHistory) -> list[dict[str, str]]:
+        """Convert ConversationHistory to Ollama chat messages format."""
+        formatted: list[dict[str, str]] = []
+
+        if self.system_prompt:
+            formatted.append({"role": "system", "content": self.system_prompt})
+
+        for msg in history.messages:
+            formatted.append({"role": msg.role, "content": msg.content})
+
+        return formatted
+
+    def _parse_output(self, response: dict[str, Any]) -> str:
+        """Extract the assistant's text from Ollama response."""
+        return response.get("message", {}).get("content", "")
 
     def validate_connection(self) -> bool:
-        """Validate that the Ollama server is reachable and the model is available."""
+        """Validate Ollama server connectivity and model availability."""
         try:
-            # Check if the model exists
-            self._client.list()
+            self._client.list()  # lightweight check
             return True
         except Exception as e:
             logger.warning(f"Ollama connection failed: {e}")

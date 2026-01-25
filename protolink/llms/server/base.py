@@ -1,29 +1,27 @@
-from typing import Any
+from typing import Any, ClassVar
 
-from protolink.llms.base import LLM, LLMProvider, LLMType
+from protolink.llms.base import LLM, LLMType
 
 
 class ServerLLM(LLM):
-    """Base class for Server-based LLM implementations."""
+    """Base class for server-based LLM implementations.
 
-    model_type: LLMType = "server"
-    provider: LLMProvider
-    base_url: str
+    This is for models that run on a self-hosted or remote server rather than via an API library.
+    """
 
-    def __init__(self, base_url: str) -> None:
-        self.model_type = self.__class__.model_type
-        self.provider = self.__class__.provider
+    model_type: ClassVar[LLMType] = "server"
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        model: str,
+        model_params: dict[str, Any] | None = None,
+    ) -> None:
         self.base_url = base_url
-
-    def set_model_params(self, model_params: dict[str, Any]) -> None:
-        """Update existing model parameters, ignoring any extra keys."""
-        valid_params = {k: v for k, v in model_params.items() if k in self.model_params}
-        self.model_params.update(valid_params)
-
-    def set_system_prompt(self, system_prompt: str) -> None:
-        """Set the system prompt for the model."""
-        self.system_prompt = system_prompt
+        merged_params = model_params or {}
+        super().__init__(model=model, model_params=merged_params)
 
     def validate_connection(self) -> bool:
-        """Validate that the server is reachable."""
-        return True
+        """Validate LLM Server connection - to be implemented by subclasses."""
+        raise NotImplementedError

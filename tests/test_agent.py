@@ -70,7 +70,7 @@ class DummyLLM(LLM):
         """Generate a response from the LLM."""
         return "Mock response"
 
-    def call_stream(self, history: ConversationHistory):
+    async def call_stream(self, history: ConversationHistory):
         """Generate a streaming response from the LLM."""
         yield "Mock stream response"
 
