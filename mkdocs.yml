@@ -74,9 +74,11 @@ nav:
       - Types: types.md
   - Examples:
       - Basic Example: examples.md
+      - LLM Usage: llm_examples.md
       - Ticket Booking Example: ticket_booking_example.md
-
   - Project:
       - Development & Contribution: development.md
+      - Changelog: changelog.md
+      - Roadmap: roadmap.md
   - Resources:
       - Relevant Projects: relevant.md

@@ -125,9 +125,12 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 |-----------|-----|---------|-------------|
 | `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
 | `transport` | `Transport \| str \| None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via `set_transport()`. |
-| `registry` | `Registry \| RegistryClient \| str \| None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string (defaults to HTTPTransport). |
+| `registry` | `Registry \| RegistryClient \| str \| None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string. |
+| `registry_url` | `str \| None` | `None` | URL of the registry when using string transport type for registry creation. |
 | `llm` | `LLM \| None` | `None` | Optional language model instance for the agent to use. |
+| `system_prompt` | `str \| None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
+| `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 
 ```python
 from protolink.agents import Agent
@@ -169,8 +172,9 @@ These methods control the agent's server component lifecycle.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `handle_task()` | `task: Task` | `Task` | **Abstract method.** Subclasses must implement this to define how tasks are processed. |
+| `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls, inference) and executes them. Can be overridden for custom orchestration. |
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Optional method for agents that want to emit real-time updates. Default implementation calls `handle_task` and emits status functionality events. |
+| `execute_task()` | `task: Task` | `Task` | Core execution method used by `handle_task`. Executes `tool_call` and `infer` parts from the last message/artifact. |
 | `process()` | `message_text: str` | `str` | Convenience method for synchronous processing of user text input. Wraps input in a Task and returns response text. |
 
 ### Communication Methods
@@ -283,9 +287,10 @@ agent.add_tool(WeatherTool())
 
 ## Abstract Methods
 
-Subclasses of `Agent` must implement the following methods:
+The `Agent` class provides a default implementation for `handle_task` that handles tool use and LLM inference automatically. You generally do **not** need to implement any abstract methods unless you require custom logic.
 
-- **`handle_task(task: Task) -> Task`**: Defines the core logic for processing incoming tasks.
+- **`handle_task(task: Task) -> Task`**: Override this if you need custom task processing logic (e.g., conditional execution, routing).
+
 
 !!! example "Minimal Agent Implementation"
     ```python
