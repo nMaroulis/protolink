@@ -44,6 +44,57 @@ Each component is **pluggable** to the agent and can be replaced with your own i
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
 </div>
 
+Here's a simple example on how **easy** it is to **create an agent**, define the neccessary **modules**, **provided by Protolink** and start the agent. The agent is then ready to **discover other agents** and send & receive **Tasks**.
+
+```python
+from protolink.agents import Agent
+from protolink.models import AgentCard
+from protolink.tools.adapters import MCPToolAdapter
+from protolink.llms.api import OpenAILLM
+from protolink.discovery import Registry
+from protolink.storage import SQLiteStorage
+
+# 1. Initialize & startRegistry for A2A Discovery
+registry = Registry(url="http://127.0.0.1:9000", transport="http")
+await registry.start()
+
+# 2. Initialize OpenAI API LLM
+llm = OpenAILLM(model="gpt-5.2")
+
+# 3. Initialize Storage
+storage = SQLiteStorage()
+
+# 4a. Define the agent card
+agent_card = AgentCard(
+    url="http://127.0.0.1:8020",
+    name="example_agent",
+    description="A dummy agent",
+)
+
+# 4b. Initialize the agent
+agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
+
+# 5a. Add Native tool
+@agent.tool(name="add", description="Add two numbers")
+async def add_numbers(a: int, b: int):
+    return a + b
+
+# 5b. There's also a way to add MCP tools (Experimental)
+mcp_tool = MCPToolAdapter(mcp_client, "multiply")
+agent.add_tool(mcp_tool)
+
+# Start the agent
+await agent.start()
+```
+
+<div align="left">
+  <h4>✨ Ready to Orchestrate</h4>
+  <p>The agent is now fully initialized and prepared to <b>discover peers</b> and handle <b>autonomous tasks</b> across your system.</p>
+</div>
+
+---
+
+
 ## Features
 
 - **A2A Protocol Implementation**: Fully compatible with **Google's A2A specification**
