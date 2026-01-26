@@ -31,6 +31,18 @@ The framework emphasizes **minimal boilerplate**, **explicit control**, and **pr
 
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
 
+</br>
+
+### The centralized agent architecture
+In Protolink the agent is the central component that handles all the logic and incorporates the **LLM**, **tools**, **transport layer** through **AgentClient** and **AgentServer**, the **Storage** and **OpenTelemetry** for logging.
+
+Each of these components is a separate module that can be used independently or in combination with other modules. 
+Each component is **pluggable** to the agent and can be replaced with your own implementation.
+
+</br>
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
+</div>
 
 ## Features
 
@@ -74,10 +86,6 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
 | **Flexibility** | Runtime configuration via providers | Code-based implementation |
 | **Use Case** | Large-scale, distributed systems | Both simple and complex agent systems |
 
-</br>
-<div align="center">
-  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
-</div>
 
 #### Key Benefits
 

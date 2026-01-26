@@ -1,4 +1,4 @@
-# 📜 Changelog
+# Changelog
 
 !!! info "About this Changelog"
     All notable changes to the **Protolink** project will be documented in this file.
@@ -7,30 +7,47 @@
     and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## Release Notes
 
-## [0.4.5] - 2026-01-26
+### [v0.4.5] - 2026-01-26
 
-!!! note "Current Status"
+!!! abstract "Current Status"
     Work in progress features for the next release.
 
-### � Added
-- LLM automated inference
-    - Tool calling
-    - Agent calling - delegated inference
-    - Final result
-- Agent orchestration
-    - Handling LLM inference or tool calling and returning the result
+#### 🚀 Added
+- **LLM Automated Inference**:
+    - Implemented robust tool calling capabilities.
+    - Added agent calling for delegated inference.
+    - Final result processing.
+- **Agent Orchestration**:
+    - Centralized handling for LLM inference, tool execution, and result aggregation.
 
-### �️ Changed
-- LLM API
-- Agent constructor
-- Transport factory
+#### 🔄 Changed
+- **LLM API**: Refactored for better type safety and extensibility.
+- **Agent Constructor**: Simplified initialization options.
+- **Transport Factory**: Improved factory patterns for transport creation.
 
-### 🛡️ Fixed
-- Agent bugs
-- HTTP backend bugs
+#### 🐞 Fixed
+- **Agent Stability**: Resolved race conditions in agent message handling.
+- **HTTP Backend**: Fixed issues with stream termination.
 
----
 
-!!! tip "Tip"
-    Use `git log` for a more detailed view of commit-by-commit changes.
+
+## 🗺️ Roadmap
+
+
+Currently working on **v0.4.6**
+
+- Finalize **LLM Automated Inference**:
+    - Examine how to structure the tool calling logic.
+    - Examine how to structure the agent delegation logic.
+    - Examine how to structure the final result processing logic
+
+
+### Upcoming Features
+- [ ] **Agent Task Handling**: Finalise logic for robust task management.
+- [ ] **Delegated Inference**: Logic for agent delegation and tool calling.
+- [ ] **Transport Layer**: Add gRPC transport support.
+- [ ] **Storage**: Add base classes and implementations (e.g., SQLite).
+- [ ] **Observability**: Add OpenTelemetry support out-of-the-box.
+- [ ] **Integrations**: Finalise MCP adapter.

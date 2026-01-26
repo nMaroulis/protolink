@@ -79,6 +79,5 @@ nav:
   - Project:
       - Development & Contribution: development.md
       - Changelog: changelog.md
-      - Roadmap: roadmap.md
   - Resources:
       - Relevant Projects: relevant.md
