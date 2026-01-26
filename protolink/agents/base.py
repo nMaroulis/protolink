@@ -15,6 +15,7 @@ from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.server import AgentServer
+from protolink.storage import Storage
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
@@ -39,6 +40,7 @@ class Agent:
         registry_url: str | None = None,
         llm: LLM | None = None,
         system_prompt: str | None = None,
+        storage: Storage | None = None,
         skills: Literal["auto", "fixed"] = "auto",
         *,
         override_system_prompt: bool = False,
@@ -46,7 +48,7 @@ class Agent:
         """Initialize agent with its identity card and transport layer.
 
         Args:
-            card: AgentCard or dict describing this agent's identity and capabilities
+            card: AgentCard or dict describing this agent's identity and capabilities.
             transport: Transport instance or transport type string. If a Transport object is provided, it's used
                 directly. If a string is provided (e.g., "http", "websocket"), a new Transport instance is created
                 (transport factory) using the agent's card URL.
@@ -54,19 +56,21 @@ class Agent:
                 its RegistryClient is extracted. If a RegistryClient is provided, it's used directly.
                 If a string is provided, a new RegistryClient is created using the transport factory with registry_url.
             registry_url: URL of registry when using string transport type for registry creation.
-            llm: Optional LLM instance for agent reasoning and inference
+            llm: Optional LLM instance for agent reasoning and inference.
             system_prompt: This is used as complementary text in the system prompt, which is responsible for explaining
                 the agent logic and role. The agent calling, tool calling and other A2A functionalities are already
                 predefined, so the LLM already has the knowledge on how to interact with its environment.
                 If you wish to override the system prompt completely, set override_system_prompt to True.
-            skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills
-            override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided
+            storage: Optional Storage instance for agent data persistence.
+            skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills.
+            override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
         self.card: AgentCard = AgentCard.from_dict(card) if isinstance(card, dict) else card
         self.context_manager = ContextManager()
         self.llm = llm
+        self.storage = storage
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
 
@@ -707,6 +711,14 @@ class Agent:
         """Sets the Agent's LLM and validates the connection."""
         self.llm = llm
         _ = self.llm.validate_connection()
+
+    def set_storage(self, storage: Storage) -> None:
+        """Sets the Agent's storage instance.
+
+        Args:
+            storage: Storage instance for persistence
+        """
+        self.storage = storage
 
     # ----------------------------------------------------------------------
     # Private Methods

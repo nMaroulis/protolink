@@ -129,6 +129,7 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `registry_url` | `str \| None` | `None` | URL of the registry when using string transport type for registry creation. |
 | `llm` | `LLM \| None` | `None` | Optional language model instance for the agent to use. |
 | `system_prompt` | `str \| None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
+| `storage` | `Storage \| None` | `None` | Optional storage instance for agent data persistence. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 
@@ -284,6 +285,36 @@ agent.add_tool(WeatherTool())
 | `get_agent_card()` | `as_json: bool = True` | `AgentCard \| dict` | Returns the agent's identity card. |
 | `set_llm()` | `llm: LLM` | `None` | Updates the agent's language model instance. |
 | `get_context_manager()` | — | `ContextManager` | Returns the context manager for this agent. |
+| `set_storage()` | `storage: Storage` | `None` | Sets the Agent's storage instance. |
+
+## Storage and Persistence
+
+Protolink provides a storage abstraction to allow agents to persist data across tasks or even standalone.
+
+### Core Storage Interface
+
+The `Storage` base class defines the CRUD interface:
+
+```python
+from protolink.storage import Storage
+
+class MyStorage(Storage):
+    def save(self, data): ...
+    def load(self): ...
+    def update(self, data): ...
+    def delete(self): ...
+```
+
+### SQLite Storage
+
+Protolink includes a built-in `SQLiteStorage` implementation:
+
+```python
+from protolink.storage import SQLiteStorage
+
+storage = SQLiteStorage(db_path="my_agent.db", namespace="main_agent")
+agent = Agent(card=card, storage=storage)
+```
 
 ## Abstract Methods
 

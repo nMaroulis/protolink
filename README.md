@@ -39,7 +39,7 @@ In Protolink the agent is the central component that handles all the logic and i
 Each of these components is a separate module that can be used independently or in combination with other modules. 
 Each component is **pluggable** to the agent and can be replaced with your own implementation.
 
-</br>
+
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
 </div>
@@ -49,12 +49,11 @@ Here's a simple example on how **easy** it is to **create an agent**, define the
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
 from protolink.discovery import Registry
 from protolink.storage import SQLiteStorage
 
-# 1. Initialize & startRegistry for A2A Discovery
+# 1. Initialize & start the Registry for A2A Discovery
 registry = Registry(url="http://127.0.0.1:9000", transport="http")
 await registry.start()
 
@@ -62,7 +61,7 @@ await registry.start()
 llm = OpenAILLM(model="gpt-5.2")
 
 # 3. Initialize Storage
-storage = SQLiteStorage()
+storage = SQLiteStorage(db_path="agent.db")
 
 # 4a. Define the agent card
 agent_card = AgentCard(
@@ -71,28 +70,21 @@ agent_card = AgentCard(
     description="A dummy agent",
 )
 
-# 4b. Initialize the agent
+# 4b. Initialize the agent (http transport will be created based on the agent card url)
 agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
 
-# 5a. Add Native tool
+# 5. Add Native tool (Tools from MCP can also be added easily using the MCPToolAdapter)
 @agent.tool(name="add", description="Add two numbers")
 async def add_numbers(a: int, b: int):
     return a + b
 
-# 5b. There's also a way to add MCP tools (Experimental)
-mcp_tool = MCPToolAdapter(mcp_client, "multiply")
-agent.add_tool(mcp_tool)
 
 # Start the agent
 await agent.start()
 ```
 
-<div align="left">
-  <h4>✨ Ready to Orchestrate</h4>
-  <p>The agent is now fully initialized and prepared to <b>discover peers</b> and handle <b>autonomous tasks</b> across your system.</p>
-</div>
-
----
+#### ✨ Ready to Orchestrate
+The agent is now fully initialized and prepared to **discover peers** and handle **autonomous tasks** across your system.
 
 
 ## Features

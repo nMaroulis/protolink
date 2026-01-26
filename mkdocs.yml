@@ -69,6 +69,7 @@ nav:
       - Models: models.md
       - Registry: registry.md
       - Server: server.md
+      - Storage: storage.md
       - Tool: tool.md
       - Transport: transport.md
       - Types: types.md
