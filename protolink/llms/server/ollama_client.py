@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import http.client
+import json
 import os
 from collections.abc import Iterable
 from typing import Any, ClassVar
+from urllib.parse import urlparse
 
-from protolink.llms._deps import require_ollama
 from protolink.llms.history import ConversationHistory
 from protolink.llms.server.base import ServerLLM
 from protolink.types import LLMProvider
@@ -14,14 +16,14 @@ logger = get_logger(__name__)
 
 
 class OllamaLLM(ServerLLM):
-    """Ollama Server implementation of the LLM interface using ConversationHistory."""
+    """Ollama Server implementation of the LLM interface. Uses the http client to make requests to the Ollama server."""
 
     provider: ClassVar[LLMProvider] = "ollama"
-    DEFAULT_MODEL: ClassVar[str] = "llama3.2"
+    DEFAULT_MODEL: ClassVar[str] = "llama3:8b"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }
-    system_prompt: str = "You are a helpful AI assistant."
+    REQUEST_TIMEOUT: ClassVar[int] = 30
 
     def __init__(
         self,
@@ -48,8 +50,15 @@ class OllamaLLM(ServerLLM):
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
         # Initialize the client
-        ollama_client = require_ollama()
-        self._client = ollama_client(host=self.base_url, headers=headers)
+        parsed = urlparse(self.base_url)
+
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Invalid URL scheme: {parsed.scheme}")
+
+        self._host = parsed.hostname
+        self._port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+        self._client = http.client.HTTPConnection(self._host, self._port, timeout=300)
 
         if not self.validate_connection():
             raise ValueError("Ollama connection failed. Check OLLAMA_HOST, OLLAMA_API_KEY, or server availability.")
@@ -60,58 +69,79 @@ class OllamaLLM(ServerLLM):
 
     def call(self, history: ConversationHistory) -> str:
         """Generate a single non-streaming response from Ollama."""
-        formatted_messages = self._format_history(history)
+        payload = {
+            "model": self.model,
+            "messages": history.messages,
+            "stream": False,
+        }
 
-        response: dict[str, Any] = self._client.chat(
-            model=self.model,
-            messages=formatted_messages,
-            **self._model_params,
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        self._client.request(
+            method="POST",
+            url="/api/chat",
+            body=json.dumps(payload),
+            headers=headers,
         )
 
-        return self._parse_output(response)
+        response = self._client.getresponse()
+        data = response.read().decode("utf-8")
+
+        self._client.close()
+
+        result = json.loads(data)
+        return result["message"]["content"]
 
     async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
         """Generate a streaming response from Ollama."""
-        formatted_messages = self._format_history(history)
 
-        stream = self._client.chat(
-            model=self.model,
-            messages=formatted_messages,
-            stream=True,
-            **self._model_params,
-        )
+        payload = {
+            "model": self.model,
+            "messages": self.history.messages,
+            "stream": True,
+        }
 
-        for chunk in stream:
-            delta = chunk.get("message", {}).get("content", "")
-            if not delta:
+        headers = {"Content-Type": "application/json"}
+
+        self._client.request("POST", "/api/chat", json.dumps(payload), headers)
+
+        response = self._client.getresponse()
+
+        for line in response:
+            if not line:
                 continue
-            yield delta
+
+            chunk = json.loads(line.decode("utf-8"))
+            if "message" in chunk:
+                yield chunk["message"]["content"]
 
     # ----------------------------------------------------------------------
     # Utils
     # ----------------------------------------------------------------------
 
-    def _format_history(self, history: ConversationHistory) -> list[dict[str, str]]:
-        """Convert ConversationHistory to Ollama chat messages format."""
-        formatted: list[dict[str, str]] = []
-
-        if self.system_prompt:
-            formatted.append({"role": "system", "content": self.system_prompt})
-
-        for msg in history.messages:
-            formatted.append({"role": msg.role, "content": msg.content})
-
-        return formatted
-
-    def _parse_output(self, response: dict[str, Any]) -> str:
-        """Extract the assistant's text from Ollama response."""
-        return response.get("message", {}).get("content", "")
-
     def validate_connection(self) -> bool:
-        """Validate Ollama server connectivity and model availability."""
+        """Validate Ollama deamon connectivity and model availability."""
         try:
-            self._client.list()  # lightweight check
+            conn = http.client.HTTPConnection(self._host, self._port, timeout=self.REQUEST_TIMEOUT)
+            conn.request("GET", "/api/tags")
+
+            response = conn.getresponse()
+            conn.close()
+
+            if response.status != 200:
+                logger.error(f"Ollama unhealthy (HTTP {response.status})")
+                return False
+
             return True
+
+        except ConnectionRefusedError:
+            logger.exception("Cannot connect to Ollama (connection refused)")
+            return False
+        except TimeoutError:
+            logger.exception("Connection to Ollama timed out")
+            return False
         except Exception as e:
-            logger.warning(f"Ollama connection failed: {e}")
+            logger.exception(f"{e}")
             return False

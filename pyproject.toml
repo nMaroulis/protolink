@@ -51,7 +51,6 @@ llms = [
     "huggingface-hub>=1.3.3",
     "google-genai>=1.55.0",
     "llama-cpp-python>=0.3.16",
-    "ollama>=0.6.1",
     "openai>=2.7.2",
 ]
 

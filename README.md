@@ -17,7 +17,7 @@
 
 ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and **integrate tools seamlessly**. Build **distributed multi-agent systems** with minimal boilerplate and production-oriented architecture.
 
-Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
+Each ProtoLink **agent** is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
 ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **LLM & tool integration**.
 
@@ -25,13 +25,12 @@ ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-p
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
-**Tool Execution**, **Agent calling**, and **LLM invocation** are all provided by Protolink. No need to care on how to call tools or other agent's, ProtoLink handles it for you, through **predefined LLM prompts** that provide the **Agent's LLM** the ability to **interact with its environment**, leaving only the logic to you.
+**Tool calling**, **Agent delegation**, **LLM invocation** and **Task execution logic** are all provided by Protolink. No need to care on how to call tools or other agents, ProtoLink handles it for you, through **automated task execution & delegation**, **predefined LLM prompts** and **custom chain-of-thought** that provide the **Agent's LLM** the ability to **interact with its environment**, leaving only the **agent logic** to you.
 
 > **Focus on your agent logic** - ProtoLink handles communication, authentication, LLM integration, and tool management for you.
 
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
 
-</br>
 
 ### The centralized agent architecture
 In Protolink the agent is the central component that handles all the logic and incorporates the **LLM**, **tools**, **transport layer** through **AgentClient** and **AgentServer**, the **Storage** and **OpenTelemetry** for logging.
@@ -44,7 +43,8 @@ Each component is **pluggable** to the agent and can be replaced with your own i
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
 </div>
 
-Here's a simple example on how **easy** it is to **create an agent**, define the neccessary **modules**, **provided by Protolink** and start the agent. The agent is then ready to **discover other agents** and send & receive **Tasks**.
+
+Here's a simple example on how **easy** it is to **create an agent**, define the neccessary **modules**, **provided by Protolink** and **plug** 🔌 them to the agent. The agent is then ready to **discover other agents** and send & receive **Tasks**.
 
 ```python
 from protolink.agents import Agent
@@ -78,13 +78,12 @@ agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
 async def add_numbers(a: int, b: int):
     return a + b
 
-
 # Start the agent
 await agent.start()
 ```
 
 #### ✨ Ready to Orchestrate
-The agent is now fully initialized and prepared to **discover peers** and handle **autonomous tasks** across your system.
+The agent is now fully initialized and prepared to **discover & being discovered by peers**, send & receive **autonomous tasks** across your system.
 
 
 ## Features
