@@ -75,17 +75,18 @@ class Agent:
         self.skills: Literal["auto", "fixed"] = skills
 
         # LLM prompt
-        self.system_prompt: str | None = system_prompt
+        self._system_prompt: str | None = system_prompt
         self.override_system_prompt: bool = override_system_prompt
 
         # Initialize client and server components
         if transport is None:
-            self._client, self._server = None, None
+            self._transport, self._client, self._server = None, None, None
             logger.warning(
-                "No transport provided, agent will not be able to receive tasks. Call set_transport() to configure."
+                "No transport provided, agent will not be able to receive tasks. Set agent.transport property"
+                " (e.g. agent.transport = 'http') to configure."
             )
         else:
-            self.set_transport(transport)
+            self.transport = transport  # init _transport, _client, _server properties
 
         # Initilize Registry Client
         if not registry:
@@ -530,7 +531,7 @@ class Agent:
 
         # Build the System Prompt
         _ = self.llm.build_system_prompt(
-            user_instructions=self.system_prompt,
+            user_instructions=self._system_prompt,
             agent_cards=agent_cards,
             tools=self.get_tools_for_prompt(),
             override_system_prompt=self.override_system_prompt,
@@ -606,7 +607,7 @@ class Agent:
         return detected_skills
 
     # ----------------------------------------------------------------------
-    # Getters & Setters
+    # Properties - Getters & Setters
     # ----------------------------------------------------------------------
 
     def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
@@ -642,16 +643,12 @@ class Agent:
             """
         return tool_prompt
 
-    def get_transport(self) -> Transport | None:
-        """
-        Get the transport layer for this agent.
-
-        Returns:
-            Transport instance for communication
-        """
+    @property
+    def transport(self) -> Transport | None:
         return self._transport
 
-    def set_transport(self, transport: TransportType | Transport | None) -> None:
+    @transport.setter
+    def transport(self, transport: TransportType | Transport | None) -> None:
         """Set the transport layer for this agent.
 
         Args:

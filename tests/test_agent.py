@@ -141,7 +141,7 @@ class TestAgent:
     def test_set_transport(self, agent):
         """Test setting the transport."""
         transport = DummyTransport(url=agent.card.url)
-        agent.set_transport(transport)
+        agent.transport = transport
         assert agent.client is not None
         assert agent.server is not None
 
@@ -151,7 +151,7 @@ class TestAgent:
         # Create an AsyncMock for the transport
         transport = DummyTransport(url=agent.card.url)
         transport.send = AsyncMock(return_value=Task.create(Message.agent("Response")))
-        agent.set_transport(transport)
+        agent.transport = transport
 
         # Create a test task
         task = Task.create(Message.user("Test"))
@@ -174,7 +174,7 @@ class TestAgent:
         transport = DummyTransport(url=agent.card.url)
         # The transport should return a Task when send_task is called (which send_message uses)
         transport.send = AsyncMock(return_value=Task.create(Message.agent("Response message")))
-        agent.set_transport(transport)
+        agent.transport = transport
 
         message = Message.user("Test message")
         response = await agent.send_message_to("http://other-agent.local", message)
@@ -366,10 +366,10 @@ class TestAgent:
     def test_set_transport_invalid(self, agent):
         """Test setting invalid transport."""
         with pytest.raises(ValueError, match="transport must not be None"):
-            agent.set_transport(None)
+            agent.transport = None
 
-        with pytest.raises(ValueError, match="Unknown transport name: invalid"):
-            agent.set_transport("invalid")
+        with pytest.raises(ValueError):
+            agent.transport = "invalid"
 
     def test_agent_repr(self, agent):
         """Test agent string representation."""

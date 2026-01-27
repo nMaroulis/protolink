@@ -15,7 +15,7 @@ class FriendlyAgent(Agent):
     def __init__(self, name: str, description: str, transport: RuntimeTransport):
         card = AgentCard(name=name, description=description, url=f"local://{name}")
         super().__init__(card)
-        self.set_transport(transport)
+        self.transport = transport
         transport.register_agent(self)
 
     async def handle_task(self, task: Task) -> Task:
