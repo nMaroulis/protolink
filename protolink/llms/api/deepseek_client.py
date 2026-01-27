@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
+from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_openai
@@ -65,7 +65,7 @@ class DeepSeekLLM(APILLM):
         )
         return response.choices[0].message.content
 
-    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         stream = self._client.chat.completions.create(
             model=self.model,
             messages=history.messages,

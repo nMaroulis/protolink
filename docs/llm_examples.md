@@ -111,7 +111,7 @@ task = Task(
     ]
 )
 
-client = AgentClient(transport=agent.get_transport())
+client = AgentClient(transport=agent.transport)
 ```
 
 ### 3. Execution: Without Tools (Failure Case)

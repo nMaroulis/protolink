@@ -3,7 +3,7 @@ from __future__ import annotations
 import http.client
 import json
 import os
-from collections.abc import Iterable
+from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
@@ -94,7 +94,7 @@ class OllamaLLM(ServerLLM):
         result = json.loads(data)
         return result["message"]["content"]
 
-    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response from Ollama."""
 
         payload = {

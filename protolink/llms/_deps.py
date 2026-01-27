@@ -47,14 +47,3 @@ def require_openai():
             "OpenAI LLM backend requires the 'openai' library. Install it with: uv add openai or uv add protolink[llms]"
         ) from exc
     return openai, ChatCompletion, ChatCompletionChunk
-
-
-def require_ollama():
-    """Lazy import for Ollama API."""
-    try:
-        from ollama import Client
-    except ImportError as exc:
-        raise ImportError(
-            "Ollama LLM backend requires the 'ollama' library. Install it with: uv add ollama or uv add protolink[llms]"
-        ) from exc
-    return Client

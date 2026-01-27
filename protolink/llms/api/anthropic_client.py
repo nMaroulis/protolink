@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
+from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_anthropic
@@ -71,7 +71,7 @@ class AnthropicLLM(APILLM):
 
         return self._parse_output(response)
 
-    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response using Anthropic Messages API."""
 
         with self._client.messages.stream(

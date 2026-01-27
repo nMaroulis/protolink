@@ -67,3 +67,21 @@ class Message:
     def assistant(cls, text: str) -> "Message":
         """Create an assistant message with text (convenience method)."""
         return cls(role="assistant").add_text(text)
+
+    @classmethod
+    def infer(
+        cls,
+        *,
+        prompt: str | None = None,
+        user: str | None = None,
+        output_schema: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "Message":
+        """Create a user message with an infer part (convenience method)."""
+        part = Part.infer(
+            prompt=prompt,
+            user=user,
+            output_schema=output_schema,
+            metadata=metadata,
+        )
+        return cls(role="user", parts=[part])

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
+from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_openai
@@ -65,7 +65,7 @@ class OpenAILLM(APILLM):
         response = self._client.responses.create(model=self.model, input=history.messages, **self._model_params)
         return self._parse_output(response)
 
-    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response using OpenAI Responses API."""
 
         stream = self._client.responses.create(

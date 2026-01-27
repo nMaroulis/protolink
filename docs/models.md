@@ -25,6 +25,7 @@ class AgentCard:
     name: str
     description: str
     url: str
+    transport: TransportType = "http"
     version: str = "1.0.0"
     protocol_version: str = protolink_version
     capabilities: AgentCapabilities = field(default_factory=AgentCapabilities)
@@ -45,6 +46,7 @@ Agent identity and capability declaration. This is the main metadata card that d
 | `name` | `str` | — | **Required.** Agent name |
 | `description` | `str` | — | **Required.** Agent purpose/description |
 | `url` | `str` | — | **Required.** Service endpoint URL |
+| `transport` | `TransportType` | `"http"` | Transport protocol to use (e.g. "http", "ws", "stdio") |
 | `version` | `str` | `"1.0.0"` | Agent version |
 | `protocol_version` | `str` | `protolink_version` | Protolink Protocol version |
 | `capabilities` | `AgentCapabilities` | `AgentCapabilities()` | Supported features |
@@ -181,6 +183,8 @@ Defines the capabilities and limitations of an agent. This extends the A2A speci
 class AgentSkill:
     id: str
     description: str = ""
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 ```
@@ -193,6 +197,8 @@ Represents a task that an agent can perform. Skills are used to advertise specif
 |-----------|-----|---------|-------------|
 | `id` | `str` | — | **Required.** Unique Human-readable identifier for the task |
 | `description` | `str` | `""` | ***Optional*** Detailed description of what the task does |
+| `input_schema` | `dict[str, Any]` | `{}` | ***Optional*** JSON Schema for input arguments |
+| `output_schema` | `dict[str, Any]` | `{}` | ***Optional*** JSON Schema for output result |
 | `tags` | `list[str]` | `[]` | ***Optional*** Tags for categorization |
 | `examples` | `list[str]` | `[]` | ***Optional*** Example inputs or usage scenarios |
 
@@ -452,6 +458,28 @@ print(len(task.messages))  # 1
 print(task.state)  # TaskState.SUBMITTED
 ```
 
+---
+
+#### `create_infer(...) -> Task` `classmethod` { #task-create-infer }
+
+Create a new task initialized with an infer message.
+
+**Parameters:**
+- `prompt`: `str | None`
+- `user`: `str | None`
+- `output_schema`: `dict[str, Any] | None`
+- `metadata`: `dict[str, Any] | None`
+
+**Returns:**
+```python
+Task  # New Task instance
+```
+
+**Example:**
+```python
+task = Task.create_infer(prompt="Calculate this")
+```
+
 ### Example
 
 ```python
@@ -668,6 +696,29 @@ print(msg.role)  # "agent"
 print(msg.parts[0].content)  # "It's sunny and 75°F."
 ```
 
+---
+
+#### `assistant(text: str) -> Message` `classmethod` { #message-assistant }
+
+Create an assistant message with text content.
+
+---
+
+#### `infer(...) -> Message` `classmethod` { #message-infer }
+
+Create a user message with an infer part.
+
+**Parameters:**
+- `prompt`: `str | None`
+- `user`: `str | None`
+- `output_schema`: `dict[str, Any] | None`
+- `metadata`: `dict[str, Any] | None`
+
+**Returns:**
+```python
+Message  # New Message instance with infer part
+```
+
 ### Example
 
 ```python
@@ -729,6 +780,34 @@ Create a text part.
 
 **Returns:** New Part instance with type "text"
 
+#### `tool_call(...) -> Part` `classmethod`
+
+Create a tool_call part.
+
+#### `tool_output(...) -> Part` `classmethod`
+
+Create a tool_output part.
+
+#### `infer(...) -> Part` `classmethod`
+
+Create an infer part.
+
+#### `infer_output(...) -> Part` `classmethod`
+
+Create an infer_output part.
+
+#### `json(content: dict) -> Part` `classmethod`
+
+Create a json part.
+
+#### `error(...) -> Part` `classmethod`
+
+Create an error part.
+
+#### `status(...) -> Part` `classmethod`
+
+Create a status part.
+
 ### Example
 
 ```python
@@ -736,8 +815,8 @@ from protolink.models import Part
 
 # Create different types of parts
 text_part = Part.text("Hello, world!")
-image_part = Part("image", binary_image_data)
-file_part = Part("file", {"filename": "report.pdf", "data": pdf_data})
+tool_call = Part.tool_call(tool_name="get_weather", args={"location": "Athens"})
+infer_part = Part.infer(prompt="Who are you?")
 ```
 
 ---

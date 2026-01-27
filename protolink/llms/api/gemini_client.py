@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
+from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_gemini
@@ -76,7 +76,7 @@ class GeminiLLM(APILLM):
         )
         return response.text  # The SDK exposes a .text attribute
 
-    async def call_stream(self, history: ConversationHistory) -> Iterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response using Gemini's streaming endpoint."""
         prompt = "\n".join(msg["content"] for msg in history.messages)
 

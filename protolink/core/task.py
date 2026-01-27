@@ -108,6 +108,28 @@ class Task:
         """Create a new task with an initial message."""
         return cls(messages=[message])
 
+    @classmethod
+    def create_infer(
+        cls,
+        *,
+        prompt: str | None = None,
+        user: str | None = None,
+        output_schema: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "Task":
+        """
+        Create a new task initialized with an infer message.
+
+        Wraps Message.infer() to create the initial message.
+        """
+        message = Message.infer(
+            prompt=prompt,
+            user=user,
+            output_schema=output_schema,
+            metadata=metadata,
+        )
+        return cls.create(message)
+
     def get_last_item(self) -> Message | Artifact | None:
         """
         Return the most recently appended Message or Artifact in this Task.

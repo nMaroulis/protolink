@@ -124,7 +124,7 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `transport` | `Transport \| str \| None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via `set_transport()`. |
+| `transport` | `Transport \| str \| None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via the `transport` property. |
 | `registry` | `Registry \| RegistryClient \| str \| None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string. |
 | `registry_url` | `str \| None` | `None` | URL of the registry when using string transport type for registry creation. |
 | `llm` | `LLM \| None` | `None` | Optional language model instance for the agent to use. |
@@ -157,13 +157,13 @@ These methods control the agent's server component lifecycle.
 | `stop()` | — | `None` | Stops the agent's server component and cleans up resources. |
 
 !!! warning "Transport Required"
-    The `start()` method requires a transport to be configured. If no transport was provided during construction, call `set_transport()` first.
+    The `start()` method requires a transport to be configured. If no transport was provided during construction, set the `transport` property first.
 
 ## Transport Management
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `set_transport()` | `transport: Transport` | `None` | Sets or updates the transport used by this agent. |
+| `transport` (property) | `Transport \| str \| None` | `None` | Gets or sets the transport used by this agent. Setting this initializes the client and server components. |
 | `client` (property) | — | `AgentClient \| None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
 | `server` (property) | — | `AgentServer \| None` | Returns the server instance if one is available via the transport. |
 

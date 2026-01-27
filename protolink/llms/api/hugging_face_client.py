@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_hugging_face
@@ -86,7 +86,7 @@ class HuggingFaceLLM(APILLM):
             logger.error(f"Error in HuggingFace API call: {e}")
             raise
 
-    async def call_stream(self, history: ConversationHistory) -> AsyncIterable[str]:
+    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         # TODO: Implement streaming
         yield ""
 

@@ -163,8 +163,8 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `call()` | `history: ConversationHistory` | `str` | **Abstract.** Generate a single response from the model. |
-| `call_stream()` | `history: ConversationHistory` | `Iterable[str]` | **Abstract.** Generate a streaming response, yielding chunks. |
-| `chat()` | `user_query: str, streaming: bool=False` | `str \| Iterable[str]` | High-level convenience method for standard chat usage. |
+| `call_stream()` | `history: ConversationHistory` | `AsyncIterator[str]` | **Abstract.** Generate a streaming response, yielding chunks. |
+| `chat()` | `user_query: str, streaming: bool=False` | `str \| AsyncIterator[str]` | High-level convenience method for standard chat usage. |
 | `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False` | `Part` | **Async.** Execute controlled multi-step inference with tool calling. |
 | `build_system_prompt()` | `user_instructions, agent_cards, tools, override_system_prompt` | `str` | Build the final system prompt for the LLM. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
