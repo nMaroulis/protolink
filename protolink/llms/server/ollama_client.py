@@ -55,13 +55,20 @@ class OllamaLLM(ServerLLM):
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"Invalid URL scheme: {parsed.scheme}")
 
+        if not parsed.hostname:
+            raise ValueError("Invalid URL: missing hostname")
+
         self._host = parsed.hostname
         self._port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
-        self._client = http.client.HTTPConnection(self._host, self._port, timeout=300)
+        self._client: http.client.HTTPConnection | None = None
+        try:
+            self._client = http.client.HTTPConnection(self._host, self._port, timeout=300)
+        except Exception:
+            logger.exception("LLM Client initilization failed :: Ollama connection failed: {e}")
 
-        if not self.validate_connection():
-            raise ValueError("Ollama connection failed. Check OLLAMA_HOST, OLLAMA_API_KEY, or server availability.")
+        # Non-blocking validation - just log if connection fails
+        _ = self.validate_connection()
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)
@@ -69,6 +76,9 @@ class OllamaLLM(ServerLLM):
 
     def call(self, history: ConversationHistory) -> str:
         """Generate a single non-streaming response from Ollama."""
+        if self._client is None:
+            raise ValueError("Ollama client not connected")
+
         payload = {
             "model": self.model,
             "messages": history.messages,
@@ -96,10 +106,12 @@ class OllamaLLM(ServerLLM):
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response from Ollama."""
+        if self._client is None:
+            raise ValueError("Ollama client not connected")
 
         payload = {
             "model": self.model,
-            "messages": self.history.messages,
+            "messages": history.messages,
             "stream": True,
         }
 

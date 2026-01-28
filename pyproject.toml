@@ -77,10 +77,17 @@ test = [
     "protolink[http]", # For testing HTTP transport
 ]
 
+# Jupyter Notebook dependencies
+notebook = [
+    "jupyter>=1.1.1",
+    "notebook>=7.5.3",
+]
+
 # All dependencies for development
 dev = [
     "protolink[all]",
     "protolink[test]",
+    "protolink[notebook]",
 ]
 
 #Build docs

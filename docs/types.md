@@ -190,7 +190,7 @@ Type alias for supported HTTP methods.
 ## LLMProvider
 
 ```python
-LLMProvider: TypeAlias = Literal["openai", "anthropic", "google", "deepseek", "huggingface", "llama.cpp", "ollama"]
+LLMProvider: TypeAlias = Literal["openai", "anthropic", "gemini", "deepseek", "huggingface", "llama.cpp", "ollama"]
 ```
 
 Type alias for supported Large Language Model providers in Protolink.

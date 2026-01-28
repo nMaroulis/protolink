@@ -47,6 +47,8 @@ class HuggingFaceLLM(APILLM):
 
         # Skip validation for now to avoid initialization issues
         # User can validate manually if needed
+        # Non-blocking validation - just log if connection fails
+        _ = self.validate_connection()
 
     # ----------------------------------------------------------------------
     # LLM calling
@@ -99,5 +101,6 @@ class HuggingFaceLLM(APILLM):
             # Try a simple API call to validate connection
             self._client.text_generation("test", model=self.model, max_new_tokens=1)
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"HuggingFace connection validation failed for model {self.model}: {e}")
             return False

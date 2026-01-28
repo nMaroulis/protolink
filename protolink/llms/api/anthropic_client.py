@@ -52,8 +52,8 @@ class AnthropicLLM(APILLM):
             base_url=base_url,
         )
 
-        if not self.validate_connection():
-            raise ValueError("Anthropic API key not provided. Set ANTHROPIC_API_KEY env var or pass api_key.")
+        # Non-blocking validation - just log if connection fails
+        _ = self.validate_connection()
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)

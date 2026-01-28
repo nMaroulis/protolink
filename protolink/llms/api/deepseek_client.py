@@ -46,11 +46,8 @@ class DeepSeekLLM(APILLM):
             base_url=base_url,
         )
 
-        if not self.validate_connection():
-            raise ValueError(
-                "DeepSeek API key not provided or connection failed. "
-                "Set DEEPSEEK_API_KEY environment variable or pass api_key parameter."
-            )
+        # Non-blocking validation - just log if connection fails
+        _ = self.validate_connection()
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)

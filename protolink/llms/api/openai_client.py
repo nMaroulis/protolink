@@ -50,10 +50,8 @@ class OpenAILLM(APILLM):
             api_key=api_key or os.getenv("OPENAI_API_KEY"),
             base_url=base_url,
         )
-        if not self.validate_connection():
-            raise ValueError(
-                "OpenAI API key not provided. Set OPENAI_API_KEY environment variable or pass the api_key parameter."
-            )
+        # Non-blocking validation - just log if connection fails
+        _ = self.validate_connection()
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)

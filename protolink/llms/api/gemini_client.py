@@ -53,8 +53,9 @@ class GeminiLLM(APILLM):
         self._client = genai.Client(api_key=api_key or os.getenv("GEMINI_API_KEY"))
         # Store the config type class for later use
         self._GenerateContentConfig = GenerateContentConfig
-        if not self.validate_connection:
-            raise ValueError("Gemini API key not provided. Set GEMINI_API_KEY env var or pass api_key parameter.")
+
+        # Non-blocking validation - just log if connection fails
+        _ = self.validate_connection()
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)

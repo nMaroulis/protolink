@@ -648,7 +648,7 @@ The LLM module defines several type aliases for clarity:
 ```python
 LLMType: TypeAlias = Literal["api", "local", "server"]
 LLMProvider: TypeAlias = Literal[
-    "openai", "anthropic", "google", "deepseek", 
+    "openai", "anthropic", "gemini", "deepseek", 
     "huggingface", "llama.cpp", "ollama"
 ]
 ```
