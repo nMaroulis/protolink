@@ -18,6 +18,7 @@ class IDGenerator:
     ARTIFACT_PREFIX: ClassVar[str] = "art_"
     TOOL_CALL_PREFIX: ClassVar[str] = "tool_call_"
     TOOL_OUTPUT_PREFIX: ClassVar[str] = "tool_output_"
+    OPENAI_TOOL_CALL_ID_PREFIX: ClassVar[str] = "call_"
 
     @staticmethod
     def generate_uuid() -> str:
@@ -105,6 +106,19 @@ class IDGenerator:
         """
         prefix = prefix or cls.TOOL_OUTPUT_PREFIX
         return f"{prefix}{IDGenerator._generate_timestamp()}_{uuid.uuid4().hex[:8]}"
+
+    @classmethod
+    def generate_openai_tool_call_id(cls, prefix: str | None = None) -> str:
+        """Generate a tool call ID with optional prefix.
+
+        Args:
+            prefix: Optional prefix for the ID (default: 'tool_call_')
+
+        Returns:
+            A unique tool call ID string
+        """
+        prefix = prefix or cls.OPENAI_TOOL_CALL_ID_PREFIX
+        return f"{prefix}{uuid.uuid4().hex}"
 
     @staticmethod
     def _generate_timestamp() -> str:

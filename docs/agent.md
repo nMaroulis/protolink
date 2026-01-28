@@ -175,7 +175,7 @@ These methods control the agent's server component lifecycle.
 |------|------------|---------|-------------|
 | `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls, inference) and executes them. Can be overridden for custom orchestration. |
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Optional method for agents that want to emit real-time updates. Default implementation calls `handle_task` and emits status functionality events. |
-| `execute_task()` | `task: Task` | `Task` | Core execution method used by `handle_task`. Executes `tool_call` and `infer` parts from the last message/artifact. |
+| `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()` to run the multi-step reasoning loop. For `tool_call` parts, it executes the tool directly. |
 | `process()` | `message_text: str` | `str` | Convenience method for synchronous processing of user text input. Wraps input in a Task and returns response text. |
 
 ### Communication Methods

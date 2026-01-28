@@ -35,12 +35,12 @@ async def main() -> None:
     print("Alice -> Bob")
     hello = Task.create(Message.user("Hi Bob, how are you?"))
     bob_reply = await alice.send_task_to("bob", hello)
-    print(bob_reply.messages[-1].parts[0].content)
+    print(bob_reply.get_last_part_content())  # builtin Task method
 
     print("\nBob -> Alice")
     ping = Task.create(Message.user("Hey Alice, got your ping!"))
     alice_reply = await bob.send_task_to("alice", ping)
-    print(alice_reply.messages[-1].parts[0].content)
+    print(alice_reply.get_last_part_content())
 
     print("\nRegistered agents:", transport.list_agents())
 

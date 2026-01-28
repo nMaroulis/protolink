@@ -223,13 +223,167 @@ async def infer(
 
 #### How It Works
 
-1. **Multi-step Loop**: Executes up to `MAX_INFER_STEPS` (10) iterations
-2. **JSON Action Protocol**: LLM must respond with structured JSON declaring actions
-3. **Action Types**: 
-   - `"final"` - Return a user-facing response
-   - `"tool_call"` - Execute a tool with arguments
-   - `"agent_call"` - Delegate to another agent
-4. **Safety Features**: Bounded execution, error handling, response validation
+1. **Multi-step Loop**: The method executes a loop up to `MAX_INFER_STEPS` (default: 10).
+2. **Deterministic Execution**: At each step, the LLM is invoked with the current history.
+3. **JSON Action Protocol**: The LLM must respond with a strict JSON object declaring one of three actions:
+   - `"final"`: The task is complete. The content is returned to the user.
+   - `"tool_call"`: The LLM wants to execute a tool. The runtime executes the tool and feeds the result back.
+   - `"agent_call"`: The LLM wants to delegate to another agent (not yet fully implemented).
+4. **Validation & Error Handling**: 
+   - Malformed JSON or invalid actions raise `ValueError`.
+   - Tool execution failures raise `RuntimeError` but catchable within the loop context if desired (currently propagates).
+   - Exceeding the step limit raises `RuntimeError`.
+
+#### Tool Call Handling (`_on_tool_call`)
+
+When a tool is executed, the result needs to be added back to the conversation history so the LLM can see it. Protolink uses a **provider-agnostic** approach by default but allows for provider-specific overrides.
+
+```python
+def _on_tool_call(self, *, tool_name: str, tool_args: dict, tool_result: Any) -> None:
+    """
+    Handle the completion of a tool invocation.
+    
+    Default behavior: Inject result as a SYSTEM message.
+    """
+```
+
+**Why System Messages?**
+By default, Protolink adds tool results as `system` messages containing a JSON dump of the result. This works across *any* LLM provider (OpenAI, Anthropic, Ollama, etc.) without needing to know their specific API schemas for tool roles.
+
+**Provider-Specific Tool Call Semantics**
+Subclasses like `OpenAILLM` or `AnthropicLLM` override this method to use their native tool confirmation APIs (e.g., `role="tool"`, `tool_call_id`, etc.), ensuring strict compliance with those platforms while keeping the main loop in `LLM.infer()` generic.
+
+## Provider-Specific Tool Call Semantics
+
+While Protolink’s inference loop and JSON action protocol are fully **provider-agnostic**, the way **tool calls and tool results are injected into the conversation history is not**. Each provider enforces a different conversational contract, message schema, and role semantics.
+
+To handle this cleanly, Protolink defines a generic `_on_tool_call` hook on `LLM`, which is overridden by provider-specific subclasses where native tool calling is supported.
+
+---
+
+### OpenAI (Responses API)
+
+OpenAI’s **Responses API** enforces a strict and non-negotiable tool-calling protocol that differs from the legacy Chat Completions interface.
+
+A complete tool interaction is represented as a **correlated pair of messages**:
+
+1. An `assistant` message declaring the tool invocation via a `tool_calls` field, including:
+   - A generated `tool_call_id`
+   - The tool (function) name
+   - The serialized tool arguments
+
+2. A subsequent `user` message containing a `tool_result` content block, which supplies:
+   - The same `tool_call_id`
+   - The serialized tool execution result
+
+Important constraints enforced by the Responses API:
+
+- A dedicated `tool` role is **explicitly forbidden**
+- Tool results **must** be embedded in a `user` message
+- The `tool_call_id` must match exactly between declaration and result
+- Any deviation from this schema results in request validation errors
+
+#### Implications for Protolink
+
+- `OpenAILLM` overrides `_on_tool_call` to:
+  - Generate a unique `tool_call_id`
+  - Inject messages using the exact schema required by the Responses API
+- Tool execution itself is handled by the runtime; this method only adapts results into OpenAI’s required format
+
+This strictness is why OpenAI requires a fully custom implementation, even though the high-level behavior (execute tool → feed result back) is conceptually identical to other providers.
+
+Official references:
+- OpenAI Responses API – Tool calling  
+  https://platform.openai.com/docs/guides/tools
+- OpenAI Responses API – Message schema  
+  https://platform.openai.com/docs/api-reference/responses
+
+---
+
+### Anthropic (Claude / Messages API)
+
+Anthropic models use a **block-based message format** rather than dedicated tool roles. Tool interactions are expressed through structured content blocks embedded within normal messages.
+
+A complete tool round-trip consists of:
+
+1. An `assistant` message containing a `tool_use` content block that declares:
+   - The name of the tool
+   - The structured input arguments
+
+2. A subsequent `user` message containing a `tool_result` content block that supplies:
+   - The identifier of the originating tool use
+   - The tool execution result
+
+Key characteristics of Anthropic’s protocol:
+
+- Tool interactions are represented via content blocks, not message roles
+- Tool outputs are conceptually treated as **user-provided information**
+- No `tool` or `system` role is introduced for tool results
+- Structural correctness at the block level is strictly enforced
+
+#### Implications for Protolink
+
+- `AnthropicLLM` overrides `_on_tool_call` to:
+  - Inject a `tool_result` content block with the correct identifier
+  - Preserve Anthropic’s expected message ordering and block semantics
+- Tool correlation is handled via block semantics rather than explicit role-based IDs
+
+Anthropic is less restrictive about message roles than OpenAI, but equally strict about content structure.
+
+---
+
+### Ollama / Server-Based Models
+
+Ollama follows a **Chat Completions–style** protocol for tool usage, closer to OpenAI’s legacy interface than the Responses API.
+
+When native tool calling is enabled:
+
+- The assistant declares a tool invocation via a `tool_calls` field
+- The tool result is returned as a separate message with:
+  - `role="tool"`
+  - The corresponding `tool_name`
+- No explicit tool call identifier is required
+- Tool calls and results are implicitly associated by message order
+
+#### Conditional Behavior in Protolink
+
+Ollama support is intentionally **conditional**:
+
+- If `self._supports_tool_calling` is `True`:
+  - Ollama-native tool messages are emitted
+- If `self._supports_tool_calling` is `False`:
+  - The method delegates to the base `LLM` implementation
+  - Tool results are injected using the provider-agnostic fallback
+    (typically a serialized `system` message)
+
+This design allows:
+
+- Disabling native tool calling for models that do not reliably support it (e.g. some LLaMA variants)
+- Preserving a single, deterministic inference loop
+- Avoiding provider-specific branching outside `_on_tool_call`
+
+Official reference:
+- Ollama Tool Calling  
+  https://docs.ollama.com/capabilities/tool-calling
+
+---
+
+## Design Rationale
+
+This layered design allows Protolink to:
+
+- Keep the core inference loop (`LLM.infer`) fully generic
+- Support strict APIs (OpenAI, Anthropic) without polluting the main control flow
+- Support looser or local models (Ollama, custom servers) safely and deterministically
+- Centralize all protocol-specific complexity inside small, well-defined overrides
+
+**In short:**
+
+- The inference logic is generic  
+- The message protocol is provider-specific  
+
+Protolink cleanly separates the two.
+
 
 #### Example Usage
 

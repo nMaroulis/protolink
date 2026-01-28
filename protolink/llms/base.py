@@ -128,6 +128,17 @@ class LLM(ABC):
 
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
+    #
+    # This is the interface that the Agent class will use to interact with the LLM. It is a controlled, multi-step
+    # inference loop that allows the LLM to invoke tools, delegate tasks to other Agents, and finally produce an
+    # ``infer_output`` Part.
+    #
+    # LLMs know how to produce these outputs for these actions (tool_calling, delegate_task, final_output) using
+    # Protolink's predefined prompts.
+    #
+    # What's interesting is how Protolink handles tool_calling and how this tool call is appended to the message
+    # history. Each class implements its own way of handling tool_calling in order to comply with the LLM's API and
+    # internal logic. This implementation should be implemented in `_on_tool_call`
     # ----------------------------------------------------------------------
 
     async def infer(self, *, query: str, tools: dict[str, "BaseTool"], streaming: bool = False) -> "Part":
@@ -173,7 +184,7 @@ class LLM(ABC):
         The method terminates only when a valid `final` action is produced or when safety limits are exceeded,
         in which case a runtime error is raised.
 
-        Returns a Part with PartType 'infer_output'.
+        Returns a Part with PartType ``infer_output``.
         """
 
         self.history.add_user(query)
@@ -218,18 +229,27 @@ class LLM(ABC):
                 except Exception as e:
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
-                # TODO: Examine tool call result and add to history
-                # self.history.add_tool(content=tool_result, tool_name=tool_name)
-                self.history.add_system(json.dumps({"type": "tool_result", "tool": tool_name, "result": tool_result}))
+                # 🔹 Provider hook, mutates history in-place
+                self._on_tool_call(
+                    tool_name=tool_name,
+                    tool_args=tool_args,
+                    tool_result=tool_result,
+                )
 
                 continue
-
             elif action == "agent_call":
                 # propagate agent_call upstream for router/dispatcher
                 # TODO: implement agent_call
                 pass
             else:
-                raise ValueError(f"Unsupported action type: {action}")
+                # Add error handling message for unsupported action types
+                self.history.add_system(
+                    f"Unsupported action type: {action}. Please try again, but only use one of the following actions:\n"
+                    f"- final\n"
+                    f"- tool_call\n"
+                    f"- agent_call"
+                )
+                continue
         raise RuntimeError(f"Maximum inference steps ({MAX_INFER_STEPS}) exceeded without producing final response")
 
     def _parse_infer_response(self, response: str) -> tuple[str, dict[str, Any]]:
@@ -282,6 +302,68 @@ class LLM(ABC):
             raise ValueError(f"{action} response must be a JSON object.\nRaw response: {response}")
 
         return action, data
+
+    def _on_tool_call(
+        self,
+        *,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        tool_result: Any,
+    ) -> None:
+        """
+        Handle the completion of a tool invocation and inject its result into the conversation history in a
+        provider-agnostic way.
+
+        This default implementation serializes the tool execution result into a system message, allowing the model to
+        observe the outcome of the tool call without relying on provider-specific message roles (e.g. `role="tool"`).
+
+        The message is intentionally added as a system message to:
+        - Maintain compatibility across LLM providers (OpenAI, Anthropic, Ollama, etc.)
+        - Avoid strict role validation errors imposed by some APIs
+        - Preserve a single, unified inference loop in the base `LLM` class
+
+        Subclasses representing providers with native tool-calling semantics SHOULD override this method.
+
+        Such providers typically require:
+        - A dedicated message role (e.g. `role="tool"`)
+        - A correlation identifier linking the tool result to the originating assistant tool call (e.g. `tool_call_id`)
+        - The tool result in a user or assistant message
+
+        In these cases, the subclass implementation should translate the completed tool execution into the exact message
+        structure expected by the provider's API and append it to the conversation history accordingly.
+
+        This design allows provider-specific protocol requirements to be encapsulated entirely within the subclass,
+        while preserving a single, shared inference loop in the base `LLM` class. The base loop remains unaware of
+        message role constraints, correlation identifiers, or transport-level validation rules.
+
+        Parameters
+        ----------
+        tool_name : str
+            The name of the tool that was invoked by the model.
+
+        tool_args : dict[str, Any]
+            The arguments that were passed to the tool by the model.
+            This is provided for observability and debugging purposes and is not used directly in the default
+            implementation.
+
+        tool_result : Any
+            The result returned by the tool execution. This value must be JSON-serializable or convertible to a string
+            representation.
+
+        Returns
+        -------
+        None
+            This method mutates the internal conversation history in-place and does not return a value.
+        """
+        self.history.add_system(
+            json.dumps(
+                {
+                    "type": "tool_result",
+                    "tool": tool_name,
+                    "result": tool_result,
+                }
+            )
+        )
 
     # ----------------------------------------------------------------------
     # Prompt management

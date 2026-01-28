@@ -32,6 +32,10 @@ class LLMMessage:
     id: str = field(default_factory=lambda: str(uuid4()))
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+    # provider specific fields
+    tool_calls: dict[str, Any] = field(default_factory=dict)
+    tool_name: str | None = None
+
 
 class ConversationHistory:
     """
@@ -90,6 +94,16 @@ class ConversationHistory:
             )
         )
 
+    def add_raw(self, message: dict[str, Any]) -> None:
+        """Add a raw message to the conversation history."""
+        self._messages.append(
+            LLMMessage(
+                role=LLMMessageRole(message["role"]),
+                content=message.get("content", ""),
+                tool_calls=message.get("tool_calls", {}),
+            )
+        )
+
     def reset_to_system(self, content: str) -> None:
         """Reset the conversation history to only include the system prompt."""
         self._messages = [
@@ -127,7 +141,7 @@ class ConversationHistory:
         return len(self._messages)
 
     # ----------------------------------------------------------------------
-    # advanced controls (important later)
+    # advanced controls
     # ----------------------------------------------------------------------
 
     def truncate(self, max_messages: int) -> None:

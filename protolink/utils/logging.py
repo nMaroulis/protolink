@@ -76,7 +76,7 @@ class ColoredFormatter(logging.Formatter):
 
 
 class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:  # type: ignore[override]
+    def format(self, record: logging.LogRecord) -> str:
         message = record.getMessage()
 
         data: dict[str, Any] = {
