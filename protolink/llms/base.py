@@ -406,7 +406,7 @@ class LLM(ABC):
         """
 
         if override_system_prompt:
-            self.system_prompt = user_instructions
+            self.system_prompt = user_instructions or ""
         else:
             self.system_prompt = BASE_SYSTEM_PROMPT.format(
                 base_instructions=BASE_INSTRUCTIONS,

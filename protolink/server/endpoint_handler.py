@@ -1,4 +1,4 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -10,7 +10,7 @@ class EndpointSpec:
     name: str
     path: str
     method: HttpMethod
-    handler: Callable[..., Awaitable]
+    handler: Callable[..., Any]  # Can be sync or async
     content_type: Literal["json", "html"] = "json"
     streaming: bool = False
     mode: Literal["request_response", "stream"] = "request_response"

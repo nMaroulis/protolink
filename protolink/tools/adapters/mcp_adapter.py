@@ -260,6 +260,7 @@ class MCPToolAdapter(BaseTool):
         self._validate_transport()
 
         if self.transport == "stdio":
+            assert self.command is not None  # Validated in _validate_transport
             server_params = StdioServerParameters(command=self.command, args=self.args)
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:
@@ -267,6 +268,7 @@ class MCPToolAdapter(BaseTool):
                     return await callback(session)
 
         elif self.transport == "sse":
+            assert self.url is not None  # Validated in _validate_transport
             async with sse_client(self.url, headers=self.headers) as (read, write):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
@@ -421,20 +423,22 @@ class MCPToolAdapter(BaseTool):
             # Create session inline since we can't reuse the adapter's _run_with_session
             # (it would cause nested event loop issues)
             if transport == "stdio":
+                assert command is not None
                 server_params = StdioServerParameters(command=command, args=args)
                 async with stdio_client(server_params) as (read, write):
                     async with ClientSession(read, write) as session:
                         await session.initialize()
                         result = await session.call_tool(tool_name, kwargs)
-                        if result.content:
+                        if result.content and hasattr(result.content[0], "text"):
                             return result.content[0].text
                         return None
             elif transport == "sse":
+                assert url is not None
                 async with sse_client(url, headers=headers) as (read, write):
                     async with ClientSession(read, write) as session:
                         await session.initialize()
                         result = await session.call_tool(tool_name, kwargs)
-                        if result.content:
+                        if result.content and hasattr(result.content[0], "text"):
                             return result.content[0].text
                         return None
             else:
@@ -489,8 +493,7 @@ class MCPToolAdapter(BaseTool):
         def call_tool(**kwargs) -> Any:
             async def _invoke(session: ClientSession):
                 result = await session.call_tool(tool_name, kwargs)
-                if result.content:
-                    # Return the text content from the first result
+                if result.content and hasattr(result.content[0], "text"):
                     return result.content[0].text
                 return None
 
@@ -525,7 +528,7 @@ class MCPToolAdapter(BaseTool):
 
         async def _invoke(session: ClientSession):
             result = await session.call_tool(self.name, kwargs)
-            if result.content:
+            if result.content and hasattr(result.content[0], "text"):
                 return result.content[0].text
             return None
 

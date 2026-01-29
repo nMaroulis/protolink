@@ -35,10 +35,10 @@ class AgentInterface(Protocol):
     def handle_task_streaming(self, task: Task) -> AsyncIterator[Any]:
         """Stream task events."""
 
-    async def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
+    def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's public metadata and capabilities."""
 
-    async def get_agent_status_html(self) -> str:
+    def get_agent_status_html(self) -> str:
         """Return a human-readable HTML status page."""
 
 

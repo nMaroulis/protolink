@@ -325,7 +325,7 @@ class Agent:
     # Registry
     # ----------------------------------------------------------------------
 
-    def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+    async def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         """Discover agents in the registry.
 
         Args:
@@ -337,7 +337,7 @@ class Agent:
         if not self.registry_client:
             return []
 
-        return self.registry_client.discover(filter_by=filter_by)
+        return await self.registry_client.discover(filter_by=filter_by)
 
     async def register(self) -> None:
         """Register this agent in the global registry.
@@ -347,13 +347,13 @@ class Agent:
         """
         if not self.registry_client:
             return
-        await self.registry_client.register(self.get_agent_card(as_json=False))
+        await self.registry_client.register(self.card)
 
     async def unregister(self) -> None:
         """Unregister this agent from the global registry."""
         if not self.registry_client:
             return
-        await self.registry_client.unregister(self.get_agent_card(as_json=False).url)
+        await self.registry_client.unregister(self.card.url)
 
     # ----------------------------------------------------------------------
     # Tool Management
@@ -514,16 +514,14 @@ class Agent:
         """
 
         if not self.llm:
-            return [
-                Part.error(
-                    code="no_llm",
-                    message="Agent has no LLM but received a infer instruction",
-                )
-            ]
+            return Part.error(
+                code="no_llm",
+                message="Agent has no LLM but received a infer instruction",
+            )
 
         # Get Available Agents
         agent_cards = ""
-        for i, agent in enumerate(self.discover_agents(), start=1):
+        for i, agent in enumerate(await self.discover_agents(), start=1):
             agent_cards += f"""
             Agent {i}:
                 {agent.get_prompt_format()}
