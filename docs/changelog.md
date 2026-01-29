@@ -50,4 +50,4 @@ Currently working on **v0.4.6**
 - [ ] **Transport Layer**: Add gRPC transport support.
 - [ ] **Storage**: Add base classes and implementations (e.g., SQLite).
 - [ ] **Observability**: Add OpenTelemetry support out-of-the-box.
-- [ ] **Integrations**: Finalise MCP adapter.
+- [x] **Integrations**: Finalise MCP adapter.

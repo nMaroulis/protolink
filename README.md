@@ -226,10 +226,11 @@ agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
 async def add_numbers(a: int, b: int):
     return a + b
 
-# Add MCP tool
-mcp_tool = MCPToolAdapter(mcp_client, "multiply")
-agent.add_tool(mcp_tool)
-
+# Add MCP tools and return them as protolink native tools
+mcp_adapter = MCPToolAdapter(transport="sse", url="https://api.example.com/mcp/sse")
+mcp_tools = mcp_adapter.get_tools()
+for mcp_tool in mcp_tools:
+    agent.add_tool(mcp_tool)
 
 # Start the agent
 await agent.start()
@@ -290,7 +291,7 @@ The following are the Protolink wrappers for each type. If you want to use anoth
 #### Tools:
 
 - [Native Tool](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py): Uses native tools.
-- [MCPToolAdapter](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp.py) - **TBD**: Connects to MCP Server and registers MCP tools as native tools.
+- [MCPToolAdapter](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py): Connects to MCP Server and registers MCP tools as native tools.
 
 
 #### How Protolink Eliminates LLM Orchestration Boilerplate

@@ -588,8 +588,8 @@ class Agent:
                 id=tool_name,
                 description=tool.description or f"Tool: {tool_name}",
                 tags=tool.tags if tool.tags else [],
-                input_schema=tool.input_schema,
-                output_schema=tool.output_schema,
+                input_schema=tool.input_schema or {},
+                output_schema=tool.output_schema or {},
             )
             detected_skills.append(skill)
 

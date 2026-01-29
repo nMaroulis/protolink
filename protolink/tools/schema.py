@@ -41,7 +41,7 @@ def _annotation_to_schema(annotation: Any) -> dict[str, Any]:
             return {"type": "boolean"}
 
         if isinstance(annotation, type) and issubclass(annotation, Enum):
-            return {"enum": [m.value for m in annotation]}  # type: ignore[misc]
+            return {"enum": [m.value for m in annotation]}
 
         if _is_typed_dict(annotation):
             props: dict[str, Any] = {}
@@ -58,11 +58,7 @@ def _annotation_to_schema(annotation: Any) -> dict[str, Any]:
 
         if is_dataclass(annotation):
             props = {f.name: _annotation_to_schema(f.type) for f in fields(annotation)}
-            required = [
-                f.name
-                for f in fields(annotation)
-                if f.default is MISSING and f.default_factory is MISSING  # type: ignore[attr-defined]
-            ]
+            required = [f.name for f in fields(annotation) if f.default is MISSING and f.default_factory is MISSING]
             schema = {"type": "object", "properties": props}
             if required:
                 schema["required"] = required

@@ -90,43 +90,40 @@ Below is a minimal example that wires together an agent, HTTP transport, an Open
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.transport import HTTPTransport
 from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
+from protolink.discovery import Registry
 
+# Initialize Registry for A2A Discovery
+registry = Registry(url="http://127.0.0.1:9000", transport="http")
+await registry.start()
 
 # Define the agent card
 agent_card = AgentCard(
     name="example_agent",
     description="A dummy agent",
+    url="http://127.0.0.1:8020",
 )
-
-
-# Initialize the transport
-transport = HTTPTransport()
-
 
 # OpenAI API LLM
 llm = OpenAILLM(model="gpt-5.2")
 
-
 # Initialize the agent
-agent = Agent(agent_card, transport, llm)
-
+agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
 
 # Add Native tool
 @agent.tool(name="add", description="Add two numbers")
 async def add_numbers(a: int, b: int):
     return a + b
 
-
-# Add MCP tool
-mcp_tool = MCPToolAdapter(mcp_client, "multiply")
-agent.add_tool(mcp_tool)
-
+# Add MCP tools and return them as protolink native tools
+mcp_adapter = MCPToolAdapter(transport="sse", url="https://api.example.com/mcp/sse")
+mcp_tools = mcp_adapter.get_tools()
+for mcp_tool in mcp_tools:
+    agent.add_tool(mcp_tool)
 
 # Start the agent
-agent.start()
+await agent.start()
 ```
 
 This example demonstrates the core pieces of Protolink:

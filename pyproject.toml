@@ -30,7 +30,6 @@ invalid-return-type = "error"
 missing-argument = "error"
 possibly-unresolved-reference = "warn"
 
-
 [project.urls]
 Documentation = "https://nmaroulis.github.io/protolink/"
 Repository = "https://github.com/nMaroulis/protolink"
@@ -52,6 +51,10 @@ llms = [
     "google-genai>=1.60.0",
     "llama-cpp-python>=0.3.16",
     "openai>=2.16.0",
+]
+
+mcp = [
+    "mcp>=1.26.0",
 ]
 
 # Database Drivers
