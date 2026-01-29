@@ -660,10 +660,11 @@ class Agent:
         if isinstance(transport, str):
             transport = get_transport(transport, url=self.card.url)
         elif isinstance(transport, Transport):
+            # TODO(): Examine here
             # Transport and AgentCard URL must match if transport has a URL.
-            transport_url = getattr(transport, "url", None)
-            if transport_url is not None and transport_url != self.card.url:
-                raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
+            # transport_url = getattr(transport, "url", None)
+            # if transport_url is not None and transport_url != self.card.url:
+            #     raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
             transport = transport
         else:
             raise ValueError("Invalid transport type")
