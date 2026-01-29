@@ -99,7 +99,7 @@ class TaskRunner:
                 messages.append(output)
 
             elif isinstance(output, Part):
-                artifacts.append(Artifact.from_part(output))
+                artifacts.append(Artifact(parts=[output]))
 
                 if output.type == "tool_call":
                     has_tool_call = True

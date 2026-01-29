@@ -49,6 +49,10 @@ class DummyTransport(Transport):
     async def stop(self) -> None:  # pragma: no cover
         pass
 
+    def setup_routes(self, endpoints: list) -> None:
+        """Setup routes - dummy implementation for testing."""
+        pass
+
     def validate_url(self) -> bool:
         return True
 

@@ -37,19 +37,21 @@ class OllamaLLM(ServerLLM):
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
 
-        super().__init__(
-            model=resolved_model,
-            model_params=merged_params,
-            base_url=base_url,
-            supports_tool_calling=supports_tool_calling,
-        )
-
-        # Resolve base_url and headers
-        self.base_url = base_url or os.getenv("OLLAMA_HOST")
-        if not self.base_url:
+        # Resolve base_url first (before super().__init__)
+        resolved_base_url = base_url or os.getenv("OLLAMA_HOST")
+        if not resolved_base_url:
             raise ValueError(
                 "Ollama base URL not provided. Set OLLAMA_HOST environment variable or pass the base_url parameter."
             )
+
+        super().__init__(
+            model=resolved_model,
+            model_params=merged_params,
+            base_url=resolved_base_url,
+            supports_tool_calling=supports_tool_calling,
+        )
+
+        self.base_url = resolved_base_url
 
         if headers is None:
             api_key = os.getenv("OLLAMA_API_KEY")

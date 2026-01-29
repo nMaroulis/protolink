@@ -6,9 +6,12 @@ Supports in-memory and JSON-RPC over HTTP/WebSocket.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from protolink.client.request_spec import ClientRequestSpec
+
+if TYPE_CHECKING:
+    from protolink.server.endpoint_handler import EndpointSpec
 
 
 class Transport(ABC):
@@ -28,6 +31,15 @@ class Transport(ABC):
 
         Returns:
             The parsed response.
+        """
+        pass
+
+    @abstractmethod
+    def setup_routes(self, endpoints: list["EndpointSpec"]) -> None:
+        """Setup routes for the transport server.
+
+        Args:
+            endpoints: List of endpoint specifications to register.
         """
         pass
 

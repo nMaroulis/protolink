@@ -24,8 +24,18 @@ class RuntimeTransport(Transport):
     def __init__(self):
         """Initialize in-memory transport."""
         self.transport_type: ClassVar[TransportType] = "runtime"
+        # self._url: str = "runtime://local"
         self.agents: dict[str, AgentProtocol] = {}
         self._task_handler: Callable[[Task], Awaitable[Task]] | None = None
+        self._endpoints: list = []  # Store endpoints for potential use
+
+    def setup_routes(self, endpoints: list) -> None:
+        """Setup routes for in-memory transport (stores endpoints for reference).
+
+        Args:
+            endpoints: List of endpoint specifications.
+        """
+        self._endpoints = endpoints
 
     def register_agent(self, agent: AgentProtocol) -> None:
         """Register an agent for in-memory communication.
