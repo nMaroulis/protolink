@@ -234,12 +234,12 @@ async def infer(
    - Tool execution failures raise `RuntimeError` but catchable within the loop context if desired (currently propagates).
    - Exceeding the step limit raises `RuntimeError`.
 
-#### Tool Call Handling (`_on_tool_call`)
+#### Tool Call Handling (`_inject_tool_call`)
 
 When a tool is executed, the result needs to be added back to the conversation history so the LLM can see it. Protolink uses a **provider-agnostic** approach by default but allows for provider-specific overrides.
 
 ```python
-def _on_tool_call(self, *, tool_name: str, tool_args: dict, tool_result: Any) -> None:
+def _inject_tool_call(self, *, tool_name: str, tool_args: dict, tool_result: Any) -> None:
     """
     Handle the completion of a tool invocation.
     

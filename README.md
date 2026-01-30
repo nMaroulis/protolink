@@ -293,6 +293,38 @@ The following are the Protolink wrappers for each type. If you want to use anoth
 - [Native Tool](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py): Uses native tools.
 - [MCPToolAdapter](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py): Connects to MCP Server and registers MCP tools as native tools.
 
+##### MCP Tool Adapter
+
+The `MCPToolAdapter` connects to [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers and exposes their tools as Protolink-native callables, wrapping remote **MCP tools** as native `Tool` instances. This enables seamless integration with the growing MCP ecosystem.
+
+**Supported transports:**
+- `stdio` — Local subprocess communication (for MCP servers as scripts/executables)
+- `sse` — Remote HTTP Server-Sent Events (for MCP servers as web services)
+
+```python
+from protolink.tools.adapters import MCPToolAdapter
+
+# Connect to a local MCP server
+adapter = MCPToolAdapter(
+    transport="stdio",
+    command="python",
+    args=["my_mcp_server.py"]
+)
+
+# Or connect to a remote MCP server
+adapter = MCPToolAdapter(
+    transport="sse",
+    url="https://api.example.com/mcp/sse"
+)
+
+# Get tools and add them to your agent
+for tool in adapter.get_tools():
+    agent.add_tool(tool)
+
+# Or call tools directly
+add_tool = adapter.get_callable("add")
+result = add_tool(a=5, b=7)
+```
 
 #### How Protolink Eliminates LLM Orchestration Boilerplate
 

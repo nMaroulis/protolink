@@ -138,7 +138,7 @@ class LLM(ABC):
     #
     # What's interesting is how Protolink handles tool_calling and how this tool call is appended to the message
     # history. Each class implements its own way of handling tool_calling in order to comply with the LLM's API and
-    # internal logic. This implementation should be implemented in `_on_tool_call`
+    # internal logic. This implementation should be implemented in `_inject_tool_call`
     # ----------------------------------------------------------------------
 
     async def infer(self, *, query: str, tools: dict[str, "BaseTool"], streaming: bool = False) -> "Part":
@@ -230,7 +230,7 @@ class LLM(ABC):
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
                 # 🔹 Provider hook, mutates history in-place
-                self._on_tool_call(
+                self._inject_tool_call(
                     tool_name=tool_name,
                     tool_args=tool_args,
                     tool_result=tool_result,
@@ -303,7 +303,7 @@ class LLM(ABC):
 
         return action, data
 
-    def _on_tool_call(
+    def _inject_tool_call(
         self,
         *,
         tool_name: str,

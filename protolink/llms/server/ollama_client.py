@@ -141,7 +141,7 @@ class OllamaLLM(ServerLLM):
     # Agent-LLM Interface - A2A Operations
     # ----------------------------------------------------------------------
 
-    def _on_tool_call(self, *, tool_name: str, tool_args: dict[str, Any], tool_result: Any):
+    def _inject_tool_call(self, *, tool_name: str, tool_args: dict[str, Any], tool_result: Any):
         """
         Inject a completed tool invocation into the conversation history using Ollama's native tool-calling message
         format.
@@ -189,7 +189,7 @@ class OllamaLLM(ServerLLM):
 
         # Fallback to provider-agnostic behavior if native tool calling is disabled
         if not self._supports_tool_calling:
-            return super()._on_tool_call(
+            return super()._inject_tool_call(
                 tool_name=tool_name,
                 tool_args=tool_args,
                 tool_result=tool_result,
