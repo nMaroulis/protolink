@@ -257,7 +257,7 @@ Subclasses like `OpenAILLM` or `AnthropicLLM` override this method to use their 
 
 While Protolink’s inference loop and JSON action protocol are fully **provider-agnostic**, the way **tool calls and tool results are injected into the conversation history is not**. Each provider enforces a different conversational contract, message schema, and role semantics.
 
-To handle this cleanly, Protolink defines a generic `_on_tool_call` hook on `LLM`, which is overridden by provider-specific subclasses where native tool calling is supported.
+To handle this cleanly, Protolink defines a generic `_inject_tool_call` hook on `LLM`, which is overridden by provider-specific subclasses where native tool calling is supported.
 
 ---
 
@@ -285,7 +285,7 @@ Important constraints enforced by the Responses API:
 
 #### Implications for Protolink
 
-- `OpenAILLM` overrides `_on_tool_call` to:
+- `OpenAILLM` overrides `_inject_tool_call` to:
   - Generate a unique `tool_call_id`
   - Inject messages using the exact schema required by the Responses API
 - Tool execution itself is handled by the runtime; this method only adapts results into OpenAI’s required format
@@ -323,7 +323,7 @@ Key characteristics of Anthropic’s protocol:
 
 #### Implications for Protolink
 
-- `AnthropicLLM` overrides `_on_tool_call` to:
+- `AnthropicLLM` overrides `_inject_tool_call` to:
   - Inject a `tool_result` content block with the correct identifier
   - Preserve Anthropic’s expected message ordering and block semantics
 - Tool correlation is handled via block semantics rather than explicit role-based IDs
@@ -360,7 +360,7 @@ This design allows:
 
 - Disabling native tool calling for models that do not reliably support it (e.g. some LLaMA variants)
 - Preserving a single, deterministic inference loop
-- Avoiding provider-specific branching outside `_on_tool_call`
+- Avoiding provider-specific branching outside `_inject_tool_call`
 
 Official reference:
 - Ollama Tool Calling  

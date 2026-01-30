@@ -87,7 +87,7 @@ class OpenAILLM(APILLM):
     # Agent-LLM Interface - A2A Operations
     # ----------------------------------------------------------------------
 
-    def _on_tool_call(self, *, tool_name: str, tool_args: dict[str, Any], tool_result: Any):
+    def _inject_tool_call(self, *, tool_name: str, tool_args: dict[str, Any], tool_result: Any):
         """
         Inject a completed tool invocation into the conversation history using OpenAI's Responses API tool-calling
         protocol.
@@ -129,9 +129,8 @@ class OpenAILLM(APILLM):
                 These are serialized and embedded in the assistant's ``tool_calls`` declaration.
 
             tool_result (Any):
-                The result returned by the executed tool. The value must be
-                JSON-serializable, as it is injected into a ``tool_result`` content
-                block within a ``user`` message.
+                The result returned by the executed tool. The value must be JSON-serializable, as it is injected into
+                a ``tool_result`` content block within a ``user`` message.
 
         Returns:
             None

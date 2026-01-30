@@ -21,7 +21,7 @@ class ServerLLM(LLM):
 
     Tool calling support is declared explicitly via the ``supports_tool_calling`` flag. When enabled, subclasses are
     expected to implement provider-specific adaptations for tool invocation and result injection (e.g. overriding
-    ``_on_tool_call``), as server protocols and message formats vary widely and are often model-dependent.
+    ``_inject_tool_call``), as server protocols and message formats vary widely and are often model-dependent.
 
     e.g. reliable vs unreliable tool callers:
 
