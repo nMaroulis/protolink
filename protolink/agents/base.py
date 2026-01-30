@@ -505,12 +505,30 @@ class Agent:
 
     async def call_llm(self, infer_part: Part) -> Part:
         """
-        Invoke the agent's LLM.
+        Invoke the agent's LLM to process an inference request.
 
-        The LLM may:
-        - return text
-        - return tool_call parts
-        - return infer parts (loop)
+        This method orchestrates a complete LLM inference cycle by:
+        1. Discovering available agents from the registry
+        2. Building a system prompt with tools, agent cards, and user instructions
+        3. Invoking the LLM's inference loop with tool and agent delegation support
+
+        The LLM may respond with:
+        - A final text response (returned as ``infer_output`` Part)
+        - Tool calls (handled internally via ``_inject_tool_call``)
+        - Agent delegation (handled via ``_handle_agent_call`` callback)
+
+        Args:
+            infer_part: A Part of type ``infer`` containing:
+                - prompt (str): The user query or instruction to process
+
+        Returns:
+            Part: A Part of type ``infer_output`` containing the LLM's final response,
+                or an ``error`` Part if no LLM is configured.
+
+        Notes:
+            The inference loop continues until the LLM produces a ``final`` action.
+            Tool calls and agent delegations are executed automatically and their
+            results are injected back into the conversation for the LLM to process.
         """
 
         if not self.llm:
@@ -535,8 +553,92 @@ class Agent:
             override_system_prompt=self.override_system_prompt,
         )
 
-        response: Part = await self.llm.infer(query=infer_part.content.get("prompt", ""), tools=self.tools)
+        response: Part = await self.llm.infer(
+            query=infer_part.content.get("prompt", ""),
+            tools=self.tools,
+            agent_callback=self._handle_agent_call,
+        )
         return response
+
+    async def _handle_agent_call(
+        self,
+        agent_name: str,
+        action: str,
+        payload: dict[str, Any],
+    ) -> Any:
+        """
+        Handle agent delegation from the LLM inference loop.
+
+        This callback is invoked when the LLM produces an agent_call action. It translates the LLM's delegation request
+        into a Task and sends it to the target agent using the transport layer.
+
+        Args:
+            agent_name: Name or URL of the agent to delegate to.
+            action: The action type - either "tool_call" (execute a tool on the remote agent) or "infer" (ask the
+                remote agent to generate a response).
+            payload: The full agent_call payload from the LLM, containing tool/args or prompt.
+
+        Returns:
+            The result from the delegated agent (typically the last part content from the response task).
+
+        Raises:
+            ValueError: If the action type is unknown.
+            RuntimeError: If the delegation fails (propagated from send_task_to).
+        """
+        # Resolve agent name to URL
+        agent_url = await self._resolve_agent_url(agent_name)
+
+        if action == "tool_call":
+            tool_name = payload.get("tool")
+            args = payload.get("args", {})
+            if not tool_name:
+                raise ValueError(f"tool_call agent_call must specify 'tool' field. Received payload: {payload}")
+            # Create task with tool_call part for the remote agent to execute
+            task = Task.create(Message(role="agent", parts=[Part.tool_call(tool_name=tool_name, args=args)]))
+            result_task = await self.send_task_to(agent_url, task)
+            print(result_task)
+            return result_task.get_last_part_content()
+
+        elif action == "infer":
+            prompt = payload.get("prompt", "")
+            # Create task with user message for the remote agent to process
+            task = Task.create(Message.user(prompt))
+            result_task = await self.send_task_to(agent_url, task)
+            return result_task.get_last_part_content()
+
+        raise ValueError(f"Unknown agent_call action: {action}")
+
+    async def _resolve_agent_url(self, agent_name: str) -> str:
+        """
+        Resolve an agent name to its URL by looking up the registry.
+
+        Args:
+            agent_name: The agent name to resolve (can also be a URL).
+
+        Returns:
+            The agent's URL.
+
+        Raises:
+            ValueError: If the agent is not found in the registry.
+        """
+        # If it already looks like a URL, return as-is
+        if (
+            agent_name.startswith("http://")
+            or agent_name.startswith("https://")
+            or agent_name.startswith("ws://")
+            or agent_name.startswith("wss://")
+        ):
+            return agent_name
+
+        # Look up in discovered agents
+        discovered = await self.discover_agents()
+        for agent in discovered:
+            if agent.name == agent_name:
+                return agent.url
+
+        raise ValueError(
+            f"Agent '{agent_name}' not found in registry. Available agents: {[a.name for a in discovered]}"
+        )
 
     # ----------------------------------------------------------------------
     # Skill Management

@@ -234,6 +234,72 @@ async def infer(
    - Tool execution failures raise `RuntimeError` but catchable within the loop context if desired (currently propagates).
    - Exceeding the step limit raises `RuntimeError`.
 
+### Inference Loop Safety Guardrails
+
+The `infer()` method implements multiple layers of safety guarantees to ensure robust, deterministic execution:
+
+#### 1. Deduplication Detection
+
+The runtime tracks recent actions using a sliding window (default: 5 actions). If the LLM produces an identical action (same tool/agent call with identical arguments), the runtime:
+
+- **Does not re-execute** the action
+- **Injects corrective guidance** into the conversation history
+- Prompts the LLM to proceed with its task or take a different action
+
+This prevents infinite loops where the LLM repeatedly calls the same tool expecting different results.
+
+```
+# Example: LLM tries to call get_weather("Tokyo") twice in a row
+# Runtime detects the duplicate and injects:
+"You have already performed this action: tool_call. The result is in your context.
+Please proceed with your task - either produce a 'final' response or take a different action."
+```
+
+#### 2. Parse Failure Circuit Breaker
+
+Instead of consuming the entire step budget on parse failures, the runtime implements a circuit breaker:
+
+- **Tracks consecutive parse failures** (not total failures)
+- After **3 consecutive failures**, raises `RuntimeError` immediately
+- Each failure **injects corrective feedback** to help the LLM self-correct
+
+```python
+# After a parse failure, the runtime injects:
+"Your previous response could not be parsed as valid JSON. Error: {error}
+Please respond with a valid JSON object containing 'type' and required fields."
+```
+
+#### 3. Self-Correcting Error Recovery
+
+Rather than failing immediately on validation errors, the runtime injects helpful context back to the LLM:
+
+| Error Type | Runtime Response |
+|------------|------------------|
+| Unknown tool | Lists available tools |
+| Missing required fields | Shows expected JSON format |
+| Type errors (wrong args) | Prompts to check `input_schema` |
+| Agent not found | Provides the error message |
+| Invalid action type | Lists valid action types |
+
+This approach allows the LLM to self-correct without consuming the entire step budget on recoverable errors.
+
+#### 4. Bounded Execution
+
+A hard limit of `MAX_INFER_STEPS` (default: 10) prevents runaway execution:
+
+- If exceeded, raises `RuntimeError` with diagnostic information
+- The error message indicates the LLM may be stuck in a loop
+- Suggests simplifying the task or checking prompts
+
+!!! tip "Debugging Inference Loops"
+    If you encounter "Maximum inference steps exceeded" errors frequently:
+    
+    1. **Check your prompts**: Ensure clear instructions for when to produce `final` responses
+    2. **Simplify the task**: Break complex tasks into smaller steps
+    3. **Review tool schemas**: Ensure tools have clear descriptions and valid schemas
+    4. **Enable logging**: Add logging to track LLM decisions at each step
+
+
 #### Tool Call Handling (`_inject_tool_call`)
 
 When a tool is executed, the result needs to be added back to the conversation history so the LLM can see it. Protolink uses a **provider-agnostic** approach by default but allows for provider-specific overrides.

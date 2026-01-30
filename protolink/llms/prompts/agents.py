@@ -66,6 +66,20 @@ Example:
   "prompt": "Determine whether weather conditions are suitable for travel in Athens tomorrow."
 }}
 
+## After an agent_call
+
+When you produce an agent_call, the system will execute it and return the result as an `agent_result` message:
+{{
+  "type": "agent_result",
+  "agent": "<agent_name>",
+  "action": "<action_type>",
+  "result": "<the_result>"
+}}
+
+**IMPORTANT**: After receiving an agent_result, you have received the information you requested.
+Do NOT repeat the same agent_call - the result is already in your context.
+Proceed with your task: either produce a final response, call another tool/agent, or continue reasoning.
+
 Do NOT assume agent internals.
 Do NOT execute tools yourself when delegating.
 

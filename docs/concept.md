@@ -273,6 +273,137 @@ This architecture makes it easy to:
 
 ---
 
+# LLM Inference Runtime
+
+When an agent includes an LLM, Protolink provides a **deterministic inference runtime** that transforms stateless language models into reliable autonomous actors.
+
+## The Core Idea
+
+> The LLM **declares intent**. The runtime **executes actions**. The LLM **observes results**.
+
+This separation ensures:
+
+- **Reproducible behavior** across different LLM providers
+- **Full control** over side effects (tool execution, agent delegation)
+- **Robust error handling** with self-correction capabilities
+
+---
+
+## ReAct-Style Execution Loop
+
+The inference runtime implements a **ReAct-style** (Reasoning + Acting) pattern:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Inference Loop                        │
+├─────────────────────────────────────────────────────────┤
+│  1. User query added to conversation history            │
+│                         ↓                               │
+│  2. LLM generates JSON action                           │
+│                         ↓                               │
+│  3. Runtime parses and validates action                 │
+│                         ↓                               │
+│  4. Action dispatched:                                  │
+│     • final → Return response                           │
+│     • tool_call → Execute tool, inject result           │
+│     • agent_call → Delegate to agent, inject result     │
+│                         ↓                               │
+│  5. Loop continues until 'final' or limit exceeded      │
+└─────────────────────────────────────────────────────────┘
+```
+
+The LLM operates in a **thought → action → observation** cycle:
+
+- **Thought**: Internal reasoning (not exposed)
+- **Action**: JSON declaration of what to do
+- **Observation**: Runtime executes, result injected into history
+
+---
+
+## JSON Action Protocol
+
+The LLM communicates via a strict JSON protocol with three action types:
+
+### Final Response
+```json
+{"type": "final", "content": "The weather in Tokyo is 28°C and sunny."}
+```
+
+### Tool Call
+```json
+{"type": "tool_call", "tool": "get_weather", "args": {"location": "Tokyo"}}
+```
+
+### Agent Delegation
+```json
+{
+  "type": "agent_call",
+  "action": "tool_call",
+  "agent": "weather_agent",
+  "tool": "get_weather",
+  "args": {"location": "Tokyo"}
+}
+```
+
+The runtime **never trusts** the LLM to execute actions directly. All actions are:
+
+1. Parsed and validated
+2. Executed by the runtime
+3. Results serialized and injected back
+
+---
+
+## Safety Guardrails
+
+The inference runtime implements multiple safety mechanisms:
+
+### Deduplication Detection
+
+Tracks recent actions in a sliding window. If the LLM repeats an identical action:
+
+- Action is **not re-executed**
+- Corrective guidance is **injected** into history
+- LLM is prompted to proceed or take different action
+
+### Parse Failure Circuit Breaker
+
+After 3 consecutive JSON parse failures:
+
+- **Raises immediately** rather than consuming step budget
+- Each failure **injects corrective feedback**
+- Helps LLM self-correct its output format
+
+### Self-Correcting Error Recovery
+
+Instead of failing on validation errors, helpful context is injected:
+
+| Error | Response |
+|-------|----------|
+| Unknown tool | Lists available tools |
+| Missing fields | Shows expected format |
+| Type errors | Prompts to check schema |
+| Agent not found | Provides error details |
+
+### Bounded Execution
+
+Hard limit of `MAX_INFER_STEPS` (default: 10) prevents runaway loops.
+
+---
+
+## Why This Matters
+
+This design enables:
+
+- **Provider-agnostic execution**: Same loop works with OpenAI, Anthropic, Ollama, etc.
+- **Observable behavior**: Every action is logged and traceable
+- **Graceful degradation**: Self-correction reduces failures
+- **Predictable resource usage**: Bounded steps prevent infinite loops
+
+The runtime transforms chaotic LLM outputs into **reliable, deterministic agent behavior**.
+
+
+---
+
 # Design Principles
 
 Protolink’s architecture is guided by a small number of **explicit design principles**.  

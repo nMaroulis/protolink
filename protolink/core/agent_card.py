@@ -169,17 +169,28 @@ class AgentCard:
             if f not in data:
                 raise ValueError(f"AgentCard :: Missing required field: {f}")
 
-    @classmethod
-    def get_prompt_format(cls) -> str:
-        """Get the prompt format for this agent."""
-
-        prompt_text: str = f"""
-            name: {cls.name},
-            description: {cls.description},
+    def get_prompt_format(self) -> str:
         """
-        if cls.skills:
+        Generate a structured text representation of this agent for LLM prompts.
+
+        This method produces a human-readable, LLM-friendly description of the agent that includes its name,
+        description, and available tools (skills). The output is designed to be embedded in a system prompt,
+        enabling LLMs to understand which agents are available for delegation via ``agent_call``.
+
+        The format includes:
+        - Agent name and description
+        - List of tools with their schemas (if any skills are registered)
+
+        Returns:
+            str: A formatted multi-line string describing the agent and its capabilities.
+        """
+        prompt_text: str = f"""
+            name: {self.name},
+            description: {self.description},
+        """
+        if self.skills:
             prompt_text += "\ntools:\n"
-            for skill in cls.skills:
+            for skill in self.skills:
                 prompt_text += f"""
                     "name": {skill.id},
                     "description": {skill.description},

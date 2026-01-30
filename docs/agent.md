@@ -178,6 +178,53 @@ These methods control the agent's server component lifecycle.
 | `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()` to run the multi-step reasoning loop. For `tool_call` parts, it executes the tool directly. |
 | `process()` | `message_text: str` | `str` | Convenience method for synchronous processing of user text input. Wraps input in a Task and returns response text. |
 
+#### The Inference Loop Integration
+
+When `execute_task()` encounters an `infer` part, it delegates to `LLM.infer()` with:
+
+1. **The query**: Extracted from the task's message content
+2. **The agent's tools**: All registered tools passed as a dictionary
+3. **An agent callback**: Enables the LLM to delegate work to other agents
+
+```python
+# Simplified view of what happens inside execute_task()
+result = await self.llm.infer(
+    query=query,
+    tools=self.tools,
+    agent_callback=self._handle_agent_call  # Enables agent delegation
+)
+```
+
+The **agent callback** (`_handle_agent_call`) is invoked when the LLM produces an `agent_call` action. It:
+
+1. **Resolves the agent name to URL** by querying the registry
+2. **Creates a Task** with the appropriate message/tool call
+3. **Sends the task** to the target agent via `send_task_to()`
+4. **Returns the result** to the inference loop
+
+This enables a coordinator agent to delegate work to specialized agents without manual orchestration.
+
+!!! info "Agent Delegation Flow"
+    ```
+    User Query → Coordinator Agent → LLM.infer()
+                                        ↓
+                                   agent_call action
+                                        ↓
+                               _handle_agent_call()
+                                        ↓
+                               resolve agent URL
+                                        ↓
+                               send_task_to(weather_agent)
+                                        ↓
+                               Weather Agent processes task
+                                        ↓
+                               Result returned to LLM
+                                        ↓
+                               LLM produces final response
+    ```
+
+
+
 ### Communication Methods
 
 | Name | Parameters | Returns | Description |

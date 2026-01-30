@@ -1,7 +1,10 @@
 import json
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
-from typing import Any, ClassVar
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from protolink.tools import BaseTool
 
 from protolink.core.part import Part
 from protolink.llms.history import ConversationHistory
@@ -141,60 +144,156 @@ class LLM(ABC):
     # internal logic. This implementation should be implemented in `_inject_tool_call`
     # ----------------------------------------------------------------------
 
-    async def infer(self, *, query: str, tools: dict[str, "BaseTool"], streaming: bool = False) -> "Part":
+    async def infer(
+        self,
+        *,
+        query: str,
+        tools: dict[str, "BaseTool"],
+        agent_callback: Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None = None,
+        streaming: bool = False,
+    ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
 
-        Args:
-            query (str):
-                The user-provided task or instruction to be processed by the agent.
-            tools (dict[str, BaseTool]):
-                A mapping of tool names to executable tool instances that the agent may invoke during inference.
-            streaming (bool, optional):
-                Whether to invoke the underlying LLM in streaming mode. Defaults to False.
-
-        Returns:
-            Part:
-                A Part instance of type ``infer_output`` containing the final user-facing response produced by the agent
-
-        Raises:
-            RuntimeError:
-                If the LLM call fails, a tool execution raises, the response cannot be parsed after repeated attempts,
-                or the maximum number of inference steps is exceeded.
-            ValueError:
-                If the LLM declares an invalid action or references an unknown tool.
-
-        Notes:
-
         This method implements a deterministic agent runtime over a stateless language model. The LLM is invoked
-        iteratively to *declare intent only* using a strict JSON action protocol. Declared actions may include
-        producing a final user-facing response, requesting execution of a registered tool, or delegating work to
-        another agent.
+        iteratively to *declare intent only* using a strict JSON action protocol. All side effects (tool execution,
+        agent dispatch) are performed by the runtime, never by the LLM itself.
 
-        All side effects (tool execution, agent dispatch, state mutation) are performed by the runtime, never by
-        the LLM itself. Tool results are serialized and injected back into the conversation context using valid LLM
-        roles to maintain provider-agnostic compatibility.
+        Workflow Overview
+        -----------------
+        The inference loop follows a ReAct-style (Reasoning + Acting) pattern:
 
-        The loop enforces:
-        - Strict JSON output validation
-        - Explicit action typing
-        - Bounded execution via a maximum step limit
-        - Structured error propagation with step-level diagnostics
+        1. **Query Injection**: The user query is added to the conversation history.
 
-        The method terminates only when a valid `final` action is produced or when safety limits are exceeded,
-        in which case a runtime error is raised.
+        2. **LLM Invocation**: The LLM generates a JSON response declaring its next action.
 
-        Returns a Part with PartType ``infer_output``.
+        3. **Response Parsing**: The runtime parses and validates the JSON response.
+           If parsing fails, corrective feedback is injected and the loop retries.
+
+        4. **Action Dispatch**: Based on the action type:
+
+           - ``final``: The loop terminates and returns the response content.
+           - ``tool_call``: The specified tool is executed, and its result is injected back into the conversation
+             history for the LLM to observe.
+           - ``agent_call``: The request is delegated to another agent via the callback, and the result is similarly
+             injected into history.
+
+        5. **Iteration**: Steps 2-4 repeat until the LLM produces a ``final`` action or safety limits are exceeded.
+
+        This design ensures the LLM remains stateless and purely declarative. The runtime maintains full control over
+        execution, enabling observability, rate limiting, and consistent error handling across providers.
+
+        Execution Model
+        ---------------
+        The LLM operates in a "thought → action → observation" cycle:
+
+        - **Thought**: The LLM reasons about the task (internal, not exposed).
+        - **Action**: The LLM outputs a JSON action declaring what it wants to do.
+        - **Observation**: The runtime executes the action and injects the result as a new message, which the LLM
+          observes on the next iteration.
+
+        This continues until the LLM determines it has enough information to produce a final response to the user.
+
+        Parameters
+        ----------
+        query : str
+            The user-provided task or instruction to be processed by the agent.
+        tools : dict[str, BaseTool]
+            A mapping of tool names to executable tool instances available for invocation.
+            Each tool must be callable with keyword arguments matching its schema.
+        agent_callback : Callable[[str, str, dict[str, Any]], Awaitable[Any]], optional
+            Async callback for handling ``agent_call`` actions. Signature::
+
+                async def callback(agent_name: str, action_type: str, payload: dict) -> Any
+
+            The callback receives the target agent's name, the action type (``tool_call`` or ``infer``), and the full
+            payload. It should return the result from the delegated agent. If None, agent_call actions trigger
+            self-correction guidance.
+        streaming : bool, default False
+            Whether to invoke the underlying LLM in streaming mode. When True, the response is collected from an async
+            generator before parsing.
+
+        Returns
+        -------
+        Part
+            A Part instance of type ``infer_output`` containing the final user-facing response produced by the agent.
+
+        Raises
+        ------
+        RuntimeError
+            Raised in the following scenarios:
+
+            - **LLM call failure**: Network error, API error, or provider-specific issue.
+            - **Unrecoverable tool error**: Tool execution raises an exception other than ``TypeError`` (which triggers
+            self-correction).
+            - **Parse circuit breaker**: 3 consecutive JSON parse failures.
+            - **Step limit exceeded**: ``MAX_INFER_STEPS`` reached without ``final``.
+
+        Notes
+        -----
+        **Action Protocol**
+
+        The LLM must respond with JSON containing a ``type`` field. Supported actions:
+
+        - ``final``: Produce the final response. Requires ``content`` field.
+        - ``tool_call``: Execute a local tool. Requires ``tool`` and ``args`` fields.
+        - ``agent_call``: Delegate to another agent. Requires ``agent``, ``action``, and action-specific fields
+        (``tool``/``args`` or ``prompt``).
+
+        Example valid responses::
+
+            {"type": "final", "content": "The weather in Athens is sunny, 28°C."}
+
+            {"type": "tool_call", "tool": "get_weather", "args": {"location": "Athens"}}
+
+            {"type": "agent_call", "action": "tool_call", "agent": "weather_agent",
+             "tool": "get_weather", "args": {"location": "Athens"}}
+
+        **Safety Guardrails**
+
+        1. *Deduplication Detection*: Tracks recent actions in a sliding window of 5. If the LLM produces an identical
+           action (same signature), the runtime injects corrective guidance rather than re-executing, preventing
+           infinite loops.
+
+        2. *Parse Failure Circuit Breaker*: After 3 consecutive JSON parse failures, raises ``RuntimeError`` early
+           rather than consuming the full step budget. Each failure injects corrective feedback to help the LLM
+           self-correct.
+
+        3. *Self-Correcting Recovery*: Instead of failing immediately on validation errors, the runtime injects
+           helpful context back into the conversation:
+
+           - Unknown tool → lists available tools
+           - Missing required fields → shows expected JSON format
+           - Type errors (wrong args) → prompts to check input_schema
+           - Agent not found → provides error details
+
+        4. *Bounded Execution*: Hard limit of ``MAX_INFER_STEPS`` (default: 10) prevents runaway execution. If exceeded,
+           raises ``RuntimeError``.
+
+        See Also
+        --------
+        _inject_tool_call : Provider-specific hook for tool result injection.
+        _inject_agent_call : Hook for agent delegation result injection.
+        _compute_action_signature : Computes action fingerprints for deduplication.
+        build_system_prompt : Constructs the system prompt with tools and agents.
         """
 
         self.history.add_user(query)
 
         steps: int = 0
+        parse_failures: int = 0
+        max_parse_failures: int = 3  # Circuit breaker for consecutive parse failures
+        recent_actions: list[str] = []  # Track recent actions for dedup detection
+        max_recent_actions: int = 5  # Window for detecting repeated actions
+
         while steps < MAX_INFER_STEPS:
             steps += 1
+
+            # ─────────────────────────────────────────────────────────────────
+            # Step 1: Call the LLM
+            # ─────────────────────────────────────────────────────────────────
             try:
                 if streaming:
-                    # Collect the full response from the stream
                     chunks = []
                     async for chunk in self.call_stream(self.history):
                         chunks.append(chunk)
@@ -204,53 +303,186 @@ class LLM(ABC):
             except Exception as e:
                 raise RuntimeError(f"LLM call failed at step {steps}: {e}") from e
 
+            # ─────────────────────────────────────────────────────────────────
+            # Step 2: Parse the response with retry budget
+            # ─────────────────────────────────────────────────────────────────
             try:
                 action, payload = self._parse_infer_response(raw_response)
+                parse_failures = 0  # Reset on success
             except ValueError as e:
-                # optional: log or track invalid LLM output
-                # here we retry the LLM a few times
-                if steps < MAX_INFER_STEPS:
-                    continue
-                raise RuntimeError(f"Failed to parse LLM output after {steps} attempts: {e}") from e
+                parse_failures += 1
+                if parse_failures >= max_parse_failures:
+                    raise RuntimeError(
+                        f"Failed to parse LLM output after {parse_failures} consecutive attempts. Last error: {e}"
+                    ) from e
+                # Inject error feedback to help LLM self-correct
+                self.history.add_system(
+                    f"Your previous response could not be parsed as valid JSON. Error: {e}\n"
+                    f"Please respond with a valid JSON object containing 'type' and required fields."
+                )
+                continue
 
+            # ─────────────────────────────────────────────────────────────────
+            # Step 3: Deduplication detection for repeated actions
+            # ─────────────────────────────────────────────────────────────────
+            action_signature = self._compute_action_signature(action, payload)
+            if action_signature in recent_actions:
+                # Detected repeated action - inject guidance to prevent infinite loop
+                self.history.add_system(
+                    f"You have already performed this action: {action}. "
+                    f"The result is in your context. Please proceed with your task - "
+                    f"either produce a 'final' response or take a different action."
+                )
+                continue
+
+            # Track recent actions (sliding window)
+            recent_actions.append(action_signature)
+            if len(recent_actions) > max_recent_actions:
+                recent_actions.pop(0)
+
+            # ─────────────────────────────────────────────────────────────────
+            # Step 4: Handle action types
+            # ─────────────────────────────────────────────────────────────────
             if action == "final":
-                return Part("infer_output", payload["content"])
+                content = payload.get("content")
+                if content is None:
+                    self.history.add_system(
+                        "Your 'final' response is missing 'content'. Please provide: "
+                        '{"type": "final", "content": "<your response>"}'
+                    )
+                    continue
+                return Part("infer_output", content)
+
             elif action == "tool_call":
+                # Validate tool_call payload
                 tool_name = payload.get("tool")
                 tool_args = payload.get("args", {})
 
-                if not tool_name or tool_name not in tools:
-                    raise ValueError(f"Unknown or missing tool: {tool_name}")
+                if not tool_name:
+                    self.history.add_system(
+                        "Your 'tool_call' is missing 'tool' field. Please specify which tool to call."
+                    )
+                    continue
+
+                if tool_name not in tools:
+                    available = list(tools.keys())
+                    self.history.add_system(f"Unknown tool: '{tool_name}'. Available tools: {available}")
+                    continue
 
                 tool = tools[tool_name]
 
                 try:
                     tool_result = await tool(**tool_args)
+                except TypeError as e:
+                    # Likely wrong arguments - help LLM correct
+                    self.history.add_system(
+                        f"Tool '{tool_name}' call failed due to argument error: {e}. "
+                        f"Please check the tool's input_schema and try again."
+                    )
+                    continue
                 except Exception as e:
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
-                # 🔹 Provider hook, mutates history in-place
                 self._inject_tool_call(
                     tool_name=tool_name,
                     tool_args=tool_args,
                     tool_result=tool_result,
                 )
-
                 continue
+
             elif action == "agent_call":
-                # propagate agent_call upstream for router/dispatcher
-                # TODO: implement agent_call
-                pass
-            else:
-                # Add error handling message for unsupported action types
-                self.history.add_system(
-                    f"Unsupported action type: {action}. Please try again, but only use one of the following actions:\n"
-                    f"- final\n"
-                    f"- tool_call\n"
-                    f"- agent_call"
+                if not agent_callback:
+                    self.history.add_system(
+                        "agent_call is not available in this context. "
+                        "Please use 'tool_call' for local tools or produce a 'final' response."
+                    )
+                    continue
+
+                # Validate agent_call payload
+                agent_name = payload.get("agent")
+                agent_action = payload.get("action")
+
+                if not agent_name:
+                    self.history.add_system(
+                        "Your 'agent_call' is missing 'agent' field. Please specify which agent to call."
+                    )
+                    continue
+
+                if agent_action not in {"tool_call", "infer"}:
+                    self.history.add_system(
+                        f"Invalid agent_call action: '{agent_action}'. Must be 'tool_call' or 'infer'."
+                    )
+                    continue
+
+                try:
+                    agent_result = await agent_callback(agent_name, agent_action, payload)
+                except ValueError as e:
+                    # Agent not found or validation error - help LLM correct
+                    self.history.add_system(f"Agent call failed: {e}")
+                    continue
+                except Exception as e:
+                    raise RuntimeError(f"Agent call to '{agent_name}' failed: {e}") from e
+
+                self._inject_agent_call(
+                    agent_name=agent_name,
+                    agent_action=agent_action,
+                    agent_result=agent_result,
                 )
                 continue
-        raise RuntimeError(f"Maximum inference steps ({MAX_INFER_STEPS}) exceeded without producing final response")
+
+            else:
+                # Unknown action type - guide LLM to valid actions
+                self.history.add_system(
+                    f"Unknown action type: '{action}'. Valid actions are:\n"
+                    f"- 'final': Produce final response\n"
+                    f"- 'tool_call': Execute a tool\n"
+                    f"- 'agent_call': Delegate to another agent"
+                )
+                continue
+
+        raise RuntimeError(
+            f"Maximum inference steps ({MAX_INFER_STEPS}) exceeded without producing final response. "
+            f"The LLM may be stuck in a loop. Consider simplifying the task or checking prompts."
+        )
+
+    def _compute_action_signature(self, action: str, payload: dict[str, Any]) -> str:
+        """
+        Compute a unique signature for an action to detect duplicates.
+
+        This enables deduplication detection to prevent infinite loops where the LLM repeatedly produces the same
+        action with identical parameters.
+
+        Parameters
+        ----------
+        action : str
+            The action type (``final``, ``tool_call``, or ``agent_call``).
+        payload : dict[str, Any]
+            The action payload containing action-specific fields.
+
+        Returns
+        -------
+        str
+            A deterministic string signature uniquely identifying this action.
+            For ``tool_call``: includes tool name and sorted args.
+            For ``agent_call``: includes agent, action type, and relevant params.
+            For other actions: includes MD5 hash of payload.
+        """
+        import hashlib
+
+        if action == "tool_call":
+            key = f"tool_call:{payload.get('tool')}:{sorted(payload.get('args', {}).items())}"
+        elif action == "agent_call":
+            agent = payload.get("agent")
+            agent_action = payload.get("action")
+            if agent_action == "tool_call":
+                key = f"agent_call:{agent}:tool_call:{payload.get('tool')}:{sorted(payload.get('args', {}).items())}"
+            else:
+                key = f"agent_call:{agent}:infer:{payload.get('prompt', '')[:50]}"
+        else:
+            # For final or other actions, use content hash
+            key = f"{action}:{hashlib.md5(str(payload).encode()).hexdigest()[:8]}"
+
+        return key
 
     def _parse_infer_response(self, response: str) -> tuple[str, dict[str, Any]]:
         """
@@ -361,6 +593,50 @@ class LLM(ABC):
                     "type": "tool_result",
                     "tool": tool_name,
                     "result": tool_result,
+                }
+            )
+        )
+
+    def _inject_agent_call(
+        self,
+        *,
+        agent_name: str,
+        agent_action: str,
+        agent_result: Any,
+    ) -> None:
+        """
+        Inject the result of an agent delegation into the conversation history.
+
+        This method records the outcome of an agent_call action, allowing the LLM to observe the result of delegating
+        work to another agent. The default implementation uses a system message with structured JSON, maintaining
+        compatibility across LLM providers.
+
+        Subclasses may override this method if they require provider-specific message formats for agent delegation
+        results, though this is less common than tool-call customization.
+
+        Parameters
+        ----------
+        agent_name : str
+            The name of the agent that was invoked.
+
+        agent_action : str
+            The action type performed by the agent (\"tool_call\" or \"infer\").
+
+        agent_result : Any
+            The result returned by the delegated agent. Must be JSON-serializable.
+
+        Returns
+        -------
+        None
+            Mutates the internal conversation history in-place.
+        """
+        self.history.add_system(
+            json.dumps(
+                {
+                    "type": "agent_result",
+                    "agent": agent_name,
+                    "action": agent_action,
+                    "result": agent_result,
                 }
             )
         )
