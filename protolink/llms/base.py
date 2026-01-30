@@ -517,7 +517,19 @@ class LLM(ABC):
         try:
             data = json.loads(response)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON: {e}\nRaw response: {response}") from e
+            # Try to find JSON within the text (e.g. if wrapped in code blocks or mixed with text)
+            try:
+                # Find the first { and the last }
+                start = response.find("{")
+                end = response.rfind("}")
+
+                if start != -1 and end != -1 and start < end:
+                    json_str = response[start : end + 1]
+                    data = json.loads(json_str)
+                else:
+                    raise e
+            except json.JSONDecodeError:
+                raise ValueError(f"Invalid JSON: {e}\nRaw response: {response}") from e
 
         action = data.get("type")
         if action not in {"final", "tool_call", "agent_call"}:

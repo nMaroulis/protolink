@@ -38,10 +38,10 @@ class OllamaLLM(ServerLLM):
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
 
         # Resolve base_url first (before super().__init__)
-        resolved_base_url = base_url or os.getenv("OLLAMA_HOST")
+        resolved_base_url = base_url or os.getenv("OLLAMA_URL")
         if not resolved_base_url:
             raise ValueError(
-                "Ollama base URL not provided. Set OLLAMA_HOST environment variable or pass the base_url parameter."
+                "Ollama base URL not provided. Set OLLAMA_URL environment variable or pass the base_url parameter."
             )
 
         super().__init__(
