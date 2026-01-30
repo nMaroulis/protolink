@@ -258,12 +258,12 @@ Follow the API documentation here: [Documentation](https://nmaroulis.github.io/p
 
 For Agent-to-Agent & Agent-to-Registry communication:
 
-- `http` · [HTTPTransport](): Uses HTTP/HTTPS for synchronous requests. Two ASGI implementations are available.
+- `http` · [HTTPTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py): Uses HTTP/HTTPS for synchronous requests. Two ASGI implementations are available.
   - Lightweight: `starlette`, `httpx` & `uvicorn`
   - Advanced | Schema Validation: `fastapi`, `pydantic` & `uvicorn`
-- `websocket` · [WebSocketTransport](): Uses WebSocket for streaming requests. [`websockets`]
+- `websocket` · [WebSocketTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py): Uses WebSocket for streaming requests. [`websockets`]
 - `grpc` · [GRPCTransport](): TBD
-- `runtime` · [RuntimeTransport](): Simple **in-process, in-memory transport**.
+- `runtime` · [RuntimeTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py): Simple **in-process, in-memory transport**.
 
 #### LLMs:
 

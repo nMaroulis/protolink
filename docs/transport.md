@@ -296,23 +296,99 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 ## RuntimeTransport
 
-`RuntimeTransport` is an in‑process, in‑memory transport used primarily for tests, local experimentation, and tightly‑coupled multi‑agent systems.
+`RuntimeTransport` is an in-process, in-memory transport that enables agents to communicate directly without network overhead. Perfect for testing, local multi-agent setups, and rapid prototyping.
 
-Characteristics:
+### Overview
 
-- No network hops, very low latency.
-- Multiple agents share the same runtime transport instance.
-- Ideal for composition and unit tests (see `tests/test_agent.py`).
+Unlike network transports (HTTP, WebSocket), RuntimeTransport:
 
-### RuntimeTransport API
+- **No meaningful URL** — agents are addressed by name or URL directly.
+- **Multiple agents share one transport** — agents register themselves with the transport instance.
+- **Zero serialization overhead** — messages pass as Python objects, no JSON encoding/decoding.
+- **Supports streaming** — agents can use `handle_task_streaming` for real-time updates.
 
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `__init__` | `...` | `None` | Create an in‑memory transport registry for agents that live in the same Python process. |
-| `register` | `agent` | `None` | Add an agent to the runtime transport so it can receive tasks from others. |
-| `unregister` | `agent` | `None` | Remove an agent from the runtime transport. |
-| `send` | `request_spec: ClientRequestSpec`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Any \| Awaitable[Any]` | Dispatch a generic request to another agent registered on the same runtime transport instance. |
-| `start` / `stop` | `self` | `None` | Often no‑op or light‑weight setup/teardown. Provided for a consistent lifecycle API with other transports. |
+### Usage
+
+```python
+from protolink.agents import Agent
+from protolink.models import AgentCard, Message, Task
+from protolink.transport import RuntimeTransport
+
+
+class TranslatorAgent(Agent):
+    """Custom agent that translates messages."""
+
+    async def handle_task(self, task: Task) -> Task:
+        user_message = task.get_last_part_content()
+        return task.complete(f"Translated: {user_message}")
+
+
+async def main() -> None:
+    # Create shared transport
+    transport = RuntimeTransport()
+
+    # Create agents with transport
+    assistant = Agent(
+        card=AgentCard(
+            name="assistant",
+            description="A helpful assistant",
+            url="runtime://assistant",
+        ),
+        transport=transport,
+    )
+    transport.register_agent(assistant)
+
+    translator = TranslatorAgent(
+        card=AgentCard(
+            name="translator",
+            description="Translates messages",
+            url="runtime://translator",
+        ),
+        transport=transport,
+    )
+    transport.register_agent(translator)
+
+    # Agents can now communicate
+    task = Task.create(Message.user("Hello!"))
+    response = await assistant.send_task_to("translator", task)
+    print(response.get_last_part_content())  # "Translated: Hello!"
+```
+
+### API Reference
+
+#### Constructor & Lifecycle
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `__init__` | — | `None` | Create an in-memory transport for local agent communication. |
+| `start` | — | `Awaitable[None]` | No-op for RuntimeTransport (provided for API consistency). |
+| `stop` | — | `Awaitable[None]` | Clear all registered agents and endpoints. |
+
+#### Agent Registry
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `register_agent` | `agent: AgentProtocol` | `None` | Register an agent by both URL and name for flexible lookup. |
+| `unregister_agent` | `agent_id: str` | `None` | Remove an agent from the transport. |
+| `get_agent` | `agent_id: str` | `AgentProtocol \| None` | Get a registered agent by URL or name. |
+| `list_agents` | — | `list[str]` | List all registered agent identifiers. |
+
+#### Sending
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Route a request to a registered agent. Used internally by `AgentClient`. |
+| `subscribe` | `agent_url: str`, `task: Task` | `AsyncIterator[dict]` | Subscribe to streaming task updates from an agent. |
+
+### Key Differences from HTTPTransport
+
+| Aspect | HTTPTransport | RuntimeTransport |
+|--------|---------------|------------------|
+| Network | HTTP over TCP | In-memory |
+| Agents per transport | 1 | Multiple |
+| URL validation | Required | Not required |
+| Serialization | JSON | Native Python objects |
+| Use case | Production, distributed | Testing, local dev |
 
 ---
 
