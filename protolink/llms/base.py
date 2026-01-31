@@ -515,7 +515,7 @@ class LLM(ABC):
         assumptions or provider-specific artifacts.
         """
         try:
-            data = json.loads(response)
+            data = json.loads(response, strict=False)
         except json.JSONDecodeError as e:
             # Try to find JSON within the text (e.g. if wrapped in code blocks or mixed with text)
             try:
@@ -525,7 +525,7 @@ class LLM(ABC):
 
                 if start != -1 and end != -1 and start < end:
                     json_str = response[start : end + 1]
-                    data = json.loads(json_str)
+                    data = json.loads(json_str, strict=False)
                 else:
                     raise e
             except json.JSONDecodeError:

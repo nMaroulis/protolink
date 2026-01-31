@@ -91,6 +91,7 @@ class OllamaLLM(ServerLLM):
             "model": self.model,
             "messages": history.messages,
             "stream": False,
+            "format": "json",
         }
 
         headers = {
@@ -121,6 +122,7 @@ class OllamaLLM(ServerLLM):
             "model": self.model,
             "messages": history.messages,
             "stream": True,
+            "format": "json",
         }
 
         headers = {"Content-Type": "application/json"}

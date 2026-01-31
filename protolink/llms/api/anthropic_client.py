@@ -61,6 +61,7 @@ class AnthropicLLM(APILLM):
 
     def call(self, history: ConversationHistory) -> str:
         """Generate a single response from the model."""
+
         response = self._client.messages.create(
             model=self.model,
             system=self.system_prompt,
@@ -90,72 +91,63 @@ class AnthropicLLM(APILLM):
 
     def _inject_tool_call(self, *, tool_name: str, tool_args: dict[str, Any], tool_result: Any):
         """
-        Inject a completed tool invocation into the conversation history using Anthropic's native tool-use message
-        protocol.
+        Inject a completed tool invocation into the conversation history as a USER message.
 
-        Anthropic models represent tool interactions as structured content blocks rather than dedicated message roles.
-        A complete tool round-trip is expressed as two consecutive messages:
+        This implementation diverges from the `LLM` base class (which uses system messages) to accommodate
+        Anthropic's specific conversational constraints:
 
-        1. An ``assistant`` message containing a ``tool_use`` content block, which declares:
-           - The name of the tool being invoked
-           - The structured input arguments provided by the model
+        1. **System Message Filtering**: Anthropic models (e.g., Claude) filter out system messages from the end
+           of the conversation history or treat them as separate from the dialogue flow. Injecting tool results
+           as system messages often results in the model "ignoring" the outcome, leading to infinite loops where
+           the model retries the same tool.
 
-        2. A subsequent ``user`` message containing a ``tool_result`` content block, which supplies:
-           - The identifier of the originating tool use
-           - The tool execution result
+        2. **Protocol Mismatch**: Protolink uses a text-based JSON protocol (`agent_call`) rather than Anthropic's
+           native `assistant:tool_use`/`user:tool_result` content blocks. Injecting structured tool messages without a
+           corresponding API-level `tools` definition would cause validation errors or model confusion.
 
-        This message pattern mirrors the conversational contract expected by Anthropic models, where tool outputs are
-        provided information rather than a distinct system role.
-
-        This method encapsulates all Anthropic-specific message formatting and role semantics, allowing the base ``LLM``
-        inference loop to remain provider-agnostic and free of protocol-specific branching.
+        By injecting the result as a standard **USER** message containing the serialized JSON result, we ensure:
+        - The model treats the output as new, actionable context provided by the environment.
+        - The message is preserved in the history and visible to the inference engine.
+        - We maintain a unified, provider-agnostic inference loop without complex protocol branching.
 
         Args:
-            tool_name (str):
-                The name of the tool invoked by the model.
-
-            tool_args (dict[str, Any]):
-                The structured input arguments supplied for the tool execution.
-
-            tool_result (Any):
-                The result returned by the tool. The value must be serializable
-                into a format accepted by Anthropic content blocks.
-
-        Returns:
-            None
-
-        Notes:
-            - Anthropic does not require an explicit tool call identifier in the same sense as OpenAI; tool correlation
-            is handled via content block semantics.
-            - Tool execution is performed externally by the runtime; this method is responsible solely for injecting the
-            declared tool usage and its result into the conversation history.
-            - No system or tool roles are introduced here, as Anthropic enforces a different conversational model than
-            OpenAI.
+            tool_name (str): The name of the tool that was executed.
+            tool_args (dict[str, Any]): The arguments passed to the tool (for context/logging).
+            tool_result (Any): The return value of the tool execution, which will be serialized to JSON.
         """
-        self.history.add_raw(
-            {
-                "role": "assistant",
-                "content": f"""[
-                    {{
-                        "type": "tool_use",
-                        "name": {tool_name},
-                        "input": {tool_args},
-                    }}
-                ]""",
-            }
+        import json
+
+        self.history.add_user(
+            json.dumps(
+                {
+                    "type": "tool_result",
+                    "tool": tool_name,
+                    "result": tool_result,
+                }
+            )
         )
 
-        self.history.add_raw(
-            {
-                "role": "user",
-                "content": f"""[
-                    {{
-                        "type": "tool_result",
-                        "tool_use_id": {tool_name},
-                        "content": {tool_result},
-                    }}
-                ]""",
-            }
+    def _inject_agent_call(
+        self,
+        *,
+        agent_name: str,
+        agent_action: str,
+        agent_result: Any,
+    ) -> None:
+        """
+        Inject a completed agent delegation into the conversation history as a USER message.
+        """
+        import json
+
+        self.history.add_user(
+            json.dumps(
+                {
+                    "type": "agent_result",
+                    "agent": agent_name,
+                    "action": agent_action,
+                    "result": agent_result,
+                }
+            )
         )
 
     # ----------------------------------------------------------------------

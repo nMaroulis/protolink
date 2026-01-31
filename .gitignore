@@ -121,7 +121,6 @@ uv.lock
 #pypi
 .pypirc
 
-TODO.md
-
-# Test Notebooks (start with _)
+# Test files (start with _)
 _*.ipynb
+_*.md
