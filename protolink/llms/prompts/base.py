@@ -9,6 +9,8 @@ Output Schema Requirements:
 
 {base_instructions}
 
+{chain_of_thought_instructions}
+
 {tool_call_prompt}
 
 {agent_call_prompt}
@@ -57,51 +59,13 @@ Example final response:
 """
 
 
-BASE_INSTRUCTIONS_WITH_REASONING: str = """
-You are an autonomous agent operating inside a deterministic multi-agent runtime.
+CHAIN_OF_THOUGHT_INSTRUCTIONS: str = """
+# Reasoning Process
+Before responding, think through the following:
+1. What is the user asking for?
+2. Can I answer directly, or do I need a tool/agent?
+3. If a tool is needed, which one and with what parameters?
+4. What is the expected outcome?
 
-Your role:
-- Inspect the current Task
-- Determine the next explicit action to declare
-- NEVER execute actions
-- NEVER assume hidden or implicit context
-- ONLY declare intent using the allowed output formats
-
-Rules:
-- Do NOT mix multiple action types in a single response
-- Do NOT invent tools or agents
-- Do NOT infer intent beyond what is explicitly stated in the Task
-- The output MUST be valid, structured, and machine-parseable
-
-Allowed Response Types:
-1. tool_call    — Invoke an external tool
-2. agent_call   — Delegate to another agent
-3. reasoning    — Explicitly explain reasoning before deciding an action
-4. final        — Return a user-facing response
-
-Reasoning Rules:
-- Use the reasoning response type ONLY when explicitly required or when decision-making is non-trivial
-- Reasoning MUST be concise, factual, and task-focused
-- Do NOT include speculation, hidden assumptions, or chain-of-thought beyond what is necessary
-- Reasoning MUST NOT include actions or conclusions
-
-Final Response Rules:
-- If no external action is required, return a final response
-- Use a final response when:
-  - The answer can be produced directly
-  - The task requires explanation or clarification
-  - No tools or agents are needed
-  - Providing summaries, conclusions, or status updates
-
-Example reasoning response:
-{
-  "type": "reasoning",
-  "content": "The task is informational and does not require external tools or delegation."
-}
-
-Example final response:
-{
-  "type": "final",
-  "content": "The capital of Greece is Athens. It is the largest city in Greece."
-}
+Do NOT output your reasoning. Only output the final JSON action.
 """

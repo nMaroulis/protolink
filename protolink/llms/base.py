@@ -8,7 +8,13 @@ if TYPE_CHECKING:
 
 from protolink.core.part import Part
 from protolink.llms.history import ConversationHistory
-from protolink.llms.prompts import AGENT_LIST_PROMPT, BASE_INSTRUCTIONS, BASE_SYSTEM_PROMPT, TOOL_CALL_PROMPT
+from protolink.llms.prompts import (
+    AGENT_LIST_PROMPT,
+    BASE_INSTRUCTIONS,
+    BASE_SYSTEM_PROMPT,
+    CHAIN_OF_THOUGHT_INSTRUCTIONS,
+    TOOL_CALL_PROMPT,
+)
 from protolink.tools import BaseTool
 from protolink.types import LLMProvider, LLMType
 
@@ -39,6 +45,8 @@ class LLM(ABC):
       interactions.
     - `system_prompt` (str): Optional system instructions used as context for the
       model when generating responses. Uses default prompts for agent, tool and llm calling.
+    - `_chain_of_thought` (bool): Whether to use chain of thought (CoT) for the model, adds reasoning steps to the
+      response.
 
     Usage:
 
@@ -65,10 +73,13 @@ class LLM(ABC):
         self,
         model: str,
         model_params: dict[str, Any],
+        *,
+        chain_of_thought: bool = False,
     ) -> None:
         # ---- Instance state ----
         self.model: str = model
         self._model_params: dict[str, Any] = model_params
+        self._chain_of_thought: bool = chain_of_thought
 
         self.history: ConversationHistory = ConversationHistory()
         self.system_prompt: str = self.build_system_prompt()
@@ -670,6 +681,7 @@ class LLM(ABC):
 
         This function combines:
         - Base agent instructions
+        - Chain of thought instructions (if enabled)
         - Tool calling prompt
         - Agent delegation prompt
         - User-provided instructions
@@ -698,6 +710,7 @@ class LLM(ABC):
         else:
             self.system_prompt = BASE_SYSTEM_PROMPT.format(
                 base_instructions=BASE_INSTRUCTIONS,
+                chain_of_thought_instructions=CHAIN_OF_THOUGHT_INSTRUCTIONS if self._chain_of_thought else "",
                 tool_call_prompt=TOOL_CALL_PROMPT.replace("{{tools}}", tools)
                 if tools
                 else "No tools are available for you to call. You cannot return a tool call response.",
