@@ -1,4 +1,5 @@
 # protolink/registry/registry.py
+import asyncio
 import time
 from typing import Any
 
@@ -53,8 +54,14 @@ class Registry:
     # Registry Server Lifecycle
     # ------------------------------------------------------------------
 
-    async def start(self) -> None:
-        """Start the registry server via the transport."""
+    async def start(self, *, blocking: bool = False) -> None:
+        """Start the registry server via the transport.
+
+        Args:
+            blocking: If True, block indefinitely after starting (useful for single-agent servers). When blocking=True,
+                the method will not return until interrupted (e.g., Ctrl+C). Use blocking=False (default) when starting
+                multiple agents or when you need to perform additional operations after starting.
+        """
         if self._server:
             try:
                 await self._server.start()
@@ -62,6 +69,13 @@ class Registry:
                 self.logger.exception(f"Unexpected error during server start: {e}")
                 raise
         self.start_time = time.time()
+
+        if blocking:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                self.logger.info("Registry shutting down...")
+                await self.stop()
 
     async def stop(self) -> None:
         """Stop the registry server via the transport."""

@@ -5,6 +5,7 @@ Simple agent implementation extending Google's A2A protocol making the Agent com
 incorporating both client and server functionalities.
 """
 
+import asyncio
 import time
 from collections.abc import AsyncIterator
 from typing import Any, Literal
@@ -113,8 +114,15 @@ class Agent:
     # Agent Server Lifecycle - A2A Operations
     # ----------------------------------------------------------------------
 
-    async def start(self, *, register: bool = True) -> None:
-        """Start the agent's server component if available."""
+    async def start(self, *, register: bool = True, blocking: bool = False) -> None:
+        """Start the agent's server component if available.
+
+        Args:
+            register: If True, register this agent with the configured registry.
+            blocking: If True, block indefinitely after starting (useful for single-agent servers). When blocking=True,
+                the method will not return until interrupted (e.g., Ctrl+C). Use blocking=False (default) when starting
+                multiple agents or when you need to perform additional operations after starting.
+        """
         # Start the Agent server
         if self._server:
             try:
@@ -136,6 +144,13 @@ class Agent:
 
         self.start_time = time.time()
 
+        if blocking:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                logger.info(f"Agent '{self.card.name}' shutting down...")
+                await self.stop()
+
     async def stop(self) -> None:
         """Stop the agent's server component if available."""
         # Stop the Agent Server
@@ -144,6 +159,13 @@ class Agent:
         # Unregister from the Registry
         if self.registry_client:
             await self.registry_client.unregister(self.card.url)
+
+    async def _run_forever(self) -> None:
+        """Block indefinitely until interrupted.
+
+        Used internally by start(block=True) to keep the agent running.
+        Handles graceful shutdown on cancellation.
+        """
 
     # ----------------------------------------------------------------------
     # Agent to Agent Communication - Client & Server

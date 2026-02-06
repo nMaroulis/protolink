@@ -28,7 +28,7 @@ from protolink.models import Task
 
 # Configuration
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:9000")
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
 
 kwargs: dict = {}
 # Set API Key manually here, if not set, it will use the environment variable

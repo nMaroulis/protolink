@@ -176,6 +176,23 @@ registry = Registry(transport)
 await registry.start()
 ```
 
+#### Blocking Mode
+
+The `start()` method accepts a `blocking` parameter:
+
+```python
+# Non-blocking (default) - for multi-agent orchestration
+await registry.start()
+await agent1.start()
+await agent2.start()
+# Continue with other logic...
+
+# Blocking - for standalone registry server
+asyncio.run(registry.start(blocking=True))  # Runs until Ctrl+C
+```
+
+Use `blocking=True` when running the registry as a standalone service.
+
 This starts a registry server that agents can connect to.
 !!! info "Single Source of Truth"
     The Registry’s public URL is derived from the transport and used by agents for registration and discovery.

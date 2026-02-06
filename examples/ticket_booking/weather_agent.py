@@ -31,7 +31,7 @@ def create_weather_agent(registry: Registry | None = None) -> Agent:
     agent = Agent(
         card={
             "name": "weather_agent",
-            "description": "Provides weather forecasts for Greek island destinations",
+            "description": "Provides weather forecasts for any location.",
             "url": os.getenv("WEATHER_AGENT_URL", "http://localhost:8030"),
         },
         transport="http",

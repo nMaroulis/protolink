@@ -153,11 +153,26 @@ These methods control the agent's server component lifecycle.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `start()` | `register: bool = True` | `None` | Starts the agent's server component if a transport is configured. Optionally registers with the registry (default True). |
+| `start()` | `register: bool = True`, `blocking: bool = False` | `None` | Starts the agent's server. If `blocking=True`, awaits indefinitely until cancelled. |
 | `stop()` | — | `None` | Stops the agent's server component and cleans up resources. |
 
-!!! warning "Transport Required"
-    The `start()` method requires a transport to be configured. If no transport was provided during construction, set the `transport` property first.
+### Blocking Mode
+
+The `blocking` parameter controls whether `start()` returns immediately or blocks the event loop:
+
+```python
+# Non-blocking (default) - for multi-agent orchestration
+await agent1.start()
+await agent2.start()
+await agent3.start()
+# Continue with other logic...
+
+# Blocking - for single-agent servers
+asyncio.run(agent.start(blocking=True))  # Runs until Ctrl+C
+```
+
+!!! tip "When to use blocking=True"
+    Use `blocking=True` when running a single agent as a standalone service. Use the default `blocking=False` when orchestrating multiple agents or when you need to execute logic after startup.
 
 ## Transport Management
 
