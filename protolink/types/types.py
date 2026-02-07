@@ -60,6 +60,9 @@ MimeType: TypeAlias = Literal[
     "application/pdf",
 ]
 
+# Reasoning | Chain-of-thought level for LLMs
+ReasoningLevel: TypeAlias = Literal["none", "low", "medium", "high"]
+
 # Supported request sources for endpoints
 RequestSourceType: TypeAlias = Literal["none", "body", "query_params", "form", "headers", "path_params"]
 

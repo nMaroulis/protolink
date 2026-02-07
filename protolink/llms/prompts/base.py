@@ -9,7 +9,7 @@ Output Schema Requirements:
 
 {base_instructions}
 
-{chain_of_thought_instructions}
+{reasoning_instructions}
 
 {tool_call_prompt}
 
@@ -59,13 +59,32 @@ Example final response:
 """
 
 
-CHAIN_OF_THOUGHT_INSTRUCTIONS: str = """
-# Reasoning Process
-Before responding, think through the following:
-1. What is the user asking for?
-2. Can I answer directly, or do I need a tool/agent?
-3. If a tool is needed, which one and with what parameters?
-4. What is the expected outcome?
-
-Do NOT output your reasoning. Only output the final JSON action.
+LOW_REASONING_PROMPT: str = """
+Use brief internal reasoning to determine the correct action.
+Quickly identify user intent, decide if a tool or agent is needed, and produce the appropriate JSON action.
+Do not reveal reasoning. Output only the final JSON action.
 """
+
+MEDIUM_REASONING_PROMPT: str = """
+Use structured internal reasoning to determine the correct action.
+Understand the user's objective, decide whether a direct response or tool or agent is required, and select appropriate
+parameters. Validate coherence and correctness before responding.
+Do not reveal reasoning. Output only the final JSON action.
+"""
+
+HIGH_REASONING_PROMPT: str = """
+Use deep and methodical internal reasoning to plan the correct action.
+Carefully analyze the user's intent, evaluate whether a response or tool or agent is required, and select the most
+appropriate action and parameters.
+Check for edge cases, inconsistencies, and invalid assumptions.
+Verify the action is logically sound and aligned with the user's request.
+Do not reveal reasoning or intermediate analysis. Output only the final JSON action.
+"""
+
+# Inject Chain-of-thought instructions based on reasoning parameter
+SYSTEM_REASONING_MAP = {
+    "none": "",
+    "low": LOW_REASONING_PROMPT,
+    "medium": MEDIUM_REASONING_PROMPT,
+    "high": HIGH_REASONING_PROMPT,
+}

@@ -12,43 +12,22 @@ from protolink.agents import Agent
 from protolink.discovery import Registry
 from protolink.llms.factory import create_llm
 
-# System prompt that instructs the LLM how to coordinate agents
-COORDINATOR_SYSTEM_PROMPT = """You are a vacation booking coordinator. Your job is to help users plan and book
-trips to Greek islands.
+# System prompt that defines the coordinator's role and workflow
+COORDINATOR_SYSTEM_PROMPT = """You are a vacation booking coordinator.
 
-You have access to THREE specialist agents:
+Your role is to help users plan and book trips by orchestrating available specialist agents.
+You will discover available agents dynamically - each agent has a description and capabilities
+that tell you what it can do.
 
-1. **holiday_advisor** - A vacation expert (has LLM, no tools).
-   Use agent_call with action "infer" to ask for destination recommendations.
-   Ask about: location, dates, budget, number of travelers.
+When handling a vacation request, follow this general workflow:
+1. **Gather information**: Get travel advice and destination recommendations from advisory agents.
+2. **Check conditions**: Verify weather, availability, or other relevant factors before booking.
+3. **Make bookings**: Reserve accommodations, transportation, or other services as needed.
+4. **Summarize**: Provide the user with a complete summary of their trip details.
 
-2. **weather_agent** - Has a `get_weather` tool to check weather conditions.
-   Use agent_call with action "tool_call" to get weather data.
-
-3. **hotel_agent** - Has a `book_hotel` tool to book accommodations.
-   Use agent_call with action "tool_call" to book hotels.
-
-WORKFLOW:
-When a user asks to book a vacation:
-1. FIRST, ask holiday_advisor (using "infer") if this destination is recommended
-2. Check weather using weather_agent (using "tool_call")
-3. If advisor recommends and weather is good, book hotel using hotel_agent (using "tool_call")
-4. Provide a complete summary including advisor's recommendation, weather, and booking
-
-HOW TO USE agent_call:
-- For holiday_advisor (LLM): {"type": "agent_call", "action": "infer", "agent": "holiday_advisor", "prompt": "Is Santorini good for a 5-night trip in July for 2 people with mid-range budget?"}
-- For weather_agent (tool): {"type": "agent_call", "action": "tool_call", "agent": "weather_agent", "tool": "get_weather", "args": {"location": "Santorini", "travel_date": "2026-07-15"}}
-- For hotel_agent (tool): {"type": "agent_call", "action": "tool_call", "agent": "hotel_agent", "tool": "book_hotel", "args": {"location": "Santorini", "check_in": "2026-07-15", "check_out": "2026-07-20", "guests": 2, "budget": "mid-range"}}
-
-IMPORTANT:
-- Always consult the holiday_advisor FIRST
-- Use action "infer" for holiday_advisor (it has an LLM, not tools)
-- Use action "tool_call" for weather_agent and hotel_agent
-- For dates, use format YYYY-MM-DD (e.g., 2026-07-15)
-- For budget, use: "budget", "mid-range", or "luxury"
-- If user doesn't specify dates, suggest July or August 2026
-- If user doesn't specify budget, assume mid-range
-"""  # noqa: E501
+Use your judgment to determine which agents to consult based on their descriptions and the user's needs.
+If an agent has an LLM, ask it for advice. If an agent has tools, call those tools with appropriate parameters.
+"""
 
 
 def create_coordinator_agent(

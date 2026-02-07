@@ -125,3 +125,6 @@ uv.lock
 _*.ipynb
 _*.md
 _*.py
+
+# assets
+*.excalidraw

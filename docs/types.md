@@ -12,6 +12,7 @@ This section provides detailed documentation for the type aliases used throughou
 - [LLMType](#llmtype)
 - [MimeType](#mimetype)
 - [PartType](#parttype)
+- [ReasoningLevelType](#reasoningleveltype)
 - [RequestSourceType](#requestsourcetype)
 - [MessageRoleType](#messageroletype)
 - [SecuritySchemeType](#securityschemetype)
@@ -389,6 +390,25 @@ PartType: TypeAlias = Literal[
     - Use **file** for binary content with metadata
     - Use **error** for structured error information
     - Use **status** for progress and state updates
+
+---
+
+## ReasoningLevel
+
+```python
+ReasoningLevel: TypeAlias = Literal["none", "low", "medium", "high"]
+```
+
+Type alias for supported reasoning levels for agent reasoning. A different prompt is injected into the LLM system prompt based on the reasoning level.
+
+### Levels
+
+| Level | Description |
+|-------|-------------|
+| **none** | No reasoning |
+| **low** | Basic reasoning |
+| **medium** | Detailed reasoning |
+| **high** | Deep reasoning |
 
 ---
 

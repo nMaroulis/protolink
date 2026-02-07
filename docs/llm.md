@@ -157,7 +157,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `model_params` | `dict[str, Any]` | Model-specific parameters (temperature, max_tokens, etc.). |
 | `system_prompt` | `str` | Default system prompt for the model. |
 | `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. |
-| `_chain_of_thought` | `bool` | Whether to include chain-of-thought reasoning instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Default: `False`. |
+| `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
 
 #### Core Methods
 

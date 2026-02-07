@@ -51,7 +51,7 @@ def create_hotel_agent(registry: Registry | None = None) -> Agent:
         card={
             "name": "hotel_agent",
             "description": "Searches and books hotel accommodations.",
-            "url": os.getenv("HOTEL_AGENT_URL", "http://localhost:8050"),
+            "url": os.getenv("HOTEL_AGENT_URL", "http://localhost:8040"),
         },
         transport="http",
         registry=registry,

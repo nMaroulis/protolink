@@ -20,6 +20,10 @@ A **real-world example** showcasing Protolink's multi-agent orchestration capabi
 
 ## 🏗️ Architecture
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/ticket_example_architecture.png" alt="Agent Architecture" width="100%">
+</div>
+
 ```
 User Request
      │
@@ -122,7 +126,7 @@ The demo will prompt you for a vacation request, or use the default:
    Weather Agent running at http://localhost:8030
 
 🏨 Starting Hotel Agent...
-   Hotel Agent running at http://localhost:8050
+   Hotel Agent running at http://localhost:8040
 
 🧭 Starting Holiday Advisor (LLM: ollama)...
    Holiday Advisor running at http://localhost:8020

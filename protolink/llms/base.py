@@ -12,11 +12,11 @@ from protolink.llms.prompts import (
     AGENT_LIST_PROMPT,
     BASE_INSTRUCTIONS,
     BASE_SYSTEM_PROMPT,
-    CHAIN_OF_THOUGHT_INSTRUCTIONS,
+    SYSTEM_REASONING_MAP,
     TOOL_CALL_PROMPT,
 )
 from protolink.tools import BaseTool
-from protolink.types import LLMProvider, LLMType
+from protolink.types import LLMProvider, LLMType, ReasoningLevel
 
 MAX_INFER_STEPS: int = 10  # safety against infinite loops
 
@@ -45,7 +45,7 @@ class LLM(ABC):
       interactions.
     - `system_prompt` (str): Optional system instructions used as context for the
       model when generating responses. Uses default prompts for agent, tool and llm calling.
-    - `_chain_of_thought` (bool): Whether to use chain of thought (CoT) for the model, adds reasoning steps to the
+    - `_reasoning` (ReasoningLevel): Whether to use chain of thought (CoT) for the model, adds reasoning steps to the
       response.
 
     Usage:
@@ -74,12 +74,12 @@ class LLM(ABC):
         model: str,
         model_params: dict[str, Any],
         *,
-        chain_of_thought: bool = False,
+        reasoning: ReasoningLevel = "none",
     ) -> None:
         # ---- Instance state ----
         self.model: str = model
         self._model_params: dict[str, Any] = model_params
-        self._chain_of_thought: bool = chain_of_thought
+        self._reasoning: ReasoningLevel = reasoning
 
         self.history: ConversationHistory = ConversationHistory()
         self.system_prompt: str = self.build_system_prompt()
@@ -710,7 +710,7 @@ class LLM(ABC):
         else:
             self.system_prompt = BASE_SYSTEM_PROMPT.format(
                 base_instructions=BASE_INSTRUCTIONS,
-                chain_of_thought_instructions=CHAIN_OF_THOUGHT_INSTRUCTIONS if self._chain_of_thought else "",
+                reasoning_instructions=SYSTEM_REASONING_MAP.get(self._reasoning, ""),
                 tool_call_prompt=TOOL_CALL_PROMPT.replace("{{tools}}", tools)
                 if tools
                 else "No tools are available for you to call. You cannot return a tool call response.",
