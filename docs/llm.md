@@ -18,6 +18,7 @@ Protolink groups LLM backends into three broad categories:
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/openai.svg" width="55" class="hover-icon" />
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/anthropic_black.svg" width="55" class="hover-icon" />
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/gemini.svg" width="55" class="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/476aabb842086433647755b0963640c6a0775f79/static/library/grok-light.svg" width="55" class="hover-icon" />
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/deepseek.svg" width="55" class="hover-icon" />
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/ollama_light.svg" width="55" class="hover-icon" />
   <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="55" class="hover-icon" /></div>
@@ -31,6 +32,7 @@ Protolink groups LLM backends into three broad categories:
     - `AnthropicLLM`: uses the **Anthropic API** for sync & async requests.
     - `GeminiLLM`: uses the **Google Gemini API** for sync & async requests.
     - `DeepSeekLLM`: uses the **DeepSeek API** for sync & async requests.
+    - `GrokLLM`: uses the **Grok API** for sync & async requests.
     - `HuggingFaceLLM`: uses the **HuggingFace Inference API** for sync & async requests.
 
 - **Server** — connects to an LLM server, locally or remotely:
