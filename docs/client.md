@@ -1,77 +1,168 @@
 # Client
 
-The **Client** layer in Protolink provides a high-level, user-friendly interface for interacting with agents. It abstracts away the low-level details of the transport layer, providing convenient methods for sending tasks, messages, and retrieving agent information.
+The **Client** layer in Protolink provides a high-level interface for agent-to-agent communication. It abstracts transport details and offers convenient methods for sending tasks, messages, and retrieving agent metadata.
 
 ## AgentClient
 
-The `AgentClient` is the primary entry point for client-side agent interactions. It wraps a `Transport` instance and uses it to send typed requests to remote agents.
+The `AgentClient` is the primary entry point for programmatic agent interactions. It wraps a transport and provides typed methods for common operations.
 
-### Usage
+### Quick Start
 
 ```python
 from protolink.client import AgentClient
-from protolink.transport import HTTPTransport
-from protolink.models import Message
+from protolink.models import Task
 
-# Initialize transport and client
-transport = HTTPTransport()
-client = AgentClient(transport)
+# Create a client (transport type + URL)
+client = AgentClient(transport="http", url="http://localhost:8000")
 
-# Send a message
-response_message = await client.send_message(
-    agent_url="http://localhost:8000",
-    message=Message.user("Hello, agent!")
-)
-print(response_message.parts[0].content)
+# Create a task with an inference request
+task = Task.create_infer(prompt="Book me a vacation to Santorini")
+
+# Send to a remote agent
+result = await client.send_task(agent_url="http://localhost:8010", task=task)
+
+# Get the response
+print(result.get_last_part_content())
 ```
 
-### API Reference
+### Constructor
 
-#### `__init__(transport: Transport)`
-Initializes the client with a specific transport implementation.
+```python
+AgentClient(transport: Transport | TransportType, url: str | None = None)
+```
 
-#### `async send_task(agent_url: str, task: Task) -> Task`
-Sends a `Task` to a remote agent and returns the updated `Task` (containing the agent's response).
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `transport` | `Transport \| str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
+| `url` | `str \| None` | Base URL when using a transport type string |
 
-*   **agent_url**: The base URL or ID of the target agent.
-*   **task**: The `Task` object to send.
+**Examples:**
 
-#### `async send_message(agent_url: str, message: Message) -> Message`
-A convenience wrapper that creates a `Task` from a single `Message`, sends it using `send_task`, and returns the last message from the response.
+```python
+# Using transport type string
+client = AgentClient(transport="http", url="http://localhost:8000")
 
-*   **agent_url**: The base URL or ID of the target agent.
-*   **message**: The `Message` object to send.
+# Using an existing transport instance
+from protolink.transport import HTTPTransport
+transport = HTTPTransport(url="http://localhost:8000")
+client = AgentClient(transport=transport)
+```
 
-#### `async get_agent_card(agent_url: str) -> AgentCard`
-Retrieves the public `AgentCard` from a remote agent. This is useful for discovery.
+---
 
-*   **agent_url**: The base URL or ID of the target agent.
+## Core Methods
+
+### `send_task()`
+
+Sends a `Task` to a remote agent and returns the processed result.
+
+```python
+async def send_task(agent_url: str, task: Task) -> Task
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `agent_url` | The full URL of the target agent (e.g., `"http://localhost:8010"`) |
+| `task` | The `Task` object to send |
+
+**Example:**
+
+```python
+from protolink.models import Task
+
+# Create an infer task
+task = Task.create_infer(prompt="What's the weather in Athens?")
+
+# Send and get result
+result = await client.send_task("http://localhost:8010", task)
+print(result.get_last_part_content())
+```
+
+---
+
+### `send_task_streaming()`
+
+Sends a task and yields streamed events as they arrive. Useful for real-time updates.
+
+```python
+async def send_task_streaming(agent_url: str, task: Task) -> AsyncIterator[Any]
+```
+
+!!! warning "Transport Support"
+    Requires a transport that implements streaming (e.g., WebSocket). Raises `NotImplementedError` for HTTP transport.
+
+---
+
+### `send_message()`
+
+Convenience wrapper that creates a Task from a Message, sends it, and returns the response message.
+
+```python
+async def send_message(agent_url: str, message: Message) -> Message
+```
+
+**Example:**
+
+```python
+from protolink.models import Message
+
+response = await client.send_message(
+    agent_url="http://localhost:8010",
+    message=Message.user("Hello, agent!")
+)
+print(response.parts[0].content)
+```
+
+---
+
+### `get_agent_card()`
+
+Retrieves the public `AgentCard` from a remote agent. Useful for discovery and capability inspection.
+
+```python
+async def get_agent_card(agent_url: str) -> AgentCard
+```
+
+**Example:**
+
+```python
+card = await client.get_agent_card("http://localhost:8010")
+print(f"Agent: {card.name}")
+print(f"Description: {card.description}")
+print(f"Skills: {[s.id for s in card.skills]}")
+```
 
 ---
 
 ## ClientRequestSpec
 
-`ClientRequestSpec` is a dataclass that defines the contract for a specific API endpoint on an agent. It allows the `AgentClient` to describe *what* it wants to do (e.g., "send a task") in a transport-agnostic way.
-
-### Structure
+`ClientRequestSpec` defines the contract for an API endpoint in a transport-agnostic way.
 
 ```python
 @dataclass(frozen=True)
 class ClientRequestSpec:
-    name: str                                   # Human-readable name (e.g., "send_task")
-    path: str                                   # URL path (e.g., "/tasks/")
-    method: HttpMethod                          # HTTP method (e.g., "POST")
-    response_parser: Callable[[Any], Any] | None # Function to parse response data
-    request_source: RequestSourceType = "body"  # Where to put the request data ("body", "query", etc.)
-    content_type: ContentType | None = None     # Content-Type header
-    accept: ContentType | None = None           # Accept header
+    name: str                    # Human-readable name (e.g., "send_task")
+    path: str                    # URL path (e.g., "/tasks/")
+    method: HttpMethod           # HTTP method (e.g., "POST")
+    response_parser: Callable    # Function to parse response data
+    request_source: str          # Where to put request data ("body", "query", etc.)
 ```
 
-### How it works
+### Built-in Request Specs
 
-When you call a method on `AgentClient` (like `send_task`), it:
-1.  Selects the appropriate `ClientRequestSpec` definition (e.g., `AgentClient.TASK_REQUEST`).
-2.  Passes this definition, along with the data, to `transport.send()`.
-3.  The transport uses the `ClientRequestSpec` to construct the actual wire request (e.g., forming the HTTP URL and method).
+| Spec | Path | Method | Description |
+|------|------|--------|-------------|
+| `TASK_REQUEST` | `/tasks/` | POST | Send a task to an agent |
+| `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | Retrieve agent metadata |
+| `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | Send task with streaming |
 
-This pattern allows new endpoints to be added to the client without modifying the transport implementations.
+### How It Works
+
+When you call a method like `send_task()`:
+
+1. The client selects the appropriate `ClientRequestSpec` (e.g., `TASK_REQUEST`)
+2. Passes the spec and data to `transport.send()`
+3. The transport uses the spec to construct the wire request
+
+This pattern allows new endpoints without modifying transport implementations.
+

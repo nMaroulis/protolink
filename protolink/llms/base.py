@@ -1,3 +1,75 @@
+"""LLM Base - Abstract base class for all LLM implementations.
+
+This module provides the `LLM` abstract base class that defines the interface for all language model implementations in
+Protolink. Whether using API-based providers (OpenAI, Anthropic, Gemini), server-based solutions (Ollama), or local
+models (LLaMA.cpp, MPT), all implementations inherit from this class.
+
+Creating a Custom LLM Wrapper
+-----------------------------
+To add support for a new LLM provider, create a subclass that implements
+the required abstract methods:
+
+Required Methods:
+    - `call(history: ConversationHistory) -> str`: Single response generation
+    - `call_stream(history: ConversationHistory) -> AsyncIterator[str]`: Streaming response
+
+Optional Override:
+    - `_inject_tool_call(...)`: Customize how tool results are injected into history.
+      Override this if your provider has specific tool-calling protocols (e.g., OpenAI
+      requires tool_call_id correlation).
+    - `validate_connection() -> bool`: Verify API connectivity or model availability.
+
+Example: Minimal Custom LLM
+    ```python
+    from collections.abc import AsyncIterator
+    from typing import Any, ClassVar
+    from protolink.llms.base import LLM
+    from protolink.llms.history import ConversationHistory
+
+    class MyCustomLLM(LLM):
+        model_type: ClassVar[str] = "api"
+        provider: ClassVar[str] = "my_provider"
+
+        def __init__(self, api_key: str, model: str = "default-model"):
+            super().__init__(model=model, model_params={"temperature": 0.7})
+            self._client = MyProviderClient(api_key)
+
+        def call(self, history: ConversationHistory) -> str:
+            # Convert history to provider's format and call API
+            messages = [{"role": m["role"], "content": m["content"]} for m in history.messages]
+            response = self._client.complete(model=self.model, messages=messages)
+            return response.text
+
+        async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
+            messages = [{"role": m["role"], "content": m["content"]} for m in history.messages]
+            stream = self._client.complete_stream(model=self.model, messages=messages)
+            for chunk in stream:
+                yield chunk.text
+
+        def validate_connection(self) -> bool:
+            try:
+                self._client.ping()
+                return True
+            except Exception:
+                return False
+
+        # Optional: Override if provider has native tool-calling protocol
+        def _inject_tool_call(self, *, tool_name: str, tool_args: dict, tool_result: Any):
+            # Provider-specific tool result injection
+            # Default uses system message; override for native tool protocols
+            self.history.add_raw({
+                "role": "tool",
+                "tool_call_id": "...",
+                "content": str(tool_result)
+            })
+    ```
+
+See Also:
+    - `protolink.llms.api.openai_client.OpenAILLM`: Example of native tool-calling override
+    - `protolink.llms.api.base.APILLM`: Base class for API-based LLMs
+    - `protolink.llms.local.base.LocalLLM`: Base class for local models
+"""
+
 import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable

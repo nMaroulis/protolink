@@ -89,6 +89,10 @@ class AnthropicLLM(APILLM):
                 if delta.type == "text_delta":
                     yield delta.text
 
+    # ----------------------------------------------------------------------
+    # Agent-LLM Interface - A2A Operations
+    # ----------------------------------------------------------------------
+
     def _inject_tool_call(self, *, tool_name: str, tool_args: dict[str, Any], tool_result: Any):
         """
         Inject a completed tool invocation into the conversation history as a USER message.
