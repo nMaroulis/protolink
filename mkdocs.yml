@@ -14,6 +14,9 @@ extra:
   copyright:
     text: "© 2025 Nikolaos Maroulis. MIT licensed."
 
+extra_css:
+  - css/extra.css
+
 theme:
   name: material
   logo: assets/logo_sm.png

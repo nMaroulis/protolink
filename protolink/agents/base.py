@@ -317,7 +317,9 @@ class Agent:
         if not self._client:
             raise RuntimeError("Agent has no transport configured, cannot send tasks.")
         self._logger.debug(f"Sending to agent {agent_url} the task: {task}")
-        return await self._client.send_task(agent_url, task)
+        result: Task = await self._client.send_task(agent_url, task)
+        self._logger.debug(f"Received response Task from agent {agent_url}: {result}")
+        return result
 
     async def send_message_to(self, agent_url: str, message: Message) -> Message:
         """Send a message to another agent.

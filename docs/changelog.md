@@ -9,6 +9,39 @@
 ---
 ## Release Notes
 
+
+### [v0.4.7] - 2026-02-08
+
+#### 🚀 Added
+- **LLM Inference Guardrails**:
+    - Implemented robust guardrails for LLM inference.
+    - Added agent calling for delegated inference.
+    - Final result processing.
+- NEW **GrokLLM**:
+- Ticket Example
+- Verbosity in Agent and Registry
+and more...
+
+### [v0.4.6] - 2026-02-05
+
+#### 🚀 Added
+- **LLM Automated Inference**:
+    - Implemented robust tool calling capabilities.
+    - Added agent calling for delegated inference.
+    - Final result processing.
+- **Agent Orchestration**:
+    - Centralized handling for LLM inference, tool execution, and result aggregation.
+
+#### 🔄 Changed
+- **LLM API**: Refactored for better type safety and extensibility.
+- **Agent Constructor**: Simplified initialization options.
+- **Transport Factory**: Improved factory patterns for transport creation.
+
+#### 🐞 Fixed
+- **Agent Stability**: Resolved race conditions in agent message handling.
+- **HTTP Backend**: Fixed issues with stream termination.
+
+
 ### [v0.4.5] - 2026-01-26
 
 !!! abstract "Current Status"
@@ -36,13 +69,9 @@
 ## 🗺️ Roadmap
 
 
-Currently working on **v0.4.6**
+Currently working on **v0.4.8**
 
-- Finalize **LLM Automated Inference**:
-    - Examine how to structure the tool calling logic.
-    - Examine how to structure the agent delegation logic.
-    - Examine how to structure the final result processing logic
-
+- Finalize LLM Inference Guardrails
 
 ### Upcoming Features
 - [ ] **Agent Task Handling**: Finalise logic for robust task management.
