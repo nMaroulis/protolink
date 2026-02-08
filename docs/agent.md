@@ -132,6 +132,7 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `storage` | `Storage \| None` | `None` | Optional storage instance for agent data persistence. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
+| `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent (WARNING only), `1` = normal (INFO), `2` = verbose (DEBUG). |
 
 ```python
 from protolink.agents import Agent

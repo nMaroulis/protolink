@@ -1,7 +1,7 @@
 # protolink/registry/registry.py
 import asyncio
 import time
-from typing import Any
+from typing import Any, Literal
 
 from protolink.client import RegistryClient
 from protolink.models import AgentCard
@@ -21,15 +21,17 @@ class Registry:
         # Registry server is now running
     """
 
-    def __init__(self, transport: TransportType | Transport = "http", url: str | None = None, verbose: int = 1):
+    def __init__(
+        self, transport: TransportType | Transport = "http", url: str | None = None, verbosity: Literal[0, 1, 2] = 1
+    ):
         """Initialize the registry.
 
         Args:
             transport: Transport instance
             url: Registry URL
-            verbose: Verbosity level [0: Warning, 2: Info, 3: Debug]
+            verbosity: Verbosity level [0: Warning, 1: Info, 2: Debug]
         """
-        self.logger = get_logger(__name__, verbose)
+        self.logger = get_logger(__name__, verbosity)
 
         # Create default HTTP transport if none provided
         if isinstance(transport, str):
@@ -88,6 +90,7 @@ class Registry:
 
     async def register(self, card: AgentCard) -> dict[str, str]:
         try:
+            self.logger.debug(f"Registering agent {card.name} on address {card.url}.")
             response = await self._client.register(card)
         except Exception as e:
             self.logger.exception(f"Failed to register agent {card.url}: {e}")
@@ -96,6 +99,7 @@ class Registry:
 
     async def unregister(self, agent_url: str) -> dict[str, str]:
         try:
+            self.logger.debug(f"Unregistering agent {agent_url}.")
             response = await self._client.unregister(agent_url)
         except Exception as e:
             self.logger.exception(f"Failed to unregister agent {agent_url}: {e}")

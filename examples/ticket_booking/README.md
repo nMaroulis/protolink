@@ -1,27 +1,49 @@
-# 🏖️ Multi-Agent Vacation Booking Demo
+# 🏖️ Vacation Booking System - Multi-Agent Demo
 
-A **real-world example** showcasing Protolink's multi-agent orchestration capabilities. This demo uses natural language to book a Greek island vacation, coordinating multiple specialized agents.
+A **decentralized, autonomous vacation booking system** showcasing Protolink's multi-agent orchestration capabilities. This demo builds a mesh of specialized agents that collaborate to plan and book a trip to Greece.
 
 ![Protolink](https://img.shields.io/badge/Protolink-Multi--Agent-blue)
-![Python 3.10+](https://img.shields.io/badge/Python-3.10+-green)
+![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green)
 ![License MIT](https://img.shields.io/badge/License-MIT-yellow)
-
-## ✨ What This Demonstrates
-
-| Feature | Description |
-|---------|-------------|
-| **Agent Delegation** | Coordinator uses `agent_call` to delegate to specialists |
-| **Tool Calling** | Weather and Hotel agents expose tools via Protolink |
-| **Registry Discovery** | Agents register and discover each other automatically |
-| **LLM Inference Loop** | Multi-step reasoning with tool/agent calls |
-| **Provider Flexibility** | Works with Ollama (free) or OpenAI |
 
 ---
 
-## 🏗️ Architecture
+## 🌟 Why This Matters
+
+The landscape of AI agents is shifting. We're moving away from monolithic scripts driven by a single giant model, towards **Multi-Agent Systems (MAS)** where specialized, autonomous agents collaborate to solve complex problems.
+
+But today's frameworks often trap you in a walled garden:
+- Locked into a specific LLM (OpenAI, Anthropic, etc.)
+- Locked into a specific Transport for communication
+- Locked into a specific runtime
+- Locked into specific Tooling schemes
+
+**Protolink breaks away from this model.** In Protolink, an Agent is an autonomous, centralized object that serves as the core unit of your system. It is designed to be fully modular, so you can plug in any LLM, Tools, Transport, Storage, OpenTelemetry and Authentication stack you need.
+
+---
+
+## 🏗️ Architecture: A Mesh of Specialists
+
+We build a team of four agents. They don't just "call" each other as functions; they communicate over HTTP using Protolink's standard `agent_call` protocol.
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/ticket_example_architecture.png" alt="Agent Architecture" width="100%">
+</div>
+
+### The Agents
+
+| Agent | Type | Purpose |
+|-------|------|---------|
+| **Coordinator** | LLM + Tools | User-facing orchestrator. Breaks down requests and delegates to specialists. |
+| **Holiday Advisor** | LLM | Pure reasoning agent. Evaluates destinations and provides recommendations. |
+| **Weather Agent** | Tools | Deterministic agent providing weather forecasts. |
+| **Hotel Agent** | Tools | Deterministic agent executing bookings. |
+| **Registry** | Discovery | Where agents register to discover each other. |
+
+### Communication Flow
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/ticket_example_flowchart.png" alt="Agent Flowchart" width="100%">
 </div>
 
 ```
@@ -30,12 +52,12 @@ User Request
      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    COORDINATOR AGENT                        │
-│                    (Has LLM - Llama3/GPT-4)                │
+│                    (Has LLM - GPT-4/Llama3)                │
 │                                                             │
 │  1. Receives: "Book me a vacation to Santorini"            │
 │  2. Thinks: "I need to check weather first"                │
 │  3. agent_call → weather_agent.get_weather()               │
-│  4. Observes: "Weather is sunny, 28°C - perfect!"          │
+│  4. Observes: "Weather is sunny, 32°C - perfect!"          │
 │  5. Thinks: "Now I can book the hotel"                     │
 │  6. agent_call → hotel_agent.book_hotel()                  │
 │  7. Observes: "Booking confirmed: HTL-ABC123"              │
@@ -67,7 +89,7 @@ User Request
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - [Ollama](https://ollama.ai) installed (free, local LLM) **OR** OpenAI API key
 
 ### 1. Install Protolink
@@ -76,38 +98,40 @@ User Request
 pip install protolink
 ```
 
-### 2. Start Ollama (if using local LLM)
+### 2. Set Up LLM
 
+**Option A: Using Ollama (Free, Local)**
 ```bash
 # Install Ollama from https://ollama.ai
-# Then pull the model:
 ollama pull llama3:8b
-
-# Start Ollama server (if not running)
 ollama serve
+```
+
+**Option B: Using OpenAI**
+```bash
+# Set your API key
+export OPENAI_API_KEY=sk-...
 ```
 
 ### 3. Run the Demo
 
+**All-in-One Script (Recommended)**
+
+The fastest way to see everything in action—all agents defined in a single file:
+
 ```bash
 cd examples/ticket_booking
+python quickstart.py
+```
 
-# Using Ollama (default, free)
+**Or run modular scripts separately:**
+
+```bash
+# Using Ollama (default)
 python run.py
 
-# Using OpenAI (requires API key)
+# Using OpenAI
 OPENAI_API_KEY=sk-... LLM_PROVIDER=openai python run.py
-```
-
-### 4. Try It!
-
-The demo will prompt you for a vacation request, or use the default:
-
-```
-💬 Enter your vacation request (or press Enter for demo):
-   Default: "Book me a relaxing vacation to Santorini for 5 nights in mid-July 2026"
-
-   > Book a budget trip to Mykonos for 3 nights in August
 ```
 
 ---
@@ -115,82 +139,36 @@ The demo will prompt you for a vacation request, or use the default:
 ## 📋 Expected Output
 
 ```
-============================================================
-🏖️  VACATION BOOKING DEMO - Protolink Multi-Agent System
-============================================================
-
-📡 Starting Registry...
-   Registry running at http://localhost:9000
-
-🌤️  Starting Weather Agent...
-   Weather Agent running at http://localhost:8030
-
-🏨 Starting Hotel Agent...
-   Hotel Agent running at http://localhost:8040
-
-🧭 Starting Holiday Advisor (LLM: ollama)...
-   Holiday Advisor running at http://localhost:8020
-
-🧠 Starting Coordinator Agent (LLM: ollama)...
-   Coordinator running at http://localhost:8010
-
-🔍 Verifying agent discovery...
-   Discovered 4 agents:
-   - weather_agent: ['get_weather']
-   - hotel_agent: ['book_hotel']
-   - holiday_advisor: LLM
-   - coordinator: LLM
-
-======================================================================
-💬 Enter your vacation request (or press Enter for demo):
-   Default: "Book me a relaxing vacation to Santorini for 5 nights in mid-July 2026"
-
-   > 
-
-📝 Processing: "Book me a relaxing vacation to Santorini for 5 nights in mid-July 2026"
-======================================================================
-
-⏳ Coordinator is working...
-   Step 1: Ask Holiday Advisor (infer) for recommendation
-   Step 2: Check weather (tool_call)
-   Step 3: Book hotel (tool_call)
-
 ✅ RESULT:
-------------------------------------------------------------
+----------------------------------------------------------------------
 Great news! I've successfully booked your relaxing vacation to Santorini!
 
-🌤️ **Weather Report for Santorini (July 2025):**
-- Temperature: 28°C (82°F)
+🌤️ **Weather Report for Santorini (July 2026):**
+- Temperature: 32°C (86°F)
 - Conditions: Sunny
-- Humidity: 45%
+- Humidity: 50%
 - Wind: Light breeze
 - Verdict: Perfect weather for a beach vacation!
 
 🏨 **Hotel Booking Confirmed:**
-- Hotel: Oia Boutique Hotel ⭐⭐⭐⭐
+- Hotel: Aegean Sunset Suites ⭐⭐⭐⭐
 - Location: Santorini
-- Check-in: July 15, 2025 at 15:00
-- Check-out: July 20, 2025 at 11:00
+- Check-in: July 15, 2026 at 15:00
+- Check-out: July 20, 2026 at 11:00
 - Duration: 5 nights
 - Room: Double Room for 2 guests
-- Amenities: Pool, Breakfast, WiFi
-- Total Price: €900 EUR
-- Booking ID: HTL-A7B3C2D1
+- Amenities: Pool, Spa, Breakfast, Sea View
+- Total Price: €1400 EUR
+- Booking ID: HTL-DAS98DA8D79D2JD9
 - Cancellation: Free until 24h before check-in
 
 Have a wonderful trip! 🏖️
-------------------------------------------------------------
+----------------------------------------------------------------------
 ```
 
 ---
 
 ## 🔧 Configuration
-
-Copy `.env.example` to `.env` and customize:
-
-```bash
-cp .env.example .env
-```
 
 ### Environment Variables
 
@@ -200,7 +178,23 @@ cp .env.example .env
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_MODEL` | `llama3:8b` | Ollama model to use |
 | `OPENAI_API_KEY` | - | OpenAI API key (if using OpenAI) |
-| `REGISTRY_URL` | `http://localhost:9000` | Registry server URL |
+| `ANTHROPIC_API_KEY` | - | Anthropic API key |
+| `GEMINI_API_KEY` | - | Google Gemini API key |
+
+### Supported LLM Providers
+
+```python
+# API-based
+from protolink.llms.api import OpenAILLM, AnthropicLLM, GeminiLLM, DeepSeekLLM, GrokLLM
+
+# Server-based
+from protolink.llms.server import OllamaLLM
+
+# Use any provider
+llm = OpenAILLM(model="gpt-4o")
+llm = AnthropicLLM(model="claude-3.5-sonnet")
+llm = OllamaLLM(model="llama3:8b")
+```
 
 ---
 
@@ -208,8 +202,10 @@ cp .env.example .env
 
 ```
 examples/ticket_booking/
-├── run.py                  # Main entry point
+├── quickstart.py           # ⭐ All-in-one script (recommended)
+├── run.py                  # Modular entry point
 ├── coordinator_agent.py    # LLM-powered orchestrator
+├── holiday_advisor.py      # LLM reasoning agent
 ├── weather_agent.py        # Weather forecast tool
 ├── hotel_booking_agent.py  # Hotel booking tool
 ├── .env.example            # Environment template
@@ -218,99 +214,73 @@ examples/ticket_booking/
 
 ---
 
-## 🧠 How Agent Delegation Works
+## 🧠 How It Works
 
-When the Coordinator's LLM needs weather data, it produces:
+### Task & Parts
+
+A **Task** is the top-level container that includes Messages or Artifacts. Each Message contains **Parts**, the atomic units of action:
+
+| Part Type | Description |
+|-----------|-------------|
+| `infer` | Request an agent's LLM to reason about a prompt |
+| `infer_output` | The final response produced by the LLM |
+| `tool_call` | Execute an agent's specific tool with arguments |
+| `tool_output` | The result returned by a tool execution |
+
+### Example Task
+
+```python
+from protolink.models import Task
+
+user_query = "Book me a relaxing vacation to Santorini for 5 nights in mid-July 2026"
+task = Task.create_infer(prompt=user_query)
+```
+
+This creates:
 
 ```json
 {
-  "type": "agent_call",
-  "action": "tool_call",
-  "agent": "weather_agent",
-  "tool": "get_weather",
-  "args": {"location": "Santorini", "travel_date": "2025-07-15"}
+  "id": "task_1f2a3b4c5d6e7f8g",
+  "messages": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "type": "infer",
+          "prompt": "Book me a relaxing vacation to Santorini for 5 nights in mid-July 2026"
+        }
+      ]
+    }
+  ],
+  "status": "pending"
 }
 ```
 
-Protolink's inference loop:
-1. **Detects** the `agent_call` action
-2. **Resolves** `weather_agent` to its URL via the Registry
-3. **Sends** a Task to the Weather Agent
-4. **Receives** the result (weather data)
-5. **Injects** the result back into the Coordinator's conversation
-6. **Continues** - the LLM sees the weather and decides next step
+### Sending Tasks with AgentClient
 
-This happens automatically - no manual orchestration code needed!
+```python
+from protolink.client import AgentClient
+
+client = AgentClient(transport="http", url="http://localhost:8050")
+result = await client.send_task(agent_url="http://localhost:8010", task=task)
+print(result.get_last_part_content())
+```
 
 ---
 
 ## 🎯 Key Takeaways
 
-1. **Separation of Concerns**: Each agent has a single responsibility
-2. **LLM Reasoning**: Only the Coordinator needs an LLM; specialists are pure tools
-3. **Dynamic Discovery**: Agents find each other through the Registry
-4. **Automatic Orchestration**: The inference loop handles multi-step workflows
-5. **Provider Agnostic**: Switch between Ollama (free) and OpenAI with one env var
+1. **Transport Independence**: Agents speak HTTP today, but can speak WebSockets, gRPC, or in-memory queues tomorrow without changing agent code.
 
----
+2. **LLM Agnostic**: Switch between providers with one line change. Use OpenAI, Anthropic, Gemini, Ollama, or any other supported provider.
 
-## 🔮 Extending This Example
+3. **Universal Tooling**: Supports the Model Context Protocol (MCP) via built-in adapters. Import tools from thousands of existing MCP servers instantly.
 
-Want to add more agents? The README below shows a full 7-agent architecture with:
-- ✈️ **Tickets Agent** - Flight/ferry booking
-- 📅 **Calendar Agent** - Event scheduling
-- 📱 **Messaging Agent** - WhatsApp notifications
+4. **Separation of Concerns**: Each agent has a single responsibility. Only agents that need reasoning get an LLM; specialists are pure tools.
 
-<details>
-<summary>📘 Full Vision: 7-Agent Architecture</summary>
+5. **Dynamic Discovery**: Agents find each other through the Registry at runtime—no hard-coded references.
 
-### Agent Overview
-
-| Agent | Uses LLM | Purpose |
-|-------|----------|---------|
-| Coordinator | ✅ | Planning, routing, decision-making |
-| Vacation Advisor | ✅ | High-level reasoning & recommendations |
-| Weather Agent | ❌ | Factual data retrieval |
-| Tickets Agent | ❌ | Booking & execution |
-| Hotel Agent | ❌ | Booking & execution |
-| Calendar Agent | ❌ | Persistence / state update |
-| Messaging Agent | ❌ | Delivery & user communication |
-
-### Full Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Orchestrator as Coordinator Agent
-    participant Advisor as Vacation Advisor (LLM)
-    participant Weather as Weather Agent
-    participant Tickets as Tickets Agent
-    participant Hotel as Hotel Agent
-    participant Calendar as Calendar Agent
-    participant Messenger as Messaging Agent
-
-    User->>Orchestrator: "Book me a trip to a Greek island"
-    
-    Orchestrator->>Advisor: Request vacation recommendations
-    Advisor-->>Orchestrator: Destination + dates + preferences
-    
-    Orchestrator->>Weather: Get weather for destination & dates
-    Weather-->>Orchestrator: Weather data (structured)
-    
-    Orchestrator->>Tickets: Check & book transport
-    Tickets-->>Orchestrator: Ticket confirmation
-    
-    Orchestrator->>Hotel: Check & book accommodation
-    Hotel-->>Orchestrator: Hotel booking confirmation
-    
-    Orchestrator->>Calendar: Create calendar events
-    Calendar-->>Orchestrator: Calendar confirmation
-    
-    Orchestrator->>Messenger: Send trip details & files
-    Messenger-->>User: Tickets + hotel + summary
-```
-
-</details>
+6. **Automatic Orchestration**: The inference loop handles multi-step workflows automatically.
 
 ---
 

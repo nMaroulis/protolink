@@ -112,7 +112,7 @@ class TestRegistry:
 
     def test_initialization_with_verbose(self):
         """Test registry initialization with verbose level."""
-        registry = Registry(url="http://localhost:9000", verbose=3)
+        registry = Registry(url="http://localhost:9000", verbosity=2)
         assert registry.logger is not None
 
     @pytest.mark.asyncio

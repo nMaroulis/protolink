@@ -23,8 +23,6 @@ from protolink.types import TransportType
 from protolink.utils.logging import get_logger
 from protolink.utils.renderers import to_status_html
 
-logger = get_logger(__name__)
-
 
 class Agent:
     """Base class for creating A2A-compatible agents.
@@ -45,6 +43,7 @@ class Agent:
         skills: Literal["auto", "fixed"] = "auto",
         *,
         override_system_prompt: bool = False,
+        verbosity: Literal[0, 1, 2] = 1,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -65,6 +64,7 @@ class Agent:
             storage: Optional Storage instance for agent data persistence.
             skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
+            verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
@@ -79,10 +79,13 @@ class Agent:
         self._system_prompt: str | None = system_prompt
         self.override_system_prompt: bool = override_system_prompt
 
+        # Logger
+        self._logger = get_logger(f"protolink.agents.{self.card.name}", verbose=verbosity)
+
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None
-            logger.warning(
+            self._logger.warning(
                 "No transport provided, agent will not be able to receive tasks. Set agent.transport property"
                 " (e.g. agent.transport = 'http') to configure."
             )
@@ -92,7 +95,7 @@ class Agent:
         # Initilize Registry Client
         if not registry:
             self.registry_client = None
-            logger.warning(
+            self._logger.warning(
                 "No registry provided, agent will not be able to register to the registry or fetch agents.\n"
                 "Call set_registry() to configure."
             )
@@ -128,19 +131,19 @@ class Agent:
             try:
                 await self._server.start()
             except Exception as e:
-                logger.exception(f"Unexpected error during server start: {e}")
+                self._logger.exception(f"Unexpected error during server start: {e}")
                 raise
         # Register to the Registry
         if register and self.registry_client:
             try:
                 _ = await self.registry_client.register(self.card)
-                logger.info(f"Registered to registry at {self.registry_client.url}")
+                self._logger.info(f"Registered to registry at {self.registry_client.url}")
             except ConnectionError as e:
-                logger.exception(
+                self._logger.exception(
                     f"Failed to register to registry: {e}. Agent will continue running but won't be discoverable."
                 )
             except Exception as e:
-                logger.exception(f"Unexpected error during registry registration: {e}")
+                self._logger.exception(f"Unexpected error during registry registration: {e}")
 
         self.start_time = time.time()
 
@@ -148,7 +151,7 @@ class Agent:
             try:
                 await asyncio.Event().wait()
             except asyncio.CancelledError:
-                logger.info(f"Agent '{self.card.name}' shutting down...")
+                self._logger.info(f"Agent '{self.card.name}' shutting down...")
                 await self.stop()
 
     async def stop(self) -> None:
@@ -229,6 +232,7 @@ class Agent:
         Returns:
             The updated Task after applying all explicitly requested executions.
         """
+        self._logger.debug(f"Received task: {task}")
         return await self.execute_task(task)
 
     async def handle_task_streaming(self, task: Task) -> AsyncIterator:
@@ -312,6 +316,7 @@ class Agent:
         """
         if not self._client:
             raise RuntimeError("Agent has no transport configured, cannot send tasks.")
+        self._logger.debug(f"Sending to agent {agent_url} the task: {task}")
         return await self._client.send_task(agent_url, task)
 
     async def send_message_to(self, agent_url: str, message: Message) -> Message:
@@ -618,7 +623,6 @@ class Agent:
             # Create task with tool_call part for the remote agent to execute
             task = Task.create(Message(role="agent", parts=[Part.tool_call(tool_name=tool_name, args=args)]))
             result_task = await self.send_task_to(agent_url, task)
-            print(result_task)
             return result_task.get_last_part_content()
 
         elif action == "infer":
@@ -814,7 +818,7 @@ class Agent:
                 self.registry_client = registry.client
             elif isinstance(registry, str):
                 if registry_url is None:
-                    logger.error("registry_url cannot be None")
+                    self._logger.error("registry_url cannot be None")
                     return
                 transport = get_transport(registry, url=registry_url)
                 self.registry_client = RegistryClient(transport=transport)
@@ -822,10 +826,10 @@ class Agent:
                 self.registry_client = registry
             else:
                 self.registry_client = None
-                logger.error("Invalid registry type")
+                self._logger.error("Invalid registry type")
         else:
             self.registry_client = None
-            logger.error("registry argument cannot be None")
+            self._logger.error("registry argument cannot be None")
 
     def set_llm(self, llm: LLM) -> None:
         """Sets the Agent's LLM and validates the connection."""

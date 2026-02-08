@@ -171,10 +171,18 @@ from protolink.discovery.registry import Registry
 from protolink.transport import HTTPTransport
 
 transport = HTTPTransport(url="http://localhost:9020")
-registry = Registry(transport)
+registry = Registry(transport, verbosity=1)
 
 await registry.start()
 ```
+
+#### Constructor Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `transport` | `TransportType \| Transport` | `"http"` | Transport instance or type string. |
+| `url` | `str \| None` | `None` | Registry URL (used when transport is a string type). |
+| `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity: `0` = silent (WARNING), `1` = normal (INFO), `2` = verbose (DEBUG). |
 
 #### Blocking Mode
 
