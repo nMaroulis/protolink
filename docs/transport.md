@@ -172,7 +172,7 @@ The tables below document each object type.
 | Field       | Type                                | Description                |
 |------------ |-------------------------------------|----------------------------|
 | `id`        | `str`                               | Unique message identifier. |
-| `role`      | `"user" \| "agent" \| "system"` | Sender role.               |
+| `role`      | `"user" ⎪ "agent" ⎪ "system"` | Sender role.               |
 | `parts`     | `list[Part]`                        | Content payloads.          |
 | `timestamp` | `str`                               | ISO‑8601 timestamp.        |
 
@@ -273,7 +273,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 30.0`, `authenticator: Authenticator \| None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False` | `None` | Configure URL, request timeout, optional authentication provider, backend implementation, and whether to enable FastAPI/Pydantic schema validation. |
+| `__init__` | `url: str`, `timeout: float = 30.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False` | `None` | Configure URL, request timeout, optional authentication provider, backend implementation, and whether to enable FastAPI/Pydantic schema validation. |
 | `start` | `self` | `Awaitable[None]` | Start the selected backend, register the `/tasks/` route and create the internal `httpx.AsyncClient`. Must be awaited before serving HTTP traffic. |
 | `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
 
@@ -282,14 +282,14 @@ The most important public methods on `HTTPTransport` are summarized below.
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `on_task_received` | `handler: Callable[[Task], Awaitable[Task]]` | `None` | Register the callback that will handle incoming tasks on `POST /tasks/`. This must be set before `start()` when running as a server. |
-| `send` | `request_spec: ClientRequestSpec`, `base_url: str`, `data: Any = None`, `params: dict \| None = None` | `Awaitable[Any]` | Send a generic request to the agent. This is the low-level primitive used by `AgentClient`. |
+| `send` | `request_spec: ClientRequestSpec`, `base_url: str`, `data: Any = None`, `params: dict ⎪ None = None` | `Awaitable[Any]` | Send a generic request to the agent. This is the low-level primitive used by `AgentClient`. |
 
 #### Auth & utilities
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `Authenticator` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
-| `_build_headers` | `skill: str \| None = None` | `dict[str, str]` | Internal helper that constructs HTTP headers (including `Authorization` when an auth context is present). Exposed here for completeness; you normally do not need to call it directly. |
+| `_build_headers` | `skill: str ⎪ None = None` | `dict[str, str]` | Internal helper that constructs HTTP headers (including `Authorization` when an auth context is present). Exposed here for completeness; you normally do not need to call it directly. |
 | `validate_url` | `-` | `-` | Return `True` if the URL is considered local to this transport's host/port (e.g. for allow‑listing), `False` otherwise. |
 
 ---
@@ -370,7 +370,7 @@ async def main() -> None:
 |--------|------------|---------|-------------|
 | `register_agent` | `agent: AgentProtocol` | `None` | Register an agent by both URL and name for flexible lookup. |
 | `unregister_agent` | `agent_id: str` | `None` | Remove an agent from the transport. |
-| `get_agent` | `agent_id: str` | `AgentProtocol \| None` | Get a registered agent by URL or name. |
+| `get_agent` | `agent_id: str` | `AgentProtocol ⎪ None` | Get a registered agent by URL or name. |
 | `list_agents` | — | `list[str]` | List all registered agent identifiers. |
 
 #### Sending
@@ -406,6 +406,6 @@ Use it when:
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `__init__` | `...` | `None` | Configure host/port and WebSocket settings for streaming connections. |
-| `send_task_stream` | `...` | `AsyncIterator[Task] \| AsyncIterator[Message]` | Send a `Task` and receive a stream of partial results or updates over a single WebSocket connection. |
+| `send_task_stream` | `...` | `AsyncIterator[Task] ⎪ AsyncIterator[Message]` | Send a `Task` and receive a stream of partial results or updates over a single WebSocket connection. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
 

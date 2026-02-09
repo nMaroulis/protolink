@@ -317,6 +317,28 @@ ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-p
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
+---
+
+## Why Protolink?
+
+The landscape of AI agents is shifting—from monolithic scripts driven by a single model, towards **Multi-Agent Systems** where specialized, autonomous agents collaborate to solve complex problems.
+
+But today's frameworks often trap you in a **walled garden**:
+
+- 🔒 **Locked into a specific LLM** (OpenAI, Anthropic, etc.)
+- 🔒 **Locked into a specific Transport** for communication
+- 🔒 **Locked into a specific Runtime** (only Python, or only a specific cloud)
+- 🔒 **Locked into specific Tooling** schemes
+- 🔒 **Agents are just functions**, not independent entities
+
+**Protolink breaks free from this model.**
+
+In Protolink, an Agent is an **autonomous, centralized object** that serves as the core unit of your system. It is designed to be **fully modular**—plug in any LLM, Tools, Transport, Storage, OpenTelemetry, and Authentication stack you need.
+
+> **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
+
+Unlike the base A2A specifications, Protolink enables **more open and flexible communication**: agents can call another agent's LLM for reasoning, invoke its tools directly, or define custom communication schemes. This creates a **flexible mesh** where specialized agents leverage each other's native capabilities without rigid orchestration bottlenecks.
+
 
 ## Protolink vs Google A2A 💡
 
@@ -345,12 +367,14 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
   Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and both native & MCP tools as agent modules.
 
 
-## Key ideas:
+## Key ideas
 
 - **Unified Agent model**: a single autonomous `AI Agent` instance handles both client and server responsibilities, incorporating LLMs and tools.
-- **Flexible transports**: HTTP, WebSocket, in‑process runtime, and planned JSON‑RPC / gRPC transports.
+- **Flexible transports**: HTTP, WebSocket, in‑process runtime, and planned JSON‑RPC / gRPC transports. Change one line of code to switch protocols.
 - **LLM‑ready architecture**: first‑class integration with API, local, and server‑hosted LLMs.
-- **Tools as modules**: native Python tools and MCP tools plugged directly into agents.
+- **Tools as modules**: native Python tools and MCP tools plugged directly into agents. Import tools from thousands of existing MCP servers instantly.
+- **Resilience by design**: by decoupling the Brain (LLM) from the Body (Agent), you are immune to provider outages or pricing changes.
+- **Developer freedom**: the pluggable architecture means you own your stack. No vendor lock-in, no framework constraints—just clean, composable components.
 
 Use this documentation to:
 

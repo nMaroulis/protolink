@@ -180,8 +180,8 @@ await registry.start()
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `transport` | `TransportType \| Transport` | `"http"` | Transport instance or type string. |
-| `url` | `str \| None` | `None` | Registry URL (used when transport is a string type). |
+| `transport` | `TransportType ⎪ Transport` | `"http"` | Transport instance or type string. |
+| `url` | `str ⎪ None` | `None` | Registry URL (used when transport is a string type). |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity: `0` = silent (WARNING), `1` = normal (INFO), `2` = verbose (DEBUG). |
 
 #### Blocking Mode

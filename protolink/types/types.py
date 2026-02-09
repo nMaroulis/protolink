@@ -7,7 +7,7 @@ Centralizing types improves reusability, discoverability, and maintainability.
 
 from typing import Literal, TypeAlias
 
-AgentRoleType: TypeAlias = Literal["gateway", "interface", "observer", "orchastrator", "worker"]
+AgentRoleType: TypeAlias = Literal["gateway", "interface", "observer", "orchestrator", "worker"]
 
 BackendType: TypeAlias = Literal["starlette", "fastapi"]
 

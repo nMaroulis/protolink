@@ -3,7 +3,7 @@
 !!! warning "🚧 Under Construction"
     This example is under construction.
 
-The fodder containing the example files can be found [here](https://github.com/nMaroulis/protolink/tree/main/examples/ticket_booking).
+The directory containing the example files can be found [here](https://github.com/nMaroulis/protolink/tree/main/examples/ticket_booking).
 
 This example demonstrates a **real-world multi-agent workflow** using Protolink.  
 The goal is to **plan and book a vacation to a Greek island** 🏖️ from a natural language request, coordinating multiple specialized agents that combine **LLM reasoning**, **tool usage**, and **external side effects**.
@@ -285,7 +285,8 @@ examples/ticket_booking/
 
 5. **Send a request**
    ```bash
-   python examples/ticket_booking/main.py
+   cd examples/ticket_booking
+   python run.py
    # Then enter: "Book me a trip to a Greek island"
    ```
 

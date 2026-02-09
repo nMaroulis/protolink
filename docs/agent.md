@@ -124,12 +124,12 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `transport` | `Transport \| str \| None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via the `transport` property. |
-| `registry` | `Registry \| RegistryClient \| str \| None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string. |
-| `registry_url` | `str \| None` | `None` | URL of the registry when using string transport type for registry creation. |
-| `llm` | `LLM \| None` | `None` | Optional language model instance for the agent to use. |
-| `system_prompt` | `str \| None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
-| `storage` | `Storage \| None` | `None` | Optional storage instance for agent data persistence. |
+| `transport` | `Transport ⎪ str ⎪ None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via the `transport` property. |
+| `registry` | `Registry ⎪ RegistryClient ⎪ str ⎪ None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string. |
+| `registry_url` | `str ⎪ None` | `None` | URL of the registry when using string transport type for registry creation. |
+| `llm` | `LLM ⎪ None` | `None` | Optional language model instance for the agent to use. |
+| `system_prompt` | `str ⎪ None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
+| `storage` | `Storage ⎪ None` | `None` | Optional storage instance for agent data persistence. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent (WARNING only), `1` = normal (INFO), `2` = verbose (DEBUG). |
@@ -179,9 +179,9 @@ asyncio.run(agent.start(blocking=True))  # Runs until Ctrl+C
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `transport` (property) | `Transport \| str \| None` | `None` | Gets or sets the transport used by this agent. Setting this initializes the client and server components. |
-| `client` (property) | — | `AgentClient \| None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
-| `server` (property) | — | `AgentServer \| None` | Returns the server instance if one is available via the transport. |
+| `transport` (property) | `Transport ⎪ str ⎪ None` | `None` | Gets or sets the transport used by this agent. Setting this initializes the client and server components. |
+| `client` (property) | — | `AgentClient ⎪ None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
+| `server` (property) | — | `AgentServer ⎪ None` | Returns the server instance if one is available via the transport. |
 
 ## Task and Message Handling
 
@@ -337,7 +337,7 @@ agent.add_tool(WeatherTool())
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `discover_agents()` | `filter_by: dict \| None = None` | `list[AgentCard]` | Discover agents in the registry matching the filter criteria. |
+| `discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Discover agents in the registry matching the filter criteria. |
 | `register()` | — | `None` | Registers this agent in the global registry. |
 | `unregister()` | — | `None` | Unregisters this agent from the global registry. |
 
@@ -345,7 +345,7 @@ agent.add_tool(WeatherTool())
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `get_agent_card()` | `as_json: bool = True` | `AgentCard \| dict` | Returns the agent's identity card. |
+| `get_agent_card()` | `as_json: bool = True` | `AgentCard ⎪ dict` | Returns the agent's identity card. |
 | `set_llm()` | `llm: LLM` | `None` | Updates the agent's language model instance. |
 | `get_context_manager()` | — | `ContextManager` | Returns the context manager for this agent. |
 | `set_storage()` | `storage: Storage` | `None` | Sets the Agent's storage instance. |

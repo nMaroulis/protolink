@@ -15,7 +15,7 @@ This separation keeps agent logic **clean, testable, and future-proof**.
 
 ---
 
-# Core Concepts
+## Core Concepts
 
 Protolink is built from the following **core components**:
 
@@ -29,7 +29,7 @@ Each layer has a **single responsibility** and a clear **dependency direction**.
 
 ---
 
-# Agent
+## Agent
 
 The **Agent** is the central abstraction in Protolink.  
 
@@ -61,16 +61,16 @@ This is **intentional and enforced by design**.
 
 ---
 
-# Client / Server Layer
+## Client / Server Layer
 
 Between the agent and the transport, Protolink introduces an **explicit client/server layer**.  
 This layer removes boilerplate from agent implementations while keeping responsibilities clear.
 
-## AgentClient (Outgoing)
+### AgentClient (Outgoing)
 
 The `AgentClient` handles **agent-to-agent outgoing communication**.
 
-### Responsibilities
+#### Responsibilities
 
 - Sending tasks to other agents  
 - Sending messages to other agents  
@@ -88,11 +88,11 @@ send_message(agent_url, message)
 Key point: The client knows what it wants to send but does not know how it is sent.
 
 
-## AgentServer (Incoming)
+### AgentServer (Incoming)
 
 The `AgentServer` handles **incoming requests** for an agent.
 
-### Responsibilities
+#### Responsibilities
 
 - Wiring the agent’s task handler into the transport  
 - Starting and stopping the server runtime  
@@ -222,13 +222,18 @@ Protolink supports **autonomous behavior** without external orchestration.
 
 Agents can:
 
-- Discover peers  
-- Schedule tasks  
-- Send tasks to other agents  
-- React to incoming tasks  
+- Discover peers dynamically via the Registry
+- Schedule and delegate tasks to specialized agents
+- Call another agent's LLM for reasoning
+- Invoke another agent's tools directly
+- React to incoming tasks autonomously
 
 This is done **inside the agent**, without manual wiring between agents.  
-Agents behave like **independent actors**, not manually invoked objects.
+Agents behave like **independent actors**, not manually invoked functions.
+
+> **Agents are entities, not functions.** They are autonomous, centralized objects that serve as the core unit of your system.
+
+This creates a **flexible mesh** where specialized agents leverage each other's native capabilities without rigid orchestration bottlenecks. The programmer can be as invasive or hands-off as they want in the agent flow—Protolink gives you the freedom to choose.
 
 ---
 
@@ -236,11 +241,11 @@ Agents behave like **independent actors**, not manually invoked objects.
 
 This design is intentionally:
 
-- Protocol-agnostic  
-- Low boilerplate  
-- Explicit  
-- Composable  
-- Testable  
+- **Protocol-agnostic**: swap transports without touching agent logic
+- **Low boilerplate**: focus on what matters, not infrastructure
+- **Explicit**: no hidden magic, you always know what's running
+- **Composable**: mix and match LLMs, tools, transports, storage
+- **Testable**: clean separation makes testing straightforward
 
 It draws inspiration from:
 
@@ -251,7 +256,41 @@ It draws inspiration from:
 
 Most importantly:
 
-> The agent stays simple, and complexity is pushed down into infrastructure layers.
+> **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
+
+---
+
+## Philosophy: Breaking Free from Lock-In
+
+Traditional AI frameworks often trap you in a walled garden:
+
+| Lock-In Type | The Problem | Protolink Solution |
+|--------------|-------------|--------------------|
+| **LLM Lock-In** | Tied to one provider (OpenAI, Anthropic) | Plug in any LLM—API, local, or self-hosted |
+| **Transport Lock-In** | Hardcoded HTTP or specific runtime | Swap transports with one line of code |
+| **Tooling Lock-In** | Proprietary tool schemas | Native tools + MCP adapter for universal tooling |
+| **Runtime Lock-In** | Only works in specific environments | Protocol-agnostic, runs anywhere Python runs |
+
+### Transport Independence
+
+Protolink agents speak HTTP today, but can speak WebSockets, gRPC, or in-memory queues tomorrow—without changing agent code. Just change the transport:
+
+```python
+# Switch from HTTP to WebSocket with one line
+agent = Agent(card, transport="websocket")  # That's it!
+```
+
+### Universal Tooling
+
+Protolink supports the **Model Context Protocol (MCP)** via a built-in adapter. Import tools from thousands of existing MCP servers (Google Drive, Slack, Postgres) instantly.
+
+### Resilience by Design
+
+By decoupling the **Brain** (LLM) from the **Body** (Agent), you are immune to provider outages or pricing changes. Swap providers without rewriting your core logic.
+
+### Developer Freedom
+
+The pluggable architecture means **you own your stack**. No vendor lock-in, no framework constraints—just clean, composable components.
 
 ---
 
@@ -273,11 +312,11 @@ This architecture makes it easy to:
 
 ---
 
-# LLM Inference Runtime
+## LLM Inference Runtime
 
 When an agent includes an LLM, Protolink provides a **deterministic inference runtime** that transforms stateless language models into reliable autonomous actors.
 
-## The Core Idea
+### The Core Idea
 
 > The LLM **declares intent**. The runtime **executes actions**. The LLM **observes results**.
 
@@ -289,7 +328,7 @@ This separation ensures:
 
 ---
 
-## ReAct-Style Execution Loop
+### ReAct-Style Execution Loop
 
 The inference runtime implements a **ReAct-style** (Reasoning + Acting) pattern:
 
@@ -320,11 +359,11 @@ The LLM operates in a **thought → action → observation** cycle:
 
 ---
 
-## JSON Action Protocol
+### JSON Action Protocol
 
 The LLM communicates via a strict JSON protocol with three action types:
 
-### Final Response
+#### Final Response
 ```json
 {"type": "final", "content": "The weather in Tokyo is 28°C and sunny."}
 ```
@@ -353,11 +392,11 @@ The runtime **never trusts** the LLM to execute actions directly. All actions ar
 
 ---
 
-## Safety Guardrails
+### Safety Guardrails
 
 The inference runtime implements multiple safety mechanisms:
 
-### Deduplication Detection
+#### Deduplication Detection
 
 Tracks recent actions in a sliding window. If the LLM repeats an identical action:
 
@@ -365,7 +404,7 @@ Tracks recent actions in a sliding window. If the LLM repeats an identical actio
 - Corrective guidance is **injected** into history
 - LLM is prompted to proceed or take different action
 
-### Parse Failure Circuit Breaker
+#### Parse Failure Circuit Breaker
 
 After 3 consecutive JSON parse failures:
 
@@ -373,7 +412,7 @@ After 3 consecutive JSON parse failures:
 - Each failure **injects corrective feedback**
 - Helps LLM self-correct its output format
 
-### Self-Correcting Error Recovery
+#### Self-Correcting Error Recovery
 
 Instead of failing on validation errors, helpful context is injected:
 
@@ -384,13 +423,13 @@ Instead of failing on validation errors, helpful context is injected:
 | Type errors | Prompts to check schema |
 | Agent not found | Provides error details |
 
-### Bounded Execution
+#### Bounded Execution
 
 Hard limit of `MAX_INFER_STEPS` (default: 10) prevents runaway loops.
 
 ---
 
-## Why This Matters
+### Why This Matters
 
 This design enables:
 
@@ -404,14 +443,14 @@ The runtime transforms chaotic LLM outputs into **reliable, deterministic agent 
 
 ---
 
-# Design Principles
+## Design Principles
 
 Protolink’s architecture is guided by a small number of **explicit design principles**.  
 These principles explain *why* the system looks the way it does and help contributors extend it coherently.
 
 ---
 
-## 1. Intent Over Mechanism
+### 1. Intent Over Mechanism
 
 Agents express **what they want to do**, never **how it is done**.
 
@@ -431,7 +470,7 @@ This allows:
 
 ---
 
-## 2. Directional Communication Is Explicit
+### 2. Directional Communication Is Explicit
 
 Outgoing and incoming communication are **separate concerns**.
 
@@ -446,7 +485,7 @@ This avoids:
 
 ---
 
-## 3. Transport Is a Boundary, Not a Feature
+### 3. Transport Is a Boundary, Not a Feature
 
 Transports are infrastructure.
 
@@ -467,7 +506,7 @@ This keeps the system future-proof.
 
 ---
 
-## 4. Registry Mirrors Agent Architecture
+### 4. Registry Mirrors Agent Architecture
 
 The registry is not “special”.
 
@@ -485,7 +524,7 @@ This symmetry:
 
 ---
 
-## 5. Minimal Boilerplate, Explicit Control
+### 5. Minimal Boilerplate, Explicit Control
 
 Protolink aims to reduce boilerplate **without hiding control**.
 
@@ -501,13 +540,13 @@ You always know:
 
 ---
 
-# Agent ↔ Agent Sequence Diagram
+## Agent ↔ Agent Sequence Diagram
 
 This section describes the **runtime flow** when one agent sends a task to another.
 
 ---
 
-## Scenario
+### Scenario
 
 Agent A wants to send a task to Agent B.
 
@@ -515,7 +554,7 @@ Both agents are already running and registered.
 
 ---
 
-## Sequence
+### Sequence
 
 1. Agent A creates a `Task`  
 2. Agent A calls `send_task_to(agent_b_url, task)`  
@@ -529,7 +568,7 @@ Both agents are already running and registered.
 
 ---
 
-## Responsibility Breakdown
+### Responsibility Breakdown
 
 - Agent: defines *what* to do  
 - Client: defines *direction*  
@@ -540,13 +579,13 @@ No layer violates its responsibility.
 
 ---
 
-# Registry Interaction Sequence
+## Registry Interaction Sequence
 
 This section explains how discovery works at runtime.
 
 ---
 
-## Agent Startup
+### Agent Startup
 
 1. Agent starts its server  
 2. Agent creates a `RegistryClient`  
@@ -556,7 +595,7 @@ This section explains how discovery works at runtime.
 
 ---
 
-## Discovery
+### Discovery
 
 1. Agent requests discovery via `RegistryClient`  
 2. Registry applies filters  
@@ -567,13 +606,13 @@ The registry **never pushes behavior** to agents.
 
 ---
 
-# Comparison With Raw Google A2A
+## Comparison With Raw Google A2A
 
 Protolink is inspired by Google’s A2A spec, but intentionally diverges in structure.
 
 ---
 
-## What Is Preserved
+### What Is Preserved
 
 - Agent Cards  
 - Task-based communication  
@@ -583,9 +622,9 @@ Protolink is inspired by Google’s A2A spec, but intentionally diverges in stru
 
 ---
 
-## What Is Improved
+### What Is Improved
 
-### 1. Central Agent Abstraction
+#### 1. Central Agent Abstraction
 
 In Protolink, the agent is the **primary unit**, not a loose collection of endpoints.
 
@@ -596,7 +635,7 @@ This:
 
 ---
 
-### 2. Explicit Client / Server Split
+#### 2. Explicit Client / Server Split
 
 Google A2A often conflates:
 - Sending  
@@ -610,7 +649,7 @@ Protolink separates them cleanly, which:
 
 ---
 
-### 3. Registry as a First-Class Component
+#### 3. Registry as a First-Class Component
 
 Instead of being an afterthought, the registry is:
 - Structured  
@@ -620,7 +659,7 @@ Instead of being an afterthought, the registry is:
 
 ---
 
-### 4. Lower Boilerplate for Users
+#### 4. Lower Boilerplate for Users
 
 A typical Protolink agent requires:
 - One subclass  
@@ -631,7 +670,7 @@ Everything else is handled by composition.
 
 ---
 
-# Mental Model Summary
+## Mental Model Summary
 
 If you remember only one thing:
 
@@ -643,7 +682,7 @@ That is the entire philosophy.
 
 ---
 
-# Protolink vs Google A2A Concepts
+### Protolink vs Google A2A Concepts
 
 Protolink is inspired by Google’s **A2A (Agent-to-Agent)** concepts, but adds practical layers and abstractions to make building autonomous agents easier and more maintainable.
 
@@ -658,7 +697,7 @@ Protolink is inspired by Google’s **A2A (Agent-to-Agent)** concepts, but adds 
 | **Boilerplate** | Manual wiring, repetitive | Minimal; agent owns clients and servers, which own transports | Focuses on developer productivity and clarity. |
 | **Autonomy** | Agents are actors, often invoked manually | Agents run autonomously, discover peers, schedule and execute tasks | Protolink pushes complexity down into infrastructure layers. |
 
-### Key Differences
+#### Key Differences
 
 1. **LLM Integration**  
    - In Protolink, an agent can include LLMs as part of its **tools/skills**, enabling advanced AI behavior.  

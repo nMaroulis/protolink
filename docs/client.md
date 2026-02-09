@@ -33,8 +33,8 @@ AgentClient(transport: Transport | TransportType, url: str | None = None)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `transport` | `Transport \| str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
-| `url` | `str \| None` | Base URL when using a transport type string |
+| `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
+| `url` | `str ⎪ None` | Base URL when using a transport type string |
 
 **Examples:**
 

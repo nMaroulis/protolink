@@ -23,7 +23,7 @@ This section provides detailed documentation for the type aliases used throughou
 ## AgentRoleType
 
 ```python
-AgentRoleType: TypeAlias = Literal["gateway", "observer", "orchastrator", "worker"]
+AgentRoleType: TypeAlias = Literal["gateway", "interface", "observer", "orchestrator", "worker"]
 ```
 
 **Agent roles** define an agent’s **responsibility in the system topology**, not its

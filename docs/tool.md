@@ -53,9 +53,9 @@ class BaseTool(Protocol):
 |-----------|------|-------------|
 | `name` | `str` | Unique identifier for the tool |
 | `description` | `str` | Human-readable description of what the tool does |
-| `input_schema` | `dict[str, type] \| None` | Mapping of parameter names to their types |
-| `output_schema` | `dict[str, type] \| None` | Mapping of output names to their types (optional) |
-| `tags` | `list[str] \| None` | Categorization tags for filtering and discovery |
+| `input_schema` | `dict[str, type] ⎪ None` | Mapping of parameter names to their types |
+| `output_schema` | `dict[str, type] ⎪ None` | Mapping of output names to their types (optional) |
+| `tags` | `list[str] ⎪ None` | Categorization tags for filtering and discovery |
 
 ### The `__call__` Method
 
@@ -205,10 +205,10 @@ adapter = MCPToolAdapter(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `transport` | `str` | `"stdio"` | Transport type: `"stdio"` or `"sse"` |
-| `command` | `str \| None` | `None` | Command to run for stdio transport |
-| `args` | `list[str] \| None` | `None` | Arguments for the stdio command |
-| `url` | `str \| None` | `None` | URL for SSE transport |
-| `headers` | `dict[str, str] \| None` | `None` | HTTP headers for SSE (e.g., auth) |
+| `command` | `str ⎪ None` | `None` | Command to run for stdio transport |
+| `args` | `list[str] ⎪ None` | `None` | Arguments for the stdio command |
+| `url` | `str ⎪ None` | `None` | URL for SSE transport |
+| `headers` | `dict[str, str] ⎪ None` | `None` | HTTP headers for SSE (e.g., auth) |
 
 ---
 
@@ -552,7 +552,7 @@ Hello, World! 👋
 |--------|---------|-------------|
 | `list_tools(refresh=False)` | `list[dict]` | List all tools as dictionaries with metadata and callables |
 | `get_tools()` | `list[Tool]` | Get all tools as native Protolink `Tool` objects (tagged with `"mcp"`) |
-| `get_tool(name)` | `dict \| None` | Get a specific tool's metadata by name |
+| `get_tool(name)` | `dict ⎪ None` | Get a specific tool's metadata by name |
 | `get_callable(name)` | `Callable` | Get a synchronous callable for a tool |
 | `wrap_tool(name)` | `MCPToolAdapter` | Wrap a tool as a BaseTool instance |
 | `print_tools()` | `None` | Print all tools in human-readable format |
@@ -564,8 +564,8 @@ Hello, World! 👋
 | `name` | `str` | Tool name |
 | `description` | `str` | Tool description |
 | `input_schema` | `dict[str, type]` | Input parameter types |
-| `output_schema` | `dict[str, type] \| None` | Output types (always `None` for MCP) |
-| `tags` | `list[str] \| None` | Tool tags (always `None` for MCP) |
+| `output_schema` | `dict[str, type] ⎪ None` | Output types (always `None` for MCP) |
+| `tags` | `list[str] ⎪ None` | Tool tags (always `None` for MCP) |
 
 ---
 

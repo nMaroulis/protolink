@@ -167,7 +167,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 |------|------------|---------|-------------|
 | `call()` | `history: ConversationHistory` | `str` | **Abstract.** Generate a single response from the model. |
 | `call_stream()` | `history: ConversationHistory` | `AsyncIterator[str]` | **Abstract.** Generate a streaming response, yielding chunks. |
-| `chat()` | `user_query: str, streaming: bool=False` | `str \| AsyncIterator[str]` | High-level convenience method for standard chat usage. |
+| `chat()` | `user_query: str, streaming: bool=False` | `str ⎪ AsyncIterator[str]` | High-level convenience method for standard chat usage. |
 | `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False` | `Part` | **Async.** Execute controlled multi-step inference with tool calling. |
 | `build_system_prompt()` | `user_instructions, agent_cards, tools, override_system_prompt` | `str` | Build the final system prompt for the LLM. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
@@ -559,10 +559,10 @@ OpenAI API implementation using the official OpenAI client.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `api_key` | `str \| None` | `None` | OpenAI API key. Uses `OPENAI_API_KEY` env var if not provided. |
-| `model` | `str \| None` | `"gpt-4o-mini"` | OpenAI model name. |
-| `model_params` | `dict[str, Any] \| None` | `None` | Model parameters (temperature, max_tokens, etc.). |
-| `base_url` | `str \| None` | `None` | Custom base URL for OpenAI-compatible APIs. |
+| `api_key` | `str ⎪ None` | `None` | OpenAI API key. Uses `OPENAI_API_KEY` env var if not provided. |
+| `model` | `str ⎪ None` | `"gpt-4o-mini"` | OpenAI model name. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+| `base_url` | `str ⎪ None` | `None` | Custom base URL for OpenAI-compatible APIs. |
 
 ```python
 from protolink.llms.api import OpenAILLM
@@ -594,7 +594,7 @@ llm = OpenAILLM(
 |-----------|-----|---------|-------------------|
 | `temperature` | `float` | `1.0` | `0.0` to `2.0` - Controls randomness |
 | `top_p` | `float` | `1.0` | Nucleus sampling parameter |
-| `max_tokens` | `int \| None` | `None` | Maximum tokens to generate |
+| `max_tokens` | `int ⎪ None` | `None` | Maximum tokens to generate |
 | `presence_penalty` | `float` | `0.0` | `-2.0` to `2.0` - Presence penalty |
 | `frequency_penalty` | `float` | `0.0` | `-2.0` to `2.0` - Frequency penalty |
 
@@ -606,10 +606,10 @@ Anthropic Claude API implementation using the official Anthropic client.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `api_key` | `str \| None` | `None` | Anthropic API key. Uses `ANTHROPIC_API_KEY` env var if not provided. |
-| `model` | `str \| None` | `"claude-3-5-sonnet-20241022"` | Claude model name. |
-| `model_params` | `dict[str, Any] \| None` | `None` | Model parameters (temperature, max_tokens, etc.). |
-| `base_url` | `str \| None` | `None` | Custom base URL for Anthropic-compatible APIs. |
+| `api_key` | `str ⎪ None` | `None` | Anthropic API key. Uses `ANTHROPIC_API_KEY` env var if not provided. |
+| `model` | `str ⎪ None` | `"claude-3-5-sonnet-20241022"` | Claude model name. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+| `base_url` | `str ⎪ None` | `None` | Custom base URL for Anthropic-compatible APIs. |
 
 ```python
 from protolink.llms.api import AnthropicLLM
@@ -635,7 +635,7 @@ llm = AnthropicLLM(
 | `max_tokens` | `int` | `4096` | Maximum tokens to generate |
 | `temperature` | `float` | `1.0` | `0.0` to `1.0` - Controls randomness |
 | `top_p` | `float` | `1.0` | Nucleus sampling parameter |
-| `top_k` | `int \| None` | `None` | Top-k sampling parameter |
+| `top_k` | `int ⎪ None` | `None` | Top-k sampling parameter |
 
 ### GeminiLLM
 
@@ -645,9 +645,9 @@ Google Gemini API implementation.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `api_key` | `str \| None` | `None` | Google API key. Uses `GEMINI_API_KEY` env var if not provided. |
-| `model` | `str \| None` | `"gemini-1.5-flash"` | Gemini model name. |
-| `model_params` | `dict[str, Any] \| None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+| `api_key` | `str ⎪ None` | `None` | Google API key. Uses `GEMINI_API_KEY` env var if not provided. |
+| `model` | `str ⎪ None` | `"gemini-1.5-flash"` | Gemini model name. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
 
 ### DeepSeekLLM
 
@@ -657,9 +657,9 @@ DeepSeek API implementation.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `api_key` | `str \| None` | `None` | DeepSeek API key. Uses `DEEPSEEK_API_KEY` env var if not provided. |
-| `model` | `str \| None` | `"deepseek-chat"` | DeepSeek model name. |
-| `model_params` | `dict[str, Any] \| None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+| `api_key` | `str ⎪ None` | `None` | DeepSeek API key. Uses `DEEPSEEK_API_KEY` env var if not provided. |
+| `model` | `str ⎪ None` | `"deepseek-chat"` | DeepSeek model name. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
 
 ### HuggingFaceLLM
 
@@ -669,9 +669,9 @@ HuggingFace Inference API implementation.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `api_key` | `str \| None` | `None` | HuggingFace API token. Uses `HF_API_TOKEN` env var if not provided. |
-| `model` | `str \| None` | `"HuggingFaceH4/zephyr-7b-beta"` | HuggingFace model name. |
-| `model_params` | `dict[str, Any] \| None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+| `api_key` | `str ⎪ None` | `None` | HuggingFace API token. Uses `HF_API_TOKEN` env var if not provided. |
+| `model` | `str ⎪ None` | `"HuggingFaceH4/zephyr-7b-beta"` | HuggingFace model name. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
 
 !!! warning "Model Availability"
     Not all HuggingFace models are available through the Inference API. Use models that are explicitly supported for inference.
@@ -706,10 +706,10 @@ Ollama server implementation for connecting to local or remote Ollama instances.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `base_url` | `str \| None` | `None` | Ollama server URL. If not provided, uses `OLLAMA_HOST` environment variable. |
-| `headers` | `dict[str, str] \| None` | `None` | Additional HTTP headers (including auth). |
-| `model` | `str \| None` | `"gemma3"` | Ollama model name. |
-| `model_params` | `dict[str, Any] \| None` | `None` | Model parameters (temperature, etc.). |
+| `base_url` | `str ⎪ None` | `None` | Ollama server URL. If not provided, uses `OLLAMA_HOST` environment variable. |
+| `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers (including auth). |
+| `model` | `str ⎪ None` | `"gemma3"` | Ollama model name. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, etc.). |
 
 ```python
 from protolink.llms.server import OllamaLLM
