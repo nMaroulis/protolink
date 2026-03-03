@@ -1,7 +1,7 @@
 # Ticket Booking Example
 
-!!! warning "🚧 Under Construction"
-    This example is under construction.
+!!! info "📝 Article on Medium"
+    The following article on [level-up coding on medium](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) also gives a hands-on guide and overview of this example.
 
 The directory containing the example files can be found [here](https://github.com/nMaroulis/protolink/tree/main/examples/ticket_booking).
 

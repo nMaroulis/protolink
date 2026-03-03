@@ -321,19 +321,18 @@ The framework emphasizes **minimal boilerplate**, **explicit control**, and **pr
 
 ## Why Protolink?
 
-The landscape of AI agents is shifting—from monolithic scripts driven by a single model, towards **Multi-Agent Systems** where specialized, autonomous agents collaborate to solve complex problems.
+The landscape of AI agents is shifting, from monolithic scripts driven by a single model, towards **Multi-Agent Systems** where specialized, autonomous agents collaborate to solve complex problems.
 
 But today's frameworks often trap you in a **walled garden**:
 
 - 🔒 **Locked into a specific LLM** (OpenAI, Anthropic, etc.)
 - 🔒 **Locked into a specific Transport** for communication
-- 🔒 **Locked into a specific Runtime** (only Python, or only a specific cloud)
 - 🔒 **Locked into specific Tooling** schemes
 - 🔒 **Agents are just functions**, not independent entities
 
 **Protolink breaks free from this model.**
 
-In Protolink, an Agent is an **autonomous, centralized object** that serves as the core unit of your system. It is designed to be **fully modular**—plug in any LLM, Tools, Transport, Storage, OpenTelemetry, and Authentication stack you need.
+In Protolink, an Agent is an **autonomous, centralized object** that serves as the core unit of your system. It is designed to be **fully modular** so you can **plug in** any LLM, Tools, Transport, Storage, OpenTelemetry, and Authentication stack you need.
 
 > **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
 

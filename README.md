@@ -31,6 +31,7 @@ The framework emphasizes **minimal boilerplate**, **explicit control**, and **pr
 
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
 
+The following article on 📝 [level-up coding on medium](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) also gives a hands-on guide and overview of Protolink.
 
 ### The centralized agent architecture
 In Protolink the agent is the central component that handles all the logic and incorporates the **LLM**, **tools**, **transport layer** through **AgentClient** and **AgentServer**, the **Storage** and **OpenTelemetry** for logging.

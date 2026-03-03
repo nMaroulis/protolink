@@ -19,22 +19,22 @@ The **Transport** layer is low-level and typically not used directly by applicat
 All transports inherit from the base `Transport` class.
 
 - **HTTPTransport**
-  - Uses HTTP/HTTPS for synchronous request/response.
-  - Used for both Agent-to-Agent and Agent-to-Registry communication.
-  - Backed by ASGI frameworks:
-    - `Starlette` + `httpx` + `uvicorn` (lightweight default backend).
-    - `FastAPI` + `pydantic` + `uvicorn` (with optional request validation).
-  - Great default choice for web‑based agents, simple deployments, and interoperable APIs.
+    - Uses HTTP/HTTPS for synchronous request/response.
+    - Used for both Agent-to-Agent and Agent-to-Registry communication.
+    - Backed by ASGI frameworks:
+        - `Starlette` + `httpx` + `uvicorn` (lightweight default backend).
+        - `FastAPI` + `pydantic` + `uvicorn` (with optional request validation).
+    - Great default choice for web‑based agents, simple deployments, and interoperable APIs.
 
 - **WebSocketTransport**
-  - Uses WebSocket for streaming requests and responses.
-  - Built on top of libraries like `websockets` (and `httpx` for HTTP parts where applicable).
-  - Useful for real‑time, bidirectional communication or token‑level streaming.
+    - Uses WebSocket for streaming requests and responses.
+    - Built on top of libraries like `websockets` (and `httpx` for HTTP parts where applicable).
+    - Useful for real‑time, bidirectional communication or token‑level streaming.
 
 - **RuntimeTransport**
-  - Simple **in‑process, in‑memory transport**.
-  - Allows multiple agents to communicate within the same Python process.
-  - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
+    - Simple **in‑process, in‑memory transport**.
+    - Allows multiple agents to communicate within the same Python process.
+    - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
 
 ### Planned Transports
 

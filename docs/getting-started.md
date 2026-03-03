@@ -2,6 +2,8 @@
 
 This guide shows how to install and start using Protolink.
 
+The following article on 📝 [level-up coding on medium](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) also gives a hands-on guide and overview of Protolink.
+
 ## Installation
 
 Protolink is published on PyPI and can be installed with either `uv` (recommended) or `pip`.
