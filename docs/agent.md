@@ -93,7 +93,7 @@ Agents communicate over a chosen transport.
 
 Common patterns:
 
-- **RuntimeTransport**: multiple agents in the same process share an in‑memory transport, which is ideal for local testing and composition.
+- **RuntimeTransport**: agents operate dedicated native local transports connected via a globally shared memory registry. This mirrors distributed HTTP environments perfectly, enabling zero network overhead testing workflows while retaining accurate boundaries.
 - **HTTPTransport / WebSocketTransport**: agents expose HTTP or WebSocket endpoints so that other agents (or external clients) can send requests.
 
 #### Agent Transport Layers

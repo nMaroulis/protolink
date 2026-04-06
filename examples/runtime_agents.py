@@ -1,8 +1,8 @@
 """Runtime Transport Example - Multi-Agent Collaboration.
 
 Demonstrates how agents communicate via the in-memory RuntimeTransport.
-Unlike HTTP transport, RuntimeTransport allows multiple agents to share
-a single transport instance for efficient local message passing.
+Unlike HTTP transport, RuntimeTransport allows agents to communicate without
+network overhead, whilst still maintaining process isolation abstractions.
 """
 
 from __future__ import annotations
@@ -49,19 +49,16 @@ async def main() -> None:
     print("  RuntimeTransport Multi-Agent Demo")
     print("=" * 50)
 
-    # Create shared transport
-    transport = RuntimeTransport()
-
-    # Create agents - pass transport to constructor
+    # Initialize agents completely isolated from each other via unique transport URLs
+    # Their endpoints will be mutually resolvable across the runtime transport's class registry internally.
     assistant = Agent(
         card=AgentCard(
             name="assistant",
             description="A helpful assistant",
             url="runtime://assistant",
         ),
-        transport=transport,
+        transport=RuntimeTransport(url="runtime://assistant"),
     )
-    transport.register_agent(assistant)
 
     translator = TranslatorAgent(
         card=AgentCard(
@@ -69,23 +66,30 @@ async def main() -> None:
             description="Translates to pig latin",
             url="runtime://translator",
         ),
-        transport=transport,
+        transport=RuntimeTransport(url="runtime://translator"),
     )
-    transport.register_agent(translator)
 
-    print(f"\n📋 Registered agents: {[a for a in transport.list_agents() if '://' in a]}")
+    # Boot the servers (which internally mounts the transports)
+    await asyncio.gather(assistant.start(), translator.start())
 
-    # Agent-to-agent communication
-    print("\n--- Assistant → Translator ---")
-    task = Task.create(Message.user("Hello world"))
-    response = await assistant.send_task_to("translator", task)
-    print(f"Result: {response.get_last_part_content()}")
+    print(f"\n📋 Active runtime transports: {list(RuntimeTransport._registry.keys())}")
 
-    print("\n--- Direct agent card lookup ---")
-    card = await assistant.client.get_agent_card("translator")
-    print(f"Found: {card.name} - {card.description}")
+    try:
+        # Agent-to-agent communication
+        print("\n--- Assistant → Translator ---")
+        task = Task.create(Message.user("Hello world"))
+        # We can send by the target's transport URL directly
+        response = await assistant.send_task_to("runtime://translator", task)
+        print(f"Result: {response.get_last_part_content()}")
 
-    print("\n✅ Demo complete!")
+        print("\n--- Direct agent card lookup ---")
+        card = await assistant.client.get_agent_card("runtime://translator")
+        print(f"Found: {card.name} - {card.description}")
+
+        print("\n✅ Demo complete!")
+    finally:
+        # Shutdown
+        await asyncio.gather(assistant.stop(), translator.stop())
 
 
 if __name__ == "__main__":

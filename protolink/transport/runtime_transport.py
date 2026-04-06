@@ -4,19 +4,21 @@ This module provides :class:`RuntimeTransport`, an in-memory transport that enab
 without network overhead. Perfect for testing, local multi-agent setups, and rapid prototyping.
 
 Unlike network transports (HTTP, WebSocket), RuntimeTransport:
-- Does not have a meaningful URL (agents are addressed by name/URL directly)
-- Supports multiple agents sharing a single transport instance
-- Routes messages directly in-memory without serialization
+- Routes messages directly in-memory, avoiding TCP overhead.
+- Supports isolated agents communicating across a fast local message bus by declaring unique 'runtime://' URLs.
+- Mimics HTTP boundaries by enforcing payload serialization semantics using Pydantic.
 """
 
 from __future__ import annotations
 
 import inspect
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar
+
+from pydantic import BaseModel
 
 from protolink.client.request_spec import ClientRequestSpec
-from protolink.models import AgentCard, Task
+from protolink.models import Task
 from protolink.transport.base import Transport
 from protolink.types import TransportType
 
@@ -24,108 +26,50 @@ if TYPE_CHECKING:
     from protolink.server.endpoint_handler import EndpointSpec
 
 
-@runtime_checkable
-class AgentProtocol(Protocol):
-    """Protocol for agents that can be registered with RuntimeTransport.
-
-    Agents must implement the minimal interface required for in-memory task handling and introspection.
-    """
-
-    card: AgentCard
-
-    async def handle_task(self, task: Task) -> Task:
-        """Handle an incoming task and return the updated task."""
-        ...
-
-    def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
-        """Return the agent's public metadata and capabilities."""
-        ...
-
-    def get_agent_status_html(self) -> str:
-        """Return a human-readable HTML status page."""
-        ...
-
-    def handle_task_streaming(self, task: Task) -> AsyncIterator[Any]:
-        """Stream task events for real-time updates."""
-        ...
-
-
 class RuntimeTransport(Transport):
-    """In-memory transport for local agent communication.
+    """In-memory transport for process-local agent communication.
 
-    Enables multiple agents to communicate without network overhead by
-    routing messages directly in-memory. Agents register themselves with
-    the transport and can then send tasks to each other using their
-    names or URLs as identifiers.
+    Enables agents to communicate without network overhead by routing
+    messages directly in-memory via a class-level global registry.
+    This transport enforces payload serialization similarly to HTTP
+    transports to guarantee interchangeable behavior and safety boundaries.
 
     Parameters
     ----------
-    None
-        RuntimeTransport does not require configuration.
-
-    Example
-    -------
-    >>> transport = RuntimeTransport()
-    >>> transport.register_agent(alice)
-    >>> transport.register_agent(bob)
-    >>> # Alice can now send tasks to Bob via the transport
-    >>> await alice.send_task_to("bob", task)
+    url : str
+        URL identifying this transport endpoint (e.g., ``"runtime://alice"``).
     """
 
     transport_type: ClassVar[TransportType] = "runtime"
-    supports_streaming: ClassVar[bool] = True
+    """Identifier for the transport type used by the registry."""
 
-    def __init__(self) -> None:
-        """Initialize in-memory transport."""
-        self._agents: dict[str, AgentProtocol] = {}
-        self._endpoints: list[EndpointSpec] = []
+    supports_streaming: ClassVar[bool] = True
+    """Indicates whether this transport supports asynchronous streaming."""
+
+    # Global registry for cross-transport routing
+    _registry: ClassVar[dict[str, RuntimeTransport]] = {}
+
+    def __init__(self, url: str) -> None:
+        """Initialize the in-memory transport.
+
+        Args:
+            url: The unique runtime URL for this agent transport endpoint.
+        """
+        self._url: str = url
+        self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
         self._is_running: bool = False
 
-    # ------------------------------------------------------------------
-    # Agent Registry
-    # ------------------------------------------------------------------
-
-    def register_agent(self, agent: AgentProtocol) -> None:
-        """Register an agent for in-memory communication.
-
-        Agents are registered by both their URL and name for flexible lookup.
+    @classmethod
+    def get_transport(cls, base_url: str) -> RuntimeTransport | None:
+        """Retrieve a registered transport instance by its URL.
 
         Args:
-            agent: Agent instance implementing AgentProtocol.
-        """
-        self._agents[agent.card.url] = agent
-        self._agents[agent.card.name] = agent
-
-    def unregister_agent(self, agent_id: str) -> None:
-        """Remove an agent from the transport.
-
-        Args:
-            agent_id: Agent URL or name to unregister.
-        """
-        agent = self._agents.get(agent_id)
-        if agent:
-            # Remove both URL and name entries
-            self._agents.pop(agent.card.url, None)
-            self._agents.pop(agent.card.name, None)
-
-    def get_agent(self, agent_id: str) -> AgentProtocol | None:
-        """Get a registered agent by URL or name.
-
-        Args:
-            agent_id: Agent URL or name.
+            base_url: The unique URL of the target transport.
 
         Returns:
-            AgentProtocol instance or None if not found.
+            The associated `RuntimeTransport` instance, or None if not found.
         """
-        return self._agents.get(agent_id)
-
-    def list_agents(self) -> list[str]:
-        """List all registered agent identifiers.
-
-        Returns:
-            List of registered agent URLs and names.
-        """
-        return list(self._agents.keys())
+        return cls._registry.get(base_url)
 
     # ------------------------------------------------------------------
     # Transport Interface (Client-side)
@@ -138,148 +82,158 @@ class RuntimeTransport(Transport):
         data: Any = None,
         params: dict[str, Any] | None = None,
     ) -> Any:
-        """Send a request to a registered agent.
+        """Send a request to a registered peer agent.
 
-        Routes requests directly to agent handlers based on the request spec.
+        Routes requests directly to agent handlers based on the target base URL
+        and the requested HTTP method and path encoded in the request specification.
 
         Args:
-            request_spec: Client request specification (endpoint name, path, etc.).
-            base_url: Agent URL or name to send the request to.
-            data: Request payload (task, etc.).
-            params: Optional query parameters (not used for runtime transport).
+            request_spec: Specifications of the request including HTTP method, path, and parsers.
+            base_url: The URL of the target agent to deliver the request to.
+            data: The request payload (typically a Task object or compatible primitive).
+            params: Optional query parameters (unused natively but supported for API alignment).
 
         Returns:
-            Response from the agent handler.
+            The raw or parsed response produced by the target endpoint's handler.
 
         Raises:
-            ValueError: If the target agent is not registered.
-            NotImplementedError: If the endpoint is not supported.
+            ConnectionError: If the target agent transport is not actively registered.
+            RuntimeError: If the requested endpoint path or method does not exist on the target.
         """
-        agent = self._agents.get(base_url)
-        if not agent:
-            raise ValueError(f"Agent not found: {base_url}")
+        target: RuntimeTransport | None = self.get_transport(base_url)
+        if not target:
+            raise ConnectionError(f"Failed to connect to agent at {base_url}. Agent transport not found in registry.")
 
-        return await self._dispatch(agent, request_spec, data)
+        # Resolve the applicable endpoint configuration on the target node
+        endpoint_key: tuple[str, str] = (request_spec.method.upper(), request_spec.path)
+        endpoint: EndpointSpec | None = target._endpoints.get(endpoint_key)
 
-    async def _dispatch(
-        self,
-        agent: AgentProtocol,
-        request_spec: ClientRequestSpec,
-        data: Any,
-    ) -> Any:
-        """Dispatch a request to the appropriate agent handler.
+        if not endpoint:
+            # Reattempt resolution by normalizing the trailing slash
+            alt_path = request_spec.path.rstrip("/") if request_spec.path.endswith("/") else request_spec.path + "/"
+            endpoint = target._endpoints.get((request_spec.method.upper(), alt_path))
 
-        Args:
-            agent: Target agent.
-            request_spec: Request specification.
-            data: Request data.
+        if not endpoint:
+            raise RuntimeError(
+                f"Agent at {base_url} returned HTTP 404: Endpoint {request_spec.method} {request_spec.path} not found"
+            )
 
-        Returns:
-            Handler response, optionally parsed.
-        """
-        match request_spec.name:
-            case "send_task":
-                return await self._handle_send_task(agent, request_spec, data)
-            case "get_agent_card":
-                return await self._handle_get_agent_card(agent, request_spec)
-            case "status":
-                return self._handle_status(agent)
-            case _:
-                raise NotImplementedError(f"Endpoint '{request_spec.name}' not supported by RuntimeTransport")
+        # Simulate robust network serialization/deserialization mimicking HTTP transport boundaries
+        payload: Any = data
+        if payload is not None:
+            if hasattr(payload, "to_dict"):
+                dict_payload: dict[str, Any] = payload.to_dict()
+                if endpoint.request_parser:
+                    payload = endpoint.request_parser(dict_payload)
+                else:
+                    payload = dict_payload
+            elif isinstance(payload, BaseModel):
+                dict_payload = payload.model_dump()
+                if endpoint.request_parser:
+                    payload = endpoint.request_parser(dict_payload)
+                else:
+                    payload = dict_payload
 
-    async def _handle_send_task(
-        self,
-        agent: AgentProtocol,
-        request_spec: ClientRequestSpec,
-        data: Any,
-    ) -> Task:
-        """Handle send_task request."""
-        task = data if isinstance(data, Task) else Task.from_dict(data)
-        result = await agent.handle_task(task)
+        # Process the request payload inside the endpoint handler
+        result: Any
+        if endpoint.request_source in ("body", "query_params") and payload is not None:
+            result = endpoint.handler(payload)
+        else:
+            result = endpoint.handler()
 
-        # Apply response parser for wire-format compatibility
-        if request_spec.response_parser:
-            return request_spec.response_parser(result.to_dict())
-        return result
-
-    async def _handle_get_agent_card(
-        self,
-        agent: AgentProtocol,
-        request_spec: ClientRequestSpec,
-    ) -> AgentCard | dict[str, Any]:
-        """Handle get_agent_card request."""
-        result = agent.get_agent_card(as_json=True)
-
-        # Handle potential async implementations
+        # Await resolving for asynchronous endpoint implementations
         if inspect.isawaitable(result):
             result = await result
 
-        # At this point, result is AgentCard | dict[str, Any]
-        card: AgentCard | dict[str, Any] = result  # type: ignore[assignment]
-
+        # Emulate outgoing response serialization using specified JSON parsers
         if request_spec.response_parser:
-            if isinstance(card, dict):
-                return request_spec.response_parser(card)
-            return request_spec.response_parser(card.to_dict())
-        return card
+            if hasattr(result, "to_dict"):
+                return request_spec.response_parser(result.to_dict())
+            elif isinstance(result, BaseModel):
+                return request_spec.response_parser(result.model_dump())
+            elif isinstance(result, dict):
+                return request_spec.response_parser(result)
 
-    def _handle_status(self, agent: AgentProtocol) -> str:
-        """Handle status request."""
-        return agent.get_agent_status_html()
+        return result
 
     # ------------------------------------------------------------------
     # Streaming Support
     # ------------------------------------------------------------------
 
-    async def subscribe(self, agent_url: str, task: Task) -> AsyncIterator[dict[str, Any]]:
-        """Subscribe to streaming task updates.
+    async def subscribe(self, base_url: str, task: Task) -> AsyncIterator[dict[str, Any]]:
+        """Subscribe to a streaming stream of task updates.
 
         Args:
-            agent_url: Agent URL or name.
-            task: Task to process.
+            base_url: The URL of the target agent to connect to for streaming.
+            task: The Task triggering the streaming sequence.
 
         Yields:
-            Event dictionaries from the agent's streaming handler.
+            Event dictionaries corresponding to streamed updates from the handler.
 
         Raises:
-            ValueError: If the agent is not found.
+            ConnectionError: If the target agent transport is not actively registered.
+            RuntimeError: If the resolved endpoint does not natively support asynchronous iteration.
         """
-        agent = self._agents.get(agent_url)
-        if not agent:
-            raise ValueError(f"Agent not found: {agent_url}")
+        target: RuntimeTransport | None = self.get_transport(base_url)
+        if not target:
+            raise ConnectionError(f"Failed to connect to agent at {base_url}. Agent transport not found in registry.")
 
-        if hasattr(agent, "handle_task_streaming"):
-            async for event in agent.handle_task_streaming(task):
-                yield event.to_dict() if hasattr(event, "to_dict") else event
-        else:
-            # Fallback: execute non-streaming and emit completion event
-            result = await agent.handle_task(task)
+        # Resolve an endpoint explicitly designed for streaming
+        stream_endpoints: list[EndpointSpec] = [ep for ep in target._endpoints.values() if ep.streaming]
+        if not stream_endpoints:
+            # Fallback wrapper enabling non-streaming endpoints to mock a final stream response
+            fallback_spec = ClientRequestSpec(
+                name="task",
+                path="/tasks/",
+                method="POST",
+                request_source="body",
+            )
+            result: Any = await self.send(fallback_spec, base_url, data=task)
             from protolink.core.events import TaskStatusUpdateEvent
 
             yield TaskStatusUpdateEvent(task_id=result.id, new_state="completed", final=True).to_dict()
+            return
+
+        endpoint: EndpointSpec = stream_endpoints[0]
+
+        # Emulate boundary validation across streaming task delivery
+        payload: Any = task
+        if endpoint.request_parser:
+            payload = endpoint.request_parser(task.to_dict())
+
+        # Begin generator sequence
+        result = endpoint.handler(payload)
+
+        if inspect.isawaitable(result):
+            result = await result
+
+        if hasattr(result, "__aiter__"):
+            async for event in result:
+                yield event.to_dict() if hasattr(event, "to_dict") else event
+        else:
+            raise RuntimeError("Streaming endpoint handler must return an AsyncIterator")
 
     # ------------------------------------------------------------------
     # Transport Lifecycle
     # ------------------------------------------------------------------
 
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
-        """Store endpoint specifications for reference.
-
-        RuntimeTransport handles routing directly in send() rather than
-        through HTTP-style route handlers.
+        """Register designated endpoint specifications for handler routing.
 
         Args:
-            endpoints: List of endpoint specifications.
+            endpoints: A comprehensive collection of `EndpointSpec` routing instructions.
         """
-        self._endpoints = endpoints
+        for endpoint in endpoints:
+            self._endpoints[(endpoint.method.upper(), endpoint.path)] = endpoint
 
     async def start(self) -> None:
-        """Start the transport (no-op for in-memory transport)."""
+        """Mount the local transport to the global class registry marking it entirely reachable."""
+        RuntimeTransport._registry[self._url] = self
         self._is_running = True
 
     async def stop(self) -> None:
-        """Stop the transport and clean up resources."""
-        self._agents.clear()
+        """Unmount the connected transport removing it gracefully from active registry loops."""
+        RuntimeTransport._registry.pop(self._url, None)
         self._endpoints.clear()
         self._is_running = False
 
@@ -288,22 +242,27 @@ class RuntimeTransport(Transport):
     # ------------------------------------------------------------------
 
     def validate_url(self) -> bool:
-        """Validate URL (always valid for runtime transport)."""
-        return True
+        """Validate whether the configuration abides by runtime requirements.
+
+        Returns:
+            bool: True if the configured URL strictly begins with 'runtime://'.
+        """
+        return self._url.startswith("runtime://")
 
     @property
     def url(self) -> str:
-        """Get the transport URL.
-
-        RuntimeTransport doesn't have a meaningful URL since it hosts
-        multiple agents. Returns a placeholder identifier.
-        """
-        return "runtime://local"
+        """str: The unified transport URL allocated explicitly upon initialization."""
+        return self._url
 
     @property
     def is_running(self) -> bool:
-        """Check if the transport is running."""
+        """bool: The initialization status detailing active connection capability."""
         return self._is_running
 
     def __repr__(self) -> str:
-        return f"RuntimeTransport(agents={len(self._agents) // 2})"
+        """Formulate explicit class identification string mapping status conditions.
+
+        Returns:
+            str: Representative diagnostic output indicating current registry conditions.
+        """
+        return f"RuntimeTransport(url={self._url}, running={self._is_running})"

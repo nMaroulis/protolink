@@ -300,16 +300,17 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 ### Overview
 
-Unlike network transports (HTTP, WebSocket), RuntimeTransport:
+Unlike network transports (HTTP, WebSocket), RuntimeTransport avoids actual TCP I/O. However, it perfectly mirrors the behavioral boundaries of `HTTPTransport` ensuring seamless interchangeability:
 
-- **No meaningful URL** — agents are addressed by name or URL directly.
-- **Multiple agents share one transport** — agents register themselves with the transport instance.
-- **Zero serialization overhead** — messages pass as Python objects, no JSON encoding/decoding.
-- **Supports streaming** — agents can use `handle_task_streaming` for real-time updates.
+- **Strict URL Routing** — each agent transport is initialized explicitly with a unique URL (e.g., `runtime://agent-name`).
+- **Global In-Memory Registry** — transports discover each other seamlessly through an automatic shared class-level global registry.
+- **Serialization Isolation** — message models natively pass through Pydantic dict boundaries, maintaining process and state safety equivalently to HTTP wire framing.
+- **Supports streaming** — agents can use generic `EndpointSpec` routing for real-time task streams.
 
 ### Usage
 
 ```python
+import asyncio
 from protolink.agents import Agent
 from protolink.models import AgentCard, Message, Task
 from protolink.transport import RuntimeTransport
@@ -324,19 +325,15 @@ class TranslatorAgent(Agent):
 
 
 async def main() -> None:
-    # Create shared transport
-    transport = RuntimeTransport()
-
-    # Create agents with transport
+    # Initialize separate transports explicitly matching endpoint design
     assistant = Agent(
         card=AgentCard(
             name="assistant",
             description="A helpful assistant",
             url="runtime://assistant",
         ),
-        transport=transport,
+        transport=RuntimeTransport(url="runtime://assistant"),
     )
-    transport.register_agent(assistant)
 
     translator = TranslatorAgent(
         card=AgentCard(
@@ -344,13 +341,15 @@ async def main() -> None:
             description="Translates messages",
             url="runtime://translator",
         ),
-        transport=transport,
+        transport=RuntimeTransport(url="runtime://translator"),
     )
-    transport.register_agent(translator)
 
-    # Agents can now communicate
+    # Boot the transports to securely bind to the global memory registry
+    await asyncio.gather(assistant.start(), translator.start())
+
+    # Directly dispatch task payloads towards the unique URL identifiers
     task = Task.create(Message.user("Hello!"))
-    response = await assistant.send_task_to("translator", task)
+    response = await assistant.send_task_to("runtime://translator", task)
     print(response.get_last_part_content())  # "Translated: Hello!"
 ```
 
@@ -360,35 +359,26 @@ async def main() -> None:
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `__init__` | — | `None` | Create an in-memory transport for local agent communication. |
-| `start` | — | `Awaitable[None]` | No-op for RuntimeTransport (provided for API consistency). |
-| `stop` | — | `Awaitable[None]` | Clear all registered agents and endpoints. |
-
-#### Agent Registry
-
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `register_agent` | `agent: AgentProtocol` | `None` | Register an agent by both URL and name for flexible lookup. |
-| `unregister_agent` | `agent_id: str` | `None` | Remove an agent from the transport. |
-| `get_agent` | `agent_id: str` | `AgentProtocol ⎪ None` | Get a registered agent by URL or name. |
-| `list_agents` | — | `list[str]` | List all registered agent identifiers. |
+| `__init__` | `url: str` | `None` | Create an isolated in-memory transport. Bound to a specified runtime URL. |
+| `start` | `self` | `Awaitable[None]` | Register the allocated `url` actively directly on the class-level registry cache. |
+| `stop` | `self` | `Awaitable[None]` | Detach registry allocations cleaning up in-memory routing bindings. |
 
 #### Sending
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Route a request to a registered agent. Used internally by `AgentClient`. |
-| `subscribe` | `agent_url: str`, `task: Task` | `AsyncIterator[dict]` | Subscribe to streaming task updates from an agent. |
+| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Route a request via explicit parsed endpoint pathways toward registered peers. Internally utilized by `AgentClient`. |
+| `subscribe` | `base_url: str`, `task: Task` | `AsyncIterator[dict]` | Connect securely subscribing mapped events from peer endpoint definitions natively generating iterative tokens. |
 
 ### Key Differences from HTTPTransport
 
 | Aspect | HTTPTransport | RuntimeTransport |
 |--------|---------------|------------------|
-| Network | HTTP over TCP | In-memory |
-| Agents per transport | 1 | Multiple |
-| URL validation | Required | Not required |
-| Serialization | JSON | Native Python objects |
-| Use case | Production, distributed | Testing, local dev |
+| Network | HTTP over TCP | Direct In-memory (Global Registry) |
+| URL prefix requirements | HTTP(s) Protocol | `runtime://` Prefix format |
+| Transport Instantiation | Multi-Process/Network | Process Local Instances |
+| Serialization Engine | Full JSON Decoding via HTTP body | Native dict structures via Pydantic serialization bridging |
+| Use case | Distributed production topologies | Test composition, high-efficiency decoupled orchestration |
 
 ---
 

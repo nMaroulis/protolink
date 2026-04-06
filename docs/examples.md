@@ -110,12 +110,12 @@ The repository includes several **standalone example scripts** that demonstrate 
 - Multi-agent orchestration with automatic peer communication
 
 ### ⚡ [`runtime_agents.py`](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_agents.py)
-**Purpose**: In-memory agent communication
+**Purpose**: In-memory agent communication interoperability
 
-- Uses `RuntimeTransport` for agent-to-agent communication without HTTP
-- Demonstrates direct agent registration and messaging
-- Shows how to build simple agent networks in a single process
-- Useful for testing and development scenarios
+- Uses explicitly mapped URL `RuntimeTransport` instances for agent-to-agent communication without HTTP configuration
+- Demonstrates safe registry discovery enabling native message parsing safely inside isolated testing contexts
+- Shows how to build reliable agent networks safely running within a single process retaining production semantics
+- Useful for test pipelines scaling native workflow isolation
 
 ### 📡 [`streaming_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/streaming_agent.py)
 **Purpose**: Real-time streaming with progress updates (v0.2.0+)
