@@ -34,7 +34,7 @@ HttpAuthScheme: TypeAlias = Literal[
 HttpMethod: TypeAlias = Literal["GET", "POST", "DELETE", "PUT", "PATCH"]
 
 LLMProvider: TypeAlias = Literal[
-    "anthropic", "deepseek", "gemini", "grok", "huggingface", "llama.cpp", "ollama", "openai"
+    "anthropic", "deepseek", "gemini", "grok", "huggingface", "llama.cpp-local", "llama.cpp-server", "ollama", "openai"
 ]
 
 LLMType: TypeAlias = Literal["api", "local", "server"]

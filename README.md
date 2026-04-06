@@ -287,9 +287,10 @@ The following are the Protolink wrappers for each type. If you want to use anoth
   - [GrokLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/grok_client.py): Uses **Grok API** for sync & async requests.
   - [DeepSeekLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/deepseek_client.py): Uses **DeepSeek API** for sync & async requests.
 - **Local**, runs the model in runtime:
-  - [LlamaCPPLLM]() - **TBD**: Uses **local runtime llama.cpp** for sync & async requests.
+  - [LlamaCPPLocalLLM](): Uses **local runtime llama-cpp-python** for sync & async requests.
 - **Server**, connects to an LLM Server, deployed locally or remotely:
   - [OllamaLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/ollama_client.py): Uses **Ollama** for sync & async requests.
+  - [LlamaCPPServerLLM](): Connects to **llama-server** for sync & async requests.
 
 #### Tools:
 

@@ -6,6 +6,8 @@ from protolink.llms.api.deepseek_client import DeepSeekLLM
 from protolink.llms.api.gemini_client import GeminiLLM
 from protolink.llms.api.openai_client import OpenAILLM
 from protolink.llms.base import LLM
+from protolink.llms.local.llamacpp_client import LlamaCPPLocalLLM
+from protolink.llms.server.llamacpp_client import LlamaCPPServerLLM
 from protolink.llms.server.ollama_client import OllamaLLM
 
 
@@ -13,6 +15,8 @@ class LLMProvider(str, Enum):
     ANTHROPIC = "anthropic"
     DEEPSEEK = "deepseek"
     GEMINI = "gemini"
+    LLAMACPP_LOCAL = "llama.cpp-local"
+    LLAMACPP_SERVER = "llama.cpp-server"
     OLLAMA = "ollama"
     OPENAI = "openai"
 
@@ -29,6 +33,8 @@ class LLMFactory:
         LLMProvider.ANTHROPIC: AnthropicLLM,
         LLMProvider.DEEPSEEK: DeepSeekLLM,
         LLMProvider.GEMINI: GeminiLLM,
+        LLMProvider.LLAMACPP_LOCAL: LlamaCPPLocalLLM,
+        LLMProvider.LLAMACPP_SERVER: LlamaCPPServerLLM,
         LLMProvider.OLLAMA: OllamaLLM,
         LLMProvider.OPENAI: OpenAILLM,
     }
@@ -40,7 +46,7 @@ class LLMFactory:
 
         Args:
             provider (str | LLMProvider): The name of the LLM provider
-                (e.g., "openai", "ollama", "anthropic").
+                (e.g., "openai", "ollama", "anthropic", "llama.cpp-server").
             **kwargs: Additional keyword arguments passed to the LLM constructor.
 
         Returns:

@@ -37,9 +37,10 @@ Protolink groups LLM backends into three broad categories:
 
 - **Server** — connects to an LLM server, locally or remotely:
     - `OllamaLLM`: connects to an **Ollama** server for sync & async requests.
+    - `LlamaCPPServerLLM`: connects to a **llama-server** for sync & async requests.
 
 - **Local** — runs the model directly in your runtime:
-    - `LlamaCPPLLM`: uses a local **llama.cpp** runtime for sync & async requests.
+    - `LlamaCPPLocalLLM`: uses a local **llama-cpp-python** runtime for sync & async requests.
 
 You can also use other LLM clients directly without going through Protolink's `LLM` wrappers if you prefer.
 
@@ -86,7 +87,7 @@ Configuration depends on the specific backend, but the general pattern is:
    agent = Agent(card=agent_card, transport="http", llm=llm)
    ```
 
-For local and server‑style LLMs (`LlamaCPPLLM`, `OllamaLLM`), configuration additionally includes paths to model files or server URLs. Refer to the corresponding example scripts for concrete usage patterns.
+For local and server‑style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`), configuration additionally includes paths to model files or server URLs. Refer to the corresponding example scripts for concrete usage patterns.
 
 ---
 
@@ -748,6 +749,52 @@ llm = OllamaLLM(model="mistral", base_url="http://localhost:11434")
 
 !!! note "Ollama Server Required"
     OllamaLLM requires a running Ollama server. Install Ollama and start it with `ollama serve`.
+
+### LlamaCPPServerLLM
+
+Llama.cpp server implementation for communicating directly with `llama-server`.
+
+#### Constructor
+
+| Parameter | Type | Default | Description |
+|-----------|-----|---------|-------------|
+| `base_url` | `str ⎪ None` | `None` | `llama-server` URL. Defaults to `http://localhost:8080`. |
+| `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers. |
+| `model` | `str ⎪ None` | `"llama3"` | The requested model representation. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, etc.). |
+
+```python
+from protolink.llms.server import LlamaCPPServerLLM
+
+llm = LlamaCPPServerLLM(
+    base_url="http://localhost:8080",
+    model="llama3"
+)
+```
+
+## Local LLMs
+
+Local LLMs run natively within the Python host machine rather than transmitting requests over the network.
+
+### LlamaCPPLocalLLM
+
+Local LLM integration using the `llama-cpp-python` distribution explicitly loading a local `.gguf` file path.
+
+#### Constructor
+
+| Parameter | Type | Default | Description |
+|-----------|-----|---------|-------------|
+| `model` | `str` | — | **Required.** Absolute Path to your downloaded `.gguf` model file. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters. |
+
+```python
+from protolink.llms.local import LlamaCPPLocalLLM
+
+llm = LlamaCPPLocalLLM(
+    model="/Users/dev/models/llama-3-8b-instruct.gguf",
+    model_params={"temperature": 0.5, "max_tokens": 1024}
+)
+```
 
 ### Usage Examples
 

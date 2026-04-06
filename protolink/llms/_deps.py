@@ -47,3 +47,15 @@ def require_openai():
             "OpenAI LLM backend requires the 'openai' library. Install it with: uv add openai or uv add protolink[llms]"
         ) from exc
     return openai, ChatCompletion, ChatCompletionChunk
+
+
+def require_llama_cpp():
+    """Lazy import for LLaMA.cpp."""
+    try:
+        import llama_cpp
+    except ImportError as exc:
+        raise ImportError(
+            "Local Llama.cpp backend requires the 'llama-cpp-python' library. "
+            "Install it with: uv add llama-cpp-python or uv add protolink[llms]"
+        ) from exc
+    return llama_cpp
