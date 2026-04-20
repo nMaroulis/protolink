@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.4.7"
+version = "0.4.8"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,25 +36,25 @@ Repository = "https://github.com/nMaroulis/protolink"
 
 [project.optional-dependencies]
 http = [
-    "fastapi>=0.128.0",
+    "fastapi>=0.136.0",
     "grpcio>=1.76.0",
     "httpx>=0.28.1",
     "pydantic>=2.12.4",
-    "starlette>=0.50.0",
-    "uvicorn>=0.40.0",
-    "websockets>=15.0",
+    "starlette>=1.0.0",
+    "uvicorn>=0.44.0",
+    "websockets>=16.0",
 ]
 
 llms = [
     "anthropic>=0.76.0",
     "huggingface-hub>=1.3.3",
     "google-genai>=1.60.0",
-    "llama-cpp-python>=0.3.16",
-    "openai>=2.16.0",
+    "llama-cpp-python>=0.3.20",
+    "openai>=2.32.0",
 ]
 
 mcp = [
-    "mcp>=1.26.0",
+    "mcp>=1.27.0",
 ]
 
 # Database Drivers

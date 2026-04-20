@@ -80,6 +80,7 @@ nav:
       - Basic Example: examples.md
       - LLM Usage: llm_examples.md
       - Ticket Booking Example: ticket_booking_example.md
+      - Code Assistant Example: code_assistant_example.md
   - Project:
       - Development & Contribution: development.md
       - Changelog: changelog.md

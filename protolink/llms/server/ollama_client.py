@@ -19,7 +19,7 @@ class OllamaLLM(ServerLLM):
     """Ollama Server implementation of the LLM interface. Uses the http client to make requests to the Ollama server."""
 
     provider: ClassVar[LLMProvider] = "ollama"
-    DEFAULT_MODEL: ClassVar[str] = "llama3:8b"  # lightweight model
+    DEFAULT_MODEL: ClassVar[str] = "gemma4:latest"  # lightweight model
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }
