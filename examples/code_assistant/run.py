@@ -45,7 +45,7 @@ from protolink.models import Task
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:9000")
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 WORKSPACE_DIR = os.path.join(os.path.dirname(__file__), "workspace")
 
 # LLM kwargs (API keys, base URLs, etc.)
@@ -57,7 +57,7 @@ if api_key:
 # Ollama-specific config
 if LLM_PROVIDER == "ollama":
     kwargs["base_url"] = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    kwargs["model"] = os.getenv("OLLAMA_MODEL", "gemma4:latest")
+    kwargs["model"] = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
 
 
 # ─────────────────────────────────────────────────────────────────────────

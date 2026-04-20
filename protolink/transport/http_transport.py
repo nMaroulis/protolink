@@ -40,7 +40,7 @@ class HTTPTransport(Transport):
     def __init__(
         self,
         url: str,
-        timeout: float = 30.0,
+        timeout: float = 60.0,
         authenticator: Authenticator | None = None,
         backend: BackendType = "starlette",
         *,
