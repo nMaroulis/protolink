@@ -26,6 +26,12 @@ In Protolink, a `Flow` expects a `Task` and returns a `Task`. A Task is essentia
 
 Protolink Flows are now **fully recursive**. This means a step in a `Pipeline` can be another entirely self-contained `Parallel` flow, or a `Graph` node can be a `Pipeline`.
 
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/flows.png" alt="Flows" width="100%">
+</div>
+
+
 This architectural shift allows you to build extremely complex, hierarchical decision trees using simple, reusable building blocks.
 
 !!! abstract "Polymorphic Step Targets"

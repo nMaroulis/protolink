@@ -508,7 +508,12 @@ This structured approach ensures predictable, deterministic agent behavior while
 
 ## Flows
 
-While frameworks like LangChain or LangGraph rely on complex implicit state machines or LLM-driven routing, Protolink's **Structured Flows** provide explicit, deterministic execution paths (`Pipeline`, `Parallel`, `Router`, `Graph`) without the heavy overhead. 
+While frameworks like LangChain or LangGraph rely on complex implicit state machines or LLM-driven routing, Protolink's **Structured Flows** provide explicit, deterministic execution paths (`Pipeline`, `Parallel`, `Router`, `Graph`) without the heavy overhead.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/flows.png" alt="Flows" width="100%">
+</div>
+
 
 You can define a structured workflow and encapsulate it entirely as an A2A Agent. This means your complex flow looks and behaves exactly like any other agent on the network!
 
