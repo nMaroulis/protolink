@@ -124,7 +124,7 @@ uv.lock
 # Test files (start with _)
 _*.ipynb
 _*.md
-_*.py
+_test.py
 
 # assets
 *.excalidraw

@@ -33,6 +33,10 @@ Follow the API documentation here 📚 [documentation](https://nmaroulis.github.
 
 The following article on 📝 [level-up coding on medium](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) also gives a hands-on guide and overview of Protolink.
 
+### NEW Feature: Flows
+
+Update 0.5.0 introduces **Structured Flows**, a new feature that allows you to define **structured workflows** for your agents. Building on A2A transport layer, flows allow you to define **complex workflows** for your agents that can be executed in a **structured & deterministic manner**. See more here 🔀 [flows](https://nmaroulis.github.io/protolink/flows/).
+
 ### The centralized agent architecture
 In Protolink the agent is the central component that handles all the logic and incorporates the **LLM**, **tools**, **transport layer** through **AgentClient** and **AgentServer**, the **Storage** and **OpenTelemetry** for logging.
 
@@ -502,7 +506,38 @@ result_task = await agent.execute_task(task)
 
 This structured approach ensures predictable, deterministic agent behavior while still supporting multi-step interactions and LLM/tool execution.
 
+## Flows
 
+While frameworks like LangChain or LangGraph rely on complex implicit state machines or LLM-driven routing, Protolink's **Structured Flows** provide explicit, deterministic execution paths (`Pipeline`, `Parallel`, `Router`, `Graph`) without the heavy overhead. 
+
+You can define a structured workflow and encapsulate it entirely as an A2A Agent. This means your complex flow looks and behaves exactly like any other agent on the network!
+
+```python
+from protolink.flows import Pipeline
+from protolink.agents import StructuredAgent
+
+# 1. Define a deterministic workflow of agents
+pipeline = Pipeline(steps=["researcher", "summarizer"])
+
+# 2. Package the entire flow as a deployable, autonomous Agent
+flow_agent = StructuredAgent(
+    card={"name": "flow_agent", "url": "http://127.0.0.1:8035"},
+    flow=pipeline,
+    transport="http"
+)
+
+await flow_agent.start()
+```
+
+Without a structured agent:
+
+```python
+from protolink.flows import Pipeline
+# Define the pipeline
+pipeline = Pipeline(steps=["researcher", "summarizer"])
+# Execute it manually in your script
+result = await pipeline.execute(task)
+```
 
 ## License
 

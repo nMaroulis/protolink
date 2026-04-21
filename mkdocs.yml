@@ -68,6 +68,7 @@ nav:
   - API Reference:
       - Agent: agent.md
       - Client: client.md
+      - Flows: flows.md
       - LLM: llm.md
       - Models: models.md
       - Registry: registry.md

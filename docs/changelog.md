@@ -9,7 +9,13 @@
 ---
 ## Release Notes
 
-### [v0.4.8] - 2026-04-21
+### [v0.5.0] - 2026-04-22
+
+#### 🚀 Added
+- **Flows**: Build deterministic execution paths out of the box (`Pipeline`, `Parallel`, `Router`, `Graph`).
+- **StructuredAgent**: Wrap any complex flow to run autonomously as a generic, network-ready A2A agent.
+
+### [v0.4.8] - 2026-04-19
 
 TBA
 
