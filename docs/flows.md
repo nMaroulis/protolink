@@ -22,6 +22,18 @@ In Protolink, a `Flow` expects a `Task` and returns a `Task`. A Task is essentia
 3. The Flow retrieves the updated `Task` and passes it to the next Agent in the sequence. 
 4. This continues until the flow finishes, returning a highly-enriched `Task` full of intermediate artifacts.
 
+### 🧱 Deep Composability & Nesting
+
+Protolink Flows are now **fully recursive**. This means a step in a `Pipeline` can be another entirely self-contained `Parallel` flow, or a `Graph` node can be a `Pipeline`.
+
+This architectural shift allows you to build extremely complex, hierarchical decision trees using simple, reusable building blocks.
+
+!!! abstract "Polymorphic Step Targets"
+    Every flow step or branch now supports three target types interchangeably:
+    *   **Local Agent Instance**: Executes directly within the same process.
+    *   **URL / Registry Name (string)**: Dispatches a remote A2A task across the network.
+    *   **Flow Instance**: Seamlessly propagates execution into a nested sub-flow.
+
 ---
 
 ## ⚙️ Execution Modes: Manual vs. Autonomous
@@ -52,31 +64,21 @@ All flows can optionally be instantiated with a `Registry` or `RegistryClient` s
 A pipeline runs a predefined list of agents in sequential order, passing the output of one agent as the input to the next.
 
 ```python
-import asyncio
-from protolink.discovery import Registry
-from protolink.flows import Pipeline
-from protolink.models import Task, Message
+pipeline = Pipeline(registry=registry)
+pipeline.add_step("researcher").add_step("summarizer")
 
-async def run_pipeline():
-    registry = Registry(url="http://localhost:9020", transport="http")
-    await registry.start()
-
-    # Define a Pipeline
-    pipeline = Pipeline(
-        steps=["researcher", "summarizer"],  # Passes task through researcher, then summarizer
-        registry=registry,
-    )
-
-    task = Task.create(Message.user("Research Protolink please."))
-
-    # Manual / Script execution
-    result = await pipeline.execute(task)
-    print(result.get_last_part_content())
+await pipeline.execute(task)
 ```
+
+!!! tip "Fluid API"
+    Pipelines support a fluid API via the `.add_step()` method, allowing you to chain steps together dynamically during initialization.
 
 ### 2. Parallel Execution
 
 If multiple agents can act independently on the same task without needing each other's output, you can execute them concurrently. Their resulting parts are appended to the task outcome simultaneously.
+
+!!! important "Safe Fan-in"
+    Parallel execution uses **ID-based merging**. This ensures that the unified task only includes strictly new messages and artifacts from each branch, preventing duplicates even in complex nested structures.
 
 ```python
 from protolink.flows import Parallel

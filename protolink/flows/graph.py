@@ -1,21 +1,24 @@
 from collections.abc import Callable
 
-from protolink.agents.base import Agent
 from protolink.client import AgentClient, RegistryClient
 from protolink.discovery import Registry
 from protolink.models import Task
+from protolink.types import FlowTarget
 
 from .base import Flow
-
-# Define acceptable step targets for ease of typing
-FlowNodeTarget = Agent | str | Flow
 
 
 class Graph(Flow):
     """A directed graph-based state machine flow.
 
-    Enables graph-like complexities including cyclical loops and deeply conditional branching topologies by registering
-    explicit nodes and edges.
+    Enables graph-like complexities including cyclical loops and deeply conditional
+    branching topologies by registering explicit nodes and edges.
+
+    Nodes can execute:
+    - **Local Agent Instances**: Direct execution of agent logic.
+    - **Remote Agent Identifiers**: Strings resolved via the registry layer.
+    - **Nested Flows**: Encapsulated standard flows (Pipelines, Parallel, Routers)
+      acting as a single node in the graph.
     """
 
     def __init__(
@@ -26,12 +29,12 @@ class Graph(Flow):
         """Initialize an empty Graph.
 
         Args:
-           client: Optional `AgentClient` for executing remote pathing.
-           registry: Optional registry configuration for mapping agent discovery.
+            client: Optional `AgentClient` for executing remote pathing.
+            registry: Optional registry configuration for mapping agent discovery.
         """
         super().__init__(client=client, registry=registry)
 
-        self.nodes: dict[str, FlowNodeTarget] = {}
+        self.nodes: dict[str, FlowTarget] = {}
 
         # Edges map a node name to exactly one destination node name.
         self.edges: dict[str, str] = {}
@@ -42,7 +45,7 @@ class Graph(Flow):
         self.entry_point: str | None = None
         self.finish_point: str = "__END__"
 
-    def add_node(self, node_name: str, target: FlowNodeTarget) -> "Graph":
+    def add_node(self, node_name: str, target: FlowTarget) -> "Graph":
         """Add a computational node to the graph.
 
         Args:
@@ -152,7 +155,8 @@ class Graph(Flow):
                 )
 
             self._logger.info(f"Graph orchestrating node: [{current_node_name}]")
-            current_task = await self._execute_node(current_node_name, current_task)
+            target = self.nodes[current_node_name]
+            current_task = await self._execute_target(target, current_task)
 
             # Determine the subsequent destination
             if current_node_name in self.edges:
@@ -178,26 +182,3 @@ class Graph(Flow):
         """Internal helper validating if node is historically mapped."""
         if node_name not in self.nodes:
             raise ValueError(f"Node '{node_name}' does not structurally exist in the graph.")
-
-    async def _execute_node(self, node_name: str, task: Task) -> Task:
-        """Execution dispatcher for an isolated node interaction."""
-        target = self.nodes[node_name]
-
-        if isinstance(target, Flow):
-            if target.client is None:
-                target.client = self.client
-            if target.registry_client is None:
-                target.registry_client = self.registry_client
-            return await target.execute(task)
-
-        elif isinstance(target, Agent):
-            return await target.handle_task(task)
-
-        elif isinstance(target, str):
-            self._ensure_client()
-            url = await self._resolve_agent_url(target)
-            assert self.client is not None
-            return await self.client.send_task(url, task)
-
-        else:
-            raise RuntimeError(f"Unknown node resolution type '{type(target)}' for Node '{node_name}'.")

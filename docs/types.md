@@ -17,6 +17,7 @@ This section provides detailed documentation for the type aliases used throughou
 - [MessageRoleType](#messageroletype)
 - [SecuritySchemeType](#securityschemetype)
 - [TransportType](#transporttype)
+- [FlowTarget](#flowtarget)
 
 ---
 
@@ -517,6 +518,41 @@ Type alias for supported transport protocols.
 | **json-rpc** | JSON-RPC over HTTP/WS |
 | **grpc** | gRPC transport |
 | **runtime** | In-memory transport for local agent composition |
+
+---
+
+## FlowTarget
+
+```python
+FlowTarget: TypeAlias = Union["Agent", str, "Flow"]
+```
+
+A polymorphic type alias used in the **Structured Flows** architecture. It represents any valid target that can act as a step or node in a workflow.
+
+### Supported Targets
+
+| Target Type | Description |
+|-------------|-------------|
+| **Agent** | A local `Agent` instance. Execution happens via `agent.handle_task()`. |
+| **str** | An agent name or URL. It is resolved via the `Registry` and executed remotely via A2A. |
+| **Flow** | Another `Flow` instance (e.g., `Pipeline`, `Parallel`). Enables **recursive nesting** of workflows. |
+
+### Usage Example
+
+```python
+from protolink.flows import Pipeline, Parallel
+from protolink.agents import Agent
+
+class Researcher(Agent): ...
+
+researcher = Researcher(...)
+
+# Building a flow with mixed target types
+complex_flow = Pipeline()
+complex_flow.add_step(researcher)          # Target: Agent
+complex_flow.add_step("quality_agent")     # Target: str
+complex_flow.add_step(Parallel(branches=[...])) # Target: Flow
+```
 
 ---
 

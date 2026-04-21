@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from protolink.client import AgentClient, RegistryClient
 from protolink.discovery import Registry
 from protolink.models import Task
+from protolink.types import FlowTarget
 from protolink.utils.logging import get_logger
 
 
@@ -12,6 +13,13 @@ class Flow(ABC):
     Flows provide deterministic orchestration of Tasks between agents.
     Unlike standard Agents that may rely on LLMs for dynamic routing,
     flows mandate strict execution paths (Sequential, Parallel, Graph, etc.).
+
+    Key features:
+    - **Composability**: Flows can be nested within each other (e.g., a Parallel block inside a Pipeline).
+    - **Centralized Dispatch**: Execution logic is handled by `_execute_target`, supporting
+      local Agents, remote agent URLs/names, and nested Flow instances.
+    - **Resource Propagation**: Parent flows automatically propagate their `AgentClient` and
+      `RegistryClient` to nested flows if they are unconfigured.
 
     All flows accept an `AgentClient` for execution and optionally a
     `Registry` for discovering agents by name.
@@ -108,3 +116,42 @@ class Flow(ABC):
                     "Flow requires an AgentClient to call remote agents. "
                     "Please provide an AgentClient during initialization."
                 )
+
+    async def _execute_target(self, target: FlowTarget, task: Task) -> Task:
+        """Centralized dispatcher for executing a flow step target.
+
+        This method handles the polymorphic nature of flow steps by delegating
+        execution based on the target type:
+        - **Flow**: Recursively executes the nested flow, propagating client and registry.
+        - **Agent**: Executes a local agent instance by calling its `handle_task` method.
+        - **str**: Resolves the agent URL (via Registry if needed) and sends the task remotely.
+
+        Args:
+            target: The execution unit (Agent instance, URL string, or nested Flow).
+            task: The current Task state to process.
+
+        Returns:
+            The Task state after execution.
+
+        Raises:
+            ValueError: If the target type is not supported.
+            RuntimeError: If remote execution is requested but no client/registry is available.
+        """
+        from protolink.agents.base import Agent
+
+        if isinstance(target, Flow):
+            # Propagate client/registry if missing in the nested flow
+            if target.client is None:
+                target.client = self.client
+            if target.registry_client is None:
+                target.registry_client = self.registry_client
+            return await target.execute(task)
+        elif isinstance(target, Agent):
+            return await target.handle_task(task)
+        elif isinstance(target, str):
+            self._ensure_client()
+            url = await self._resolve_agent_url(target)
+            assert self.client is not None
+            return await self.client.send_task(url, task)
+        else:
+            raise ValueError(f"Invalid execution target type: {type(target)}")

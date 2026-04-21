@@ -5,7 +5,11 @@ This module contains shared type aliases used throughout the Protolink framework
 Centralizing types improves reusability, discoverability, and maintainability.
 """
 
-from typing import Literal, TypeAlias
+from typing import TYPE_CHECKING, Literal, TypeAlias
+
+if TYPE_CHECKING:
+    from protolink.agents.base import Agent
+    from protolink.flows.base import Flow
 
 AgentRoleType: TypeAlias = Literal["gateway", "interface", "observer", "orchestrator", "worker"]
 
@@ -112,3 +116,5 @@ SecuritySchemeType: TypeAlias = Literal[
 ]
 
 TransportType: TypeAlias = Literal["http", "websocket", "sse", "json-rpc", "grpc", "runtime"]
+
+FlowTarget: TypeAlias = "Agent | str | Flow"

@@ -7,7 +7,7 @@ from protolink.flows import Flow, Pipeline
 from protolink.models import AgentCard, Task
 from protolink.storage import Storage
 from protolink.transport import Transport
-from protolink.types import TransportType
+from protolink.types import FlowTarget, TransportType
 
 
 class StructuredAgent(Agent):
@@ -21,7 +21,7 @@ class StructuredAgent(Agent):
     def __init__(
         self,
         card: dict[str, Any] | AgentCard,
-        flow: Flow | list[str],
+        flow: Flow | list[FlowTarget],
         transport: TransportType | Transport | None = None,
         registry: TransportType | Registry | RegistryClient | None = None,
         registry_url: str | None = None,
@@ -33,7 +33,7 @@ class StructuredAgent(Agent):
         Args:
             card: AgentCard or dict describing this agent's identity.
             flow: The underlying `Flow` to execute (e.g., `Pipeline`, `Graph`).
-                For backwards compatibility and convenience, passing a `list[str]` automatically mounts
+                For backwards compatibility and convenience, passing a `list` automatically mounts
                 a `Pipeline`.
             transport: Transport layer definition.
             registry: Registry definition.
@@ -55,7 +55,7 @@ class StructuredAgent(Agent):
             self._logger.warning(
                 "Initializing StructuredAgent with a list of steps is legacy behavior. Creating Pipeline automagically."
             )
-            self.flow: Flow = Pipeline(steps=cast(list[Agent | str], flow))
+            self.flow: Flow = Pipeline(steps=cast(list[FlowTarget], flow))
         else:
             self.flow = flow
 

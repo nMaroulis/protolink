@@ -529,13 +529,12 @@ flow_agent = StructuredAgent(
 await flow_agent.start()
 ```
 
-Without a structured agent:
+Without a structured agent and with **Fluent API**:
 
 ```python
 from protolink.flows import Pipeline
-# Define the pipeline
-pipeline = Pipeline(steps=["researcher", "summarizer"])
-# Execute it manually in your script
+# Define and execute manually
+pipeline = Pipeline().add_step("researcher").add_step("summarizer")
 result = await pipeline.execute(task)
 ```
 

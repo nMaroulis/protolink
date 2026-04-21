@@ -1,9 +1,9 @@
 from collections.abc import Callable
 
-from protolink.agents.base import Agent
 from protolink.client import AgentClient, RegistryClient
 from protolink.discovery import Registry
 from protolink.models import Task
+from protolink.types import FlowTarget
 
 from .base import Flow
 
@@ -13,11 +13,16 @@ class Router(Flow):
 
     Calculates dynamic routing explicitly instead of relying on unpredictable LLM inference.
     Similar to LangChain's RunnableBranch or conditional routing mechanisms.
+
+    Routing destinations can be:
+    - **Agent instances**: Local execution.
+    - **URL strings**: Remote A2A execution.
+    - **Nested Flows**: Sub-orchestration logic.
     """
 
     def __init__(
         self,
-        routes: dict[str, Agent | str | Flow],
+        routes: dict[str, FlowTarget],
         condition_fn: Callable[[Task], str],
         client: AgentClient | None = None,
         registry: Registry | RegistryClient | None = None,
@@ -60,26 +65,4 @@ class Router(Flow):
             )
 
         route_destination = self.routes[next_route_key]
-
-        if isinstance(route_destination, Flow):
-            self._logger.info("Router delegating to nested flow.")
-            # Inherit client & registry organically
-            if route_destination.client is None:
-                route_destination.client = self.client
-            if route_destination.registry_client is None:
-                route_destination.registry_client = self.registry_client
-            return await route_destination.execute(task)
-
-        elif isinstance(route_destination, Agent):
-            self._logger.info(f"Router delegating to local agent: {route_destination.card.name}")
-            return await route_destination.handle_task(task)
-
-        elif isinstance(route_destination, str):
-            self._ensure_client()
-            url = await self._resolve_agent_url(route_destination)
-            self._logger.info(f"Router delegating to remote agent: {url}")
-            assert self.client is not None
-            return await self.client.send_task(url, task)
-
-        else:
-            raise ValueError(f"Invalid route destination type: {type(route_destination)}")
+        return await self._execute_target(route_destination, task)
