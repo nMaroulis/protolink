@@ -46,9 +46,9 @@ class WebSocketTransport(Transport):
         timeout: float = 60.0,
         authenticator: Authenticator | None = None,
     ) -> None:
-        self._url = url
-        self.timeout = timeout
-        self.authenticator = authenticator
+        self._url: str = url
+        self._timeout: float = timeout
+        self.authenticator: Authenticator | None = authenticator
         self.security_context: Any | None = None
 
         self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
@@ -135,7 +135,7 @@ class WebSocketTransport(Transport):
             conn = await self._ensure_client_connection(base_url)
             try:
                 await conn.send(json.dumps(payload))
-                raw = await asyncio.wait_for(conn.recv(), timeout=self.timeout)
+                raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
             except ConnectionClosed as e:
                 self._client_conns.pop(base_url, None)
                 raise ConnectionError(f"WebSocket connection closed while talking to {base_url}") from e
@@ -181,7 +181,7 @@ class WebSocketTransport(Transport):
             try:
                 await conn.send(json.dumps(payload))
                 while True:
-                    raw = await asyncio.wait_for(conn.recv(), timeout=self.timeout)
+                    raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
                     if isinstance(raw, (bytes, bytearray)):
                         raw = raw.decode("utf-8", errors="replace")
 
@@ -368,3 +368,13 @@ class WebSocketTransport(Transport):
     def url(self) -> str:
         """Base URL for this transport (server bind address)."""
         return self._url
+
+    @property
+    def timeout(self) -> float:
+        """Get the timeout for WebSocket operations."""
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value: float) -> None:
+        """Set the timeout for WebSocket operations."""
+        self._timeout = value

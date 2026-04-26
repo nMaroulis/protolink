@@ -57,6 +57,10 @@ User Request: "Add docstrings to all functions in utils.py"
               └─────────────────┘
 ```
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/code_example_agents.png" alt="Code Assistant Agent Architecture" width="100%">
+</div>
+
 ### The Agents
 
 | Agent | Type | Protolink Feature | Purpose |
@@ -241,6 +245,12 @@ examples/code_assistant/
 ---
 
 ## 🧠 How It Works — Step by Step
+
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/code_example_steps.png" alt="Code Assistant Agent Steps" width="100%">
+</div>
+
 
 ### 1. Agent Registration & Discovery
 

@@ -46,8 +46,8 @@ class HTTPTransport(Transport):
         *,
         validate_schema: bool = False,
     ) -> None:
-        self._url = url
-        self.timeout: float = timeout
+        self._url: str = url
+        self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
         self.security_context: object | None = None
         # Handlers that are called for different Server Requests
@@ -100,7 +100,7 @@ class HTTPTransport(Transport):
                 kwargs["params"] = {"data": str(data)}
 
         try:
-            response = await client.request(request_spec.method, url, **kwargs)
+            response = await client.request(request_spec.method, url, timeout=self._timeout, **kwargs)
             response.raise_for_status()
 
             # Parse response
@@ -124,7 +124,7 @@ class HTTPTransport(Transport):
         """Return an initialized :class:`httpx.AsyncClient` instance."""
 
         if not self._client:
-            self._client = httpx.AsyncClient(timeout=self.timeout)
+            self._client = httpx.AsyncClient(timeout=self._timeout)
         return self._client
 
     # ------------------------------------------------------------------
@@ -146,7 +146,7 @@ class HTTPTransport(Transport):
         await self.backend.start(self._url)
 
         # Initialize HTTP client
-        self._client = httpx.AsyncClient(timeout=self.timeout)
+        self._client = httpx.AsyncClient(timeout=self._timeout)
 
     async def stop(self) -> None:
         """Stop the HTTP server and close the underlying HTTP client."""
@@ -198,3 +198,13 @@ class HTTPTransport(Transport):
     def url(self) -> str:
         """Get the URL of the transport."""
         return self._url
+
+    @property
+    def timeout(self) -> float:
+        """Get the timeout for the HTTP client."""
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value: float) -> None:
+        """Set the timeout for the HTTP client."""
+        self._timeout = value

@@ -273,9 +273,16 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 60.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False` | `None` | Configure URL, request timeout, optional authentication provider, backend implementation, and whether to enable FastAPI/Pydantic schema validation. |
+| `__init__` | `url: str`, `timeout: float = 60.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False` | `None` | Configure URL, default request timeout, optional authentication provider, backend implementation, and whether to enable FastAPI/Pydantic schema validation. |
 | `start` | `self` | `Awaitable[None]` | Start the selected backend, register the `/tasks/` route and create the internal `httpx.AsyncClient`. Must be awaited before serving HTTP traffic. |
 | `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
+
+#### Properties
+
+| Name | Type | Access | Description |
+| ---- | ---- | ------ | ----------- |
+| `url` | `str` | Read-only | The base URL configured for this transport. |
+| `timeout` | `float` | Read/Write | The request timeout (in seconds) for outgoing requests. This can be changed at runtime to easily adjust timeouts for subsequent requests without restarting the transport. |
 
 #### Sending & receiving
 
@@ -363,6 +370,13 @@ async def main() -> None:
 | `start` | `self` | `Awaitable[None]` | Register the allocated `url` actively directly on the class-level registry cache. |
 | `stop` | `self` | `Awaitable[None]` | Detach registry allocations cleaning up in-memory routing bindings. |
 
+#### Properties
+
+| Name | Type | Access | Description |
+| ---- | ---- | ------ | ----------- |
+| `url` | `str` | Read-only | The unique runtime URL allocated to this transport. |
+| `is_running` | `bool` | Read-only | Whether the transport is currently registered in the global in-memory registry. |
+
 #### Sending
 
 | Method | Parameters | Returns | Description |
@@ -398,4 +412,11 @@ Use it when:
 | `__init__` | `...` | `None` | Configure host/port and WebSocket settings for streaming connections. |
 | `send_task_stream` | `...` | `AsyncIterator[Task] ⎪ AsyncIterator[Message]` | Send a `Task` and receive a stream of partial results or updates over a single WebSocket connection. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
+
+#### Properties
+
+| Name | Type | Access | Description |
+| ---- | ---- | ------ | ----------- |
+| `url` | `str` | Read-only | The base URL configured for this transport. |
+| `timeout` | `float` | Read/Write | The timeout (in seconds) for WebSocket receive operations. This can be changed at runtime to adjust response wait times for subsequent requests. |
 
