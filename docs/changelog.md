@@ -9,6 +9,18 @@
 ---
 ## Release Notes
 
+### [v0.5.1] - 2026-04-28
+
+#### 🚀 Added
+- **Telemetry**: Add LangSmith and Langfuse telemetry implementations
+- **BaseTelemetry**: Add base telemetry class
+- **AsyncTelemetry**: Add async telemetry class
+- **TelemetryManager**: Add telemetry manager class
+- **Registry**: Add telemetry manager to registry
+- **Task**: Add telemetry manager to task
+- **Agent**: Add telemetry manager to agent
+- **Tool**: Add telemetry manager to tool
+
 ### [v0.5.0] - 2026-04-22
 
 #### 🚀 Added

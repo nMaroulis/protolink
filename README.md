@@ -33,7 +33,7 @@ Follow the API documentation here 📚 [documentation](https://nmaroulis.github.
 
 The following article on 📝 [level-up coding on medium](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) also gives a hands-on guide and overview of Protolink.
 
-### NEW Feature: Flows
+### NEW Feature: Flows 📣
 
 Update 0.5.0 introduces **Structured Flows**, a new feature that allows you to define **structured workflows** for your agents. Building on A2A transport layer, flows allow you to define **complex workflows** for your agents that can be executed in a **structured & deterministic manner**. See more here 🔀 [flows](https://nmaroulis.github.io/protolink/flows/).
 
@@ -542,6 +542,29 @@ from protolink.flows import Pipeline
 pipeline = Pipeline().add_step("researcher").add_step("summarizer")
 result = await pipeline.execute(task)
 ```
+
+## Telemetry
+
+Protolink provides non-invasive, out-of-the-box observability for agent task execution, LLM inferences, and tool calls. It utilizes Python's `contextvars` to automatically track execution states asynchronously without cluttering core method signatures.
+
+Currently supported telemetry integrations:
+- **[Langfuse](https://langfuse.com/)**
+- **[LangSmith](https://www.langchain.com/langsmith)**
+
+To use telemetry, simply install the optional dependency (`uv add "protolink[telemetry]"`) and inject the tracker to your agent:
+
+```python
+from protolink.telemetry import LangfuseTelemetry
+from protolink.agents import Agent
+
+# Traces, spans and generations will be automatically recorded!
+agent = Agent(
+    card={"name": "ObserverAgent", "url": "http://127.0.0.1:8000"},
+    telemetry=LangfuseTelemetry()
+)
+```
+
+See the [Telemetry Documentation](https://nmaroulis.github.io/protolink/telemetry/) for full setup instructions and custom integrations.
 
 ## License
 

@@ -17,6 +17,7 @@ from protolink.llms.base import LLM
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.server import AgentServer
 from protolink.storage import Storage
+from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
@@ -40,6 +41,7 @@ class Agent:
         llm: LLM | None = None,
         system_prompt: str | None = None,
         storage: Storage | None = None,
+        telemetry: Telemetry | None = None,
         skills: Literal["auto", "fixed"] = "auto",
         *,
         override_system_prompt: bool = False,
@@ -62,6 +64,7 @@ class Agent:
                 predefined, so the LLM already has the knowledge on how to interact with its environment.
                 If you wish to override the system prompt completely, set override_system_prompt to True.
             storage: Optional Storage instance for agent data persistence.
+            telemetry: Optional Telemetry instance for agent observability and tracing.
             skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
             verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose.
@@ -72,6 +75,8 @@ class Agent:
         self.context_manager = ContextManager()
         self.llm = llm
         self.storage = storage
+        self._telemetry: Telemetry | None = None
+        self.telemetry = telemetry
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
 
@@ -233,7 +238,18 @@ class Agent:
             The updated Task after applying all explicitly requested executions.
         """
         self._logger.debug(f"Received task: {task}")
-        return await self.execute_task(task)
+        if self.telemetry:
+            await self.telemetry.on_task_start(task, self.card.name)
+
+        try:
+            result = await self.execute_task(task)
+            if self.telemetry:
+                await self.telemetry.on_task_end(task, result, self.card.name)
+            return result
+        except Exception:
+            if self.telemetry:
+                await self.telemetry.on_task_end(task, task, self.card.name)
+            raise
 
     async def handle_task_streaming(self, task: Task) -> AsyncIterator:
         """Process a task with streaming updates (NEW in v0.2.0).
@@ -530,10 +546,17 @@ class Agent:
                 error={"message": f"Tool '{tool_name}' not found"},
             )
 
+        if self.telemetry:
+            await self.telemetry.on_tool_start(tool_name, args)
+
         try:
             result = await tool(**args)
+            if self.telemetry:
+                await self.telemetry.on_tool_end(tool_name, result)
             return Part.tool_output(call_id=call_id, result=result)
         except Exception as e:
+            if self.telemetry:
+                await self.telemetry.on_tool_end(tool_name, None, error=str(e))
             return Part.tool_output(
                 call_id=call_id,
                 error={"message": str(e)},
@@ -589,11 +612,29 @@ class Agent:
             override_system_prompt=self.override_system_prompt,
         )
 
+        if self.telemetry:
+            prompt = (
+                infer_part.content.get("prompt", "")
+                if isinstance(infer_part.content, dict)
+                else getattr(infer_part.content, "prompt", "")
+            )
+            model_name = getattr(self.llm, "model_name", None) or getattr(self.llm, "model", None)
+            await self.telemetry.on_llm_start(prompt, model_name)
+
+        query = (
+            infer_part.content.get("prompt", "")
+            if isinstance(infer_part.content, dict)
+            else getattr(infer_part.content, "prompt", "")
+        )
         response: Part = await self.llm.infer(
-            query=infer_part.content.get("prompt", ""),
+            query=query,
             tools=self.tools,
             agent_callback=self._handle_agent_call,
         )
+
+        if self.telemetry:
+            await self.telemetry.on_llm_end(response)
+
         return response
 
     async def _handle_agent_call(
@@ -852,6 +893,19 @@ class Agent:
             storage: Storage instance for persistence
         """
         self.storage = storage
+
+    @property
+    def telemetry(self) -> Telemetry | None:
+        return self._telemetry
+
+    @telemetry.setter
+    def telemetry(self, telemetry: Telemetry | None) -> None:
+        """Sets the Agent's telemetry instance.
+
+        Args:
+            telemetry: Telemetry instance for observability
+        """
+        self._telemetry = telemetry
 
     # ----------------------------------------------------------------------
     # Private Methods

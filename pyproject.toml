@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.5.0"
+version = "0.5.1"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -57,6 +57,11 @@ mcp = [
     "mcp>=1.27.0",
 ]
 
+telemetry = [
+    "langfuse",
+    "langsmith",
+]
+
 # Database Drivers
 db = [
 ]
@@ -65,7 +70,9 @@ db = [
 all = [
     "protolink[http]",
     "protolink[llms]",
+    "protolink[mcp]",
     "protolink[db]",
+    "protolink[telemetry]",
 ]
 
 # Only for testing

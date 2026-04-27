@@ -74,6 +74,7 @@ nav:
       - Registry: registry.md
       - Server: server.md
       - Storage: storage.md
+      - Telemetry: telemetry.md
       - Tool: tool.md
       - Transport: transport.md
       - Types: types.md
