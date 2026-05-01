@@ -70,6 +70,7 @@ nav:
       - Client: client.md
       - Flows: flows.md
       - LLM: llm.md
+      - Logging: logging.md
       - Models: models.md
       - Registry: registry.md
       - Server: server.md

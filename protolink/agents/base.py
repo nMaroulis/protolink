@@ -14,6 +14,7 @@ from protolink.client import AgentClient, RegistryClient
 from protolink.core.context_manager import ContextManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
+from protolink.logging import BaseLogger, ConsoleLogger
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.server import AgentServer
 from protolink.storage import Storage
@@ -21,7 +22,6 @@ from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
-from protolink.utils.logging import get_logger
 from protolink.utils.renderers import to_status_html
 
 
@@ -43,6 +43,7 @@ class Agent:
         storage: Storage | None = None,
         telemetry: Telemetry | None = None,
         skills: Literal["auto", "fixed"] = "auto",
+        logger: BaseLogger | None = None,
         *,
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
@@ -66,6 +67,7 @@ class Agent:
             storage: Optional Storage instance for agent data persistence.
             telemetry: Optional Telemetry instance for agent observability and tracing.
             skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills.
+            logger: Custom logger instance. If not provided, a ConsoleLogger will be used.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
             verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose.
         """
@@ -84,8 +86,12 @@ class Agent:
         self._system_prompt: str | None = system_prompt
         self.override_system_prompt: bool = override_system_prompt
 
-        # Logger
-        self._logger = get_logger(f"protolink.agents.{self.card.name}", verbose=verbosity)
+        # Logger - Maps verbosity to WARNING, INFO, DEBUG for default console logger.
+        self._logger = (
+            ConsoleLogger(name=f"protolink.agents.{self.card.name}", level={0: 30, 1: 20, 2: 10}.get(verbosity, 20))
+            if logger is None
+            else logger
+        )
 
         # Initialize client and server components
         if transport is None:

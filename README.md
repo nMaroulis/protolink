@@ -102,6 +102,7 @@ The agent is now fully initialized and prepared to **discover & being discovered
   - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
   - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
   - **Enhanced Security**: **OAuth 2.0** and **API key support**.
+  - **Comprehensive Logging**: Built-in support for **console** (colored) and **file-based** logging (including structured **JSON** output).
   - Built-in support for streaming and async operations.
 - **Planned Integrations**:
   - **Advanced Orchestration Patterns**
@@ -565,6 +566,14 @@ agent = Agent(
 ```
 
 See the [Telemetry Documentation](https://nmaroulis.github.io/protolink/telemetry/) for full setup instructions and custom integrations.
+
+#### Logging:
+
+Protolink provides a flexible logging system to track agent activity across different outputs.
+
+- [ConsoleLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/console.py): Provides colored, human-readable logs in the terminal.
+- [FileLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/file.py): Persists logs to disk, with optional **JSON** formatting for easy ingestion into log management tools.
+- [BaseLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/base.py): Abstract base class for creating custom logging implementations.
 
 ## License
 

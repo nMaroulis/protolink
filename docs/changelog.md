@@ -9,6 +9,11 @@
 ---
 ## Release Notes
 
+### [v0.5.2] - 2026-05-02
+
+#### 🚀 Added
+- **Logging**: Added explicit `file` logger (json) and `console` logger (color).
+
 ### [v0.5.1] - 2026-04-28
 
 #### 🚀 Added
