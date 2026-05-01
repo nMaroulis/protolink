@@ -524,7 +524,7 @@ Type alias for supported transport protocols.
 ## FlowTarget
 
 ```python
-FlowTarget: TypeAlias = Union["Agent", str, "Flow"]
+FlowTarget: TypeAlias = "Agent" | str | "Flow"
 ```
 
 A polymorphic type alias used in the **Structured Flows** architecture. It represents any valid target that can act as a step or node in a workflow.

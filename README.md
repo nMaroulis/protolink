@@ -551,16 +551,16 @@ Currently supported telemetry integrations:
 - **[Langfuse](https://langfuse.com/)**
 - **[LangSmith](https://www.langchain.com/langsmith)**
 
-To use telemetry, simply install the optional dependency (`uv add "protolink[telemetry]"`) and inject the tracker to your agent:
+To use telemetry, simply install the optional dependency (`uv add "protolink[telemetry]"`) and inject the tracker to your agent. You can also broadcast events to multiple trackers using `MultiTelemetry`:
 
 ```python
-from protolink.telemetry import LangfuseTelemetry
+from protolink.telemetry import LangfuseTelemetry, LangSmithTelemetry, MultiTelemetry
 from protolink.agents import Agent
 
-# Traces, spans and generations will be automatically recorded!
+# Traces, spans and generations will be automatically recorded to both Langfuse and LangSmith!
 agent = Agent(
     card={"name": "ObserverAgent", "url": "http://127.0.0.1:8000"},
-    telemetry=LangfuseTelemetry()
+    telemetry=MultiTelemetry([LangfuseTelemetry(), LangSmithTelemetry()])
 )
 ```
 

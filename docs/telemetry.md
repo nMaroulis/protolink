@@ -69,6 +69,26 @@ agent = Agent(
 )
 ```
 
+## Multiplexing Telemetry
+
+If you want to broadcast telemetry events to multiple trackers simultaneously, you can use the `MultiTelemetry` class:
+
+```python
+from protolink.telemetry import LangfuseTelemetry, LangSmithTelemetry, MultiTelemetry
+from protolink.agents.base import Agent
+
+# Initialize tracking
+langfuse_tracker = LangfuseTelemetry()
+langsmith_tracker = LangSmithTelemetry()
+multi_tracker = MultiTelemetry([langfuse_tracker, langsmith_tracker])
+
+# Inject into an agent
+agent = Agent(
+    card={"name": "ObserverAgent", "capabilities": {}},
+    telemetry=multi_tracker
+)
+```
+
 ## Setting Telemetry Dynamically
 
 You can also change or assign a telemetry tracker after agent initialization using the `.telemetry` property:
