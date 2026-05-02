@@ -5,59 +5,55 @@ Shows how to create a simple agent that echoes user input.
 """
 
 from protolink.agents import Agent
-from protolink.models import AgentCard, Task
+
+# To Enable LLM Inference import e.g. -> from protolink.llms.api import OpenAILLM
+# e.g. a local ollama LLM below uncomment code below and comment llm = None
+
+# from protolink.llms.server import OllamaLLM
+# llm = OllamaLLM(base_url="http://localhost:11434", model="gemma4:e4b")  # 8b model for light inference
+
+llm = None
+
+agent_card = {
+    "name": "echo-agent",
+    "description": "An agent that echoes back your messages",
+    "url": "local://echo-agent",
+}
+
+# Create the agent
+agent = Agent(agent_card, transport="runtime", llm=llm, verbosity=2)
 
 
-class EchoAgent(Agent):
-    """A simple agent that echoes back user messages."""
-
-    def __init__(self):
-        # Directly as a dict.
-        # card = {
-        #     "name":"echo-agent",
-        #     "description":"An agent that echoes back your messages",
-        #     "url":"local://echo-agent",
-        # }
-        # OR
-        card = AgentCard(
-            name="echo-agent",
-            description="An agent that echoes back your messages",
-            url="local://echo-agent",
-        )
-        super().__init__(card)
-
-    def handle_task(self, task: Task) -> Task:
-        """Process the task by echoing back the user's message."""
-        # Get the user's message
-        if task.messages:
-            user_message = task.messages[0]
-            if user_message.parts:
-                user_text = user_message.parts[0].content
-
-                # Create a response
-                response = f"Echo: {user_text}"
-                return task.complete(response)
-
-        return task.fail("No message to echo")
+# Add Native tool using the decorator, Input/Output signatures are automatically inferred by Protolink
+@agent.tool(name="echo_tool", description="Echoes back your messages")
+async def echo_tool(message: str):
+    return {"response": f"Echo: {message}"}
 
 
-def main():
-    # Create the agent
-    agent = EchoAgent()
+print("\n------------- AGENT INFORMATION -------------")
+print(f"Agent: {agent.card.name}")
+print(f"Description: {agent.card.description}")
+print(f"URL: {agent.card.url}")
+print("-----------------------------------------------")
 
-    print(f"Agent: {agent.card.name}")
-    print(f"Description: {agent.card.description}")
-    print()
 
+def tool_call_example():
     # Test the agent with direct processing
-    test_messages = ["Hello, agent!", "How are you?", "This is a test message"]
+    # The invoke(_sync) is a convenience method that is used to directly invoke the agent to handle a task..
+    response = agent.invoke_sync("hello", part_type="tool_call", tool_name="echo_tool", tool_args={"message": "world"})
+    print("---------------- RESPONSE -----------------------")
+    print(response)
 
-    for msg in test_messages:
-        print(f"User: {msg}")
-        response = agent.process(msg)
-        print(f"Agent: {response}")
-        print()
+
+def llm_inference_example(message: str = "Hey, how are you doing today?"):
+    response = agent.invoke_sync(message=message, part_type="infer")
+    print("---------------- RESPONSE -----------------------")
+    print(response)
 
 
 if __name__ == "__main__":
-    main()
+    tool_call_example()
+
+    # LLM Inference Example (Configure an LLM using the built-in LLM classes)
+
+    # llm_inference_example(message="Hey, how are you doing today?")

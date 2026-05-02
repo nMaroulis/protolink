@@ -81,10 +81,11 @@ The repository includes several **standalone example scripts** that demonstrate 
 ### 📝 [`basic_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/basic_agent.py)
 **Purpose**: Minimal agent setup focused on core concepts
 
-- Creates a simple echo agent that responds to user messages
-- Demonstrates agent creation with `AgentCard` and basic task handling
-- Shows how to process messages and complete tasks
-- Uses local transport (no network dependencies)
+- Demonstrates simplified agent creation using dictionary-based `AgentCard`
+- Shows how to add native tools using the `@agent.tool` decorator with automatic schema inference
+- Demonstrates direct agent invocation using convenience methods: `invoke()` and `invoke_sync()`
+- Includes optional LLM integration for reasoning and inference
+- Uses `runtime` transport for in-memory execution (no network dependencies)
 
 ### 🌐 [`http_agents.py`](https://github.com/nMaroulis/protolink/blob/main/examples/http_agents.py)
 **Purpose**: HTTP transport and agent-to-agent communication

@@ -17,7 +17,7 @@ class LlamaCPPServerLLM(ServerLLM):
     """Llama.cpp Server implementation of the LLM interface. Communicates directly with the `llama-server` via HTTP."""
 
     provider: ClassVar[LLMProvider] = "llama.cpp-server"
-    DEFAULT_MODEL: ClassVar[str] = "gemma4:latest"
+    DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }

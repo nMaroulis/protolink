@@ -130,8 +130,8 @@ class TestAgent:
     #         await agent.handle_task(task)
 
     @pytest.mark.asyncio
-    async def test_process_method(self, agent):
-        """Test the process method with a simple echo response."""
+    async def test_invoke_method(self, agent):
+        """Test the invoke method with a simple echo response."""
 
         # Create a test agent that implements handle_task
         class TestAgent(Agent):
@@ -139,8 +139,19 @@ class TestAgent:
                 return task.complete("Test response")
 
         test_agent = TestAgent(agent.card)
-        response = await test_agent.process("Hello")
+        response = await test_agent.invoke("Hello", part_type="infer")
         assert response == "Test response"
+
+    def test_invoke_sync_method(self, agent):
+        """Test the invoke_sync method."""
+
+        class TestAgent(Agent):
+            async def handle_task(self, task):
+                return task.complete("Sync response")
+
+        test_agent = TestAgent(agent.card)
+        response = test_agent.invoke_sync("Hello", part_type="infer")
+        assert response == "Sync response"
 
     def test_set_transport(self, agent):
         """Test setting the transport."""

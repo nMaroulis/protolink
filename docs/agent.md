@@ -195,7 +195,8 @@ asyncio.run(agent.start(blocking=True))  # Runs until Ctrl+C
 | `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls, inference) and executes them. Can be overridden for custom orchestration. |
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Optional method for agents that want to emit real-time updates. Default implementation calls `handle_task` and emits status functionality events. |
 | `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()` to run the multi-step reasoning loop. For `tool_call` parts, it executes the tool directly. |
-| `process()` | `message_text: str` | `str` | Convenience method for synchronous processing of user text input. Wraps input in a Task and returns response text. |
+| `invoke()` | `message, part_type="infer", tool_name=None, tool_args=None` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. |
+| `invoke_sync()` | `message, part_type="infer", tool_name=None, tool_args=None` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
 
 #### The Inference Loop Integration
 

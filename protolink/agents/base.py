@@ -91,7 +91,7 @@ class Agent:
         # memory_mode determines if history is wiped per task ("none") or kept per session ("session")
         self.memory_mode = memory
         # SessionManager provides a modular interface to load/save histories via self.storage
-        self.session_manager = SessionManager(storage=self.storage, memory_mode=memory)
+        self._session_manager = SessionManager(storage=self.storage, memory_mode=memory)
 
         # LLM prompt
         self._system_prompt: str | None = system_prompt
@@ -307,28 +307,48 @@ class Agent:
 
             yield TaskErrorEvent(task_id=task.id, error_code="task_failed", error_message=str(e), recoverable=False)
 
-    async def process(self, message_text: str) -> str:
+    # ----------------------------------------------------------------------
+    # Invoke Agent - Convenience Methods for direct / test invocation
+    # ----------------------------------------------------------------------
+
+    async def invoke(
+        self,
+        message: str,
+        part_type: Literal["tool_call", "infer"] = "infer",
+        tool_name: str | None = None,
+        tool_args: dict[str, Any] | None = None,
+    ) -> str:
         """Simple synchronous processing (convenience method).
 
         Args:
-            message_text: User input text
+            message: User message text
+            part_type: Type of part to create
 
         Returns:
             Agent response text
         """
         # Create a task with the user message
-        task = Task.create(Message.user(message_text))
+        if part_type == "infer":
+            task = Task.create_infer(prompt=message)
+        elif part_type == "tool_call":
+            task = Task.create_tool_call(tool_name=tool_name if tool_name else "", args=tool_args)
+        else:
+            raise ValueError(f"Unsupported part type: {part_type}")
 
         # Process the task
         result_task = await self.handle_task(task)
+        last_part = result_task.get_last_part_content()
+        return last_part if last_part else "No response generated"
 
-        # Extract response
-        if result_task.messages:
-            last_message = result_task.messages[-1]
-            if last_message.role == "agent" and last_message.parts:
-                return last_message.parts[0].content
-
-        return "No response generated"
+    def invoke_sync(
+        self,
+        message: str,
+        part_type: Literal["tool_call", "infer"] = "infer",
+        tool_name: str | None = None,
+        tool_args: dict[str, Any] | None = None,
+    ) -> str:
+        """Simple synchronous processing (convenience method)."""
+        return asyncio.run(self.invoke(message, part_type, tool_name, tool_args))
 
     # ----------------------------------------------------------------------
     # Message & Task Sending - A2A Client Operations
@@ -506,7 +526,7 @@ class Agent:
         # If no session_id is found, we fall back to the task.id (stateless behavior).
         session_id = task.metadata.get("session_id", task.id)
         if self.llm:
-            self.llm.history = self.session_manager.get_history(
+            self.llm.history = self._session_manager.get_history(
                 session_id, default_system_prompt=self.llm.system_prompt
             )
 
@@ -516,20 +536,20 @@ class Agent:
         for part in last_item.parts:
             if part.type == "tool_call":
                 outputs.append(await self.execute_tool(part))
-
             elif part.type == "infer":
                 outputs.append(await self.call_llm(part))
+            else:
+                self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
         # ---- Attach outputs to the Task ----
         for out in outputs:
             if isinstance(out, Message):
                 task.add_message(out)
             else:
                 task.add_artifact(Artifact(parts=[out]))
-
         # ---- Session memory: Save session history ----
         # Persist the current state of the conversation (including the latest responses) back to storage.
         if self.llm:
-            self.session_manager.save_history(session_id, self.llm.history)
+            self._session_manager.save_history(session_id, self.llm.history)
 
         return task
 
@@ -564,11 +584,13 @@ class Agent:
             tool_name = part.content.tool_name
             args = part.content.args
             call_id = part.content.call_id
+            self._logger.debug(f"Executing tool: {tool_name}")
         else:
             # Handle the dictionary (network/JSON execution)
             tool_name = part.content.get("tool_name")
             args = part.content.get("args", {})
             call_id = part.content.get("call_id")
+            self._logger.debug(f"Executing tool: {tool_name}")
 
         tool = self.tools.get(tool_name)
         if not tool:

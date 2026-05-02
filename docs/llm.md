@@ -122,7 +122,7 @@ from protolink.llms.server import OllamaLLM   # or any other provider
 # Initialize your chosen LLM
 llm = OpenAILLM(model="gpt-4o")
 llm = AnthropicLLM(model="claude-3-5-sonnet")
-llm = OllamaLLM(model="gemma4:latest", base_url="http://localhost:11434")
+llm = OllamaLLM(model="gemma4:e4b", base_url="http://localhost:11434")
 
 # The rest of your code stays EXACTLY the same!
 response = llm.chat("Hello! How are you?")

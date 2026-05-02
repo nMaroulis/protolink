@@ -85,3 +85,19 @@ class Message:
             metadata=metadata,
         )
         return cls(role="user", parts=[part])
+
+    @classmethod
+    def tool_call(
+        cls,
+        *,
+        tool_name: str,
+        args: dict[str, Any] | None = None,
+        call_id: str | None = None,
+    ) -> "Message":
+        """Create a user message with a tool_call part (convenience method)."""
+        part = Part.tool_call(
+            tool_name=tool_name,
+            args=args or {},
+            call_id=call_id,
+        )
+        return cls(role="user", parts=[part])

@@ -130,6 +130,26 @@ class Task:
         )
         return cls.create(message)
 
+    @classmethod
+    def create_tool_call(
+        cls,
+        *,
+        tool_name: str,
+        args: dict[str, Any] | None = None,
+        call_id: str | None = None,
+    ) -> "Task":
+        """
+        Create a new task initialized with a tool_call message.
+
+        Wraps Message.tool_call() to create the initial message.
+        """
+        message = Message.tool_call(
+            tool_name=tool_name,
+            args=args or {},
+            call_id=call_id,
+        )
+        return cls.create(message)
+
     def get_last_item(self) -> Message | Artifact | None:
         """
         Return the most recently appended Message or Artifact in this Task.

@@ -19,7 +19,7 @@ class OllamaLLM(ServerLLM):
     """Ollama Server implementation of the LLM interface. Uses the http client to make requests to the Ollama server."""
 
     provider: ClassVar[LLMProvider] = "ollama"
-    DEFAULT_MODEL: ClassVar[str] = "gemma4:latest"  # lightweight model
+    DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"  # lightweight model
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }
@@ -94,23 +94,35 @@ class OllamaLLM(ServerLLM):
             "format": "json",
         }
 
-        headers = {
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
 
-        self._client.request(
-            method="POST",
-            url="/api/chat",
-            body=json.dumps(payload),
-            headers=headers,
-        )
+        try:
+            self._client.request(
+                method="POST",
+                url="/api/chat",
+                body=json.dumps(payload),
+                headers=headers,
+            )
 
-        response = self._client.getresponse()
-        data = response.read().decode("utf-8")
+            response = self._client.getresponse()
+            data = response.read().decode("utf-8")
+        finally:
+            self._client.close()
 
-        self._client.close()
+        if response.status != 200:
+            raise RuntimeError(f"Ollama API request failed with status {response.status}: {data}")
 
-        result = json.loads(data)
+        try:
+            result = json.loads(data)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Failed to decode Ollama response as JSON: {data}") from e
+
+        if "error" in result:
+            raise RuntimeError(f"Ollama API returned an error: {result['error']}")
+
+        if "message" not in result or "content" not in result["message"]:
+            raise RuntimeError(f"Unexpected Ollama response format. Missing 'message' or 'content': {result}")
+
         return result["message"]["content"]
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
@@ -131,13 +143,28 @@ class OllamaLLM(ServerLLM):
 
         response = self._client.getresponse()
 
-        for line in response:
-            if not line:
-                continue
+        if response.status != 200:
+            error_data = response.read().decode("utf-8")
+            self._client.close()
+            raise RuntimeError(f"Ollama API streaming request failed with status {response.status}: {error_data}")
 
-            chunk = json.loads(line.decode("utf-8"))
-            if "message" in chunk:
-                yield chunk["message"]["content"]
+        try:
+            for line in response:
+                if not line:
+                    continue
+
+                try:
+                    chunk = json.loads(line.decode("utf-8"))
+                except json.JSONDecodeError:
+                    continue
+
+                if "error" in chunk:
+                    raise RuntimeError(f"Ollama API returned an error during stream: {chunk['error']}")
+
+                if "message" in chunk and "content" in chunk["message"]:
+                    yield chunk["message"]["content"]
+        finally:
+            self._client.close()
 
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
