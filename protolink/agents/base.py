@@ -838,7 +838,6 @@ class Agent:
         """
 
         if transport is None:
-            self._transport, self._client, self._server = None, None, None
             raise ValueError("transport must not be None")
 
         if isinstance(transport, str):

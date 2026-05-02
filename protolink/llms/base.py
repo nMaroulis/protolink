@@ -791,6 +791,7 @@ class LLM(ABC):
                 else "",
                 user_instructions=user_instructions or "",
             )
+        # Stateless history (wipe per task)
         self.history.reset_to_system(self.system_prompt)
         return self.system_prompt
 

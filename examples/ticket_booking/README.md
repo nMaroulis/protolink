@@ -103,7 +103,7 @@ pip install protolink
 **Option A: Using Ollama (Free, Local)**
 ```bash
 # Install Ollama from https://ollama.ai
-ollama pull llama3:8b
+ollama pull gemma4:latest
 ollama serve
 ```
 

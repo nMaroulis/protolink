@@ -318,7 +318,7 @@ print(f"Weather Agent running at {WEATHER_AGENT_URL}")
 This agent has an LLM and knows about the Weather Agent via the Registry.
 
 ```python
-llm = OllamaLLM(base_url="http://localhost:11434", model="llama3:8b")
+llm = OllamaLLM(base_url="http://localhost:11434", model="gemma4:latest")
 
 COORDINATOR_SYSTEM_PROMPT = """You are a coordinator agent. When users ask about weather, 
 delegate to the weather_agent using agent_call with action 'tool_call'. 

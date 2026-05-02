@@ -113,6 +113,25 @@ class ConversationHistory:
             )
         ]
 
+    def set_system(self, content: str) -> None:
+        """Set or update the system prompt without wiping the rest of the history.
+        If a system message exists at the beginning, it is updated.
+        Otherwise, a new system message is prepended.
+        """
+        if self._messages and self._messages[0].role == LLMMessageRole.SYSTEM:
+            self._messages[0] = LLMMessage(
+                role=LLMMessageRole.SYSTEM,
+                content=content,
+            )
+        else:
+            self._messages.insert(
+                0,
+                LLMMessage(
+                    role=LLMMessageRole.SYSTEM,
+                    content=content,
+                ),
+            )
+
     # ----------------------------------------------------------------------
     # accessors
     # ----------------------------------------------------------------------

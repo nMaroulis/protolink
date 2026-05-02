@@ -38,7 +38,7 @@ if api_key:
 
 # Setup manually for Ollama
 base_url: str = "http://localhost:11434"
-model: str = "llama3:8b"
+model: str = "gemma4:latest"
 if LLM_PROVIDER == "ollama":
     kwargs["base_url"] = os.getenv("OLLAMA_URL", base_url)
     kwargs["model"] = os.getenv("OLLAMA_MODEL", model)

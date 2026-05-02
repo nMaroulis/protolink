@@ -1,4 +1,5 @@
 import asyncio
+import copy
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.discovery import Registry
@@ -58,7 +59,8 @@ class Parallel(Flow):
         existing_message_ids = {m.id for m in task.messages}
         existing_artifact_ids = {a.id for a in task.artifacts}
 
-        cors = [self._execute_target(branch, task) for branch in self.branches]
+        # Fix #4: Deep-copy the task for each branch to prevent race conditions
+        cors = [self._execute_target(branch, copy.deepcopy(task)) for branch in self.branches]
 
         # Execute all coroutines concurrently
         results: list[Task] = await asyncio.gather(*cors, return_exceptions=False)
@@ -75,6 +77,9 @@ class Parallel(Flow):
                 if art.id not in existing_artifact_ids:
                     task.add_artifact(art)
                     existing_artifact_ids.add(art.id)
+
+            # Merge metadata
+            task.metadata.update(result_task.metadata)
 
         self._logger.info("Parallel flow fan-in complete.")
         return task

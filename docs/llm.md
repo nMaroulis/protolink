@@ -122,7 +122,7 @@ from protolink.llms.server import OllamaLLM   # or any other provider
 # Initialize your chosen LLM
 llm = OpenAILLM(model="gpt-4o")
 llm = AnthropicLLM(model="claude-3-5-sonnet")
-llm = OllamaLLM(model="llama3", base_url="http://localhost:11434")
+llm = OllamaLLM(model="gemma4:latest", base_url="http://localhost:11434")
 
 # The rest of your code stays EXACTLY the same!
 response = llm.chat("Hello! How are you?")
@@ -502,6 +502,8 @@ Protolink uses a sophisticated prompt engineering system to turn standard LLMs i
 #### The System Prompt Blueprint
 
 The `LLM.build_system_prompt()` method dynamically assembles a comprehensive system prompt that enforces a **deterministic execution loop**. This blueprint tells the LLM exactly how to behave, how to format its output, and what capabilities it has.
+
+This method calls `reset_to_system(self, new_system_prompt: str)` to reset the history and set the new system prompt. This means the history is stateless, and is reset for each inference task.
 
 It is composed of several key components:
 

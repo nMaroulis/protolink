@@ -34,6 +34,7 @@ class ServerLLM(LLM):
     > Unreliable / looping
     llama2, llama3
     llama3.2 (better, still flaky)
+    gemma2, gemma3, gemma4
     base (non-instruct) models
 
     This design keeps the core inference loop in ``LLM`` provider-agnostic, while allowing server-specific subclasses

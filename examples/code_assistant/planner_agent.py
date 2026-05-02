@@ -144,6 +144,7 @@ def create_planner_agent(
         llm=llm,
         system_prompt=PLANNER_SYSTEM_PROMPT,
     )
+    agent.transport.timeout = 120
 
     return agent
 
