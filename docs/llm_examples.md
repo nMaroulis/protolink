@@ -389,7 +389,7 @@ print(f"\nResult: {result.get_last_part_content()}")
    }
    ```
 3. Protolink's `_handle_agent_call` resolved `weather_agent` to its URL via the Registry
-4. A Task was sent to the Weather Agent via `send_task_to()`
+4. A Task was sent to the Weather Agent via `call_agent()`
 5. The Weather Agent executed `get_weather("Athens")`
 6. The result was returned to the Coordinator's LLM loop via `_inject_agent_call`
 7. The LLM produced a final response incorporating the weather data

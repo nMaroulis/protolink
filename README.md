@@ -12,8 +12,7 @@
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%">
 </div>
 
-> 📌 The framework is currently in **alpha** and is subject to change. 
-
+> 📌 The framework is currently in **alpha** and is subject to change.
 
 ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and **integrate tools seamlessly**. Build **distributed multi-agent systems** with minimal boilerplate and production-oriented architecture.
 

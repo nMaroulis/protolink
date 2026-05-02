@@ -234,7 +234,7 @@ class EchoAgent(Agent):
         return Task(id=task.id, messages=task.messages + [reply])
 ```
 
-Then run the agent and call it from another agent or client using `send_task_to` or `send_message_to`.
+Then run the agent and call it from another agent or client using `call_agent` or `send_message_to`.
 
 #### Calling a remote agent
 
@@ -255,13 +255,13 @@ class CallerAgent(Agent):
 
     async def handle_task(self, task: Task) -> Task:
         # Forward the task to another agent
-        result = await self.send_task_to(self.target_url, task)
+        result = await self.call_agent(self.target_url, task)
         return result
 
 
 async def call_remote(url: str) -> None:
     hello = Task.create(Message.user("Hello over HTTP!"))
-    result = await caller_agent.send_task_to(url, hello)
+    result = await caller_agent.call_agent(url, hello)
     print("Response:", result.messages[-1].parts[0].content)
 ```
 
@@ -356,7 +356,7 @@ async def main() -> None:
 
     # Directly dispatch task payloads towards the unique URL identifiers
     task = Task.create(Message.user("Hello!"))
-    response = await assistant.send_task_to("runtime://translator", task)
+    response = await assistant.call_agent("runtime://translator", task)
     print(response.get_last_part_content())  # "Translated: Hello!"
 ```
 

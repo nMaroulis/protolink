@@ -99,7 +99,7 @@ async def main() -> None:
 
     print("\n--- Request/response task: AlertAgent -> WeatherAgent ---")
     task = Task.create(Message.user("What's the weather in Geneva?"))
-    res_task = await alert_agent.send_task_to(weather_url, task)
+    res_task = await alert_agent.call_agent(weather_url, task)
     print(res_task.messages[-1].parts[0].content)
 
     print("\n--- Streaming task events: AlertAgent -> WeatherAgent (/tasks/stream) ---")

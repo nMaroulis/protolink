@@ -557,7 +557,7 @@ Both agents are already running and registered.
 ### Sequence
 
 1. Agent A creates a `Task`  
-2. Agent A calls `send_task_to(agent_b_url, task)`  
+2. Agent A calls `call_agent(agent_b_url, task)`  
 3. `AgentClient` forwards the task to its transport  
 4. Transport sends the request to Agent B’s server endpoint  
 5. Agent B’s transport receives the request  

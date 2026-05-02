@@ -4,17 +4,29 @@ Agents are the core building blocks in Protolink.
 
 ## Concepts
 
-An **Agent** in Protolink is a unified component that can act as both **client and server**. This is different from the original A2A spec, which separates client and server concerns.
+An **Agent** in Protolink is a unified component that acts as both **client and server**, unlike Google’s A2A protocol, which separates these concerns.
+
+It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLM**, **transport**, **memory**, **storage**, **telemetry**, and **logging**. T
+
+Agents **communicate through Tasks**, the fundamental unit of work:
+- **Receive tasks** via ``handle_task()``
+- **Send tasks** via ``call_agent()``
+
+Agents also register themselves and discover others via the registry. For inference requests ("infer"), ProtoLink automatically manages the full LLM interaction cycle until the task is resolved.
+
+Each component is **pluggable** to the agent and can be replaced with your own implementation.
 
 High‑level ideas:
 
 - **Unified model**: a single `Agent` instance can send and receive messages.
 - **AgentCard**: a small model describing the agent (name, description, metadata).
 - **Modules**:
-    - **LLMs** (e.g. `OpenAILLM`, `AnthropicLLM`, `LlamaCPPLLM`, `OllamaLLM`).
-    - **Tools** (native Python functions or MCP‑backed tools).
+  - **LLMs** (e.g. `OpenAILLM`, `AnthropicLLM`, `LlamaCPPLLM`, `OllamaLLM`).
+  - **Tools** (native Python functions or MCP‑backed tools).
+  - **Storage** (e.g. `InMemoryStorage`, `Storage`).
+  - **Telemetry** (e.g. `Telemetry`, `BaseTelemetry`).
+  - **Logger** (e.g. `ConsoleLogger`, `FileLogger`).
 - **Transport abstraction**: agents communicate over transports such as HTTP, WebSocket, gRPC, or the in‑process runtime transport.
-
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
@@ -63,13 +75,12 @@ You can then attach tools and start the agent.
 
 Once the **Agent** and **Registry** objects have been initiated, they will automatically expose a web interface at `/status` where they display the registry and agent's information.
 
-
 <table style="border-collapse: collapse; border: none; width: 100%;">
   <tr style="border: none;">
     <td style="text-align: center; border: none; padding: 10px; transition: transform 0.3s ease, box-shadow 0.3s ease;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" 
-           alt="Registry Status Card" 
-           width="60%" 
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png"
+           alt="Registry Status Card"
+           width="60%"
            style="border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease;"
            onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.2)';"
            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';">
@@ -219,7 +230,7 @@ The **agent callback** (`_handle_agent_call`) is invoked when the LLM produces a
 
 1. **Resolves the agent name to URL** by querying the registry
 2. **Creates a Task** with the appropriate message/tool call
-3. **Sends the task** to the target agent via `send_task_to()`
+3. **Sends the task** to the target agent via `call_agent()`
 4. **Returns the result** to the inference loop
 
 This enables a coordinator agent to delegate work to specialized agents without manual orchestration.
@@ -234,7 +245,7 @@ This enables a coordinator agent to delegate work to specialized agents without 
                                         ↓
                                resolve agent URL
                                         ↓
-                               send_task_to(weather_agent)
+                               call_agent(weather_agent)
                                         ↓
                                Weather Agent processes task
                                         ↓
@@ -249,7 +260,7 @@ This enables a coordinator agent to delegate work to specialized agents without 
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `send_task_to()` | `agent_url: str`, `task: Task` | `Task` | Sends a task to another agent and returns the processed result. |
+| `call_agent()` | `agent_url: str`, `task: Task` | `Task` | Sends a task to another agent and returns the processed result. |
 | `send_message_to()` | `agent_url: str`, `message: Message` | `Message` | Sends a message to another agent and returns the response. |
 
 

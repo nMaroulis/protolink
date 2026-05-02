@@ -52,7 +52,7 @@ class AutonomousAgent(Agent):
         for peer in peers:
             print(f"[{self.card.name}] Sending task to {peer.name}")
             task = Task.create(Message.user(f"Hello from {self.card.name}!"))
-            result_task = await self.send_task_to(peer.url, task)
+            result_task = await self.call_agent(peer.url, task)
             for msg in result_task.messages:
                 print(f"[{peer.name} -> {self.card.name}] {msg.role}: {msg.parts[0].content}")
 

@@ -161,7 +161,7 @@ class TestAgent:
         assert agent.server is not None
 
     @pytest.mark.asyncio
-    async def test_send_task_to(self, agent):
+    async def test_call_agent(self, agent):
         """Test sending a task to another agent."""
         # Create an AsyncMock for the transport
         transport = DummyTransport(url=agent.card.url)
@@ -172,7 +172,7 @@ class TestAgent:
         task = Task.create(Message.user("Test"))
 
         # Test sending the task
-        response = await agent.send_task_to("http://other-agent.local", task)
+        response = await agent.call_agent("http://other-agent.local", task)
 
         # Verify the response and that transport was called correctly
         assert isinstance(response, Task)

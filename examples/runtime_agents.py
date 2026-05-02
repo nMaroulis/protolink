@@ -79,7 +79,7 @@ async def main() -> None:
         print("\n--- Assistant → Translator ---")
         task = Task.create(Message.user("Hello world"))
         # We can send by the target's transport URL directly
-        response = await assistant.send_task_to("runtime://translator", task)
+        response = await assistant.call_agent("runtime://translator", task)
         print(f"Result: {response.get_last_part_content()}")
 
         print("\n--- Direct agent card lookup ---")

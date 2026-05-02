@@ -3,6 +3,28 @@ ProtoLink - Agent Base Class
 
 Simple agent implementation extending Google's A2A protocol making the Agent component more centralised,
 incorporating both client and server functionalities.
+
+The Agent is the central component of the ProtoLink framework, and it is used to manage the agent's identity,
+capabilities, and interactions with other agents.
+
+The philosophy is that the Agent should be self-contained and able to function independently. Each module is
+pluggable to the agent and can be replaced with your own implementation. The Agent incorporates:
+- Tools
+- LLM
+- Transport
+- Memory
+- Storage
+- Telemetry
+- Logger
+
+Receives Tasks from other Agents or Users -> handle_task() function
+Sends Tasks to other Agents -> call_agent() function
+
+The task is the primary unit of work in the ProtoLink framework. Agents receive & send tasks from/to other agents.
+
+The Agent is also responsible for registering itself to the registry and fetching other agents from the registry.
+If another agent invokes the agent's LLM for inference ('infer' action type), an inference cycle starts until the Task
+is resolved, all handled automatically by Protolink.
 """
 
 import asyncio
@@ -308,6 +330,47 @@ class Agent:
             yield TaskErrorEvent(task_id=task.id, error_code="task_failed", error_message=str(e), recoverable=False)
 
     # ----------------------------------------------------------------------
+    # Task & Message Delegation - A2A Client Operations
+    # ----------------------------------------------------------------------
+
+    async def call_agent(self, agent_url: str, task: Task) -> Task:
+        """Send a task to another agent.
+
+        Args:
+            agent_url: URL of the target agent
+            task: Task to send
+
+        Returns:
+            Task with updated state and response messages
+
+        Raises:
+            RuntimeError: If agent has no transport configured
+        """
+        if not self._client:
+            raise RuntimeError("Agent has no transport configured, cannot send tasks.")
+        self._logger.debug(f"Sending to agent {agent_url} the task: {task}")
+        result: Task = await self._client.send_task(agent_url, task)
+        self._logger.debug(f"Received response Task from agent {agent_url}: {result}")
+        return result
+
+    async def send_message_to(self, agent_url: str, message: Message) -> Message:
+        """Send a message to another agent.
+
+        Args:
+            agent_url: URL of the target agent
+            message: Message to send
+
+        Returns:
+            Response message
+
+        Raises:
+            RuntimeError: If agent has no transport configured
+        """
+        if not self._client:
+            raise RuntimeError("Agent has no transport configured, cannot send messages.")
+        return await self._client.send_message(agent_url, message)
+
+    # ----------------------------------------------------------------------
     # Invoke Agent - Convenience Methods for direct / test invocation
     # ----------------------------------------------------------------------
 
@@ -349,47 +412,6 @@ class Agent:
     ) -> str:
         """Simple synchronous processing (convenience method)."""
         return asyncio.run(self.invoke(message, part_type, tool_name, tool_args))
-
-    # ----------------------------------------------------------------------
-    # Message & Task Sending - A2A Client Operations
-    # ----------------------------------------------------------------------
-
-    async def send_task_to(self, agent_url: str, task: Task) -> Task:
-        """Send a task to another agent.
-
-        Args:
-            agent_url: URL of the target agent
-            task: Task to send
-
-        Returns:
-            Task with updated state and response messages
-
-        Raises:
-            RuntimeError: If agent has no transport configured
-        """
-        if not self._client:
-            raise RuntimeError("Agent has no transport configured, cannot send tasks.")
-        self._logger.debug(f"Sending to agent {agent_url} the task: {task}")
-        result: Task = await self._client.send_task(agent_url, task)
-        self._logger.debug(f"Received response Task from agent {agent_url}: {result}")
-        return result
-
-    async def send_message_to(self, agent_url: str, message: Message) -> Message:
-        """Send a message to another agent.
-
-        Args:
-            agent_url: URL of the target agent
-            message: Message to send
-
-        Returns:
-            Response message
-
-        Raises:
-            RuntimeError: If agent has no transport configured
-        """
-        if not self._client:
-            raise RuntimeError("Agent has no transport configured, cannot send messages.")
-        return await self._client.send_message(agent_url, message)
 
     # ----------------------------------------------------------------------
     # Context Management
@@ -714,7 +736,7 @@ class Agent:
 
         Raises:
             ValueError: If the action type is unknown.
-            RuntimeError: If the delegation fails (propagated from send_task_to).
+            RuntimeError: If the delegation fails (propagated from call_agent).
         """
         # Resolve agent name to URL
         agent_url = await self._resolve_agent_url(agent_name)
@@ -726,14 +748,14 @@ class Agent:
                 raise ValueError(f"tool_call agent_call must specify 'tool' field. Received payload: {payload}")
             # Create task with tool_call part for the remote agent to execute
             task = Task.create(Message(role="agent", parts=[Part.tool_call(tool_name=tool_name, args=args)]))
-            result_task = await self.send_task_to(agent_url, task)
+            result_task = await self.call_agent(agent_url, task)
             return result_task.get_last_part_content()
 
         elif action == "infer":
             prompt = payload.get("prompt", "")
             # Create task with user message for the remote agent to process
             task = Task.create(Message.user(prompt))
-            result_task = await self.send_task_to(agent_url, task)
+            result_task = await self.call_agent(agent_url, task)
             return result_task.get_last_part_content()
 
         raise ValueError(f"Unknown agent_call action: {action}")

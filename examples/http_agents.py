@@ -69,11 +69,11 @@ async def main() -> None:
         print("SUCCESS: Message echo verified.")
 
         # ---------------------------------------------------------
-        # Test 3: send_task (via Agent.send_task_to)
+        # Test 3: Send Task (via Agent.call_agent)
         # ---------------------------------------------------------
-        print("\n--- Test 3: send_task_to ---")
+        print("\n--- Test 3: call_agent ---")
         task = Task.create(Message.user("Do complex task"))
-        response_task = await client_agent.send_task_to(target_url, task)
+        response_task = await client_agent.call_agent(target_url, task)
 
         last_msg_content = response_task.messages[-1].parts[0].content
         print(f"Sent Task ID: {task.id}")

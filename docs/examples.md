@@ -91,7 +91,7 @@ The repository includes several **standalone example scripts** that demonstrate 
 **Purpose**: HTTP transport and agent-to-agent communication
 
 - Demonstrates two agents communicating over HTTP
-- Tests client functions: `get_agent_card`, `send_message_to`, `send_task_to`
+- Tests client functions: `get_agent_card`, `send_message_to`, `call_agent`
 - Shows how to set up multiple agents on different ports
 - Includes comprehensive error handling and cleanup
 
