@@ -36,6 +36,35 @@ class LLMMessage:
     tool_calls: dict[str, Any] = field(default_factory=dict)
     tool_name: str | None = None
 
+    def to_dict(self) -> dict[str, Any]:
+        """Convert message to a JSON-serializable dictionary."""
+        return {
+            "role": self.role.value,
+            "content": self.content,
+            "name": self.name,
+            "metadata": self.metadata,
+            "id": self.id,
+            "created_at": self.created_at.isoformat(),
+            "tool_calls": self.tool_calls,
+            "tool_name": self.tool_name,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> LLMMessage:
+        """Create a message from a dictionary."""
+        return cls(
+            role=LLMMessageRole(data["role"]),
+            content=data["content"],
+            name=data.get("name"),
+            metadata=data.get("metadata", {}),
+            id=data.get("id", str(uuid4())),
+            created_at=datetime.fromisoformat(data["created_at"])
+            if "created_at" in data
+            else datetime.now(timezone.utc),
+            tool_calls=data.get("tool_calls", {}),
+            tool_name=data.get("tool_name"),
+        )
+
 
 class ConversationHistory:
     """
@@ -152,6 +181,17 @@ class ConversationHistory:
             {"role": msg.role.value, "content": msg.content, **({"name": msg.name} if msg.name else {})}
             for msg in self._messages
         ]
+
+    def to_list(self) -> list[dict[str, Any]]:
+        """Convert entire history to a list of full message dictionaries."""
+        return [msg.to_dict() for msg in self._messages]
+
+    @classmethod
+    def from_list(cls, messages_data: list[dict[str, Any]]) -> ConversationHistory:
+        """Create a history instance from a list of full message dictionaries."""
+        history = cls()
+        history._messages = [LLMMessage.from_dict(m) for m in messages_data]
+        return history
 
     def __iter__(self) -> Iterable[LLMMessage]:
         return iter(self._messages)

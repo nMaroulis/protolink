@@ -110,9 +110,8 @@ async def test_infer_parsing_error_correction():
     assert result.content == "Recovery success"
     assert llm.call_count == 2
     # Verify history length:
-    # 1 (initial system) + 1 (user query) + 1 (error feedback system message)
-    # The final "final" response is NOT added to history by the infer loop.
-    assert len(llm.history) == 3
+    # 1 (initial system) + 1 (user query) + 1 (error feedback system message) + 1 (final assistant response)
+    assert len(llm.history) == 4
 
 
 @pytest.mark.asyncio

@@ -434,9 +434,14 @@ class LLM(ABC):
                         '{"type": "final", "content": "<your response>"}'
                     )
                     continue
+                # Add final response to history
+                self.history.add_assistant(raw_response)
                 return Part("infer_output", content)
 
             elif action == "tool_call":
+                # Add assistant call to history before result
+                self.history.add_assistant(raw_response)
+
                 # Validate tool_call payload
                 tool_name = payload.get("tool")
                 tool_args = payload.get("args", {})
@@ -480,6 +485,9 @@ class LLM(ABC):
                         "Please use 'tool_call' for local tools or produce a 'final' response."
                     )
                     continue
+
+                # Add assistant call to history before result
+                self.history.add_assistant(raw_response)
 
                 # Validate agent_call payload
                 agent_name = payload.get("agent")
@@ -747,6 +755,7 @@ class LLM(ABC):
         tools: str | None = None,
         *,
         override_system_prompt: bool = False,
+        persist: bool = False,
     ) -> str:
         """
         Build the final system prompt for the LLM.
@@ -764,17 +773,12 @@ class LLM(ABC):
             user_instructions: Optional instructions from the user to customize behavior.
             agent_cards: JSON/text describing available agents for delegation.
             tools: JSON/text describing available tools for this agent.
-            override_system_prompt: Whether to override comletely the system prompt with the user defined prompt.
+            override_system_prompt: Whether to override completely the system prompt with the user defined prompt.
+            persist: If True, updates the system prompt in history without wiping conversation turns.
+                If False (default), resets history to only include the new system prompt.
 
         Returns:
             A fully assembled, machine-readable prompt string suitable for sending to the LLM.
-
-        Example:
-            >>> user_instructions = "Always use the weather tool first if the user asks about weather."
-            >>> agent_cards = '[{"name": "weather_forecaster", "tools": ["get_weather"]}]'
-            >>> tools = '[{"name": "get_weather", "args": ["location"]}]'
-            >>> prompt = build_system_prompt(user_instructions, agent_cards, tools)
-            >>> print(prompt[:500])  # preview the first 500 characters
         """
 
         if override_system_prompt:
@@ -791,8 +795,12 @@ class LLM(ABC):
                 else "",
                 user_instructions=user_instructions or "",
             )
-        # Stateless history (wipe per task)
-        self.history.reset_to_system(self.system_prompt)
+
+        if persist:
+            self.history.set_system(self.system_prompt)
+        else:
+            self.history.reset_to_system(self.system_prompt)
+
         return self.system_prompt
 
     # ----------------------------------------------------------------------

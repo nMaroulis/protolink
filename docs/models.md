@@ -15,6 +15,8 @@ This section provides detailed API documentation for the core data models in Pro
 - [Artifact](#artifact)
 - [EndpointSpec](#endpointspec)
 - [Context](#context)
+- [LLMMessage](#llmmessage)
+- [ConversationHistory](#conversationhistory)
 
 ---
 ## AgentCard
@@ -1056,3 +1058,66 @@ restored_task = Task.from_dict(task_dict)
 context_dict = context.to_dict()
 restored_context = Context.from_dict(context_dict)
 ```
+
+---
+
+## LLMMessage
+
+```python
+@dataclass
+class LLMMessage:
+    role: LLMMessageRole
+    content: str
+    name: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: str = field(default_factory=lambda: str(uuid4()))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    tool_calls: dict[str, Any] = field(default_factory=dict)
+    tool_name: str | None = None
+```
+
+Canonical message format used internally across all LLM providers. Unlike the standard `Message` model used for agent-to-agent communication, `LLMMessage` is optimized for LLM context windows and provider-specific schemas.
+
+### Methods
+
+#### `to_dict() -> dict[str, Any]`
+Convert the message to a JSON-serializable dictionary, preserving all fields (including metadata and tool calls).
+
+#### `from_dict(data: dict[str, Any]) -> LLMMessage` `classmethod`
+Create an `LLMMessage` instance from a dictionary.
+
+---
+
+## ConversationHistory
+
+```python
+class ConversationHistory:
+    def __init__(self, system_prompt: str | None = None):
+        self._messages: list[LLMMessage] = []
+```
+
+Manages the conversation state for an LLM in a provider-agnostic way.
+
+### Methods
+
+#### `to_list() -> list[dict[str, Any]]`
+Convert the entire history into a list of full message dictionaries. Used for persistence.
+
+#### `from_list(messages_data: list[dict[str, Any]]) -> ConversationHistory` `classmethod`
+Restore a conversation history from a list of message dictionaries.
+
+#### `add_user(content: str)`
+Add a user message to history.
+
+#### `add_assistant(content: str)`
+Add an assistant message to history.
+
+#### `add_system(content: str)`
+Add a system message to history.
+
+#### `reset_to_system(system_prompt: str)`
+Wipes all history and sets a new system prompt.
+
+#### `set_system(system_prompt: str)`
+Updates the system prompt (at index 0) while preserving all subsequent conversation turns.
+

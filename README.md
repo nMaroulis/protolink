@@ -31,7 +31,9 @@ The framework emphasizes **minimal boilerplate**, **explicit control**, and **pr
 
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
 
-The following article on 📝 [level-up coding on medium](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) also gives a hands-on guide and overview of Protolink.
+The following *articles* published on ***Level Up Coding*** on ***Medium*** give a hands-on guide and overview of Protolink:
+- 📝 [Your First Autonomous Agent Mesh – Easier Than You Think](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a)
+- 📝 [Build Easily Your Own “Claude Code” with Three Agents: Brain, Hands, and Coordinator](https://medium.com/gitconnected/build-easily-your-own-claude-code-with-three-agents-brain-hands-and-coordinator-5236b392ddf0)
 
 ### NEW Feature: Flows 📣
 

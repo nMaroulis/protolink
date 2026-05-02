@@ -10,6 +10,7 @@ This section provides detailed documentation for the type aliases used throughou
 - [HttpMethod](#httpmethod)
 - [LLMProvider](#llmprovider)
 - [LLMType](#llmtype)
+- [MemoryModeType](#memorymodetype)
 - [MimeType](#mimetype)
 - [PartType](#parttype)
 - [ReasoningLevelType](#reasoningleveltype)
@@ -192,7 +193,10 @@ Type alias for supported HTTP methods.
 ## LLMProvider
 
 ```python
-LLMProvider: TypeAlias = Literal["openai", "anthropic", "gemini", "deepseek", "huggingface", "llama.cpp", "ollama"]
+LLMProvider: TypeAlias = Literal[
+    "anthropic", "deepseek", "gemini", "grok", "huggingface", 
+    "llama.cpp-local", "llama.cpp-server", "ollama", "openai"
+]
 ```
 
 Type alias for supported Large Language Model providers in Protolink.
@@ -203,10 +207,12 @@ Type alias for supported Large Language Model providers in Protolink.
 |----------|-------------|
 | **openai** | OpenAI API (GPT models) |
 | **anthropic** | Anthropic Claude API |
-| **google** | Google AI models |
+| **gemini** | Google AI models |
+| **grok** | xAI Grok API |
 | **deepseek** | DeepSeek API (OpenAI-compatible) |
 | **huggingface** | Hugging Face Inference API |
-| **llama.cpp** | Local LLaMA models |
+| **llama.cpp-local** | Local LLaMA models via llama-cpp-python |
+| **llama.cpp-server** | Remote LLaMA models via llama.cpp server |
 | **ollama** | Ollama local models |
 
 ### Usage Example
@@ -246,6 +252,33 @@ from protolink.types import LLMType
 api_llm = OpenAILLM(model="gpt-4")  # API type
 local_llm = LocalLLM(model_path="./model.gguf")  # Local type
 server_llm = ServerLLM(endpoint="http://localhost:8080")  # Server type
+```
+
+---
+
+## MemoryModeType
+
+```python
+MemoryModeType: TypeAlias = Literal["none", "session"]
+```
+
+Type alias for agent conversation memory modes.
+
+### Memory Modes
+
+| Mode | Description |
+|------|-------------|
+| **none** | Stateless operation. Conversation history is wiped after every task execution. |
+| **session** | Stateful operation. Conversation history is preserved across tasks sharing the same `session_id`. |
+
+### Usage Example
+
+```python
+from protolink.types import MemoryModeType
+from protolink.agents import Agent
+
+# Create a stateful agent
+agent = Agent(card=card, memory="session")
 ```
 
 ---
@@ -302,6 +335,9 @@ PartType: TypeAlias = Literal[
     "status",
     "error",
     "warning",
+    # ---- LLM Call ----
+    "infer",
+    "infer_output",
     # ---- Tool interaction ----
     "tool_call",
     "tool_output",
@@ -353,6 +389,13 @@ PartType: TypeAlias = Literal[
 |-------|-------------|-----------|
 | **tool_call** | Tool invocation request | Function calls with parameters |
 | **tool_output** | Tool execution result | Function return values, tool outputs |
+
+### LLM Call
+
+| Type | Description | Use Case |
+|-------|-------------|-----------|
+| **infer** | Inference instruction | Explicit request for LLM reasoning |
+| **infer_output** | Inference result | Final response or tool calls from LLM |
 
 ### Reasoning & Observability
 
@@ -448,7 +491,8 @@ Type alias for supported message roles in agent communication.
 | Role | Description |
 |------|-------------|
 | **user** | Human user messages |
-| **agent** | Agent responses |
+| **agent** | Higher-level agent responses |
+| **assistant** | Core LLM responses / thoughts |
 | **system** | System instructions |
 
 ### Usage Example

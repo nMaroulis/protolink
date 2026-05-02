@@ -12,16 +12,17 @@ from typing import Any, Literal
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.context_manager import ContextManager
+from protolink.core.memory import SessionManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.logging import BaseLogger, ConsoleLogger
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.server import AgentServer
-from protolink.storage import Storage
+from protolink.storage import InMemoryStorage, Storage
 from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
-from protolink.types import TransportType
+from protolink.types import MemoryModeType, TransportType
 from protolink.utils.renderers import to_status_html
 
 
@@ -47,6 +48,7 @@ class Agent:
         *,
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
+        memory: MemoryModeType = "none",
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -70,17 +72,26 @@ class Agent:
             logger: Custom logger instance. If not provided, a ConsoleLogger will be used.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
             verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose.
+            memory: Conversation memory mode.
+                - ``"none"`` (default): Stateless. History is wiped on every task.
+                - ``"session"``: Persistent per session. History is preserved across tasks with the same ``session_id``.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
         self.card: AgentCard = AgentCard.from_dict(card) if isinstance(card, dict) else card
         self.context_manager = ContextManager()
         self.llm = llm
-        self.storage = storage
+        self.storage = storage if storage is not None else InMemoryStorage(namespace=self.card.name)
         self._telemetry: Telemetry | None = None
         self.telemetry = telemetry
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
+
+        # Conversation Memory & Persistence
+        # memory_mode determines if history is wiped per task ("none") or kept per session ("session")
+        self.memory_mode = memory
+        # SessionManager provides a modular interface to load/save histories via self.storage
+        self.session_manager = SessionManager(storage=self.storage, memory_mode=memory)
 
         # LLM prompt
         self._system_prompt: str | None = system_prompt
@@ -490,6 +501,15 @@ class Agent:
         if last_item is None:
             return task
 
+        # ---- Session memory: Load session history ----
+        # If memory is enabled, we attempt to resume context using session_id from task metadata.
+        # If no session_id is found, we fall back to the task.id (stateless behavior).
+        session_id = task.metadata.get("session_id", task.id)
+        if self.llm:
+            self.llm.history = self.session_manager.get_history(
+                session_id, default_system_prompt=self.llm.system_prompt
+            )
+
         outputs: list[Part | Message] = []
 
         # ---- Inspect Parts in the last item only ----
@@ -505,6 +525,11 @@ class Agent:
                 task.add_message(out)
             else:
                 task.add_artifact(Artifact(parts=[out]))
+
+        # ---- Session memory: Save session history ----
+        # Persist the current state of the conversation (including the latest responses) back to storage.
+        if self.llm:
+            self.session_manager.save_history(session_id, self.llm.history)
 
         return task
 
@@ -616,6 +641,7 @@ class Agent:
             agent_cards=agent_cards,
             tools=self.get_tools_for_prompt(),
             override_system_prompt=self.override_system_prompt,
+            persist=self.memory_mode == "session",
         )
 
         if self.telemetry:

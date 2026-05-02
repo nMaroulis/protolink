@@ -43,6 +43,12 @@ LLMProvider: TypeAlias = Literal[
 
 LLMType: TypeAlias = Literal["api", "local", "server"]
 
+# Memory Mode for Conversation History, used by the Agent class and Memory class.
+MemoryModeType: TypeAlias = Literal["none", "session"]
+
+# Supported roles in Messages
+MessageRoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]
+
 # Supported Agent IO formats
 MimeType: TypeAlias = Literal[
     # Text
@@ -71,9 +77,6 @@ ReasoningLevel: TypeAlias = Literal["none", "low", "medium", "high"]
 
 # Supported request sources for endpoints
 RequestSourceType: TypeAlias = Literal["none", "body", "query_params", "form", "headers", "path_params"]
-
-# Supported roles in Messages
-MessageRoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]
 
 # Supported part content types
 PartType: TypeAlias = Literal[

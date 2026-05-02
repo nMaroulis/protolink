@@ -130,8 +130,11 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `llm` | `LLM ⎪ None` | `None` | Optional language model instance for the agent to use. |
 | `system_prompt` | `str ⎪ None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
 | `storage` | `Storage ⎪ None` | `None` | Optional storage instance for agent data persistence. |
+| `telemetry` | `Telemetry ⎪ None` | `None` | Optional telemetry instance for observability and tracing. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
+| `logger` | `BaseLogger ⎪ None` | `None` | Custom logger instance (e.g. `ConsoleLogger` or `FileLogger`). |
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
+| `memory` | `MemoryModeType` | `"none"` | Conversation memory mode: `"none"` (stateless) or `"session"` (persistent across tasks with same `session_id`). |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent (WARNING only), `1` = normal (INFO), `2` = verbose (DEBUG). |
 
 ```python
@@ -346,9 +349,11 @@ agent.add_tool(WeatherTool())
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `get_agent_card()` | `as_json: bool = True` | `AgentCard ⎪ dict` | Returns the agent's identity card. |
-| `set_llm()` | `llm: LLM` | `None` | Updates the agent's language model instance. |
+| `get_agent_status_html()` | — | `str` | Returns a rich HTML status page for the agent (displayed at `/status`). |
+| `set_llm()` | `llm: LLM` | `None` | Updates the agent's language model instance and validates the connection. |
+| `set_storage()` | `storage: Storage` | `None` | Sets the Agent's storage instance for persistence. |
+| `set_registry()` | `registry, registry_url=None` | `None` | Configures the agent's connection to a Protolink registry. |
 | `get_context_manager()` | — | `ContextManager` | Returns the context manager for this agent. |
-| `set_storage()` | `storage: Storage` | `None` | Sets the Agent's storage instance. |
 
 ## Storage and Persistence
 
@@ -368,9 +373,21 @@ class MyStorage(Storage):
     def delete(self): ...
 ```
 
+### In-Memory Storage (Default)
+
+Protolink includes a built-in `InMemoryStorage` which is the **default storage backend** for all agents. It is a lightweight, RAM-backed dictionary that supports TTL (Time-To-Live) for automatic cleanup.
+
+```python
+from protolink.storage import InMemoryStorage
+
+# Default: shared class-level store
+storage = InMemoryStorage(namespace="my_agent", ttl=3600)
+agent = Agent(card=card, storage=storage)
+```
+
 ### SQLite Storage
 
-Protolink includes a built-in `SQLiteStorage` implementation:
+For persistent storage across restarts, use the built-in `SQLiteStorage`:
 
 ```python
 from protolink.storage import SQLiteStorage
@@ -378,6 +395,23 @@ from protolink.storage import SQLiteStorage
 storage = SQLiteStorage(db_path="my_agent.db", namespace="main_agent")
 agent = Agent(card=card, storage=storage)
 ```
+
+## Session Persistence
+
+When an agent is initialized with `memory="session"`, it tracks conversation state across multiple task executions based on the `session_id`.
+
+1. **Activation**: Set `memory="session"` in the Agent constructor.
+2. **Identification**: Include a `session_id` in your task metadata:
+   ```python
+   task = Task.create(Message.user("My name is Alice"))
+   task.metadata["session_id"] = "user_123"
+   await agent.execute_task(task)
+   ```
+3. **Resumption**: Subsequent tasks with the same `session_id` will automatically load the previous conversation history into the LLM context.
+
+!!! tip "Session IDs"
+    If no `session_id` is provided in the task metadata, the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
+
 
 ## Abstract Methods
 

@@ -170,7 +170,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `call_stream()` | `history: ConversationHistory` | `AsyncIterator[str]` | **Abstract.** Generate a streaming response, yielding chunks. |
 | `chat()` | `user_query: str, streaming: bool=False` | `str ⎪ AsyncIterator[str]` | High-level convenience method for standard chat usage. |
 | `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False` | `Part` | **Async.** Execute controlled multi-step inference with tool calling. |
-| `build_system_prompt()` | `user_instructions, agent_cards, tools, override_system_prompt` | `str` | Build the final system prompt for the LLM. |
+| `build_system_prompt()` | `user_instructions, agent_cards, tools, override_system_prompt, persist=False` | `str` | Build the final system prompt. If `persist=True`, preserves existing conversation history. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
 | `validate_connection()` | — | `bool` | **Abstract.** Validate that the LLM connection is working. |
 
@@ -230,10 +230,11 @@ async def infer(
 1. **Multi-step Loop**: The method executes a loop up to `MAX_INFER_STEPS` (default: 10).
 2. **Deterministic Execution**: At each step, the LLM is invoked with the current history.
 3. **JSON Action Protocol**: The LLM must respond with a strict JSON object declaring one of three actions:
-   - `"final"`: The task is complete. The content is returned to the user.
-   - `"tool_call"`: The LLM wants to execute a tool. The runtime executes the tool and feeds the result back.
-   - `"agent_call"`: The LLM wants to delegate to another agent (not yet fully implemented).
-4. **Validation & Error Handling**: 
+   - `"final"`: The task is complete. The content is added to history and returned to the user.
+   - `"tool_call"`: The LLM wants to execute a tool. The action is added to history, the runtime executes the tool, and feeds the result back.
+   - `"agent_call"`: The LLM wants to delegate to another agent.
+4. **History Recording**: All turns of the conversation (User input, Assistant reasoning, and Tool results) are automatically committed to the `ConversationHistory` object, ensuring the agent retains context for the entire multi-turn exchange.
+5. **Validation & Error Handling**: 
    - Malformed JSON or invalid actions raise `ValueError`.
    - Tool execution failures raise `RuntimeError` but catchable within the loop context if desired (currently propagates).
    - Exceeding the step limit raises `RuntimeError`.
@@ -503,7 +504,7 @@ Protolink uses a sophisticated prompt engineering system to turn standard LLMs i
 
 The `LLM.build_system_prompt()` method dynamically assembles a comprehensive system prompt that enforces a **deterministic execution loop**. This blueprint tells the LLM exactly how to behave, how to format its output, and what capabilities it has.
 
-This method calls `reset_to_system(self, new_system_prompt: str)` to reset the history and set the new system prompt. This means the history is stateless, and is reset for each inference task.
+By default, this method calls `reset_to_system(self, new_system_prompt: str)` which clears the history. However, when using the **`persist=True`** flag, it calls `set_system()`, which updates the instructions while keeping the conversation history intact—essential for persistent sessions.
 
 It is composed of several key components:
 
