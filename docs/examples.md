@@ -87,6 +87,14 @@ The repository includes several **standalone example scripts** that demonstrate 
 - Includes optional LLM integration for reasoning and inference
 - Uses `runtime` transport for in-memory execution (no network dependencies)
 
+### 🧠 [`agent_memory.py`](https://github.com/nMaroulis/protolink/blob/main/examples/agent_memory.py)
+**Purpose**: Conversation memory and persistence across tasks
+
+- Demonstrates the difference between stateless agents (`memory="none"`) and persistent agents (`memory="session"`)
+- Shows how `invoke_sync()` handles session history automatically using a default `session_id`
+- Demonstrates history persistence across sequential calls to the same agent instance
+- Useful for building conversational bots and multi-turn interaction assistants
+
 ### 🌐 [`http_agents.py`](https://github.com/nMaroulis/protolink/blob/main/examples/http_agents.py)
 **Purpose**: HTTP transport and agent-to-agent communication
 

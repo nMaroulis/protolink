@@ -206,8 +206,8 @@ asyncio.run(agent.start(blocking=True))  # Runs until Ctrl+C
 | `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls, inference) and executes them. Can be overridden for custom orchestration. |
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Optional method for agents that want to emit real-time updates. Default implementation calls `handle_task` and emits status functionality events. |
 | `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()` to run the multi-step reasoning loop. For `tool_call` parts, it executes the tool directly. |
-| `invoke()` | `message, part_type="infer", tool_name=None, tool_args=None` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. |
-| `invoke_sync()` | `message, part_type="infer", tool_name=None, tool_args=None` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
+| `invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. Accepts an optional `session_id` for memory. |
+| `invoke_sync()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
 
 #### The Inference Loop Integration
 
@@ -422,7 +422,9 @@ When an agent is initialized with `memory="session"`, it tracks conversation sta
 3. **Resumption**: Subsequent tasks with the same `session_id` will automatically load the previous conversation history into the LLM context.
 
 !!! tip "Session IDs"
-    If no `session_id` is provided in the task metadata, the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
+    When using direct invocation methods like `invoke()` or `invoke_sync()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `memory="session"` is enabled.
+
+    If no `session_id` is provided in the task metadata (for non-invoke calls), the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
 
 
 ## Abstract Methods

@@ -380,12 +380,16 @@ class Agent:
         part_type: Literal["tool_call", "infer"] = "infer",
         tool_name: str | None = None,
         tool_args: dict[str, Any] | None = None,
+        session_id: str = "invocation_session_id",
     ) -> str:
         """Simple synchronous processing (convenience method).
 
         Args:
             message: User message text
             part_type: Type of part to create
+            tool_name: Name of tool (if part_type is "tool_call")
+            tool_args: Arguments for tool (if part_type is "tool_call")
+            session_id: Session ID to use for the task
 
         Returns:
             Agent response text
@@ -398,6 +402,8 @@ class Agent:
         else:
             raise ValueError(f"Unsupported part type: {part_type}")
 
+        task.metadata["session_id"] = session_id
+
         # Process the task
         result_task = await self.handle_task(task)
         last_part = result_task.get_last_part_content()
@@ -409,9 +415,10 @@ class Agent:
         part_type: Literal["tool_call", "infer"] = "infer",
         tool_name: str | None = None,
         tool_args: dict[str, Any] | None = None,
+        session_id: str = "invocation_session_id",
     ) -> str:
         """Simple synchronous processing (convenience method)."""
-        return asyncio.run(self.invoke(message, part_type, tool_name, tool_args))
+        return asyncio.run(self.invoke(message, part_type, tool_name, tool_args, session_id))
 
     # ----------------------------------------------------------------------
     # Context Management
