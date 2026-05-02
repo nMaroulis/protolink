@@ -25,7 +25,7 @@ WEATHER_DATA = {
 }
 
 
-def create_weather_agent(registry: Registry | None = None) -> Agent:
+def create_weather_agent(registry: Registry | None = None, verbosity: int = 1) -> Agent:
     """Create and configure the Weather Agent."""
 
     agent = Agent(
@@ -36,6 +36,7 @@ def create_weather_agent(registry: Registry | None = None) -> Agent:
         },
         transport="http",
         registry=registry,
+        verbosity=verbosity,
     )
 
     @agent.tool(

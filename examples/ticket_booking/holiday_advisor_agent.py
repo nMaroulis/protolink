@@ -40,6 +40,7 @@ Keep responses concise and helpful. You are the expert - be confident in your ad
 def create_advisor_agent(
     registry: Registry | None = None,
     llm_provider: str = "ollama",
+    verbosity: int = 1,
     **kwargs,
 ) -> Agent:
     """
@@ -93,6 +94,7 @@ def create_advisor_agent(
         registry=registry,
         llm=llm,
         system_prompt=ADVISOR_SYSTEM_PROMPT,
+        verbosity=verbosity,
     )
 
     return agent

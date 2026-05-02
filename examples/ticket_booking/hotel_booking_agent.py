@@ -44,7 +44,7 @@ DEFAULT_HOTELS = [
 ]
 
 
-def create_hotel_agent(registry: Registry | None = None) -> Agent:
+def create_hotel_agent(registry: Registry | None = None, verbosity: int = 1) -> Agent:
     """Create and configure the Hotel Booking Agent."""
 
     agent = Agent(
@@ -55,6 +55,7 @@ def create_hotel_agent(registry: Registry | None = None) -> Agent:
         },
         transport="http",
         registry=registry,
+        verbosity=verbosity,
     )
 
     @agent.tool(

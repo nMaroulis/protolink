@@ -33,6 +33,7 @@ If an agent has an LLM, ask it for advice. If an agent has tools, call those too
 def create_coordinator_agent(
     registry: Registry,
     llm_provider: str = "ollama",
+    verbosity: int = 1,
     **kwargs,
 ) -> Agent:
     """
@@ -60,6 +61,7 @@ def create_coordinator_agent(
         registry=registry,
         llm=llm,
         system_prompt=COORDINATOR_SYSTEM_PROMPT,
+        verbosity=verbosity,
     )
 
     return agent

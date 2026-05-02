@@ -25,10 +25,17 @@ from weather_agent import create_weather_agent
 from protolink.client import AgentClient
 from protolink.discovery import Registry
 from protolink.models import Task
+from protolink.transport import HTTPTransport
 
 # Configuration
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:9000")
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+
+CLIENT_ADDRESS = os.getenv("CLIENT_ADDRESS", "http://localhost:8100")
+CLIENT_REQUEST_TIMEOUT = 240
+
+VERBOSITY = 2  # DEBUG, Change 1 for normal, 0 for silent
+
 
 kwargs: dict = {}
 # Set API Key manually here, if not set, it will use the environment variable
@@ -68,12 +75,12 @@ async def main():
 
         # Step 2: Start specialist agents (no LLM - tool only)
         print("\n🌤️  Starting Weather Agent (tool-only)...")
-        weather_agent = create_weather_agent(registry)
+        weather_agent = create_weather_agent(registry, verbosity=VERBOSITY)
         await weather_agent.start()
         print(f"   Weather Agent running at {weather_agent.card.url}")
 
         print("\n🏨 Starting Hotel Agent (tool-only)...")
-        hotel_agent = create_hotel_agent(registry)
+        hotel_agent = create_hotel_agent(registry, verbosity=VERBOSITY)
         await hotel_agent.start()
         print(f"   Hotel Agent running at {hotel_agent.card.url}")
 
@@ -82,6 +89,7 @@ async def main():
         advisor_agent = create_advisor_agent(
             registry=registry,
             llm_provider=LLM_PROVIDER,
+            verbosity=VERBOSITY,
             **kwargs,
         )
         await advisor_agent.start()
@@ -92,6 +100,7 @@ async def main():
         coordinator = create_coordinator_agent(
             registry=registry,
             llm_provider=LLM_PROVIDER,
+            verbosity=VERBOSITY,
             **kwargs,
         )
         await coordinator.start()
@@ -130,7 +139,11 @@ async def main():
         print("   Step 3: Book hotel (tool_call)")
         print()
 
-        client = AgentClient(transport=coordinator.transport)
+        # It doesn't matter what transport is used for the client as long as it's the same type (i.e. HTTPTransport)
+        # so the client can communicate over the wire with the same protocol.
+        # AgentClient(transport=coordinator.transport) will also work.
+        client_transport = HTTPTransport(url=CLIENT_ADDRESS, timeout=CLIENT_REQUEST_TIMEOUT)
+        client = AgentClient(transport=client_transport)
         task = Task.create_infer(prompt=user_query)
 
         result = await client.send_task(agent_url=coordinator.card.url, task=task)

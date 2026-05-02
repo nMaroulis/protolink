@@ -93,7 +93,7 @@ class Agent:
             skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills.
             logger: Custom logger instance. If not provided, a ConsoleLogger will be used.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
-            verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose.
+            verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose (debug mode).
             memory: Conversation memory mode.
                 - ``"none"`` (default): Stateless. History is wiped on every task.
                 - ``"session"``: Persistent per session. History is preserved across tasks with the same ``session_id``.
