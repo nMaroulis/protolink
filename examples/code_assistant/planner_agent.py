@@ -110,7 +110,14 @@ def create_planner_agent(
     class PlannerAgent(Agent):
         async def handle_task(self, task):
             """Override to add logging around the inference call."""
-            prompt = task.get_last_part_content() if task.messages else "No prompt"
+            content = task.get_last_part_content() if task.messages else "No prompt"
+
+            # Handle both string (text part) and dict (infer part) content
+            if isinstance(content, dict):
+                prompt = content.get("prompt", str(content))
+            else:
+                prompt = str(content)
+
             # Truncate for display
             preview = prompt[:120].replace("\n", " ") if prompt else ""
             print(f"\n   🧠 [planner] infer called: {preview}...")
@@ -118,8 +125,9 @@ def create_planner_agent(
             # Delegate to parent's handle_task, which invokes the LLM
             result = await super().handle_task(task)
 
-            response = result.get_last_part_content() if result else "No response"
-            resp_preview = response[:100].replace("\n", " ") if response else ""
+            response_content = result.get_last_part_content() if result else "No response"
+            response_str = str(response_content)
+            resp_preview = response_str[:100].replace("\n", " ") if response_str else ""
             print(f"   🧠 [planner] → {resp_preview}...")
 
             return result

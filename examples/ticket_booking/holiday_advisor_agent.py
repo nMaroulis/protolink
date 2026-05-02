@@ -62,15 +62,23 @@ def create_advisor_agent(
     class HolidayAdvisorAgent(Agent):
         async def handle_task(self, task):
             # Log the incoming request
-            prompt = task.get_last_part_content() if task.messages else "No prompt"
+            content = task.get_last_part_content() if task.messages else "No prompt"
+
+            # Handle both string (text part) and dict (infer part) content
+            if isinstance(content, dict):
+                prompt = content.get("prompt", str(content))
+            else:
+                prompt = str(content)
+
             print(f"\n   🧭 [holiday_advisor] infer called with: {prompt[:80]}...")
 
             # Call the parent's handle_task (which uses LLM.infer)
             result = await super().handle_task(task)
 
             # Log the response
-            response = result.get_last_part_content() if result else "No response"
-            preview = response[:100].replace("\n", " ") if response else ""
+            response_content = result.get_last_part_content() if result else "No response"
+            response_str = str(response_content)
+            preview = response_str[:100].replace("\n", " ") if response_str else ""
             print(f"   🧭 [holiday_advisor] → {preview}...")
 
             return result
