@@ -58,16 +58,10 @@ def create_hotel_agent(registry: Registry | None = None, verbosity: int = 1) -> 
         verbosity=verbosity,
     )
 
+    # The input schema is automatically inferred from the function signature and type hints.
     @agent.tool(
         name="book_hotel",
         description="Book a hotel for a vacation. Returns booking confirmation with details.",
-        input_schema={
-            "location": str,
-            "check_in": str,
-            "check_out": str,
-            "guests": int,
-            "budget": str,  # "budget", "mid-range", or "luxury"
-        },
     )
     def book_hotel(
         location: str,

@@ -40,8 +40,8 @@ from typing import Any, Protocol
 class BaseTool(Protocol):
     name: str
     description: str
-    input_schema: dict[str, type] | None
-    output_schema: dict[str, type] | None
+    input_schema: dict[str, Any] | None
+    output_schema: str | Any | None
     tags: list[str] | None
 
     async def __call__(self, **kwargs) -> Any: ...
@@ -53,8 +53,8 @@ class BaseTool(Protocol):
 |-----------|------|-------------|
 | `name` | `str` | Unique identifier for the tool |
 | `description` | `str` | Human-readable description of what the tool does |
-| `input_schema` | `dict[str, type] ⎪ None` | Mapping of parameter names to their types |
-| `output_schema` | `dict[str, type] ⎪ None` | Mapping of output names to their types (optional) |
+| `input_schema` | `dict[str, Any] ⎪ None` | Flattened dictionary of parameter definitions (see below) |
+| `output_schema` | `str ⎪ Any ⎪ None` | The return type name (e.g., `"dict"`, `"str"`) |
 | `tags` | `list[str] ⎪ None` | Categorization tags for filtering and discovery |
 
 ### The `__call__` Method
@@ -97,6 +97,13 @@ async def add_numbers(a: int, b: int) -> int:
 async def multiply_numbers(a: float, b: float) -> float:
     """Multiply two numbers and return the result."""
     return a * b
+
+# Inferred Schemas:
+# input_schema: {
+#     "a": {"type": "number", "required": True},
+#     "b": {"type": "number", "required": True}
+# }
+# output_schema: "float"
 ```
 
 ### Decorator Parameters
@@ -297,6 +304,7 @@ base_tools = adapter.get_tools()
 for tool in base_tools:
     print(f"{tool.name}: {tool.description}")
     print(f"  Input Schema: {tool.input_schema}")
+    # e.g., {'location': {'type': 'string', 'required': True}, ...}
 ```
 
 **Returns** a list of native Protolink `Tool` instances. Each tool:
@@ -387,7 +395,7 @@ add_tool = adapter.wrap_tool("add")
 # Access metadata
 print(add_tool.name)         # "add"
 print(add_tool.description)  # "Add two integers."
-print(add_tool.input_schema) # {"a": int, "b": int}
+print(add_tool.input_schema) # {"a": {"type": "integer", "required": True}, ...}
 
 # Invoke asynchronously
 import asyncio
@@ -563,9 +571,9 @@ Hello, World! 👋
 |-----------|------|-------------|
 | `name` | `str` | Tool name |
 | `description` | `str` | Tool description |
-| `input_schema` | `dict[str, type]` | Input parameter types |
-| `output_schema` | `dict[str, type] ⎪ None` | Output types (always `None` for MCP) |
-| `tags` | `list[str] ⎪ None` | Tool tags (always `None` for MCP) |
+| `input_schema` | `dict[str, Any]` | Flattened input parameter definitions |
+| `output_schema` | `str ⎪ None` | Output type name |
+| `tags` | `list[str] ⎪ None` | Tool tags |
 
 ---
 

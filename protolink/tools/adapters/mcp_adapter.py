@@ -109,8 +109,8 @@ class MCPToolAdapter(BaseTool):
         headers (dict[str, str]): Headers for SSE transport.
         name (str): Tool name (set when wrapping a specific tool).
         description (str): Tool description (set when wrapping a specific tool).
-        input_schema (dict[str, type] | None): Input parameter types.
-        output_schema (dict[str, type] | None): Output types (currently unused by MCP).
+        input_schema (dict[str, Any] | None): Flattened input parameter definitions.
+        output_schema (str | None): Output type name (currently unused by MCP).
         tags (list[str] | None): Optional tags for tool categorization.
 
     Example:
@@ -218,8 +218,8 @@ class MCPToolAdapter(BaseTool):
         # BaseTool protocol attributes (set when wrapping a specific tool)
         self.name: str = ""
         self.description: str = ""
-        self.input_schema: dict[str, type] | None = None
-        self.output_schema: dict[str, type] | None = None
+        self.input_schema: dict[str, Any] | None = None
+        self.output_schema: str | None = None
         self.tags: list[str] | None = None
 
         self._tools_cache: list[dict] | None = None

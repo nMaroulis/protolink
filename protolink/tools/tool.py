@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from protolink.tools.base import BaseTool
-from protolink.tools.schema import infer_input_schema, infer_output_schema
+from protolink.tools.schema import infer_input_schema, infer_output_schema, normalize_schema
 
 
 @dataclass
@@ -22,8 +22,8 @@ class Tool(BaseTool):
 
     name: str
     description: str
-    input_schema: dict[str, type] | None
-    output_schema: dict[str, type] | None
+    input_schema: dict[str, Any] | None
+    output_schema: Any | None
     tags: list[str] | None
 
     func: Callable[..., Any]
@@ -35,8 +35,12 @@ class Tool(BaseTool):
         If ``input_schema`` and/or ``output_schema`` are not provided explicitly,
         they are inferred from the wrapped callable.
         """
+        # Input Schema
         if self.input_schema is None:
             self.input_schema = infer_input_schema(self.func, title=f"{self.name}Input")
+        else:
+            self.input_schema = normalize_schema(self.input_schema, title=f"{self.name}Input")
+        # Output Schema
         if self.output_schema is None:
             self.output_schema = infer_output_schema(self.func, title=f"{self.name}Output")
 

@@ -474,7 +474,11 @@ class Agent:
         """Register a Tool instance with the agent."""
         self.tools[tool.name] = tool
         skill = AgentSkill(
-            id=tool.name, description=tool.description or f"Tool: {tool.name}", tags=tool.tags if tool.tags else []
+            id=tool.name,
+            description=tool.description or f"Tool: {tool.name}",
+            input_schema=tool.input_schema or {},
+            output_schema=tool.output_schema or {},
+            tags=tool.tags or [],
         )
         self._add_skill_to_agent_card(skill)
 
@@ -886,7 +890,20 @@ class Agent:
         return to_status_html(agent=self.card, start_time=self.start_time)
 
     def get_tools_for_prompt(self) -> str | None:
-        """Return a string with a list of the agent's tools to be used in  LLM prompts."""
+        """Return a string with a list of the agent's tools to be used in  LLM prompts.
+
+        Example:
+                Tool 1:
+                    "name": book_hotel,
+                    "description": Book a hotel for a vacation. Returns booking confirmation with details.,
+                    "input_schema": {
+                        "location": {"type": "string", "required": True},
+                        "check_in": {"type": "string", "required": True},
+                        "check_out": {"type": "string", "required": True},
+                        "guests": {"type": "integer", "default": 2, "required": False}
+                    }
+                    "output_schema": dict[str, str]
+        """
         if not self.tools:
             return None
 

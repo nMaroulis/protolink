@@ -55,31 +55,36 @@ Here's a simple example on how **easy** it is to **create an agent**, define the
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
-from protolink.llms.api import OpenAILLM
-from protolink.discovery import Registry
-from protolink.storage import SQLiteStorage
 
-# 1. Initialize & start the Registry for A2A Discovery
+# 1. Initialize & start the Registry for A2A Discovery (optional)
+from protolink.discovery import Registry
 registry = Registry(url="http://127.0.0.1:9000", transport="http")
 await registry.start()
 
-# 2. Initialize OpenAI API LLM
-llm = OpenAILLM(model="gpt-5.2")
+# 2. Initialize OpenAI API LLM (optional)
+from protolink.llms.api import OpenAILLM
+llm = OpenAILLM(model="gpt-5.2") # for local model use protolink.llms.server.OllamaLLM and more...
 
-# 3. Initialize Storage
+# 3. Initialize Storage (optional)
+from protolink.storage import SQLiteStorage
 storage = SQLiteStorage(db_path="agent.db")
 
-# 4a. Define the agent card
+# 4. Initialize Telemetry (optional)
+from protolink.telemetry import LangfuseTelemetry
+telemetry = LangfuseTelemetry()
+
+# 5a. Define the agent card
 agent_card = AgentCard(
     url="http://127.0.0.1:8020",
     name="example_agent",
     description="A dummy agent",
 )
 
-# 4b. Initialize the agent (http transport will be created based on the agent card url)
-agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
+# 5b. Initialize the agent (http transport will be created based on the agent card url)
+# Plug the modules to the agent
+agent = Agent(agent_card, transport="http", llm=llm, registry=registry, storage=storage, telemetry=telemetry)
 
-# 5. Add Native tool (Tools from MCP can also be added easily using the MCPToolAdapter)
+# 6. Add Native tool (Tools from MCP can also be added easily using the MCPToolAdapter)
 @agent.tool(name="add", description="Add two numbers")
 async def add_numbers(a: int, b: int):
     return a + b
@@ -89,8 +94,7 @@ await agent.start()
 ```
 
 #### ✨ Ready to Orchestrate
-The agent is now fully initialized and prepared to **discover & being discovered by peers**, send & receive **autonomous tasks** across your system.
-
+The agent is now fully initialized and prepared to **discover & being discovered by peers**, send & receive **tasks** across your system.
 
 ## Features
 

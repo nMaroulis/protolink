@@ -103,13 +103,24 @@ card = AgentCard.from_dict(json_data)
 
 ---
 
-#### `_validate_fields(data: dict[str, Any]) -> None`
+#### `_validate_fields(data: dict[str, Any]) -> None` `staticmethod`
 
 Validate the fields of the AgentCard.
 
 **Returns:**
 ```python
 None
+```
+
+---
+
+#### `get_prompt_format() -> str`
+
+Generate a structured, human-readable text representation of the agent and its skills for use in LLM system prompts. This is used by other agents to understand how to delegate tasks to this agent.
+
+**Returns:**
+```python
+str  # Multi-line formatted string
 ```
 
 
@@ -176,6 +187,18 @@ Defines the capabilities and limitations of an agent. This extends the A2A speci
 | `rag` | `bool` | `False` | Supports Retrieval-Augmented Generation |
 | `code_execution` | `bool` | `False` | Has access to safe execution sandbox |
 
+### Methods
+
+#### `as_dict() -> dict[str, Any]`
+
+Return all capabilities as a flat dictionary.
+
+---
+
+#### `enabled() -> list[str]`
+
+Return a list of all enabled (truthy) capabilities. Useful for quick inspection.
+
 ---
 
 ## AgentSkill
@@ -186,7 +209,7 @@ class AgentSkill:
     id: str
     description: str = ""
     input_schema: dict[str, Any] = field(default_factory=dict)
-    output_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: str | None = None
     tags: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 ```
@@ -198,11 +221,11 @@ Represents a task that an agent can perform. Skills are used to advertise specif
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `id` | `str` | — | **Required.** Unique Human-readable identifier for the task |
-| `description` | `str` | `""` | ***Optional*** Detailed description of what the task does |
-| `input_schema` | `dict[str, Any]` | `{}` | ***Optional*** JSON Schema for input arguments |
-| `output_schema` | `dict[str, Any]` | `{}` | ***Optional*** JSON Schema for output result |
-| `tags` | `list[str]` | `[]` | ***Optional*** Tags for categorization |
-| `examples` | `list[str]` | `[]` | ***Optional*** Example inputs or usage scenarios |
+| `description` | `str` | `""` | Detailed description of what the task does |
+| `input_schema` | `dict[str, Any]` | `{}` | Flattened dictionary of parameter definitions with `type`, `required`, and `default` keys |
+| `output_schema` | `str ⎪ None` | `None` | The name of the return type (e.g., `"dict"`, `"str"`) |
+| `tags` | `list[str]` | `[]` | List of tags for categorization |
+| `examples` | `list[str]` | `[]` | Example inputs or usage scenarios |
 
 ### Example
 

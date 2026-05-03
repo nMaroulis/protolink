@@ -1,3 +1,9 @@
+"""Schema inference and conversion utilities for Protolink tools.
+
+This module provides functionality to automatically generate JSON-schema-like
+definitions from Python type hints and function signatures.
+"""
+
 import inspect
 import types
 import typing
@@ -8,6 +14,10 @@ from typing import Any, get_args, get_origin, get_type_hints
 
 
 def _safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
+    """Safely extract type hints from a callable.
+
+    Handles potential TypeErrors or other exceptions during type hint resolution.
+    """
     try:
         return get_type_hints(func, include_extras=True)
     except TypeError:
@@ -17,10 +27,12 @@ def _safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
 
 
 def _is_typed_dict(tp: Any) -> bool:
+    """Check if a type is a TypedDict."""
     return isinstance(tp, type) and hasattr(tp, "__total__") and hasattr(tp, "__annotations__")
 
 
 def _annotation_to_schema(annotation: Any) -> dict[str, Any]:
+    """Convert a Python type annotation to a JSON schema dictionary."""
     if annotation in (Any, object) or annotation is inspect._empty:
         return {}
 
@@ -96,12 +108,47 @@ def _annotation_to_schema(annotation: Any) -> dict[str, Any]:
     return {}
 
 
+def normalize_schema(schema: Any, title: str | None = None) -> dict[str, Any]:
+    """Normalize a schema into a flat dictionary of parameter definitions."""
+    if isinstance(schema, dict):
+        # If it's already a complex schema, extract properties
+        if "properties" in schema:
+            props = schema["properties"]
+            required_list = schema.get("required", [])
+            for name, pdef in props.items():
+                if isinstance(pdef, dict):
+                    pdef["required"] = name in required_list
+            return props
+
+        # Assume it's a mapping of param name -> type
+        out = {}
+        for name, ann in schema.items():
+            out[name] = _annotation_to_schema(ann)
+            out[name]["required"] = True  # Default to True for explicit dict-based schema
+        return out
+
+    return _annotation_to_schema(schema)
+
+
 def infer_input_schema(func: Callable[..., Any], *, title: str) -> dict[str, Any]:
+    """Infer the input schema for a callable as a flat dictionary of parameters.
+
+    Extracts parameter names, types, and default values.
+
+    Example:
+        >>> infer_input_schema(book_hotel, title="book_hotel")
+            "input_schema": {
+                'location': {'type': 'string', 'required': True},
+                'check_in': {'type': 'string', 'required': True},
+                'check_out': {'type': 'string', 'required': True},
+                'guests': {'type': 'integer', 'default': 2, 'required': False},
+                'budget': {'type': 'string', 'default': 'mid-range', 'required': False}
+            },
+    """
     sig = inspect.signature(func)
     hints = _safe_get_type_hints(func)
 
     props: dict[str, Any] = {}
-    required: list[str] = []
 
     for name, param in sig.parameters.items():
         if name in {"self", "cls"}:
@@ -111,21 +158,25 @@ def infer_input_schema(func: Callable[..., Any], *, title: str) -> dict[str, Any
 
         ann = hints.get(name, param.annotation)
         schema = _annotation_to_schema(ann)
+
         if param.default is not inspect._empty:
-            schema = {**schema, "default": param.default}
+            schema["default"] = param.default
+            schema["required"] = False
         else:
-            required.append(name)
+            schema["required"] = True
 
         props[name] = schema
 
-    out: dict[str, Any] = {"title": title, "type": "object", "properties": props}
-    if required:
-        out["required"] = required
-    return out
+    return props
 
 
-def infer_output_schema(func: Callable[..., Any], *, title: str) -> dict[str, Any]:
+def infer_output_schema(func: Callable[..., Any], *, title: str) -> str:
+    """Infer the output type for a callable.
+
+    Returns the name of the return type annotation as a string.
+    """
     hints = _safe_get_type_hints(func)
     ann = hints.get("return", Any)
-    schema = _annotation_to_schema(ann)
-    return {"title": title, **schema} if schema else {"title": title}
+    if isinstance(ann, type):
+        return ann.__name__
+    return str(ann)
