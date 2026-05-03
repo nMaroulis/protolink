@@ -62,6 +62,8 @@ class AgentSkill:
     Attributes:
         id: Unique Human-readable identifier for the task
         description: Detailed description of what the task does [Optional]
+        input_schema: Schema for the input data (JSON schema) [Optional]
+        output_schema: Schema for the output data (JSON schema) [Optional]
         tags: List of tags for categorization [Optional]
         examples: Example inputs or usage scenarios [Optional]
     """
@@ -180,6 +182,18 @@ class AgentCard:
         The format includes:
         - Agent name and description
         - List of tools with their schemas (if any skills are registered)
+
+        Example:
+            name: "Weather Agent"
+            description: "Use this agent if the user asks about weather, temperature, or climate."
+            tools:
+                "name": "get_temperature"
+                "description": "Returns the temperature in a location for a given date"
+                "input_schema": {
+                    "location": {"type": "string", "required": True},
+                    "datetime": {"type": "datetime", "required": True, "default": "now"},
+                }
+                "output_schema": float
 
         Returns:
             str: A formatted multi-line string describing the agent and its capabilities.

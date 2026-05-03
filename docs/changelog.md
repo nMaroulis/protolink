@@ -2,29 +2,37 @@
 
 !!! info "About this Changelog"
     All notable changes to the **Protolink** project will be documented in this file.
-    
+
     The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 ## Release Notes
 
+### [v0.5.3] - 2026-05-03
+
+#### 🐞 Fixed
+- **Tooling Schema**: Tool schema is now correctly inferred from the function signature and type hints. It is also correctly appended to the Agent Card prompt, so other agents are aware of available tools and schemas.
+
 ### [v0.5.2] - 2026-05-02
 
 #### 🚀 Added
-- **Logging**: Added explicit `file` logger (json) and `console` logger (color).
+- **Logging Module**: Added explicit `file` logger (json) and `console` logger (color).
+- Plug in Logging to the Agent using the `logger` argument. If none is provided, a default logger using the ConsoleLogger, so the IO is appended to the terminal.
+- Added **context memory**:
+    - "none" - No context memory.
+    - "session" - Session based context memory. Agent remembers all messages exchanged during the current session with other agents.
+Memory is configured in the agent using the `memory` argument. If none is provided, no memory is used.
 
 ### [v0.5.1] - 2026-04-28
 
 #### 🚀 Added
 - **Telemetry**: Add LangSmith and Langfuse telemetry implementations
 - **BaseTelemetry**: Add base telemetry class
-- **AsyncTelemetry**: Add async telemetry class
-- **TelemetryManager**: Add telemetry manager class
-- **Registry**: Add telemetry manager to registry
-- **Task**: Add telemetry manager to task
-- **Agent**: Add telemetry manager to agent
-- **Tool**: Add telemetry manager to tool
+- **LangfuseTelemetry**: Langfuse telemetry implementation
+- **LangsmithTelemetry**: Langsmith telemetry implementation
+- **MultiTelemetry**: Multiplex multiple telemetry implementations.
+- **Agent**: Plug in to the Agent using the `telemetry` argument. If none is provided, no telemetry is collected.
 
 ### [v0.5.0] - 2026-04-22
 

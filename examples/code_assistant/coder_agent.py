@@ -104,7 +104,7 @@ def create_coder_agent(registry: Registry | None = None) -> Agent:
     @agent.tool(
         name="read_file",
         description="Read the contents of a file. Returns the file content as a string with line numbers.",
-        input_schema={"path": str},
+        # input_schema={"path": str} # Input schema is automatically inferred from the function signature and typehints
     )
     def read_file(path: str) -> dict:
         """Read a file from the workspace and return its contents with line numbers."""
