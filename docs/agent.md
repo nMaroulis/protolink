@@ -144,6 +144,7 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `telemetry` | `Telemetry ⎪ None` | `None` | Optional telemetry instance for observability and tracing. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 | `logger` | `BaseLogger ⎪ None` | `None` | Custom logger instance (e.g. `ConsoleLogger` or `FileLogger`). |
+| `discovery_ttl` | `int` | `0` | Time to live in seconds for caching Agent information discovered from the Registry. Default is `0` (no caching). |
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `memory` | `MemoryModeType` | `"none"` | Conversation memory mode: `"none"` (stateless) or `"session"` (persistent across tasks with same `session_id`). |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent (WARNING only), `1` = normal (INFO), `2` = verbose (DEBUG). |
@@ -170,6 +171,7 @@ These methods control the agent's server component lifecycle.
 |------|------------|---------|-------------|
 | `start()` | `register: bool = True`, `blocking: bool = False` | `None` | Starts the agent's server. If `blocking=True`, awaits indefinitely until cancelled. |
 | `stop()` | — | `None` | Stops the agent's server component and cleans up resources. |
+| `start_sync()` | `blocking: bool = False` | `None` | Synchronous wrapper around start() for convenience. |
 
 ### Blocking Mode
 
@@ -361,7 +363,9 @@ agent.add_tool(WeatherTool())
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `get_agent_card()` | `as_json: bool = True` | `AgentCard ⎪ dict` | Returns the agent's identity card. |
-| `get_agent_status_html()` | — | `str` | Returns a rich HTML status page for the agent (displayed at `/status`). |
+| `get_status()` | `output_format: Literal["html", "json"] = "html"` | `str` | Returns the agent's status as HTML or JSON. HTML is a rich status page for the agent (displayed at `/status`). JSON is a machine-readable representation of the agent's status. |
+| `get_chat()` | — | `str` | Returns a self-contained chat UI as HTML. Only functional when the agent has an LLM configured (served at `/chat`). |
+| `handle_chat_message()` | `data: dict` | `dict` | Processes an incoming chat message via the agent's `invoke()` method and returns the response. |
 | `set_llm()` | `llm: LLM` | `None` | Updates the agent's language model instance and validates the connection. |
 | `set_storage()` | `storage: Storage` | `None` | Sets the Agent's storage instance for persistence. |
 | `set_registry()` | `registry, registry_url=None` | `None` | Configures the agent's connection to a Protolink registry. |
@@ -425,6 +429,52 @@ When an agent is initialized with `memory="session"`, it tracks conversation sta
     When using direct invocation methods like `invoke()` or `invoke_sync()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `memory="session"` is enabled.
 
     If no `session_id` is provided in the task metadata (for non-invoke calls), the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
+
+
+## Chat Gateway
+
+When an agent is configured with an **LLM**, Protolink automatically exposes a built-in **Chat UI** at the `/chat` endpoint. This provides a browser-based interface for interacting with the agent directly — ideal for development, demos, and quick testing.
+
+### How It Works
+
+- **`GET /chat`** — Serves a self-contained HTML/CSS/JS chat interface. The page is always registered but displays a fallback message if no LLM is configured.
+- **`POST /chat`** — Accepts `{"message": "...", "session_id": "..."}` and returns `{"response": "..."}`. This endpoint is only registered when the agent has an LLM.
+
+The chat page displays agent metadata (name, description, skills) and LLM configuration (provider, model, temperature) in a sidebar, alongside a modern conversational interface.
+
+### Usage
+
+No extra setup is needed — just provide an LLM when creating your agent:
+
+```python
+from protolink.agents import Agent
+from protolink.llms.api import OpenAILLM
+
+agent = Agent(
+    card={"name": "assistant", "description": "A helpful assistant", "url": "http://localhost:8000"},
+    transport="http",
+    llm=OpenAILLM(model="gpt-4o"),
+)
+
+agent.start_sync(blocking=True)
+# Chat UI is now available at http://localhost:8000/chat
+```
+
+### Session Memory
+
+The chat UI generates a unique `session_id` per browser tab. When combined with `memory="session"`, conversations persist across messages within the same tab:
+
+```python
+agent = Agent(
+    card=card,
+    transport="http",
+    llm=OpenAILLM(model="gpt-4o"),
+    memory="session",  # Enables cross-message memory in chat
+)
+```
+
+!!! tip "Chat vs Status"
+    The `/status` page shows the agent's operational health and metadata. The `/chat` page provides an interactive conversation interface. Both are served automatically when the agent starts.
 
 
 ## Abstract Methods

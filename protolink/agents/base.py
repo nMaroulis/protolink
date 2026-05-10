@@ -45,6 +45,7 @@ from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
 from protolink.types import MemoryModeType, TransportType
+from protolink.utils.chat_renderer import to_chat_html
 from protolink.utils.renderers import to_status_html
 
 
@@ -67,6 +68,7 @@ class Agent:
         telemetry: Telemetry | None = None,
         skills: Literal["auto", "fixed"] = "auto",
         logger: BaseLogger | None = None,
+        discovery_ttl: int = 0,
         *,
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
@@ -92,6 +94,7 @@ class Agent:
             telemetry: Optional Telemetry instance for agent observability and tracing.
             skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills.
             logger: Custom logger instance. If not provided, a ConsoleLogger will be used.
+            discovery_ttl: Time to live in seconds for caching Agent information discovered from the Registry.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
             verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose (debug mode).
             memory: Conversation memory mode.
@@ -157,6 +160,9 @@ class Agent:
         # Uptime
         self.start_time: float | None = None
 
+        # Discovery TTL Cache - TODO(): Implement proper cache
+        self._discovery_ttl = discovery_ttl
+
     # ----------------------------------------------------------------------
     # Agent Server Lifecycle - A2A Operations
     # ----------------------------------------------------------------------
@@ -207,12 +213,9 @@ class Agent:
         if self.registry_client:
             await self.registry_client.unregister(self.card.url)
 
-    async def _run_forever(self) -> None:
-        """Block indefinitely until interrupted.
-
-        Used internally by start(block=True) to keep the agent running.
-        Handles graceful shutdown on cancellation.
-        """
+    def start_sync(self, *, blocking: bool = False) -> None:
+        """Synchronous wrapper around start() for convenience."""
+        asyncio.run(self.start(blocking=blocking))
 
     # ----------------------------------------------------------------------
     # Agent to Agent Communication - Client & Server
@@ -881,13 +884,67 @@ class Agent:
         """
         return self.card.to_dict() if as_json else self.card
 
-    def get_agent_status_html(self) -> str:
-        """Return the agent's status as HTML.
+    def get_status(self, output_format: Literal["html", "json"] = "html") -> str:
+        """Return the agent's status as HTML or JSON.
+
+        Args:
+            output_format: Format of the returned status information
 
         Returns:
-            HTML string with agent status information
+            String with agent status information in the specified format
         """
-        return to_status_html(agent=self.card, start_time=self.start_time)
+        if output_format == "html":
+            return to_status_html(agent=self.card, start_time=self.start_time)
+        elif output_format == "json":
+            return str(self.card.to_dict())
+        raise ValueError(f"Unknown format: {output_format}")
+
+    def get_chat(self) -> str:
+        """Return the chat UI page as HTML.
+
+        This endpoint is only available if the agent has an LLM configured.
+        It renders a self-contained chat interface that communicates with
+        the agent's POST /chat endpoint.
+
+        Returns:
+            HTML string with the chat interface
+        """
+        if not self.llm:
+            return "<html><body><h1>Chat not available</h1><p>This agent has no LLM configured.</p></body></html>"
+
+        llm_info = {
+            "provider": getattr(self.llm, "provider", None),
+            "model": getattr(self.llm, "model", None),
+            "model_type": getattr(self.llm, "model_type", None),
+            "model_params": getattr(self.llm, "model_params", {}),
+        }
+        return to_chat_html(agent=self.card, llm_info=llm_info, start_time=self.start_time)
+
+    async def handle_chat_message(self, data: dict[str, Any]) -> dict[str, str]:
+        """Handle an incoming chat message from the chat UI.
+
+        Expects a JSON body with 'message' and optional 'session_id'.
+        Uses the agent's invoke() method under the hood.
+
+        Args:
+            data: Dict with 'message' (str) and optional 'session_id' (str)
+
+        Returns:
+            Dict with 'response' key containing the agent's reply
+        """
+        message = data.get("message", "")
+        session_id = data.get("session_id", "chat_default")
+
+        if not message:
+            return {"error": "Empty message"}
+        if not self.llm:
+            return {"error": "Agent has no LLM configured"}
+
+        try:
+            response = await self.invoke(message=message, part_type="infer", session_id=session_id)
+            return {"response": response}
+        except Exception as e:
+            return {"error": str(e)}
 
     def get_tools_for_prompt(self) -> str | None:
         """Return a string with a list of the agent's tools to be used in  LLM prompts.

@@ -21,6 +21,7 @@ The `AgentServer` exposes an `Agent` over a Transport.
 - Exposing the Task submission endpoint.
 - Serving the Agent's identity card (`/.well-known/agent.json`).
 - Providing a status page.
+- Exposing the Chat Gateway when the agent has an LLM.
 
 ### Endpoints
 
@@ -29,6 +30,8 @@ The `AgentServer` exposes an `Agent` over a Transport.
 | `/tasks/` | `POST` | **Task Submission**. Accepts a `Task` object, processes it via the Agent, and returns the result. |
 | `/.well-known/agent.json` | `GET` | **Agent Discovery**. Returns the `AgentCard` describing this agent. |
 | `/status` | `GET` | **Status Page**. Returns a human-readable HTML status dashboard. |
+| `/chat` | `GET` | **Chat Page**. Returns a self-contained HTML/CSS/JS chat interface. Always registered; shows a fallback message if no LLM is configured. |
+| `/chat` | `POST` | **Chat Message**. Accepts `{"message": "...", "session_id": "..."}` and returns the agent's response. *Only registered when the agent has an LLM.* |
 
 ### Usage
 

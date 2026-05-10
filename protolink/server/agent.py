@@ -14,7 +14,7 @@ It does **not** implement networking itself. Instead, it:
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from protolink.models import AgentCard, Task
 from protolink.server.endpoint_handler import EndpointSpec
@@ -38,8 +38,14 @@ class AgentInterface(Protocol):
     def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's public metadata and capabilities."""
 
-    def get_agent_status_html(self) -> str:
-        """Return a human-readable HTML status page."""
+    def get_status(self, output_format: Literal["html", "json"] = "html") -> str:
+        """Return the agent's status as HTML or JSON."""
+
+    def get_chat(self) -> str:
+        """Return the chat UI page as HTML."""
+
+    async def handle_chat_message(self, data: dict[str, Any]) -> dict[str, str]:
+        """Handle an incoming chat message and return the response."""
 
 
 class AgentServer:
@@ -92,7 +98,15 @@ class AgentServer:
                 name="status",
                 path="/status",
                 method="GET",
-                handler=self._agent.get_agent_status_html,
+                handler=self._agent.get_status,
+                request_source="none",
+                content_type="html",
+            ),
+            EndpointSpec(
+                name="chat_page",
+                path="/chat",
+                method="GET",
+                handler=self._agent.get_chat,
                 request_source="none",
                 content_type="html",
             ),
@@ -113,6 +127,23 @@ class AgentServer:
             )
 
         self._transport.setup_routes(endpoints)
+
+        # ── Chat endpoints (only when the agent has an LLM) ──
+        has_llm = bool(getattr(self._agent, "llm", None))
+        if not has_llm:
+            card = getattr(self._agent, "card", None)
+            has_llm = bool(card and getattr(getattr(card, "capabilities", None), "has_llm", False))
+        if has_llm:
+            chat_endpoints = [
+                EndpointSpec(
+                    name="chat_message",
+                    path="/chat",
+                    method="POST",
+                    handler=self._agent.handle_chat_message,
+                    request_source="body",
+                ),
+            ]
+            self._transport.setup_routes(chat_endpoints)
 
     async def start(self) -> None:
         """Start the agent server.
