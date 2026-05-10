@@ -73,6 +73,7 @@ class Agent:
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
         memory: MemoryModeType = "none",
+        expose_chat: bool = True,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -100,12 +101,16 @@ class Agent:
             memory: Conversation memory mode.
                 - ``"none"`` (default): Stateless. History is wiped on every task.
                 - ``"session"``: Persistent per session. History is preserved across tasks with the same ``session_id``.
+            expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
         self.card: AgentCard = AgentCard.from_dict(card) if isinstance(card, dict) else card
         self.context_manager = ContextManager()
+        # LLM validation is handled by the @llm.setter property.
+        self._llm: LLM | None = None
         self.llm = llm
+        self._storage: Storage
         self.storage = storage if storage is not None else InMemoryStorage(namespace=self.card.name)
         self._telemetry: Telemetry | None = None
         self.telemetry = telemetry
@@ -116,7 +121,7 @@ class Agent:
         # memory_mode determines if history is wiped per task ("none") or kept per session ("session")
         self.memory_mode = memory
         # SessionManager provides a modular interface to load/save histories via self.storage
-        self._session_manager = SessionManager(storage=self.storage, memory_mode=memory)
+        self._session_manager = SessionManager(storage=self._storage, memory_mode=memory)
 
         # LLM prompt
         self._system_prompt: str | None = system_prompt
@@ -149,11 +154,6 @@ class Agent:
         else:
             self.set_registry(registry, registry_url)
 
-        # LLM Validation
-        if self.llm is not None:
-            if self.llm.validate_connection():
-                self.card.capabilities.has_llm = True  # Override even if defined by the user.
-
         # Resolve and add necessairy skills
         self._resolve_skills(skills)
 
@@ -162,6 +162,9 @@ class Agent:
 
         # Discovery TTL Cache - TODO(): Implement proper cache
         self._discovery_ttl = discovery_ttl
+
+        # Expose Chat
+        self._expose_chat = expose_chat
 
     # ----------------------------------------------------------------------
     # Agent Server Lifecycle - A2A Operations
@@ -873,7 +876,84 @@ class Agent:
         return detected_skills
 
     # ----------------------------------------------------------------------
-    # Properties - Getters & Setters
+    # Properties
+    # ----------------------------------------------------------------------
+
+    @property
+    def transport(self) -> Transport | None:
+        return self._transport
+
+    @transport.setter
+    def transport(self, transport: TransportType | Transport | None) -> None:
+        """Set the transport layer for this agent.
+
+        Args:
+            transport: Transport instance for communication
+        """
+
+        if transport is None:
+            raise ValueError("transport must not be None")
+
+        if isinstance(transport, str):
+            transport = get_transport(transport, url=self.card.url)
+        elif isinstance(transport, Transport):
+            # TODO(): Examine here
+            # Transport and AgentCard URL must match if transport has a URL.
+            # transport_url = getattr(transport, "url", None)
+            # if transport_url is not None and transport_url != self.card.url:
+            #     raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
+            transport = transport
+        else:
+            raise ValueError("Invalid transport type")
+
+        self._transport = transport
+        # Initialize Agent-to-Agent Client
+        self._client = AgentClient(transport=transport)
+        # Exposes AgentProtocol to Server
+        self._server = AgentServer(transport=transport, agent=self)
+
+    @property
+    def llm(self) -> LLM | None:
+        """The agent's language model instance."""
+        return self._llm
+
+    @llm.setter
+    def llm(self, llm: LLM | None) -> None:
+        """Set the agent's LLM, validate the connection and update capabilities."""
+        self._llm = llm
+        if llm is not None:
+            if llm.validate_connection():
+                self.card.capabilities.has_llm = True
+        else:
+            self.card.capabilities.has_llm = False
+
+    @property
+    def telemetry(self) -> Telemetry | None:
+        return self._telemetry
+
+    @telemetry.setter
+    def telemetry(self, telemetry: Telemetry | None) -> None:
+        """Sets the Agent's telemetry instance.
+
+        Args:
+            telemetry: Telemetry instance for observability
+        """
+        self._telemetry = telemetry
+
+    @property
+    def storage(self) -> Storage:
+        """The agent's storage instance."""
+        return self._storage
+
+    @storage.setter
+    def storage(self, storage: Storage) -> None:
+        """Set the agent's storage instance and update session manager."""
+        self._storage = storage
+        if hasattr(self, "_session_manager"):
+            self._session_manager.storage = storage
+
+    # ----------------------------------------------------------------------
+    # Getters & Setters
     # ----------------------------------------------------------------------
 
     def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
@@ -903,14 +983,17 @@ class Agent:
         """Return the chat UI page as HTML.
 
         This endpoint is only available if the agent has an LLM configured.
-        It renders a self-contained chat interface that communicates with
-        the agent's POST /chat endpoint.
+        It renders a self-contained chat interface that communicates with the agent's POST /chat endpoint.
 
         Returns:
             HTML string with the chat interface
         """
+
         if not self.llm:
             return "<html><body><h1>Chat not available</h1><p>This agent has no LLM configured.</p></body></html>"
+
+        if not self._expose_chat:
+            return "<html><body><h1>Chat not available</h1><p>This agent does not expose a chat UI.</p></body></html>"
 
         llm_info = {
             "provider": getattr(self.llm, "provider", None),
@@ -939,6 +1022,8 @@ class Agent:
             return {"error": "Empty message"}
         if not self.llm:
             return {"error": "Agent has no LLM configured"}
+        if not self._expose_chat:
+            return {"error": "Agent does not expose a chat endpoint"}
 
         try:
             response = await self.invoke(message=message, part_type="infer", session_id=session_id)
@@ -976,39 +1061,6 @@ class Agent:
             """
         return tool_prompt
 
-    @property
-    def transport(self) -> Transport | None:
-        return self._transport
-
-    @transport.setter
-    def transport(self, transport: TransportType | Transport | None) -> None:
-        """Set the transport layer for this agent.
-
-        Args:
-            transport: Transport instance for communication
-        """
-
-        if transport is None:
-            raise ValueError("transport must not be None")
-
-        if isinstance(transport, str):
-            transport = get_transport(transport, url=self.card.url)
-        elif isinstance(transport, Transport):
-            # TODO(): Examine here
-            # Transport and AgentCard URL must match if transport has a URL.
-            # transport_url = getattr(transport, "url", None)
-            # if transport_url is not None and transport_url != self.card.url:
-            #     raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
-            transport = transport
-        else:
-            raise ValueError("Invalid transport type")
-
-        self._transport = transport
-        # Initialize Agent-to-Agent Client
-        self._client = AgentClient(transport=transport)
-        # Exposes AgentProtocol to Server
-        self._server = AgentServer(transport=transport, agent=self)
-
     def set_registry(
         self, registry: TransportType | Registry | RegistryClient | None, registry_url: str | None = None
     ) -> None:
@@ -1036,32 +1088,6 @@ class Agent:
         else:
             self.registry_client = None
             self._logger.error("registry argument cannot be None")
-
-    def set_llm(self, llm: LLM) -> None:
-        """Sets the Agent's LLM and validates the connection."""
-        self.llm = llm
-        _ = self.llm.validate_connection()
-
-    def set_storage(self, storage: Storage) -> None:
-        """Sets the Agent's storage instance.
-
-        Args:
-            storage: Storage instance for persistence
-        """
-        self.storage = storage
-
-    @property
-    def telemetry(self) -> Telemetry | None:
-        return self._telemetry
-
-    @telemetry.setter
-    def telemetry(self, telemetry: Telemetry | None) -> None:
-        """Sets the Agent's telemetry instance.
-
-        Args:
-            telemetry: Telemetry instance for observability
-        """
-        self._telemetry = telemetry
 
     # ----------------------------------------------------------------------
     # Private Methods

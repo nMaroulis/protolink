@@ -542,6 +542,115 @@ body {{
   .toggle-sidebar {{ display: flex; align-items: center; justify-content: center; }}
   .msg {{ max-width: 90%; }}
 }}
+
+/* ── Debug panel ──────────────────────────────────────────── */
+.debug-switch {{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}}
+
+.debug-switch-label {{
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  transition: color var(--transition);
+}}
+
+.debug-switch-track {{
+  position: relative;
+  width: 38px;
+  height: 20px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: all var(--transition);
+}}
+
+.debug-switch-knob {{
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: all var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}}
+
+.debug-switch input {{ display: none; }}
+
+.debug-switch input:checked ~ .debug-switch-track {{
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}}
+
+.debug-switch input:checked ~ .debug-switch-track .debug-switch-knob {{
+  left: 20px;
+  background: var(--accent-bright);
+  box-shadow: 0 0 6px var(--accent-glow);
+}}
+
+.debug-switch:hover .debug-switch-track {{
+  border-color: var(--border-hover);
+}}
+
+.debug-switch input:checked ~ .debug-switch-label {{
+  color: var(--accent-bright);
+}}
+
+.debug-panel {{
+  display: none;
+  border-bottom: 1px solid var(--border);
+  background: rgba(6, 8, 15, .8);
+  backdrop-filter: blur(12px);
+  padding: 12px 24px;
+  animation: slideDown .25s cubic-bezier(.4,0,.2,1);
+}}
+
+.debug-panel.visible {{ display: block; }}
+
+@keyframes slideDown {{
+  from {{ opacity: 0; transform: translateY(-8px); }}
+  to {{ opacity: 1; transform: translateY(0); }}
+}}
+
+.debug-grid {{
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}}
+
+.debug-item {{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 100px;
+}}
+
+.debug-label {{
+  font-size: .58rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text-muted);
+}}
+
+.debug-value {{
+  font-size: .78rem;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  color: var(--accent-bright);
+}}
+
+.debug-value.warn {{ color: #fbbf24; }}
+.debug-value.error {{ color: #f87171; }}
 </style>
 </head>
 <body>
@@ -616,6 +725,36 @@ body {{
     <button class="toggle-sidebar" id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
     <span class="topbar-title">Chat with {_fmt(agent.name)}</span>
     <span class="topbar-model">{provider} · {model}</span>
+    <label class="debug-switch" title="Toggle debug panel">
+      <input type="checkbox" id="debug-checkbox" onchange="toggleDebug()" />
+      <div class="debug-switch-track"><div class="debug-switch-knob"></div></div>
+      <span class="debug-switch-label">Debug</span>
+    </label>
+  </div>
+
+  <div class="debug-panel" id="debug-panel">
+    <div class="debug-grid">
+      <div class="debug-item">
+        <span class="debug-label">Last Latency</span>
+        <span class="debug-value" id="dbg-latency">—</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Avg Latency</span>
+        <span class="debug-value" id="dbg-avg-latency">—</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Messages Sent</span>
+        <span class="debug-value" id="dbg-msg-count">0</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Session ID</span>
+        <span class="debug-value" id="dbg-session">—</span>
+      </div>
+      <div class="debug-item">
+        <span class="debug-label">Last Error</span>
+        <span class="debug-value" id="dbg-error">None</span>
+      </div>
+    </div>
   </div>
 
   <div class="messages" id="messages">
@@ -702,6 +841,48 @@ function addMessage(text, role) {{
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }}
 
+/* ── Debug state ─────────────────────────────────────────── */
+let debugMsgCount = 0;
+let debugLatencies = [];
+const dbgLatency = document.getElementById("dbg-latency");
+const dbgAvgLatency = document.getElementById("dbg-avg-latency");
+const dbgMsgCount = document.getElementById("dbg-msg-count");
+const dbgSession = document.getElementById("dbg-session");
+const dbgError = document.getElementById("dbg-error");
+dbgSession.textContent = sessionId;
+
+function toggleDebug() {{
+  const panel = document.getElementById("debug-panel");
+  const checked = document.getElementById("debug-checkbox").checked;
+  if (checked) {{
+    panel.classList.add("visible");
+  }} else {{
+    panel.classList.remove("visible");
+  }}
+}}
+
+function updateDebugStats(latencyMs, error) {{
+  debugMsgCount++;
+  dbgMsgCount.textContent = debugMsgCount;
+
+  if (error) {{
+    dbgError.textContent = error.substring(0, 60);
+    dbgError.className = "debug-value error";
+  }} else {{
+    dbgError.textContent = "None";
+    dbgError.className = "debug-value";
+  }}
+
+  if (latencyMs !== null) {{
+    debugLatencies.push(latencyMs);
+    dbgLatency.textContent = latencyMs + " ms";
+    dbgLatency.className = latencyMs > 5000 ? "debug-value warn" : "debug-value";
+    const avg = Math.round(debugLatencies.reduce((a, b) => a + b, 0) / debugLatencies.length);
+    dbgAvgLatency.textContent = avg + " ms";
+    dbgAvgLatency.className = avg > 5000 ? "debug-value warn" : "debug-value";
+  }}
+}}
+
 /* ── Send message ───────────────────────────────────────── */
 async function sendMessage() {{
   const text = inputEl.value.trim();
@@ -715,18 +896,25 @@ async function sendMessage() {{
   typingEl.classList.add("visible");
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
+  const t0 = performance.now();
   try {{
     const res = await fetch("/chat", {{
       method: "POST",
       headers: {{ "Content-Type": "application/json" }},
       body: JSON.stringify({{ message: text, session_id: sessionId }}),
     }});
+    const t1 = performance.now();
+    const latency = Math.round(t1 - t0);
     const data = await res.json();
     typingEl.classList.remove("visible");
+    const errorMsg = data.error || null;
     addMessage(data.response || data.error || "No response", "agent");
+    updateDebugStats(latency, errorMsg);
   }} catch (err) {{
+    const t1 = performance.now();
     typingEl.classList.remove("visible");
     addMessage("⚠ Connection error: " + err.message, "agent");
+    updateDebugStats(Math.round(t1 - t0), err.message);
   }}
 }}
 </script>

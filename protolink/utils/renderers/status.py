@@ -148,6 +148,49 @@ footer {{ margin-top: 22px; display: flex; justify-content: space-between; font-
   transition: text-shadow .3s ease;
 }}
 .uptime:hover {{ text-shadow: 0 0 12px var(--accent), 0 0 24px var(--accent-soft); }}
+.llm-badge {{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .7rem;
+  font-weight: 600;
+  color: #c084fc;
+  background: rgba(192, 132, 252, .1);
+  border: 1px solid rgba(192, 132, 252, .25);
+  padding: 4px 10px;
+  border-radius: 999px;
+  transition: all .2s ease;
+}}
+.llm-badge::before {{
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c084fc;
+  box-shadow: 0 0 6px rgba(192, 132, 252, .6);
+  animation: pulse-llm 2s infinite;
+}}
+@keyframes pulse-llm {{
+  0%,100% {{ box-shadow: 0 0 0 0 rgba(192, 132, 252, .5); }}
+  50% {{ box-shadow: 0 0 8px 3px rgba(192, 132, 252, .15); }}
+}}
+.llm-badge:hover {{ border-color: #c084fc; box-shadow: 0 0 0 3px rgba(192, 132, 252, .1); }}
+.chat-btn {{
+  background: linear-gradient(135deg, rgba(99,102,241,.15), rgba(124,58,237,.15));
+  border: 1px solid rgba(99,102,241,.3);
+  color: #a5b4fc;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: .8rem;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .2s ease;
+}}
+.chat-btn:hover {{ border-color: #818cf8; color: #c7d2fe; box-shadow: 0 0 0 3px rgba(99,102,241,.15), 0 4px 12px rgba(99,102,241,.2); transform: translateY(-1px); }}
 </style>
 </head>
 <body>
@@ -170,7 +213,10 @@ footer {{ margin-top: 22px; display: flex; justify-content: space-between; font-
     </div>
 
     <section>
-      <h2>Capabilities</h2>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom: 4px;">
+        <h2 style="margin:0;">Capabilities</h2>
+        {'<span class="llm-badge">LLM</span>' if agent.capabilities.has_llm else ""}
+      </div>
       <ul>{_list([str(c) for c in agent.capabilities.enabled() or []], empty="None")}</ul>
     </section>
 
@@ -197,6 +243,7 @@ footer {{ margin-top: 22px; display: flex; justify-content: space-between; font-
 
     <div class="actions">
       <button id="ping-btn" onclick="ping()">Ping agent</button>
+      {'<a class="chat-btn" href="/chat">💬 Open Chat</a>' if agent.capabilities.has_llm else ""}
       <span id="ping-result" class="ping-result"></span>
       <span class="uptime">Uptime: <span id="uptime">0s</span></span>
     </div>

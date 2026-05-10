@@ -372,11 +372,17 @@ class TestAgent:
         assert context_manager == agent.context_manager
 
     def test_set_llm(self, agent):
-        """Test setting the LLM."""
+        """Test setting the LLM via property."""
         llm = DummyLLM()
-        agent.set_llm(llm)
+        agent.llm = llm
 
         assert agent.llm == llm
+        assert agent.card.capabilities.has_llm is True
+
+        # Setting to None should clear the capability flag
+        agent.llm = None
+        assert agent.llm is None
+        assert agent.card.capabilities.has_llm is False
 
     def test_set_transport_invalid(self, agent):
         """Test setting invalid transport."""

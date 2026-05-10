@@ -148,6 +148,7 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `memory` | `MemoryModeType` | `"none"` | Conversation memory mode: `"none"` (stateless) or `"session"` (persistent across tasks with same `session_id`). |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent (WARNING only), `1` = normal (INFO), `2` = verbose (DEBUG). |
+| `expose_chat` | `bool` | `True` | Whether the Agent will expose a chat endpoint for interaction with a UI. |
 
 ```python
 from protolink.agents import Agent
@@ -366,8 +367,8 @@ agent.add_tool(WeatherTool())
 | `get_status()` | `output_format: Literal["html", "json"] = "html"` | `str` | Returns the agent's status as HTML or JSON. HTML is a rich status page for the agent (displayed at `/status`). JSON is a machine-readable representation of the agent's status. |
 | `get_chat()` | — | `str` | Returns a self-contained chat UI as HTML. Only functional when the agent has an LLM configured (served at `/chat`). |
 | `handle_chat_message()` | `data: dict` | `dict` | Processes an incoming chat message via the agent's `invoke()` method and returns the response. |
-| `set_llm()` | `llm: LLM` | `None` | Updates the agent's language model instance and validates the connection. |
-| `set_storage()` | `storage: Storage` | `None` | Sets the Agent's storage instance for persistence. |
+| `llm` (property) | `LLM ⎪ None` | `None` | Gets or sets the agent's language model. Setting this validates the connection and updates `card.capabilities.has_llm` automatically. |
+| `storage` (property) | `Storage` | `None` | Gets or sets the agent's storage instance. Setting this automatically updates the internal `SessionManager`. |
 | `set_registry()` | `registry, registry_url=None` | `None` | Configures the agent's connection to a Protolink registry. |
 | `get_context_manager()` | — | `ContextManager` | Returns the context manager for this agent. |
 
