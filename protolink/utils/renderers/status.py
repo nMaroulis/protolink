@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 """
-HTML and text renderers for Protolink agents.
+HTML and text renderers for Protolink Agent & Registry Status pages.
 
 These utilities provide human-readable representations of AgentCard instances without introducing UI frameworks or runtime dependencies.
 """

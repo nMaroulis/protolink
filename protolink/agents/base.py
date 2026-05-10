@@ -45,8 +45,8 @@ from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
 from protolink.types import MemoryModeType, TransportType
-from protolink.utils.chat_renderer import to_chat_html
-from protolink.utils.renderers import to_status_html
+from protolink.utils.renderers.chat import to_chat_html
+from protolink.utils.renderers.status import to_status_html
 
 
 class Agent:

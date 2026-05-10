@@ -9,7 +9,7 @@ from protolink.server import RegistryServer
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
 from protolink.utils.logging import get_logger
-from protolink.utils.renderers import to_registry_status_html
+from protolink.utils.renderers.status import to_registry_status_html
 
 
 class Registry:
