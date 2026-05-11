@@ -121,11 +121,16 @@ class TestRegistry:
         registry = Registry(transport=dummy_transport)
         assert registry.start_time is None
 
-        await registry.start()
+        if task := registry.start(background=True):
+            await task
         assert registry.start_time is not None
         assert dummy_transport._started is True
 
-        await registry.stop()
+        if task := registry.stop():
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         assert dummy_transport._started is False
 
     @pytest.mark.asyncio
@@ -134,8 +139,9 @@ class TestRegistry:
         dummy_transport.start = AsyncMock(side_effect=Exception("Test error"))
         registry = Registry(transport=dummy_transport)
 
+        task = registry.start(background=True)
         with pytest.raises(Exception, match="Test error"):
-            await registry.start()
+            await task
 
     @pytest.mark.asyncio
     async def test_register_agent(self, dummy_transport, agent_card):
@@ -357,7 +363,8 @@ class TestRegistry:
         registry = Registry(transport=http_transport)
 
         # Start registry
-        await registry.start()
+        if task := registry.start(background=True):
+            await task
         assert registry.start_time is not None
 
         # Register agent (directly call handler to avoid network)
@@ -378,7 +385,11 @@ class TestRegistry:
         assert registry.count() == 0
 
         # Stop registry
-        await registry.stop()
+        if task := registry.stop():
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     def test_filter_by_multiple_attributes(self, dummy_transport):
         """Test filtering agents by multiple attributes."""

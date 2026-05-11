@@ -22,7 +22,7 @@ async def main():
 
     # 1. Start Registry
     registry = Registry(url=REGISTRY_URL, transport="http")
-    await registry.start()
+    registry.start(background=True)
     print("✅ Registry started")
 
     # 2. Setup Agent A (Researcher)
@@ -44,7 +44,7 @@ async def main():
         registry_url=REGISTRY_URL,
         verbosity=2,
     )
-    await researcher.start()
+    researcher.start(background=True)
     print("✅ Researcher agent started")
 
     # 3. Setup Agent B (Summarizer)
@@ -65,7 +65,7 @@ async def main():
         registry_url=REGISTRY_URL,
         verbosity=2,
     )
-    await summarizer.start()
+    summarizer.start(background=True)
     print("✅ Summarizer agent started")
 
     await asyncio.sleep(1)  # wait for registration
@@ -111,7 +111,7 @@ async def main():
         registry_url=REGISTRY_URL,
         verbosity=1,
     )
-    await structured_agent.start()
+    structured_agent.start(background=True)
     print("✅ StructuredAgent started")
 
     # User interacts with the StructuredAgent as if it were a single agent
@@ -126,10 +126,10 @@ async def main():
 
     # Cleanup
     print("\n🛑 Shutting down...")
-    await structured_agent.stop()
-    await summarizer.stop()
-    await researcher.stop()
-    await registry.stop()
+    structured_agent.stop()
+    summarizer.stop()
+    researcher.stop()
+    registry.stop()
 
 
 if __name__ == "__main__":

@@ -1,180 +1,67 @@
-# Registry
-
-The **Registry** is the discovery and coordination layer of Protolink.  
-It allows agents to **register themselves**, **discover other agents**, and **interact autonomously** over a shared transport.
-
-At a high level:
-
-- Agents **announce their existence** to a Registry
-- Other agents can **discover agents dynamically**
-- The Registry runs as a **server** and exposes a transport-backed API
-- Agents can operate **autonomously**, without manual function calls
-
-!!! success "Why a Registry?"
-    The Registry enables **dynamic, decentralized agent systems**.  
-    Agents don’t need hard-coded references to each other — they discover peers at runtime and coordinate through messages.
-
-!!! info "Inspiration"
-    The Registry is inspired by [Google's A2A paper](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/), which introduces a similar concept for agent-to-agent discovery.
-
-## Core Concepts
-
-### Registry
-
-The Registry is a **long-running service** responsible for:
-
-- Tracking active agents
-- Storing their `AgentCard` metadata
-- Exposing discovery endpoints via a transport
-- Acting as the entry point for multi-agent systems
-
-The Registry does **not execute agent logic**.  
-It only provides **discovery, metadata, and routing primitives**.
-
----
-
-### Agent Registration
-
-Each agent registers itself by sending its `AgentCard` to the Registry when it starts.
-
-An `AgentCard` typically includes:
-
-- Agent name
-- Description
-- Capabilities / skills
-- Transport URL
-- Optional metadata
-
-Once registered, the agent becomes discoverable by other agents.
-
-!!! note "Dynamic Systems"
-    Agents may join or leave at any time.  
-    The Registry reflects the current state of the system dynamically.
-
----
-
-### Agent Discovery
-
-Agents query the Registry to discover other agents.
-
-Discovery supports **optional filtering**, for example:
-
-- By name
-- By capability
-- By arbitrary metadata
-
-```python
-agents = await registry.discover(filters={
-    "capability": "search",
-    "domain": "finance"
-})
-```
-
-# Registry
-
-The **Registry** is the discovery and coordination layer of Protolink.  
-It allows agents to **register themselves**, **discover other agents**, and **interact autonomously** over a shared transport.
-
-At a high level:
-
-- Agents **announce their existence** to a Registry
-- Other agents can **discover agents dynamically**
-- The Registry runs as a **server** and exposes a transport-backed API
-- Agents can operate **autonomously**, without manual function calls
-
-!!! success "Why a Registry?"
-    The Registry enables **dynamic, decentralized agent systems**.  
-    Agents don’t need hard-coded references to each other — they discover peers at runtime and coordinate through messages.
-
----
-
-## Core Concepts
-
-### Registry
-
-The Registry is a **long-running service** responsible for:
-
-- Tracking active agents
-- Storing their `AgentCard` metadata
-- Exposing discovery endpoints via a transport
-- Acting as the entry point for multi-agent systems
-
-The Registry does **not execute agent logic**.  
-It only provides **discovery, metadata, and routing primitives**.
-
----
-
-### Agent Registration
-
-Each agent registers itself by sending its `AgentCard` to the Registry when it starts.
-
-An `AgentCard` typically includes:
-
-- Agent name
-- Description
-- Capabilities / skills
-- Transport URL
-- Optional metadata
-
-Once registered, the agent becomes discoverable by other agents.
-
-!!! note "Dynamic Systems"
-    Agents may join or leave at any time.  
-    The Registry reflects the current state of the system dynamically.
-
----
-
-### Agent Discovery
-
-Agents query the Registry to discover other agents.
-
-Discovery supports **optional filtering**, for example:
-
-- By name
-- By capability
-- By arbitrary metadata
-
-```python
-agents = await registry.discover(filters={
-    "capability": "search",
-    "domain": "finance"
-})
-```
-
 !!! tip "Filters are Optional"
     Calling discover() with no filters returns all registered agents.
 
-
 ### Transport Integration
 
-The Registry is transport-agnostic.
-It relies on a Transport implementation to expose its API.
+The Registry is transport-agnostic. It relies on a Transport implementation to expose its API.
 
 Currently supported:
-
 - `HTTPTransport` (via `protolink.transport.HTTPTransport`)
 
 The transport is responsible for:
-
 - Binding to a host and port
 - Exposing registry endpoints
 - Handling request/response lifecycle
 
 ---
 
-### Starting the Registry
+## Lifecycle Methods
 
-The Registry is started via its transport
+These methods control the registry server component lifecycle.
 
+| Name | Parameters | Returns | Description |
+|------|------------|---------|-------------|
+| `start()` | `background: bool = False` | `asyncio.Task ⎪ None` | Starts the Registry runtime. Automatically detects environment and event loops. |
+| `stop()` | — | `None` | Stops the Registry runtime and cleans up resources. |
+
+### Execution Models: Adaptive `start()`
+
+Similar to agents, the Registry's `start()` method is **environment-aware**. It detects whether it is running in a script, an async app, or a notebook.
+
+#### The `background` Parameter
+
+- **`background=False` (Default)**: Blocks execution until the registry is stopped (e.g., via Ctrl+C). Ideal for standalone registry processes.
+- **`background=True`**: Starts the registry in the background and returns immediately. Ideal for orchestrating a system in a single script.
+
+#### Common Usage Patterns
+
+**1. Standalone Registry Service**
 ```python
 from protolink.discovery.registry import Registry
-from protolink.transport import HTTPTransport
+registry = Registry(url="http://localhost:9000")
 
-transport = HTTPTransport(url="http://localhost:9020")
-registry = Registry(transport, verbosity=1)
-
-await registry.start()
+# Blocks and runs the registry server
+registry.start()
 ```
+
+**2. Multi-Agent Orchestration (Sync Script)**
+```python
+registry.start(background=True)
+agent_a.start(background=True)
+agent_b.start(background=False) # Blocks here to keep the process alive
+```
+
+**3. Jupyter Notebooks**
+```python
+# In a Jupyter cell
+registry.start() # Returns an asyncio.Task immediately and runs in background
+```
+
+!!! tip "Graceful Shutdown"
+    Use `registry.stop()` to cleanly shut down the server. In blocking scripts, `registry.start()` handles `KeyboardInterrupt` automatically.
+
+---
+
 
 #### Constructor Parameters
 
@@ -184,24 +71,6 @@ await registry.start()
 | `url` | `str ⎪ None` | `None` | Registry URL (used when transport is a string type). |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity: `0` = silent (WARNING), `1` = normal (INFO), `2` = verbose (DEBUG). |
 
-#### Blocking Mode
-
-The `start()` method accepts a `blocking` parameter:
-
-```python
-# Non-blocking (default) - for multi-agent orchestration
-await registry.start()
-await agent1.start()
-await agent2.start()
-# Continue with other logic...
-
-# Blocking - for standalone registry server
-asyncio.run(registry.start(blocking=True))  # Runs until Ctrl+C
-```
-
-Use `blocking=True` when running the registry as a standalone service.
-
-This starts a registry server that agents can connect to.
 !!! info "Single Source of Truth"
     The Registry’s public URL is derived from the transport and used by agents for registration and discovery.
 

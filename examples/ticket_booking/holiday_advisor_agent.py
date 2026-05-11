@@ -7,7 +7,6 @@ It uses an LLM for reasoning - no tools needed.
 This showcases agent_call with action "infer" (LLM-to-LLM delegation).
 """
 
-import asyncio
 import os
 
 from protolink.agents import Agent
@@ -109,10 +108,9 @@ if __name__ == "__main__":
 
     llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")
     agent = create_advisor_agent(registry, llm_provider)
-    asyncio.run(agent.start())
     print(f"Holiday Advisor Agent running at {agent.card.url}")
     print("Press Ctrl+C to stop")
     try:
-        asyncio.get_event_loop().run_forever()
+        agent.start()
     except KeyboardInterrupt:
-        asyncio.run(agent.stop())
+        agent.stop()

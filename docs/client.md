@@ -4,7 +4,17 @@ The **Client** layer in Protolink provides a high-level interface for agent-to-a
 
 ## AgentClient
 
-The `AgentClient` is the primary entry point for programmatic agent interactions. It wraps a transport and provides typed methods for common operations.
+The `AgentClient` is the primary entry point for programmatic agent interactions. It wraps a transport and provides a unified interface for communicating with Protolink agents.
+
+### Design Philosophy: Async vs Sync
+
+Protolink's client architecture exposes two APIs to accommodate different workflows:
+
+1. **Async API (Recommended)**: The core implementation. Ideal for modern applications, web servers (e.g., FastAPI), and high-performance multi-agent orchestration where non-blocking I/O is crucial.
+2. **Sync API (`client.sync`)**: A thin, blocking wrapper over the async methods. Designed for simple scripts, CLI tools, and environments where managing an `asyncio` event loop is cumbersome.
+
+!!! warning "Async Loop Constraint"
+    The Sync API (`client.sync`) uses `asyncio.run()` under the hood. It **cannot** be used inside an already running event loop (e.g., inside an async function). If you are inside an `async def`, always use the standard Async API.
 
 ### Quick Start
 
@@ -130,6 +140,37 @@ card = await client.get_agent_card("http://localhost:8010")
 print(f"Agent: {card.name}")
 print(f"Description: {card.description}")
 print(f"Skills: {[s.id for s in card.skills]}")
+```
+
+---
+
+## Synchronous API
+
+The `AgentClient` provides synchronous versions of its core methods for use in non-async contexts (scripts, notebooks, CLI tools). These are accessible via the `client.sync` property.
+
+Internally, these methods use `asyncio.run()` to handle the asynchronous transport logic.
+
+!!! warning "Do Not Use in Async Loops"
+    The synchronous API should **NOT** be used inside an active event loop (e.g., inside FastAPI endpoints or async Jupyter cells) as it uses `asyncio.run()`, which will raise a `RuntimeError`.
+
+| Async Method | Synchronous Equivalent | Description |
+|--------------|------------------------|-------------|
+| `send_task()` | `client.sync.send_task()` | Synchronously send a task and wait for the result. |
+| `send_message()` | `client.sync.send_message()` | Synchronously send a message and wait for the response message. |
+| `get_agent_card()` | `client.sync.get_agent_card()` | Synchronously retrieve an agent's public card. |
+
+**Example:**
+
+```python
+from protolink.client import AgentClient
+from protolink.models import Task
+
+client = AgentClient(transport="http", url="http://localhost:8000")
+task = Task.create_infer(prompt="Hello, agent!")
+
+# No 'await' or 'async def' needed. Use the .sync property!
+result = client.sync.send_task("http://localhost:8010", task)
+print(result.get_last_part_content())
 ```
 
 ---

@@ -28,6 +28,7 @@ is resolved, all handled automatically by Protolink.
 """
 
 import asyncio
+import threading
 import time
 from collections.abc import AsyncIterator
 from typing import Any, Literal
@@ -154,6 +155,11 @@ class Agent:
         else:
             self.set_registry(registry, registry_url)
 
+        # Runtime Lifecycle State
+        self._background_task: asyncio.Task | None = None
+        self._thread: threading.Thread | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+
         # Resolve and add necessairy skills
         self._resolve_skills(skills)
 
@@ -170,26 +176,43 @@ class Agent:
     # Agent Server Lifecycle - A2A Operations
     # ----------------------------------------------------------------------
 
-    async def start(self, *, register: bool = True, blocking: bool = False) -> None:
-        """Start the agent's server component if available.
+    ### ------- Internal Runtime Operations -------
+
+    async def _serve(self, *, register: bool = True) -> None:
+        """Initialize and start the agent runtime.
+
+        This method performs agent startup operations such as:
+        - starting the transport/server
+        - registering the agent to the registry
+        - initializing runtime state
+
+        This method does NOT:
+        - block indefinitely
+        - manage event loops
+        - handle threading
+        - detect execution environments
+
+        It is the internal async startup primitive used by the public `start()` API.
 
         Args:
-            register: If True, register this agent with the configured registry.
-            blocking: If True, block indefinitely after starting (useful for single-agent servers). When blocking=True,
-                the method will not return until interrupted (e.g., Ctrl+C). Use blocking=False (default) when starting
-                multiple agents or when you need to perform additional operations after starting.
+            register: If True, registers the agent with the configured registry.
+
+        Raises:
+            Exception: Propagates unexpected startup or registration errors.
         """
-        # Start the Agent server
+
+        # Start server
         if self._server:
             try:
                 await self._server.start()
             except Exception as e:
                 self._logger.exception(f"Unexpected error during server start: {e}")
                 raise
-        # Register to the Registry
+
+        # Register agent
         if register and self.registry_client:
             try:
-                _ = await self.registry_client.register(self.card)
+                await self.registry_client.register(self.card)
                 self._logger.info(f"Registered to registry at {self.registry_client.url}")
             except ConnectionError as e:
                 self._logger.exception(
@@ -200,25 +223,144 @@ class Agent:
 
         self.start_time = time.time()
 
-        if blocking:
-            try:
-                await asyncio.Event().wait()
-            except asyncio.CancelledError:
-                self._logger.info(f"Agent '{self.card.name}' shutting down...")
-                await self.stop()
+    async def _serve_forever(self) -> None:
+        """Keep the agent runtime alive until cancellation.
 
-    async def stop(self) -> None:
-        """Stop the agent's server component if available."""
-        # Stop the Agent Server
+        This method blocks indefinitely and gracefully shuts down the
+        agent when cancellation occurs.
+        """
+
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self._logger.info(f"Agent '{self.card.name}' shutting down...")
+            await self._stop()
+
+    async def _stop(self) -> None:
+        """Internal async shutdown primitive."""
+
+        # Stop server
         if self._server:
             await self._server.stop()
-        # Unregister from the Registry
+
+        # Unregister
         if self.registry_client:
             await self.registry_client.unregister(self.card.url)
 
-    def start_sync(self, *, blocking: bool = False) -> None:
-        """Synchronous wrapper around start() for convenience."""
-        asyncio.run(self.start(blocking=blocking))
+    ### ------- Public API -------
+
+    def start(
+        self,
+        *,
+        register: bool = True,
+        background: bool = False,
+    ) -> None | asyncio.Task:
+        """Start the agent runtime.
+
+        This is the main public entrypoint for running the agent and is compatible with:
+        - standard Python scripts
+        - async applications
+        - Jupyter notebooks
+        - interactive environments
+
+        The method automatically detects whether an asyncio event loop is already running and adapts
+        execution accordingly.
+
+        Args:
+            register: If True, registers the agent with the configured registry.
+            background:
+                Controls execution mode.
+
+                - If True, starts the agent in the background and returns immediately.
+                - If False (default), blocks execution until shutdown.
+
+        Returns:
+            asyncio.Task | None:
+                - Returns an asyncio Task when running inside an existing async event loop.
+                - Returns None in blocking/script execution mode.
+
+        Notes:
+            - This is the recommended entrypoint for all users.
+            - Advanced users should avoid calling internal lifecycle methods directly.
+        """
+
+        async def _lifecycle():
+            await self._serve(register=register)
+
+            if not background:
+                await self._serve_forever()
+
+        try:
+            # Existing event loop (Jupyter / async app)
+            loop = asyncio.get_running_loop()
+
+            self._background_task = loop.create_task(_lifecycle())
+            return self._background_task
+
+        except RuntimeError:
+            # Standard Python script
+
+            if background:
+
+                def _thread_target():
+                    self._loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(self._loop)
+
+                    self._background_task = self._loop.create_task(_lifecycle())
+
+                    try:
+                        self._loop.run_until_complete(self._background_task)
+                    finally:
+                        self._loop.close()
+
+                self._thread = threading.Thread(
+                    target=_thread_target,
+                    daemon=True,
+                )
+                self._thread.start()
+
+                return None
+
+            # Blocking mode
+            asyncio.run(_lifecycle())
+            return None
+
+    def stop(self) -> None | asyncio.Task:
+        """Stop the agent runtime.
+
+        This method automatically handles shutdown across:
+        - scripts
+        - async environments
+        - background threads
+        - Jupyter notebooks
+
+        Returns:
+            asyncio.Task | None:
+                - Returns the asyncio Task being cancelled when running inside an async event loop.
+                - Returns None otherwise.
+
+        Notes:
+            - Safe to call multiple times.
+            - Cancels active runtime tasks before cleanup.
+        """
+
+        # Async task mode
+        if self._background_task and not self._background_task.done():
+            self._background_task.cancel()
+            return self._background_task
+
+        # Background thread event loop
+        if self._loop and self._loop.is_running():
+
+            async def _shutdown():
+                await self._stop()
+
+            asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
+
+            # Stop loop safely
+            self._loop.call_soon_threadsafe(self._loop.stop)
+
+        return None
 
     # ----------------------------------------------------------------------
     # Agent to Agent Communication - Client & Server
@@ -429,7 +571,7 @@ class Agent:
     # ----------------------------------------------------------------------
     # Context Management
     # ----------------------------------------------------------------------
-
+    # TODO(): Remove
     def get_context_manager(self) -> ContextManager:
         """Get the context manager for this agent (NEW in v0.2.0).
 

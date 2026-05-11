@@ -168,7 +168,7 @@ async def main():
         # available agents at runtime.
         print("\n📡 Starting Registry...")
         registry = Registry(url=REGISTRY_URL, transport="http")
-        await registry.start()
+        registry.start(background=True)
         print(f"   Registry running at {REGISTRY_URL}")
 
         # ─── Step 3: Start Coder Agent (Tools-Only) ──────────────────
@@ -177,7 +177,7 @@ async def main():
         # the Registry so the Orchestrator can discover them.
         print("\n🔧 Starting Coder Agent (tools-only, no LLM)...")
         coder = create_coder_agent(registry)
-        await coder.start()
+        coder.start(background=True)
         print(f"   Coder running at {coder.card.url}")
         print(f"   Tools: {list(coder.tools.keys())}")
 
@@ -191,7 +191,7 @@ async def main():
             llm_provider=LLM_PROVIDER,
             **kwargs,
         )
-        await planner.start()
+        planner.start(background=True)
         print(f"   Planner running at {planner.card.url}")
 
         # ─── Step 5: Start Orchestrator Agent (LLM + Agent Calls) ────
@@ -203,7 +203,7 @@ async def main():
             llm_provider=LLM_PROVIDER,
             **kwargs,
         )
-        await orchestrator.start()
+        orchestrator.start(background=True)
         print(f"   Orchestrator running at {orchestrator.card.url}")
 
         # ─── Step 6: Verify Agent Discovery ──────────────────────────
@@ -278,13 +278,13 @@ async def cleanup(registry, coder, planner, orchestrator):
     print("\n🛑 Shutting down agents...")
 
     if orchestrator:
-        await orchestrator.stop()
+        orchestrator.stop()
     if planner:
-        await planner.stop()
+        planner.stop()
     if coder:
-        await coder.stop()
+        coder.stop()
     if registry:
-        await registry.stop()
+        registry.stop()
 
     print("   All agents stopped.")
 

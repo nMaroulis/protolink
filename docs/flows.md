@@ -181,7 +181,7 @@ structured_agent = StructuredAgent(
 )
 
 # Start listening on the network
-await structured_agent.start()
+structured_agent.start()
 
 # Now other agents or clients seamlessly interact with the flow:
 client = AgentClient(transport="http", url="http://localhost:8036")

@@ -33,7 +33,8 @@ async def main() -> None:
     client_agent = EchoAgent("client_agent", "I am the client", port=client_port)
 
     # Start both
-    await asyncio.gather(server_agent.start(), client_agent.start())
+    server_agent.start(background=True)
+    client_agent.start(background=True)
 
     # Wait briefly for startup
     await asyncio.sleep(0.5)
@@ -87,7 +88,8 @@ async def main() -> None:
         raise
     finally:
         print("\nShutting down agents...")
-        await asyncio.gather(server_agent.stop(), client_agent.stop())
+        server_agent.stop()
+        client_agent.stop()
 
 
 if __name__ == "__main__":

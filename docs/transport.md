@@ -352,7 +352,8 @@ async def main() -> None:
     )
 
     # Boot the transports to securely bind to the global memory registry
-    await asyncio.gather(assistant.start(), translator.start())
+    assistant.start(background=True)
+    translator.start(background=True)
 
     # Directly dispatch task payloads towards the unique URL identifiers
     task = Task.create(Message.user("Hello!"))

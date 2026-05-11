@@ -51,7 +51,7 @@ async def main():
 
     # 1. Start Registry
     registry = Registry(url=REGISTRY_URL, transport="http")
-    await registry.start()
+    registry.start(background=True)
 
     # 2. Setup mock agents
     writer = WriterAgent(
@@ -83,10 +83,10 @@ async def main():
         verbosity=0,
     )
 
-    await writer.start()
-    await editor.start()
-    await reviewer.start()
-    await qc.start()
+    writer.start(background=True)
+    editor.start(background=True)
+    reviewer.start(background=True)
+    qc.start(background=True)
 
     await asyncio.sleep(1)  # wait for registration
 
@@ -174,12 +174,12 @@ async def main():
 
     # Cleanup
     print("\n🛑 Shutting down...")
-    await structured_agent.stop()
-    await qc.stop()
-    await reviewer.stop()
-    await editor.stop()
-    await writer.stop()
-    await registry.stop()
+    structured_agent.stop()
+    qc.stop()
+    reviewer.stop()
+    editor.stop()
+    writer.stop()
+    registry.stop()
 
 
 if __name__ == "__main__":

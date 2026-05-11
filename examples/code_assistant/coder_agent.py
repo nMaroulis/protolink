@@ -25,7 +25,6 @@ do it. This separation means:
 ═══════════════════════════════════════════════════════════════════════════
 """
 
-import asyncio
 import fnmatch
 import os
 
@@ -295,10 +294,9 @@ if __name__ == "__main__":
         transport="http",
     )
     agent = create_coder_agent(registry)
-    asyncio.run(agent.start())
     print(f"Coder Agent running at {agent.card.url}")
     print("Press Ctrl+C to stop")
     try:
-        asyncio.get_event_loop().run_forever()
+        agent.start()
     except KeyboardInterrupt:
-        asyncio.run(agent.stop())
+        agent.stop()

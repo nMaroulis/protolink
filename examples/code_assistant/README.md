@@ -259,10 +259,10 @@ When the demo starts, each agent registers itself with the **Registry**:
 ```python
 # Each agent registers automatically on start()
 registry = Registry(url="http://localhost:9000", transport="http")
-await registry.start()
+registry.start()
 
 agent = Agent(card={...}, transport="http", registry=registry)
-await agent.start()  # ← Registers with the Registry
+agent.start()  # ← Registers with the Registry
 ```
 
 The Orchestrator then discovers all available agents:

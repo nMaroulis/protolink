@@ -1,5 +1,12 @@
-# protolink/registry/registry.py
+"""
+ProtoLink - Registry Class
+
+The registry is a centralized service that allows agents to register themselves and their capabilities. Agents can
+query the registry to discover other agents and their capabilities.
+"""
+
 import asyncio
+import threading
 import time
 from typing import Any, Literal
 
@@ -17,7 +24,7 @@ class Registry:
 
     Usage:
         registry = Registry(url="http://localhost:9000")
-        await registry.start()
+        registry.start()
         # Registry server is now running
     """
 
@@ -52,37 +59,159 @@ class Registry:
         # Setup registry server
         self._server = RegistryServer(self, transport)
 
+        # Runtime Lifecycle State
+        self._background_task: asyncio.Task | None = None
+        self._thread: threading.Thread | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+
     # ------------------------------------------------------------------
     # Registry Server Lifecycle
     # ------------------------------------------------------------------
 
-    async def start(self, *, blocking: bool = False) -> None:
-        """Start the registry server via the transport.
+    async def _serve(self) -> None:
+        """Initialize and start the registry runtime.
 
-        Args:
-            blocking: If True, block indefinitely after starting (useful for single-agent servers). When blocking=True,
-                the method will not return until interrupted (e.g., Ctrl+C). Use blocking=False (default) when starting
-                multiple agents or when you need to perform additional operations after starting.
+        This method starts the registry server and initializes runtime state.
+
+        It does NOT:
+        - block indefinitely
+        - manage event loops
+        - handle threading
+        - detect execution environments
+
+        It is the internal async startup primitive used by the public `start()` API.
+
+        Raises:
+            Exception: Propagates unexpected server startup errors.
         """
+
         if self._server:
             try:
                 await self._server.start()
             except Exception as e:
                 self.logger.exception(f"Unexpected error during server start: {e}")
                 raise
+
         self.start_time = time.time()
 
-        if blocking:
-            try:
-                await asyncio.Event().wait()
-            except asyncio.CancelledError:
-                self.logger.info("Registry shutting down...")
-                await self.stop()
+    async def _serve_forever(self) -> None:
+        """Keep the registry runtime alive until cancelled."""
 
-    async def stop(self) -> None:
-        """Stop the registry server via the transport."""
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.logger.info("Registry shutting down...")
+            await self._stop()
+
+    async def _stop(self) -> None:
+        """Internal async shutdown primitive."""
+
         if self._server:
             await self._server.stop()
+
+    def start(self, *, background: bool = False) -> None | asyncio.Task:
+        """Start the registry runtime.
+
+        This method automatically adapts to the current execution environment and
+        works seamlessly in:
+        - standard Python scripts
+        - async applications
+        - Jupyter notebooks
+
+        Args:
+            background:
+                Controls execution mode.
+
+                - If True, starts the registry in the background and returns immediately.
+                - If False (default), blocks execution until shutdown.
+
+        Returns:
+            asyncio.Task | None:
+                - Returns an asyncio Task when running inside an existing async event loop.
+                - Returns None in blocking/script execution mode.
+
+        Notes:
+            - This is the recommended entrypoint for starting the registry.
+            - The async runtime is automatically managed internally.
+        """
+
+        async def _lifecycle():
+            await self._serve()
+
+            if not background:
+                await self._serve_forever()
+
+        try:
+            # Existing event loop (Jupyter / async app)
+            loop = asyncio.get_running_loop()
+
+            self._background_task = loop.create_task(_lifecycle())
+            return self._background_task
+
+        except RuntimeError:
+            # Standard Python script
+
+            if background:
+
+                def _thread_target():
+                    self._loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(self._loop)
+
+                    self._background_task = self._loop.create_task(_lifecycle())
+
+                    try:
+                        self._loop.run_until_complete(self._background_task)
+                    finally:
+                        self._loop.close()
+
+                self._thread = threading.Thread(
+                    target=_thread_target,
+                    daemon=True,
+                )
+                self._thread.start()
+
+                return None
+
+            # Blocking mode
+            asyncio.run(_lifecycle())
+            return None
+
+    def stop(self) -> None | asyncio.Task:
+        """Stop the registry runtime.
+
+        This method automatically handles shutdown across:
+        - scripts
+        - async environments
+        - background threads
+        - Jupyter notebooks
+
+        Returns:
+            asyncio.Task | None:
+                - Returns the asyncio Task being cancelled when running inside an async event loop.
+                - Returns None otherwise.
+
+        Notes:
+            - Safe to call multiple times.
+            - Cancels active runtime tasks before cleanup.
+        """
+
+        # Async task mode
+        if self._background_task and not self._background_task.done():
+            self._background_task.cancel()
+            return self._background_task
+
+        # Background thread event loop
+        if self._loop and self._loop.is_running():
+
+            async def _shutdown():
+                await self._stop()
+
+            asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
+
+            # Stop loop safely
+            self._loop.call_soon_threadsafe(self._loop.stop)
+
+        return None
 
     # ------------------------------------------------------------------
     # Client API (agents call these)

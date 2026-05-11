@@ -72,7 +72,7 @@ async def main():
         verbosity=2,
     )
 
-    await agent.start()
+    agent.start(background=True)
 
     # ---------------------------------------------------------
     # (3) WEATHER AGENT
@@ -114,7 +114,7 @@ async def main():
         }
         return result
 
-    await agent.start()
+    agent.start(background=True)
 
     # ---------------------------------------------------------
     # (4) HOTEL BOOKING AGENT
@@ -190,7 +190,7 @@ async def main():
 
         return {"status": "confirmed", "booking_id": booking_id}
 
-    await agent.start()
+    agent.start(background=True)
 
     # ---------------------------------------------------------
     # (5) COORDINATOR AGENT
@@ -231,7 +231,7 @@ async def main():
         verbosity=2,
     )
 
-    await agent.start()
+    agent.start()
 
     # ---------------------------------------------------------
     # (6) AGENT CLIENT - TASK - USER INTERFACE

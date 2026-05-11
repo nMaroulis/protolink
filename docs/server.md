@@ -41,8 +41,7 @@ The `Agent` class automatically creates an `AgentServer` internally when a trans
 # AgentServer is created internally here
 agent = Agent(card=card, transport=transport)
 
-# This calls agent.server.start()
-await agent.start()
+agent.start()
 ```
 
 ---

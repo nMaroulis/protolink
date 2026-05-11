@@ -30,7 +30,6 @@ expensive and critical. By isolating it:
 ═══════════════════════════════════════════════════════════════════════════
 """
 
-import asyncio
 import os
 
 from protolink.agents import Agent
@@ -170,10 +169,9 @@ if __name__ == "__main__":
 
     llm_provider: str = os.getenv("LLM_PROVIDER", "ollama")
     agent = create_planner_agent(registry, llm_provider)
-    asyncio.run(agent.start())
     print(f"Planner Agent running at {agent.card.url}")
     print("Press Ctrl+C to stop")
     try:
-        asyncio.get_event_loop().run_forever()
+        agent.start()
     except KeyboardInterrupt:
-        asyncio.run(agent.stop())
+        agent.stop()

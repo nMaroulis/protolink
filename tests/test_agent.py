@@ -411,7 +411,9 @@ class TestAgent:
             mock_server_instance.start = AsyncMock()
             mock_server.return_value = mock_server_instance
 
-            await agent.start(register=True)
+            # In async loop, start returns a task we should await for it to finish _serve()
+            if task := agent.start(register=True, background=True):
+                await task
 
             mock_registry_client.register.assert_called_once_with(agent_card)
 
@@ -428,8 +430,16 @@ class TestAgent:
             mock_server_instance.stop = AsyncMock()
             mock_server.return_value = mock_server_instance
 
-            await agent.start(register=False)
-            await agent.stop()
+            # In async loop, start returns a task we should await for it to finish _serve()
+            if task := agent.start(register=False, background=True):
+                await task
+
+            # stop returns a task that we should await for it to finish _stop() cleanup
+            if task := agent.stop():
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
             mock_registry_client.unregister.assert_called_once_with(agent_card.url)
 

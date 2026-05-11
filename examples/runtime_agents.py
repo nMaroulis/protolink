@@ -70,7 +70,10 @@ async def main() -> None:
     )
 
     # Boot the servers (which internally mounts the transports)
-    await asyncio.gather(assistant.start(), translator.start())
+    if task := assistant.start(background=True):
+        await task
+    if task := translator.start(background=True):
+        await task
 
     print(f"\n📋 Active runtime transports: {list(RuntimeTransport._registry.keys())}")
 
@@ -89,7 +92,8 @@ async def main() -> None:
         print("\n✅ Demo complete!")
     finally:
         # Shutdown
-        await asyncio.gather(assistant.stop(), translator.stop())
+        assistant.stop()
+        translator.stop()
 
 
 if __name__ == "__main__":

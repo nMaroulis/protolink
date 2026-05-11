@@ -70,18 +70,18 @@ async def main():
         # Step 1: Start the Registry
         print("📡 Starting Registry...")
         registry = Registry(url=REGISTRY_URL, transport="http")
-        await registry.start()
+        registry.start()
         print(f"   Registry running at {REGISTRY_URL}")
 
         # Step 2: Start specialist agents (no LLM - tool only)
         print("\n🌤️  Starting Weather Agent (tool-only)...")
         weather_agent = create_weather_agent(registry, verbosity=VERBOSITY)
-        await weather_agent.start()
+        weather_agent.start()
         print(f"   Weather Agent running at {weather_agent.card.url}")
 
         print("\n🏨 Starting Hotel Agent (tool-only)...")
         hotel_agent = create_hotel_agent(registry, verbosity=VERBOSITY)
-        await hotel_agent.start()
+        hotel_agent.start()
         print(f"   Hotel Agent running at {hotel_agent.card.url}")
 
         # Step 3: Start Holiday Advisor (has LLM - for infer action)
@@ -92,7 +92,7 @@ async def main():
             verbosity=VERBOSITY,
             **kwargs,
         )
-        await advisor_agent.start()
+        advisor_agent.start()
         print(f"   Holiday Advisor running at {advisor_agent.card.url}")
 
         # Step 4: Start coordinator (with LLM)
@@ -103,7 +103,7 @@ async def main():
             verbosity=VERBOSITY,
             **kwargs,
         )
-        await coordinator.start()
+        coordinator.start()
         print(f"   Coordinator running at {coordinator.card.url}")
 
         # Step 5: Verify agent discovery
@@ -169,15 +169,15 @@ async def cleanup(registry, weather_agent, hotel_agent, advisor_agent, coordinat
     print("\n🛑 Shutting down agents...")
 
     if coordinator:
-        await coordinator.stop()
+        coordinator.stop()
     if advisor_agent:
-        await advisor_agent.stop()
+        advisor_agent.stop()
     if hotel_agent:
-        await hotel_agent.stop()
+        hotel_agent.stop()
     if weather_agent:
-        await weather_agent.stop()
+        weather_agent.stop()
     if registry:
-        await registry.stop()
+        registry.stop()
 
     print("   All agents stopped.")
 

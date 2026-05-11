@@ -170,27 +170,60 @@ These methods control the agent's server component lifecycle.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `start()` | `register: bool = True`, `blocking: bool = False` | `None` | Starts the agent's server. If `blocking=True`, awaits indefinitely until cancelled. |
-| `stop()` | — | `None` | Stops the agent's server component and cleans up resources. |
-| `start_sync()` | `blocking: bool = False` | `None` | Synchronous wrapper around start() for convenience. |
+| `start()` | `register: bool = True`, `background: bool = False` | `asyncio.Task ⎪ None` | Starts the agent runtime. Automatically detects the environment and handles event loops. |
+| `stop()` | — | `None` | Stops the agent runtime and cleans up resources. |
 
-### Blocking Mode
+### Execution Models: Adaptive `start()`
 
-The `blocking` parameter controls whether `start()` returns immediately or blocks the event loop:
+The `start()` method is the primary entrypoint for running an agent. It is designed to be **environment-aware**, meaning it automatically detects whether it's running in a standard Python script, an asynchronous application, or a Jupyter notebook, and adapts its execution model accordingly.
 
+#### The `background` Parameter
+
+The `background` parameter controls whether the agent blocks the current execution or runs in the background:
+
+- **`background=False` (Default)**: Blocks execution until the agent is stopped (e.g., via Ctrl+C in a terminal).
+- **`background=True`**: Starts the agent and returns immediately, allowing the rest of the script to continue.
+
+#### Common Usage Patterns
+
+**1. Standalone Python Script**
+For simple scripts where the agent is the main process, use the default blocking mode:
 ```python
-# Non-blocking (default) - for multi-agent orchestration
-await agent1.start()
-await agent2.start()
-await agent3.start()
-# Continue with other logic...
-
-# Blocking - for single-agent servers
-asyncio.run(agent.start(blocking=True))  # Runs until Ctrl+C
+# This will block the script and run until interrupted
+agent.start()
 ```
 
-!!! tip "When to use blocking=True"
-    Use `blocking=True` when running a single agent as a standalone service. Use the default `blocking=False` when orchestrating multiple agents or when you need to execute logic after startup.
+**2. Multi-Agent Script (Sync)**
+If you need to start multiple agents in a single script, run the first ones in the background and the last one in blocking mode to keep the process alive:
+```python
+agent_a.start(background=True)
+agent_b.start(background=True)
+agent_c.start(background=False) # Keep the script alive
+```
+
+**3. Jupyter Notebooks / Interactive Environments**
+Jupyter Notebooks run inside an existing event loop. `start()` detects this and returns an `asyncio.Task` immediately, regardless of the `background` setting, so it doesn't block the cell:
+```python
+# In a Jupyter cell
+agent.start() # Returns an asyncio.Task and keeps the agent running in the background
+```
+
+**4. Async Applications (FastAPI, etc.)**
+When integrating into an async app, `start()` can be called normally. It will return a task that you can optionally await or manage:
+```python
+async def main():
+    # Start the agent as a background task in the existing loop
+    task = agent.start(background=True)
+    
+    # ... other async logic ...
+    
+    await asyncio.Event().wait() # Keep the loop running
+```
+
+!!! tip "Graceful Shutdown"
+    Always use `agent.stop()` to ensure that the agent unregisters from the registry and releases its network ports cleanly. In a standard script, `agent.start()` handles `KeyboardInterrupt` gracefully if `background=False`.
+
+## Transport Management
 
 ## Transport Management
 
@@ -457,7 +490,7 @@ agent = Agent(
     llm=OpenAILLM(model="gpt-4o"),
 )
 
-agent.start_sync(blocking=True)
+agent.start()
 # Chat UI is now available at http://localhost:8000/chat
 ```
 

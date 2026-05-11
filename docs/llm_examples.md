@@ -128,7 +128,7 @@ agent = Agent(
     system_prompt="You are a helpful assistant.",
 )
 
-await agent.start()
+agent.start()
 ```
 
 ### 2. The Task
@@ -173,7 +173,7 @@ Now, we dynamically register a tool with the agent. Protolink automatically expo
 
 ```python
 # Stop the agent to modify it safeley (optional but good practice)
-await agent.stop()
+agent.stop()
 
 @agent.tool(
     name="weather_info", 
@@ -184,7 +184,7 @@ def get_weather(location: str) -> str:
     # Simulating an API call
     return f"The weather in {location} is sunny."
 
-await agent.start()
+agent.start()
 ```
 
 ### 5. Execution: With Tools (Success Case)
@@ -276,7 +276,7 @@ COORDINATOR_URL = "http://localhost:8002"
 
 # Start the registry for agent discovery
 registry = Registry(url=REGISTRY_URL, transport="http")
-await registry.start()
+registry.start()
 ```
 
 ### 2. Create the Weather Agent (Specialist)
@@ -309,7 +309,7 @@ def get_weather(location: str) -> str:
     }
     return weather_data.get(location.lower(), f"Weather data not available for {location}")
 
-await weather_agent.start()
+weather_agent.start(background=True)
 print(f"Weather Agent running at {WEATHER_AGENT_URL}")
 ```
 
@@ -336,7 +336,7 @@ coordinator = Agent(
     system_prompt=COORDINATOR_SYSTEM_PROMPT,
 )
 
-await coordinator.start()
+coordinator.start()
 ```
 
 ### 4. Verify Agent Discovery

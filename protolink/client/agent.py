@@ -1,10 +1,10 @@
-"""Agent Client - High-level interface for agent-to-agent communication.
+"""Agent Client - High-level interface for agent-to-agent and User-to-agent communication.
 
-This module provides the `AgentClient` class, which abstracts transport details and
-offers convenient methods for sending tasks, messages, and retrieving agent cards.
+This module provides the `AgentClient` class, which abstracts transport details and offers convenient methods for
+sending tasks, messages, and retrieving agent cards.
 
-The client uses `ClientRequestSpec` objects to define API contracts in a transport-agnostic
-way. This allows the same client code to work over HTTP, WebSocket, or any other transport.
+The client uses `ClientRequestSpec` objects to define API contracts in a transport-agnostic way. This allows the same
+client code to work over HTTP, WebSocket, or any other transport.
 
 Example:
     >>> from protolink.client import AgentClient
@@ -15,6 +15,7 @@ Example:
     >>> result = await client.send_task("http://localhost:8010", task)
 """
 
+import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -24,30 +25,42 @@ from protolink.types import TransportType
 
 
 class AgentClient:
-    """Client for interacting with Protolink agents.
+    """High-level client for Agent-to-Agent and User-to-Agent communication.
 
-    The AgentClient provides a high-level interface for agent-to-agent communication.
-    It wraps a transport implementation and exposes typed methods for common operations:
+    This client provides a unified interface for interacting with Protolink agents over different
+    transports (HTTP, WebSocket, etc.).
 
-    - `send_task()`: Send a Task to a remote agent and get the result
-    - `send_task_streaming()`: Send a Task and receive streamed events
-    - `send_message()`: Convenience wrapper for simple message exchange
-    - `get_agent_card()`: Retrieve an agent's public metadata
+    It exposes both:
+    - Async API (recommended for modern applications)
+    - Sync API (for scripts and simple usage)
 
-    The client uses `ClientRequestSpec` class attributes to define the API contract
-    for each endpoint. This allows transports to handle routing without hardcoding paths.
+    The sync API is accessible via `client.sync`.
 
-    Args:
-        transport: Either a Transport instance or a transport type string (e.g., "http").
-        url: Base URL for the transport (required if transport is a string type).
+    Architecture
+    ------------
+    - Async methods are the source of truth
+    - Sync methods are thin wrappers over async execution
+    - Transport layer is fully abstracted
 
-    Example:
-        >>> # Using transport type string
+    Design Philosophy
+    ------------------
+    This client is designed to:
+    - Be transport-agnostic
+    - Support both async and sync workflows
+    - Keep a minimal and predictable API surface
+    - Avoid exposing transport details to users
+
+    Example
+    -------
+    Async usage (recommended):
         >>> client = AgentClient(transport="http", url="http://localhost:8000")
-        >>>
-        >>> # Using existing transport instance
-        >>> from protolink.transport import HTTPTransport
-        >>> client = AgentClient(transport=HTTPTransport(url="http://localhost:8000"))
+        >>> task = Task.create_infer(prompt="Hello")
+        >>> result = await client.send_task("http://agent:8001", task)
+
+    Sync usage (scripts / notebooks / CLI):
+        >>> client = AgentClient(transport="http", url="http://localhost:8000")
+        >>> task = Task.create_infer(prompt="Hello")
+        >>> result = client.sync.send_task("http://agent:8001", task)
     """
 
     TASK_REQUEST = ClientRequestSpec(
@@ -79,23 +92,52 @@ class AgentClient:
         else:
             self._transport = get_transport(transport=transport, url=url)
 
+        self.sync = SyncAgentClient(self)
+
     # ----------------------------------------------------------------------
     # Agent-to-Agent Communication
     # ----------------------------------------------------------------------
 
     async def send_task(self, agent_url: str, task: Task) -> Task:
-        """Send a task to a remote agent."""
+        """Send a task to a remote agent and return the processed result.
+
+        This is the core communication primitive for agent-to-agent interaction.
+
+        Args:
+            agent_url: Target agent endpoint URL.
+            task: Task object containing instructions or input payload.
+
+        Returns:
+            Task: Updated task containing the response from the remote agent.
+
+        Example:
+            >>> result = await client.send_task(
+            ...     "http://agent:8001",
+            ...     Task.create_infer(prompt="What is AI?")
+            ... )
+        """
         return await self._transport.send(self.TASK_REQUEST, agent_url, data=task)
 
     async def send_task_streaming(self, agent_url: str, task: Task) -> AsyncIterator[Any]:
-        """Send a task and yield streamed task events.
+        """Send a task to a remote agent and receive streamed events.
 
-        This requires a transport that implements a streaming subscription API.
+        This method enables real-time streaming responses from agents.
 
-        Raises
-        ------
-        NotImplementedError
-            If the configured transport does not support streaming.
+        Requires a transport that supports streaming (e.g. WebSocket, SSE, etc).
+
+        Args:
+            agent_url: Target agent endpoint URL.
+            task: Task to execute.
+
+        Yields:
+            Streaming events emitted by the remote agent.
+
+        Raises:
+            NotImplementedError: If transport does not support streaming.
+
+        Example:
+            >>> async for event in client.send_task_streaming(url, task):
+            ...     print(event)
         """
         subscribe = getattr(self._transport, "subscribe", None)
         if subscribe is None:
@@ -104,7 +146,26 @@ class AgentClient:
             yield event
 
     async def send_message(self, agent_url: str, message: Message) -> Message:
-        """Send a message to a remote agent (convenience wrapper)."""
+        """Send a simple message to a remote agent and return its response.
+
+        This is a convenience wrapper over task-based communication.
+
+        Internally:
+            Message → Task → Agent execution → Response Message
+
+        Args:
+            agent_url: Target agent endpoint URL.
+            message: Input message.
+
+        Returns:
+            Message: Final response message from the agent.
+
+        Example:
+            >>> response = await client.send_message(
+            ...     "http://agent:8001",
+            ...     Message(role="user", content="Hello")
+            ... )
+        """
         task = Task.create(message)
         result_task = await self.send_task(agent_url, task)
         if result_task.messages:
@@ -112,5 +173,89 @@ class AgentClient:
         raise RuntimeError("No response messages returned by agent")
 
     async def get_agent_card(self, agent_url: str) -> AgentCard:
-        """Get the public agent card."""
+        """Retrieve the public metadata (AgentCard) of an agent.
+
+        The AgentCard contains:
+            - capabilities
+            - identity
+            - endpoints
+            - supported features
+
+        Args:
+            agent_url: Target agent endpoint URL.
+
+        Returns:
+            AgentCard: Metadata describing the remote agent.
+
+        Example:
+            >>> card = await client.get_agent_card("http://agent:8001")
+            >>> print(card.name)
+        """
+
         return await self._transport.send(self.AGENT_CARD_REQUEST, agent_url)
+
+
+# ----------------------------------------------------------------------
+# Synchronous API
+# ----------------------------------------------------------------------
+
+
+class SyncAgentClient:
+    """Synchronous wrapper around AgentClient.
+
+    This class provides blocking equivalents of async methods
+    for use in:
+    - scripts
+    - CLI tools
+    - notebooks without async support
+
+    Internally uses `asyncio.run()` to execute async operations.
+
+    Warning:
+        This API should NOT be used inside an active event loop
+        (e.g., FastAPI, Jupyter async cells).
+
+    Example:
+        >>> client = AgentClient(transport="http", url="http://localhost:8000")
+        >>> result = client.sync.send_task(url, task)
+    """
+
+    def __init__(self, async_client: AgentClient):
+        self._client = async_client
+
+    def send_task(self, agent_url: str, task: Task) -> Task:
+        """Synchronously send a task to a remote agent.
+
+        This is a blocking version of `send_task()`.
+
+        Internally runs the async implementation in a new event loop.
+
+        Example:
+            >>> result = client.sync.send_task(
+            ...     "http://agent:8001",
+            ...     Task.create_infer(prompt="Hello")
+            ... )
+        """
+        return asyncio.run(self._client.send_task(agent_url, task))
+
+    def send_message(self, agent_url: str, message: Message) -> Message:
+        """Synchronously send a message to a remote agent.
+
+        Blocking convenience wrapper for simple interactions.
+
+        Example:
+            >>> response = client.sync.send_message(
+            ...     "http://agent:8001",
+            ...     Message(role="user", content="Hi")
+            ... )
+        """
+        return asyncio.run(self._client.send_message(agent_url, message))
+
+    def get_agent_card(self, agent_url: str) -> AgentCard:
+        """Synchronously retrieve an agent's metadata (AgentCard).
+
+        Example:
+            >>> card = client.sync.get_agent_card("http://agent:8001")
+            >>> print(card.capabilities)
+        """
+        return asyncio.run(self._client.get_agent_card(agent_url))

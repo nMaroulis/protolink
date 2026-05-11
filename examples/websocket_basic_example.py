@@ -61,7 +61,7 @@ async def main() -> None:
     alert_url = "ws://127.0.0.1:8020"
 
     registry = Registry(transport="websocket", url=registry_url)
-    await registry.start()
+    registry.start(background=True)
 
     weather_card = AgentCard(url=weather_url, name="WeatherAgent", description="Produces weather data")
     weather_agent = WeatherAgent(
@@ -88,7 +88,8 @@ async def main() -> None:
         print(f"ALERT: {message}")
         return {"status": "sent", "message": message}
 
-    await asyncio.gather(weather_agent.start(register=True), alert_agent.start(register=True))
+    weather_agent.start(register=True, background=True)
+    alert_agent.start(register=True, background=True)
 
     await asyncio.sleep(0.3)
 
@@ -113,8 +114,9 @@ async def main() -> None:
         print(f"[event {event_count}] {event}")
 
     print("\nShutting down...")
-    await asyncio.gather(weather_agent.stop(), alert_agent.stop())
-    await registry.stop()
+    weather_agent.stop()
+    alert_agent.stop()
+    registry.stop()
 
 
 if __name__ == "__main__":

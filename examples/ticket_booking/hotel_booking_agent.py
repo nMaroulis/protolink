@@ -5,7 +5,6 @@ This agent handles hotel searches and bookings.
 No LLM is used - bookings are direct tool executions.
 """
 
-import asyncio
 import hashlib
 import os
 from datetime import date
@@ -166,10 +165,9 @@ def create_hotel_agent(registry: Registry | None = None, verbosity: int = 1) -> 
 # For standalone execution
 if __name__ == "__main__":
     agent = create_hotel_agent()
-    asyncio.run(agent.start())
     print(f"Hotel Agent running at {agent.card.url}")
     print("Press Ctrl+C to stop")
     try:
-        asyncio.get_event_loop().run_forever()
+        agent.start()
     except KeyboardInterrupt:
-        asyncio.run(agent.stop())
+        agent.stop()

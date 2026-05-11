@@ -98,7 +98,7 @@ from protolink.discovery import Registry
 
 # Initialize Registry for A2A Discovery
 registry = Registry(url="http://127.0.0.1:9000", transport="http")
-await registry.start()
+registry.start(background=True)
 
 # Define the agent card
 agent_card = AgentCard(
@@ -125,7 +125,7 @@ for mcp_tool in mcp_tools:
     agent.add_tool(mcp_tool)
 
 # Start the agent
-await agent.start()
+agent.start()
 ```
 
 This example demonstrates the core pieces of Protolink:

@@ -44,7 +44,7 @@ REGISTRY_URL = "http://localhost:9010"
 
 # Create and start registry (uses HTTP transport by default)
 registry = Registry(transport="http", url=REGISTRY_URL)
-await registry.start()
+registry.start()
 ```
 
 The registry exposes these endpoints:
@@ -77,7 +77,7 @@ agent = WeatherAgent(card=card, transport="http", registry="http", registry_url=
 async def get_weather(city: str):
     return {"city": city, "temperature": 28, "condition": "sunny"}
 
-await agent.start(register=True)
+agent.start(register=True)
 ```
 
 ### 3. Start the Alert Agent
@@ -111,7 +111,7 @@ async def send_alert(message: str):
     print(f"ALERT: {message}")
     return {"status": "sent", "message": message}
 
-await agent.start(register=True)
+agent.start(register=True)
 ```
 
 ## Key Concepts

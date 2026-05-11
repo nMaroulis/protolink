@@ -59,7 +59,7 @@ from protolink.models import AgentCard
 # 1. Initialize & start the Registry for A2A Discovery (optional)
 from protolink.discovery import Registry
 registry = Registry(url="http://127.0.0.1:9000", transport="http")
-await registry.start()
+registry.start(background=True)
 
 # 2. Initialize OpenAI API LLM (optional)
 from protolink.llms.api import OpenAILLM
@@ -89,12 +89,14 @@ agent = Agent(agent_card, transport="http", llm=llm, registry=registry, storage=
 async def add_numbers(a: int, b: int):
     return a + b
 
-# Start the agent
-await agent.start()
+# Start the agent.
+agent.start()
 ```
 
 #### ✨ Ready to Orchestrate
-The agent is now fully initialized and prepared to **discover & being discovered by peers**, send & receive **tasks** across your system.
+The agent is now fully initialized and prepared to **discover & be discovered by peers**, send & receive **tasks** across your system.
+
+**Note**: `agent.start()` automatically **adapts** to the current environment under the hood, working seamlessly in **standard Python scripts, async applications, and Jupyter notebooks** with both **blocking** and **background** execution modes. When `background=True`, it runs the agent non-blocking using an **event loop task** or a **dedicated background thread** depending on the runtime context.
 
 ## Features
 
@@ -217,7 +219,7 @@ from protolink.discovery import Registry
 
 # Initialize Registry for A2A Discovery
 registry = Registry(url="http://127.0.0.1:9000", transport="http")
-await registry.start()
+registry.start(background=True)
 
 # Define the agent card
 agent_card = AgentCard(
@@ -244,7 +246,7 @@ for mcp_tool in mcp_tools:
     agent.add_tool(mcp_tool)
 
 # Start the agent
-await agent.start()
+agent.start()
 ```
 
 Once the **Agent** and **Registry** objects have been initiated, they will automatically expose a web interface at `/status` where they display the registry and agent's information.
@@ -537,7 +539,7 @@ flow_agent = StructuredAgent(
     transport="http"
 )
 
-await flow_agent.start()
+flow_agent.start()
 ```
 
 Without a structured agent and with **Fluent API**:
