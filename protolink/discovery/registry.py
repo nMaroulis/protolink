@@ -106,6 +106,11 @@ class Registry:
     async def _stop(self) -> None:
         """Internal async shutdown primitive."""
 
+        # Guard against double stop
+        if getattr(self, "_stopped", False):
+            return
+        self._stopped = True
+
         if self._server:
             await self._server.stop()
 
@@ -137,9 +142,7 @@ class Registry:
 
         async def _lifecycle():
             await self._serve()
-
-            if not background:
-                await self._serve_forever()
+            await self._serve_forever()
 
         try:
             # Existing event loop (Jupyter / async app)
@@ -166,7 +169,7 @@ class Registry:
 
                 self._thread = threading.Thread(
                     target=_thread_target,
-                    daemon=True,
+                    daemon=False,
                 )
                 self._thread.start()
 
@@ -176,7 +179,7 @@ class Registry:
             asyncio.run(_lifecycle())
             return None
 
-    def stop(self) -> None | asyncio.Task:
+    def stop(self) -> None:
         """Stop the registry runtime.
 
         This method automatically handles shutdown across:
@@ -185,33 +188,27 @@ class Registry:
         - background threads
         - Jupyter notebooks
 
-        Returns:
-            asyncio.Task | None:
-                - Returns the asyncio Task being cancelled when running inside an async event loop.
-                - Returns None otherwise.
-
         Notes:
             - Safe to call multiple times.
             - Cancels active runtime tasks before cleanup.
         """
 
-        # Async task mode
+        # Async task mode (Jupyter / async app with existing event loop)
         if self._background_task and not self._background_task.done():
-            self._background_task.cancel()
-            return self._background_task
+            loop = self._background_task.get_loop()
+            if loop.is_running():
+                loop.call_soon_threadsafe(self._background_task.cancel)
+                return
 
-        # Background thread event loop
+        # Background thread mode
         if self._loop and self._loop.is_running():
+            if self._background_task and not self._background_task.done():
+                self._loop.call_soon_threadsafe(self._background_task.cancel)
 
-            async def _shutdown():
-                await self._stop()
-
-            asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
-
-            # Stop loop safely
-            self._loop.call_soon_threadsafe(self._loop.stop)
-
-        return None
+        # Wait for the thread to fully exit before returning,
+        # so the process doesn't die while uvicorn is still cleaning up
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=10)
 
     # ------------------------------------------------------------------
     # Client API (agents call these)

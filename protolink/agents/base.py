@@ -38,7 +38,7 @@ from protolink.core.context_manager import ContextManager
 from protolink.core.memory import SessionManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
-from protolink.logging import BaseLogger, ConsoleLogger
+from protolink.logging import BaseLogger, ConsoleLogger, get_agent_farewell, get_agent_greeting
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.server import AgentServer
 from protolink.storage import InMemoryStorage, Storage
@@ -235,11 +235,17 @@ class Agent:
         except asyncio.CancelledError:
             self._logger.info(f"Agent '{self.card.name}' shutting down...")
             await self._stop()
+            self._logger.info(get_agent_farewell(self.card.name))
 
     async def _stop(self) -> None:
         """Internal async shutdown primitive."""
 
-        # Stop server
+        # Guard against double stop
+        if getattr(self, "_stopped", False):
+            return
+        self._stopped = True
+
+        # Stop server and transport on a deeper level
         if self._server:
             await self._server.stop()
 
@@ -285,10 +291,9 @@ class Agent:
         """
 
         async def _lifecycle():
+            self._logger.info(get_agent_greeting(self.card.name))
             await self._serve(register=register)
-
-            if not background:
-                await self._serve_forever()
+            await self._serve_forever()
 
         try:
             # Existing event loop (Jupyter / async app)
@@ -315,7 +320,7 @@ class Agent:
 
                 self._thread = threading.Thread(
                     target=_thread_target,
-                    daemon=True,
+                    daemon=False,
                 )
                 self._thread.start()
 
@@ -325,7 +330,7 @@ class Agent:
             asyncio.run(_lifecycle())
             return None
 
-    def stop(self) -> None | asyncio.Task:
+    def stop(self) -> None:
         """Stop the agent runtime.
 
         This method automatically handles shutdown across:
@@ -334,33 +339,27 @@ class Agent:
         - background threads
         - Jupyter notebooks
 
-        Returns:
-            asyncio.Task | None:
-                - Returns the asyncio Task being cancelled when running inside an async event loop.
-                - Returns None otherwise.
-
         Notes:
             - Safe to call multiple times.
             - Cancels active runtime tasks before cleanup.
         """
 
-        # Async task mode
+        # Async task mode (Jupyter / async app with existing event loop)
         if self._background_task and not self._background_task.done():
-            self._background_task.cancel()
-            return self._background_task
+            loop = self._background_task.get_loop()
+            if loop.is_running():
+                loop.call_soon_threadsafe(self._background_task.cancel)
+                return
 
-        # Background thread event loop
+        # Background thread mode
         if self._loop and self._loop.is_running():
+            if self._background_task and not self._background_task.done():
+                self._loop.call_soon_threadsafe(self._background_task.cancel)
 
-            async def _shutdown():
-                await self._stop()
-
-            asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
-
-            # Stop loop safely
-            self._loop.call_soon_threadsafe(self._loop.stop)
-
-        return None
+        # Wait for the thread to fully exit before returning,
+        # so the process doesn't die while uvicorn is still cleaning up
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=10)
 
     # ----------------------------------------------------------------------
     # Agent to Agent Communication - Client & Server
