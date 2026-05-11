@@ -29,15 +29,28 @@ if TYPE_CHECKING:
 class RuntimeTransport(Transport):
     """In-memory transport for process-local agent communication.
 
-    Enables agents to communicate without network overhead by routing
-    messages directly in-memory via a class-level global registry.
-    This transport enforces payload serialization similarly to HTTP
-    transports to guarantee interchangeable behavior and safety boundaries.
+    The ``RuntimeTransport`` enables agents to communicate seamlessly without the
+    overhead of establishing TCP connections, allocating ports, or marshalling
+    data across network sockets. Instead, it routes messages directly in-memory
+    via a thread-safe, class-level global registry.
+
+    **Architectural Simulation**
+    To ensure that agents built for local runtime execution are 100% compatible
+    with distributed environments (like ``HTTPTransport``), this transport strictly
+    enforces payload serialization/deserialization boundaries (via Pydantic).
+    This means if a payload is structurally invalid, it will fail locally just
+    as it would over a real network request.
+
+    **Concurrency and Event Loops**
+    Unlike socket-based transports, the ``RuntimeTransport`` accesses shared memory
+    across Python event loops. It abstracts away inter-loop communication by directly
+    executing asynchronous handlers and resolving their responses in the caller's context.
 
     Parameters
     ----------
     url : str
-        URL identifying this transport endpoint (e.g., ``"runtime://alice"``).
+        URL identifying this transport endpoint. Must use the ``runtime://`` scheme
+        (e.g., ``"runtime://alice"``).
     """
 
     transport_type: ClassVar[TransportType] = "runtime"
@@ -61,13 +74,17 @@ class RuntimeTransport(Transport):
 
     @classmethod
     def get_transport(cls, base_url: str) -> RuntimeTransport | None:
-        """Retrieve a registered transport instance by its URL.
+        """Retrieve a registered peer transport instance from the global registry.
+
+        This mechanism acts as an in-memory DNS resolver. When an agent requests
+        communication with a `runtime://` URI, this method resolves the URI to
+        the active `RuntimeTransport` instance instantiated in the current Python process.
 
         Args:
-            base_url: The unique URL of the target transport.
+            base_url: The unique URI of the target transport (e.g., ``runtime://bob``).
 
         Returns:
-            The associated `RuntimeTransport` instance, or None if not found.
+            The active `RuntimeTransport` instance, or `None` if the target is offline or unregistered.
         """
         return cls._registry.get(base_url)
 
@@ -82,23 +99,33 @@ class RuntimeTransport(Transport):
         data: Any = None,
         params: dict[str, Any] | None = None,
     ) -> Any:
-        """Send a request to a registered peer agent.
+        """Execute a zero-overhead remote procedure call (RPC) against a peer agent.
 
-        Routes requests directly to agent handlers based on the target base URL
-        and the requested HTTP method and path encoded in the request specification.
+        This client orchestrator perfectly mimics a standard network-based HTTP request,
+        but resolves entirely within process memory:
+
+        1. **Resolution**: Resolves the target `base_url` against the global registry.
+        2. **Routing**: Cross-references the requested HTTP `method` and `path` against
+           the target transport's internal endpoint dictionary.
+        3. **Serialization Boundary**: Strictly forces the request payload through Pydantic
+           parsing logic (simulating JSON wire serialization) to guarantee structural safety.
+        4. **Execution**: Dispatches the payload to the underlying Python handler and `await`s
+           the result regardless of which event loop the target server was initialized on.
+        5. **Response Marshalling**: Translates the rich domain model returned by the handler
+           back through standard serialization layers before yielding it to the caller.
 
         Args:
-            request_spec: Specifications of the request including HTTP method, path, and parsers.
-            base_url: The URL of the target agent to deliver the request to.
-            data: The request payload (typically a Task object or compatible primitive).
-            params: Optional query parameters (unused natively but supported for API alignment).
+            request_spec: The high-level specification detailing HTTP verb, path, and serializers.
+            base_url: The exact URI of the target agent.
+            data: The request payload (typically a `Task` or `Message`).
+            params: Optional query parameters (mimicked for API symmetry).
 
         Returns:
-            The raw or parsed response produced by the target endpoint's handler.
+            The parsed response emitted by the target agent.
 
         Raises:
-            ConnectionError: If the target agent transport is not actively registered.
-            RuntimeError: If the requested endpoint path or method does not exist on the target.
+            ConnectionError: If the target URI is not registered in the global memory bus.
+            RuntimeError: If the target endpoint (method/path) cannot be resolved.
         """
         target: RuntimeTransport | None = self.get_transport(base_url)
         if not target:
@@ -161,18 +188,25 @@ class RuntimeTransport(Transport):
     # ------------------------------------------------------------------
 
     async def subscribe(self, base_url: str, task: Task) -> AsyncIterator[dict[str, Any]]:
-        """Subscribe to a streaming stream of task updates.
+        """Establish a local asynchronous streaming pipeline to a peer agent.
+
+        Designed for streaming workloads like real-time agent thought processing, this method
+        circumvents WebSocket infrastructure and natively consumes the target agent's `AsyncIterator`.
+
+        It resolves the `base_url`, locates an endpoint flagged for `streaming`, enforces the
+        Pydantic serialization boundary, and then seamlessly yields deserialized dictionaries
+        from the underlying Python generator directly into the caller's event loop context.
 
         Args:
-            base_url: The URL of the target agent to connect to for streaming.
-            task: The Task triggering the streaming sequence.
+            base_url: The target agent URI.
+            task: The `Task` invoking the streaming logic.
 
         Yields:
-            Event dictionaries corresponding to streamed updates from the handler.
+            Incremental dictionaries representing chunked event progression.
 
         Raises:
-            ConnectionError: If the target agent transport is not actively registered.
-            RuntimeError: If the resolved endpoint does not natively support asynchronous iteration.
+            ConnectionError: If the target agent is not actively registered.
+            RuntimeError: If the resolved endpoint fails to return an `AsyncIterator`.
         """
         target: RuntimeTransport | None = self.get_transport(base_url)
         if not target:
@@ -218,21 +252,35 @@ class RuntimeTransport(Transport):
     # ------------------------------------------------------------------
 
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
-        """Register designated endpoint specifications for handler routing.
+        """Cache abstract endpoint models into the local routing table.
+
+        Instead of delegating to heavy ASGI frameworks like Starlette or FastAPI,
+        the `RuntimeTransport` maintains a highly optimized dictionary mapping
+        `(HTTP_METHOD, PATH)` tuples to their corresponding `EndpointSpec` instances.
 
         Args:
-            endpoints: A comprehensive collection of `EndpointSpec` routing instructions.
+            endpoints: A list of `EndpointSpec` configurations defining the server API.
         """
         for endpoint in endpoints:
             self._endpoints[(endpoint.method.upper(), endpoint.path)] = endpoint
 
     async def start(self) -> None:
-        """Mount the local transport to the global class registry marking it entirely reachable."""
+        """Activate the transport and broadcast its availability to the local process.
+
+        This method injects the transport instance into the `RuntimeTransport._registry`
+        singleton dictionary. Once registered, any other agent running in the same Python
+        process can instantly route messages to this transport using its `runtime://` URI.
+        """
         RuntimeTransport._registry[self._url] = self
         self._is_running = True
 
     async def stop(self) -> None:
-        """Unmount the connected transport removing it gracefully from active registry loops."""
+        """Gracefully terminate transport operations and drop from the global registry.
+
+        This method removes the transport's URI from the `_registry`, severing incoming
+        connections. It subsequently clears all loaded endpoints, ensuring garbage collection
+        can aggressively prune the isolated server state.
+        """
         RuntimeTransport._registry.pop(self._url, None)
         self._endpoints.clear()
         self._is_running = False

@@ -1,3 +1,10 @@
+"""FastAPI transport backend for Protolink agents.
+
+This module provides the :class:`FastAPIBackend`, utilizing the FastAPI framework to construct
+highly validated, ASGI-compliant web servers. It translates abstract agent endpoints into native
+FastAPI routes, optionally leveraging Pydantic schema generation.
+"""
+
 import asyncio
 import json
 from typing import Any
@@ -75,11 +82,12 @@ class FastAPIBackend(BackendInterface):
         )
 
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
-        """Register all HTTP routes on the FastAPI application.
+        """Mount abstract Protolink endpoints as physical FastAPI routes.
 
-        This method wires the public HTTP API to the internal handlers.
-        Each route is registered via a dedicated helper for clarity and
-        parity with the Starlette backend.
+        This method acts as the architectural bridge between Protolink's internal `EndpointSpec`
+        definitions and the external ASGI routing engine. It dynamically constructs asynchronous
+        HTTP handlers capable of extracting JSON payloads, validating them (if enabled), and
+        marshaling the result back over the wire via FastAPI's `JSONResponse`.
         """
         for ep in endpoints:
             self._register_endpoint(ep)
@@ -89,6 +97,13 @@ class FastAPIBackend(BackendInterface):
     # ----------------------------------------------------------------------
 
     async def start(self, url: str) -> None:
+        """Boot the Uvicorn ASGI server as an isolated background task.
+
+        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn
+        `Server` instance, and schedules it within the current asyncio event loop. To prevent
+        race conditions, it actively polls `server.started` to ensure the TCP socket is bound
+        before yielding control back to the caller.
+        """
         import uvicorn
 
         host, port = self._get_host_port(url)
@@ -105,6 +120,12 @@ class FastAPIBackend(BackendInterface):
             await asyncio.sleep(0.02)
 
     async def stop(self) -> None:
+        """Gracefully orchestrate Uvicorn server teardown.
+
+        Injects the `should_exit` signal directly into the Uvicorn state machine, triggering a
+        graceful draining of active connections. It then safely `await`s the server's background
+        task to prevent orphaned processes and suppresses any expected `CancelledError` exceptions.
+        """
         if self._server_instance:
             self._server_instance.should_exit = True
 
@@ -122,7 +143,12 @@ class FastAPIBackend(BackendInterface):
     # ----------------------------------------------------------------------
 
     def _serialize_result(self, result):
-        """Auto-serialize models or objects."""
+        """Recursively normalize rich domain models into strictly JSON-compatible structures.
+
+        FastAPI's native `JSONResponse` requires purely dict/list primitives. This utility ensures
+        that Protolink `BaseModel`s, DataClasses, or arbitrary nested lists are aggressively flattened
+        prior to final response dispatch.
+        """
         if hasattr(result, "to_json"):
             return result.to_json()
         elif hasattr(result, "to_dict"):

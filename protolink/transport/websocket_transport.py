@@ -35,6 +35,17 @@ class WebSocketTransport(Transport):
 
     This means **no changes** are required to `ClientRequestSpec` or `EndpointSpec` for
     basic request/response functionality.
+
+    **Concurrency and Event Loop Isolation**
+    Because Protolink executes agents using isolated background threads when ``background=True``,
+    a single ``WebSocketTransport`` instance may be accessed by multiple ``asyncio`` event loops
+    concurrently (e.g., the server running in a background thread and client requests dispatched
+    from the main thread).
+
+    To prevent `asyncio` cross-loop contamination, this transport implements loop-aware connection
+    management. Persistent WebSocket connections and their synchronization primitives (like
+    ``asyncio.Lock``) are dynamically cached using composite keys incorporating the caller's
+    event loop ID. This guarantees strict isolation of connections per thread.
     """
 
     transport_type: ClassVar[TransportType] = "websocket"
@@ -54,6 +65,8 @@ class WebSocketTransport(Transport):
         self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
         self._server: Any | None = None
 
+        # Loop-aware connection states to prevent cross-loop boundary exceptions.
+        # Keys are structured as: f"{base_url}_{id(asyncio.get_running_loop())}"
         self._client_conns: dict[str, Any] = {}
         self._client_locks: dict[str, asyncio.Lock] = {}
 
@@ -62,7 +75,13 @@ class WebSocketTransport(Transport):
     # ------------------------------------------------------------------
 
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
-        """Register server endpoints.
+        """Register the supported protocol handlers into memory.
+
+        Unlike HTTP servers that utilize complex routing engines, WebSocket multiplexes all logic
+        over a single persistent endpoint. This method caches the abstract ``EndpointSpec`` objects
+        into an internal dictionary keyed by ``(method, path)``, enabling the central
+        ``_handle_connection`` router to rapidly dispatch incoming JSON-RPC style frames to their
+        appropriate domain handlers.
 
         Parameters
         ----------
@@ -76,7 +95,12 @@ class WebSocketTransport(Transport):
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Start a WebSocket server at ``self.url``."""
+        """Spin up the native `websockets` daemon on the specified interface.
+
+        This instantiates an ``asyncio`` background task running the ``websockets.serve``
+        lifecycle. Once bound to the designated port, all inbound TCP connections are immediately
+        funneled directly into the ``_handle_connection`` multiplexer.
+        """
         host, port = self._get_host_port(self._url)
         if not host or not port:
             raise ValueError(f"Invalid URL: {self._url}. Missing host or port.")
@@ -109,7 +133,16 @@ class WebSocketTransport(Transport):
         data: Any = None,
         params: dict[str, Any] | None = None,
     ) -> Any:
-        """Send a request to a remote endpoint and return the parsed response."""
+        """Multiplex a single synchronous-style request over a persistent WebSocket connection.
+
+        This client orchestrator translates a RESTful ``ClientRequestSpec`` into a JSON-RPC
+        flavored payload by injecting a unique ``message_id``. It secures an exclusive lease
+        on the loop-isolated connection via ``asyncio.Lock()``, pushes the payload, and blocks
+        until a frame with the exact matching ``id`` is yielded by the remote server.
+
+        This design facilitates transparent, bi-directional communication while appearing identical
+        to standard HTTP request/response lifecycles to the developer.
+        """
         message_id = uuid.uuid4().hex
 
         payload: dict[str, Any] = {
@@ -130,14 +163,15 @@ class WebSocketTransport(Transport):
             payload.setdefault("params", {})
             payload["params"].update(params)
 
-        lock = self._client_locks.setdefault(base_url, asyncio.Lock())
+        loop_key = f"{base_url}_{id(asyncio.get_running_loop())}"
+        lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
         async with lock:
-            conn = await self._ensure_client_connection(base_url)
+            conn = await self._ensure_client_connection(base_url, loop_key)
             try:
                 await conn.send(json.dumps(payload))
                 raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
             except ConnectionClosed as e:
-                self._client_conns.pop(base_url, None)
+                self._client_conns.pop(loop_key, None)
                 raise ConnectionError(f"WebSocket connection closed while talking to {base_url}") from e
 
         if isinstance(raw, (bytes, bytearray)):
@@ -161,10 +195,13 @@ class WebSocketTransport(Transport):
         return result
 
     async def subscribe(self, agent_url: str, task: Any) -> AsyncIterator[Any]:
-        """Subscribe to task events from a remote agent.
+        """Establish an asynchronous streaming pipeline over a persistent WebSocket connection.
 
-        This sends a POST request to ``/tasks/stream`` and yields each streamed
-        event frame until the server marks the stream as final.
+        Designed for heavy workloads (like streaming agent thought processes or task progression),
+        this pushes a ``/tasks/stream`` payload with a unique ``message_id``. It then continuously
+        polls the loop-isolated socket, yielding deserialized chunks back to the caller as an
+        ``AsyncIterator``. The pipeline automatically terminates when the remote server sends a
+        frame tagged with ``final=True``.
         """
         message_id = uuid.uuid4().hex
 
@@ -175,9 +212,10 @@ class WebSocketTransport(Transport):
             "data": self._serialize_result(task),
         }
 
-        lock = self._client_locks.setdefault(agent_url, asyncio.Lock())
+        loop_key = f"{agent_url}_{id(asyncio.get_running_loop())}"
+        lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
         async with lock:
-            conn = await self._ensure_client_connection(agent_url)
+            conn = await self._ensure_client_connection(agent_url, loop_key)
             try:
                 await conn.send(json.dumps(payload))
                 while True:
@@ -204,12 +242,19 @@ class WebSocketTransport(Transport):
                     if msg.get("final", False):
                         break
             except ConnectionClosed as e:
-                self._client_conns.pop(agent_url, None)
+                self._client_conns.pop(loop_key, None)
                 raise ConnectionError(f"WebSocket connection closed while streaming from {agent_url}") from e
 
-    async def _ensure_client_connection(self, base_url: str) -> Any:
-        """Get or create a cached client WebSocket connection for ``base_url``."""
-        existing = self._client_conns.get(base_url)
+    async def _ensure_client_connection(self, base_url: str, loop_key: str) -> Any:
+        """Get or create a cached client WebSocket connection for ``base_url``.
+
+        This method utilizes a ``loop_key`` (incorporating the current ``asyncio`` event
+        loop ID) to lazily instantiate and cache persistent websocket connections per event
+        loop. This strict isolation ensures that concurrent requests made from the main
+        thread and the background server thread do not share underlying websocket primitives,
+        thereby completely eliminating `Future attached to a different loop` exceptions.
+        """
+        existing = self._client_conns.get(loop_key)
         if existing is not None and not getattr(existing, "closed", False):
             return existing
 
@@ -218,7 +263,7 @@ class WebSocketTransport(Transport):
             conn = await websockets.connect(base_url, additional_headers=headers)
         except TypeError:
             conn = await websockets.connect(base_url, extra_headers=headers)
-        self._client_conns[base_url] = conn
+        self._client_conns[loop_key] = conn
         return conn
 
     # ------------------------------------------------------------------
@@ -226,13 +271,23 @@ class WebSocketTransport(Transport):
     # ------------------------------------------------------------------
 
     async def authenticate(self, credentials: str) -> None:
-        """Authenticate using the configured authenticator and store a security context."""
+        """Validate credentials and establish a WebSocket security context.
+
+        Delegates validation to the injected ``Authenticator``. The resulting token or security
+        state is permanently bound to the transport instance and seamlessly injected into the
+        handshake headers when initializing new physical ``websockets.connect()`` streams.
+        """
         if not self.authenticator:
             raise RuntimeError("No Authenticator configured")
         self.security_context = await self.authenticator.authenticate(credentials)
 
     def _build_headers(self) -> dict[str, str]:
-        """Build HTTP-style headers used during the WebSocket handshake."""
+        """Compile the HTTP upgrade headers required for the WebSocket handshake.
+
+        If authentication is configured, this securely injects the ``Authorization: Bearer <token>``
+        header into the initial HTTP GET request that is used to upgrade the connection to the
+        WebSocket protocol.
+        """
         headers: dict[str, str] = {}
         if self.authenticator and self.security_context:
             headers["Authorization"] = f"Bearer {self.security_context.token}"
@@ -243,7 +298,16 @@ class WebSocketTransport(Transport):
     # ------------------------------------------------------------------
 
     async def _handle_connection(self, websocket: Any) -> None:
-        """Handle a single inbound WebSocket connection."""
+        """The central multiplexer for all inbound WebSocket traffic.
+
+        This loop continuously consumes raw JSON frames from the underlying socket. It deserializes
+        the request to identify its correlation ``id``, intended ``method``, and ``path``. It then:
+        1. Resolves the appropriate ``EndpointSpec`` registered via ``setup_routes``.
+        2. Normalizes input data into the expected format (body vs. query parameters).
+        3. Executes the underlying domain handler. If the handler is a streaming generator, it loops
+           and emits chunked frames incrementally. Otherwise, it executes a standard request/response pattern.
+        4. Serializes the final result and transmits it back with the matching correlation ``id``.
+        """
         async for raw in websocket:
             response: dict[str, Any]
             req: Any = None
@@ -338,7 +402,12 @@ class WebSocketTransport(Transport):
             await websocket.send(json.dumps(response))
 
     def _serialize_result(self, result: Any) -> Any:
-        """Serialize common model types into JSON-compatible structures."""
+        """Recursively normalize complex data models into JSON-safe structures.
+
+        Since websockets mandate purely text-based (or binary) JSON payloads, this utility ensures
+        that rich domain models (like Pydantic ``BaseModel``, custom DataClasses, or nested lists)
+        are aggressively flattened into basic Python dictionaries prior to `json.dumps()` serialization.
+        """
         if hasattr(result, "to_json"):
             return result.to_json()
         if hasattr(result, "to_dict"):

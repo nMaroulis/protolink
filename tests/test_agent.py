@@ -411,11 +411,11 @@ class TestAgent:
             mock_server_instance.start = AsyncMock()
             mock_server.return_value = mock_server_instance
 
-            # In async loop, start returns a task we should await for it to finish _serve()
-            if task := agent.start(register=True, background=True):
-                await task
+            agent.start(register=True, background=True)
+            await asyncio.sleep(0.1)
 
             mock_registry_client.register.assert_called_once_with(agent_card)
+            agent.stop()
 
     @pytest.mark.asyncio
     async def test_stop_with_registry(self, agent_card):
@@ -430,16 +430,9 @@ class TestAgent:
             mock_server_instance.stop = AsyncMock()
             mock_server.return_value = mock_server_instance
 
-            # In async loop, start returns a task we should await for it to finish _serve()
-            if task := agent.start(register=False, background=True):
-                await task
-
-            # stop returns a task that we should await for it to finish _stop() cleanup
-            if task := agent.stop():
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+            agent.start(register=False, background=True)
+            await asyncio.sleep(0.1)
+            agent.stop()
 
             mock_registry_client.unregister.assert_called_once_with(agent_card.url)
 

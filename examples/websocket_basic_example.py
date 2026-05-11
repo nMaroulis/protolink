@@ -59,9 +59,9 @@ async def main() -> None:
     registry_url = "ws://127.0.0.1:9000"
     weather_url = "ws://127.0.0.1:8010"
     alert_url = "ws://127.0.0.1:8020"
-
     registry = Registry(transport="websocket", url=registry_url)
     registry.start(background=True)
+    await asyncio.sleep(0.1)
 
     weather_card = AgentCard(url=weather_url, name="WeatherAgent", description="Produces weather data")
     weather_agent = WeatherAgent(

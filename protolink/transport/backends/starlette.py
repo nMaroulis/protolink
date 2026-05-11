@@ -1,3 +1,10 @@
+"""Starlette transport backend for Protolink agents.
+
+This module provides the :class:`StarletteBackend`, utilizing the lightweight Starlette framework
+to construct fast, minimalistic ASGI-compliant web servers. It is the default backend due to its
+zero-overhead footprint and robust async routing capabilities.
+"""
+
 import asyncio
 import json
 from typing import Any
@@ -71,10 +78,12 @@ class StarletteBackend(BackendInterface):
         self.app.add_route(ep.path, route, methods=[ep.method])
 
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
-        """Register all HTTP routes on the Starlette application.
+        """Mount abstract Protolink endpoints as physical Starlette routes.
 
-        This method wires the public HTTP API to the internal handlers.
-        Each route is registered via a dedicated helper for clarity and separation of concerns.
+        This method serves as the architectural bridge between Protolink's `EndpointSpec` definitions
+        and the Starlette routing engine. It dynamically constructs asynchronous endpoint handlers
+        capable of extracting raw JSON body payloads, invoking domain logic, and transmitting
+        `JSONResponse` objects back over the wire.
         """
         for ep in endpoints:
             self._register_endpoint(ep)
@@ -84,6 +93,13 @@ class StarletteBackend(BackendInterface):
     # ----------------------------------------------------------------------
 
     async def start(self, url: str) -> None:
+        """Boot the Uvicorn ASGI server as an isolated background task.
+
+        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn
+        `Server` instance, and schedules it within the current asyncio event loop. To prevent
+        race conditions during agent startup, it actively polls `server.started` to ensure the
+        TCP socket is bound before yielding control.
+        """
         import uvicorn
 
         host, port = self._get_host_port(url)
@@ -99,6 +115,12 @@ class StarletteBackend(BackendInterface):
             await asyncio.sleep(0.02)
 
     async def stop(self) -> None:
+        """Gracefully orchestrate Uvicorn server teardown.
+
+        Injects the `should_exit` signal directly into the Uvicorn state machine to initiate a
+        graceful draining of active connections. It then synchronously `await`s the server's
+        background task, suppressing `CancelledError` exceptions to ensure a clean exit.
+        """
         if self._server_instance:
             self._server_instance.should_exit = True
 
@@ -116,7 +138,12 @@ class StarletteBackend(BackendInterface):
     # ----------------------------------------------------------------------
 
     def _serialize_result(self, result):
-        """Auto-serialize models or objects."""
+        """Recursively normalize rich domain models into strictly JSON-compatible structures.
+
+        Starlette's native `JSONResponse` requires purely dict/list primitives. This utility ensures
+        that Protolink `BaseModel`s, DataClasses, or arbitrary nested lists are aggressively flattened
+        prior to final response dispatch.
+        """
         if hasattr(result, "to_json"):
             return result.to_json()
         elif hasattr(result, "to_dict"):
