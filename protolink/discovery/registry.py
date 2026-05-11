@@ -114,7 +114,7 @@ class Registry:
         if self._server:
             await self._server.stop()
 
-    def start(self, *, background: bool = False) -> None | asyncio.Task:
+    def start(self, *, background: bool = False) -> None:
         """Start the registry runtime.
 
         This method automatically adapts to the current execution environment and
@@ -127,13 +127,8 @@ class Registry:
             background:
                 Controls execution mode.
 
-                - If True, starts the registry in the background and returns immediately.
+                - If True, starts the registry in a background thread and returns immediately.
                 - If False (default), blocks execution until shutdown.
-
-        Returns:
-            asyncio.Task | None:
-                - Returns an asyncio Task when running inside an existing async event loop.
-                - Returns None in blocking/script execution mode.
 
         Notes:
             - This is the recommended entrypoint for starting the registry.
@@ -144,40 +139,39 @@ class Registry:
             await self._serve()
             await self._serve_forever()
 
-        try:
-            # Existing event loop (Jupyter / async app)
-            loop = asyncio.get_running_loop()
+        if background:
 
-            self._background_task = loop.create_task(_lifecycle())
-            return self._background_task
+            def _thread_target():
+                self._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._loop)
 
-        except RuntimeError:
-            # Standard Python script
+                self._background_task = self._loop.create_task(_lifecycle())
 
-            if background:
+                try:
+                    self._loop.run_until_complete(self._background_task)
+                finally:
+                    self._loop.close()
 
-                def _thread_target():
-                    self._loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(self._loop)
-
-                    self._background_task = self._loop.create_task(_lifecycle())
-
-                    try:
-                        self._loop.run_until_complete(self._background_task)
-                    finally:
-                        self._loop.close()
-
-                self._thread = threading.Thread(
-                    target=_thread_target,
-                    daemon=False,
-                )
-                self._thread.start()
-
-                return None
-
-            # Blocking mode
-            asyncio.run(_lifecycle())
+            self._thread = threading.Thread(
+                target=_thread_target,
+                daemon=False,
+            )
+            self._thread.start()
             return None
+
+        # Blocking mode
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                self.logger.warning(
+                    "Registry.start() called in blocking mode from within an active event loop. "
+                    "This will block the loop. Use background=True instead."
+                )
+        except RuntimeError:
+            pass
+
+        asyncio.run(_lifecycle())
+        return None
 
     def stop(self) -> None:
         """Stop the registry runtime.
@@ -192,13 +186,6 @@ class Registry:
             - Safe to call multiple times.
             - Cancels active runtime tasks before cleanup.
         """
-
-        # Async task mode (Jupyter / async app with existing event loop)
-        if self._background_task and not self._background_task.done():
-            loop = self._background_task.get_loop()
-            if loop.is_running():
-                loop.call_soon_threadsafe(self._background_task.cancel)
-                return
 
         # Background thread mode
         if self._loop and self._loop.is_running():

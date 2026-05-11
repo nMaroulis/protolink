@@ -170,58 +170,59 @@ These methods control the agent's server component lifecycle.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `start()` | `register: bool = True`, `background: bool = False` | `asyncio.Task ⎪ None` | Starts the agent runtime. Automatically detects the environment and handles event loops. |
-| `stop()` | — | `None` | Stops the agent runtime and cleans up resources. |
+| `start()` | `register: bool = True`, `background: bool = False` | `None` | Starts the agent runtime. Can run in the main loop or as an isolated background thread. |
+| `stop()` | — | `None` | Stops the agent runtime and synchronously cleans up resources. |
 
-### Execution Models: Adaptive `start()`
+### Execution Models & Lifecycle
 
-The `start()` method is the primary entrypoint for running an agent. It is designed to be **environment-aware**, meaning it automatically detects whether it's running in a standard Python script, an asynchronous application, or a Jupyter notebook, and adapts its execution model accordingly.
+The `start()` method is the primary entrypoint for running an agent. To provide a "minimal boilerplate" experience, Protolink's lifecycle management automatically isolates the agent's internal async operations when running in the background, making it extremely robust across different environments.
 
 #### The `background` Parameter
 
-The `background` parameter controls whether the agent blocks the current execution or runs in the background:
+The `background` parameter controls the execution mode and event loop isolation:
 
-- **`background=False` (Default)**: Blocks execution until the agent is stopped (e.g., via Ctrl+C in a terminal).
-- **`background=True`**: Starts the agent and returns immediately, allowing the rest of the script to continue.
+- **`background=True`**: Starts the agent in a dedicated background thread with its own isolated `asyncio` event loop. It returns immediately. This is the **recommended mode** when running agents from Jupyter Notebooks, inside existing `asyncio` applications, or when orchestrating multiple agents in a single script. 
+- **`background=False` (Default)**: Takes over the main thread and blocks execution until the agent is stopped (e.g., via Ctrl+C in a terminal). Ideal for standalone agent processes.
+
+#### Seamless Synchronous Teardown
+
+Because `background=True` isolates the agent in its own thread, shutting down the agent is incredibly simple. You just call `agent.stop()`. 
+The `stop()` method operates synchronously—it tells the background thread to shut down and blocks for a fraction of a second to gracefully close Uvicorn and unregister from the registry. You **do not** need to `await` it, and it will never trigger messy `CancelledError` exceptions in your main event loop.
 
 #### Common Usage Patterns
 
 **1. Standalone Python Script**
 For simple scripts where the agent is the main process, use the default blocking mode:
 ```python
-# This will block the script and run until interrupted
+# This will take over the main thread and block until interrupted
 agent.start()
 ```
 
-**2. Multi-Agent Script (Sync)**
-If you need to start multiple agents in a single script, run the first ones in the background and the last one in blocking mode to keep the process alive:
+**2. Multi-Agent Script**
+If you need to start multiple agents in a single script, run them in the background and gracefully stop them at the end.
 ```python
 agent_a.start(background=True)
 agent_b.start(background=True)
-agent_c.start(background=False) # Keep the script alive
+
+# ... interact with agents ...
+
+agent_a.stop()
+agent_b.stop()
 ```
 
-**3. Jupyter Notebooks / Interactive Environments**
-Jupyter Notebooks run inside an existing event loop. `start()` detects this and returns an `asyncio.Task` immediately, regardless of the `background` setting, so it doesn't block the cell:
-```python
-# In a Jupyter cell
-agent.start() # Returns an asyncio.Task and keeps the agent running in the background
-```
-
-**4. Async Applications (FastAPI, etc.)**
-When integrating into an async app, `start()` can be called normally. It will return a task that you can optionally await or manage:
+**3. Jupyter Notebooks & Async Apps**
+Jupyter Notebooks and async frameworks (like FastAPI) already have an active event loop. Using `background=True` safely isolates the agent from this loop:
 ```python
 async def main():
-    # Start the agent as a background task in the existing loop
-    task = agent.start(background=True)
+    agent.start(background=True)  # Spawns isolated thread, safe for async context
     
-    # ... other async logic ...
+    # ... your async app logic ...
     
-    await asyncio.Event().wait() # Keep the loop running
+    agent.stop()  # Cleanly shuts down the thread without blocking your loop permanently
 ```
 
 !!! tip "Graceful Shutdown"
-    Always use `agent.stop()` to ensure that the agent unregisters from the registry and releases its network ports cleanly. In a standard script, `agent.start()` handles `KeyboardInterrupt` gracefully if `background=False`.
+    Always use `agent.stop()` to ensure that the agent unregisters from the registry and releases its network ports cleanly. In a standard script, `agent.start(background=False)` handles `KeyboardInterrupt` gracefully out of the box.
 
 ## Transport Management
 

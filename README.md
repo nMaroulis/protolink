@@ -96,7 +96,7 @@ agent.start()
 #### ✨ Ready to Orchestrate
 The agent is now fully initialized and prepared to **discover & be discovered by peers**, send & receive **tasks** across your system.
 
-**Note**: `agent.start()` automatically **adapts** to the current environment under the hood, working seamlessly in **standard Python scripts, async applications, and Jupyter notebooks** with both **blocking** and **background** execution modes. When `background=True`, it runs the agent non-blocking using an **event loop task** or a **dedicated background thread** depending on the runtime context.
+**Note**: `agent.start()` automatically **adapts** to the current environment under the hood, working seamlessly in **standard Python scripts, async applications, and Jupyter notebooks** with both **blocking** and **background** execution modes. When `background=True`, it runs the agent non-blocking using an **event loop task** or a **dedicated background thread** depending on the runtime context. See how Protolink handles [agent execution **lifecycle**](https://nmaroulis.github.io/protolink/agent/#lifecycle-methods).
 
 ## Features
 

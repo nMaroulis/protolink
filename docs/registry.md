@@ -21,17 +21,17 @@ These methods control the registry server component lifecycle.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `start()` | `background: bool = False` | `asyncio.Task ⎪ None` | Starts the Registry runtime. Automatically detects environment and event loops. |
-| `stop()` | — | `None` | Stops the Registry runtime and cleans up resources. |
+| `start()` | `background: bool = False` | `None` | Starts the Registry runtime. Can run in the main loop or as an isolated background thread. |
+| `stop()` | — | `None` | Stops the Registry runtime and synchronously cleans up resources. |
 
-### Execution Models: Adaptive `start()`
+### Execution Models & Lifecycle
 
-Similar to agents, the Registry's `start()` method is **environment-aware**. It detects whether it is running in a script, an async app, or a notebook.
+Similar to agents, the Registry's lifecycle management is designed for "minimal boilerplate" and robust background execution across all environments (scripts, async apps, notebooks).
 
 #### The `background` Parameter
 
-- **`background=False` (Default)**: Blocks execution until the registry is stopped (e.g., via Ctrl+C). Ideal for standalone registry processes.
-- **`background=True`**: Starts the registry in the background and returns immediately. Ideal for orchestrating a system in a single script.
+- **`background=True`**: Starts the registry in a dedicated background thread with its own isolated `asyncio` event loop and returns immediately. Because it uses a separate thread, it prevents event loop collisions and allows you to easily shut it down later using the synchronous `.stop()` method without any `await` syntax.
+- **`background=False` (Default)**: Blocks the main thread's execution until the registry is stopped (e.g., via Ctrl+C). Ideal for standalone registry processes.
 
 #### Common Usage Patterns
 
@@ -44,21 +44,26 @@ registry = Registry(url="http://localhost:9000")
 registry.start()
 ```
 
-**2. Multi-Agent Orchestration (Sync Script)**
+**2. Multi-Agent Orchestration**
 ```python
 registry.start(background=True)
-agent_a.start(background=True)
-agent_b.start(background=False) # Blocks here to keep the process alive
+agent.start(background=True)
+
+# ... run your logic ...
+
+# Synchronous, graceful teardown. No async/await boilerplate needed!
+agent.stop()
+registry.stop()
 ```
 
-**3. Jupyter Notebooks**
+**3. Jupyter Notebooks & Async Contexts**
 ```python
-# In a Jupyter cell
-registry.start() # Returns an asyncio.Task immediately and runs in background
+# Safe to use in an existing async loop
+registry.start(background=True) 
 ```
 
 !!! tip "Graceful Shutdown"
-    Use `registry.stop()` to cleanly shut down the server. In blocking scripts, `registry.start()` handles `KeyboardInterrupt` automatically.
+    Always use `registry.stop()` to cleanly shut down the server and release ports. In blocking scripts, `registry.start(background=False)` handles `KeyboardInterrupt` automatically.
 
 ---
 
