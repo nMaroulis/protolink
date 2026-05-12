@@ -211,30 +211,56 @@ class HTTPTransport(Transport):
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Boot the background ASGI server and prime the client connection pool.
+        """Boot the background ASGI server and eagerly prime the loop-isolated client pool.
 
-        When invoked, this kicks off the ``uvicorn`` or alternative ASGI server lifecycle configured
-        by the active backend. Immediately afterward, it eagerly provisions an ``httpx.AsyncClient``
-        pool dedicated strictly to the caller's event loop to guarantee safe outbound communications.
+        This method initializes the dual-role nature of the transport. It first kicks off the configured ASGI server
+        (e.g., Uvicorn) to handle inbound traffic. Immediately following, it provisions an ``httpx.AsyncClient``
+        dedicated to the caller's current event loop.
+
+        **Technical Note on Eager Provisioning:**
+        By instantiating the client pool during ``start()``, we guarantee that the transport is fully warmed for
+        outbound communication before the method returns. This is critical in multi-threaded Protolink environments
+        (like background agents) where the server-side loop must be able to immediately dispatch registry registration
+        requests or delegation calls without the overhead or potential race conditions of lazy initialization.
+
+        The use of an ID-keyed pool (``self._clients``) ensures that this eagerly created client is strictly bound to
+        the current thread's loop selector, preventing cross-loop boundary violations.
         """
 
-        # Start the HTTP server
         await self.backend.start(self._url)
 
-        # Initialize HTTP client for the current loop
         import asyncio
 
         loop_id = id(asyncio.get_running_loop())
         self._clients[loop_id] = httpx.AsyncClient(timeout=self._timeout)
 
     async def stop(self) -> None:
-        """Stop the HTTP server and gracefully close all isolated HTTP client pools."""
+        """Stop the HTTP server and gracefully close the loop-isolated HTTP client pool.
 
+        This method orchestrates a multi-layered shutdown. First, it terminates the ASGI server backend.
+        Second, it performs a loop-safe cleanup of outbound connection pools.
+
+        **Technical Note on Loop Isolation:**
+        In Protolink's multi-threaded architecture, a single ``HTTPTransport`` instance is frequently shared across
+        multiple ``asyncio`` event loops (e.g., a background server thread and the main execution thread).
+        Because ``asyncio`` primitives—including the sockets and selectors within ``httpx.AsyncClient``, are strictly
+        bound to the loop that instantiated them, attempting to close a client from a different loop triggers
+        a ``RuntimeError`` ("Event loop is closed" or "Future attached to a different loop").
+
+        To resolve this, we utilize an ID-keyed connection pool. This method only ``aclose()``'s the client associated
+        with the *caller's* current event loop, ensuring that shutdown logic never violates loop boundaries or attempts
+        to interact with a potentially defunct selector from another thread.
+        """
+
+        # Stop the server backend
         await self.backend.stop()
-        for client in self._clients.values():
-            if not client.is_closed:
-                await client.aclose()
-        self._clients.clear()
+
+        import asyncio
+
+        loop_id = id(asyncio.get_running_loop())
+        client = self._clients.pop(loop_id, None)
+        if client and not client.is_closed:
+            await client.aclose()
 
     # ------------------------------------------------------------------
     # Authentication & Security

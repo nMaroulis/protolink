@@ -70,18 +70,18 @@ async def main():
         # Step 1: Start the Registry
         print("📡 Starting Registry...")
         registry = Registry(url=REGISTRY_URL, transport="http")
-        registry.start()
+        registry.start(background=True)  # runs in the background so it doesn't block the runtime
         print(f"   Registry running at {REGISTRY_URL}")
 
         # Step 2: Start specialist agents (no LLM - tool only)
         print("\n🌤️  Starting Weather Agent (tool-only)...")
         weather_agent = create_weather_agent(registry, verbosity=VERBOSITY)
-        weather_agent.start()
+        weather_agent.start(background=True)
         print(f"   Weather Agent running at {weather_agent.card.url}")
 
         print("\n🏨 Starting Hotel Agent (tool-only)...")
         hotel_agent = create_hotel_agent(registry, verbosity=VERBOSITY)
-        hotel_agent.start()
+        hotel_agent.start(background=True)
         print(f"   Hotel Agent running at {hotel_agent.card.url}")
 
         # Step 3: Start Holiday Advisor (has LLM - for infer action)
@@ -92,7 +92,7 @@ async def main():
             verbosity=VERBOSITY,
             **kwargs,
         )
-        advisor_agent.start()
+        advisor_agent.start(background=True)
         print(f"   Holiday Advisor running at {advisor_agent.card.url}")
 
         # Step 4: Start coordinator (with LLM)
@@ -103,7 +103,7 @@ async def main():
             verbosity=VERBOSITY,
             **kwargs,
         )
-        coordinator.start()
+        coordinator.start(background=True)
         print(f"   Coordinator running at {coordinator.card.url}")
 
         # Step 5: Verify agent discovery

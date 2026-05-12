@@ -261,33 +261,56 @@ class Agent:
         register: bool = True,
         background: bool = False,
     ) -> None:
-        """Start the agent runtime.
+        """Start the agent runtime and initialize outbound/inbound communications.
 
-        This is the main public entrypoint for running the agent and is compatible with:
-        - standard Python scripts
+        This is the primary public entrypoint for running the agent. It is designed to be
+        environment-agnostic, working seamlessly in:
+        - standard scripts
         - async applications
-        - Jupyter notebooks
-        - interactive environments
+        - background threads
+        - Jupyter notebooks (interactive environments)
+
+
+        **Technical Note on Lifecycle Orchestration:**
+        Protolink handles the transition between synchronous and asynchronous contexts using
+        a dual-mode execution strategy:
+
+        1. **Deterministic Background Mode (``background=True``):** Starts a dedicated thread
+           with its own ``asyncio`` event loop. To prevent race conditions, this method
+           utilizes a ``threading.Event`` to block the caller until the background agent is
+           fully initialized, registered, and ready to receive traffic. Any startup
+           failures (e.g., port collisions) are captured and re-raised in the caller thread.
+
+        2. **Blocking Mode (``background=False``):** Utilizes ``asyncio.run()`` to take over
+            the main thread's execution. This is the recommended pattern for standalone
+           agent scripts.
 
         Args:
-            register: If True, registers the agent with the configured registry.
-            background:
-                Controls execution mode.
-
-                - If True, starts the agent in a background thread and returns immediately.
-                - If False (default), blocks execution until shutdown.
+            register: If True, registers the agent with the configured registry upon startup.
+            background: Controls execution mode. If True, returns immediately after startup.
 
         Notes:
-            - This is the recommended entrypoint for all users.
-            - Advanced users should avoid calling internal lifecycle methods directly.
+            - Safe to call in any environment.
+            - Re-raises background startup exceptions in the main thread.
         """
 
         async def _lifecycle():
-            self._logger.info(get_agent_greeting(self.card.name))
-            await self._serve(register=register)
-            await self._serve_forever()
+            try:
+                self._logger.info(get_agent_greeting(self.card.name))
+                await self._serve()
+                # Signal that startup completed successfully
+                self._ready_event.set()
+                await self._serve_forever()
+            except Exception as e:
+                # Store startup failure so the main thread can re-raise it
+                self._startup_exception = e
+                # Unblock waiting thread even on failure
+                self._ready_event.set()
+                raise
 
         if background:
+            self._ready_event = threading.Event()
+            self._startup_exception = None
 
             def _thread_target():
                 self._loop = asyncio.new_event_loop()
@@ -298,6 +321,15 @@ class Agent:
                 try:
                     self._loop.run_until_complete(self._background_task)
                 finally:
+                    # Cancel pending tasks cleanly
+                    pending = asyncio.all_tasks(self._loop)
+
+                    for task in pending:
+                        task.cancel()
+
+                    if pending:
+                        self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+
                     self._loop.close()
 
             self._thread = threading.Thread(
@@ -305,34 +337,56 @@ class Agent:
                 daemon=False,
             )
             self._thread.start()
-            return None
+            # Wait until Agent startup completes
+            ready = self._ready_event.wait(timeout=10)
 
+            if not ready:
+                self._logger.warning(f"Agent '{self.card.name}' background thread took more than 10s to start.")
+
+            # Re-raise startup exceptions in caller thread
+            if self._startup_exception is not None:
+                raise self._startup_exception
+
+            return
         # Blocking mode
         try:
             loop = asyncio.get_running_loop()
             if loop.is_running():
-                self._logger.warning(
+                self._logger.error(
                     "Agent.start() called in blocking mode from within an active event loop. "
-                    "This will block the loop. Use background=True instead."
+                    "This will block the loop. Use \033[1mbackground=True\033[22m instead."
                 )
         except RuntimeError:
             pass
 
         asyncio.run(_lifecycle())
-        return None
+        return
 
     def stop(self) -> None:
-        """Stop the agent runtime.
+        """Stop the agent runtime and orchestrate a graceful teardown.
 
-        This method automatically handles shutdown across:
+        This method automatically handles shutdown across across all supported execution environments:
         - scripts
         - async environments
         - background threads
         - Jupyter notebooks
 
+        It is specifically designed to safely terminate agents started with ``background=True``.
+
+        **Technical Note on Thread-Safe Teardown:**
+        When an agent is running in a background thread, its lifecycle is managed by a private event loop.
+        To stop it from the main thread, we utilize ``call_soon_threadsafe`` to inject a cancellation request into
+        the background loop. This triggers a ``CancelledError`` within the ``_lifecycle()`` coroutine, allowing
+        it to execute its ``finally`` blocks which perform critical cleanup like closing the transport and stopping
+        the ASGI server.
+
+        The subsequent ``join(timeout=10)`` synchronizes the main thread with the background thread's exit.
+        This ensures that the caller doesn't proceed (or the process doesn't exit) while the background server
+        is still in the middle of a graceful port release or connection drain.
+
         Notes:
             - Safe to call multiple times.
-            - Cancels active runtime tasks before cleanup.
+            - Blocks the main thread briefly to ensure deterministic cleanup.
         """
 
         # Background thread mode
@@ -1172,7 +1226,7 @@ class Agent:
                     "output_schema": dict[str, str]
         """
         if not self.tools:
-            return None
+            return
 
         tool_prompt: str = ""
         for i, (name, tool) in enumerate(self.tools.items(), start=1):

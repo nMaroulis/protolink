@@ -12,4 +12,4 @@ def safe_import(*, package: str, module: str | None = None, class_name: str) -> 
             imported_module = __import__(f"protolink.{package}", fromlist=[class_name])
         return getattr(imported_module, class_name, None)
     except ImportError:
-        return None
+        return
