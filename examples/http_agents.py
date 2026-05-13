@@ -13,9 +13,8 @@ without event loop contamination.
 
 from __future__ import annotations
 
-import asyncio
-
 from protolink.agents import Agent
+from protolink.client import AgentClient
 from protolink.models import AgentCard, Message, Task
 from protolink.transport import HTTPTransport
 
@@ -42,6 +41,7 @@ class EchoAgent(Agent):
         card = AgentCard(name=name, description=description, url=f"http://127.0.0.1:{port}")
         super().__init__(card, transport=transport)
 
+    # Overrides the base class handle_task method to add custom logic.
     async def handle_task(self, task: Task) -> Task:
         """Process incoming HTTP requests and return a mutated task state.
 
@@ -55,36 +55,34 @@ class EchoAgent(Agent):
         return task.complete(f"[{self.card.name}] echo: {user_text}")
 
 
-async def main() -> None:
+def main() -> None:
     """Orchestrate the distributed network test sequence.
 
     This control plane executes the following architectural workflow:
-    1. **Initialization**: Spins up two discrete agents on isolated network ports (8020 and 8021).
-    2. **Background Execution**: Calls `.start(background=True)` to offload their respective
-       Starlette servers into highly concurrent, loop-isolated background threads.
-    3. **Card Discovery Test**: Validates the client's ability to query the remote server's
+    1. **Initialization**: Spins up a discrete agent on port 8020.
+    2. **Background Execution**: Calls `.start(background=True)` to offload the
+       Starlette server into a loop-isolated background thread.
+    3. **Client Setup**: Initializes an `AgentClient` to communicate with the agent.
+    4. **Card Discovery Test**: Validates the client's ability to query the remote server's
        metadata (via `GET /`).
-    4. **Message Dispatch Test**: Validates sending atomic, stateless `Message` payloads
-       across the network.
-    5. **Task Orchestration Test**: Validates sending stateful `Task` containers that track
-       workflow progression and return mutated state.
-    6. **Graceful Teardown**: Synchronously terminates the background servers and closes
-       all TCP sockets.
+    5. **Message Dispatch Test**: Validates sending atomic, stateless `Message` payloads
+       across the network using `client.sync.send_message`.
+    6. **Task Orchestration Test**: Validates sending stateful `Task` containers that track
+       workflow progression using `client.sync.send_task`.
+    7. **Graceful Teardown**: Synchronously terminates the background server.
     """
 
-    # 1. Setup Agents
+    # 1. Setup Server Agent
     server_port = 8020
-    client_port = 8021
-
     server_agent = EchoAgent("server_agent", "I echo messages", port=server_port)
-    client_agent = EchoAgent("client_agent", "I am the client", port=client_port)
 
-    # Start both
+    # Start the server in the background
+    print(f"Starting server agent on port {server_port}...")
     server_agent.start(background=True)
-    client_agent.start(background=True)
 
-    # Wait briefly for startup
-    await asyncio.sleep(0.5)
+    # 2. Setup AgentClient
+    # The client is transport-agnostic and will handle communication over HTTP.
+    client = AgentClient(transport="http")
 
     target_url = server_agent.card.url
 
@@ -93,23 +91,18 @@ async def main() -> None:
 
         # ---------------------------------------------------------
         # Test 1: get_agent_card
-        # Accessing via _client as Agent doesn't expose it directly yet,
-        # but User asked to test client funcs from the agent.
         # ---------------------------------------------------------
         print("\n--- Test 1: get_agent_card ---")
-        if client_agent._client:
-            card = await client_agent._client.get_agent_card(target_url)
-            print(f"SUCCESS: Retrieved card for '{card.name}'")
-            print(f"Description: {card.description}")
-        else:
-            print("ERROR: Client agent has no transport client configured.")
+        card = client.sync.get_agent_card(target_url)
+        print(f"SUCCESS: Retrieved card for '{card.name}'")
+        print(f"Description: {card.description}")
 
         # ---------------------------------------------------------
-        # Test 2: send_message (via Agent.send_message_to)
+        # Test 2: send_message
         # ---------------------------------------------------------
-        print("\n--- Test 2: send_message_to ---")
+        print("\n--- Test 2: send_message ---")
         msg = Message.user("Hello World")
-        response_msg = await client_agent.send_message_to(target_url, msg)
+        response_msg = client.sync.send_message(target_url, msg)
         print(f"Sent: '{msg.parts[0].content}'")
         print(f"Received: '{response_msg.parts[0].content}'")
 
@@ -117,11 +110,11 @@ async def main() -> None:
         print("SUCCESS: Message echo verified.")
 
         # ---------------------------------------------------------
-        # Test 3: Send Task (via Agent.call_agent)
+        # Test 3: Send Task
         # ---------------------------------------------------------
-        print("\n--- Test 3: call_agent ---")
+        print("\n--- Test 3: send_task ---")
         task = Task.create(Message.user("Do complex task"))
-        response_task = await client_agent.call_agent(target_url, task)
+        response_task = client.sync.send_task(target_url, task)
 
         last_msg_content = response_task.messages[-1].parts[0].content
         print(f"Sent Task ID: {task.id}")
@@ -136,8 +129,7 @@ async def main() -> None:
     finally:
         print("\nShutting down agents...")
         server_agent.stop()
-        client_agent.stop()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

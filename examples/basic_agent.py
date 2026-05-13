@@ -55,5 +55,5 @@ if __name__ == "__main__":
     tool_call_example()
 
     # LLM Inference Example (Configure an LLM using the built-in LLM classes)
-
+    # Uncomment the following line to enable LLM inference
     # llm_inference_example(message="Hey, how are you doing today?")

@@ -1100,11 +1100,12 @@ class Agent:
     def llm(self, llm: LLM | None) -> None:
         """Set the agent's LLM, validate the connection and update capabilities."""
         self._llm = llm
-        if llm is not None:
-            if llm.validate_connection():
-                self.card.capabilities.has_llm = True
-        else:
-            self.card.capabilities.has_llm = False
+        # Update LLM capability in card (handles both object and dict formats)
+        has_llm = bool(llm and llm.validate_connection())
+        if hasattr(self.card.capabilities, "has_llm"):
+            self.card.capabilities.has_llm = has_llm
+        elif isinstance(self.card.capabilities, dict):
+            self.card.capabilities["has_llm"] = has_llm
 
     @property
     def telemetry(self) -> Telemetry | None:
