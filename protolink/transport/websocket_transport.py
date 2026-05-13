@@ -105,7 +105,12 @@ class WebSocketTransport(Transport):
         if not host or not port:
             raise ValueError(f"Invalid URL: {self._url}. Missing host or port.")
 
-        self._server = await websockets.serve(self._handle_connection, host=host, port=port)
+        self._server = await websockets.serve(
+            self._handle_connection,
+            host=host,
+            port=port,
+            close_timeout=3.0,
+        )
 
     async def stop(self) -> None:
         """Stop the WebSocket server and close any cached client connections."""
@@ -308,98 +313,103 @@ class WebSocketTransport(Transport):
            and emits chunked frames incrementally. Otherwise, it executes a standard request/response pattern.
         4. Serializes the final result and transmits it back with the matching correlation ``id``.
         """
-        async for raw in websocket:
-            response: dict[str, Any]
-            req: Any = None
-            try:
-                if isinstance(raw, (bytes, bytearray)):
-                    raw = raw.decode("utf-8", errors="replace")
-                req = json.loads(raw)
-                request_id = req.get("id")
-                method = req.get("method")
-                path = req.get("path")
+        try:
+            async for raw in websocket:
+                response: dict[str, Any]
+                req: Any = None
+                try:
+                    if isinstance(raw, (bytes, bytearray)):
+                        raw = raw.decode("utf-8", errors="replace")
+                    req = json.loads(raw)
+                    request_id = req.get("id")
+                    method = req.get("method")
+                    path = req.get("path")
 
-                if not request_id or not method or not path:
-                    raise ValueError("Missing required fields: id/method/path")
+                    if not request_id or not method or not path:
+                        raise ValueError("Missing required fields: id/method/path")
 
-                ep = self._endpoints.get((method, path))
-                if ep is None:
-                    raise ValueError(f"No endpoint registered for {method} {path}")
+                    ep = self._endpoints.get((method, path))
+                    if ep is None:
+                        raise ValueError(f"No endpoint registered for {method} {path}")
 
-                if ep.request_source == "body":
-                    payload = req.get("data")
-                elif ep.request_source == "query_params":
-                    payload = req.get("params") or {}
-                else:
-                    payload = None
-
-                if ep.request_parser:
-                    handler_input = (
-                        await ep.request_parser(payload)
-                        if is_async_callable(ep.request_parser)
-                        else ep.request_parser(payload)
-                    )
-                else:
-                    handler_input = payload
-
-                handler_is_async = is_async_callable(ep.handler)
-
-                if ep.mode == "stream" or ep.streaming:
-                    if ep.request_source != "none" and payload is not None:
-                        stream_obj = ep.handler(handler_input)
+                    if ep.request_source == "body":
+                        payload = req.get("data")
+                    elif ep.request_source == "query_params":
+                        payload = req.get("params") or {}
                     else:
-                        stream_obj = ep.handler()
+                        payload = None
 
-                    if inspect.isawaitable(stream_obj):
-                        stream_obj = await stream_obj
+                    if ep.request_parser:
+                        handler_input = (
+                            await ep.request_parser(payload)
+                            if is_async_callable(ep.request_parser)
+                            else ep.request_parser(payload)
+                        )
+                    else:
+                        handler_input = payload
 
-                    if not hasattr(stream_obj, "__aiter__"):
-                        raise TypeError("Streaming handler must return an async iterator")
+                    handler_is_async = is_async_callable(ep.handler)
 
-                    sent_final = False
-                    async for event in stream_obj:
-                        event_payload = self._serialize_result(event)
-                        final = False
-                        if isinstance(event_payload, dict):
-                            final = bool(event_payload.get("final", False))
-                        await websocket.send(
-                            json.dumps(
-                                {
-                                    "id": request_id,
-                                    "ok": True,
-                                    "result": event_payload,
-                                    "final": final,
-                                    "stream": True,
-                                }
+                    if ep.mode == "stream" or ep.streaming:
+                        if ep.request_source != "none" and payload is not None:
+                            stream_obj = ep.handler(handler_input)
+                        else:
+                            stream_obj = ep.handler()
+
+                        if inspect.isawaitable(stream_obj):
+                            stream_obj = await stream_obj
+
+                        if not hasattr(stream_obj, "__aiter__"):
+                            raise TypeError("Streaming handler must return an async iterator")
+
+                        sent_final = False
+                        async for event in stream_obj:
+                            event_payload = self._serialize_result(event)
+                            final = False
+                            if isinstance(event_payload, dict):
+                                final = bool(event_payload.get("final", False))
+                            await websocket.send(
+                                json.dumps(
+                                    {
+                                        "id": request_id,
+                                        "ok": True,
+                                        "result": event_payload,
+                                        "final": final,
+                                        "stream": True,
+                                    }
+                                )
                             )
-                        )
-                        if final:
-                            sent_final = True
-                            break
+                            if final:
+                                sent_final = True
+                                break
 
-                    if not sent_final:
-                        await websocket.send(
-                            json.dumps({"id": request_id, "ok": True, "result": None, "final": True, "stream": True})
-                        )
-                    continue
+                        if not sent_final:
+                            await websocket.send(
+                                json.dumps(
+                                    {"id": request_id, "ok": True, "result": None, "final": True, "stream": True}
+                                )
+                            )
+                        continue
 
-                if ep.request_source != "none" and payload is not None:
-                    result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
-                else:
-                    result = await ep.handler() if handler_is_async else ep.handler()
+                    if ep.request_source != "none" and payload is not None:
+                        result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
+                    else:
+                        result = await ep.handler() if handler_is_async else ep.handler()
 
-                response = {"id": request_id, "ok": True, "result": self._serialize_result(result)}
-            except Exception as e:
-                response = {
-                    "id": req.get("id") if isinstance(req, dict) else None,
-                    "ok": False,
-                    "error": {"message": str(e), "type": e.__class__.__name__},
-                }
+                    response = {"id": request_id, "ok": True, "result": self._serialize_result(result)}
+                except Exception as e:
+                    response = {
+                        "id": req.get("id") if isinstance(req, dict) else None,
+                        "ok": False,
+                        "error": {"message": str(e), "type": e.__class__.__name__},
+                    }
 
-                if isinstance(req, dict) and req.get("path") == "/tasks/stream":
-                    response["final"] = True
+                    if isinstance(req, dict) and req.get("path") == "/tasks/stream":
+                        response["final"] = True
 
-            await websocket.send(json.dumps(response))
+                await websocket.send(json.dumps(response))
+        except ConnectionClosed:
+            pass
 
     def _serialize_result(self, result: Any) -> Any:
         """Recursively normalize complex data models into JSON-safe structures.

@@ -245,13 +245,17 @@ class Agent:
             return
         self._stopped = True
 
-        # Stop server and transport on a deeper level
+        # 1. Unregister from registry first (while transport is still alive)
+        if self.registry_client:
+            try:
+                # We use a short timeout for unregistration during shutdown
+                await asyncio.wait_for(self.registry_client.unregister(self.card.url), timeout=2.0)
+            except Exception as e:
+                self._logger.debug(f"Failed to unregister from registry during shutdown: {e}")
+
+        # 2. Stop server and transport
         if self._server:
             await self._server.stop()
-
-        # Unregister
-        if self.registry_client:
-            await self.registry_client.unregister(self.card.url)
 
     ### ------- Public API -------
 
