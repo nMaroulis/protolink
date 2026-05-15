@@ -159,7 +159,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `model` | `str` | The model name/identifier. |
 | `model_params` | `dict[str, Any]` | Model-specific parameters (temperature, max_tokens, etc.). |
 | `system_prompt` | `str` | Default system prompt for the model. |
-| `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. |
+| `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. Automatically managed by the [Agent state system](agent.md#state-persistence) when enabled. |
 | `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
 
 #### Core Methods
@@ -233,7 +233,7 @@ async def infer(
    - `"final"`: The task is complete. The content is added to history and returned to the user.
    - `"tool_call"`: The LLM wants to execute a tool. The action is added to history, the runtime executes the tool, and feeds the result back.
    - `"agent_call"`: The LLM wants to delegate to another agent.
-4. **History Recording**: All turns of the conversation (User input, Assistant reasoning, and Tool results) are automatically committed to the `ConversationHistory` object, ensuring the agent retains context for the entire multi-turn exchange.
+4. **History Recording**: All turns of the conversation (User input, Assistant reasoning, and Tool results) are automatically committed to the `ConversationHistory` object. If the agent's `state=["conversation"]` is enabled, this history is automatically persisted to the [Storage](storage.md) backend and resumed in the next session.
 5. **Validation & Error Handling**: 
    - Malformed JSON or invalid actions raise `ValueError`.
    - Tool execution failures raise `RuntimeError` but catchable within the loop context if desired (currently propagates).

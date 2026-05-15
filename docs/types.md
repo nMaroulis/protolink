@@ -10,13 +10,13 @@ This section provides detailed documentation for the type aliases used throughou
 - [HttpMethod](#httpmethod)
 - [LLMProvider](#llmprovider)
 - [LLMType](#llmtype)
-- [MemoryModeType](#memorymodetype)
 - [MimeType](#mimetype)
 - [PartType](#parttype)
 - [ReasoningLevelType](#reasoningleveltype)
 - [RequestSourceType](#requestsourcetype)
 - [MessageRoleType](#messageroletype)
 - [SecuritySchemeType](#securityschemetype)
+- [StateMode](#statemode)
 - [TransportType](#transporttype)
 - [FlowTarget](#flowtarget)
 
@@ -256,33 +256,6 @@ server_llm = ServerLLM(endpoint="http://localhost:8080")  # Server type
 
 ---
 
-## MemoryModeType
-
-```python
-MemoryModeType: TypeAlias = Literal["none", "session"]
-```
-
-Type alias for agent conversation memory modes.
-
-### Memory Modes
-
-| Mode | Description |
-|------|-------------|
-| **none** | Stateless operation. Conversation history is wiped after every task execution. |
-| **session** | Stateful operation. Conversation history is preserved across tasks sharing the same `session_id`. |
-
-### Usage Example
-
-```python
-from protolink.types import MemoryModeType
-from protolink.agents import Agent
-
-# Create a stateful agent
-agent = Agent(card=card, memory="session")
-```
-
----
-
 ## MimeType
 
 Type alias for supported MIME types in Protolink. These are used to specify the **input** and **output** **formats** that agents can handle.
@@ -505,6 +478,38 @@ from protolink.models import Message
 user_msg = Message(role="user", content="Hello, how are you?")
 agent_msg = Message(role="agent", content="I'm doing well, thank you!")
 system_msg = Message(role="system", content="You are a helpful assistant.")
+```
+
+---
+
+## StateMode
+
+```python
+StateMode: TypeAlias = Literal["conversation", "tools", "task", "flow"]
+```
+
+Type alias for supported agent state modules. These define which components of an agent's internal state should be persisted between task executions.
+
+### Supported Modules
+
+| Mode | Description |
+|------|-------------|
+| **conversation** | Persists LLM conversation history and message context. |
+| **tools** | Persists internal tool states across different sessions. |
+| **task** | Persists task-related metadata and operational status. |
+| **flow** | Persists structured flow progress and checkpoint information. |
+
+### Usage Example
+
+```python
+from protolink.types import StateMode
+from protolink.agents import Agent
+
+# Enable specific state modules
+agent = Agent(
+    card=card,
+    state=["conversation", "tools"]
+)
 ```
 
 ---

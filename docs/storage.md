@@ -37,7 +37,12 @@ Using storage with an agent is straightforward:
        description="Agent with long-term memory"
    )
 
-   agent = Agent(card=agent_card, transport="http", storage=storage)
+   agent = Agent(
+       card=agent_card,
+       transport="http",
+       storage=storage,
+       state=["conversation"]  # Enables persistence for specific modules
+   )
    ```
 
 !!! tip "Namespacing"
@@ -140,6 +145,19 @@ class PersistentAgent(Agent):
         
         return await super().handle_task(task)
 ```
+
+### State System Integration (v0.5.5+)
+
+Starting with version **v0.5.5**, Protolink includes a unified **State** system that automatically manages persistence for various agent modules. When you provide a `storage` instance and enable specific `state` modules, the `State` orchestrator handles the lower-level `load()` and `save()` operations for you.
+
+| Module | Storage Usage |
+|--------|---------------|
+| **conversation** | Stores a serialized map of `session_id` to `ConversationHistory` lists. |
+| **tools** | Allows tools to persist their internal state across sessions. |
+| **task** | Persists task-related metadata and status. |
+| **flow** | Manages checkpointing and progress for structured flows. |
+
+This high-level system is the **recommended way** to manage persistence, as it ensures consistency and reduces boilerplate code in your `handle_task` implementation.
 
 ## Error Handling
 

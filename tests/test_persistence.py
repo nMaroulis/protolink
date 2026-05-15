@@ -65,7 +65,7 @@ async def test_session_persistence():
     # Setup agent with session memory
     llm = MockLLM()
     card = AgentCard(name="persistent", description="test", url="runtime://persistent")
-    agent = Agent(card=card, llm=llm, memory="session")
+    agent = Agent(card=card, llm=llm, state=["conversation"])
 
     session_id = "user-123"
 
@@ -90,7 +90,7 @@ async def test_session_persistence():
 async def test_different_sessions_isolation():
     llm = MockLLM()
     card = AgentCard(name="isolated", description="test", url="runtime://isolated")
-    agent = Agent(card=card, llm=llm, memory="session")
+    agent = Agent(card=card, llm=llm, state=["conversation"])
 
     # Session A
     task_a = create_infer_task("I am A", "session-A")

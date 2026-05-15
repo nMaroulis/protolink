@@ -366,11 +366,6 @@ class TestAgent:
         # Last event should be completion (not error)
         assert events[-1].new_state == "completed"
 
-    def test_get_context_manager(self, agent):
-        """Test getting the context manager."""
-        context_manager = agent.get_context_manager()
-        assert context_manager == agent.context_manager
-
     def test_set_llm(self, agent):
         """Test setting the LLM via property."""
         llm = DummyLLM()

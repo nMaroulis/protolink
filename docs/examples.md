@@ -90,7 +90,7 @@ The repository includes several **standalone example scripts** that demonstrate 
 ### 🧠 [`agent_memory.py`](https://github.com/nMaroulis/protolink/blob/main/examples/agent_memory.py)
 **Purpose**: Conversation memory and persistence across tasks
 
-- Demonstrates the difference between stateless agents (`memory="none"`) and persistent agents (`memory="session"`)
+- Demonstrates the difference between stateless agents (`state=None`) and persistent agents (`state=["conversation"]`)
 - Shows how `invoke_sync()` handles session history automatically using a default `session_id`
 - Demonstrates history persistence across sequential calls to the same agent instance
 - Useful for building conversational bots and multi-turn interaction assistants

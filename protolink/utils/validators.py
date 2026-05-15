@@ -115,28 +115,9 @@ class Validator:
         return True, ""
 
     @classmethod
-    def validate_context_id(cls, context_id: str) -> tuple[bool, str]:
-        """Validate a context ID.
-
-        Args:
-            context_id: Context ID to validate
-
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
-        if not context_id or not cls._is_valid_context_id(context_id):
-            return False, "Context ID must be alphanumeric with underscores or hyphens"
-        return True, ""
-
-    @classmethod
     def _is_valid_id(cls, id_str: str) -> bool:
         """Check if a string is a valid ID."""
         return bool(re.match(cls.ID_PATTERN, id_str))
-
-    @classmethod
-    def _is_valid_context_id(cls, context_id: str) -> bool:
-        """Check if a string is a valid context ID."""
-        return bool(re.match(cls.CONTEXT_ID_PATTERN, context_id))
 
     @staticmethod
     def _is_valid_uuid(uuid_str: str) -> bool:

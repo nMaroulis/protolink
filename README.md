@@ -54,7 +54,6 @@ Here's a simple example on how **easy** it is to **create an agent**, define the
 
 ```python
 from protolink.agents import Agent
-from protolink.models import AgentCard
 
 # 1. Initialize & start the Registry for A2A Discovery (optional)
 from protolink.discovery import Registry
@@ -74,15 +73,15 @@ from protolink.telemetry import LangfuseTelemetry
 telemetry = LangfuseTelemetry()
 
 # 5a. Define the agent card
-agent_card = AgentCard(
-    url="http://127.0.0.1:8020",
-    name="example_agent",
-    description="A dummy agent",
-)
+agent_card = {
+    "url": "http://127.0.0.1:8020",
+    "name": "example_agent",
+    "description": "A dummy agent",
+}
 
 # 5b. Initialize the agent (http transport will be created based on the agent card url)
 # Plug the modules to the agent
-agent = Agent(agent_card, transport="http", llm=llm, registry=registry, storage=storage, telemetry=telemetry)
+agent = Agent(card=agent_card, transport="http", llm=llm, registry=registry, storage=storage, telemetry=telemetry)
 
 # 6. Add Native tool (Tools from MCP can also be added easily using the MCPToolAdapter)
 @agent.tool(name="add", description="Add two numbers")
@@ -94,6 +93,7 @@ agent.start()
 ```
 
 #### ✨ Ready to Orchestrate
+
 The agent is now fully initialized and prepared to **discover & be discovered by peers**, send & receive **tasks** across your system.
 
 **Note**: `agent.start()` automatically **adapts** to the current environment under the hood, working seamlessly in **standard Python scripts, async applications, and Jupyter notebooks** with both **blocking** and **background** execution modes. When `background=True`, it runs the agent non-blocking using an **event loop task** or a **dedicated background thread** depending on the runtime context. See how Protolink handles [agent execution **lifecycle**](https://nmaroulis.github.io/protolink/agent/#lifecycle-methods).
@@ -158,13 +158,13 @@ Protolink takes a **centralized agent** approach compared to Google's A2A protoc
    - No complex configuration needed for common use cases
 
 ## Why Protolink? 🚀
+
 - **Real Multi-Agent Systems**: Build **autonomous agents** with embedded LLMs, tools, and memory that communicate directly.
 - **Simple API**: Built from the ground-up for **minimal boilerplate**, letting you focus on agent logic rather than infrastructure.
 - **Developer Friendly**: Clean abstractions and direct code paths make debugging and maintenance a breeze.
 - **Production Oriented**: Designed for **performance, reliability, and scalability** in real-world deployments.
 - **Extensible & Interoperable**: Add new agents, transports, or protocols easily; compatible with **A2A** and **MCP** standards.
 - **Community Focused**: Designed for the open-source community with clear contribution guidelines.
-
 
 ## Installation
 

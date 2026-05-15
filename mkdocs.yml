@@ -74,6 +74,7 @@ nav:
       - Models: models.md
       - Registry: registry.md
       - Server: server.md
+      - State: state.md
       - Storage: storage.md
       - Telemetry: telemetry.md
       - Tool: tool.md

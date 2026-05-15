@@ -34,18 +34,17 @@ from collections.abc import AsyncIterator
 from typing import Any, Literal
 
 from protolink.client import AgentClient, RegistryClient
-from protolink.core.context_manager import ContextManager
-from protolink.core.memory import SessionManager
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.logging import BaseLogger, ConsoleLogger, get_agent_farewell, get_agent_greeting
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.server import AgentServer
+from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
 from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool, Tool
 from protolink.transport import Transport, get_transport
-from protolink.types import MemoryModeType, TransportType
+from protolink.types import StateMode, TransportType
 from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
 
@@ -66,6 +65,7 @@ class Agent:
         llm: LLM | None = None,
         system_prompt: str | None = None,
         storage: Storage | None = None,
+        state: list[StateMode] | State | None = None,
         telemetry: Telemetry | None = None,
         skills: Literal["auto", "fixed"] = "auto",
         logger: BaseLogger | None = None,
@@ -73,7 +73,6 @@ class Agent:
         *,
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
-        memory: MemoryModeType = "none",
         expose_chat: bool = True,
     ):
         """Initialize agent with its identity card and transport layer.
@@ -92,22 +91,23 @@ class Agent:
                 the agent logic and role. The agent calling, tool calling and other A2A functionalities are already
                 predefined, so the LLM already has the knowledge on how to interact with its environment.
                 If you wish to override the system prompt completely, set override_system_prompt to True.
-            storage: Optional Storage instance for agent data persistence.
+            storage: Optional Storage instance for agent data persistence. It's also used for State persistence.
+            state: Agent state. Choose for which modules state should be persistent.
+                - ``None`` (default): Stateless. State is wiped on every task.
+                - ``["conversation"]``: Persistent conversation history per session. Conversation Session State is
+                preserved across tasks with the same ``session_id``.
+                Example: ``state=["conversation"]``
             telemetry: Optional Telemetry instance for agent observability and tracing.
             skills: Skills mode - "auto" to detect from tools, "fixed" to use only card-defined skills.
             logger: Custom logger instance. If not provided, a ConsoleLogger will be used.
             discovery_ttl: Time to live in seconds for caching Agent information discovered from the Registry.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
             verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose (debug mode).
-            memory: Conversation memory mode.
-                - ``"none"`` (default): Stateless. History is wiped on every task.
-                - ``"session"``: Persistent per session. History is preserved across tasks with the same ``session_id``.
             expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
         self.card: AgentCard = AgentCard.from_dict(card) if isinstance(card, dict) else card
-        self.context_manager = ContextManager()
         # LLM validation is handled by the @llm.setter property.
         self._llm: LLM | None = None
         self.llm = llm
@@ -118,11 +118,11 @@ class Agent:
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
 
-        # Conversation Memory & Persistence
-        # memory_mode determines if history is wiped per task ("none") or kept per session ("session")
-        self.memory_mode = memory
-        # SessionManager provides a modular interface to load/save histories via self.storage
-        self._session_manager = SessionManager(storage=self._storage, memory_mode=memory)
+        # Agent State Persistence
+        if isinstance(state, State):
+            self._state: State = state
+        else:
+            self._state: State = State(storage=self.storage, enabled=state if state is not None else [])
 
         # LLM prompt
         self._system_prompt: str | None = system_prompt
@@ -176,7 +176,7 @@ class Agent:
     # Agent Server Lifecycle - A2A Operations
     # ----------------------------------------------------------------------
 
-    ### ------- Internal Runtime Operations -------
+    ### -------------------- Internal Runtime Operations -------------------
 
     async def _serve(self, *, register: bool = True) -> None:
         """Initialize and start the agent runtime.
@@ -257,7 +257,7 @@ class Agent:
         if self._server:
             await self._server.stop()
 
-    ### ------- Public API -------
+    ### ---------------------------- Public API ----------------------------
 
     def start(
         self,
@@ -610,18 +610,6 @@ class Agent:
         return asyncio.run(self.invoke(message, part_type, tool_name, tool_args, session_id))
 
     # ----------------------------------------------------------------------
-    # Context Management
-    # ----------------------------------------------------------------------
-    # TODO(): Remove
-    def get_context_manager(self) -> ContextManager:
-        """Get the context manager for this agent (NEW in v0.2.0).
-
-        Returns:
-            ContextManager instance
-        """
-        return self.context_manager
-
-    # ----------------------------------------------------------------------
     # Registry
     # ----------------------------------------------------------------------
 
@@ -743,12 +731,12 @@ class Agent:
         if last_item is None:
             return task
 
-        # ---- Session memory: Load session history ----
-        # If memory is enabled, we attempt to resume context using session_id from task metadata.
+        # ---- Session Conversation State: Load session history ----
+        # If conversation is enabled in the State, we attempt to resume context using session_id from task metadata.
         # If no session_id is found, we fall back to the task.id (stateless behavior).
         session_id = task.metadata.get("session_id", task.id)
-        if self.llm:
-            self.llm.history = self._session_manager.get_history(
+        if self.llm and self._state.conversation:
+            self.llm.history = self._state.conversation.get_history(
                 session_id, default_system_prompt=self.llm.system_prompt
             )
 
@@ -768,10 +756,10 @@ class Agent:
                 task.add_message(out)
             else:
                 task.add_artifact(Artifact(parts=[out]))
-        # ---- Session memory: Save session history ----
+        # ---- Session Conversation State: Save session history ----
         # Persist the current state of the conversation (including the latest responses) back to storage.
-        if self.llm:
-            self._session_manager.save_history(session_id, self.llm.history)
+        if self.llm and self._state.conversation:
+            self._state.conversation.save_history(session_id, self.llm.history)
 
         return task
 
@@ -885,7 +873,7 @@ class Agent:
             agent_cards=agent_cards,
             tools=self.get_tools_for_prompt(),
             override_system_prompt=self.override_system_prompt,
-            persist=self.memory_mode == "session",
+            persist=self._state.conversation is not None,
         )
 
         if self.telemetry:
@@ -1133,8 +1121,8 @@ class Agent:
     def storage(self, storage: Storage) -> None:
         """Set the agent's storage instance and update session manager."""
         self._storage = storage
-        if hasattr(self, "_session_manager"):
-            self._session_manager.storage = storage
+        if hasattr(self, "_state"):
+            self._state.storage = storage
 
     # ----------------------------------------------------------------------
     # Getters & Setters

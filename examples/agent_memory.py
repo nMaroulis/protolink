@@ -3,7 +3,7 @@ Purpose: Conversation memory and persistence across tasks.
 
 Demonstrates history persistence across sequential calls to the same agent instance.
 
-Demonstrates the difference between stateless agents (`memory="none"`) and persistent agents (`memory="session"`).
+Demonstrates the difference between stateless agents (`state=None`) and persistent agents (`state=["conversation"]`).
 
 Shows how `invoke_sync()` handles session history automatically using a default `session_id`.
 
@@ -37,7 +37,7 @@ agent_stateful = Agent(
     },
     transport="runtime",
     llm=llm,
-    memory="session",  # Session memory is not reset between tasks
+    state=["conversation"],  # Session memory is not reset between tasks
 )
 
 QUESTIONS = [

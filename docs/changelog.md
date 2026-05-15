@@ -10,6 +10,27 @@
 
 ## Release Notes
 
+### [v0.5.5] - 2026-05-16
+
+#### 🐞 NEW Feature - State (API Refactor)
+
+- **State Management**: Refactored agent state management, specifically around conversation history persistence. The syntax has been simplyfied:
+
+```python
+agent = Agent(
+    card=card,
+    ...
+    state=["conversation"],  # Session memory is not reset between tasks
+)
+```
+
+NEW: **protolink.state** module. The State class manages:
+
+- **Session memory** - Session memory is not reset between tasks
+- **Conversation history** - Conversation history persistence
+- **Tool call history** - Tool call history persistence
+- **Flow state** - Flow state persistence
+
 ### [v0.5.4] - 2026-05-12
 
 #### 🐞 Refactored

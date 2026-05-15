@@ -43,8 +43,8 @@ LLMProvider: TypeAlias = Literal[
 
 LLMType: TypeAlias = Literal["api", "local", "server"]
 
-# Memory Mode for Conversation History, used by the Agent class and Memory class.
-MemoryModeType: TypeAlias = Literal["none", "session"]
+# State Modes for Agent States, used by the Agent class.
+StateMode: TypeAlias = Literal["conversation", "tools", "task", "flow"]
 
 # Supported roles in Messages
 MessageRoleType: TypeAlias = Literal["agent", "assistant", "system", "user"]

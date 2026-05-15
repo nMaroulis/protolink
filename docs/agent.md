@@ -141,12 +141,12 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `llm` | `LLM ⎪ None` | `None` | Optional language model instance for the agent to use. |
 | `system_prompt` | `str ⎪ None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
 | `storage` | `Storage ⎪ None` | `None` | Optional storage instance for agent data persistence. |
+| `state` | `list[StateMode] ⎪ State ⎪ None` | `None` | Optional agent state configuration. Defines which modules (conversation, tools, etc.) should be persistent. |
 | `telemetry` | `Telemetry ⎪ None` | `None` | Optional telemetry instance for observability and tracing. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
 | `logger` | `BaseLogger ⎪ None` | `None` | Custom logger instance (e.g. `ConsoleLogger` or `FileLogger`). |
 | `discovery_ttl` | `int` | `0` | Time to live in seconds for caching Agent information discovered from the Registry. Default is `0` (no caching). |
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
-| `memory` | `MemoryModeType` | `"none"` | Conversation memory mode: `"none"` (stateless) or `"session"` (persistent across tasks with same `session_id`). |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent (WARNING only), `1` = normal (INFO), `2` = verbose (DEBUG). |
 | `expose_chat` | `bool` | `True` | Whether the Agent will expose a chat endpoint for interaction with a UI. |
 
@@ -404,7 +404,6 @@ agent.add_tool(WeatherTool())
 | `llm` (property) | `LLM ⎪ None` | `None` | Gets or sets the agent's language model. Setting this validates the connection and updates `card.capabilities.has_llm` automatically. |
 | `storage` (property) | `Storage` | `None` | Gets or sets the agent's storage instance. Setting this automatically updates the internal `SessionManager`. |
 | `set_registry()` | `registry, registry_url=None` | `None` | Configures the agent's connection to a Protolink registry. |
-| `get_context_manager()` | — | `ContextManager` | Returns the context manager for this agent. |
 
 ## Storage and Persistence
 
@@ -447,21 +446,36 @@ storage = SQLiteStorage(db_path="my_agent.db", namespace="main_agent")
 agent = Agent(card=card, storage=storage)
 ```
 
-## Session Persistence
+## State Persistence
 
-When an agent is initialized with `memory="session"`, it tracks conversation state across multiple task executions based on the `session_id`.
+When an agent is initialized with the `state` parameter, it tracks internal state across multiple task executions based on a `session_id`.
 
-1. **Activation**: Set `memory="session"` in the Agent constructor.
-2. **Identification**: Include a `session_id` in your task metadata:
+1. **Activation**: Pass a list of state modules to the `Agent` constructor.
+   ```python
+   # Enable conversation history and tool state persistence
+   agent = Agent(card=card, state=["conversation", "tools"])
+   ```
+
+2. **Identification**: Include a `session_id` in your task metadata. This ID is used to partition the state in the storage.
    ```python
    task = Task.create(Message.user("My name is Alice"))
    task.metadata["session_id"] = "user_123"
    await agent.execute_task(task)
    ```
-3. **Resumption**: Subsequent tasks with the same `session_id` will automatically load the previous conversation history into the LLM context.
+
+3. **Resumption**: Subsequent tasks with the same `session_id` will automatically load the previous state (e.g., conversation history) into the execution context.
+
+### Supported State Modules
+
+| Module | Description |
+|--------|-------------|
+| `conversation` | Persists conversation history between the user and the agent. |
+| `tools` | Persists tool-specific state across sessions. |
+| `task` | Persists task-related metadata and status. |
+| `flow` | Persists flow state across runs. |
 
 !!! tip "Session IDs"
-    When using direct invocation methods like `invoke()` or `invoke_sync()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `memory="session"` is enabled.
+    When using direct invocation methods like `invoke()` or `invoke_sync()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `state=["conversation"]` is enabled.
 
     If no `session_id` is provided in the task metadata (for non-invoke calls), the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
 
@@ -493,19 +507,6 @@ agent = Agent(
 
 agent.start()
 # Chat UI is now available at http://localhost:8000/chat
-```
-
-### Session Memory
-
-The chat UI generates a unique `session_id` per browser tab. When combined with `memory="session"`, conversations persist across messages within the same tab:
-
-```python
-agent = Agent(
-    card=card,
-    transport="http",
-    llm=OpenAILLM(model="gpt-4o"),
-    memory="session",  # Enables cross-message memory in chat
-)
 ```
 
 !!! tip "Chat vs Status"
