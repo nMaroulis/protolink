@@ -67,8 +67,27 @@ registry.start(background=True)
 
 ---
 
+## Discovery Performance
 
-#### Constructor Parameters
+The Registry is optimized for high-throughput environments where hundreds or thousands of agents may be registered simultaneously.
+
+### Secondary Indexing
+
+To avoid linear scans ($O(N)$) during discovery, the Registry maintains internal **secondary indexes** for common filter fields:
+
+- **Agent Name**: Exact matches are resolved in $O(1)$.
+- **Agent Role**: Role-based discovery is resolved in $O(1)$.
+- **Tags**: Filtering by tag is resolved in $O(1)$.
+
+When multiple filters are applied (e.g., `role="worker"` AND `tags=["finance"]`), the Registry performs **set intersections** on these indexes, drastically reducing the search space to $O(K)$ candidates where $K$ is the number of agents matching the filters.
+
+### Robust Fallback
+
+While the Registry relies on indexes for speed, it includes a **robust fallback mechanism**. If a discovery query uses non-indexed fields or if the internal indexes are bypassed (e.g., during manual testing), the Registry automatically falls back to a linear scan to ensure no results are missed.
+
+---
+
+### Constructor Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

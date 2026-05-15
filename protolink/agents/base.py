@@ -111,30 +111,34 @@ class Agent:
         # LLM validation is handled by the @llm.setter property.
         self._llm: LLM | None = None
         self.llm = llm
+        # Storage
         self._storage: Storage
         self.storage = storage if storage is not None else InMemoryStorage(namespace=self.card.name)
+        # Telemetry
         self._telemetry: Telemetry | None = None
         self.telemetry = telemetry
+        # Tools & skills
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
-
-        # Agent State Persistence
-        if isinstance(state, State):
-            self._state: State = state
-        else:
-            self._state: State = State(storage=self.storage, enabled=state if state is not None else [])
-
-        # LLM prompt
-        self._system_prompt: str | None = system_prompt
-        self.override_system_prompt: bool = override_system_prompt
-
         # Logger - Maps verbosity to WARNING, INFO, DEBUG for default console logger.
         self._logger = (
             ConsoleLogger(name=f"protolink.agents.{self.card.name}", level={0: 30, 1: 20, 2: 10}.get(verbosity, 20))
             if logger is None
             else logger
         )
-
+        # Agent State Persistence
+        if isinstance(state, State):
+            self._state: State = state
+        else:
+            if state is None:
+                self._logger.debug(f"State not provided, agent {self.card.name} will be stateless.")
+                self._state: State = State(storage=self.storage, enabled=[])
+            else:
+                self._state: State = State(storage=self.storage, enabled=state)
+                self._logger.debug(f"Agent {self.card.name} state set to {state}")
+        # LLM prompt
+        self._system_prompt: str | None = system_prompt
+        self.override_system_prompt: bool = override_system_prompt
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None
@@ -144,7 +148,6 @@ class Agent:
             )
         else:
             self.transport = transport  # init _transport, _client, _server properties
-
         # Initilize Registry Client
         if not registry:
             self.registry_client = None
@@ -154,21 +157,16 @@ class Agent:
             )
         else:
             self.set_registry(registry, registry_url)
-
         # Runtime Lifecycle State
         self._background_task: asyncio.Task | None = None
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
-
         # Resolve and add necessairy skills
         self._resolve_skills(skills)
-
         # Uptime
         self.start_time: float | None = None
-
         # Discovery TTL Cache - TODO(): Implement proper cache
         self._discovery_ttl = discovery_ttl
-
         # Expose Chat
         self._expose_chat = expose_chat
 

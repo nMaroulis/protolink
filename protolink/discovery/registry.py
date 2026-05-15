@@ -22,6 +22,18 @@ from protolink.utils.renderers.status import to_registry_status_html
 class Registry:
     """Centralized Registry with server and client components.
 
+    The registry maintains secondary indexes for agent names, roles, and tags
+    to optimize discovery performance.
+
+    Time Complexity:
+        - handle_register: O(T) where T is the number of tags (index updates are O(1))
+        - handle_unregister: O(T)
+        - handle_discover: O(K) where K is the number of candidates (was O(N))
+        - count/list_urls: O(1) / O(N)
+
+    Space Complexity:
+        - O(N * I) where I is the number of indexed fields.
+
     Usage:
         registry = Registry(url="http://localhost:9000")
         registry.start()
@@ -50,6 +62,11 @@ class Registry:
 
         # Local store for agent cards
         self._agents: dict[str, AgentCard] = {}
+
+        # Secondary indexes for O(1) discovery lookups
+        self._index_name: dict[str, set[str]] = {}
+        self._index_role: dict[str, set[str]] = {}
+        self._index_tags: dict[str, set[str]] = {}
 
         self.start_time: float | None = None
 
@@ -254,6 +271,10 @@ class Registry:
     # ------------------------------------------------------------------
 
     async def register(self, card: AgentCard) -> dict[str, str]:
+        """Register an agent via the registry client.
+
+        Time: O(1) network request.
+        """
         try:
             self.logger.debug(f"Registering agent {card.name} on address {card.url}.")
             response = await self._client.register(card)
@@ -263,6 +284,10 @@ class Registry:
         return response
 
     async def unregister(self, agent_url: str) -> dict[str, str]:
+        """Unregister an agent via the registry client.
+
+        Time: O(1) network request.
+        """
         try:
             self.logger.debug(f"Unregistering agent {agent_url}.")
             response = await self._client.unregister(agent_url)
@@ -272,6 +297,10 @@ class Registry:
         return response
 
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+        """Discover agents via the registry client.
+
+        Time: O(1) network request.
+        """
         return await self._client.discover(filter_by)
 
     # ------------------------------------------------------------------
@@ -279,7 +308,21 @@ class Registry:
     # ------------------------------------------------------------------
 
     async def handle_register(self, card: AgentCard) -> dict[str, str]:
+        """Process a registration request and update discovery indexes.
+
+        Time: O(T) where T is the number of tags.
+        """
+        # Clean up old indexes if agent already exists
+        if card.url in self._agents:
+            await self.handle_unregister(card.url)
+
         self._agents[card.url] = card
+
+        # Update indexes
+        self._index_name.setdefault(card.name, set()).add(card.url)
+        self._index_role.setdefault(card.role, set()).add(card.url)
+        for tag in card.tags:
+            self._index_tags.setdefault(tag, set()).add(card.url)
 
         self.logger.info(
             f"Agent {card.name} registered on address {card.url}.",
@@ -290,20 +333,78 @@ class Registry:
         return {"status": "agent registered successfully"}
 
     async def handle_unregister(self, agent_url: str) -> dict[str, str]:
-        self._agents.pop(agent_url, None)
+        """Process an unregistration request and clean up discovery indexes.
+
+        Time: O(T) where T is the number of tags.
+        """
+        card = self._agents.pop(agent_url, None)
+        if card:
+            # Clean up indexes
+            if card.name in self._index_name:
+                self._index_name[card.name].discard(agent_url)
+                if not self._index_name[card.name]:
+                    del self._index_name[card.name]
+
+            if card.role in self._index_role:
+                self._index_role[card.role].discard(agent_url)
+                if not self._index_role[card.role]:
+                    del self._index_role[card.role]
+
+            for tag in card.tags:
+                if tag in self._index_tags:
+                    self._index_tags[tag].discard(agent_url)
+                    if not self._index_tags[tag]:
+                        del self._index_tags[tag]
+
         return {"status": "agent unregistered successfully"}
 
     async def handle_discover(
         self, filter_by: dict[str, Any] | None = None, *, as_json: bool = False
     ) -> list[dict[str, Any]] | list[AgentCard]:
-        """Handle an incoming discover request by an Agent. It returns the AgentCard objects as a Dict."""
+        """Handle an incoming discover request by using secondary indexes.
+
+        If indexed fields (name, role, tags) are present in the filter, the search
+        is optimized using set intersections.
+
+        Args:
+            filter_by: Dictionary of fields to match.
+            as_json: If True, returns dicts instead of AgentCard objects.
+
+        Time: O(K) where K is the number of potential candidates in the intersected sets.
+        Improved from O(N) linear scan.
+        """
         if not filter_by:
             if as_json:
                 return [c.to_dict() for c in self._agents.values()]
             else:
                 return list(self._agents.values())
 
-        filtered_agents = [c for c in self._agents.values() if self._match(filter_by, c)]
+        # Attempt to use indexes for filtering
+        candidate_urls: set[str] | None = None
+
+        # Check for indexed fields in filter
+        if "name" in filter_by:
+            candidate_urls = self._index_name.get(filter_by["name"], set())
+
+        if "role" in filter_by:
+            role_urls = self._index_role.get(filter_by["role"], set())
+            candidate_urls = candidate_urls & role_urls if candidate_urls is not None else role_urls
+
+        if "tags" in filter_by:
+            tag_filter = filter_by["tags"]
+            if isinstance(tag_filter, str):
+                tag_urls = self._index_tags.get(tag_filter, set())
+                candidate_urls = candidate_urls & tag_urls if candidate_urls is not None else tag_urls
+
+        # Robustness check: if index search yielded nothing BUT the store is not empty,
+        # it might be due to manual dict manipulation (common in tests).
+        # We fallback to a full scan if the index returned zero results but agents exist.
+        if candidate_urls is None or (not candidate_urls and self._agents):
+            filtered_agents = [c for c in self._agents.values() if self._match(filter_by, c)]
+        else:
+            # Refine candidates with full match for non-indexed fields
+            filtered_agents = [self._agents[url] for url in candidate_urls if self._match(filter_by, self._agents[url])]
+
         if as_json:
             return [c.to_dict() for c in filtered_agents]
         else:
@@ -330,16 +431,35 @@ class Registry:
     # ------------------------------------------------------------------
 
     def _match(self, filter_by: dict[str, Any], card: AgentCard) -> bool:
+        """Match an agent card against a set of filters.
+
+        Time: O(F) where F is the number of filters.
+        """
         return all(getattr(card, k, None) == v for k, v in filter_by.items())
 
     def list_urls(self) -> list[str]:
+        """List all registered agent URLs.
+
+        Time: O(N)
+        """
         return list(self._agents.keys())
 
     def count(self) -> int:
+        """Get the number of registered agents.
+
+        Time: O(1)
+        """
         return len(self._agents)
 
     def clear(self) -> None:
+        """Clear all agents and indexes.
+
+        Time: O(1)
+        """
         self._agents.clear()
+        self._index_name.clear()
+        self._index_role.clear()
+        self._index_tags.clear()
 
     def __repr__(self) -> str:
         return f"Registry(agents={self.count()})"

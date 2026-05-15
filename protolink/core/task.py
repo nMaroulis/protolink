@@ -35,13 +35,25 @@ _ALLOWED_TRANSITIONS: dict[TaskState, set[TaskState]] = {
 class Task:
     """Shared Unit of work exchanged between agents.
 
+    Tasks act as the state container for agentic workflows, tracking communication
+    history and produced artifacts. This implementation uses internal caching
+    to optimize retrieval of the most recent task updates.
+
     Attributes:
         id: Unique task identifier
         state: Current task state (check TaskState enum)
         messages: Communication history for this task
-        artifacts: Output artifacts produced by task (NEW in v0.2.0)
+        artifacts: Output artifacts produced by task
         metadata: Additional task metadata
         created_at: Task creation time
+
+    Time Complexity:
+        - add_message / add_artifact: O(1)
+        - get_last_item: O(1) (Improved from O(N) by caching _last_item)
+        - to_dict: O(M + A) where M is messages and A is artifacts
+
+    Space Complexity:
+        - O(M + A) where M is messages and A is artifacts.
     """
 
     id: str = field(default_factory=lambda: IDGenerator.generate_task_id())
@@ -51,35 +63,57 @@ class Task:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: utc_now())
 
+    _last_item: Message | Artifact | None = field(default=None, init=False, repr=False)
+
     def add_message(self, message: Message) -> "Task":
-        """Add a message to the task."""
+        """Add a message to the task and update the last item cache.
+
+        Time: O(1)
+        """
         self.messages.append(message)
+        self._last_item = message
         return self
 
     def add_artifact(self, artifact: Artifact) -> "Task":
-        """Add an artifact to the task (NEW in v0.2.0)."""
+        """Add an artifact to the task and update the last item cache.
+
+        Time: O(1)
+        """
         self.artifacts.append(artifact)
+        self._last_item = artifact
         return self
 
     def update_state(self, state: TaskState) -> "Task":
-        """Update task state."""
+        """Update task state.
+
+        Time: O(1)
+        """
         self.state = state
         return self
 
     def complete(self, response_text: str) -> "Task":
-        """Mark task as completed with a response."""
+        """Mark task as completed with a response.
+
+        Time: O(1)
+        """
         self.add_message(Message.agent(response_text))
         self.state = TaskState.COMPLETED
         return self
 
     def fail(self, error_message: str) -> "Task":
-        """Mark task as failed."""
+        """Mark task as failed.
+
+        Time: O(1)
+        """
         self.metadata["error"] = error_message
         self.state = TaskState.FAILED
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
+        """Convert task to a JSON-serializable dictionary.
+
+        Time: O(M + A) where M is messages and A is artifacts.
+        """
         return {
             "id": self.id,
             "state": self.state.value,
@@ -91,10 +125,16 @@ class Task:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Task":
-        """Create from dictionary."""
+        """Create a Task instance from a dictionary.
+
+        This method also reconstructs the `_last_item` cache by comparing
+        the timestamps of the last message and artifact.
+
+        Time: O(M + A)
+        """
         messages = [Message.from_dict(m) for m in data.get("messages", [])]
         artifacts = [Artifact.from_dict(a) for a in data.get("artifacts", [])]
-        return cls(
+        task = cls(
             id=data.get("id", IDGenerator.generate_task_id()),
             state=TaskState(data.get("state", TaskState.SUBMITTED.value)),
             messages=messages,
@@ -103,10 +143,27 @@ class Task:
             created_at=data.get("created_at", utc_now()),
         )
 
+        # Reconstruct last item cache from existing data
+        candidates = []
+        if messages:
+            candidates.append(messages[-1])
+        if artifacts:
+            candidates.append(artifacts[-1])
+
+        if candidates:
+            task._last_item = max(candidates, key=lambda x: x.timestamp)
+
+        return task
+
     @classmethod
     def create(cls, message: Message) -> "Task":
-        """Create a new task with an initial message."""
-        return cls(messages=[message])
+        """Create a new task with an initial message.
+
+        Time: O(1)
+        """
+        task = cls(messages=[message])
+        task._last_item = message
+        return task
 
     @classmethod
     def create_infer(
@@ -120,7 +177,7 @@ class Task:
         """
         Create a new task initialized with an infer message.
 
-        Wraps Message.infer() to create the initial message.
+        Time: O(1)
         """
         message = Message.infer(
             prompt=prompt,
@@ -141,7 +198,7 @@ class Task:
         """
         Create a new task initialized with a tool_call message.
 
-        Wraps Message.tool_call() to create the initial message.
+        Time: O(1)
         """
         message = Message.tool_call(
             tool_name=tool_name,
@@ -154,25 +211,9 @@ class Task:
         """
         Return the most recently appended Message or Artifact in this Task.
 
-        Since messages and artifacts are appended in order, the last item in each list is always the most recent.
-        We compare timestamps of the last Message and last Artifact to determine which is more recent.
+        Time: O(1) (Using cached _last_item)
         """
-        if not self.messages and not self.artifacts:
-            return None
-
-        # Get candidates (last items from each collection)
-        candidates = []
-        if self.messages:
-            candidates.append(self.messages[-1])
-        if self.artifacts:
-            candidates.append(self.artifacts[-1])
-
-        # Return single candidate or compare timestamps
-        if len(candidates) == 1:
-            return candidates[0]
-
-        # Sort by timestamp (descending) and return first
-        return max(candidates, key=lambda x: x.timestamp)
+        return self._last_item
 
     @staticmethod
     def tool_call(
@@ -184,7 +225,7 @@ class Task:
         """
         Create a tool_call Part to be executed by an agent.
 
-        This represents an explicit request to invoke a tool.
+        Time: O(1)
         """
         return Part.tool_call(
             tool_name=tool_name,
@@ -203,7 +244,7 @@ class Task:
         """
         Create a infer Part to be executed by the agent's LLM.
 
-        An infer explicitly instructs the agent to invoke its LLM.
+        Time: O(1)
         """
 
         return Part.infer(
@@ -220,6 +261,8 @@ class Task:
     def get_last_part_content(self) -> Any | None:
         """
         Get the content of the last part in the most recent Message or Artifact.
+
+        Time: O(1)
         """
         last_item = self.get_last_item()
         if last_item is None:

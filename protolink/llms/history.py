@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -69,12 +70,29 @@ class LLMMessage:
 class ConversationHistory:
     """
     Manages conversation state in a provider-agnostic way.
+
+    This implementation uses a `collections.deque` as the underlying data structure
+    to optimize for frequent prepending of system messages and message truncation.
+
+    Time Complexity:
+        - add_*: O(1)
+        - set_system: O(1) when prepending (was O(N) with list)
+        - truncate: O(M) where M is the number of messages to remove
+        - messages (property): O(N) due to serialization
+
+    Space Complexity:
+        - O(N) where N is the number of messages in history.
     """
 
     __slots__ = ("_messages",)
 
     def __init__(self, system_prompt: str | None = None):
-        self._messages: list[LLMMessage] = []
+        """Initialize the conversation history.
+
+        Args:
+            system_prompt: Optional initial system instruction.
+        """
+        self._messages: deque[LLMMessage] = deque()
         if system_prompt:
             self.add_system(system_prompt)
 
@@ -83,6 +101,10 @@ class ConversationHistory:
     # ----------------------------------------------------------------------
 
     def add_system(self, content: str) -> None:
+        """Add a system message to the history.
+
+        Time: O(1)
+        """
         self._messages.append(
             LLMMessage(
                 role=LLMMessageRole.SYSTEM,
@@ -91,6 +113,10 @@ class ConversationHistory:
         )
 
     def add_user(self, content: str, **metadata: Any) -> None:
+        """Add a user message to the history.
+
+        Time: O(1)
+        """
         self._messages.append(
             LLMMessage(
                 role=LLMMessageRole.USER,
@@ -100,6 +126,10 @@ class ConversationHistory:
         )
 
     def add_assistant(self, content: str, **metadata: Any) -> None:
+        """Add an assistant message to the history.
+
+        Time: O(1)
+        """
         self._messages.append(
             LLMMessage(
                 role=LLMMessageRole.ASSISTANT,
@@ -114,6 +144,10 @@ class ConversationHistory:
         tool_name: str,
         **metadata: Any,
     ) -> None:
+        """Add a tool response to the history.
+
+        Time: O(1)
+        """
         self._messages.append(
             LLMMessage(
                 role=LLMMessageRole.TOOL,
@@ -124,7 +158,10 @@ class ConversationHistory:
         )
 
     def add_raw(self, message: dict[str, Any]) -> None:
-        """Add a raw message to the conversation history."""
+        """Add a raw message to the conversation history.
+
+        Time: O(1)
+        """
         self._messages.append(
             LLMMessage(
                 role=LLMMessageRole(message["role"]),
@@ -134,18 +171,25 @@ class ConversationHistory:
         )
 
     def reset_to_system(self, content: str) -> None:
-        """Reset the conversation history to only include the system prompt."""
-        self._messages = [
+        """Reset the conversation history to only include the system prompt.
+
+        Time: O(1)
+        """
+        self._messages.clear()
+        self._messages.append(
             LLMMessage(
                 role=LLMMessageRole.SYSTEM,
                 content=content,
             )
-        ]
+        )
 
     def set_system(self, content: str) -> None:
         """Set or update the system prompt without wiping the rest of the history.
-        If a system message exists at the beginning, it is updated.
-        Otherwise, a new system message is prepended.
+
+        If a system message exists at the beginning, it is updated in-place.
+        Otherwise, a new system message is prepended to the deque.
+
+        Time: O(1) (Improved from O(N) by using deque.appendleft)
         """
         if self._messages and self._messages[0].role == LLMMessageRole.SYSTEM:
             self._messages[0] = LLMMessage(
@@ -153,8 +197,7 @@ class ConversationHistory:
                 content=content,
             )
         else:
-            self._messages.insert(
-                0,
+            self._messages.appendleft(
                 LLMMessage(
                     role=LLMMessageRole.SYSTEM,
                     content=content,
@@ -166,7 +209,10 @@ class ConversationHistory:
     # ----------------------------------------------------------------------
 
     def messages_raw(self) -> list[LLMMessage]:
-        """Return a shallow copy to prevent mutation."""
+        """Return a shallow copy of messages as a list.
+
+        Time: O(N)
+        """
         return list(self._messages)
 
     @property
@@ -174,8 +220,9 @@ class ConversationHistory:
         """Convert messages to standard LLM readable format.
 
         Returns:
-            List of dictionaries in the format expected by most LLM APIs:
-            [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+            List of dictionaries in the format expected by most LLM APIs.
+
+        Time: O(N)
         """
         return [
             {"role": msg.role.value, "content": msg.content, **({"name": msg.name} if msg.name else {})}
@@ -183,14 +230,20 @@ class ConversationHistory:
         ]
 
     def to_list(self) -> list[dict[str, Any]]:
-        """Convert entire history to a list of full message dictionaries."""
+        """Convert entire history to a list of full message dictionaries.
+
+        Time: O(N)
+        """
         return [msg.to_dict() for msg in self._messages]
 
     @classmethod
     def from_list(cls, messages_data: list[dict[str, Any]]) -> ConversationHistory:
-        """Create a history instance from a list of full message dictionaries."""
+        """Create a history instance from a list of full message dictionaries.
+
+        Time: O(N)
+        """
         history = cls()
-        history._messages = [LLMMessage.from_dict(m) for m in messages_data]
+        history._messages = deque(LLMMessage.from_dict(m) for m in messages_data)
         return history
 
     def __iter__(self) -> Iterable[LLMMessage]:
@@ -206,10 +259,21 @@ class ConversationHistory:
     def truncate(self, max_messages: int) -> None:
         """
         Truncate history while ALWAYS preserving the system prompt.
+
+        Args:
+            max_messages: Maximum number of messages to retain (including system prompt).
+
+        Time: O(M) where M is the number of messages to remove (popleft is O(1)).
         """
         if max_messages < 2:
             raise ValueError("max_messages must be >= 2")
 
-        system = self._messages[0]
-        rest = self._messages[1:][-(max_messages - 1) :]
-        self._messages = [system, *rest]
+        if len(self._messages) <= max_messages:
+            return
+
+        system = self._messages.popleft()
+        # Keep only the last (max_messages - 1) messages
+        while len(self._messages) >= max_messages:
+            self._messages.popleft()
+
+        self._messages.appendleft(system)

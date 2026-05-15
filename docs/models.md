@@ -288,6 +288,9 @@ class Task:
 
 Unit of work exchanged between agents. Tasks encapsulate a complete unit of work including messages, state, and output artifacts.
 
+!!! tip "Performance Note"
+    The `Task` model implements internal caching for the most recent activity. Calling `get_last_item()` is an **$O(1)$** operation, avoiding expensive list indexing or timestamp comparisons.
+
 ### Parameters
 
 | Parameter | Type | Default | Description |
@@ -988,10 +991,13 @@ Create an `LLMMessage` instance from a dictionary.
 ```python
 class ConversationHistory:
     def __init__(self, system_prompt: str | None = None):
-        self._messages: list[LLMMessage] = []
+        self._messages: deque[LLMMessage] = deque()
 ```
 
-Manages the conversation state for an LLM in a provider-agnostic way.
+Manages conversation state in a provider-agnostic way.
+
+!!! info "Optimized Architecture"
+    `ConversationHistory` uses a **`collections.deque`** to ensure that updating system prompts or truncating history remains highly performant ($O(1)$ prepends) even as the conversation grows.
 
 ### Methods
 

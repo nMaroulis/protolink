@@ -162,6 +162,12 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. Automatically managed by the [Agent state system](agent.md#state-persistence) when enabled. |
 | `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
 
+!!! info "History Performance"
+    Protolink's `ConversationHistory` uses a **`collections.deque`** internally. This optimizes two critical hot-paths in agentic workflows:
+    
+    1.  **System Prompt Updates**: Updating or prepending the system prompt is an **$O(1)$** operation (no list re-allocation).
+    2.  **History Truncation**: Trimming old messages to fit context windows is significantly faster than standard list slicing.
+
 #### Core Methods
 
 | Name | Parameters | Returns | Description |
