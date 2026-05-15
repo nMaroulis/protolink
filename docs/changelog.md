@@ -31,6 +31,13 @@ NEW: **protolink.state** module. The State class manages:
 - **Tool call history** - Tool call history persistence
 - **Flow state** - Flow state persistence
 
+**DSA Optimization**:
+
+- **Conversation History**: Use Message Double Ended Queue for O(1) append and pop operations.
+- **Registry Storage**: Optimize agent pop operations to O(1)
+and more... 
+
+
 ### [v0.5.4] - 2026-05-12
 
 #### 🐞 Refactored
