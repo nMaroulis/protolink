@@ -171,11 +171,28 @@ class AgentCard:
 
     @staticmethod
     def _validate_fields(data: dict[str, Any]) -> None:
-        """Validate fields."""
-        required_fields = ["name", "description", "url"]
-        for f in required_fields:
-            if f not in data:
-                raise ValueError(f"AgentCard :: Missing required field: {f}")
+        """Perform strict validation of mandatory AgentCard fields."""
+
+        # 1. Name is mandatory for identity
+        if not data.get("name"):
+            raise ValueError(
+                "\033[1mAgentCard\033[22m :: Missing required field \033[1mname\033[22m. "
+                "The agent must have a unique name for identification."
+            )
+
+        # 2. Description is mandatory - helps other agents discover capabilities
+        if not data.get("description"):
+            raise ValueError(
+                "\033[1mAgentCard\033[22m :: Missing required field \033[1mdescription\033[22m. "
+                "A description is required so other agents can identify what this agent does and how to interact with it."  # noqa: E501
+            )
+
+        # 3. URL is mandatory - required for transport and registration
+        if not data.get("url"):
+            raise ValueError(
+                "\033[1mAgentCard\033[22m :: Missing required field \033[1murl\033[22m. "
+                "An agent cannot register to a registry or use the underlying transport layer without a valid URL endpoint."  # noqa: E501
+            )
 
     def get_prompt_format(self) -> str:
         """

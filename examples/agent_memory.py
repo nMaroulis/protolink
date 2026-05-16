@@ -5,7 +5,7 @@ Demonstrates history persistence across sequential calls to the same agent insta
 
 Demonstrates the difference between stateless agents (`state=None`) and persistent agents (`state=["conversation"]`).
 
-Shows how `invoke_sync()` handles session history automatically using a default `session_id`.
+Shows how `agent.sync.invoke()` handles session history automatically using a default `session_id`.
 
 Useful for building conversational bots and multi-turn interaction assistants.
 """
@@ -52,7 +52,7 @@ QUESTIONS = [
 def run_pipeline(agent: Agent):
     for i, question in enumerate(QUESTIONS):
         print(f"({i + 1}) Asking question: {question}")
-        res = agent.invoke_sync(question)
+        res = agent.sync.invoke(question)
         print(f"Response ({i + 1}): {res}\n")
 
 

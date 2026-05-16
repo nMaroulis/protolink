@@ -109,7 +109,7 @@ await agent.execute_task(task)
 ### Default Behavior
 If no `session_id` is provided:
 
-1.  **`invoke()` / `invoke_sync()`**: These methods use a default ID (`"invocation_session_id"`), ensuring that sequential calls to the same agent instance share history by default.
+1.  **`invoke()` / `sync.invoke()`**: These methods use a default ID (`"invocation_session_id"`), ensuring that sequential calls to the same agent instance share history by default.
 2.  **External Tasks**: The agent falls back to using the `task.id`. This effectively makes the task stateless across different task IDs, but persistent if the *same task* is updated and re-processed.
 
 ---

@@ -143,14 +143,14 @@ class TestAgent:
         assert response == "Test response"
 
     def test_invoke_sync_method(self, agent):
-        """Test the invoke_sync method."""
+        """Test the sync.invoke method."""
 
         class TestAgent(Agent):
             async def handle_task(self, task):
                 return task.complete("Sync response")
 
         test_agent = TestAgent(agent.card)
-        response = test_agent.invoke_sync("Hello", part_type="infer")
+        response = test_agent.sync.invoke("Hello", part_type="infer")
         assert response == "Sync response"
 
     def test_set_transport(self, agent):

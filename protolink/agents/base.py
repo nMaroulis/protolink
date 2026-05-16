@@ -165,10 +165,13 @@ class Agent:
         self._resolve_skills(skills)
         # Uptime
         self.start_time: float | None = None
-        # Discovery TTL Cache - TODO(): Implement proper cache
+        # Discovery TTL Cache
         self._discovery_ttl = discovery_ttl
+        self._discovery_cache: dict[str, tuple[float, list[AgentCard]]] = {}
         # Expose Chat
         self._expose_chat = expose_chat
+        # Sync API
+        self.sync = SyncAgent(self)
 
     # ----------------------------------------------------------------------
     # Agent Server Lifecycle - A2A Operations
@@ -300,14 +303,16 @@ class Agent:
             try:
                 self._logger.info(get_agent_greeting(self.card.name))
                 await self._serve()
-                # Signal that startup completed successfully
-                self._ready_event.set()
+                # Signal that startup completed successfully if in background mode
+                if hasattr(self, "_ready_event"):
+                    self._ready_event.set()
                 await self._serve_forever()
             except Exception as e:
                 # Store startup failure so the main thread can re-raise it
                 self._startup_exception = e
-                # Unblock waiting thread even on failure
-                self._ready_event.set()
+                # Unblock waiting thread even on failure if in background mode
+                if hasattr(self, "_ready_event"):
+                    self._ready_event.set()
                 raise
 
         if background:
@@ -596,17 +601,6 @@ class Agent:
         last_part = result_task.get_last_part_content()
         return last_part if last_part else "No response generated"
 
-    def invoke_sync(
-        self,
-        message: str,
-        part_type: Literal["tool_call", "infer"] = "infer",
-        tool_name: str | None = None,
-        tool_args: dict[str, Any] | None = None,
-        session_id: str = "invocation_session_id",
-    ) -> str:
-        """Simple synchronous processing (convenience method)."""
-        return asyncio.run(self.invoke(message, part_type, tool_name, tool_args, session_id))
-
     # ----------------------------------------------------------------------
     # Registry
     # ----------------------------------------------------------------------
@@ -623,7 +617,21 @@ class Agent:
         if not self.registry_client:
             return []
 
-        return await self.registry_client.discover(filter_by=filter_by)
+        # Simple TTL caching
+        cache_key = str(filter_by)
+        if self._discovery_ttl > 0:
+            cached = self._discovery_cache.get(cache_key)
+            if cached:
+                timestamp, cards = cached
+                if time.time() - timestamp < self._discovery_ttl:
+                    return cards
+
+        cards = await self.registry_client.discover(filter_by=filter_by)
+
+        if self._discovery_ttl > 0:
+            self._discovery_cache[cache_key] = (time.time(), cards)
+
+        return cards
 
     async def register(self) -> None:
         """Register this agent in the global registry.
@@ -858,12 +866,9 @@ class Agent:
             )
 
         # Get Available Agents
-        agent_cards = ""
-        for i, agent in enumerate(await self.discover_agents(), start=1):
-            agent_cards += f"""
-            Agent {i}:
-                {agent.get_prompt_format()}
-            """
+        discovered = await self.discover_agents()
+        agent_cards_list = [f"Agent {i}:\n{agent.get_prompt_format()}" for i, agent in enumerate(discovered, start=1)]
+        agent_cards = "\n".join(agent_cards_list)
 
         # Build the System Prompt
         _ = self.llm.build_system_prompt(
@@ -968,15 +973,12 @@ class Agent:
         ):
             return agent_name
 
-        # Look up in discovered agents
-        discovered = await self.discover_agents()
-        for agent in discovered:
-            if agent.name == agent_name:
-                return agent.url
+        # Look up in registry using filtered discovery (O(1) with optimized Registry)
+        discovered = await self.discover_agents(filter_by={"name": agent_name})
+        if discovered:
+            return discovered[0].url
 
-        raise ValueError(
-            f"Agent '{agent_name}' not found in registry. Available agents: {[a.name for a in discovered]}"
-        )
+        raise ValueError(f"Agent '{agent_name}' not found in registry.")
 
     # ----------------------------------------------------------------------
     # Skill Management
@@ -1217,19 +1219,18 @@ class Agent:
                     "output_schema": dict[str, str]
         """
         if not self.tools:
-            return
+            return ""
 
-        tool_prompt: str = ""
+        tool_prompts = []
         for i, (name, tool) in enumerate(self.tools.items(), start=1):
-            tool_prompt += f"""
-            Tool {i}:
-                "name": {name},
-                "description": {tool.description},
-                "input_schema": {tool.input_schema},
-                "output_schema": {tool.output_schema}
-            \n
-            """
-        return tool_prompt
+            tool_prompts.append(
+                f"Tool {i}:\n"
+                f'    "name": {name},\n'
+                f'    "description": {tool.description},\n'
+                f'    "input_schema": {tool.input_schema},\n'
+                f'    "output_schema": {tool.output_schema}'
+            )
+        return "\n".join(tool_prompts)
 
     def set_registry(
         self, registry: TransportType | Registry | RegistryClient | None, registry_url: str | None = None
@@ -1265,3 +1266,67 @@ class Agent:
 
     def __repr__(self) -> str:
         return f"Agent(name='{self.card.name}', url='{self.card.url}')"
+
+
+class SyncAgent:
+    """Synchronous wrapper around Agent.
+
+    This class provides blocking equivalents of async methods
+    for use in:
+    - scripts
+    - CLI tools
+    - notebooks without async support
+
+    Internally uses `asyncio.run()` to execute async operations.
+
+    Warning:
+        This API should NOT be used inside an active event loop.
+    """
+
+    def __init__(self, agent: "Agent"):
+        self._agent = agent
+
+    def invoke(
+        self,
+        message: str,
+        part_type: Literal["tool_call", "infer"] = "infer",
+        tool_name: str | None = None,
+        tool_args: dict[str, Any] | None = None,
+        session_id: str = "invocation_session_id",
+    ) -> str:
+        """Synchronously process a message.
+
+        Args:
+            message: User message text
+            part_type: Type of part to create
+            tool_name: Name of tool (if part_type is "tool_call")
+            tool_args: Arguments for tool (if part_type is "tool_call")
+            session_id: Session ID to use for the task
+
+        Returns:
+            Agent response text
+        """
+        return asyncio.run(self._agent.invoke(message, part_type, tool_name, tool_args, session_id))
+
+    def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+        """Synchronously discover agents in the registry.
+
+        Args:
+            filter_by: Optional filter criteria
+
+        Returns:
+            List of matching AgentCard objects
+        """
+        return asyncio.run(self._agent.discover_agents(filter_by))
+
+    def call_agent(self, agent_url: str, task: Task) -> Task:
+        """Synchronously send a task to another agent.
+
+        Args:
+            agent_url: URL of the target agent
+            task: Task to send
+
+        Returns:
+            Task with updated state and response messages
+        """
+        return asyncio.run(self._agent.call_agent(agent_url, task))

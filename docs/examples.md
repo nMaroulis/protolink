@@ -83,7 +83,7 @@ The repository includes several **standalone example scripts** that demonstrate 
 
 - Demonstrates simplified agent creation using dictionary-based `AgentCard`
 - Shows how to add native tools using the `@agent.tool` decorator with automatic schema inference
-- Demonstrates direct agent invocation using convenience methods: `invoke()` and `invoke_sync()`
+- Demonstrates direct agent invocation using convenience methods: `invoke()` and `sync.invoke()`
 - Includes optional LLM integration for reasoning and inference
 - Uses `runtime` transport for in-memory execution (no network dependencies)
 
@@ -91,7 +91,7 @@ The repository includes several **standalone example scripts** that demonstrate 
 **Purpose**: Conversation memory and persistence across tasks
 
 - Demonstrates the difference between stateless agents (`state=None`) and persistent agents (`state=["conversation"]`)
-- Shows how `invoke_sync()` handles session history automatically using a default `session_id`
+- Shows how `sync.invoke()` handles session history automatically using a default `session_id`
 - Demonstrates history persistence across sequential calls to the same agent instance
 - Useful for building conversational bots and multi-turn interaction assistants
 

@@ -166,14 +166,16 @@ class Registry:
         async def _lifecycle():
             try:
                 await self._serve()
-                # Signal that startup completed successfully
-                self._ready_event.set()
+                # Signal that startup completed successfully if in background mode
+                if hasattr(self, "_ready_event"):
+                    self._ready_event.set()
                 await self._serve_forever()
             except Exception as e:
                 # Store startup failure so the main thread can re-raise it
                 self._startup_exception = e
-                # Unblock waiting thread even on failure
-                self._ready_event.set()
+                # Unblock waiting thread even on failure if in background mode
+                if hasattr(self, "_ready_event"):
+                    self._ready_event.set()
                 raise
 
         if background:
@@ -363,8 +365,7 @@ class Registry:
     ) -> list[dict[str, Any]] | list[AgentCard]:
         """Handle an incoming discover request by using secondary indexes.
 
-        If indexed fields (name, role, tags) are present in the filter, the search
-        is optimized using set intersections.
+        If indexed fields (name, role, tags) are present in the filter, the search is optimized using set intersections.
 
         Args:
             filter_by: Dictionary of fields to match.

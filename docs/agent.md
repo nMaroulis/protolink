@@ -244,7 +244,9 @@ async def main():
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Optional method for agents that want to emit real-time updates. Default implementation calls `handle_task` and emits status functionality events. |
 | `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()` to run the multi-step reasoning loop. For `tool_call` parts, it executes the tool directly. |
 | `invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. Accepts an optional `session_id` for memory. |
-| `invoke_sync()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
+| `sync.invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
+| `sync.discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Synchronous version of `discover_agents()`. |
+| `sync.call_agent()` | `agent_url: str`, `task: Task` | `Task` | Synchronous version of `call_agent()`. |
 
 #### The Inference Loop Integration
 
@@ -299,6 +301,54 @@ This enables a coordinator agent to delegate work to specialized agents without 
 |------|------------|---------|-------------|
 | `call_agent()` | `agent_url: str`, `task: Task` | `Task` | Sends a task to another agent and returns the processed result. |
 | `send_message_to()` | `agent_url: str`, `message: Message` | `Message` | Sends a message to another agent and returns the response. |
+
+
+## Synchronous API (`SyncAgent`)
+
+Protolink is built on an asynchronous foundation using `asyncio`, which is essential for handling concurrent agent interactions and streaming responses. However, many development workflows—such as data science notebooks, CLI tools, and simple automation scripts—benefit from a straightforward, blocking API.
+
+The `Agent` class provides a `.sync` property, which is an instance of `SyncAgent`. This class acts as a thin, synchronous wrapper around the agent's core async methods.
+
+### Why Use the Sync API?
+
+1.  **Reduced Boilerplate**: Eliminates the need for `async/await` and event loop management in scripts.
+2.  **Environment Compatibility**: Works seamlessly in standard Python environments and legacy codebases that are not yet async-ready.
+3.  **Prototyping**: Allows for faster iteration when building simple "input-output" agent flows.
+
+### How it Works Internally
+
+The `SyncAgent` class does not re-implement any logic. Instead, it delegates calls to the agent's async methods using `asyncio.run()`. This ensures that all behavior—including tool execution, state management, and LLM orchestration—remains identical across both APIs.
+
+!!! warning "Event Loop Conflict"
+    The synchronous API is **not thread-safe** if called from within an active event loop (e.g., inside a FastAPI endpoint or an async function). Doing so will raise a `RuntimeError`. For async applications, always use the standard `await agent.invoke()` methods.
+
+### Key Sync Methods
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `agent.sync.invoke()` | `message, part_type, ...` | `str` | Blocking version of `invoke()`. Processes a message and returns the text result. |
+| `agent.sync.discover_agents()` | `filter_by` | `list[AgentCard]` | Blocking version of `discover_agents()`. Fetches agents from the registry. |
+| `agent.sync.call_agent()` | `agent_url, task` | `Task` | Blocking version of `call_agent()`. Sends a task to a remote agent. |
+
+### Usage Example
+
+```python
+from protolink.agents import Agent
+
+agent = Agent(card={"name": "my-agent", "url": "local://agent"}, transport="runtime")
+
+# Use the .sync property for blocking calls
+response = agent.sync.invoke("Hello, agent!")
+print(f"Agent said: {response}")
+
+# Discovering other agents synchronously
+discovered = agent.sync.discover_agents(filter_by={"name": "weather-agent"})
+if discovered:
+    target_url = discovered[0].url
+    # Call agent synchronously
+    task = Task.create_infer("What is the temperature?")
+    result = agent.sync.call_agent(target_url, task)
+```
 
 
 
@@ -404,6 +454,7 @@ agent.add_tool(WeatherTool())
 | `llm` (property) | `LLM ⎪ None` | `None` | Gets or sets the agent's language model. Setting this validates the connection and updates `card.capabilities.has_llm` automatically. |
 | `storage` (property) | `Storage` | `None` | Gets or sets the agent's storage instance. Setting this automatically updates the internal `SessionManager`. |
 | `set_registry()` | `registry, registry_url=None` | `None` | Configures the agent's connection to a Protolink registry. |
+| `sync` (property) | — | `SyncAgent` | Returns a synchronous wrapper around the agent for blocking operations. |
 
 ## Storage and Persistence
 
@@ -475,7 +526,7 @@ When an agent is initialized with the `state` parameter, it tracks internal stat
 | `flow` | Persists flow state across runs. |
 
 !!! tip "Session IDs"
-    When using direct invocation methods like `invoke()` or `invoke_sync()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `state=["conversation"]` is enabled.
+    When using direct invocation methods like `invoke()` or `sync.invoke()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `state=["conversation"]` is enabled.
 
     If no `session_id` is provided in the task metadata (for non-invoke calls), the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
 
