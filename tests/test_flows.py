@@ -95,20 +95,17 @@ async def test_router_execution():
     agent_even = MockAgent("EvenAgent", append_text="Even")
     agent_odd = MockAgent("OddAgent", append_text="Odd")
 
-    def condition(task: Task) -> str:
-        # Route based on metadata value
-        val = task.metadata.get("value", 0)
-        return "even" if val % 2 == 0 else "odd"
-
-    router = Router(routes={"even": agent_even, "odd": agent_odd}, condition_fn=condition)
+    router = Router(routes={"even": agent_even, "odd": agent_odd}, routing_prompt="Route to even or odd.")
 
     # Test even path
-    task_even = Task(messages=[Message.user("Test even")], metadata={"value": 2})
+    task_even = Task.create(Message.agent("Some context and then [ROUTE: even]"))
+    task_even.metadata["value"] = 2
     result_even = await router.execute(task_even)
     assert result_even.messages[-1].parts[0].content == "Even"
 
     # Test odd path
-    task_odd = Task(messages=[Message.user("Test odd")], metadata={"value": 3})
+    task_odd = Task.create(Message.agent("Some context and then [ROUTE: odd]"))
+    task_odd.metadata["value"] = 3
     result_odd = await router.execute(task_odd)
     assert result_odd.messages[-1].parts[0].content == "Odd"
 
