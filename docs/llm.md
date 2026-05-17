@@ -529,7 +529,11 @@ It is composed of several key components:
     -   Lists other available agents in the registry.
     -   Defines the `agent_call` JSON format for delegation.
 
-4.  **User Instructions**:
+4.  **Semantic Context Injection**:
+    -   Injected automatically when the Agent is executing inside a Flow (`Pipeline`, `Router`, `Graph`).
+    -   Provides downstream topology awareness, dynamically commanding the LLM to format its output for the specific agent(s) receiving its output next.
+
+5.  **User Instructions**:
     -   Your specific customization (e.g., "You are a coding assistant").
     -   Appended to the blueprint to guide the specific task domain.
 

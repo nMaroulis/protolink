@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.discovery import Registry
-from protolink.models import Task
+from protolink.models import AgentCard, Task
 from protolink.types import FlowTarget
 from protolink.utils.logging import get_logger
 
@@ -21,6 +21,8 @@ class Flow(ABC):
       URLs/names, and nested Flow instances.
     - **Resource Propagation**: Parent flows automatically propagate their `AgentClient` and `RegistryClient` to
       nested flows if they are unconfigured.
+    - **Semantic Context Injection**: Flows dynamically build instruction prompts based on their downstream topology
+      and inject them into `task.flow_state["prompt"]` for executing agents to utilize seamlessly.
 
     All flows accept an `AgentClient` for execution and optionally a `Registry` for discovering agents by name.
     """
@@ -62,6 +64,98 @@ class Flow(ABC):
             The Task will contain appended Messages and Artifacts from the journey.
         """
         pass
+
+    async def _build_flow_prompt(self, next_target: FlowTarget | None = None, *, is_final: bool = False) -> str:
+        """Build the semantic context instructions for the LLM based on the next target.
+
+        Args:
+            next_target: The next step in the flow.
+            is_final: Whether the current step is the last step.
+
+        Returns:
+            A string containing the flow instructions to inject into the LLM system prompt.
+        """
+        from protolink.agents.base import Agent
+        from protolink.flows.parallel import Parallel
+        from protolink.flows.router import Router
+        from protolink.llms.prompts import (
+            FLOW_PARALLEL_PROMPT,
+            FLOW_ROUTER_PROMPT,
+            FLOW_TARGET_PROMPT,
+            FLOW_TERMINAL_PROMPT,
+        )
+
+        if is_final:
+            return FLOW_TERMINAL_PROMPT
+
+        if not next_target:
+            return ""
+
+        discovered = []
+        if self.registry_client:
+            try:
+                discovered = await self.registry_client.discover()
+            except Exception:
+                pass
+
+        flow_instructions = ""
+        if isinstance(next_target, Router):
+            routes_info = []
+            for route_key, route_dest in next_target.routes.items():
+                route_card: AgentCard | None = None
+                if isinstance(route_dest, str):
+                    for card in discovered:
+                        if card.name == route_dest or card.url == route_dest:
+                            route_card = card
+                            break
+                elif isinstance(route_dest, Agent):
+                    route_card = route_dest.card
+
+                if route_card:
+                    routes_info.append(f"Route Key: '{route_key}'\nAgent Profile:\n{route_card.get_prompt_format()}\n")
+                else:
+                    routes_info.append(f"Route Key: '{route_key}'\nTarget: {route_dest}\n")
+
+            flow_instructions = FLOW_ROUTER_PROMPT.format(
+                routing_prompt=next_target.routing_prompt, routes_info="\n".join(routes_info)
+            )
+        elif isinstance(next_target, Parallel):
+            parallel_info = []
+            for branch_idx, branch_dest in enumerate(next_target.branches):
+                branch_card: AgentCard | None = None
+                if isinstance(branch_dest, str):
+                    for card in discovered:
+                        if card.name == branch_dest or card.url == branch_dest:
+                            branch_card = card
+                            break
+                elif isinstance(branch_dest, Agent):
+                    branch_card = branch_dest.card
+
+                if branch_card:
+                    parallel_info.append(f"Agent {branch_idx + 1} Profile:\n{branch_card.get_prompt_format()}\n")
+                else:
+                    parallel_info.append(f"Agent {branch_idx + 1} Target: {branch_dest}\n")
+
+            flow_instructions = FLOW_PARALLEL_PROMPT.format(parallel_info="\n".join(parallel_info))
+        else:
+            next_card = None
+            if isinstance(next_target, str):
+                for card in discovered:
+                    if card.name == next_target or card.url == next_target:
+                        next_card = card
+                        break
+            elif isinstance(next_target, Agent):
+                next_card = next_target.card
+            elif isinstance(next_target, Flow):
+                return f"\n\n--- FLOW PIPELINE CONTEXT ---\nYour output will be passed to a nested {next_target.__class__.__name__} flow structure."  # noqa: E501
+
+            if next_card:
+                flow_instructions = FLOW_TARGET_PROMPT.format(
+                    next_agent_name=next_card.name,
+                    next_agent_card=next_card.get_prompt_format(),
+                )
+
+        return flow_instructions
 
     async def _resolve_agent_url(self, agent_name_or_url: str) -> str:
         """Resolve a string to a valid agent URL.

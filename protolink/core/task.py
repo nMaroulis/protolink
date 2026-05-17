@@ -121,6 +121,7 @@ class Task:
             "messages": [m.to_dict() for m in self.messages],
             "artifacts": [a.to_dict() for a in self.artifacts],
             "metadata": self.metadata,
+            "flow_state": self.flow_state,
             "created_at": self.created_at,
         }
 
@@ -141,6 +142,7 @@ class Task:
             messages=messages,
             artifacts=artifacts,
             metadata=data.get("metadata", {}),
+            flow_state=data.get("flow_state", {}),
             created_at=data.get("created_at", utc_now()),
         )
 

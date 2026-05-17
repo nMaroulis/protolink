@@ -756,6 +756,7 @@ class LLM(ABC):
         agent_cards: str | None = None,
         tools: str | None = None,
         *,
+        flow_instructions: str | None = None,
         override_system_prompt: bool = False,
         persist: bool = False,
     ) -> str:
@@ -775,6 +776,7 @@ class LLM(ABC):
             user_instructions: Optional instructions from the user to customize behavior.
             agent_cards: JSON/text describing available agents for delegation.
             tools: JSON/text describing available tools for this agent.
+            flow_instructions: Optional flow context instructions (e.g. pipeline step awareness).
             override_system_prompt: Whether to override completely the system prompt with the user defined prompt.
             persist: If True, updates the system prompt in history without wiping conversation turns.
                 If False (default), resets history to only include the new system prompt.
@@ -796,6 +798,7 @@ class LLM(ABC):
                 if agent_cards
                 else "",
                 user_instructions=user_instructions or "",
+                flow_instructions=flow_instructions or "",
             )
 
         if persist:

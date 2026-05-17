@@ -22,6 +22,9 @@ class Parallel(Flow):
     from each branch are merged, avoiding data duplication or array index collisions.
     - **Nested Execution**: Branches can be local Agents, remote URLs, or nested
       Flows (e.g., a Pipeline inside a Parallel branch).
+    - **Semantic Fan-Out Context**: If a `Parallel` flow is set as the next target in a pipeline, the flow orchestrator
+      will automatically notify the preceding agent that its output is being broadcast to a committee of concurrent
+      receivers, allowing the LLM to format its response accordingly.
     """
 
     def __init__(

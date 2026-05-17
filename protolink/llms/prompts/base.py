@@ -18,6 +18,7 @@ Output Schema Requirements:
 # User Instructions
 {user_instructions}
 
+{flow_instructions}
 """
 
 

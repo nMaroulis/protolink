@@ -15,9 +15,16 @@
 
 # Flows Refactor & Upgrade
 
+- **Semantic Context Injection**: Flows dynamically build instruction prompts based on their downstream topology. This prompt is injected into the `task.flow_state["prompt"]` for executing agents to utilize seamlessly. This way agents are aware of their downstream context and can format their output accordingly.
+- **Graph**: Add Graph flow, which is a flow that is made up of nodes and edges. 
+- **Pipeline**: Add Pipeline flow, which is a flow that is made up of steps. 
+- **Parallel**: Add Parallel flow, which is a flow that is made up of branches. 
+- **Router**: Add Router flow, which is a flow that is made up of a router. 
+  
 - Removed **Structured Agent**
 - Better **State** Management
 - **Flow Sync** Module
+- 
 
 **More:**
 

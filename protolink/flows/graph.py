@@ -128,6 +128,11 @@ class Graph(Flow):
     async def execute(self, task: Task) -> Task:
         """Execute the graph traversal sequence based on connections and state logic.
 
+        This method implements Semantic Context Injection. Before executing each node, it checks if a deterministic,
+        non-conditional edge exists pointing to a subsequent node. If found, it pre-builds a context-aware LLM prompt
+        using `_build_flow_prompt` and populates `task.flow_state["prompt"]`. This allows the executing agent to
+        dynamically format its output specifically for the downstream receiver without knowing the graph's structure.
+
         Args:
             task: The original `Task` payload to flow through the machine.
 
@@ -156,6 +161,22 @@ class Graph(Flow):
 
             self._logger.info(f"Graph orchestrating node: [{current_node_name}]")
             target = self.nodes[current_node_name]
+
+            # Determine deterministic subsequent destination if applicable
+            next_target = None
+            if current_node_name in self.edges:
+                next_target = self.edges[current_node_name]
+                if next_target == self.finish_point:
+                    current_task.flow_state.clear()
+                    current_task.flow_state["prompt"] = await self._build_flow_prompt(is_final=True)
+                else:
+                    target_obj = self.nodes[next_target]
+                    current_task.flow_state.clear()
+                    current_task.flow_state["prompt"] = await self._build_flow_prompt(next_target=target_obj)
+            else:
+                # Conditional edges are non-deterministic before execution.
+                current_task.flow_state.clear()
+
             current_task = await self._execute_target(target, current_task)
 
             # Determine the subsequent destination

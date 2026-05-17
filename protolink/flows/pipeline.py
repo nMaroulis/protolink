@@ -56,6 +56,11 @@ class Pipeline(Flow):
     async def execute(self, task: Task) -> Task:
         """Execute the task sequentially through the defined steps.
 
+        This method implements Semantic Context Injection. Before executing each step, the Pipeline analyzes the
+        topology to identify the subsequent step. It pre-builds a context-aware LLM prompt using `_build_flow_prompt`
+        and populates `task.flow_state["prompt"]`. This allows the executing agent to dynamically format its
+        output specifically for the downstream receiver without knowing the flow's internal structure.
+
         Args:
             task: The initial state `Task` object.
 
@@ -65,7 +70,21 @@ class Pipeline(Flow):
         """
         current_task = task
 
-        for step in self.steps:
+        for idx, step in enumerate(self.steps):
+            # Check if there is a subsequent target step
+            next_target = None
+            if idx + 1 < len(self.steps):
+                next_target = self.steps[idx + 1]
+
+            # Populate task flow_state with pre-built flow instructions
+            # This ensures flow_state is perfectly JSON-serializable and prevents deepcopy bugs.
+            current_task.flow_state.clear()
+
+            if next_target:
+                current_task.flow_state["prompt"] = await self._build_flow_prompt(next_target=next_target)
+            else:
+                current_task.flow_state["prompt"] = await self._build_flow_prompt(is_final=True)
+
             current_task = await self._execute_target(step, current_task)
 
         return current_task

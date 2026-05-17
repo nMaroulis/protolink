@@ -17,10 +17,10 @@ In standard Protolink (or many other LLM-based frameworks), an Agent receives a 
 
 In Protolink, a `Flow` expects a `Task` and returns a `Task`. A Task is essentially a container holding a history of interactions (Messages and Artifacts). When a Flow executes:
 
-1. It sends the `Task` to the first Agent.
-2. That Agent performs its logic (maybe running tools or inferring) and appends a new `Artifact` containing its output to the `Task`.
-3. The Flow retrieves the updated `Task` and passes it to the next Agent in the sequence. 
-4. This continues until the flow finishes, returning a highly-enriched `Task` full of intermediate artifacts.
+1. **Semantic Context Injection**: The Flow orchestrator evaluates the *next step* in the topology. It pre-builds a context-aware system prompt (e.g., "Your output goes to the Editor") and attaches it to the `Task`'s `flow_state`.
+2. **Execution**: It sends the `Task` to the current Agent.
+3. **Context-Aware Inference**: The Agent automatically injects the `flow_state` prompt into its LLM, ensuring it formats its output perfectly for the downstream receiver. It then performs its logic and appends an `Artifact` to the `Task`.
+4. **Traversal**: The Flow retrieves the updated `Task` and passes it to the next Agent. This continues until the flow finishes, returning a highly-enriched `Task` full of intermediate artifacts.
 
 ### 🧱 Deep Composability & Nesting
 
@@ -42,22 +42,11 @@ This architectural shift allows you to build extremely complex, hierarchical dec
 
 ---
 
-## ⚙️ Execution Modes: Manual vs. Autonomous
+## ⚙️ Execution
 
-One of the most important concepts to understand is **how** a flow actually runs. Protolink provides two distinct ways to execute your flows:
+You can define a Flow and run it programmatically in your Python script using its `.execute(task)` method. In this mode, the flow runs exactly once to completion and then your script continues.
 
-=== "Manual / Script-Based"
-
-    You can define a Flow and run it programmatically in your Python script using its `.execute(task)` method. In this mode, the flow runs exactly once to completion and then your script continues.
-    
-    This is great for one-off tasks, background jobs, or testing.
-
-=== "Autonomous (The StructuredAgent)"
-
-    If you want your flow to act as an autonomous entity continuously listening for tasks on a network, you simply pass it to a `StructuredAgent`.
-    
-    !!! tip "The Power of StructuredAgent"
-        A `StructuredAgent` is a built-in Protolink Agent that runs a `Flow` behind the scenes. This is extremely powerful because it packages an entire complex pipeline into a compliant A2A node! From the outside, other agents or clients don't even know it's a flow—they interact with the `StructuredAgent` exactly like any other agent.
+This is great for one-off tasks, background jobs, testing, or embedding a structured pipeline inside your own custom Agent classes.
 
 ---
 
@@ -83,7 +72,10 @@ await pipeline.execute(task)
 
 If multiple agents can act independently on the same task without needing each other's output, you can execute them concurrently. Their resulting parts are appended to the task outcome simultaneously.
 
-!!! important "Safe Fan-in"
+!!! important "Semantic Fan-Out Context"
+    When a preceding agent passes its output to a `Parallel` flow, Protolink's Semantic Context Injection automatically informs the agent that it is broadcasting to a committee of concurrent receivers. The agent is fed the `AgentCards` for all parallel branches, allowing it to formulate a single comprehensive response optimized for *all* downstream consumers!
+
+!!! info "Safe Fan-in"
     Parallel execution uses **ID-based merging**. This ensures that the unified task only includes strictly new messages and artifacts from each branch, preventing duplicates even in complex nested structures.
 
 ```python
@@ -104,28 +96,29 @@ for art in result.artifacts:
 
 ### 3. Conditional Routing
 
-A `Router` allows conditional branching. Based on a user-defined evaluator function you provide, the task is forwarded to a specific mapped agent.
+A `Router` allows conditional branching based on **LLM decision-making**. Instead of hardcoding unpredictable Python `if/else` statements, the Router injects your `routing_prompt` into the *preceding agent*, empowering the LLM itself to choose the correct path.
+
+The preceding agent evaluates its own task context and appends a structured tag (e.g., `[ROUTE: quality]`) to its final response. The Router safely extracts this tag, cleans the payload, and deterministically forwards the task to the chosen route.
 
 ```python
 from protolink.flows import Router
 
-# Evaluator returns the string key mapped to the next agent
-def route_condition(t: Task) -> str:
-    content = t.get_last_part_content()
-    return "needs_edit" if "bad" in content.lower() else "good_to_go"
-
 router = Router(
     routes={
-        "needs_edit": "editor", 
-        "good_to_go": "quality"
+        "editor": "editor", 
+        "quality": "quality"
     }, 
-    condition_fn=route_condition, 
+    routing_prompt="If the text is poorly written, route to 'editor'. If it is perfect, route to 'quality'.", 
     registry=registry
 )
 
-# This will route uniquely to the 'editor' agent based on evaluating the text
-task = Task.create(Message.user("This is really bad."))
-await router.execute(task) 
+# Place the router in a Pipeline:
+pipeline = Pipeline(registry=registry)
+pipeline.add_step("writer").add_step(router)
+
+# The 'writer' agent will automatically receive the routing instructions and choose the path!
+task = Task.create(Message.user("Write a very short poem."))
+await pipeline.execute(task) 
 ```
 
 ### 4. Graph Flows (State Machines)
@@ -159,32 +152,3 @@ graph.add_edge("final", "__END__")
 graph.set_entry_point("entry")
 ```
 
----
-
-## 🏛️ Encapsulating within a StructuredAgent
-
-As mentioned earlier, you can take any of the flows defined above (even the highly complex `Graph` state machine) and wrap them directly into a `StructuredAgent`.
-
-!!! info "Seamless Interoperability"
-    Once wrapped, your workflow is exposed as a single Agent endpoint. Other components in your system can offload work to this massive pipeline by just sending it a standard Protolink Task!
-
-```python
-from protolink.agents.builtins import StructuredAgent
-
-# Wrap the Graph state machine inside an autonomous Agent!
-structured_agent = StructuredAgent(
-    card={"name": "graph_agent", "url": "http://localhost:8035"},
-    flow=graph, # Pass any Flow (Pipeline, Parallel, Graph, Router, etc)
-    transport="http",
-    registry="http",
-    registry_url="http://localhost:9030",
-)
-
-# Start listening on the network
-structured_agent.start()
-
-# Now other agents or clients seamlessly interact with the flow:
-client = AgentClient(transport="http", url="http://localhost:8036")
-task = Task.create(Message.user("Write a blog post about Protolink."))
-result = await client.send_task("http://localhost:8035", task)
-```

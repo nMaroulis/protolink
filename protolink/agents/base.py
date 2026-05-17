@@ -753,7 +753,7 @@ class Agent:
             if part.type == "tool_call":
                 outputs.append(await self.execute_tool(part))
             elif part.type == "infer":
-                outputs.append(await self.call_llm(part))
+                outputs.append(await self.call_llm(part, task=task))
             else:
                 self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
         # ---- Attach outputs to the Task ----
@@ -831,7 +831,7 @@ class Agent:
                 error={"message": str(e)},
             )
 
-    async def call_llm(self, infer_part: Part) -> Part:
+    async def call_llm(self, infer_part: Part, task: Task | None = None) -> Part:
         """
         Invoke the agent's LLM to process an inference request.
 
@@ -848,6 +848,7 @@ class Agent:
         Args:
             infer_part: A Part of type ``infer`` containing:
                 - prompt (str): The user query or instruction to process
+            task: Optional Task object to retrieve topological/flow context.
 
         Returns:
             Part: A Part of type ``infer_output`` containing the LLM's final response,
@@ -870,11 +871,15 @@ class Agent:
         agent_cards_list = [f"Agent {i}:\n{agent.get_prompt_format()}" for i, agent in enumerate(discovered, start=1)]
         agent_cards = "\n".join(agent_cards_list)
 
+        # Extract flow instructions injected by orchestrators
+        flow_instructions = task.flow_state.get("prompt", "") if task and task.flow_state else ""
+
         # Build the System Prompt
         _ = self.llm.build_system_prompt(
             user_instructions=self._system_prompt,
             agent_cards=agent_cards,
-            tools=self.get_tools_for_prompt(),
+            tools=self._build_tools_prompt(),
+            flow_instructions=flow_instructions,
             override_system_prompt=self.override_system_prompt,
             persist=self._state.conversation is not None,
         )
@@ -1203,7 +1208,7 @@ class Agent:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_tools_for_prompt(self) -> str | None:
+    def _build_tools_prompt(self) -> str | None:
         """Return a string with a list of the agent's tools to be used in  LLM prompts.
 
         Example:
