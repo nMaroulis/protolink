@@ -35,9 +35,8 @@ _ALLOWED_TRANSITIONS: dict[TaskState, set[TaskState]] = {
 class Task:
     """Shared Unit of work exchanged between agents.
 
-    Tasks act as the state container for agentic workflows, tracking communication
-    history and produced artifacts. This implementation uses internal caching
-    to optimize retrieval of the most recent task updates.
+    Tasks act as the state container for agentic workflows, tracking communication history and produced artifacts.
+    This implementation uses internal caching to optimize retrieval of the most recent task updates.
 
     Attributes:
         id: Unique task identifier
@@ -45,6 +44,7 @@ class Task:
         messages: Communication history for this task
         artifacts: Output artifacts produced by task
         metadata: Additional task metadata
+        flow_state: Optional flow state for structured flows
         created_at: Task creation time
 
     Time Complexity:
@@ -61,6 +61,7 @@ class Task:
     messages: list[Message] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    flow_state: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: utc_now())
 
     _last_item: Message | Artifact | None = field(default=None, init=False, repr=False)

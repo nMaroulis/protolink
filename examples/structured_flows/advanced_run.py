@@ -1,13 +1,11 @@
-import asyncio
 import os
 import sys
+import time
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from protolink.agents import Agent
-from protolink.agents.builtins import StructuredAgent
-from protolink.client import AgentClient
 from protolink.discovery import Registry
 from protolink.flows import Graph, Parallel, Router
 from protolink.models import Artifact, Message, Part, Task
@@ -44,7 +42,7 @@ class QualityControlAgent(Agent):
         return task
 
 
-async def main():
+def main():
     print("=" * 70)
     print("🚀 Advanced Structured Flows Example")
     print("=" * 70)
@@ -88,7 +86,7 @@ async def main():
     reviewer.start(background=True)
     qc.start(background=True)
 
-    await asyncio.sleep(1)  # wait for registration
+    time.sleep(1)  # wait for registration
 
     # ==========================================
     # Example 1: Parallel Flow
@@ -101,7 +99,7 @@ async def main():
     parallel = Parallel(branches=["editor", "reviewer"], registry=registry)
 
     task_parallel = Task.create(Message.user("Please analyze this draft."))
-    res_parallel = await parallel.execute(task_parallel)
+    res_parallel = parallel.sync.execute(task_parallel)
 
     print("\n   [Parallel Flow Accumulated Artifacts]")
     for art in res_parallel.artifacts:
@@ -123,16 +121,16 @@ async def main():
     )
 
     task_good = Task.create(Message.user("This looks amazing and ready."))
-    await router.execute(task_good)
+    router.sync.execute(task_good)
 
     task_bad = Task.create(Message.user("This is really bad."))
-    await router.execute(task_bad)
+    router.sync.execute(task_bad)
 
     # ================================================
-    # Example 3: Graph Flow inside StructuredAgent
+    # Example 3: Graph Flow (Direct Execution)
     # ================================================
     print("\n" + "-" * 50)
-    print("🟢 Executing Graph Flow via StructuredAgent")
+    print("🟢 Executing Graph Flow")
     print("-" * 50)
 
     graph = Graph(registry=registry)
@@ -153,20 +151,9 @@ async def main():
     graph.add_edge("final", "__END__")
     graph.set_entry_point("entry")
 
-    # Wrap the entire graph state machine inside an autonomous Agent!
-    structured_agent = StructuredAgent(
-        card={"name": "graph_agent", "url": "http://localhost:8035", "description": "LangGraph style Agent"},
-        flow=graph,
-        transport="http",
-        registry="http",
-        registry_url=REGISTRY_URL,
-        verbosity=1,
-    )
-    await structured_agent.start()
-
-    client = AgentClient(transport="http", url="http://localhost:8036")
+    # Execute graph flow directly
     task_graph = Task.create(Message.user("Write a blog post about Protolink."))
-    res_graph = await client.send_task("http://localhost:8035", task_graph)
+    res_graph = graph.sync.execute(task_graph)
 
     print("\n   [Graph Flow Final Task State]")
     for idx, art in enumerate(res_graph.artifacts):
@@ -174,7 +161,6 @@ async def main():
 
     # Cleanup
     print("\n🛑 Shutting down...")
-    structured_agent.stop()
     qc.stop()
     reviewer.stop()
     editor.stop()
@@ -183,4 +169,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

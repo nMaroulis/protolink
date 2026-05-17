@@ -25,7 +25,7 @@ async def main():
 
     registry = Registry(transport="http", url=REGISTRY_URL)
     # Start the Registry simply by using .start()
-    await registry.start()
+    registry.start(background=True)
 
     # ---------------------------------------------------------
     # (2) VACATION ADVISOR AGENT
@@ -231,7 +231,7 @@ async def main():
         verbosity=2,
     )
 
-    agent.start()
+    agent.start(background=True)
 
     # ---------------------------------------------------------
     # (6) AGENT CLIENT - TASK - USER INTERFACE

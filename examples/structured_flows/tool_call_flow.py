@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 
@@ -10,24 +9,22 @@ from protolink.flows import Pipeline
 from protolink.models import Message, Part, Task
 
 
-async def main():
+def main():
     print("=" * 70)
     print("🚀 Structured Flow: Cross-Agent Tool Execution Example")
     print("=" * 70)
 
     # 1. Define an Agent with a Tool
-    class ToolProviderAgent(Agent):
-        def __init__(self):
-            super().__init__(
-                card={"name": "calculator", "url": "http://localhost:8041", "description": "Provides math tools"},
-                transport="http",
-            )
+    calc_agent = Agent(
+        card={"name": "calculator", "url": "http://localhost:8041", "description": "Provides math tools"},
+        transport="http",
+    )
 
-            # Add a simple tool
-            @self.tool(name="add", description="Adds two numbers")
-            async def add(a: int, b: int) -> int:
-                print(f"   [ToolProvider] Executing 'add' tool with {a} and {b}")
-                return a + b
+    # Add a simple tool
+    @calc_agent.tool(name="add", description="Adds two numbers")
+    async def add(a: int, b: int) -> int:
+        print(f"   [ToolProvider] Executing 'add' tool with {a} and {b}")
+        return a + b
 
     # 2. Define an Agent that "Calls" the tool by constructing a task
     class RequesterAgent(Agent):
@@ -48,8 +45,6 @@ async def main():
             task.add_message(msg)
             return task
 
-    # Initialize agents
-    calc_agent = ToolProviderAgent()
     req_agent = RequesterAgent()
 
     # 3. Build a Pipeline
@@ -64,7 +59,9 @@ async def main():
     print("\n🟢 Executing flow...")
     task = Task.create(Message.user("Please add 10 and 32."))
 
-    result = await flow.execute(task)
+    # Sync execution
+    # For async use await flow.execute(task)
+    result = flow.sync.execute(task)
 
     print("\n" + "-" * 40)
     print("🏁 Execution Results")
@@ -87,4 +84,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

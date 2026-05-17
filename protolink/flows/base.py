@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 
 from protolink.client import AgentClient, RegistryClient
@@ -48,6 +49,7 @@ class Flow(ABC):
                 self.registry_client = registry
 
         self._logger = get_logger("protolink.flows")
+        self.sync = SyncFlow(self)
 
     @abstractmethod
     async def execute(self, task: Task) -> Task:
@@ -120,8 +122,7 @@ class Flow(ABC):
     async def _execute_target(self, target: FlowTarget, task: Task) -> Task:
         """Centralized dispatcher for executing a flow step target.
 
-        This method handles the polymorphic nature of flow steps by delegating
-        execution based on the target type:
+        This method handles the polymorphic nature of flow steps by delegating execution based on the target type:
         - **Flow**: Recursively executes the nested flow, propagating client and registry.
         - **Agent**: Executes a local agent instance by calling its `handle_task` method.
         - **str**: Resolves the agent URL (via Registry if needed) and sends the task remotely.
@@ -155,3 +156,34 @@ class Flow(ABC):
             return await self.client.send_task(url, task)
         else:
             raise ValueError(f"Invalid execution target type: {type(target)}")
+
+
+class SyncFlow:
+    """Synchronous wrapper around Flow.
+
+    This class provides blocking equivalents of async methods for use in:
+        - scripts
+        - CLI tools
+        - notebooks without async support
+
+    Internally uses `asyncio.run()` to execute async operations.
+
+    Warning:
+        This API should NOT be used inside an active event loop (e.g., FastAPI, Jupyter async cells).
+    """
+
+    def __init__(self, flow: Flow):
+        self._flow = flow
+
+    def execute(self, task: Task) -> Task:
+        """Synchronously execute the flow on a given task.
+
+        This is a blocking version of `execute()`.
+
+        Internally runs the async implementation in a new event loop.
+
+        Example:
+            >>> flow = Pipeline([...])
+            >>> result = flow.sync.execute(task)
+        """
+        return asyncio.run(self._flow.execute(task))

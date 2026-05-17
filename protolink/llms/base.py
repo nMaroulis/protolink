@@ -70,6 +70,7 @@ See Also:
     - `protolink.llms.local.base.LocalLLM`: Base class for local models
 """
 
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -155,6 +156,7 @@ class LLM(ABC):
 
         self.history: ConversationHistory = ConversationHistory()
         self.system_prompt: str = self.build_system_prompt()
+        self.sync = SyncLLM(self)
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)
@@ -868,3 +870,46 @@ class LLM(ABC):
     def __repr__(self) -> str:
         """Detailed string representation of the LLM instance."""
         return self.__str__()
+
+
+class SyncLLM:
+    """Synchronous wrapper around LLM.
+
+    This class provides blocking equivalents of async methods
+    for use in:
+    - scripts
+    - CLI tools
+    - notebooks without async support
+
+    Internally uses `asyncio.run()` to execute async operations.
+
+    Warning:
+        This API should NOT be used inside an active event loop
+        (e.g., FastAPI, Jupyter async cells).
+    """
+
+    def __init__(self, llm: "LLM"):
+        self._llm = llm
+
+    def infer(
+        self,
+        *,
+        query: str,
+        tools: dict[str, "BaseTool"],
+        agent_callback: Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None = None,
+        streaming: bool = False,
+    ) -> "Part":
+        """Synchronously execute the inference loop.
+
+        This is a blocking version of `infer()`.
+
+        Internally runs the async implementation in a new event loop.
+        """
+        return asyncio.run(
+            self._llm.infer(
+                query=query,
+                tools=tools,
+                agent_callback=agent_callback,
+                streaming=streaming,
+            )
+        )

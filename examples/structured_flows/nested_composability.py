@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 
@@ -10,7 +9,7 @@ from protolink.flows import Parallel, Pipeline
 from protolink.models import Artifact, Message, Part, Task
 
 
-async def main():
+def main():
     print("=" * 70)
     print("🚀 Nested Flow Composability Example (No StructuredAgent)")
     print("=" * 70)
@@ -47,7 +46,8 @@ async def main():
     print("\n🟢 Executing nested flow...")
     initial_task = Task.create(Message.user("Create a report about Protolink."))
 
-    result_task = await main_flow.execute(initial_task)
+    # For async use await main_flow.execute(initial_task)
+    result_task = main_flow.sync.execute(initial_task)
 
     print("\n" + "-" * 40)
     print("🏁 Final Flow Results")
@@ -65,4 +65,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

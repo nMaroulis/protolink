@@ -30,10 +30,9 @@ class Router(Flow):
         """Initialize the dynamic router.
 
         Args:
-            routes: A dictionary mapping potential string conditions to their respective
-                Agent, URLs, or nested nested Flows.
-            condition_fn: A synchronous callable that receives the current `Task` and
-                evaluates it, returning a mapped string key that must exist in `routes`.
+            routes: A dictionary mapping potential string conditions to their respective Agent, URLs, or nested Flows.
+            condition_fn: A synchronous callable that receives the current `Task` and evaluates it, returning a mapped
+                string key that must exist in `routes`.
             client: Optional `AgentClient` for executing remote paths.
             registry: Optional registry configuration for discovery.
         """

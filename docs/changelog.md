@@ -1,4 +1,5 @@
-# Changelog
+
+\# Changelog
 
 !!! info "About this Changelog"
     All notable changes to the **Protolink** project will be documented in this file.
@@ -9,6 +10,20 @@
 ---
 
 ## Release Notes
+
+### [v0.5.6] - 2026-05-17
+
+# Flows Refactor & Upgrade
+
+- Removed **Structured Agent**
+- Better **State** Management
+- **Flow Sync** Module
+
+**More:**
+
+- **Agent Sync** Module
+- **LLM Sync** Module
+- **Agent Discovery TTL**
 
 ### [v0.5.5] - 2026-05-16
 
