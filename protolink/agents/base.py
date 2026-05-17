@@ -837,7 +837,7 @@ class Agent:
 
         This method orchestrates a complete LLM inference cycle by:
         1. Discovering available agents from the registry
-        2. Building a system prompt with tools, agent cards, and user instructions
+        2. Building a system prompt with tools, agent cards, and user instructions (Semantic Context Injection)
         3. Invoking the LLM's inference loop with tool and agent delegation support
 
         The LLM may respond with:

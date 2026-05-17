@@ -19,6 +19,10 @@ def main():
         def __init__(self, name, url, description):
             super().__init__(card={"name": name, "url": url, "description": description}, transport="http")
 
+        # By overriding the handle_task method, you can define custom logic for each agent
+        # this allows for flexibility and customization
+        # This means that you override the default behavior of the agent provided by protolink which handles
+        # automatically tool call, LLM (infer) calls etc from other agents.
         async def handle_task(self, task: Task) -> Task:
             print(f"   [{self.card.name}] Processing...")
             task.add_artifact(Artifact(parts=[Part.text(f"Output from {self.card.name}")]))

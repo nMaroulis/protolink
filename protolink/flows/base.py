@@ -12,18 +12,17 @@ class Flow(ABC):
     """Abstract base class for all structured flows in Protolink.
 
     Flows provide deterministic orchestration of Tasks between agents.
-    Unlike standard Agents that may rely on LLMs for dynamic routing,
-    flows mandate strict execution paths (Sequential, Parallel, Graph, etc.).
+    Unlike standard Agents that may rely on LLMs for dynamic routing, flows mandate strict execution paths
+    (Sequential, Parallel, Graph, etc.).
 
     Key features:
     - **Composability**: Flows can be nested within each other (e.g., a Parallel block inside a Pipeline).
-    - **Centralized Dispatch**: Execution logic is handled by `_execute_target`, supporting
-      local Agents, remote agent URLs/names, and nested Flow instances.
-    - **Resource Propagation**: Parent flows automatically propagate their `AgentClient` and
-      `RegistryClient` to nested flows if they are unconfigured.
+    - **Centralized Dispatch**: Execution logic is handled by `_execute_target`, supporting local Agents, remote agent
+      URLs/names, and nested Flow instances.
+    - **Resource Propagation**: Parent flows automatically propagate their `AgentClient` and `RegistryClient` to
+      nested flows if they are unconfigured.
 
-    All flows accept an `AgentClient` for execution and optionally a
-    `Registry` for discovering agents by name.
+    All flows accept an `AgentClient` for execution and optionally a `Registry` for discovering agents by name.
     """
 
     def __init__(
@@ -36,8 +35,8 @@ class Flow(ABC):
         Args:
             client: The `AgentClient` instance required to send tasks to remote agents.
                 If not provided, the flow will attempt to instantiate one from the registry.
-            registry: A `Registry` or `RegistryClient` used to discover agents by their name
-                instead of requiring absolute URLs.
+            registry: A `Registry` or `RegistryClient` used to discover agents by their name instead of requiring
+                      absolute URLs.
         """
         self.client = client
         self.registry_client: RegistryClient | None = None

@@ -26,6 +26,8 @@ The framework emphasizes **minimal boilerplate**, **explicit control**, and **pr
 
 **Tool calling**, **Agent delegation**, **LLM invocation** and **Task execution logic** are all provided by Protolink. No need to care on how to call tools or other agents, ProtoLink handles it for you, through **automated task execution & delegation**, **predefined LLM prompts** and **custom chain-of-thought** that provide the **Agent's LLM** the ability to **interact with its environment**, leaving only the **agent logic** to you.
 
+Protolink uses **dynamic semantic context injection**, automatically enriching agent prompts with **downstream agent capabilities, tools, and communication contracts** so agents remain **fully decoupled** while adapting their behavior at **runtime** without **hardcoded integrations**.
+
 > **Focus on your agent logic** - ProtoLink handles communication, authentication, LLM integration, and tool management for you.
 
 Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
@@ -36,7 +38,7 @@ The following *articles* published on ***Level Up Coding*** on ***Medium*** give
 
 ### NEW Feature: Flows 📣
 
-Update 0.5.0 introduces **Structured Flows**, a new feature that allows you to define **structured workflows** for your agents. Building on A2A transport layer, flows allow you to define **complex workflows** for your agents that can be executed in a **structured & deterministic manner**. See more here 🔀 [flows](https://nmaroulis.github.io/protolink/flows/).
+Update 0.5.0 introduces **Structured Flows**, a new feature that allows you to define **structured workflows** for your agents. Building on A2A transport layer, flows allow you to define **complex workflows** for your agents that can be executed in a **structured & deterministic manner**. Again the **Semantic Context Injection** is handled by Protolink, meaning that the agents will **automatically** have the necessary context about the flow they are executing and what to pass down to next agents in the pipeline. See more here 🔀 [flows](https://nmaroulis.github.io/protolink/flows/).
 
 ### The centralized agent architecture
 In Protolink the agent is the central component that handles all the logic and incorporates the **LLM**, **tools**, **transport layer** through **AgentClient** and **AgentServer**, the **Storage** and **OpenTelemetry** for logging.

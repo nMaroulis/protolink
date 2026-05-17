@@ -6,7 +6,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from protolink.agents import Agent
-from protolink.agents.builtins import StructuredAgent
 from protolink.client import AgentClient
 from protolink.discovery import Registry
 from protolink.flows import Pipeline
@@ -102,18 +101,6 @@ async def main():
     print("🟢 Running Autonomous StructuredAgent")
     print("-" * 40)
 
-    # We expose the flow as a unified Agent itself
-    structured_agent = StructuredAgent(
-        card={"name": "flow_agent", "url": "http://localhost:8023", "description": "Flow pipeline as an agent"},
-        flow=["researcher", "summarizer"],  # routes to researcher -> summarizer
-        transport="http",
-        registry="http",
-        registry_url=REGISTRY_URL,
-        verbosity=1,
-    )
-    structured_agent.start(background=True)
-    print("✅ StructuredAgent started")
-
     # User interacts with the StructuredAgent as if it were a single agent
     client = AgentClient(transport="http", url="http://localhost:8024")
 
@@ -126,7 +113,6 @@ async def main():
 
     # Cleanup
     print("\n🛑 Shutting down...")
-    structured_agent.stop()
     summarizer.stop()
     researcher.stop()
     registry.stop()

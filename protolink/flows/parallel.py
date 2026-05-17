@@ -18,9 +18,8 @@ class Parallel(Flow):
     Messages are aggregated back into the single original Task instance.
 
     Key Features:
-    - **Safe Fan-in**: Uses unique `id` tracking for Messages and Artifacts to ensure
-      that only strictly new additions from each branch are merged, avoiding data
-      duplication or array index collisions.
+    - **Safe Fan-in**: Uses unique `id` tracking for Messages and Artifacts to ensure that only strictly new additions
+    from each branch are merged, avoiding data duplication or array index collisions.
     - **Nested Execution**: Branches can be local Agents, remote URLs, or nested
       Flows (e.g., a Pipeline inside a Parallel branch).
     """
@@ -34,8 +33,8 @@ class Parallel(Flow):
         """Initialize the parallel flow.
 
         Args:
-            branches: A list of `Agent` instances, agent names/URLs as strings,
-                or nested `Flow` instances to be executed concurrently.
+            branches: A list of `Agent` instances, agent names/URLs as strings, or nested `Flow` instances to be
+            executed concurrently.
             client: Optional `AgentClient` for resolving remote string-based agents.
             registry: Optional registry configuration for discovering agent dependencies.
         """
@@ -49,9 +48,8 @@ class Parallel(Flow):
             task: The `Task` to be processed. Passed independently to all branches.
 
         Returns:
-            A unified `Task` object containing the aggregated messages and artifacts
-            from all branches. The objects are appended in the order the branches
-            were defined.
+            A unified `Task` object containing the aggregated messages and artifacts from all branches. The objects are
+            appended in the order the branches were defined.
         """
         self._logger.info(f"Parallel flow fanning out to {len(self.branches)} branches...")
 
