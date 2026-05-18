@@ -25,6 +25,10 @@ class SQLiteStorage(Storage):
             table_name: Name of the table to store data in.
             namespace: Unique identifier for this storage instance's data.
         """
+        # Validate table name for injection attacks
+        if not table_name.isidentifier():
+            raise ValueError(f"Invalid table name: {table_name!r}")
+
         self.db_path = db_path
         self.table_name = table_name
         self.namespace = namespace

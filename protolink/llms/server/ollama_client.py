@@ -22,6 +22,7 @@ class OllamaLLM(ServerLLM):
     DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"  # lightweight model
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
+        "num_predict": 4096,  # Prevent truncated JSON output
     }
     REQUEST_TIMEOUT: ClassVar[int] = 90
 
@@ -87,11 +88,17 @@ class OllamaLLM(ServerLLM):
         if self._client is None:
             raise ValueError("Ollama client not connected")
 
+        # Translate max_tokens to num_predict for Ollama options compatibility
+        options = dict(self._model_params)
+        if "max_tokens" in options:
+            options["num_predict"] = options.pop("max_tokens")
+
         payload = {
             "model": self.model,
             "messages": history.messages,
             "stream": False,
             "format": "json",
+            "options": options,
         }
 
         headers = {"Content-Type": "application/json"}
@@ -130,11 +137,17 @@ class OllamaLLM(ServerLLM):
         if self._client is None:
             raise ValueError("Ollama client not connected")
 
+        # Translate max_tokens to num_predict for Ollama options compatibility
+        options = dict(self._model_params)
+        if "max_tokens" in options:
+            options["num_predict"] = options.pop("max_tokens")
+
         payload = {
             "model": self.model,
             "messages": history.messages,
             "stream": True,
             "format": "json",
+            "options": options,
         }
 
         headers = {"Content-Type": "application/json"}

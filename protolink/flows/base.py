@@ -51,7 +51,7 @@ class Flow(ABC):
             elif isinstance(registry, RegistryClient):
                 self.registry_client = registry
 
-        self._logger = get_logger("protolink.flows")
+        self._logger = get_logger(f"protolink.flows.{type(self).__name__}")
         self.sync = SyncFlow(self)
 
     @abstractmethod

@@ -148,7 +148,7 @@ class Agent:
             )
         else:
             self.transport = transport  # init _transport, _client, _server properties
-        # Initilize Registry Client
+        # Initialize Registry Client
         if not registry:
             self.registry_client = None
             self._logger.warning(
