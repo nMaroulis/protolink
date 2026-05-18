@@ -135,7 +135,7 @@ class Agent:
                 self._state: State = State(storage=self.storage, enabled=[])
             else:
                 self._state: State = State(storage=self.storage, enabled=state)
-                self._logger.debug(f"Agent {self.card.name} state set to {state}")
+                self._logger.debug(f"Agent {self.card.name} state set to {self._state.to_dict()}")
         # LLM prompt
         self._system_prompt: str | None = system_prompt
         self.override_system_prompt: bool = override_system_prompt
@@ -468,7 +468,7 @@ class Agent:
         Returns:
             The updated Task after applying all explicitly requested executions.
         """
-        self._logger.debug(f"Received task: {task}")
+        self._logger.debug(f"Received task: {task.to_dict()}")
         if self.telemetry:
             await self.telemetry.on_task_start(task, self.card.name)
 
@@ -540,9 +540,9 @@ class Agent:
         """
         if not self._client:
             raise RuntimeError("Agent has no transport configured, cannot send tasks.")
-        self._logger.debug(f"Sending to agent {agent_url} the task: {task}")
+        self._logger.debug(f"Sending to agent {agent_url} the task: {task.to_dict()}")
         result: Task = await self._client.send_task(agent_url, task)
-        self._logger.debug(f"Received response Task from agent {agent_url}: {result}")
+        self._logger.debug(f"Received response Task from agent {agent_url}: {result.to_dict()}")
         return result
 
     async def send_message_to(self, agent_url: str, message: Message) -> Message:

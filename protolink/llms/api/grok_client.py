@@ -37,6 +37,7 @@ class GrokLLM(APILLM):
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }
+    REQUEST_TIMEOUT: ClassVar[int] = 90
 
     def __init__(
         self,
@@ -68,8 +69,8 @@ class GrokLLM(APILLM):
         if not self._api_key:
             logger.warning("No API key provided for Grok. Set XAI_API_KEY or GROK_API_KEY env var.")
 
-        self._client = httpx.Client(timeout=60.0)
-        self._async_client = httpx.AsyncClient(timeout=60.0)
+        self._client = httpx.Client(timeout=self.REQUEST_TIMEOUT)
+        self._async_client = httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT)
 
         # Non-blocking validation - just log if connection fails
         _ = self.validate_connection()

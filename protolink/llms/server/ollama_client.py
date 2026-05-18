@@ -23,7 +23,7 @@ class OllamaLLM(ServerLLM):
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }
-    REQUEST_TIMEOUT: ClassVar[int] = 30
+    REQUEST_TIMEOUT: ClassVar[int] = 90
 
     def __init__(
         self,

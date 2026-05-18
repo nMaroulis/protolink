@@ -54,7 +54,7 @@ class WebSocketTransport(Transport):
     def __init__(
         self,
         url: str,
-        timeout: float = 60.0,
+        timeout: float = 360.0,
         authenticator: Authenticator | None = None,
     ) -> None:
         self._url: str = url

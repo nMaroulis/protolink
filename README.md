@@ -524,33 +524,80 @@ While frameworks like LangChain or LangGraph rely on complex implicit state mach
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/flows.png" alt="Flows" width="100%">
 </div>
 
+Flows allow you to define highly composable, rigid, and predictable multi-step workflows. They remove the LLM from the routing equation, routing the task predictably through a state machine that you control programmatically.
 
-You can define a structured workflow and encapsulate it entirely as an A2A Agent. This means your complex flow looks and behaves exactly like any other agent on the network!
+### 🧠 Semantic Context Injection
+
+Even though flows are programmatically structured, agents executing inside them must remain **fully decoupled** from the overall flow topology. Protolink achieves this through **Dynamic Semantic Context Injection**:
+
+1. **Topological Analysis**: Before dispatching a step, the Flow orchestrator looks at the subsequent step in the topology (e.g., a single downstream agent, a parallel committee, or conditional routes).
+2. **Context-Aware Prompt Generation**: It automatically builds descriptive system instructions outlining the next target's capabilities, description, or routing choices (retrieved dynamically via their `AgentCard` from the Registry).
+3. **Flow State Injection**: It populates the prompt into `task.flow_state["prompt"]`.
+4. **Execution**: The executing agent's LLM automatically merges these instructions into its system prompt during inference. The agent adapts its behavior at runtime to optimize its output format for the downstream receiver without any hardcoded integration!
+
+In simple terms, the Flow tells the agents what to do and what format to use for their output based on the downstream agents' capabilities. In the Pipeline example below, the orchestrator tells the researcher that its output will be used by the summarizer, so it should format its output in a way that the summarizer can understand. This is done automatically and transparently to the developer!
+
+---
+
+### ⚙️ Usage & Execution
+
+You can define and run structured flows programmatically using both asynchronous and synchronous APIs.
+
+#### 1. Define and Execute a Pipeline
+
+A `Pipeline` runs a predefined sequence of agents, passing the output of one agent as the input to the next:
 
 ```python
 from protolink.flows import Pipeline
-from protolink.agents import StructuredAgent
+from protolink.models import Task
 
-# 1. Define a deterministic workflow of agents
-pipeline = Pipeline(steps=["researcher", "summarizer"])
-
-# 2. Package the entire flow as a deployable, autonomous Agent
-flow_agent = StructuredAgent(
-    card={"name": "flow_agent", "url": "http://127.0.0.1:8035"},
-    flow=pipeline,
-    transport="http"
+# 1. Define a deterministic sequence of steps (can be Agent names, instances, or other sub-flows)
+pipeline = Pipeline(
+    steps=["researcher", "summarizer"],
+    registry=registry  # Optional: allows discovering string-based agents by name
 )
 
-flow_agent.start()
+# 2. Run the flow asynchronously
+task = Task.create_infer(prompt="Research the future of Agentic computing.")
+result = await pipeline.execute(task)
 ```
 
-Without a structured agent and with **Fluent API**:
+#### 2. Fluent API Chaining
+
+Pipelines support a fluid builder pattern for dynamic step configuration:
 
 ```python
-from protolink.flows import Pipeline
-# Define and execute manually
-pipeline = Pipeline().add_step("researcher").add_step("summarizer")
+pipeline = Pipeline(registry=registry).add_step("researcher").add_step("summarizer")
 result = await pipeline.execute(task)
+```
+
+#### 3. Synchronous Execution Wrapper
+
+For simple scripts, Jupyter Notebooks, or background workers where async syntax is not preferred, use the `.sync` blocking wrapper:
+
+```python
+# Executes the flow synchronously in a clean event loop
+result = pipeline.sync.execute(task)
+print(result.get_last_part_content())
+```
+
+#### 4. Deep Composability & Nesting
+
+Since every flow primitive inherits from the base `Flow` class, they are fully polymorphic. You can nest complex flow structures inside one another seamlessly:
+
+```python
+from protolink.flows import Pipeline, Parallel
+
+# A parallel execution block containing multiple concurrent agents
+review_committee = Parallel(branches=["editor", "fact_checker"], registry=registry)
+
+# Embed the parallel block as a single step inside a pipeline!
+orchestrated_flow = Pipeline(registry=registry) \
+    .add_step("researcher") \
+    .add_step(review_committee) \
+    .add_step("summarizer")
+
+result = await orchestrated_flow.execute(task)
 ```
 
 ## Telemetry
