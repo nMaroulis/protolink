@@ -1,53 +1,24 @@
 import asyncio
-import os
-from collections.abc import AsyncIterator
-from typing import ClassVar
-
-from dotenv import load_dotenv
 
 from protolink.agents import Agent
 from protolink.discovery import Registry
 from protolink.flows import Parallel, Pipeline
-from protolink.llms.api import OpenAILLM
-from protolink.llms.base import LLM
-from protolink.llms.history import ConversationHistory
+from protolink.llms import MockLLM, create_llm
 from protolink.models import Artifact, Message, Task
 
-load_dotenv()
 
-
-class MockLLM(LLM):
-    model_type: ClassVar[str] = "api"
-    provider: ClassVar[str] = "mock"
-
-    def __init__(self):
-        super().__init__(model="mock-gpt")
-
-    def call(self, history: ConversationHistory) -> str:
-        last_user_msg = ""
-        for m in reversed(history.messages):
-            if m.get("role") == "user":
-                last_user_msg = str(m.get("content", ""))
-                break
-
-        system_prompt = ""
-        for m in history.messages:
-            if m.get("role") == "system":
-                system_prompt = str(m.get("content", ""))
-
+class CustomMockLLM(MockLLM):
+    def mock_call(self, last_user_msg: str, system_prompt: str) -> str:
         if "research" in system_prompt.lower():
             return f"[RESEARCHER] Gathered information about: '{last_user_msg}'"
         elif "security" in system_prompt.lower():
             return "[SECURITY] Audited the research content. Confirmed no credential leaks or sensitive data exposure."
-        elif "performance" in system_prompt.lower():
-            return "[PERFORMANCE] Verified structural layout. Formatting is optimized and clean."
+        elif "format" in system_prompt.lower() or "performance" in system_prompt.lower():
+            return "[FORMATTING] Verified structural layout. Formatting is optimized and clean."
         elif "summarizer" in system_prompt.lower():
             return f"[SUMMARY] Synthesized the research and reviews. Everything looks solid.\nInput payload: {last_user_msg}"  # noqa: E501
 
         return f"[MOCK] Generic output to '{last_user_msg}'"
-
-    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        yield self.call(history)
 
 
 # Specialized Reviewer Agent that appends a custom artifact
@@ -72,7 +43,18 @@ class ArtifactReviewerAgent(Agent):
         return task
 
 
-LLM_PROVIDER = OpenAILLM(model="gpt-4o-mini") if os.getenv("OPENAI_API_KEY") else MockLLM()
+mock_llm = CustomMockLLM()
+
+# Select LLM
+LLM_PROVIDER = "mock"  # <-- UNCOMMENT to use a Mock LLM
+
+# It is suggested to use an actual LLM e.g. local Ollama for free testing
+LLM_PROVIDER = "ollama"  # <-- UNCOMMENT to use Ollama
+LLM_ARGS = {"base_url": "http://localhost:11434", "model": "gemma4:e4b"}
+# OR OpenAI, or any LLM in protolink.llms. Or even your own custom LLM
+# LLM_PROVIDER = "openai" # <-- UNCOMMENT to use OpenAI
+# LLM_ARGS = {"model": "gpt-4o-mini", "api_key": "xxx"}
+
 REGISTRY_URL = "http://localhost:9040"
 
 
@@ -90,7 +72,7 @@ async def main():
     # 2. Setup Agents
     researcher = Agent(
         card={"name": "researcher", "url": "http://localhost:8081", "description": "Gathers rich raw data."},
-        llm=LLM_PROVIDER,
+        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a researcher. Generate comprehensive domain information.",
         transport="http",
         registry="http",
@@ -102,19 +84,19 @@ async def main():
         name="security_inspector",
         description="Inspects for leaks.",
         system_prompt="Audit content for leak issues.",
-        llm=LLM_PROVIDER,
+        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
     )
 
     perf_agent = ArtifactReviewerAgent(
         name="format_inspector",
         description="Profiles formatting.",
         system_prompt="Audit content for format standard issues.",
-        llm=LLM_PROVIDER,
+        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
     )
 
     summarizer = Agent(
         card={"name": "summarizer", "url": "http://localhost:8084", "description": "Summarizes research + reviews."},
-        llm=LLM_PROVIDER,
+        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a summarizer. Take everything (messages & artifacts) and build a unified report.",
         transport="http",
         registry="http",
@@ -141,7 +123,8 @@ async def main():
     pipeline.add_step(researcher).add_step(review_committee).add_step(summarizer)
 
     # 5. Execute
-    task = Task.create(Message.user("Please analyze and write a secure report on the modern WebSockets protocol."))
+    user_prompt = "Please analyze and write a secure report on the modern WebSockets protocol."
+    task = Task.create_infer(prompt=user_prompt)
 
     print("🟢 Executing Advanced Nested Flow (Sequential -> Concurrent -> Sequential)...")
     result = await pipeline.execute(task)
@@ -150,14 +133,14 @@ async def main():
     print("🏁 Advanced Nested Flow Completed Successfully")
     print("-" * 50)
 
-    print("\n📦 Unified Output Artifacts:")
-    for art in result.artifacts:
-        print(f"  - Artifact ID: {art.id}")
-        if art.parts:
-            print(f"    Content: {art.parts[0].content}")
+    print("\nEntire Task Message Flow:")
+    for idx, msg in enumerate(result.messages):
+        print(f"  [{idx}] {msg.role.upper()}: {msg.parts[0].content}")
 
-    print("\n💬 Final Summary Output:")
-    print(result.get_last_part_content())
+    print("\nEntire Task Artifact Flow:")
+    for idx, art in enumerate(result.artifacts):
+        content = art.parts[0].content if art.parts else "No Content"
+        print(f"  [{idx}] ARTIFACT: {content}")
 
     # Cleanup
     print("\n🛑 Shutting down...")
@@ -169,6 +152,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    if not os.getenv("OPENAI_API_KEY"):
-        print("💡 OPENAI_API_KEY not set. Running with lightweight MockLLM (offline-safe).")
+    if LLM_PROVIDER == "mock":
+        print("💡 Running with lightweight CustomMockLLM (offline-safe).")
     asyncio.run(main())

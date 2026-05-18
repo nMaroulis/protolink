@@ -1,62 +1,35 @@
 import asyncio
 import os
-from collections.abc import AsyncIterator
-from typing import ClassVar
-
-from dotenv import load_dotenv
 
 from protolink.agents import Agent
 from protolink.discovery import Registry
 from protolink.flows import Pipeline, Router
-from protolink.llms.api import OpenAILLM
-from protolink.llms.base import LLM
-from protolink.llms.history import ConversationHistory
-from protolink.models import Message, Task
+from protolink.llms import MockLLM, create_llm
+from protolink.models import Task
 
-load_dotenv()
+mock_llm = MockLLM(
+    mock_responses={
+        "writer": {
+            "bad": "Draft: This is a draft that requires intensive review. [ROUTE: editor]",
+            "draft": "Draft: This is a draft that requires intensive review. [ROUTE: editor]",
+            "*": "Perfect Output: This content is absolutely beautiful and ready. [ROUTE: qa]",
+        },
+        "editor": "[EDITED] Polished the draft to look neat.",
+        "qa": "[APPROVED] QA Verified successfully.",
+    }
+)
 
+# Select LLM
+LLM_PROVIDER = "mock"  # <-- UNCOMMENT to use a Mock LLM
 
-class MockLLM(LLM):
-    model_type: ClassVar[str] = "api"
-    provider: ClassVar[str] = "mock"
-
-    def __init__(self):
-        super().__init__(model="mock-gpt")
-
-    def call(self, history: ConversationHistory) -> str:
-        last_user_msg = ""
-        for m in reversed(history.messages):
-            if m.get("role") == "user":
-                last_user_msg = str(m.get("content", ""))
-                break
-
-        system_prompt = ""
-        for m in history.messages:
-            if m.get("role") == "system":
-                system_prompt = str(m.get("content", ""))
-
-        # Writer Agent
-        if "writer" in system_prompt.lower():
-            # Mock the writer producing output and evaluating next steps based on user input
-            if "bad" in last_user_msg.lower() or "draft" in last_user_msg.lower():
-                return "Draft: This is a draft that requires intensive review. [ROUTE: editor]"
-            return "Perfect Output: This content is absolutely beautiful and ready. [ROUTE: qa]"
-
-        # Editor Agent
-        elif "editor" in system_prompt.lower():
-            return f"[EDITED] Polished the draft: '{last_user_msg}' to look neat."
-
-        # QA Agent
-        elif "quality" in system_prompt.lower():
-            return f"[APPROVED] QA Verified successfully: '{last_user_msg}'"
-
-        return f"[MOCK] Generic output to '{last_user_msg}'"
-
-    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        yield self.call(history)
+# It is suggested to use an actual LLM e.g. local Ollama for free testing
+LLM_PROVIDER = "ollama"  # <-- UNCOMMENT to use Ollama
+LLM_ARGS = {"base_url": "http://localhost:11434", "model": "gemma4:e4b"}
+# OR OpenAI, or any LLM in protolink.llms. Or even your own custom LLM
+# LLM_PROVIDER = "openai" # <-- UNCOMMENT to use OpenAI
+# LLM_ARGS = {"model": "gpt-4o-mini", "api_key": "xxx"}
 
 
-LLM_PROVIDER = OpenAILLM(model="gpt-4o-mini") if os.getenv("OPENAI_API_KEY") else MockLLM()
 REGISTRY_URL = "http://localhost:9040"
 
 
@@ -74,7 +47,7 @@ async def main():
     # 2. Setup Agents
     writer = Agent(
         card={"name": "writer", "url": "http://localhost:8051", "description": "Writes drafts and decides routes."},
-        llm=LLM_PROVIDER,
+        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a writer. Draft content and route to 'editor' if it needs work, or 'qa' if it looks excellent.",  # noqa: E501
         transport="http",
         registry="http",
@@ -83,7 +56,7 @@ async def main():
     )
     editor = Agent(
         card={"name": "editor", "url": "http://localhost:8052", "description": "Polishes draft content."},
-        llm=LLM_PROVIDER,
+        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a professional editor. Format, improve structure and polish the content.",
         transport="http",
         registry="http",
@@ -92,7 +65,7 @@ async def main():
     )
     qa = Agent(
         card={"name": "qa", "url": "http://localhost:8053", "description": "Quality assurance check."},
-        llm=LLM_PROVIDER,
+        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a QA specialist. Verify the draft is clean and output a final approval message.",
         transport="http",
         registry="http",
@@ -120,28 +93,40 @@ async def main():
 
     # Execution 1: Bad Draft (Routes to editor)
     print("\n🟢 Scenario 1: Drafting content that needs edits...")
-    task1 = Task.create(
-        Message.user("Write a rough draft about quantum mechanics. Use the word 'draft' and make it look unfinished.")
-    )
+    user_prompt_1 = "Write a rough draft about quantum mechanics. Use the word 'draft' and make it look unfinished."
+    task1 = Task.create_infer(prompt=user_prompt_1)
+
     result1 = await pipeline.execute(task1)
 
     print("\n🏁 Scenario 1 Result:")
     print(f"Final Step Output: {result1.get_last_part_content()}")
-    print("Messages Path:")
+    print("\nEntire Task Message Flow:")
     for idx, msg in enumerate(result1.messages):
         print(f"  [{idx}] {msg.role.upper()}: {msg.parts[0].content}")
+
+    print("\nEntire Task Artifact Flow:")
+    for idx, art in enumerate(result1.artifacts):
+        content = art.parts[0].content if art.parts else "No Content"
+        print(f"  [{idx}] ARTIFACT: {content}")
 
     # Execution 2: Excellent Draft (Routes to qa)
     print("\n" + "=" * 50)
     print("🟢 Scenario 2: Drafting perfect content...")
-    task2 = Task.create(Message.user("Write a neat and perfect sentence about butterflies."))
+    user_prompt_2 = "Write a neat and perfect sentence about butterflies."
+    task2 = Task.create_infer(prompt=user_prompt_2)
+
     result2 = await pipeline.execute(task2)
 
     print("\n🏁 Scenario 2 Result:")
     print(f"Final Step Output: {result2.get_last_part_content()}")
-    print("Messages Path:")
+    print("\nEntire Task Message Flow:")
     for idx, msg in enumerate(result2.messages):
         print(f"  [{idx}] {msg.role.upper()}: {msg.parts[0].content}")
+
+    print("\nEntire Task Artifact Flow:")
+    for idx, art in enumerate(result2.artifacts):
+        content = art.parts[0].content if art.parts else "No Content"
+        print(f"  [{idx}] ARTIFACT: {content}")
 
     # Cleanup
     print("\n🛑 Shutting down...")

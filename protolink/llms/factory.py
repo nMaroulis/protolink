@@ -7,6 +7,7 @@ from protolink.llms.api.gemini_client import GeminiLLM
 from protolink.llms.api.openai_client import OpenAILLM
 from protolink.llms.base import LLM
 from protolink.llms.local.llamacpp_client import LlamaCPPLocalLLM
+from protolink.llms.mock_client import MockLLM
 from protolink.llms.server.llamacpp_client import LlamaCPPServerLLM
 from protolink.llms.server.ollama_client import OllamaLLM
 
@@ -19,6 +20,7 @@ class LLMProvider(str, Enum):
     LLAMACPP_SERVER = "llama.cpp-server"
     OLLAMA = "ollama"
     OPENAI = "openai"
+    MOCK = "mock"
 
 
 class LLMFactory:
@@ -37,6 +39,7 @@ class LLMFactory:
         LLMProvider.LLAMACPP_SERVER: LlamaCPPServerLLM,
         LLMProvider.OLLAMA: OllamaLLM,
         LLMProvider.OPENAI: OpenAILLM,
+        LLMProvider.MOCK: MockLLM,
     }
 
     @classmethod

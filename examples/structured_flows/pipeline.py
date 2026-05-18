@@ -1,58 +1,26 @@
 import asyncio
 import os
-from collections.abc import AsyncIterator
-from typing import ClassVar
 
 from dotenv import load_dotenv
 
 from protolink.agents import Agent
 from protolink.discovery import Registry
 from protolink.flows import Pipeline
-from protolink.llms import create_llm  # LLM Factory
-from protolink.llms.base import LLM
-from protolink.llms.history import ConversationHistory
+from protolink.llms import MockLLM, create_llm
 from protolink.models import Task
 
 load_dotenv()
 
 
-# Define a premium MockLLM to make this run 100% offline without API keys
-class MockLLM(LLM):
-    model_type: ClassVar[str] = "api"
-    provider: ClassVar[str] = "mock"
+class MyMockLLM(MockLLM):
+    """Clean custom MockLLM overriding mock_call method."""
 
-    def __init__(self):
-        super().__init__(model="mock-gpt", model_params={})
-
-    def call(self, history: ConversationHistory) -> str:
-        import json
-
-        # Simple rule-based mock matching the domain
-        last_user_msg = ""
-        for m in reversed(history.messages):
-            if m.get("role") == "user":
-                last_user_msg = str(m.get("content", ""))
-                break
-
-        system_prompt = ""
-        for m in history.messages:
-            if m.get("role") == "system":
-                system_prompt = str(m.get("content", ""))
-
+    def mock_call(self, last_user_msg: str, system_prompt: str) -> str:
         if "researcher" in system_prompt.lower():
-            content = f"[RESEARCH INFO] Gathered core details on: '{last_user_msg}'"
+            return f"[RESEARCH INFO] Gathered core details on: '{last_user_msg}'"
         elif "summarizer" in system_prompt.lower():
-            content = f"[SUMMARY] Distilled key points:\n- Protolink enables stateful A2A workflows.\n- Found context: '{last_user_msg}'"  # noqa: E501
-        else:
-            content = f"[MOCK] Unprocessed generic response to '{last_user_msg}'"
-
-        return json.dumps({"type": "final", "content": content})
-
-    async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        yield self.call(history)
-
-    def validate_connection(self) -> bool:
-        return True
+            return f"[SUMMARY] Distilled key points:\n- Protolink enables stateful A2A workflows.\n- Found context: '{last_user_msg}'"  # noqa: E501
+        return f"[MOCK] Unprocessed generic response to '{last_user_msg}'"
 
 
 # Select LLM
@@ -88,7 +56,7 @@ async def main():
             "url": "http://localhost:8041",
             "description": "Expert researcher that gathers comprehensive data on requested topics.",
         },
-        llm=MockLLM() if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
+        llm=MyMockLLM() if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a diligent researcher. Gather facts and present them clearly.",
         transport="http",
         registry="http",
@@ -105,7 +73,7 @@ async def main():
             "url": "http://localhost:8042",
             "description": "Expert at synthesizing dense information into clear, concise summaries.",
         },
-        llm=MockLLM() if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
+        llm=MyMockLLM() if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a summarizer. Distill gather facts into high-level points.",
         transport="http",
         registry="http",
