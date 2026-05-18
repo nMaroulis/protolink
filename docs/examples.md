@@ -141,3 +141,11 @@ The repository includes several **standalone example scripts** that demonstrate 
 - Demonstrates both request/response and streaming task patterns
 - Shows registry discovery over WebSockets
 - Real-time progress updates via WebSocket events
+
+### 🔄 [`structured_flows/`](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows)
+**Purpose**: Advanced flow orchestration patterns
+
+- Demonstrates Graph flow for complex state machine topologies with cyclic loops
+- Shows conditional branching and multi-step review workflows
+- Examples include sequential processing, parallel execution, and dynamic routing
+- Illustrates integration of multiple agents in structured flow patterns
