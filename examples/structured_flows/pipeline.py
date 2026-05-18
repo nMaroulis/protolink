@@ -27,7 +27,7 @@ class MyMockLLM(MockLLM):
 LLM_PROVIDER = "mock"  # <-- UNCOMMENT to use a Mock LLM
 
 # It is suggested to use an actual LLM e.g. local Ollama for free testing
-# LLM_PROVIDER = "ollama" # <-- UNCOMMENT to use Ollama
+# LLM_PROVIDER = "ollama"  # <-- UNCOMMENT to use Ollama
 LLM_ARGS = {"base_url": "http://localhost:11434", "model": "gemma4:e4b"}
 # OR OpenAI, or any LLM in protolink.llms. Or even your own custom LLM
 # LLM_PROVIDER = "openai" # <-- UNCOMMENT to use OpenAI
@@ -57,12 +57,14 @@ async def main():
             "description": "Expert researcher that gathers comprehensive data on requested topics.",
         },
         llm=MyMockLLM() if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
-        system_prompt="You are a diligent researcher. Gather facts and present them clearly.",
+        system_prompt="""You are a diligent researcher. Gather facts and present them clearly.
+            Use your own knowledge to provide a comprehensive answer. Do not rely on external tools or agents.""",
         transport="http",
         registry="http",
         registry_url=REGISTRY_URL,
         verbosity=2,
     )
+
     researcher.start(background=True)
     print("✅ Researcher agent started")
 
@@ -78,7 +80,7 @@ async def main():
         transport="http",
         registry="http",
         registry_url=REGISTRY_URL,
-        verbosity=0,
+        verbosity=2,
     )
     summarizer.start(background=True)
     print("✅ Summarizer agent started")

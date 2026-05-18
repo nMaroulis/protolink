@@ -45,6 +45,7 @@ from protolink.models import Task
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────
 REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:9000")
+CLIENT_URL = os.getenv("CLIENT_URL", "http://localhost:8300")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 WORKSPACE_DIR = os.path.join(os.path.dirname(__file__), "workspace")
 
@@ -252,7 +253,7 @@ async def main():
         print()
 
         # Create and send the task
-        client = AgentClient(transport=orchestrator.transport)
+        client = AgentClient(url=CLIENT_URL, transport="http", timeout=600)
         task = Task.create_infer(prompt=user_query)
         result = await client.send_task(agent_url=orchestrator.card.url, task=task)
 

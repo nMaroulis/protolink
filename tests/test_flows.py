@@ -35,9 +35,10 @@ async def test_pipeline_execution():
 
     result = await pipeline.execute(task)
 
-    assert len(result.messages) == 3  # User + AgentA + AgentB
+    assert len(result.messages) == 4  # User + AgentA + InferredA + AgentB
     assert result.messages[1].parts[0].content == "Hello from A"
-    assert result.messages[2].parts[0].content == "Hello from B"
+    assert result.messages[2].parts[0].content == {"prompt": "Hello from A"}
+    assert result.messages[3].parts[0].content == "Hello from B"
 
 
 @pytest.mark.asyncio
@@ -129,11 +130,12 @@ async def test_graph_execution():
     task = Task(messages=[Message.user("Begin")])
     result = await graph.execute(task)
 
-    # Messages should be: User, Start, Mid, End
-    assert len(result.messages) == 4
+    assert len(result.messages) == 6
     assert result.messages[1].parts[0].content == "Starting"
-    assert result.messages[2].parts[0].content == "Processing"
-    assert result.messages[3].parts[0].content == "Finished"
+    assert result.messages[2].parts[0].content == {"prompt": "Starting"}
+    assert result.messages[3].parts[0].content == "Processing"
+    assert result.messages[4].parts[0].content == {"prompt": "Processing"}
+    assert result.messages[5].parts[0].content == "Finished"
 
 
 @pytest.mark.asyncio

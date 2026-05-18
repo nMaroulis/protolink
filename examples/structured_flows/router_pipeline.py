@@ -7,17 +7,15 @@ from protolink.flows import Pipeline, Router
 from protolink.llms import MockLLM, create_llm
 from protolink.models import Task
 
-mock_llm = MockLLM(
-    mock_responses={
-        "writer": {
-            "bad": "Draft: This is a draft that requires intensive review. [ROUTE: editor]",
-            "draft": "Draft: This is a draft that requires intensive review. [ROUTE: editor]",
-            "*": "Perfect Output: This content is absolutely beautiful and ready. [ROUTE: qa]",
-        },
-        "editor": "[EDITED] Polished the draft to look neat.",
-        "qa": "[APPROVED] QA Verified successfully.",
-    }
-)
+MOCK_RESPONSES = {
+    "writer": {
+        "bad": "Draft: This is a draft that requires intensive review. [ROUTE: editor]",
+        "draft": "Draft: This is a draft that requires intensive review. [ROUTE: editor]",
+        "*": "Perfect Output: This content is absolutely beautiful and ready. [ROUTE: qa]",
+    },
+    "editor": "[EDITED] Polished the draft to look neat.",
+    "qa": "[APPROVED] QA Verified successfully.",
+}
 
 # Select LLM
 LLM_PROVIDER = "mock"  # <-- UNCOMMENT to use a Mock LLM
@@ -47,7 +45,9 @@ async def main():
     # 2. Setup Agents
     writer = Agent(
         card={"name": "writer", "url": "http://localhost:8051", "description": "Writes drafts and decides routes."},
-        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
+        llm=MockLLM(mock_responses={"writer": MOCK_RESPONSES["writer"]})
+        if LLM_PROVIDER == "mock"
+        else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a writer. Draft content and route to 'editor' if it needs work, or 'qa' if it looks excellent.",  # noqa: E501
         transport="http",
         registry="http",
@@ -56,7 +56,9 @@ async def main():
     )
     editor = Agent(
         card={"name": "editor", "url": "http://localhost:8052", "description": "Polishes draft content."},
-        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
+        llm=MockLLM(default_response=MOCK_RESPONSES["editor"])
+        if LLM_PROVIDER == "mock"
+        else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a professional editor. Format, improve structure and polish the content.",
         transport="http",
         registry="http",
@@ -65,7 +67,9 @@ async def main():
     )
     qa = Agent(
         card={"name": "qa", "url": "http://localhost:8053", "description": "Quality assurance check."},
-        llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
+        llm=MockLLM(default_response=MOCK_RESPONSES["qa"])
+        if LLM_PROVIDER == "mock"
+        else create_llm(LLM_PROVIDER, **LLM_ARGS),
         system_prompt="You are a QA specialist. Verify the draft is clean and output a final approval message.",
         transport="http",
         registry="http",

@@ -28,7 +28,7 @@ class RegistryClient:
         name="discover",
         path="/agents/",
         method="GET",
-        request_source="none",
+        request_source="query_params",
     )
 
     def __init__(self, transport: Transport):

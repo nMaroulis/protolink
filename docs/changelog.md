@@ -16,21 +16,22 @@
 # Flows Refactor & Upgrade
 
 - **Semantic Context Injection**: Flows dynamically build instruction prompts based on their downstream topology. This prompt is injected into the `task.flow_state["prompt"]` for executing agents to utilize seamlessly. This way agents are aware of their downstream context and can format their output accordingly.
-- **Graph**: Add Graph flow, which is a flow that is made up of nodes and edges. 
-- **Pipeline**: Add Pipeline flow, which is a flow that is made up of steps. 
-- **Parallel**: Add Parallel flow, which is a flow that is made up of branches. 
-- **Router**: Add Router flow, which is a flow that is made up of a router. 
-  
+- Correct **Task** management. Added flow_state to Task, so that we provide additional context to the agents.
+- **NEW Flow Examples** for each Use case (Graph, Pipeline, Parallel, Router).
 - Removed **Structured Agent**
 - Better **State** Management
 - **Flow Sync** Module
-- 
 
 **More:**
 
+- **HUGE BUG fix**: Agent URL received from registry was wrong most of the time.
 - **Agent Sync** Module
 - **LLM Sync** Module
+- **Added GuardRails**:
+    - Added context for Agent ID and prevent agent from calling himself.
+    - Removed self from fetched agents.
 - **Agent Discovery TTL**
+- **Mock LLM** for testing
 
 ### [v0.5.5] - 2026-05-16
 

@@ -150,8 +150,9 @@ def create_planner_agent(
         registry=registry,
         llm=llm,
         system_prompt=PLANNER_SYSTEM_PROMPT,
+        verbosity=2,
     )
-    agent.transport.timeout = 120
+    agent.transport.timeout = 360
 
     return agent
 

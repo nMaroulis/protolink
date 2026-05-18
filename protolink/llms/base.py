@@ -759,6 +759,7 @@ class LLM(ABC):
         flow_instructions: str | None = None,
         override_system_prompt: bool = False,
         persist: bool = False,
+        agent_name: str | None = None,
     ) -> str:
         """
         Build the final system prompt for the LLM.
@@ -780,6 +781,7 @@ class LLM(ABC):
             override_system_prompt: Whether to override completely the system prompt with the user defined prompt.
             persist: If True, updates the system prompt in history without wiping conversation turns.
                 If False (default), resets history to only include the new system prompt.
+            agent_name: The registered name of the current agent to prevent self-delegation.
 
         Returns:
             A fully assembled, machine-readable prompt string suitable for sending to the LLM.
@@ -788,9 +790,17 @@ class LLM(ABC):
         if override_system_prompt:
             self.system_prompt = user_instructions or ""
         else:
+            # Guardrail: Prevent agent from delegating to itself and provide ID
+            agent_identity_prompt = ""
+            if agent_name:
+                agent_identity_prompt = (
+                    f"Your registered name in the system is '{agent_name}'. "
+                    f"You are executing as '{agent_name}'. Do NOT attempt to delegate tasks to yourself."
+                )
             self.system_prompt = BASE_SYSTEM_PROMPT.format(
                 base_instructions=BASE_INSTRUCTIONS,
                 reasoning_instructions=SYSTEM_REASONING_MAP.get(self._reasoning, ""),
+                agent_identity_prompt=agent_identity_prompt,
                 tool_call_prompt=TOOL_CALL_PROMPT.replace("{{tools}}", tools)
                 if tools
                 else "No tools are available for you to call. You cannot return a tool call response.",

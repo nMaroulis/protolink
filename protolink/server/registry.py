@@ -51,7 +51,11 @@ class RegistryServer:
         return request.get("agent_url")
 
     async def discover_parser(self, request: Any) -> dict[str, Any] | None:
-        return request.get("filter_by")
+        if not isinstance(request, dict):
+            return None
+        if "filter_by" in request:
+            return request.get("filter_by")
+        return request
 
     # ------------------------------------------------------------------
     # Endpoints

@@ -234,6 +234,28 @@ class Flow(ABC):
             RuntimeError: If remote execution is requested but no client/registry is available.
         """
         from protolink.agents.base import Agent
+        from protolink.models import Message
+
+        # --- Flow Transition Bridge ---
+        # When a flow step completes, its output is a Part of type "infer_output" (or "text", etc.).
+        # Protolink agents are strictly deterministic: they only execute when they find an active
+        # executable instruction (Part.infer or Part.tool_call) in the task's last item.
+        # Without this bridge, downstream agents would receive "infer_output" and no-op.
+        #
+        # The bridge checks: does the task's last item contain an executable instruction?
+        # If not, it wraps the previous output content into a new Part.infer() user message,
+        # giving the downstream agent a clear "run your LLM on this" instruction.
+        #
+        # This only applies to Agent targets (local or remote). Nested Flows handle their own
+        # internal dispatch and don't need wrapping.
+        if isinstance(target, (Agent, str)):
+            last_item = task.get_last_item()
+            if last_item:
+                has_executable = any(p.type in ("infer", "tool_call") for p in last_item.parts)
+                if not has_executable:
+                    content = task.get_last_part_content()
+                    if content is not None:
+                        task.add_message(Message.infer(prompt=str(content)))
 
         if isinstance(target, Flow):
             # Propagate client/registry if missing in the nested flow

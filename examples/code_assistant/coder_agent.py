@@ -89,6 +89,7 @@ def create_coder_agent(registry: Registry | None = None) -> Agent:
         },
         transport="http",
         registry=registry,
+        verbosity=2,
     )
 
     # ══════════════════════════════════════════════════════════════════

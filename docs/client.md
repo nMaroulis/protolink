@@ -45,12 +45,13 @@ AgentClient(transport: Transport | TransportType, url: str | None = None)
 |-----------|------|-------------|
 | `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
 | `url` | `str ⎪ None` | Base URL when using a transport type string |
+| `timeout` | `int` | Timeout in seconds for the request (default: 300) |
 
 **Examples:**
 
 ```python
 # Using transport type string
-client = AgentClient(transport="http", url="http://localhost:8000")
+client = AgentClient(transport="http", url="http://localhost:8000", timeout=120)
 
 # Using an existing transport instance
 from protolink.transport import HTTPTransport

@@ -32,7 +32,7 @@ REGISTRY_URL = os.getenv("REGISTRY_URL", "http://localhost:9000")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 
 CLIENT_ADDRESS = os.getenv("CLIENT_ADDRESS", "http://localhost:8100")
-CLIENT_REQUEST_TIMEOUT = 240
+CLIENT_REQUEST_TIMEOUT = 600
 
 VERBOSITY = 2  # DEBUG, Change 1 for normal, 0 for silent
 

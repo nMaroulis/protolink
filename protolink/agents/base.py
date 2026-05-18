@@ -866,11 +866,11 @@ class Agent:
                 message="Agent has no LLM but received a infer instruction",
             )
 
-        # Get Available Agents
+        # Get Available Agents (Guardrail: excluding ourselves to prevent self-delegation loops)
         discovered = await self.discover_agents()
+        discovered = [agent for agent in discovered if agent.url != self.card.url]
         agent_cards_list = [f"Agent {i}:\n{agent.get_prompt_format()}" for i, agent in enumerate(discovered, start=1)]
         agent_cards = "\n".join(agent_cards_list)
-
         # Extract flow instructions injected by orchestrators
         flow_instructions = task.flow_state.get("prompt", "") if task and task.flow_state else ""
 
@@ -882,6 +882,7 @@ class Agent:
             flow_instructions=flow_instructions,
             override_system_prompt=self.override_system_prompt,
             persist=self._state.conversation is not None,
+            agent_name=self.card.name,
         )
 
         if self.telemetry:
@@ -937,6 +938,13 @@ class Agent:
         # Resolve agent name to URL
         agent_url = await self._resolve_agent_url(agent_name)
 
+        # Guardrail Check for self-delegation
+        if agent_url == self.card.url:
+            self._logger.debug("Self-delegation detected.")
+            raise ValueError(
+                f"Self-delegation is not allowed. You are '{self.card.name}' ({self.card.url}) and cannot delegate tasks to yourself."  # noqa: E501
+            )
+
         if action == "tool_call":
             tool_name = payload.get("tool")
             args = payload.get("args", {})
@@ -949,8 +957,8 @@ class Agent:
 
         elif action == "infer":
             prompt = payload.get("prompt", "")
-            # Create task with user message for the remote agent to process
-            task = Task.create(Message.user(prompt))
+            # Create task with infer message for the remote agent to process
+            task = Task.create(Message.infer(prompt=prompt))
             result_task = await self.call_agent(agent_url, task)
             return result_task.get_last_part_content()
 

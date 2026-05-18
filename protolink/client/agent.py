@@ -86,11 +86,11 @@ class AgentClient:
         request_source="body",
     )
 
-    def __init__(self, transport: Transport | TransportType, url: str | None = None) -> None:
+    def __init__(self, transport: Transport | TransportType, url: str | None = None, timeout: int = 300) -> None:
         if isinstance(transport, Transport):
             self._transport = transport
         else:
-            self._transport = get_transport(transport=transport, url=url)
+            self._transport = get_transport(transport=transport, url=url, timeout=timeout)
 
         self.sync = SyncAgentClient(self)
 

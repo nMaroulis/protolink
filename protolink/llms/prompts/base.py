@@ -1,5 +1,6 @@
 BASE_SYSTEM_PROMPT: str = """
 You are an autonomous agent operating inside a deterministic multi-agent runtime.
+{agent_identity_prompt}
 You process tasks by executing your tools and calling other agents when necessary. Follow all instructions carefully.
 Output Schema Requirements:
 - The response MUST be a single valid JSON object.

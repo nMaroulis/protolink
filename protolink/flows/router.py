@@ -83,9 +83,8 @@ class Router(Flow):
         # Clean the tag from the task so the downstream agent doesn't see it
         last_item = task.get_last_item()
         if last_item and last_item.parts:
-            # We assume the first part of the last item is the text we need to modify
             for part in last_item.parts:
-                if part.type == "text" and isinstance(part.content, str):
+                if part.type in ("text", "infer_output") and isinstance(part.content, str):
                     part.content = part.content.replace(match.group(0), "").strip()
                     break
 

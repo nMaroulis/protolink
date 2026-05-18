@@ -126,8 +126,9 @@ def create_orchestrator_agent(
         registry=registry,
         llm=llm,
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
+        verbosity=2,
     )
-    agent.transport.timeout = 120
+    agent.transport.timeout = 600
 
     return agent
 
