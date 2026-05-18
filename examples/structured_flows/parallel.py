@@ -4,7 +4,7 @@ from protolink.agents import Agent
 from protolink.discovery import Registry
 from protolink.flows import Parallel
 from protolink.llms import MockLLM, create_llm
-from protolink.models import Artifact, Message, Task
+from protolink.models import Task
 
 
 class CustomMockLLM(MockLLM):
@@ -22,31 +22,6 @@ class CustomMockLLM(MockLLM):
 
 
 mock_llm = CustomMockLLM()
-
-
-# Specialized Reviewer Agent that appends a custom artifact
-class ReviewerAgent(Agent):
-    def __init__(self, name: str, url: str, description: str, system_prompt: str, llm):
-        super().__init__(
-            card={"name": name, "url": url, "description": description},
-            llm=llm,
-            system_prompt=system_prompt,
-            transport="http",
-            registry="http",
-            registry_url="http://localhost:9040",
-            verbosity=0,
-        )
-
-    async def handle_task(self, task: Task) -> Task:
-        # Get response from the LLM
-        res = await self.call_llm(task)
-        # Create an artifact
-        art = Artifact(id=f"art_{self.card.name}")
-        art.add_text(res)
-        task.add_artifact(art)
-        # Add a friendly progress message
-        task.add_message(Message.agent(f"Finished {self.card.name} evaluation."))
-        return task
 
 
 # Select LLM
@@ -77,19 +52,31 @@ async def main():
     registry.start(background=True)
 
     # 2. Setup Specialized Reviewers
-    sec_agent = ReviewerAgent(
-        name="security_reviewer",
-        url=AGENT_REVIEWER_URL_1,
-        description="Expert at scanning code for vulnerabilities and backdoors.",
+    sec_agent = Agent(
+        card={
+            "name": "security_reviewer",
+            "url": AGENT_REVIEWER_URL_1,
+            "description": "Expert at scanning code for vulnerabilities and backdoors.",
+        },
         system_prompt="You are a security reviewer. Audit the code for security flaws.",
         llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
+        transport="http",
+        registry="http",
+        registry_url=REGISTRY_URL,
+        verbosity=2,
     )
-    perf_agent = ReviewerAgent(
-        name="performance_reviewer",
-        url=AGENT_REVIEWER_URL_2,
-        description="Expert at profiling performance and complexity constraints.",
+    perf_agent = Agent(
+        card={
+            "name": "performance_reviewer",
+            "url": AGENT_REVIEWER_URL_2,
+            "description": "Expert at profiling performance and complexity constraints.",
+        },
         system_prompt="You are a performance reviewer. Audit the code for complexity bottlenecks.",
         llm=mock_llm if LLM_PROVIDER == "mock" else create_llm(LLM_PROVIDER, **LLM_ARGS),
+        transport="http",
+        registry="http",
+        registry_url=REGISTRY_URL,
+        verbosity=2,
     )
 
     sec_agent.start(background=True)

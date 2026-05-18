@@ -21,7 +21,7 @@ MOCK_RESPONSES = {
 LLM_PROVIDER = "mock"  # <-- UNCOMMENT to use a Mock LLM
 
 # It is suggested to use an actual LLM e.g. local Ollama for free testing
-LLM_PROVIDER = "ollama"  # <-- UNCOMMENT to use Ollama
+# LLM_PROVIDER = "ollama"  # <-- UNCOMMENT to use Ollama
 LLM_ARGS = {"base_url": "http://localhost:11434", "model": "gemma4:e4b"}
 # OR OpenAI, or any LLM in protolink.llms. Or even your own custom LLM
 # LLM_PROVIDER = "openai" # <-- UNCOMMENT to use OpenAI
@@ -44,7 +44,14 @@ async def main():
 
     # 2. Setup Agents
     writer = Agent(
-        card={"name": "writer", "url": "http://localhost:8051", "description": "Writes drafts and decides routes."},
+        card={
+            "name": "writer",
+            "url": "http://localhost:8051",
+            "description": "Writes drafts and decides routes.",
+            "capabilities": {
+                "delegation": False
+            },  # With this capability set to false, the agent will not be able to call other agents.
+        },
         llm=MockLLM(mock_responses={"writer": MOCK_RESPONSES["writer"]})
         if LLM_PROVIDER == "mock"
         else create_llm(LLM_PROVIDER, **LLM_ARGS),
@@ -52,10 +59,15 @@ async def main():
         transport="http",
         registry="http",
         registry_url=REGISTRY_URL,
-        verbosity=0,
+        verbosity=2,
     )
     editor = Agent(
-        card={"name": "editor", "url": "http://localhost:8052", "description": "Polishes draft content."},
+        card={
+            "name": "editor",
+            "url": "http://localhost:8052",
+            "description": "Polishes draft content.",
+            "capabilities": {"delegation": False},
+        },
         llm=MockLLM(default_response=MOCK_RESPONSES["editor"])
         if LLM_PROVIDER == "mock"
         else create_llm(LLM_PROVIDER, **LLM_ARGS),
@@ -63,10 +75,15 @@ async def main():
         transport="http",
         registry="http",
         registry_url=REGISTRY_URL,
-        verbosity=0,
+        verbosity=2,
     )
     qa = Agent(
-        card={"name": "qa", "url": "http://localhost:8053", "description": "Quality assurance check."},
+        card={
+            "name": "qa",
+            "url": "http://localhost:8053",
+            "description": "Quality assurance check.",
+            "capabilities": {"delegation": False},
+        },
         llm=MockLLM(default_response=MOCK_RESPONSES["qa"])
         if LLM_PROVIDER == "mock"
         else create_llm(LLM_PROVIDER, **LLM_ARGS),
@@ -74,7 +91,7 @@ async def main():
         transport="http",
         registry="http",
         registry_url=REGISTRY_URL,
-        verbosity=0,
+        verbosity=2,
     )
 
     writer.start(background=True)

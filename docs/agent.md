@@ -290,10 +290,42 @@ This enables a coordinator agent to delegate work to specialized agents without 
                                         ↓
                                Result returned to LLM
                                         ↓
-                               LLM produces final response
+                                LLM produces final response
     ```
 
+### Controlling Agent Delegation
 
+By default, any agent with an LLM can dynamically delegate work to other agents discovered via the registry. However, you can explicitly disable or control delegation using the agent's **Capabilities**:
+
+* **`delegation`**: A boolean flag (defaulting to `True`) indicating whether the agent is allowed to delegate tasks to other agents.
+* **`has_llm`**: A boolean flag (defaulting to `False`) showing whether the agent has an LLM as a core component.
+
+#### Disabling Delegation
+
+If you set `"delegation": False` within the agent's card capabilities:
+1. The agent will **not** query the registry to discover other agents.
+2. The agent's prompt builder will **not** inject other agents' definitions or descriptions into the LLM system instructions.
+3. The inference engine's `agent_callback` is set to `None`, completely preventing any remote task delegation loops.
+
+#### Configuration Example
+
+To disable delegation, simply define it in your `AgentCard` capabilities dictionary:
+
+```python
+from protolink.agents import Agent
+
+writer = Agent(
+    card={
+        "name": "writer",
+        "url": "http://localhost:8051",
+        "description": "Writes drafts and decides routes.",
+        "capabilities": {
+            "delegation": False  # Disables A2A delegation completely
+        }
+    },
+    llm=llm,
+)
+```
 
 ### Communication Methods
 

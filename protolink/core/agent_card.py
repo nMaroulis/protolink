@@ -16,12 +16,13 @@ class AgentCapabilities:
         streaming: Whether the agent supports Server-Sent Events (SSE) streaming
         push_notifications: Whether the agent supports push notifications (webhooks) for task updates
         state_transition_history: Whether the agent can provide a detailed history of task state transitions
+        delegation: Whether the agent can delegate tasks to other agents
+        has_llm: Whether the agent has an LLM as a core component (brain)
         max_concurrency: Maximum number of concurrent tasks the agent can handle
         message_batching: Whether the agent can process multiple messages in a single request
         tool_calling: Whether the agent can call external tools/APIs
         multi_step_reasoning: Whether the agent can perform multi-step reasoning
         timeout_support: Whether the agent respects timeouts for operations
-        delegation: Whether the agent can delegate tasks to other agents
         rag: Whether the agent supports Retrieval-Augmented Generation
         code_execution: Whether the agent has access to a safe execution sandbox
     """
@@ -30,13 +31,13 @@ class AgentCapabilities:
     push_notifications: bool = False
     state_transition_history: bool = False
     # Extensions to A2A spec
+    delegation: bool = True
     has_llm: bool = False
     max_concurrency: int = 1
     message_batching: bool = False
     tool_calling: bool = False
     multi_step_reasoning: bool = False
     timeout_support: bool = False
-    delegation: bool = False
     rag: bool = False
     code_execution: bool = False
 

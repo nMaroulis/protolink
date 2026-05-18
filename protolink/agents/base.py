@@ -867,10 +867,16 @@ class Agent:
             )
 
         # Get Available Agents (Guardrail: excluding ourselves to prevent self-delegation loops)
-        discovered = await self.discover_agents()
-        discovered = [agent for agent in discovered if agent.url != self.card.url]
-        agent_cards_list = [f"Agent {i}:\n{agent.get_prompt_format()}" for i, agent in enumerate(discovered, start=1)]
-        agent_cards = "\n".join(agent_cards_list)
+        if self.card.capabilities.delegation:  # If the agent supports delegation
+            discovered = await self.discover_agents()
+            discovered = [agent for agent in discovered if agent.url != self.card.url]
+            agent_cards_list = [
+                f"Agent {i}:\n{agent.get_prompt_format()}" for i, agent in enumerate(discovered, start=1)
+            ]
+            agent_cards = "\n".join(agent_cards_list)
+        else:
+            agent_cards = ""
+
         # Extract flow instructions injected by orchestrators
         flow_instructions = task.flow_state.get("prompt", "") if task and task.flow_state else ""
 
@@ -902,7 +908,7 @@ class Agent:
         response: Part = await self.llm.infer(
             query=query,
             tools=self.tools,
-            agent_callback=self._handle_agent_call,
+            agent_callback=self._handle_agent_call if self.card.capabilities.delegation else None,
         )
 
         if self.telemetry:
