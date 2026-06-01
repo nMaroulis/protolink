@@ -27,10 +27,24 @@ class StarletteBackend(BackendInterface):
     # Setup Routes - Define Server URIs
     # ----------------------------------------------------------------------
 
-    def _register_endpoint(self, ep: EndpointSpec) -> None:
+    def _register_endpoint(self, ep: EndpointSpec, authenticator: Any = None) -> None:
         _, Request, JSONResponse, HTMLResponse = _require_starlette()  # noqa: N806
 
         async def route(request: Request):
+            # -------------------------
+            # Authenticate request
+            # -------------------------
+            if authenticator:
+                from protolink.security.auth import extract_credentials
+
+                credentials = extract_credentials(request.headers, dict(request.query_params))
+                if not credentials:
+                    return JSONResponse({"error": "Missing credentials"}, status_code=401)
+                try:
+                    await authenticator.authenticate(credentials)
+                except Exception as e:
+                    return JSONResponse({"error": f"Authentication failed: {e}"}, status_code=401)
+
             # -------------------------
             # Extract raw payload
             # -------------------------
@@ -77,7 +91,7 @@ class StarletteBackend(BackendInterface):
 
         self.app.add_route(ep.path, route, methods=[ep.method])
 
-    def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
+    def setup_routes(self, endpoints: list[EndpointSpec], authenticator: Any = None) -> None:
         """Mount abstract Protolink endpoints as physical Starlette routes.
 
         This method serves as the architectural bridge between Protolink's `EndpointSpec` definitions
@@ -86,7 +100,7 @@ class StarletteBackend(BackendInterface):
         `JSONResponse` objects back over the wire.
         """
         for ep in endpoints:
-            self._register_endpoint(ep)
+            self._register_endpoint(ep, authenticator=authenticator)
 
     # ----------------------------------------------------------------------
     # ASGI Server Lifecycle

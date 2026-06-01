@@ -103,6 +103,15 @@ The repository includes several **standalone example scripts** that demonstrate 
 - Shows how to set up multiple agents on different ports
 - Includes comprehensive error handling and cleanup
 
+### 🔒 [`authentication.py`](https://github.com/nMaroulis/protolink/blob/main/examples/authentication.py)
+**Purpose**: Authentication, credentials propagation, and security verification
+
+- Demonstrates API Key, Basic, and Bearer (JWT) token authentication providers
+- Covers server-side route authentication (returning `401 Unauthorized` for failed requests)
+- Covers client-side lazy authentication (automatic signature/credential injection on outgoing requests)
+- Verifies both HTTP (Starlette and FastAPI backends) and WebSocket handshake verification
+- Demonstrates success and failure scenarios for both transports
+
 ### 🤖 [`llms.py`](https://github.com/nMaroulis/protolink/blob/main/examples/llms.py)
 **Purpose**: LLM backend integration and testing
 - Tests OpenAI and Anthropic LLM implementations

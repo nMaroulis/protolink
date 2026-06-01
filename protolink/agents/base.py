@@ -38,6 +38,7 @@ from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.logging import BaseLogger, ConsoleLogger, get_agent_farewell, get_agent_greeting
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
+from protolink.security.auth import Authenticator
 from protolink.server import AgentServer
 from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
@@ -74,6 +75,8 @@ class Agent:
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
         expose_chat: bool = True,
+        authenticator: Authenticator | None = None,
+        credentials: str | None = None,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -139,6 +142,9 @@ class Agent:
         # LLM prompt
         self._system_prompt: str | None = system_prompt
         self.override_system_prompt: bool = override_system_prompt
+        # Store authentication configuration
+        self.authenticator: Authenticator | None = authenticator
+        self.credentials: str | None = credentials
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None
@@ -1084,15 +1090,19 @@ class Agent:
         if transport is None:
             raise ValueError("transport must not be None")
 
+        authenticator = getattr(self, "authenticator", None)
+        credentials = getattr(self, "credentials", None)
+
         if isinstance(transport, str):
-            transport = get_transport(transport, url=self.card.url)
+            transport = get_transport(
+                transport, url=self.card.url, authenticator=authenticator, credentials=credentials
+            )
         elif isinstance(transport, Transport):
-            # TODO(): Examine here
-            # Transport and AgentCard URL must match if transport has a URL.
-            # transport_url = getattr(transport, "url", None)
-            # if transport_url is not None and transport_url != self.card.url:
-            #     raise ValueError(f"Transport URL {transport.url} does not match AgentCard URL {self.card.url}")
-            transport = transport
+            # Inject authenticator and credentials if the transport doesn't have them but the agent does
+            if authenticator is not None and getattr(transport, "authenticator", None) is None:
+                setattr(transport, "authenticator", authenticator)  # noqa: B010
+            if credentials is not None and getattr(transport, "credentials", None) is None:
+                setattr(transport, "credentials", credentials)  # noqa: B010
         else:
             raise ValueError("Invalid transport type")
 
@@ -1101,6 +1111,14 @@ class Agent:
         self._client = AgentClient(transport=transport)
         # Exposes AgentProtocol to Server
         self._server = AgentServer(transport=transport, agent=self)
+
+        # Update AgentCard security schemes if authenticator is configured
+        if authenticator:
+            scheme = getattr(authenticator, "security_scheme", None)
+            if scheme:
+                if self.card.security_schemes is None:
+                    self.card.security_schemes = {}
+                self.card.security_schemes[scheme.auth_type] = scheme.to_dict()
 
     @property
     def llm(self) -> LLM | None:

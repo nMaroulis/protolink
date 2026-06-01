@@ -65,8 +65,9 @@ class HTTPTransport(Transport):
         backend: BackendType = "starlette",
         *,
         validate_schema: bool = False,
+        credentials: str | None = None,
     ) -> None:
-        """Initialize the HTTP transport and underlying ASGI server framework.
+        """Initialize HTTP transport. and underlying ASGI server framework.
 
         Args:
             url: The absolute URL (e.g., ``"http://localhost:8000"``) dictating both the
@@ -83,6 +84,7 @@ class HTTPTransport(Transport):
         self._url: str = url
         self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
+        self.credentials: str | None = credentials
         self.security_context: object | None = None
         # Handlers that are called for different Server Requests
 
@@ -122,6 +124,9 @@ class HTTPTransport(Transport):
         RuntimeError
             If the remote endpoint returns a non-200 HTTP status code.
         """
+        if self.authenticator and self.credentials and not self.security_context:
+            await self.authenticate(self.credentials)
+
         client = await self._ensure_client()
         headers = self._build_headers()
 
@@ -204,7 +209,7 @@ class HTTPTransport(Transport):
         or ``FastAPIBackend``) which binds the abstract ``EndpointSpec`` models into tangible
         RESTful routes on the underlying server application.
         """
-        self.backend.setup_routes(endpoints)
+        self.backend.setup_routes(endpoints, authenticator=self.authenticator)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -299,8 +304,24 @@ class HTTPTransport(Transport):
         if self.authenticator and self.security_context:
             # Type guard: we know security_context is not None here
             context = self.security_context
-            if hasattr(context, "token"):
-                headers["Authorization"] = f"Bearer {context.token}"
+            token = getattr(context, "token", None)
+            if token:
+                scheme = getattr(self.authenticator, "security_scheme", None)
+                if scheme:
+                    if scheme.auth_type == "http":
+                        if scheme.auth_scheme == "basic":
+                            headers["Authorization"] = f"Basic {token}"
+                        elif scheme.auth_scheme == "bearer":
+                            headers["Authorization"] = f"Bearer {token}"
+                        else:
+                            headers["Authorization"] = f"{scheme.auth_scheme.capitalize()} {token}"
+                    elif scheme.auth_type == "apiKey":
+                        headers["X-API-Key"] = token
+                        headers["Authorization"] = f"ApiKey {token}"
+                    else:
+                        headers["Authorization"] = f"Bearer {token}"
+                else:
+                    headers["Authorization"] = f"Bearer {token}"
         return headers
 
     def validate_url(self) -> bool:

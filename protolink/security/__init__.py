@@ -1,3 +1,19 @@
-from .auth import APIKeyAuth, Authenticator, BearerTokenAuth, OAuth2DelegationAuth, SecurityContext
+from .auth import (
+    APIKeyAuth,
+    Authenticator,
+    BasicAuth,
+    BearerTokenAuth,
+    OAuth2DelegationAuth,
+    SecurityContext,
+    extract_credentials,
+)
 
-__all__ = ["APIKeyAuth", "Authenticator", "BearerTokenAuth", "OAuth2DelegationAuth", "SecurityContext"]
+__all__ = [
+    "APIKeyAuth",
+    "Authenticator",
+    "BasicAuth",
+    "BearerTokenAuth",
+    "OAuth2DelegationAuth",
+    "SecurityContext",
+    "extract_credentials",
+]

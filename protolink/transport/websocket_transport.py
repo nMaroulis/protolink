@@ -56,10 +56,12 @@ class WebSocketTransport(Transport):
         url: str,
         timeout: float = 360.0,
         authenticator: Authenticator | None = None,
+        credentials: str | None = None,
     ) -> None:
         self._url: str = url
         self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
+        self.credentials: str | None = credentials
         self.security_context: Any | None = None
 
         self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
@@ -105,12 +107,63 @@ class WebSocketTransport(Transport):
         if not host or not port:
             raise ValueError(f"Invalid URL: {self._url}. Missing host or port.")
 
+        kwargs: dict[str, Any] = {
+            "close_timeout": 3.0,
+        }
+        if self.authenticator:
+            kwargs["process_request"] = self._process_request
+
         self._server = await websockets.serve(
             self._handle_connection,
             host=host,
             port=port,
-            close_timeout=3.0,
+            **kwargs,
         )
+
+    async def _process_request(self, path: str, request_headers: Any) -> Any:
+        """Authenticate incoming websocket handshake requests."""
+        if not self.authenticator:
+            return None
+
+        # websockets v14+ passes a Request object (which has a .headers attribute)
+        # instead of a raw headers object.
+        headers = request_headers
+        if hasattr(request_headers, "headers"):
+            headers = request_headers.headers
+
+        from protolink.security.auth import extract_credentials
+
+        credentials = extract_credentials(headers)
+        if not credentials:
+            try:
+                from websockets.datastructures import Headers
+                from websockets.http11 import Response
+
+                return Response(
+                    status_code=401,
+                    reason_phrase="Unauthorized",
+                    headers=Headers([("Content-Type", "text/plain")]),
+                    body=b"Unauthorized: Missing credentials",
+                )
+            except ImportError:
+                return 401, [("Content-Type", "text/plain")], b"Unauthorized: Missing credentials"
+
+        try:
+            await self.authenticator.authenticate(credentials)
+            return None  # Let connection proceed
+        except Exception as e:
+            try:
+                from websockets.datastructures import Headers
+                from websockets.http11 import Response
+
+                return Response(
+                    status_code=401,
+                    reason_phrase="Unauthorized",
+                    headers=Headers([("Content-Type", "text/plain")]),
+                    body=f"Unauthorized: {e}".encode(),
+                )
+            except ImportError:
+                return 401, [("Content-Type", "text/plain")], f"Unauthorized: {e}".encode()
 
     async def stop(self) -> None:
         """Stop the WebSocket server and close any cached client connections."""
@@ -148,6 +201,9 @@ class WebSocketTransport(Transport):
         This design facilitates transparent, bi-directional communication while appearing identical
         to standard HTTP request/response lifecycles to the developer.
         """
+        if self.authenticator and self.credentials and not self.security_context:
+            await self.authenticate(self.credentials)
+
         message_id = uuid.uuid4().hex
 
         payload: dict[str, Any] = {
@@ -208,6 +264,9 @@ class WebSocketTransport(Transport):
         ``AsyncIterator``. The pipeline automatically terminates when the remote server sends a
         frame tagged with ``final=True``.
         """
+        if self.authenticator and self.credentials and not self.security_context:
+            await self.authenticate(self.credentials)
+
         message_id = uuid.uuid4().hex
 
         payload: dict[str, Any] = {
@@ -287,15 +346,28 @@ class WebSocketTransport(Transport):
         self.security_context = await self.authenticator.authenticate(credentials)
 
     def _build_headers(self) -> dict[str, str]:
-        """Compile the HTTP upgrade headers required for the WebSocket handshake.
-
-        If authentication is configured, this securely injects the ``Authorization: Bearer <token>``
-        header into the initial HTTP GET request that is used to upgrade the connection to the
-        WebSocket protocol.
-        """
+        """Compile the HTTP upgrade headers required for the WebSocket handshake."""
         headers: dict[str, str] = {}
         if self.authenticator and self.security_context:
-            headers["Authorization"] = f"Bearer {self.security_context.token}"
+            context = self.security_context
+            token = getattr(context, "token", None)
+            if token:
+                scheme = getattr(self.authenticator, "security_scheme", None)
+                if scheme:
+                    if scheme.auth_type == "http":
+                        if scheme.auth_scheme == "basic":
+                            headers["Authorization"] = f"Basic {token}"
+                        elif scheme.auth_scheme == "bearer":
+                            headers["Authorization"] = f"Bearer {token}"
+                        else:
+                            headers["Authorization"] = f"{scheme.auth_scheme.capitalize()} {token}"
+                    elif scheme.auth_type == "apiKey":
+                        headers["X-API-Key"] = token
+                        headers["Authorization"] = f"ApiKey {token}"
+                    else:
+                        headers["Authorization"] = f"Bearer {token}"
+                else:
+                    headers["Authorization"] = f"Bearer {token}"
         return headers
 
     # ------------------------------------------------------------------

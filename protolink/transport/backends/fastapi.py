@@ -27,10 +27,24 @@ class FastAPIBackend(BackendInterface):
     # Setup Routes - Define Server URIs
     # ----------------------------------------------------------------------
 
-    def _register_endpoint(self, ep: EndpointSpec) -> None:
+    def _register_endpoint(self, ep: EndpointSpec, authenticator: Any = None) -> None:
         _, Request, JSONResponse, HTMLResponse, _ = _require_fastapi()  # noqa: N806
 
         async def route(request: Request):
+            # -------------------------
+            # Authenticate request
+            # -------------------------
+            if authenticator:
+                from protolink.security.auth import extract_credentials
+
+                credentials = extract_credentials(request.headers, dict(request.query_params))
+                if not credentials:
+                    return JSONResponse(status_code=401, content={"error": "Missing credentials"})
+                try:
+                    await authenticator.authenticate(credentials)
+                except Exception as e:
+                    return JSONResponse(status_code=401, content={"error": f"Authentication failed: {e}"})
+
             # -------------------------
             # Extract raw payload
             # -------------------------
@@ -81,7 +95,7 @@ class FastAPIBackend(BackendInterface):
             methods=[ep.method],
         )
 
-    def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
+    def setup_routes(self, endpoints: list[EndpointSpec], authenticator: Any = None) -> None:
         """Mount abstract Protolink endpoints as physical FastAPI routes.
 
         This method acts as the architectural bridge between Protolink's internal `EndpointSpec`
@@ -90,7 +104,7 @@ class FastAPIBackend(BackendInterface):
         marshaling the result back over the wire via FastAPI's `JSONResponse`.
         """
         for ep in endpoints:
-            self._register_endpoint(ep)
+            self._register_endpoint(ep, authenticator=authenticator)
 
     # ----------------------------------------------------------------------
     # ASGI Server Lifecycle

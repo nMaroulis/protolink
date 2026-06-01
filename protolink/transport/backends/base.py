@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from protolink.server.endpoint_handler import EndpointSpec
+
+if TYPE_CHECKING:
+    from protolink.security.auth import Authenticator
 
 
 class BackendInterface(ABC):
     @abstractmethod
-    def setup_routes(self, endpoints: list[EndpointSpec]) -> None:
+    def setup_routes(self, endpoints: list[EndpointSpec], authenticator: Authenticator | None = None) -> None:
         """Register all abstract endpoints onto the physical ASGI routing table.
 
         Subclasses must implement this to iterate over the provided `EndpointSpec` models

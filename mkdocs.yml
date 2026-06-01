@@ -79,6 +79,7 @@ nav:
       - Telemetry: telemetry.md
       - Tool: tool.md
       - Transport: transport.md
+      - Authentication: authentication.md
       - Types: types.md
   - Examples:
       - Basic Example: examples.md

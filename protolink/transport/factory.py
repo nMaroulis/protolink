@@ -46,7 +46,16 @@ def get_transport(transport: str, **kwargs) -> Transport:
     else:
         transport_class = entry
 
-    return transport_class(**kwargs)
+    import inspect
+
+    sig = inspect.signature(transport_class.__init__)
+    has_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+    if not has_kwargs:
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+    else:
+        filtered_kwargs = kwargs
+
+    return transport_class(**filtered_kwargs)
 
 
 def register_transport(name: str, cls: type[Transport] | str) -> None:

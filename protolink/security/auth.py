@@ -95,6 +95,12 @@ class Authenticator(ABC):
     Implementations provide authentication methods (Bearer, OAuth2, etc.).
     """
 
+    @property
+    @abstractmethod
+    def security_scheme(self) -> SecurityScheme:
+        """Get the security scheme definition for this authenticator."""
+        pass
+
     @abstractmethod
     async def authenticate(self, credentials: str) -> SecurityContext:
         """Authenticate a principal with provided credentials.
@@ -139,6 +145,14 @@ class BearerTokenAuth(Authenticator):
         )
         context = await auth.authenticate(token)
     """
+
+    @property
+    def security_scheme(self) -> SecurityScheme:
+        return SecurityScheme(
+            auth_type="http",
+            auth_scheme="bearer",
+            description="Bearer token authentication (JWT or opaque)",
+        )
 
     def __init__(self, secret: str = "", algorithm: str = "HS256"):
         """Initialize bearer token auth.
@@ -213,6 +227,15 @@ class OAuth2DelegationAuth(Authenticator):
         context = await auth.authenticate(user_token)
     """
 
+    @property
+    def security_scheme(self) -> SecurityScheme:
+        return SecurityScheme(
+            auth_type="oauth2",
+            auth_scheme=None,
+            description="OAuth 2.0 token exchange with delegated scopes",
+            metadata={"exchange_endpoint": self.exchange_endpoint},
+        )
+
     def __init__(self, exchange_endpoint: str, client_id: str, client_secret: str):
         """Initialize OAuth 2.0 delegation auth.
 
@@ -284,6 +307,14 @@ class APIKeyAuth(Authenticator):
     Suitable for service-to-service authentication.
     """
 
+    @property
+    def security_scheme(self) -> SecurityScheme:
+        return SecurityScheme(
+            auth_type="apiKey",
+            auth_scheme=None,
+            description="Simple API key authentication",
+        )
+
     def __init__(self, valid_keys: dict[str, list[str]]):
         """Initialize API key auth.
 
@@ -317,3 +348,97 @@ class APIKeyAuth(Authenticator):
             Same context
         """
         return context
+
+
+class BasicAuth(Authenticator):
+    """HTTP Basic Authentication (username & password).
+
+    Validates username and password credentials.
+    """
+
+    def __init__(self, valid_credentials: dict[str, str]):
+        """Initialize with a dictionary mapping username -> password."""
+        self.valid_credentials = valid_credentials
+
+    @property
+    def security_scheme(self) -> SecurityScheme:
+        return SecurityScheme(
+            auth_type="http",
+            auth_scheme="basic",
+            description="HTTP Basic authentication (username:password)",
+        )
+
+    async def authenticate(self, credentials: str) -> SecurityContext:
+        """Authenticate base64 encoded username:password string or raw username:password.
+
+        Args:
+            credentials: Base64 encoded 'username:password' string, or raw 'username:password'
+        """
+        import base64
+
+        decoded = credentials
+        # Check if it looks like base64
+        try:
+            # Try to decode from base64 first
+            decoded_bytes = base64.b64decode(credentials.encode("utf-8"), validate=True)
+            decoded = decoded_bytes.decode("utf-8")
+        except Exception:
+            # If not valid base64, assume it is already decoded
+            pass
+
+        if ":" not in decoded:
+            raise Exception("Invalid Basic authentication format")
+
+        username, password = decoded.split(":", 1)
+        if username not in self.valid_credentials or self.valid_credentials[username] != password:
+            raise Exception("Invalid username or password")
+
+        return SecurityContext(principal_id=username, token=credentials)
+
+    async def refresh_token(self, context: SecurityContext) -> SecurityContext:
+        """Basic credentials don't refresh."""
+        return context
+
+
+def extract_credentials(headers: Any, query_params: dict[str, str] | None = None) -> str | None:
+    """Helper to extract credentials from headers or query parameters.
+
+    Looks for:
+    1. 'Authorization' header: extracts value after 'Bearer ', 'Basic ', 'ApiKey ' prefix (or raw if no prefix)
+    2. 'X-API-Key' / 'x-api-key' header
+    3. 'api_key' / 'apikey' query parameter
+    """
+    if headers is not None:
+        auth_header = None
+        if hasattr(headers, "get"):
+            auth_header = headers.get("authorization") or headers.get("Authorization")
+        else:
+            # Fallback for dict/list-like headers
+            for k, v in headers:
+                if k.lower() == "authorization":
+                    auth_header = v
+                    break
+
+        if auth_header:
+            for prefix in ["Bearer ", "Basic ", "ApiKey ", "apikey "]:
+                if auth_header.lower().startswith(prefix.lower()):
+                    return auth_header[len(prefix) :].strip()
+            return auth_header.strip()
+
+        api_key_header = None
+        if hasattr(headers, "get"):
+            api_key_header = headers.get("x-api-key") or headers.get("X-API-Key")
+        else:
+            for k, v in headers:
+                if k.lower() == "x-api-key":
+                    api_key_header = v
+                    break
+        if api_key_header:
+            return api_key_header.strip()
+
+    if query_params:
+        for key in ["api_key", "apikey", "token"]:
+            if key in query_params:
+                return query_params[key].strip()
+
+    return None
