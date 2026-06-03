@@ -149,6 +149,8 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent (WARNING only), `1` = normal (INFO), `2` = verbose (DEBUG). |
 | `expose_chat` | `bool` | `True` | Whether the Agent will expose a chat endpoint for interaction with a UI. |
+| `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
+| `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
 
 ```python
 from protolink.agents import Agent

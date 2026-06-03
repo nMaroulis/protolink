@@ -107,6 +107,8 @@ class Agent:
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
             verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose (debug mode).
             expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
+            authenticator: Optional Authenticator instance for verifying incoming requests to this agent.
+            credentials: Optional credentials string used for authenticating outgoing requests.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
