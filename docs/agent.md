@@ -598,6 +598,52 @@ agent.start()
     The `/status` page shows the agent's operational health and metadata. The `/chat` page provides an interactive conversation interface. Both are served automatically when the agent starts.
 
 
+## YAML Import and Export
+
+Protolink supports exporting an agent's configuration (identity card, capabilities, transport, LLM, security/authenticator, and registered tools) to a YAML file, and importing it back to reconstruct a functional `Agent` instance.
+
+### Exporting an Agent
+
+To serialize and export an agent's configuration:
+
+```python
+# Export to a YAML file
+agent.to_yaml("agent_config.yaml")
+
+# Get configuration as a YAML string
+yaml_str = agent.to_yaml_string()
+
+# Get configuration as a dictionary
+config_dict = agent.to_dict()
+```
+
+### Importing an Agent
+
+To load and reconstruct an agent from a serialized configuration:
+
+```python
+from protolink.agents import Agent
+
+# Reconstruct from a YAML file
+agent = Agent.from_yaml("agent_config.yaml")
+
+# Reconstruct from a YAML string
+agent = Agent.from_yaml_string(yaml_str)
+
+# Reconstruct from a dictionary
+agent = Agent.from_dict(config_dict)
+```
+
+#### Handling Dependencies and Overrides
+
+1. **Security & Credentials**: Sensitive information like API keys or passwords are not serialized by default. You can pass them as overrides during import:
+   ```python
+   agent = Agent.from_yaml("agent_config.yaml", credentials="my-secret-key")
+   ```
+2. **Tool Function Paths**: Standard Python tools are serialized using their module and function name paths (e.g. `my_module:my_tool_func`). When the agent is imported, Protolink dynamically imports the function. If the module cannot be imported (e.g., if loaded in a different environment), Protolink registers a stub tool that returns a clean runtime error when executed rather than crashing initialization.
+3. **MCP Tool Adapters**: Model Context Protocol (MCP) tool configs are fully serialized. If the MCP dependencies are installed on the target machine, they will be initialized and bound correctly.
+
+
 ## Abstract Methods
 
 The `Agent` class provides a default implementation for `handle_task` that handles tool use and LLM inference automatically. You generally do **not** need to implement any abstract methods unless you require custom logic.

@@ -99,6 +99,10 @@ class DummyTool(BaseTool):
         return f"Tool result: {kwargs}"
 
 
+def multiply_tool_func(a: int, b: int) -> int:
+    return a * b
+
+
 class TestAgent:
     """Test cases for the Agent class."""
 
@@ -470,3 +474,36 @@ class TestAgent:
     #         match=r"Transport URL http://different-url\.local does not match AgentCard URL http://test-agent\.local",
     #     ):
     #         Agent(agent_card, transport=transport)
+
+    def test_yaml_serialization(self, agent_card, tmp_path):
+        """Test exporting agent to YAML and importing it back."""
+        # Create an agent with transport and a tool
+        agent = Agent(agent_card, transport="runtime")
+
+        agent.tool(name="multiply_tool", description="Multiplies two numbers")(multiply_tool_func)
+
+        # Export to yaml string
+        yaml_str = agent.to_yaml_string()
+        assert "test-agent" in yaml_str
+        assert "multiply_tool" in yaml_str
+        assert "runtime" in yaml_str
+
+        # Export to file
+        yaml_file = tmp_path / "agent_config.yaml"
+        agent.to_yaml(str(yaml_file))
+        assert yaml_file.exists()
+
+        # Import from yaml file
+        imported_agent = Agent.from_yaml(str(yaml_file))
+        assert imported_agent.card.name == agent.card.name
+        assert imported_agent.card.url == agent.card.url
+        assert "multiply_tool" in imported_agent.tools
+
+        # Verify the tool works on the imported agent
+        result = imported_agent.sync.invoke(
+            message="",
+            part_type="tool_call",
+            tool_name="multiply_tool",
+            tool_args={"a": 6, "b": 7},
+        )
+        assert "42" in str(result)

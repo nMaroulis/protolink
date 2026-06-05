@@ -1306,6 +1306,401 @@ class Agent:
     def __repr__(self) -> str:
         return f"Agent(name='{self.card.name}', url='{self.card.url}')"
 
+    # ----------------------------------------------------------------------
+    # Serialization & Deserialization (YAML/Dict)
+    # ----------------------------------------------------------------------
+
+    def _serialize_tool(self, tool: BaseTool) -> dict[str, Any]:
+        """Serialize a tool to a dictionary representation."""
+        tool_dict = {
+            "name": tool.name,
+            "description": tool.description,
+            "input_schema": tool.input_schema,
+            "output_schema": tool.output_schema,
+            "tags": tool.tags,
+        }
+        # Check if it is an MCPToolAdapter
+        if tool.__class__.__name__ == "MCPToolAdapter":
+            tool_dict["type"] = "mcp"
+            tool_dict["mcp_config"] = {
+                "transport": getattr(tool, "transport", "stdio"),
+                "command": getattr(tool, "command", None),
+                "args": getattr(tool, "args", []),
+                "url": getattr(tool, "url", None),
+                "headers": getattr(tool, "headers", {}),
+            }
+        else:
+            tool_dict["type"] = "native"
+            if hasattr(tool, "func") and callable(tool.func):
+                func = tool.func
+                if hasattr(func, "__module__") and hasattr(func, "__name__") and func.__module__ != "builtins":
+                    tool_dict["func_path"] = f"{func.__module__}:{func.__name__}"
+        return tool_dict
+
+    @classmethod
+    def _deserialize_tool(cls, tool_dict: dict[str, Any]) -> BaseTool:
+        """Deserialize a tool from a dictionary representation."""
+        tool_type = tool_dict.get("type", "native")
+        if tool_type == "mcp":
+            try:
+                from protolink.tools.adapters.mcp_adapter import MCPToolAdapter
+            except ImportError:
+
+                class MCPStubTool(BaseTool):
+                    def __init__(self, name, description):
+                        self.name = name
+                        self.description = description
+                        self.input_schema = {}
+                        self.output_schema = None
+                        self.tags = ["mcp"]
+
+                    async def __call__(self, **kwargs):
+                        raise RuntimeError(
+                            f"MCP tool '{self.name}' could not be invoked because MCP dependency is not installed."
+                        )
+
+                return MCPStubTool(tool_dict["name"], tool_dict.get("description", ""))
+
+            mcp_config = tool_dict.get("mcp_config", {})
+            adapter = MCPToolAdapter(
+                transport=mcp_config.get("transport", "stdio"),
+                command=mcp_config.get("command"),
+                args=mcp_config.get("args"),
+                url=mcp_config.get("url"),
+                headers=mcp_config.get("headers"),
+            )
+            return adapter.wrap_tool(tool_dict["name"])
+        else:
+            func_path = tool_dict.get("func_path")
+            from collections.abc import Callable
+
+            func: Callable[..., Any] | None = None
+            if func_path:
+                try:
+                    import importlib
+
+                    module_name, func_name = func_path.split(":")
+                    module = importlib.import_module(module_name)
+                    resolved = module
+                    for part in func_name.split("."):
+                        resolved = getattr(resolved, part)
+                    if callable(resolved):
+                        func = resolved
+                    else:
+                        raise TypeError(f"Object '{func_path}' is not callable")
+                except Exception as e:
+
+                    def make_stub(name, err_msg):
+                        async def stub_func(**kwargs):
+                            raise RuntimeError(
+                                f"Tool '{name}' could not be executed because its function "
+                                f"'{func_path}' failed to load: {err_msg}"
+                            )
+
+                        return stub_func
+
+                    func = make_stub(tool_dict["name"], str(e))
+
+            if func is None:
+
+                def make_stub(name):
+                    async def stub_func(**kwargs):
+                        raise RuntimeError(f"Tool '{name}' has no associated python function.")
+
+                    return stub_func
+
+                func = make_stub(tool_dict["name"])
+
+            from protolink.tools.tool import Tool
+
+            return Tool(
+                name=tool_dict["name"],
+                description=tool_dict.get("description", ""),
+                input_schema=tool_dict.get("input_schema"),
+                output_schema=tool_dict.get("output_schema"),
+                tags=tool_dict.get("tags"),
+                func=func,
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the agent configuration to a dictionary representation."""
+        level = getattr(self._logger, "level", 20)
+        verbosity = 1
+        if level == 30:
+            verbosity = 0
+        elif level == 10:
+            verbosity = 2
+
+        data = {
+            "card": self.card.to_dict(),
+            "skills": self.skills,
+            "verbosity": verbosity,
+            "expose_chat": self._expose_chat,
+            "discovery_ttl": self._discovery_ttl,
+            "override_system_prompt": self.override_system_prompt,
+            "system_prompt": self._system_prompt,
+            "credentials": self.credentials,
+        }
+
+        # Transport
+        if self._transport:
+            transport_config = {
+                "type": getattr(self._transport, "transport_type", "http"),
+                "url": self._transport.url,
+                "timeout": getattr(self._transport, "timeout", 360.0),
+            }
+            if hasattr(self._transport, "backend"):
+                backend_name = "starlette"
+                if "FastAPIBackend" in self._transport.backend.__class__.__name__:
+                    backend_name = "fastapi"
+                transport_config["backend"] = backend_name
+            if hasattr(self._transport, "backend") and hasattr(self._transport.backend, "validate_schema"):
+                transport_config["validate_schema"] = getattr(self._transport.backend, "validate_schema", False)
+            data["transport"] = transport_config
+
+        # Registry
+        if self.registry_client:
+            data["registry"] = {
+                "type": getattr(self.registry_client.transport, "transport_type", "http"),
+                "url": self.registry_client.url,
+            }
+
+        # LLM
+        if self.llm:
+            llm_config = {
+                "provider": self.llm.provider,
+                "model": self.llm.model,
+                "model_params": self.llm._model_params,
+                "reasoning": self.llm._reasoning,
+            }
+            base_url = getattr(self.llm, "base_url", None)
+            if base_url:
+                llm_config["base_url"] = base_url
+            data["llm"] = llm_config
+
+        # Authenticator
+        if self.authenticator:
+            auth_type = self.authenticator.__class__.__name__
+            if auth_type == "BearerTokenAuth":
+                data["authenticator"] = {
+                    "type": "bearer",
+                    "secret": getattr(self.authenticator, "secret", ""),
+                    "algorithm": getattr(self.authenticator, "algorithm", "HS256"),
+                }
+            elif auth_type == "APIKeyAuth":
+                data["authenticator"] = {
+                    "type": "api_key",
+                    "valid_keys": getattr(self.authenticator, "valid_keys", {}),
+                }
+            elif auth_type == "BasicAuth":
+                data["authenticator"] = {
+                    "type": "basic",
+                    "valid_credentials": getattr(self.authenticator, "valid_credentials", {}),
+                }
+            elif auth_type == "OAuth2DelegationAuth":
+                data["authenticator"] = {
+                    "type": "oauth2",
+                    "exchange_endpoint": getattr(self.authenticator, "exchange_endpoint", ""),
+                    "client_id": getattr(self.authenticator, "client_id", ""),
+                    "client_secret": getattr(self.authenticator, "client_secret", ""),
+                }
+
+        # Tools
+        if self.tools:
+            data["tools"] = [self._serialize_tool(t) for t in self.tools.values()]
+
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any], **overrides) -> "Agent":
+        """Reconstruct an Agent instance from a dictionary configuration.
+
+        Args:
+            data: The serialized configuration dictionary.
+            **overrides: Override specific parameters passed to the Agent constructor.
+        """
+        card_data = overrides.get("card", data.get("card"))
+        if not card_data:
+            raise ValueError("Configuration dictionary must contain 'card' field.")
+
+        # Authenticator
+        authenticator = overrides.get("authenticator")
+        if authenticator is None:
+            auth_config = data.get("authenticator")
+            if auth_config:
+                t = auth_config.get("type")
+                if t == "bearer":
+                    from protolink.security.auth import BearerTokenAuth
+
+                    authenticator = BearerTokenAuth(
+                        secret=auth_config.get("secret", ""),
+                        algorithm=auth_config.get("algorithm", "HS256"),
+                    )
+                elif t == "api_key":
+                    from protolink.security.auth import APIKeyAuth
+
+                    authenticator = APIKeyAuth(valid_keys=auth_config.get("valid_keys", {}))
+                elif t == "basic":
+                    from protolink.security.auth import BasicAuth
+
+                    authenticator = BasicAuth(valid_credentials=auth_config.get("valid_credentials", {}))
+                elif t == "oauth2":
+                    from protolink.security.auth import OAuth2DelegationAuth
+
+                    authenticator = OAuth2DelegationAuth(
+                        exchange_endpoint=auth_config.get("exchange_endpoint", ""),
+                        client_id=auth_config.get("client_id", ""),
+                        client_secret=auth_config.get("client_secret", ""),
+                    )
+
+        # Credentials
+        credentials = overrides.get("credentials", data.get("credentials"))
+
+        # Transport
+        transport = overrides.get("transport")
+        if transport is None:
+            transport_config = data.get("transport")
+            if transport_config:
+                transport_type = transport_config.get("type", "http")
+                try:
+                    from protolink.transport import get_transport
+
+                    t_kwargs = {
+                        "url": transport_config.get("url", card_data.get("url")),
+                        "timeout": transport_config.get("timeout", 360.0),
+                    }
+                    if "backend" in transport_config:
+                        t_kwargs["backend"] = transport_config["backend"]
+                    if "validate_schema" in transport_config:
+                        t_kwargs["validate_schema"] = transport_config["validate_schema"]
+
+                    t_kwargs["authenticator"] = authenticator
+                    t_kwargs["credentials"] = credentials
+
+                    transport = get_transport(transport_type, **t_kwargs)
+                except Exception:
+                    transport = transport_type
+
+        # Registry
+        registry = overrides.get("registry")
+        registry_url = overrides.get("registry_url")
+        if registry is None:
+            registry_config = data.get("registry")
+            if registry_config:
+                registry = registry_config.get("type")
+                registry_url = registry_config.get("url")
+
+        # LLM
+        llm = overrides.get("llm")
+        if llm is None:
+            llm_config = data.get("llm")
+            if llm_config:
+                from protolink.llms import create_llm
+
+                provider = llm_config.get("provider")
+                l_kwargs = {
+                    "model": llm_config.get("model"),
+                    "model_params": llm_config.get("model_params", {}),
+                    "reasoning": llm_config.get("reasoning", "none"),
+                }
+                base_url = llm_config.get("base_url")
+                if base_url:
+                    l_kwargs["base_url"] = base_url
+                llm = create_llm(provider, **l_kwargs)
+
+        storage = overrides.get("storage")
+        state = overrides.get("state")
+        telemetry = overrides.get("telemetry")
+        logger = overrides.get("logger")
+
+        skills_val = overrides.get("skills", data.get("skills"))
+        skills: Literal["auto", "fixed"] = skills_val if skills_val in ("auto", "fixed") else "auto"
+
+        verbosity_val = overrides.get("verbosity", data.get("verbosity"))
+        verbosity: Literal[0, 1, 2] = verbosity_val if verbosity_val in (0, 1, 2) else 1
+
+        expose_chat_val = overrides.get("expose_chat", data.get("expose_chat"))
+        expose_chat: bool = bool(expose_chat_val) if expose_chat_val is not None else True
+
+        discovery_ttl_val = overrides.get("discovery_ttl", data.get("discovery_ttl"))
+        discovery_ttl: int = int(discovery_ttl_val) if discovery_ttl_val is not None else 0
+
+        override_system_prompt_val = overrides.get("override_system_prompt", data.get("override_system_prompt"))
+        override_system_prompt: bool = (
+            bool(override_system_prompt_val) if override_system_prompt_val is not None else False
+        )
+
+        system_prompt = overrides.get("system_prompt", data.get("system_prompt"))
+
+        agent = cls(
+            card=card_data,
+            transport=transport,
+            registry=registry,
+            registry_url=registry_url,
+            llm=llm,
+            system_prompt=system_prompt,
+            storage=storage,
+            state=state,
+            telemetry=telemetry,
+            skills=skills,
+            logger=logger,
+            discovery_ttl=discovery_ttl,
+            override_system_prompt=override_system_prompt,
+            verbosity=verbosity,
+            expose_chat=expose_chat,
+            authenticator=authenticator,
+            credentials=credentials,
+        )
+
+        tools_data = data.get("tools", [])
+        for tool_dict in tools_data:
+            tool = cls._deserialize_tool(tool_dict)
+            agent.add_tool(tool)
+
+        return agent
+
+    def to_yaml_string(self) -> str:
+        """Serialize the agent configuration to a YAML string."""
+        import yaml
+
+        return yaml.safe_dump(self.to_dict(), sort_keys=False)
+
+    def to_yaml(self, filepath: str) -> None:
+        """Export the agent configuration to a YAML file.
+
+        Args:
+            filepath: Absolute or relative path to the YAML file.
+        """
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(self.to_yaml_string())
+
+    @classmethod
+    def from_yaml_string(cls, yaml_str: str, **overrides) -> "Agent":
+        """Reconstruct an Agent instance from a YAML string.
+
+        Args:
+            yaml_str: The YAML string containing agent configuration.
+            **overrides: Override specific parameters passed to the Agent constructor.
+        """
+        import yaml
+
+        data = yaml.safe_load(yaml_str)
+        if not isinstance(data, dict):
+            raise ValueError("Invalid YAML configuration format. Must be a mapping/dictionary.")
+        return cls.from_dict(data, **overrides)
+
+    @classmethod
+    def from_yaml(cls, filepath: str, **overrides) -> "Agent":
+        """Load and reconstruct an Agent instance from a YAML file.
+
+        Args:
+            filepath: Path to the YAML file.
+            **overrides: Override specific parameters passed to the Agent constructor.
+        """
+        with open(filepath, encoding="utf-8") as f:
+            yaml_str = f.read()
+        return cls.from_yaml_string(yaml_str, **overrides)
+
 
 class SyncAgent:
     """Synchronous wrapper around Agent.
