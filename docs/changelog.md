@@ -11,6 +11,25 @@
 
 ## Release Notes
 
+### [v0.5.7] - 2026-06-07
+
+NEW:
+
+- Authentication now works with all transports (http, websocket)
+  - Integrated to Agent. Now passable to agent as an argument 
+    - `authenticator`: Optional Authenticator instance for verifying incoming requests to this agent.
+    - `credentials`: Optional credentials string used for authenticating outgoing requests.
+
+- **Import** / **Export** Agent from/to `yaml`
+  - Agent can now serialize itself and save to yaml file
+    - `to_yaml`: Saves the agent configuration to a YAML file
+  - Agent can now load from yaml file
+    - `from_yaml`: Loads the agent configuration from a YAML file
+
+Bug Fixes:
+
+None
+
 ### [v0.5.6] - 2026-05-17
 
 # Flows Refactor & Upgrade
