@@ -845,18 +845,9 @@ class Agent:
             - error: Error information (on failure)
         """
 
-        if hasattr(part.content, "tool_name"):
-            # Handle the dataclass object (in-memory execution)
-            tool_name = part.content.tool_name
-            args = part.content.args
-            call_id = part.content.call_id
-            self._logger.debug(f"Executing tool: {tool_name}")
-        else:
-            # Handle the dictionary (network/JSON execution)
-            tool_name = part.content.get("tool_name")
-            args = part.content.get("args", {})
-            call_id = part.content.get("call_id")
-            self._logger.debug(f"Executing tool: {tool_name}")
+        tc = part.as_tool_call()
+        tool_name, args, call_id = tc.tool_name, tc.args, tc.call_id
+        self._logger.debug(f"Executing tool: {tool_name}")
 
         tool = self.tools.get(tool_name)
         if not tool:
