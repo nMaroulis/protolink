@@ -96,6 +96,24 @@ class Part:
         content = cls._hydrate_content(part_type, data.get("content"))
         return cls(type=part_type, content=content)
 
+    def as_tool_call(self) -> ToolCall:
+        if self.type != "tool_call":
+            raise ValueError(f"Expected part type 'tool_call', got '{self.type}'")
+        if isinstance(self.content, ToolCall):
+            return self.content
+        if isinstance(self.content, dict):
+            return self._hydrate_content("tool_call", self.content)
+        raise TypeError(f"Unexpected tool_call content type: {type(self.content)}")
+
+    def as_tool_output(self) -> ToolOutput:
+        if self.type != "tool_output":
+            raise ValueError(f"Expected part type 'tool_output', got '{self.type}'")
+        if isinstance(self.content, ToolOutput):
+            return self.content
+        if isinstance(self.content, dict):
+            return self._hydrate_content("tool_output", self.content)
+        raise TypeError(f"Unexpected tool_output content type: {type(self.content)}")
+
     @classmethod
     def text(cls, content: str) -> "Part":
         """Create a text part (convenience method)."""
