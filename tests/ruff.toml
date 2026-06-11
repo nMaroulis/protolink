@@ -1,0 +1,46 @@
+line-length = 120
+target-version = "py310"
+
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[lint]
+# Enable all error (E) and warning (W) level rules
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "A",   # flake8-builtins
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "YTT", # flake8-2020
+    "FBT", # flake8-boolean-trap
+    "Q",   # flake8-quotes
+    "RUF", # ruff-specific rules
+]
+
+# Allow autofix for all rules
+fixable = ["ALL"]
+
+# Specific rule configurations
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+"tests/*" = ["S101"]      # Allow assert in test files
+
+[lint.isort]
+known-first-party = ["protolink"]
+
+[lint.flake8-quotes]
+docstring-quotes = "double"
+
+[lint.mccabe]
+max-complexity = 10

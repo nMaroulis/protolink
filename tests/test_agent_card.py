@@ -10,6 +10,7 @@ def test_agent_card_initialization():
     assert card.name == "test-agent"
     assert card.description == "A test agent"
     assert card.url == "http://test-agent.local"
+    assert card.transport == "http"
     assert card.version == "1.0.0"
     assert isinstance(card.capabilities, AgentCapabilities)
     assert card.capabilities.streaming is False
@@ -51,6 +52,7 @@ def test_to_dict():
     assert json_data["name"] == "json-agent"
     assert json_data["description"] == "Agent for JSON testing"
     assert json_data["url"] == "http://json-test.local"
+    assert json_data["transport"] == "http"
     assert json_data["version"] == "1.0.0"
     assert json_data["capabilities"]["streaming"] is True
     assert json_data["capabilities"]["tool_calling"] is True
@@ -63,6 +65,7 @@ def test_from_dict():
         "name": "from-json",
         "description": "Agent created from JSON",
         "url": "http://from-json.local",
+        "transport": "sse",
         "version": "3.0.0",
         "capabilities": {"streaming": True, "tool_calling": True},
         "securitySchemes": {"oauth2": {"type": "oauth2"}},
@@ -73,6 +76,7 @@ def test_from_dict():
     assert card.name == "from-json"
     assert card.description == "Agent created from JSON"
     assert card.url == "http://from-json.local"
+    assert card.transport == "sse"
     assert card.version == "3.0.0"
     assert isinstance(card.capabilities, AgentCapabilities)
     assert card.capabilities.streaming is True
