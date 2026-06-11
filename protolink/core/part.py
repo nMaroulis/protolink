@@ -54,6 +54,33 @@ class Part:
     type: PartType
     content: Any
 
+    @staticmethod
+    def _hydrate_content(part_type: PartType, content: Any) -> Any:
+        if content is None:
+            return content
+
+        if part_type == "tool_call":
+            if isinstance(content, ToolCall):
+                return content
+            if isinstance(content, dict):
+                return ToolCall(
+                    tool_name=content["tool_name"],
+                    args=content.get("args", {}),
+                    call_id=content.get("call_id", IDGenerator.generate_tool_call_id()),
+                )
+
+        if part_type == "tool_output":
+            if isinstance(content, ToolOutput):
+                return content
+            if isinstance(content, dict):
+                return ToolOutput(
+                    call_id=content.get("call_id", IDGenerator.generate_tool_output_id()),
+                    result=content.get("result"),
+                    error=content.get("error"),
+                )
+
+        return content
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         content = asdict(self.content) if hasattr(self.content, "__dataclass_fields__") else self.content
@@ -65,7 +92,9 @@ class Part:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Part":
         """Create from dictionary."""
-        return cls(**data)
+        part_type = data["type"]
+        content = cls._hydrate_content(part_type, data.get("content"))
+        return cls(type=part_type, content=content)
 
     @classmethod
     def text(cls, content: str) -> "Part":
