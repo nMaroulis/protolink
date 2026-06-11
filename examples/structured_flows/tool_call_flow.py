@@ -72,7 +72,7 @@ def main():
     if last_item:
         for part in last_item.parts:
             if part.type == "tool_output":
-                res = part.content.result if hasattr(part.content, "result") else part.content.get("result")
+                res = part.as_tool_output().result
                 print(f"✅ Success! Tool Output: {res}")
             elif part.type == "error":
                 msg = part.content.message if hasattr(part.content, "message") else part.content.get("message")

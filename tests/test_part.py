@@ -51,11 +51,12 @@ async def test_execute_tool_with_deserialized_part():
     """Simulates network path: tool_call arrives as dict via from_dict."""
 
     class EchoTool(BaseTool):
-        name = "echo"
-        description = "echo"
-        input_schema = {}
-        output_schema = {}
-        tags: list[str] = []
+        def __init__(self):
+            self.name = "echo"
+            self.description = "echo"
+            self.input_schema = {}
+            self.output_schema = {}
+            self.tags = []
 
         async def __call__(self, **kwargs):
             return kwargs.get("msg", "")
@@ -71,4 +72,3 @@ async def test_execute_tool_with_deserialized_part():
     assert result.type == "tool_output"
     assert result.as_tool_output().result == "ping"
     assert result.as_tool_output().call_id == "c1"
-
