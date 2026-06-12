@@ -88,6 +88,7 @@ from protolink.llms.prompts import (
     SYSTEM_REASONING_MAP,
     TOOL_CALL_PROMPT,
 )
+from protolink.llms.serialization import json_history_default
 from protolink.tools import BaseTool
 from protolink.types import LLMProvider, LLMType, ReasoningLevel
 
@@ -776,7 +777,8 @@ class LLM(ABC):
                     "type": "tool_result",
                     "tool": tool_name,
                     "result": tool_result,
-                }
+                },
+                default=json_history_default,
             )
         )
 
@@ -820,7 +822,8 @@ class LLM(ABC):
                     "agent": agent_name,
                     "action": agent_action,
                     "result": agent_result,
-                }
+                },
+                default=json_history_default,
             )
         )
 

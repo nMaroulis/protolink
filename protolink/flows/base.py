@@ -252,7 +252,8 @@ class Flow(ABC):
             last_item = task.get_last_item()
             if last_item:
                 has_executable = any(p.type in ("infer", "tool_call") for p in last_item.parts)
-                if not has_executable:
+                is_plain_user_message = isinstance(last_item, Message) and last_item.role == "user"
+                if not has_executable and not is_plain_user_message:
                     content = task.get_last_part_content()
                     if content is not None:
                         task.add_message(Message.infer(prompt=str(content)))

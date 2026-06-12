@@ -248,6 +248,19 @@ async def main():
 | `sync.discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Synchronous version of `discover_agents()`. |
 | `sync.call_agent()` | `agent_url: str`, `task: Task` | `Task` | Synchronous version of `call_agent()`. |
 
+#### Task Lifecycle
+
+The default `Agent` implementation manages `Task.state` for you:
+
+1. Incoming non-terminal tasks move to `TaskState.WORKING`.
+2. Successful tool or LLM outputs move the task to `TaskState.COMPLETED`.
+3. Error parts, failed tool outputs, or raised exceptions move the task to `TaskState.FAILED`.
+4. Status parts requesting more input move the task to `TaskState.INPUT_REQUIRED`.
+
+Every successful state change is appended to `task.metadata["state_history"]`. Streaming handlers emit matching `TaskStatusUpdateEvent` events and include the final serialized task in the final status event metadata.
+
+If you override `handle_task()` completely, you are responsible for preserving this lifecycle behavior. Prefer calling `await self.execute_task(task)` inside custom handlers when you only need to wrap or augment the default execution.
+
 #### The Inference Loop Integration
 
 When `execute_task()` encounters an `infer` part, it delegates to `LLM.infer()` with:

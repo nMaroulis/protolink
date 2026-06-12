@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 from protolink.llms._deps import require_anthropic
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
+from protolink.llms.serialization import json_history_default
 from protolink.types import LLMProvider
 from protolink.utils.logging import get_logger
 
@@ -127,7 +128,8 @@ class AnthropicLLM(APILLM):
                     "type": "tool_result",
                     "tool": tool_name,
                     "result": tool_result,
-                }
+                },
+                default=json_history_default,
             )
         )
 
@@ -150,7 +152,8 @@ class AnthropicLLM(APILLM):
                     "agent": agent_name,
                     "action": agent_action,
                     "result": agent_result,
-                }
+                },
+                default=json_history_default,
             )
         )
 

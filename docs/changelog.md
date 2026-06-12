@@ -11,6 +11,50 @@
 
 ## Release Notes
 
+### [v0.5.9] - TBD
+
+NEW:
+
+- **Task lifecycle enforcement**
+  - `Task.state` now uses enforced `TaskState` transitions instead of acting as a loose label.
+  - Added terminal-state awareness through `Task.is_terminal` for `completed`, `failed`, and `canceled` tasks.
+  - Added lifecycle helpers: `Task.begin()`, `Task.require_input()`, and `Task.cancel()`.
+  - Successful state transitions are recorded in `task.metadata["state_history"]`.
+  - Direct task construction now normalizes serialized state values and rebuilds the last-item cache.
+
+- **Agent-managed task states**
+  - Default `Agent.execute_task()` now moves non-terminal tasks to `working`, finalizes successful runs as `completed`, marks error outputs and exceptions as `failed`, and supports `input-required` status outputs.
+  - Streaming task handling now emits lifecycle-aware status updates and includes the final serialized task in final status event metadata.
+  - `TaskLifecycle` now applies protocol-safe transition paths before completing, requiring input, failing, or canceling tasks.
+
+- **LLM history serialization helper**
+  - Added `protolink.llms.serialization.json_history_default()` for framework object serialization in LLM conversation history.
+  - Base and Anthropic LLM history injection now serialize dataclasses, `to_dict()` objects, and `model_dump()` objects consistently.
+
+Changed:
+
+- `protolink.models` now exports `TaskState`.
+- Task validation now accepts empty message, artifact, and metadata containers and validates `Task.state` as a `TaskState`.
+- Flow execution no longer auto-wraps plain user messages without executable parts into inferred prompts.
+- `.ruff_cache/` is now ignored by git.
+
+Fixed:
+
+- Fixed delegated agent tool results crashing LLM history injection when the remote tool output is hydrated as a `ToolOutput` dataclass.
+- Fixed task execution leaving tasks in non-terminal states after successful default agent execution.
+- Fixed invalid direct lifecycle jumps such as `submitted -> completed` by requiring transition through `working`.
+
+Docs:
+
+- Updated README task semantics to describe `Task.state` and `metadata["state_history"]`.
+- Added Agent documentation for default task lifecycle behavior and streaming status updates.
+- Expanded model and transport docs for task lifecycle states, terminal states, transition history, and new task helper methods.
+
+Tests:
+
+- Added lifecycle coverage for direct task construction, invalid transitions, `Task.complete()`, successful agent execution, and failed tool execution.
+- Added regression coverage for delegated `ToolOutput` serialization in the LLM inference loop.
+
 ### [v0.5.8] - 2026-06-11
 
 NEW:

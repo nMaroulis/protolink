@@ -10,6 +10,13 @@ from protolink.utils.id_generator import IDGenerator
 
 
 class TaskState(Enum):
+    """Lifecycle states for a task as it moves through agent execution.
+
+    The default lifecycle is:
+    ``submitted`` -> ``working`` -> one of ``completed``, ``input-required``,
+    ``failed``, or ``canceled``. Terminal states cannot transition further.
+    """
+
     SUBMITTED = "submitted"
     WORKING = "working"
     INPUT_REQUIRED = "input-required"
@@ -29,6 +36,22 @@ _ALLOWED_TRANSITIONS: dict[TaskState, set[TaskState]] = {
     TaskState.FAILED: set(),
     TaskState.UNKNOWN: set(TaskState),
 }
+
+_TERMINAL_STATES: set[TaskState] = {TaskState.COMPLETED, TaskState.CANCELED, TaskState.FAILED}
+
+
+def _coerce_task_state(state: TaskState | str) -> TaskState:
+    """Normalize a state value to ``TaskState``.
+
+    Serialized tasks carry states as strings, while in-memory tasks store the
+    enum. Accepting both keeps deserialization and direct construction
+    ergonomic while preserving a single internal representation.
+    """
+    if isinstance(state, TaskState):
+        return state
+    if isinstance(state, str):
+        return TaskState(state)
+    raise TypeError(f"Task state must be a TaskState or str, got {type(state).__name__}")
 
 
 @dataclass
@@ -66,6 +89,41 @@ class Task:
 
     _last_item: Message | Artifact | None = field(default=None, init=False, repr=False)
 
+    def __post_init__(self) -> None:
+        """Normalize state and rebuild the last-item cache after dataclass init."""
+        self.state = _coerce_task_state(self.state)
+        if self._last_item is None:
+            self._last_item = self._compute_last_item()
+
+    def _compute_last_item(self) -> Message | Artifact | None:
+        """Return the most recent message or artifact based on timestamps."""
+        candidates: list[Message | Artifact] = []
+        if self.messages:
+            candidates.append(self.messages[-1])
+        if self.artifacts:
+            candidates.append(self.artifacts[-1])
+        if not candidates:
+            return None
+        return max(candidates, key=lambda item: item.timestamp)
+
+    def _record_state_transition(self, previous_state: TaskState, new_state: TaskState) -> None:
+        """Append a serialized state transition to ``metadata['state_history']``."""
+        history = self.metadata.setdefault("state_history", [])
+        if not isinstance(history, list):
+            return
+        history.append(
+            {
+                "previous_state": previous_state.value,
+                "new_state": new_state.value,
+                "timestamp": utc_now(),
+            }
+        )
+
+    @property
+    def is_terminal(self) -> bool:
+        """Return whether the task is in a terminal lifecycle state."""
+        return self.state in _TERMINAL_STATES
+
     def add_message(self, message: Message) -> "Task":
         """Add a message to the task and update the last item cache.
 
@@ -84,30 +142,74 @@ class Task:
         self._last_item = artifact
         return self
 
-    def update_state(self, state: TaskState) -> "Task":
-        """Update task state.
+    def update_state(self, state: TaskState | str) -> "Task":
+        """Transition the task to a new state.
+
+        The transition must be allowed by the task lifecycle graph. Repeating
+        the current state is treated as a no-op. Successful transitions are
+        recorded in ``metadata['state_history']``.
 
         Time: O(1)
         """
-        self.state = state
+        current_state = _coerce_task_state(self.state)
+        new_state = _coerce_task_state(state)
+        if current_state == new_state:
+            self.state = new_state
+            return self
+
+        if new_state not in _ALLOWED_TRANSITIONS[current_state]:
+            raise ValueError(f"Invalid task state transition: {current_state.value} -> {new_state.value}")
+
+        self.state = new_state
+        self._record_state_transition(current_state, new_state)
+        return self
+
+    def begin(self) -> "Task":
+        """Mark the task as actively being processed."""
+        return self.update_state(TaskState.WORKING)
+
+    def require_input(self, message: Message | None = None) -> "Task":
+        """Mark the task as waiting for additional input.
+
+        If the task has not started yet, it is first moved through
+        ``WORKING`` so the lifecycle history remains valid.
+        """
+        if self.state in {TaskState.SUBMITTED, TaskState.INPUT_REQUIRED}:
+            self.begin()
+        self.update_state(TaskState.INPUT_REQUIRED)
+        if message:
+            self.add_message(message)
         return self
 
     def complete(self, response_text: str) -> "Task":
-        """Mark task as completed with a response.
+        """Mark the task as completed and append a final agent message.
+
+        If the task is still ``SUBMITTED`` or ``INPUT_REQUIRED``, it is first
+        moved through ``WORKING`` so callers can use this convenience method
+        directly without manually managing intermediate states.
 
         Time: O(1)
         """
+        if self.state in {TaskState.SUBMITTED, TaskState.INPUT_REQUIRED}:
+            self.begin()
+        self.update_state(TaskState.COMPLETED)
         self.add_message(Message.agent(response_text))
-        self.state = TaskState.COMPLETED
         return self
 
     def fail(self, error_message: str) -> "Task":
-        """Mark task as failed.
+        """Mark the task as failed and store the error message in metadata.
 
         Time: O(1)
         """
+        self.update_state(TaskState.FAILED)
         self.metadata["error"] = error_message
-        self.state = TaskState.FAILED
+        return self
+
+    def cancel(self, reason: str | None = None) -> "Task":
+        """Mark the task as canceled and optionally store a cancel reason."""
+        self.update_state(TaskState.CANCELED)
+        if reason:
+            self.metadata["cancel_reason"] = reason
         return self
 
     def to_dict(self) -> dict[str, Any]:
@@ -136,7 +238,7 @@ class Task:
         """
         messages = [Message.from_dict(m) for m in data.get("messages", [])]
         artifacts = [Artifact.from_dict(a) for a in data.get("artifacts", [])]
-        task = cls(
+        return cls(
             id=data.get("id", IDGenerator.generate_task_id()),
             state=TaskState(data.get("state", TaskState.SUBMITTED.value)),
             messages=messages,
@@ -145,18 +247,6 @@ class Task:
             flow_state=data.get("flow_state", {}),
             created_at=data.get("created_at", utc_now()),
         )
-
-        # Reconstruct last item cache from existing data
-        candidates = []
-        if messages:
-            candidates.append(messages[-1])
-        if artifacts:
-            candidates.append(artifacts[-1])
-
-        if candidates:
-            task._last_item = max(candidates, key=lambda x: x.timestamp)
-
-        return task
 
     @classmethod
     def create(cls, message: Message) -> "Task":

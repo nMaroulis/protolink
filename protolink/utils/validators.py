@@ -8,7 +8,7 @@ import uuid
 
 from protolink.core.agent_card import AgentCard
 from protolink.core.message import Message
-from protolink.core.task import Task
+from protolink.core.task import Task, TaskState
 
 
 class Validator:
@@ -86,16 +86,16 @@ class Validator:
         if not task.id or not cls._is_valid_uuid(task.id):
             return False, "Task ID is required and must be a valid UUID"
 
-        if not task.state or not isinstance(task.state, str):
-            return False, "Task state is required and must be a string"
+        if not isinstance(task.state, TaskState):
+            return False, "Task state is required and must be a TaskState"
 
-        if not task.messages or not isinstance(task.messages, list):
+        if not isinstance(task.messages, list):
             return False, "Task messages are required and must be a list"
 
-        if not task.artifacts or not isinstance(task.artifacts, list):
+        if not isinstance(task.artifacts, list):
             return False, "Task artifacts are required and must be a list"
 
-        if not task.metadata or not isinstance(task.metadata, dict):
+        if not isinstance(task.metadata, dict):
             return False, "Task metadata are required and must be a dict"
 
         return True, ""

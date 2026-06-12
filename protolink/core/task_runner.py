@@ -9,18 +9,34 @@ from protolink.core.task import Task, TaskState
 
 
 class TaskLifecycle:
-    """Handles transitions of Task states and optional artifacts."""
+    """Apply protocol-safe task state transitions.
+
+    This helper is intentionally small: it centralizes lifecycle transitions
+    for code that interprets already-produced outputs. It does not execute
+    tools, call LLMs, or perform agent dispatch.
+    """
+
+    @staticmethod
+    def _begin_if_needed(task: Task) -> None:
+        """Move a non-terminal task to ``WORKING`` before a final transition."""
+        if not task.is_terminal and task.state != TaskState.WORKING:
+            task.update_state(TaskState.WORKING)
 
     def submit(self, task: Task) -> Task:
+        """Mark a task as submitted."""
         return task.update_state(TaskState.SUBMITTED)
 
     def begin(self, task: Task) -> Task:
+        """Mark a task as actively being processed."""
         return task.update_state(TaskState.WORKING)
 
     def require_input(self, task: Task, message: Message | None = None) -> Task:
+        """Mark a task as waiting for additional input."""
+        self._begin_if_needed(task)
+        task.update_state(TaskState.INPUT_REQUIRED)
         if message:
             task.add_message(message)
-        return task.update_state(TaskState.INPUT_REQUIRED)
+        return task
 
     def complete(
         self,
@@ -28,12 +44,15 @@ class TaskLifecycle:
         message: Message | None = None,
         artifacts: list[Artifact] | None = None,
     ) -> Task:
+        """Mark a task as completed and optionally attach outputs."""
+        self._begin_if_needed(task)
+        task.update_state(TaskState.COMPLETED)
         if message:
             task.add_message(message)
         if artifacts:
             for artifact in artifacts:
                 task.add_artifact(artifact)
-        return task.update_state(TaskState.COMPLETED)
+        return task
 
     def fail(
         self,
@@ -41,11 +60,13 @@ class TaskLifecycle:
         error: str,
         artifacts: list[Artifact] | None = None,
     ) -> Task:
+        """Mark a task as failed and record the error message."""
+        task.update_state(TaskState.FAILED)
         task.metadata["error"] = error
         if artifacts:
             for artifact in artifacts:
                 task.add_artifact(artifact)
-        return task.update_state(TaskState.FAILED)
+        return task
 
     def cancel(
         self,
@@ -53,12 +74,14 @@ class TaskLifecycle:
         reason: str | None = None,
         artifacts: list[Artifact] | None = None,
     ) -> Task:
+        """Mark a task as canceled and optionally record a reason."""
+        task.update_state(TaskState.CANCELED)
         if reason:
             task.metadata["cancel_reason"] = reason
         if artifacts:
             for artifact in artifacts:
                 task.add_artifact(artifact)
-        return task.update_state(TaskState.CANCELED)
+        return task
 
 
 class TaskRunner:

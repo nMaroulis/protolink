@@ -278,12 +278,13 @@ Type alias for supported security schemes in Protolink. These are used to specif
 ```python
 @dataclass
 class Task:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=IDGenerator.generate_task_id)
     state: TaskState = TaskState.SUBMITTED
     messages: list[Message] = field(default_factory=list)
     artifacts: list[Artifact] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    flow_state: dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=utc_now)
 ```
 
 Unit of work exchanged between agents. Tasks encapsulate a complete unit of work including messages, state, and output artifacts.
@@ -300,7 +301,43 @@ Unit of work exchanged between agents. Tasks encapsulate a complete unit of work
 | `messages` | `list[Message]` | `[]` | Communication history |
 | `artifacts` | `list[Artifact]` | `[]` | Output artifacts |
 | `metadata` | `dict[str, Any]` | `{}` | Additional metadata |
+| `flow_state` | `dict[str, Any]` | `{}` | Flow/orchestration context |
 | `created_at` | `str` | `utc now` | Creation timestamp |
+
+### Lifecycle
+
+`Task.state` is an enforced lifecycle value, not a loose label. Valid transitions are:
+
+```text
+submitted -> working -> completed
+submitted -> working -> input-required -> working -> completed
+submitted -> working -> failed
+submitted -> canceled
+```
+
+`completed`, `failed`, and `canceled` are terminal states. Once a task reaches one of them, it should not be processed again.
+
+Every successful state change is recorded in `task.metadata["state_history"]`:
+
+```python
+[
+    {
+        "previous_state": "submitted",
+        "new_state": "working",
+        "timestamp": "2026-06-12T08:30:00Z",
+    }
+]
+```
+
+The default `Agent.execute_task()` lifecycle is:
+
+1. Move a non-terminal task to `WORKING`.
+2. Execute explicit `tool_call` and `infer` parts from the latest message or artifact.
+3. Append outputs as artifacts or messages.
+4. Set the final state:
+   - `COMPLETED` for successful outputs
+   - `FAILED` for error parts, failed tool outputs, or exceptions
+   - `INPUT_REQUIRED` for status parts requesting more input
 
 ### Methods
 
@@ -352,13 +389,15 @@ task.add_artifact(artifact)
 
 ---
 
-#### `update_state(state: TaskState) -> Task` { #task-update-state }
+#### `update_state(state: TaskState | str) -> Task` { #task-update-state }
 
-Update the task's current state.
+Transition the task to a new state.
+
+The transition must be valid according to the lifecycle graph above. Repeating the current state is a no-op. Invalid transitions raise `ValueError`.
 
 **Parameters:**
 ```python
-state: TaskState  # New task state from TaskState enum
+state: TaskState | str  # New task state
 ```
 
 **Returns:**
@@ -372,6 +411,30 @@ task.update_state(TaskState.WORKING)
 # ... process task ...
 task.update_state(TaskState.COMPLETED)
 ```
+
+Invalid direct jumps are rejected:
+
+```python
+task = Task.create(Message.user("hello"))
+task.update_state(TaskState.COMPLETED)
+# ValueError: Invalid task state transition: submitted -> completed
+```
+
+---
+
+#### `begin() -> Task` { #task-begin }
+
+Mark the task as actively being processed.
+
+This is equivalent to `task.update_state(TaskState.WORKING)`.
+
+---
+
+#### `require_input(message: Message | None = None) -> Task` { #task-require-input }
+
+Mark the task as waiting for more input.
+
+If the task is still `SUBMITTED`, this convenience method first transitions through `WORKING` so the lifecycle history remains valid.
 
 ---
 
@@ -393,6 +456,7 @@ Task  # Self for method chaining
 ```python
 task.complete("The weather is sunny and 75°F.")
 print(task.state)  # TaskState.COMPLETED
+print(task.metadata["state_history"][-1]["new_state"])  # "completed"
 ```
 
 ---
@@ -416,6 +480,17 @@ Task  # Self for method chaining
 task.fail("Weather API unavailable")
 print(task.state)  # TaskState.FAILED
 print(task.metadata["error"])  # "Weather API unavailable"
+```
+
+---
+
+#### `cancel(reason: str | None = None) -> Task` { #task-cancel }
+
+Mark the task as canceled.
+
+**Parameters:**
+```python
+reason: str | None  # Optional cancellation reason stored in metadata
 ```
 
 ---
@@ -454,12 +529,9 @@ Task  # New Task instance
 
 **Example:**
 ```python
-task_dict = {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "state": "completed",
-    "messages": []
-}
+task_dict = {"state": "working", "messages": [], "artifacts": []}
 task = Task.from_dict(task_dict)
+print(task.state)  # TaskState.WORKING
 ```
 
 ---
@@ -515,9 +587,9 @@ from protolink.models import Task, Message
 # Create task with initial message
 task = Task.create(Message.user("What's the weather in New York?"))
 
-# Add response and complete
-task.add_message(Message.agent("It's 72°F and sunny in New York."))
-task.complete("Weather forecast provided.")
+# Process it through the default lifecycle
+task.begin()
+task.complete("It's 72°F and sunny in New York.")
 
 # Or use convenience method
 task = Task.create(Message.user("Hello")).complete("Hi there!")
@@ -539,6 +611,9 @@ class TaskState(Enum):
 ```
 
 Enumeration of possible task states.
+
+!!! note "Terminal States"
+    `COMPLETED`, `CANCELED`, and `FAILED` are terminal. They intentionally have no outgoing transitions.
 
 ### Values
 

@@ -3,7 +3,7 @@ from protolink.core.agent_card import AgentCard, AgentSkill
 from protolink.core.artifact import Artifact
 from protolink.core.message import Message
 from protolink.core.part import Part
-from protolink.core.task import Task
+from protolink.core.task import Task, TaskState
 from protolink.server.endpoint_handler import EndpointSpec
 
 __all__ = [
@@ -15,4 +15,5 @@ __all__ = [
     "Message",
     "Part",
     "Task",
+    "TaskState",
 ]

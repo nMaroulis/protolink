@@ -433,7 +433,8 @@ This project uses a structured, Agent-to-Agent (A2A) style communication model. 
 ### 1. Task
 A **Task** represents a unit of work or a conversation thread between agents.  
 - It contains **Messages** and **Artifacts**.
-- Tracks **metadata** such as state (`submitted`, `working`, `completed`) and execution history.
+- Tracks lifecycle through `Task.state` (`submitted`, `working`, `completed`, `failed`, etc.).
+- Records successful state transitions in `metadata["state_history"]`.
 - Tasks are sent between agents; each agent executes what is explicitly defined in the task.
 
 ### 2. Message
@@ -474,7 +475,7 @@ A **Part** is the atomic content of a Message or Artifact.
 
 3. **Appending Outputs**  
    - Results are appended to the Task as new **Artifacts**.
-   - Lifecycle state transitions (`working`, `completed`, `failed`) are updated in the Task metadata.
+   - Lifecycle state transitions are applied to `Task.state` and recorded in `metadata["state_history"]`.
 
 4. **Sequential Processing**  
    - Tasks are processed sequentially at the message/artifact level.

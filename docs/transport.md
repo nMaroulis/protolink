@@ -152,11 +152,13 @@ The tables below document each object type.
 | Field        | Type             | Description                                   |
 |------------- |------------------|-----------------------------------------------|
 | `id`         | `str`            | Unique task identifier.                       |
-| `state`      | `str`            | One of `"submitted"`, `"working"`, `"completed"`, etc. |
+| `state`      | `str`            | Serialized `TaskState`, such as `"submitted"`, `"working"`, `"input-required"`, `"completed"`, `"failed"`, or `"canceled"`. |
 | `messages`   | `list[Message]`  | Conversation history for this task.           |
 | `artifacts`  | `list[Artifact]` | Outputs produced by the task.                 |
-| `metadata`   | `dict[str, Any]` | Arbitrary metadata attached to the task.      |
+| `metadata`   | `dict[str, Any]` | Arbitrary metadata attached to the task, including optional `state_history`. |
 | `created_at` | `str`            | ISO‑8601 timestamp (UTC).                     |
+
+`completed`, `failed`, and `canceled` are terminal states. Default agents move incoming tasks to `working` before execution and then finish them as `completed`, `input-required`, or `failed` depending on the produced outputs.
 
 #### Message
 

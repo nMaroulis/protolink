@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from protolink.core.part import ToolOutput
 from protolink.llms.base import LLM
 from protolink.llms.history import ConversationHistory
 from protolink.tools.base import BaseTool
@@ -98,6 +99,43 @@ async def test_infer_agent_call_loop():
     assert llm.call_count == 2
     # The callback receives the entire payload
     agent_callback.assert_awaited_once_with("other_agent", "infer", payload)
+
+
+@pytest.mark.asyncio
+async def test_infer_agent_call_serializes_tool_output_result():
+    payload = {
+        "thought": "Ask a tool-owning agent",
+        "type": "agent_call",
+        "agent": "hotel_agent",
+        "action": "tool_call",
+        "tool": "book_hotel",
+        "args": {"location": "Santorini"},
+    }
+    responses = [
+        json.dumps(payload),
+        json.dumps({"thought": "Hotel booked", "type": "final", "content": "Finished with agent tool"}),
+    ]
+    llm = MockLLM(responses)
+    agent_callback = AsyncMock(
+        return_value=ToolOutput(
+            call_id="call_hotel",
+            result={"status": "confirmed", "booking_id": "HTL-123"},
+        )
+    )
+
+    result = await llm.infer(query="Book a hotel", tools={}, agent_callback=agent_callback)
+
+    assert result.content == "Finished with agent tool"
+    agent_result_message = next(
+        json.loads(message["content"])
+        for message in llm.history.messages
+        if '"type": "agent_result"' in message["content"]
+    )
+    assert agent_result_message["result"] == {
+        "call_id": "call_hotel",
+        "result": {"status": "confirmed", "booking_id": "HTL-123"},
+        "error": None,
+    }
 
 
 @pytest.mark.asyncio

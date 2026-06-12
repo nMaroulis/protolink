@@ -34,6 +34,7 @@ from collections.abc import AsyncIterator
 from typing import Any, Literal
 
 from protolink.client import AgentClient, RegistryClient
+from protolink.core.task import TaskState
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.logging import BaseLogger, ConsoleLogger, get_agent_farewell, get_agent_greeting
@@ -500,16 +501,34 @@ class Agent:
             TaskStatusUpdateEvent,
         )
 
-        yield TaskStatusUpdateEvent(task_id=task.id, previous_state="submitted", new_state="working")
+        previous_state = self._begin_task_if_needed(task)
+        if previous_state is None:
+            yield TaskStatusUpdateEvent(
+                task_id=task.id,
+                previous_state=None,
+                new_state=self._state_value(task.state),
+                final=True,
+                metadata={"task": task.to_dict()},
+            )
+            return
+
+        yield TaskStatusUpdateEvent(
+            task_id=task.id,
+            previous_state=previous_state,
+            new_state=self._state_value(task.state),
+        )
 
         try:
             last_item = task.get_last_item()
             if last_item is None:
+                previous_state = self._state_value(task.state)
+                task.update_state(TaskState.COMPLETED)
                 yield TaskStatusUpdateEvent(
                     task_id=task.id,
-                    previous_state="working",
-                    new_state="completed",
+                    previous_state=previous_state,
+                    new_state=self._state_value(task.state),
                     final=True,
+                    metadata={"task": task.to_dict()},
                 )
                 return
 
@@ -538,7 +557,17 @@ class Agent:
                             outputs.append(Part.from_dict(event["__protolink_part__"]))
                             continue
                         if isinstance(event, TaskErrorEvent):
+                            previous_state = self._state_value(task.state)
+                            if not task.is_terminal:
+                                task.fail(event.error_message)
                             yield event
+                            yield TaskStatusUpdateEvent(
+                                task_id=task.id,
+                                previous_state=previous_state,
+                                new_state=self._state_value(task.state),
+                                final=True,
+                                metadata={"task": task.to_dict()},
+                            )
                             return
                         yield event
                 else:
@@ -553,22 +582,35 @@ class Agent:
             if self.llm and self._state.conversation:
                 self._state.conversation.save_history(session_id, self.llm.history)
 
+            previous_state = self._state_value(task.state)
+            self._finalize_task_state(task, outputs)
+
             for artifact in task.artifacts:
                 yield TaskArtifactUpdateEvent(task_id=task.id, artifact=artifact)
 
             yield TaskStatusUpdateEvent(
                 task_id=task.id,
-                previous_state="working",
-                new_state="completed",
+                previous_state=previous_state,
+                new_state=self._state_value(task.state),
                 final=True,
                 metadata={"task": task.to_dict()},
             )
         except Exception as e:
+            previous_state = self._state_value(task.state)
+            if not task.is_terminal:
+                task.fail(str(e))
             yield TaskErrorEvent(
                 task_id=task.id,
                 error_code="task_failed",
                 error_message=str(e),
                 recoverable=False,
+            )
+            yield TaskStatusUpdateEvent(
+                task_id=task.id,
+                previous_state=previous_state,
+                new_state=self._state_value(task.state),
+                final=True,
+                metadata={"task": task.to_dict()},
             )
 
     # ----------------------------------------------------------------------
@@ -752,6 +794,67 @@ class Agent:
     # Task & Tool Execution
     # ----------------------------------------------------------------------
 
+    @staticmethod
+    def _state_value(state: TaskState | str) -> str:
+        """Return a serialized task state value for events and metadata."""
+        return state.value if isinstance(state, TaskState) else str(state)
+
+    @staticmethod
+    def _part_requires_input(part: Part) -> bool:
+        """Return whether an output part explicitly asks for more input."""
+        if part.type != "status" or not isinstance(part.content, dict):
+            return False
+        return part.content.get("state") in {"input-required", "input_required"}
+
+    @staticmethod
+    def _part_error_message(part: Part) -> str | None:
+        """Extract a user-facing error message from an output part, if any."""
+        if part.type == "error" and isinstance(part.content, dict):
+            return str(part.content.get("message", "unknown error"))
+
+        if part.type == "tool_output":
+            try:
+                error = part.as_tool_output().error
+            except (TypeError, ValueError):
+                error = part.content.get("error") if isinstance(part.content, dict) else None
+            if error:
+                if isinstance(error, dict):
+                    return str(error.get("message", error))
+                return str(error)
+
+        return None
+
+    def _begin_task_if_needed(self, task: Task) -> str | None:
+        """Move a non-terminal task to ``WORKING`` and return its prior state."""
+        if task.is_terminal:
+            return None
+        previous_state = self._state_value(task.state)
+        if task.state != TaskState.WORKING:
+            task.begin()
+        return previous_state
+
+    def _finalize_task_state(self, task: Task, outputs: list[Part | Message]) -> None:
+        """Set the terminal or waiting state implied by agent outputs.
+
+        Errors win over all other outputs, an explicit status part can request
+        more input, and otherwise successful execution completes the task.
+        """
+        if task.is_terminal:
+            return
+
+        for output in outputs:
+            if isinstance(output, Part):
+                error_message = self._part_error_message(output)
+                if error_message:
+                    task.fail(error_message)
+                    return
+
+        if any(isinstance(output, Part) and self._part_requires_input(output) for output in outputs):
+            task.require_input()
+            return
+
+        task.update_state(TaskState.COMPLETED)
+
     async def execute_task(self, task: Task) -> Task:
         """
         Execute the next step of a Task by inspecting the most recently
@@ -767,14 +870,17 @@ class Agent:
         - `tool_call` Parts are executed via registered tools
         - `infer` Parts trigger model inference via the agent's LLM (if available)
 
+        Task lifecycle:
+        - A non-terminal task is moved to ``WORKING`` before execution
+        - Successful outputs move the task to ``COMPLETED``
+        - Error outputs or raised exceptions move the task to ``FAILED``
+        - Status outputs requesting input move the task to ``INPUT_REQUIRED``
+
         Determinism guarantees:
         - No intent inference
         - No fallback behavior
         - No automatic execution unless explicitly declared
         - If nothing executable is found, this method is a no-op
-
-        Task lifecycle (state transitions) is NOT handled here.
-        This method only produces outputs and appends them to the Task.
 
         Args:
             task: The Task to execute.
@@ -783,39 +889,52 @@ class Agent:
             The same Task instance, augmented with new Messages or Artifacts.
         """
 
-        last_item = task.get_last_item()
-        if last_item is None:
+        if task.is_terminal:
             return task
 
-        # ---- Session Conversation State: Load session history ----
-        # If conversation is enabled in the State, we attempt to resume context using session_id from task metadata.
-        # If no session_id is found, we fall back to the task.id (stateless behavior).
-        session_id = task.metadata.get("session_id", task.id)
-        if self.llm and self._state.conversation:
-            self.llm.history = self._state.conversation.get_history(
-                session_id, default_system_prompt=self.llm.system_prompt
-            )
+        self._begin_task_if_needed(task)
 
-        outputs: list[Part | Message] = []
+        try:
+            last_item = task.get_last_item()
+            if last_item is None:
+                task.update_state(TaskState.COMPLETED)
+                return task
 
-        # ---- Inspect Parts in the last item only ----
-        for part in last_item.parts:
-            if part.type == "tool_call":
-                outputs.append(await self.execute_tool(part))
-            elif part.type == "infer":
-                outputs.append(await self.call_llm(part, task=task))
-            else:
-                self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
-        # ---- Attach outputs to the Task ----
-        for out in outputs:
-            if isinstance(out, Message):
-                task.add_message(out)
-            else:
-                task.add_artifact(Artifact(parts=[out]))
-        # ---- Session Conversation State: Save session history ----
-        # Persist the current state of the conversation (including the latest responses) back to storage.
-        if self.llm and self._state.conversation:
-            self._state.conversation.save_history(session_id, self.llm.history)
+            # ---- Session Conversation State: Load session history ----
+            # If conversation is enabled in the State, we attempt to resume context using session_id from task metadata.
+            # If no session_id is found, we fall back to the task.id (stateless behavior).
+            session_id = task.metadata.get("session_id", task.id)
+            if self.llm and self._state.conversation:
+                self.llm.history = self._state.conversation.get_history(
+                    session_id, default_system_prompt=self.llm.system_prompt
+                )
+
+            outputs: list[Part | Message] = []
+
+            # ---- Inspect Parts in the last item only ----
+            for part in last_item.parts:
+                if part.type == "tool_call":
+                    outputs.append(await self.execute_tool(part))
+                elif part.type == "infer":
+                    outputs.append(await self.call_llm(part, task=task))
+                else:
+                    self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
+            # ---- Attach outputs to the Task ----
+            for out in outputs:
+                if isinstance(out, Message):
+                    task.add_message(out)
+                else:
+                    task.add_artifact(Artifact(parts=[out]))
+            # ---- Session Conversation State: Save session history ----
+            # Persist the current state of the conversation (including the latest responses) back to storage.
+            if self.llm and self._state.conversation:
+                self._state.conversation.save_history(session_id, self.llm.history)
+
+            self._finalize_task_state(task, outputs)
+        except Exception as exc:
+            if not task.is_terminal:
+                task.fail(str(exc))
+            raise
 
         return task
 
