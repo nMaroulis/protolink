@@ -20,6 +20,8 @@ Each ProtoLink **agent** is a **self-contained runtime** that can embed an **LLM
 
 ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **LLM & tool integration**.
 
+> ProtoLink is an **A2A-native agent runtime** for building distributed, typed, observable agent systems. LangChain composes model calls; ProtoLink runs agents.”
+
 #### 🎯 The Philosophy
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.

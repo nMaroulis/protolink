@@ -1063,26 +1063,38 @@ class Agent:
             agent_name=self.card.name,
         )
 
-        if self.telemetry:
-            prompt = (
-                infer_part.content.get("prompt", "")
-                if isinstance(infer_part.content, dict)
-                else getattr(infer_part.content, "prompt", "")
-            )
-            model_name = getattr(self.llm, "model_name", None) or getattr(self.llm, "model", None)
-            await self.telemetry.on_llm_start(prompt, model_name)
-
         query = (
             infer_part.content.get("prompt", "")
             if isinstance(infer_part.content, dict)
             else getattr(infer_part.content, "prompt", "")
         )
+
+        model_name = getattr(self.llm, "model_name", None) or getattr(self.llm, "model", None)
+        if self.telemetry:
+            await self.telemetry.on_llm_start(
+                query,
+                model_name,
+                {
+                    "agent_name": self.card.name,
+                    "task_id": task.id if task else None,
+                    "trace_id": task.metadata.get("trace_id") if task else None,
+                    "provider": getattr(self.llm, "provider", None),
+                    "model_type": getattr(self.llm, "model_type", None),
+                },
+            )
+
+        async def emit_inference_event(event: dict[str, Any]) -> None:
+            if self.telemetry:
+                await self.telemetry.on_llm_event(event)
+            if event_callback:
+                await event_callback(event)
+
         response: Part = await self.llm.infer(
             query=query,
             tools=self.tools,
             agent_callback=self._handle_agent_call if self.card.capabilities.delegation else None,
             streaming=streaming,
-            event_callback=event_callback,
+            event_callback=emit_inference_event if self.telemetry or event_callback else None,
         )
 
         if self.telemetry:

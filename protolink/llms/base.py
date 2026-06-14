@@ -417,6 +417,7 @@ class LLM(ABC):
                         "step": steps,
                         "message": str(e),
                         "parse_failures": parse_failures,
+                        "retry_count": parse_failures,
                         "recoverable": parse_failures < max_parse_failures,
                     }
                 )
@@ -438,6 +439,15 @@ class LLM(ABC):
             action_signature = self._compute_action_signature(action, payload)
             if action_signature in recent_actions:
                 # Detected repeated action - inject guidance to prevent infinite loop
+                await emit(
+                    {
+                        "type": "llm_retry",
+                        "step": steps,
+                        "reason": "duplicate_action",
+                        "action": action,
+                        "payload": payload,
+                    }
+                )
                 self.history.add_system(
                     f"You have already performed this action: {action}. "
                     f"The result is in your context. Please proceed with your task - "

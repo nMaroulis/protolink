@@ -46,7 +46,12 @@ class MultiTelemetry(Telemetry):
         for tracker in self.trackers:
             await tracker.on_task_end(task, result, agent_name)
 
-    async def on_llm_start(self, prompt: str, model: str | None = None) -> Any:
+    async def on_llm_start(
+        self,
+        prompt: str,
+        model: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any:
         """Called before making an inference call to an LLM.
 
         Args:
@@ -57,7 +62,7 @@ class MultiTelemetry(Telemetry):
             Any: None.
         """
         for tracker in self.trackers:
-            await tracker.on_llm_start(prompt, model)
+            await tracker.on_llm_start(prompt, model, metadata)
 
     async def on_llm_end(self, response: Part) -> Any:
         """Called after an inference call to an LLM completes.
@@ -97,3 +102,8 @@ class MultiTelemetry(Telemetry):
         """
         for tracker in self.trackers:
             await tracker.on_tool_end(tool_name, result, error)
+
+    async def on_llm_event(self, event: dict[str, Any]) -> Any:
+        """Broadcast detailed inference-loop events to all trackers."""
+        for tracker in self.trackers:
+            await tracker.on_llm_event(event)

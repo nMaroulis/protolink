@@ -41,12 +41,19 @@ class Telemetry(ABC):
         pass
 
     @abstractmethod
-    async def on_llm_start(self, prompt: str, model: str | None = None) -> Any:
+    async def on_llm_start(
+        self,
+        prompt: str,
+        model: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any:
         """Called before making an inference call to an LLM.
 
         Args:
             prompt (str): The complete prompt string being sent to the LLM.
             model (str | None): The identifier of the model being invoked, if available.
+            metadata (dict[str, Any] | None): Optional model/provider metadata
+                such as usage, token, or cost details.
 
         Returns:
             Any: An optional provider-specific context or identifier (e.g., a Generation object).
@@ -91,3 +98,13 @@ class Telemetry(ABC):
             Any: An optional provider-specific context or identifier.
         """
         pass
+
+    async def on_llm_event(self, event: dict[str, Any]) -> Any:
+        """Called for detailed provider-agnostic inference-loop events.
+
+        Implementations may use this hook to record raw action payloads,
+        parse retries, streamed chunks, delegated agent calls, and other
+        execution details emitted by ``LLM.infer()``. The default is a no-op
+        so existing telemetry providers only need the coarse hooks above.
+        """
+        return None

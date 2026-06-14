@@ -85,7 +85,7 @@ cd protolink
 uv pip install -e ".[dev]"
 ```
 
-## Basic Example
+## First Agent
 
 Below is a minimal example that wires together an agent, HTTP transport, an OpenAI LLM, and both native and MCP tools:
 
@@ -136,3 +136,20 @@ This example demonstrates the core pieces of Protolink:
 - **Native tools** (Python functions decorated with `@agent.tool`).
 - **MCP tools** registered via `MCPToolAdapter`.
 
+
+### Using the CLI
+
+Create a runnable one-file starter agent:
+
+```bash
+protolink init agent
+uv run python agent.py
+```
+
+The default starter uses the top-level API:
+
+```python
+from protolink import Agent, AgentCard, LocalTraceTelemetry, Task, create_llm
+```
+
+It runs locally without an API key by executing a tool call directly. If `OPENAI_API_KEY` is set, it also enables LLM inference. Use `--template tool` for a tool-only starter or `--force` to overwrite an existing file.

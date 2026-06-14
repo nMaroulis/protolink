@@ -34,6 +34,9 @@ possibly-unresolved-reference = "warn"
 Documentation = "https://nmaroulis.github.io/protolink/"
 Repository = "https://github.com/nMaroulis/protolink"
 
+[project.scripts]
+protolink = "protolink.cli:main"
+
 [project.optional-dependencies]
 http = [
     "fastapi>=0.136.0",

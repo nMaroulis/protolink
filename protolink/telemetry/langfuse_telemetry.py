@@ -85,7 +85,12 @@ class LangfuseTelemetry(Telemetry):
         finally:
             _current_langfuse_trace.set(None)
 
-    async def on_llm_start(self, prompt: str, model: str | None = None) -> Any:
+    async def on_llm_start(
+        self,
+        prompt: str,
+        model: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any:
         """Starts a new generation span within the active Langfuse trace.
 
         Args:
@@ -103,6 +108,7 @@ class LangfuseTelemetry(Telemetry):
                 name="LLM Call",
                 model=model,
                 input=prompt,
+                metadata=metadata or None,
             )
             _current_langfuse_generation.set(generation)
         except Exception as e:

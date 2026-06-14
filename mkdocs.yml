@@ -65,6 +65,7 @@ nav:
       - Home: index.md
       - Concept: concept.md
       - Getting Started: getting-started.md
+      - CLI: cli.md
   - API Reference:
       - Agent: agent.md
       - Client: client.md

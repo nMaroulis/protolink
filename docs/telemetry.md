@@ -2,7 +2,7 @@
 
 The Telemetry subsystem provides standard observable tracing to agent task execution, tool calling, and LLM inference. Protolink supports a non-invasive integration with external tracing services using Python's `contextvars`. This means it tracks nested traces, spans, and runs in the background without cluttering core execution method signatures.
 
-Currently, Protolink offers native integrations for **[Langfuse](https://langfuse.com/)** and **[LangSmith](https://www.langchain.com/langsmith)**.
+Protolink includes a built-in local trace recorder and native integrations for **[Langfuse](https://langfuse.com/)** and **[LangSmith](https://www.langchain.com/langsmith)**.
 
 ## Installation
 
@@ -21,6 +21,32 @@ uv add langsmith
 ## Setup & Usage
 
 To enable observability, instantiate your preferred telemetry tracker and inject it into your `Agent`. Tasks executed by this agent will now automatically trace their internal states and synchronize with your observability platform.
+
+### Local Trace Example
+
+`LocalTraceTelemetry` records task traces in memory and can append replayable JSONL records to disk. It captures trace IDs, parent-child spans, model metadata, token estimates, raw inference-loop events, retry counts, and redacted payloads without requiring an external service.
+
+```python
+from protolink import Agent, AgentCard, LocalTraceTelemetry, Task
+
+telemetry = LocalTraceTelemetry(path="traces.jsonl")
+
+agent = Agent(
+    card=AgentCard(
+        name="local_observer",
+        description="A locally traced agent",
+        url="runtime://local-observer",
+    ),
+    telemetry=telemetry,
+)
+
+@agent.tool(name="add", description="Add two integers")
+async def add(a: int, b: int) -> int:
+    return a + b
+
+result = await agent.handle_task(Task.create_tool_call(tool_name="add", args={"a": 2, "b": 3}))
+records = telemetry.recorder.replay()
+```
 
 ### Langfuse Example
 
@@ -116,7 +142,12 @@ class MyCustomTelemetry(Telemetry):
     async def on_task_end(self, task: Task, result: Task, agent_name: str) -> Any:
         pass
         
-    async def on_llm_start(self, prompt: str, model: str | None = None) -> Any:
+    async def on_llm_start(
+        self,
+        prompt: str,
+        model: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any:
         pass
         
     async def on_llm_end(self, response: Part) -> Any:
@@ -126,6 +157,9 @@ class MyCustomTelemetry(Telemetry):
         pass
         
     async def on_tool_end(self, tool_name: str, result: Any, error: str | None = None) -> Any:
+        pass
+
+    async def on_llm_event(self, event: dict[str, Any]) -> Any:
         pass
 ```
 

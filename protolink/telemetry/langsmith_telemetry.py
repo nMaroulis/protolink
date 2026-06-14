@@ -86,7 +86,12 @@ class LangSmithTelemetry(Telemetry):
         finally:
             _current_langsmith_run.set(None)
 
-    async def on_llm_start(self, prompt: str, model: str | None = None) -> Any:
+    async def on_llm_start(
+        self,
+        prompt: str,
+        model: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any:
         """Starts a child run for an LLM inference within the active task's run.
 
         Args:
@@ -103,7 +108,7 @@ class LangSmithTelemetry(Telemetry):
             llm_run = parent_run.create_child(
                 name="LLM Call",
                 run_type="llm",
-                inputs={"prompt": prompt, "model": model},
+                inputs={"prompt": prompt, "model": model, "metadata": metadata or {}},
             )
             llm_run.post()
             _current_langsmith_llm_run.set(llm_run)

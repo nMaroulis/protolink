@@ -31,11 +31,20 @@ NEW:
   - Added `protolink.llms.serialization.json_history_default()` for framework object serialization in LLM conversation history.
   - Base and Anthropic LLM history injection now serialize dataclasses, `to_dict()` objects, and `model_dump()` objects consistently.
 
+- **First-run developer experience**
+  - Added top-level exports for common primitives such as `Agent`, `AgentCard`, `Task`, `Tool`, `Pipeline`, `create_llm`, and local tracing utilities.
+  - Added the `protolink init agent` CLI command with runnable `basic` and `tool` starter templates.
+
+- **Local observability**
+  - Added `LocalTraceTelemetry` and `LocalTraceRecorder` for in-memory and JSONL task trace replay.
+  - Local traces now capture trace IDs, span hierarchy, LLM action events, retry counts, token estimates, model metadata, and redacted payloads.
+
 Changed:
 
 - `protolink.models` now exports `TaskState`.
 - Task validation now accepts empty message, artifact, and metadata containers and validates `Task.state` as a `TaskState`.
 - Flow execution no longer auto-wraps plain user messages without executable parts into inferred prompts.
+- Telemetry hooks now accept optional LLM metadata and expose detailed inference-loop events through `on_llm_event()`.
 - `.ruff_cache/` is now ignored by git.
 
 Fixed:
@@ -49,11 +58,13 @@ Docs:
 - Updated README task semantics to describe `Task.state` and `metadata["state_history"]`.
 - Added Agent documentation for default task lifecycle behavior and streaming status updates.
 - Expanded model and transport docs for task lifecycle states, terminal states, transition history, and new task helper methods.
+- Added CLI documentation and local trace telemetry documentation.
 
 Tests:
 
 - Added lifecycle coverage for direct task construction, invalid transitions, `Task.complete()`, successful agent execution, and failed tool execution.
 - Added regression coverage for delegated `ToolOutput` serialization in the LLM inference loop.
+- Added coverage for top-level exports, CLI scaffolding, local trace capture, redaction, and retry metadata.
 
 ### [v0.5.8] - 2026-06-11
 
