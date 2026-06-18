@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import ClassVar
+from typing import ClassVar, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -7,6 +7,7 @@ import pytest
 from protolink.llms.actions import ToolCallAction
 from protolink.llms.api.anthropic_client import AnthropicLLM
 from protolink.llms.history import ConversationHistory
+from protolink.tools.base import BaseTool
 
 
 class DummyTool:
@@ -17,10 +18,22 @@ class DummyTool:
     tags: ClassVar[list] = []
 
 
+def _make_anthropic_llm() -> AnthropicLLM:
+    llm = AnthropicLLM.__new__(AnthropicLLM)
+    llm.model = "claude-test"
+    llm._model_params = {"max_tokens": 128}
+    llm.history = ConversationHistory()
+    llm.system_prompt = ""
+    llm._client = MagicMock()
+    return llm
+
+
+def _tools() -> dict[str, BaseTool]:
+    return {"search": cast(BaseTool, DummyTool())}
+
+
 def test_anthropic_llm_native_tool_call_action():
-    llm = AnthropicLLM(api_key="mock-key")
-    mock_client = MagicMock()
-    llm._client = mock_client
+    llm = _make_anthropic_llm()
 
     mock_response = MagicMock()
     mock_block = MagicMock()
@@ -29,15 +42,15 @@ def test_anthropic_llm_native_tool_call_action():
     mock_block.input = {"query": "protolink"}
     mock_block.id = "toolu_123"
     mock_response.content = [mock_block]
-    mock_client.messages.create.return_value = mock_response
+    llm._client.messages.create.return_value = mock_response
 
     history = ConversationHistory()
     history.add_user("Find docs")
 
-    result = llm.call_action(history, tools={"search": DummyTool()}, agent_callback_available=False)
+    result = llm.call_action(history, tools=_tools(), agent_callback_available=False)
 
-    mock_client.messages.create.assert_called_once()
-    kwargs = mock_client.messages.create.call_args.kwargs
+    llm._client.messages.create.assert_called_once()
+    kwargs = llm._client.messages.create.call_args.kwargs
 
     assert kwargs["tools"][0]["name"] == "search"
     assert kwargs["tools"][0]["input_schema"] == {
@@ -54,7 +67,7 @@ def test_anthropic_llm_native_tool_call_action():
 
 
 def test_anthropic_llm_parse_plain_text():
-    llm = AnthropicLLM(api_key="mock-key")
+    llm = _make_anthropic_llm()
 
     mock_response = MagicMock()
     mock_block = MagicMock()
@@ -79,12 +92,7 @@ class _FakeAnthropicStream:
 
 @pytest.mark.asyncio
 async def test_anthropic_call_action_stream_collects_tool_use_json_deltas():
-    llm = AnthropicLLM.__new__(AnthropicLLM)
-    llm.model = "claude-test"
-    llm._model_params = {"max_tokens": 128}
-    llm.history = ConversationHistory()
-    llm.system_prompt = ""
-    llm._client = MagicMock()
+    llm = _make_anthropic_llm()
     llm._client.messages.stream.return_value = _FakeAnthropicStream(
         [
             SimpleNamespace(
@@ -100,7 +108,7 @@ async def test_anthropic_call_action_stream_collects_tool_use_json_deltas():
 
     history = ConversationHistory()
     history.add_user("Find docs")
-    result = await llm.call_action_stream(history, tools={"search": DummyTool()}, agent_callback_available=False)
+    result = await llm.call_action_stream(history, tools=_tools(), agent_callback_available=False)
 
     kwargs = llm._client.messages.stream.call_args.kwargs
     assert kwargs["tools"][0]["name"] == "search"
