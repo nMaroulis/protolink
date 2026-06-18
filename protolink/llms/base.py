@@ -1103,7 +1103,9 @@ class LLM(ABC):
                 await asyncio.sleep(delay + jitter)
 
         # Should never reach here, but satisfy the type checker
-        raise last_exception  # type: ignore[misc]
+        if last_exception is None:
+            raise RuntimeError("retry loop exited without returning a result or capturing an exception")
+        raise last_exception
 
     @staticmethod
     def _is_transient_error(exc: Exception) -> bool:
