@@ -101,10 +101,10 @@ async def main():
     await asyncio.sleep(0.5)
 
     # 3. Define the Router
-    # The router decides to dispatch to either editor or qa based on [ROUTE: key]
+    # The router prefers structured Part.route(...) decisions and still accepts [ROUTE: key] tags from text-only models.
     router = Router(
         routes={"editor": "editor", "qa": "qa"},
-        routing_prompt="If the content requires editing, output '[ROUTE: editor]'. If it is perfect, output '[ROUTE: qa]'.",  # noqa: E501
+        routing_prompt="If the content requires editing, choose 'editor'. If it is perfect, choose 'qa'.",
         registry=registry,
     )
 

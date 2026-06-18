@@ -98,7 +98,23 @@ for art in result.artifacts:
 
 A `Router` allows conditional branching based on **LLM decision-making** while keeping the actual branch transition explicit and inspectable. The Router injects your `routing_prompt` into the *preceding agent*, asking it to choose one of the named routes.
 
-The preceding agent evaluates its own task context and appends a structured tag (e.g., `[ROUTE: quality]`) to its final response. The Router safely extracts this tag, cleans the payload, and deterministically forwards the task to the chosen route.
+The preferred contract is a structured route part:
+
+```python
+from protolink.models import Message, Part
+
+task.add_message(
+    Message(
+        role="agent",
+        parts=[
+            Part.text("This draft needs editing."),
+            Part.route("editor", reason="needs polish"),
+        ],
+    )
+)
+```
+
+`Part.route(...)` round-trips through normal task serialization, appears in traces, and gives tests an exact branch key to assert. The Router also accepts JSON-shaped decisions such as `{"route_key": "editor"}` and the older `[ROUTE: editor]` text tag as compatibility fallbacks.
 
 ```python
 from protolink.flows import Router
@@ -108,7 +124,7 @@ router = Router(
         "editor": "editor", 
         "quality": "quality"
     }, 
-    routing_prompt="If the text is poorly written, route to 'editor'. If it is perfect, route to 'quality'.", 
+    routing_prompt="If the text is poorly written, choose 'editor'. If it is perfect, choose 'quality'.",
     registry=registry
 )
 

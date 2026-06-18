@@ -40,7 +40,7 @@ The following *articles* published on ***Level Up Coding*** on ***Medium*** give
 
 ### NEW Feature: Flows 📣
 
-Update 0.5.0 introduces **Structured Flows**, a new feature that allows you to define **structured workflows** for your agents. Building on A2A transport layer, flows allow you to define **complex workflows** for your agents that can be executed in a **structured & deterministic manner**. Again the **Semantic Context Injection** is handled by Protolink, meaning that the agents will **automatically** have the necessary context about the flow they are executing and what to pass down to next agents in the pipeline. See more here 🔀 [flows](https://nmaroulis.github.io/protolink/flows/).
+Update 0.5.0 introduces **Structured Flows**, a new feature that allows you to define **structured workflows** for your agents. Building on A2A transport layer, flows allow you to define **complex workflows** for your agents that can be executed in a **structured & deterministic manner**. Technically, each flow is a deterministic `Flow.execute(Task) -> Task` state machine over A2A `Task`, `Message`, `Artifact`, and `AgentCard` primitives, keeping orchestration protocol-native instead of creating a separate graph runtime. Again the **Semantic Context Injection** is handled by Protolink, meaning that the agents will **automatically** have the necessary context about the flow they are executing and what to pass down to next agents in the pipeline. See more here 🔀 [flows](https://nmaroulis.github.io/protolink/flows/).
 
 ### The centralized agent architecture
 In Protolink the agent is the central component that handles all the logic and incorporates the **LLM**, **tools**, **transport layer** through **AgentClient** and **AgentServer**, the **Storage** and **OpenTelemetry** for logging.
@@ -537,7 +537,7 @@ While frameworks like LangChain or LangGraph rely on complex implicit state mach
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/flows.png" alt="Flows" width="100%">
 </div>
 
-Flows allow you to define highly composable, rigid, and predictable multi-step workflows. They remove the LLM from the routing equation, routing the task predictably through a state machine that you control programmatically.
+Flows allow you to define highly composable, rigid, and predictable multi-step workflows. `Pipeline`, `Parallel`, and `Graph` define deterministic topology, while `Router` branches on structured `Part.route(...)` decisions that are serializable, trace-visible, and testable. Legacy `[ROUTE: key]` tags are still accepted for older prompts.
 
 ### 🧠 Semantic Context Injection
 

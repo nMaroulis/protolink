@@ -27,7 +27,11 @@ Routing Rules provided by the developer:
 Available Routes:
 {routes_info}
 
-You must append the exact routing tag to the very end of your final response using the format: [ROUTE: route_key]
+Prefer emitting a structured route decision part in the runtime shape:
+{{"type": "route", "content": {{"route_key": "route_key", "reason": "short reason"}}}}
+
+If your provider can only return text, append the exact routing tag to the very end of your final response using
+the format: [ROUTE: route_key]
 For example, if you choose the 'editor' route, end your text with: [ROUTE: editor]
 """
 FLOW_PARALLEL_PROMPT: str = """

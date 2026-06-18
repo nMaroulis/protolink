@@ -67,7 +67,7 @@ class AgentSkill:
         input_schema: Schema for the input data (JSON schema) [Optional]
         output_schema: Schema for the output data (JSON schema) [Optional]
         tags: List of tags for categorization [Optional]
-        examples: Example inputs or usage scenarios [Optional]
+        examples: Example inputs, outputs, or usage scenarios [Optional]
     """
 
     id: str
@@ -75,7 +75,7 @@ class AgentSkill:
     input_schema: dict[str, Any] = field(default_factory=dict)
     output_schema: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
-    examples: list[str] = field(default_factory=list)
+    examples: list[Any] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate fields after initialization."""
@@ -221,10 +221,15 @@ class AgentCard:
                 "name": "get_temperature"
                 "description": "Returns the temperature in a location for a given date"
                 "input_schema": {
-                    "location": {"type": "string", "required": True},
-                    "datetime": {"type": "datetime", "required": True, "default": "now"},
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string"},
+                        "datetime": {"type": "string", "format": "date-time", "default": "now"}
+                    },
+                    "required": ["location"],
                 }
-                "output_schema": float
+                "output_schema": {"type": "number"}
+                "examples": [{"location": "Athens", "datetime": "now"}]
 
         Returns:
             str: A formatted multi-line string describing the agent and its capabilities.
@@ -241,6 +246,7 @@ class AgentCard:
                     "description": {skill.description},
                     "input_schema": {skill.input_schema}
                     "output_schema": {skill.output_schema}
+                    "examples": {skill.examples}
                     \n
                 """
         return prompt_text

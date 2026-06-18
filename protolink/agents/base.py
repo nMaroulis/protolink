@@ -45,6 +45,7 @@ from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
 from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool, Tool
+from protolink.tools.schema import validate_tool_args
 from protolink.transport import Transport, get_transport
 from protolink.types import StateMode, TransportType
 from protolink.utils.renderers.chat import to_chat_html
@@ -754,6 +755,7 @@ class Agent:
             input_schema=tool.input_schema or {},
             output_schema=tool.output_schema or {},
             tags=tool.tags or [],
+            examples=getattr(tool, "examples", None) or [],
         )
         self._add_skill_to_agent_card(skill)
 
@@ -764,6 +766,7 @@ class Agent:
         input_schema: dict[str, Any] | None = None,
         output_schema: dict[str, Any] | None = None,
         tags: list[str] | None = None,
+        examples: list[Any] | None = None,
     ):
         """Decorator helper for defining inline tool functions."""
 
@@ -777,6 +780,7 @@ class Agent:
                     output_schema=output_schema,
                     tags=tags,
                     func=func,
+                    examples=examples,
                 )
             )
             return func
@@ -788,6 +792,8 @@ class Agent:
         tool = self.tools.get(tool_name, None)
         if not tool:
             raise ValueError(f"Tool {tool_name} not found")
+        if not getattr(tool, "_protolink_validates_args", False):
+            kwargs = validate_tool_args(kwargs, getattr(tool, "input_schema", None))
         return await tool(**kwargs)
 
     # ----------------------------------------------------------------------
@@ -979,7 +985,10 @@ class Agent:
             await self.telemetry.on_tool_start(tool_name, args)
 
         try:
-            result = await tool(**args)
+            call_args = args
+            if not getattr(tool, "_protolink_validates_args", False):
+                call_args = validate_tool_args(args, getattr(tool, "input_schema", None))
+            result = await tool(**call_args)
             if self.telemetry:
                 await self.telemetry.on_tool_end(tool_name, result)
             return Part.tool_output(call_id=call_id, result=result)
@@ -1304,6 +1313,7 @@ class Agent:
                 tags=tool.tags if tool.tags else [],
                 input_schema=tool.input_schema or {},
                 output_schema=tool.output_schema or {},
+                examples=getattr(tool, "examples", None) or [],
             )
             detected_skills.append(skill)
 
@@ -1578,6 +1588,7 @@ class Agent:
             "input_schema": tool.input_schema,
             "output_schema": tool.output_schema,
             "tags": tool.tags,
+            "examples": getattr(tool, "examples", None),
         }
         # Check if it is an MCPToolAdapter
         if tool.__class__.__name__ == "MCPToolAdapter":
@@ -1613,6 +1624,7 @@ class Agent:
                         self.input_schema = {}
                         self.output_schema = None
                         self.tags = ["mcp"]
+                        self.examples = []
 
                     async def __call__(self, **kwargs):
                         raise RuntimeError(
@@ -1679,6 +1691,7 @@ class Agent:
                 input_schema=tool_dict.get("input_schema"),
                 output_schema=tool_dict.get("output_schema"),
                 tags=tool_dict.get("tags"),
+                examples=tool_dict.get("examples"),
                 func=func,
             )
 

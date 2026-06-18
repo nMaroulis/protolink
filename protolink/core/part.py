@@ -43,6 +43,24 @@ class ToolOutput:
 
 
 @dataclass
+class RouteDecision:
+    """
+    Structured flow routing decision.
+
+    Attributes:
+        route_key: Key in the receiving Router's route map.
+        reason: Optional human-readable reason for the decision.
+        confidence: Optional confidence score from 0.0 to 1.0.
+        metadata: Additional serializable decision context.
+    """
+
+    route_key: str
+    reason: str | None = None
+    confidence: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class Part:
     """Atomic content unit within a message.
 
@@ -77,6 +95,20 @@ class Part:
                     call_id=content.get("call_id", IDGenerator.generate_tool_output_id()),
                     result=content.get("result"),
                     error=content.get("error"),
+                )
+
+        if part_type in {"route", "decision"}:
+            if isinstance(content, RouteDecision):
+                return content
+            if isinstance(content, dict):
+                route_key = content.get("route_key", content.get("route", content.get("key")))
+                if route_key is None:
+                    raise ValueError("route decision content must include 'route_key'")
+                return RouteDecision(
+                    route_key=str(route_key),
+                    reason=content.get("reason"),
+                    confidence=content.get("confidence"),
+                    metadata=content.get("metadata") or {},
                 )
 
         return content
@@ -114,6 +146,15 @@ class Part:
             return self._hydrate_content("tool_output", self.content)
         raise TypeError(f"Unexpected tool_output content type: {type(self.content)}")
 
+    def as_route_decision(self) -> RouteDecision:
+        if self.type not in {"route", "decision"}:
+            raise ValueError(f"Expected part type 'route' or 'decision', got '{self.type}'")
+        if isinstance(self.content, RouteDecision):
+            return self.content
+        if isinstance(self.content, dict):
+            return self._hydrate_content(self.type, self.content)
+        raise TypeError(f"Unexpected route decision content type: {type(self.content)}")
+
     @classmethod
     def text(cls, content: str) -> "Part":
         """Create a text part (convenience method)."""
@@ -139,6 +180,46 @@ class Part:
         return cls(
             type="status",
             content={"state": state, "message": message},
+        )
+
+    @classmethod
+    def route(
+        cls,
+        route_key: str,
+        *,
+        reason: str | None = None,
+        confidence: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "Part":
+        """Create a structured route decision part."""
+        return cls(
+            type="route",
+            content=RouteDecision(
+                route_key=route_key,
+                reason=reason,
+                confidence=confidence,
+                metadata=metadata or {},
+            ),
+        )
+
+    @classmethod
+    def decision(
+        cls,
+        route_key: str,
+        *,
+        reason: str | None = None,
+        confidence: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "Part":
+        """Create a structured decision part suitable for Router branching."""
+        return cls(
+            type="decision",
+            content=RouteDecision(
+                route_key=route_key,
+                reason=reason,
+                confidence=confidence,
+                metadata=metadata or {},
+            ),
         )
 
     # ------------------------------------------------------------------

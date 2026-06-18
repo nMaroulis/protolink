@@ -45,11 +45,23 @@ NEW:
   - Added native streaming action acquisition through `call_action_stream()` so providers can stream text while buffering tool-call deltas into one validated runtime action.
   - Added provider-neutral tool schema builders and synthetic native delegation tools for agent calls.
 
+- **Structured route decisions**
+  - Added `RouteDecision` plus `Part.route(...)` and `Part.decision(...)` for serializable, trace-visible flow routing.
+  - `Router` now prefers structured route parts and JSON-shaped route decisions before falling back to legacy `[ROUTE: key]` text tags.
+  - Legacy text-tag routing now records the chosen route as structured task metadata and a route part for replayability.
+
+- **First-class tool JSON Schema**
+  - Native `Tool` wrappers now infer full JSON Schema objects for inputs and outputs instead of flat parameter maps or return type strings.
+  - Added nested schema preservation for Pydantic models, dataclasses, typed dictionaries, enums, arrays, objects, unions, and literals.
+  - Added runtime validation/coercion for tool arguments before execution, including custom `BaseTool` implementations with JSON Schema input contracts.
+  - Tool examples now flow into advertised `AgentSkill.examples`.
+
 Changed:
 
 - `protolink.models` now exports `TaskState`.
 - Task validation now accepts empty message, artifact, and metadata containers and validates `Task.state` as a `TaskState`.
 - Flow execution no longer auto-wraps plain user messages without executable parts into inferred prompts.
+- Flow transition bridging now ignores structured `route` and `decision` control parts when preparing downstream agent prompts.
 - Telemetry hooks now accept optional LLM metadata and expose detailed inference-loop events through `on_llm_event()`.
 - LLM prompt selection now separates JSON action prompts from native provider tool prompts, preventing native providers from seeing JSON tool-call instructions while keeping small/local models on the simple JSON protocol by default.
 - Ollama, llama.cpp, LM Studio, and OpenAI-compatible local servers now use native tool calling only when `supports_tool_calling=True`; otherwise they retain the JSON fallback path.
@@ -76,6 +88,7 @@ Docs:
 - Expanded model and transport docs for task lifecycle states, terminal states, transition history, and new task helper methods.
 - Added CLI documentation and local trace telemetry documentation.
 - Expanded LLM documentation for the typed `infer()` cycle, JSON vs native action modes, native streaming tool-call behavior, and provider support matrix.
+- Updated flow docs for structured route decisions and updated tool/model docs for first-class JSON Schema, Pydantic support, runtime validation, and skill examples.
 
 Tests:
 
@@ -83,6 +96,7 @@ Tests:
 - Added regression coverage for delegated `ToolOutput` serialization in the LLM inference loop.
 - Added coverage for top-level exports, CLI scaffolding, local trace capture, redaction, and retry metadata.
 - Added regression coverage for native action dispatch, native streaming action dispatch, provider tool-call normalization, streamed tool-call delta accumulation, and Ollama's opt-in native tool mode.
+- Added coverage for route decision part round-trips, structured Router branching, nested/Pydantic tool schema inference, runtime argument coercion, custom `BaseTool` schema validation, and AgentSkill examples.
 
 ### [v0.5.8] - 2026-06-11
 

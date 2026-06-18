@@ -4,7 +4,7 @@ import pytest
 
 from protolink.agents import Agent
 from protolink.core.agent_card import AgentCard
-from protolink.core.part import Part, ToolCall, ToolOutput
+from protolink.core.part import Part, RouteDecision, ToolCall, ToolOutput
 from protolink.tools import BaseTool
 
 
@@ -25,6 +25,23 @@ def test_tool_output_roundtrip():
     assert isinstance(out, ToolOutput)
     assert out.call_id == "call_abc"
     assert out.result == 42
+
+
+def test_route_decision_roundtrip():
+    original = Part.route(
+        "quality",
+        reason="draft is ready",
+        confidence=0.91,
+        metadata={"source": "test"},
+    )
+    restored = Part.from_dict(original.to_dict())
+    decision = restored.as_route_decision()
+
+    assert isinstance(decision, RouteDecision)
+    assert decision.route_key == "quality"
+    assert decision.reason == "draft is ready"
+    assert decision.confidence == 0.91
+    assert decision.metadata == {"source": "test"}
 
 
 def test_from_dict_hydrates_tool_call():

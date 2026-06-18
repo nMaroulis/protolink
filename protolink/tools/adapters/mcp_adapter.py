@@ -109,8 +109,8 @@ class MCPToolAdapter(BaseTool):
         headers (dict[str, str]): Headers for SSE transport.
         name (str): Tool name (set when wrapping a specific tool).
         description (str): Tool description (set when wrapping a specific tool).
-        input_schema (dict[str, Any] | None): Flattened input parameter definitions.
-        output_schema (str | None): Output type name (currently unused by MCP).
+        input_schema (dict[str, Any] | None): JSON Schema input object from the MCP server.
+        output_schema (dict[str, Any] | None): Output schema (currently unused by MCP).
         tags (list[str] | None): Optional tags for tool categorization.
 
     Example:
@@ -161,7 +161,7 @@ class MCPToolAdapter(BaseTool):
         >>> add_tool = adapter.wrap_tool("add")
         >>> print(add_tool.name)         # "add"
         >>> print(add_tool.description)  # "Add two integers."
-        >>> print(add_tool.input_schema) # {"a": int, "b": int}
+        >>> print(add_tool.input_schema) # {"type": "object", "properties": {"a": {"type": "integer"}}}
         >>> # Use async call
         >>> import asyncio
         >>> result = asyncio.run(add_tool(a=5, b=7))
@@ -219,7 +219,7 @@ class MCPToolAdapter(BaseTool):
         self.name: str = ""
         self.description: str = ""
         self.input_schema: dict[str, Any] | None = None
-        self.output_schema: str | None = None
+        self.output_schema: dict[str, Any] | None = None
         self.tags: list[str] | None = None
 
         self._tools_cache: list[dict] | None = None
@@ -389,7 +389,7 @@ class MCPToolAdapter(BaseTool):
             wrapped = ProtoTool(
                 name=tool_dict["name"],
                 description=tool_dict["description"],
-                input_schema=tool_dict["input_types"],
+                input_schema=tool_dict["input_schema"],
                 output_schema=None,
                 tags=["mcp"],
                 func=self._make_async_callable(tool_dict["name"]),
@@ -549,7 +549,7 @@ class MCPToolAdapter(BaseTool):
             A new ``MCPToolAdapter`` instance with:
                 - ``name``: Set to the tool's name.
                 - ``description``: Set to the tool's description.
-                - ``input_schema``: Set to the parsed Python types.
+                - ``input_schema``: Set to the original MCP JSON Schema.
                 - ``__call__``: Configured to invoke the specific tool.
 
         Raises:
@@ -559,7 +559,7 @@ class MCPToolAdapter(BaseTool):
             >>> add_tool = adapter.wrap_tool("add")
             >>> print(add_tool.name)         # "add"
             >>> print(add_tool.description)  # "Add two integers."
-            >>> print(add_tool.input_schema) # {"a": int, "b": int}
+            >>> print(add_tool.input_schema) # {"type": "object", "properties": {"a": {"type": "integer"}}}
             >>>
             >>> # Call the tool asynchronously
             >>> import asyncio
@@ -583,7 +583,7 @@ class MCPToolAdapter(BaseTool):
         )
         wrapped.name = tool_info["name"]
         wrapped.description = tool_info["description"]
-        wrapped.input_schema = tool_info["input_types"]
+        wrapped.input_schema = tool_info["input_schema"]
         wrapped.output_schema = None
         wrapped.tags = None
         wrapped._tools_cache = self._tools_cache

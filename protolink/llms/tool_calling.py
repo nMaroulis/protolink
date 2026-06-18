@@ -1,9 +1,8 @@
 """Provider-neutral helpers for exposing Protolink tools to LLM backends.
 
-Protolink stores tool input schemas in a friendly flat parameter-map form. LLM
-providers, however, expect JSON Schema objects or provider-specific function
-declarations. This module converts the internal representation into canonical
-schemas and builds the small synthetic tools used for agent delegation.
+Protolink stores tool input schemas as JSON Schema objects while still accepting
+legacy flat parameter maps from older code. This module normalizes either form
+for providers and builds the small synthetic tools used for agent delegation.
 """
 
 from __future__ import annotations

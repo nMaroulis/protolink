@@ -41,8 +41,9 @@ class BaseTool(Protocol):
     name: str
     description: str
     input_schema: dict[str, Any] | None
-    output_schema: str | Any | None
+    output_schema: dict[str, Any] | None
     tags: list[str] | None
+    examples: list[Any] | None
 
     async def __call__(self, **kwargs) -> Any: ...
 ```
@@ -53,9 +54,10 @@ class BaseTool(Protocol):
 |-----------|------|-------------|
 | `name` | `str` | Unique identifier for the tool |
 | `description` | `str` | Human-readable description of what the tool does |
-| `input_schema` | `dict[str, Any] ⎪ None` | Flattened dictionary of parameter definitions (see below) |
-| `output_schema` | `str ⎪ Any ⎪ None` | The return type name (e.g., `"dict"`, `"str"`) |
+| `input_schema` | `dict[str, Any] ⎪ None` | JSON Schema object for accepted keyword arguments |
+| `output_schema` | `dict[str, Any] ⎪ None` | JSON Schema object for the returned value |
 | `tags` | `list[str] ⎪ None` | Categorization tags for filtering and discovery |
+| `examples` | `list[Any] ⎪ None` | Example inputs, outputs, or usage scenarios advertised on `AgentSkill` |
 
 ### The `__call__` Method
 
@@ -100,10 +102,15 @@ async def multiply_numbers(a: float, b: float) -> float:
 
 # Inferred Schemas:
 # input_schema: {
-#     "a": {"type": "number", "required": True},
-#     "b": {"type": "number", "required": True}
+#     "type": "object",
+#     "properties": {
+#         "a": {"type": "integer"},
+#         "b": {"type": "integer"}
+#     },
+#     "required": ["a", "b"],
+#     "additionalProperties": False
 # }
-# output_schema: "float"
+# output_schema: {"type": "integer"}
 ```
 
 ### Decorator Parameters
@@ -112,9 +119,32 @@ async def multiply_numbers(a: float, b: float) -> float:
 |-----------|------|-------------|
 | `name` | `str` | The tool's identifier (used in tool calls) |
 | `description` | `str` | Description shown to the LLM for tool selection |
-| `input_schema` | `dict[str, Any] ⎪ None` | Optional explicit input schema. If omitted, Protolink infers it from type hints. |
-| `output_schema` | `dict[str, Any] ⎪ None` | Optional explicit output schema. If omitted, Protolink infers a return type name. |
+| `input_schema` | `dict[str, Any] ⎪ None` | Optional explicit JSON Schema. If omitted, Protolink infers it from type hints. Legacy `{name: type}` maps are still accepted and normalized. |
+| `output_schema` | `dict[str, Any] ⎪ None` | Optional explicit JSON Schema. If omitted, Protolink infers it from the return type hint. |
 | `tags` | `list[str]` | Optional categorization tags |
+| `examples` | `list[Any]` | Optional examples copied to the advertised `AgentSkill` |
+
+### JSON Schema and Runtime Validation
+
+Tool schemas are first-class JSON Schema objects. Native tools infer nested schemas from Python type hints, dataclasses, enums, typed dictionaries, and Pydantic models. Before execution, Protolink validates and lightly coerces tool arguments against the schema, then applies Python annotation validation where available.
+
+```python
+from pydantic import BaseModel, Field
+
+class BookingRequest(BaseModel):
+    location: str
+    guests: int = Field(gt=0)
+
+@agent.tool(
+    name="book_hotel",
+    description="Book a hotel",
+    examples=[{"booking": {"location": "Athens", "guests": 2}}],
+)
+async def book_hotel(booking: BookingRequest) -> dict[str, str]:
+    return {"location": booking.location, "status": "confirmed"}
+```
+
+The inferred input schema is a JSON Schema object with a nested `booking` property. Runtime calls such as `{"booking": {"location": "Athens", "guests": "2"}}` are coerced before the function receives a `BookingRequest` instance. Missing required fields, unexpected fields, invalid enums, and incompatible scalar values return a structured tool error instead of reaching user code.
 
 ### When to Use Native Tools
 
@@ -306,7 +336,7 @@ base_tools = adapter.get_tools()
 for tool in base_tools:
     print(f"{tool.name}: {tool.description}")
     print(f"  Input Schema: {tool.input_schema}")
-    # e.g., {'location': {'type': 'string', 'required': True}, ...}
+    # e.g., {"type": "object", "properties": {"location": {"type": "string"}}}
 ```
 
 **Returns** a list of native Protolink `Tool` instances. Each tool:
@@ -397,7 +427,7 @@ add_tool = adapter.wrap_tool("add")
 # Access metadata
 print(add_tool.name)         # "add"
 print(add_tool.description)  # "Add two integers."
-print(add_tool.input_schema) # {"a": {"type": "integer", "required": True}, ...}
+print(add_tool.input_schema) # {"type": "object", "properties": {"a": {"type": "integer"}}, ...}
 
 # Invoke asynchronously
 import asyncio
@@ -573,8 +603,8 @@ Hello, World! 👋
 |-----------|------|-------------|
 | `name` | `str` | Tool name |
 | `description` | `str` | Tool description |
-| `input_schema` | `dict[str, Any]` | Flattened input parameter definitions |
-| `output_schema` | `str ⎪ None` | Output type name |
+| `input_schema` | `dict[str, Any]` | JSON Schema input object |
+| `output_schema` | `dict[str, Any] ⎪ None` | Output JSON Schema when available |
 | `tags` | `list[str] ⎪ None` | Tool tags |
 
 ---

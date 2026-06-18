@@ -5,7 +5,7 @@ from protolink.flows.graph import Graph
 from protolink.flows.parallel import Parallel
 from protolink.flows.pipeline import Pipeline
 from protolink.flows.router import Router
-from protolink.models import AgentCard, Artifact, Message, Task
+from protolink.models import AgentCard, Artifact, Message, Part, Task
 
 
 class MockAgent(Agent):
@@ -109,6 +109,37 @@ async def test_router_execution():
     task_odd.metadata["value"] = 3
     result_odd = await router.execute(task_odd)
     assert result_odd.messages[-1].parts[0].content == "Odd"
+
+
+@pytest.mark.asyncio
+async def test_router_accepts_structured_route_part_and_preserves_trace():
+    class CapturingAgent(MockAgent):
+        def __init__(self, name: str):
+            super().__init__(name, append_text="Captured")
+            self.last_content = None
+
+        async def handle_task(self, task: Task) -> Task:
+            self.last_content = task.get_last_part_content()
+            return await super().handle_task(task)
+
+    editor = CapturingAgent("Editor")
+    router = Router(routes={"editor": editor}, routing_prompt="Route drafts to editor.")
+    task = Task.create(
+        Message(
+            role="agent",
+            parts=[
+                Part.text("Draft text"),
+                Part.route("editor", reason="needs polish", confidence=0.8),
+            ],
+        )
+    )
+
+    result = await router.execute(task)
+
+    assert editor.last_content == {"prompt": "Draft text"}
+    assert result.messages[-1].parts[0].content == "Captured"
+    assert task.messages[0].parts[1].as_route_decision().route_key == "editor"
+    assert task.metadata["route_decisions"][0]["reason"] == "needs polish"
 
 
 @pytest.mark.asyncio

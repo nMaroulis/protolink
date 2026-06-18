@@ -224,10 +224,10 @@ Represents a task that an agent can perform. Skills are used to advertise specif
 |-----------|-----|---------|-------------|
 | `id` | `str` | — | **Required.** Unique Human-readable identifier for the task |
 | `description` | `str` | `""` | Detailed description of what the task does |
-| `input_schema` | `dict[str, Any]` | `{}` | Flattened dictionary of parameter definitions with `type`, `required`, and `default` keys |
-| `output_schema` | `dict[str, Any]` | `{}` | JSON-schema-like description of the output payload |
+| `input_schema` | `dict[str, Any]` | `{}` | JSON Schema object for accepted inputs |
+| `output_schema` | `dict[str, Any]` | `{}` | JSON Schema object for the output payload |
 | `tags` | `list[str]` | `[]` | List of tags for categorization |
-| `examples` | `list[str]` | `[]` | Example inputs or usage scenarios |
+| `examples` | `list[Any]` | `[]` | Example inputs, outputs, or usage scenarios |
 
 ### Example
 
@@ -235,11 +235,17 @@ Represents a task that an agent can perform. Skills are used to advertise specif
 skill = AgentSkill(
     id="weather_forecast",
     description="Get weather forecast for any location",
+    input_schema={
+        "type": "object",
+        "properties": {"location": {"type": "string"}},
+        "required": ["location"],
+        "additionalProperties": False,
+    },
+    output_schema={"type": "object", "additionalProperties": True},
     tags=["weather", "forecast", "location"],
     examples=[
-        "What's the weather in New York?",
-        "Forecast for London tomorrow",
-        "Weather in 90210"
+        {"location": "New York"},
+        {"location": "London"}
     ]
 )
 ```
@@ -917,6 +923,14 @@ Create an error part.
 
 Create a status part.
 
+#### `route(...) -> Part` `classmethod`
+
+Create a structured flow route decision part with a route key plus optional reason, confidence, and metadata. Routers prefer this serialized control part over text tags.
+
+#### `decision(...) -> Part` `classmethod`
+
+Create a structured decision part with the same content shape as `route(...)`.
+
 ### Example
 
 ```python
@@ -926,6 +940,7 @@ from protolink.models import Part
 text_part = Part.text("Hello, world!")
 tool_call = Part.tool_call(tool_name="get_weather", args={"location": "Athens"})
 infer_part = Part.infer(prompt="Who are you?")
+route_part = Part.route("quality", reason="ready for review")
 ```
 
 ---

@@ -69,6 +69,28 @@ class Message:
         return cls(role="assistant").add_text(text)
 
     @classmethod
+    def route(
+        cls,
+        route_key: str,
+        *,
+        reason: str | None = None,
+        confidence: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "Message":
+        """Create an agent message with a structured route decision."""
+        return cls(
+            role="agent",
+            parts=[
+                Part.route(
+                    route_key,
+                    reason=reason,
+                    confidence=confidence,
+                    metadata=metadata,
+                )
+            ],
+        )
+
+    @classmethod
     def infer(
         cls,
         *,
