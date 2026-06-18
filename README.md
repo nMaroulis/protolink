@@ -20,13 +20,13 @@ Each ProtoLink **agent** is a **self-contained runtime** that can embed an **LLM
 
 ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **LLM & tool integration**.
 
-> ProtoLink is an **A2A-native agent runtime** for building distributed, typed, observable agent systems. LangChain composes model calls; ProtoLink runs agents.”
+> ProtoLink is an **A2A-native agent runtime** for building distributed, typed, observable agent systems. LangChain composes model calls; ProtoLink runs agents.
 
 #### 🎯 The Philosophy
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
-**Tool calling**, **Agent delegation**, **LLM invocation** and **Task execution logic** are all provided by Protolink. No need to care on how to call tools or other agents, ProtoLink handles it for you, through **automated task execution & delegation**, **predefined LLM prompts** and **custom chain-of-thought** that provide the **Agent's LLM** the ability to **interact with its environment**, leaving only the **agent logic** to you.
+**Tool calling**, **agent delegation**, **LLM invocation**, and **task execution logic** are provided by Protolink. You describe the agent, its tools, and its capabilities; ProtoLink handles the infer loop, native tool calling where available, JSON fallback for smaller models, action validation, and deterministic execution.
 
 Protolink uses **dynamic semantic context injection**, automatically enriching agent prompts with **downstream agent capabilities, tools, and communication contracts** so agents remain **fully decoupled** while adapting their behavior at **runtime** without **hardcoded integrations**.
 
@@ -348,12 +348,20 @@ result = add_tool(a=5, b=7)
 
 #### How Protolink Eliminates LLM Orchestration Boilerplate
 
-Protolink treats agentic systems as **distributed programs**, not probabilistic workflows.  
-Every interaction between models, tools, and agents is expressed as an explicit, typed action with deterministic execution semantics. The goal is to replace emergent behavior and prompt-driven control flow with **inspectable, replayable, and verifiable computation**, while preserving the expressive power of modern LLMs.
+Protolink treats agentic systems as **distributed programs**, not probabilistic workflows.
+Every interaction between models, tools, and agents becomes an explicit action that the runtime can validate, execute, observe, and replay.
 
-Protolink provides a **deterministic execution layer** for LLMs, tools, and agents, allowing users to focus purely on business logic instead of orchestration glue.
+At the heart of Protolink is the **infer loop**:
 
-Building agentic systems usually means wrestling with tool-calling prompts, JSON schemas, output parsing, routing between agents, retries, and error handling. This boilerplate is repetitive, fragile, and completely orthogonal to the problem you actually want to solve.
+1. The LLM proposes exactly one next action.
+2. Protolink validates that action.
+3. The runtime executes the tool call, agent delegation, or final response.
+4. The result is fed back into the conversation.
+5. The loop repeats until the agent returns a final answer.
+
+This is where Protolink removes the boilerplate most agent frameworks push onto you: provider-specific tool prompts, JSON parsing, schema validation, retries, routing, delegation, and error recovery.
+
+When a provider supports native tool calling, Protolink uses it. When a local or smaller model works better with simple JSON instructions, Protolink uses that instead. The user-facing contract stays the same.
 
 Protolink removes that complexity by standardizing all interactions through a small set of explicit primitives:
 
@@ -376,17 +384,19 @@ From there, the runtime handles everything deterministically.
 
 You do **not** need to:
 
-- Prompt the LLM to decide when to **call tools**
-- **Parse** raw LLM text or JSON
+- Write provider-specific tool-calling prompts
+- Parse raw LLM text or JSON
+- Convert native tool calls into runtime actions
 - Write **routing** or **delegation logic**
-- Implement planners, routers, or state machines
+- Rebuild retry, validation, and self-correction loops
 
 The runtime automatically:
 
-- Builds structured system prompts
-- Injects tool schemas and agent capabilities
-- Enforces strict output contracts
-- Executes declared actions deterministically
+- Selects the right prompt/tool-calling mode for the model
+- Injects tool schemas and discovered agent capabilities
+- Validates every LLM action before execution
+- Executes tools and agent calls deterministically
+- Emits structured events for tracing and debugging
 
 Tool calls, agent calls, and LLM invocations only happen when explicitly declared.
 All results are returned as structured Parts — no hidden side effects, no magic.

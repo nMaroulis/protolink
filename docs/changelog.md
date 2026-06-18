@@ -55,6 +55,14 @@ Changed:
 - Ollama, llama.cpp, LM Studio, and OpenAI-compatible local servers now use native tool calling only when `supports_tool_calling=True`; otherwise they retain the JSON fallback path.
 - `.ruff_cache/` is now ignored by git.
 
+Infer Loop Updates:
+- The LLM no longer directly drives execution through fragile raw text.
+- Every step converges into typed actions: FinalAction, ToolCallAction, AgentCallAction.
+- Native providers like OpenAI/Anthropic/Gemini use real provider tool calling instead of being forced through prompt JSON.
+- Small/local models still get the simpler JSON protocol, which is the right call for Ollama/Gemma-style reliability.
+- Streaming now has a real action boundary through call_action_stream(), instead of pretending chunks are immediately executable.
+- The loop has retries, parse failure limits, duplicate-action detection, tool argument correction, unknown-tool correction, and structured events for observability.
+
 Fixed:
 
 - Fixed delegated agent tool results crashing LLM history injection when the remote tool output is hydrated as a `ToolOutput` dataclass.
