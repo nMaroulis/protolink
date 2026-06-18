@@ -8,6 +8,9 @@ version = "0.5.8"
 description = "A framework for building and managing agents based on the A2A protocol."
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.12.4",
+]
 license = "MIT"
 authors = [
     {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"},
@@ -42,7 +45,6 @@ http = [
     "fastapi>=0.136.0",
     "grpcio>=1.76.0",
     "httpx>=0.28.1",
-    "pydantic>=2.12.4",
     "starlette>=1.0.0",
     "uvicorn>=0.44.0",
     "websockets>=16.0",

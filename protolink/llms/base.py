@@ -70,21 +70,37 @@ See Also:
     - `protolink.llms.local.base.LocalLLM`: Base class for local models
 """
 
+import ast
 import asyncio
 import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 if TYPE_CHECKING:
     from protolink.tools import BaseTool
 
 from protolink.core.part import Part
+from protolink.llms.actions import (
+    AgentCallAction,
+    FinalAction,
+    LLMAction,
+    LLMActionResult,
+    ToolCallAction,
+    prompt_action_schema,
+    validate_action_payload,
+)
 from protolink.llms.history import ConversationHistory
 from protolink.llms.prompts import (
     AGENT_LIST_PROMPT,
     BASE_INSTRUCTIONS,
     BASE_SYSTEM_PROMPT,
+    NATIVE_AGENT_LIST_PROMPT,
+    NATIVE_BASE_INSTRUCTIONS,
+    NATIVE_NO_TOOL_PROMPT,
+    NATIVE_SYSTEM_PROMPT,
+    NATIVE_SYSTEM_REASONING_MAP,
+    NATIVE_TOOL_PROMPT,
     SYSTEM_REASONING_MAP,
     TOOL_CALL_PROMPT,
 )
@@ -156,7 +172,7 @@ class LLM(ABC):
         self._reasoning: ReasoningLevel = reasoning
 
         self.history: ConversationHistory = ConversationHistory()
-        self.system_prompt: str = self.build_system_prompt()
+        self.system_prompt: str = self.build_system_prompt(action_mode="json")
         self.sync = SyncLLM(self)
 
     # ----------------------------------------------------------------------
@@ -215,6 +231,93 @@ class LLM(ABC):
             return self.call_stream(self.history)
         return self.call(self.history)
 
+    @property
+    def uses_native_action_prompt(self) -> bool:
+        """Whether this LLM should receive provider-native tool instructions.
+
+        The default is ``False`` because the portable Protolink protocol is a
+        simple JSON action contract. Providers that actually send native tool
+        declarations override this so the system prompt does not ask the model
+        to emit JSON while the provider API is asking it to call tools.
+        """
+        return False
+
+    @property
+    def supports_native_action_stream(self) -> bool:
+        """Whether ``streaming=True`` can acquire actions from native events.
+
+        Providers that override ``call_action_stream()`` to consume structured
+        streaming tool-call events should return ``True`` here. Providers that
+        stream plain text should keep the default ``False`` so the agent builds
+        the JSON action prompt for streaming inference.
+        """
+        return False
+
+    def call_action(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, "BaseTool"],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+    ) -> LLMActionResult:
+        """Return one validated runtime action for the current conversation.
+
+        Subclasses with native tool/function-calling support should override
+        this method and normalize provider-native results into
+        :class:`~protolink.llms.actions.LLMActionResult`. The base
+        implementation is the compatibility path: call the model for text,
+        parse the prompt-defined JSON action, validate it with Pydantic, and
+        return the same typed result shape as native adapters.
+
+        Args:
+            history: Conversation history for this inference step.
+            tools: Local tools available to this agent. Fallback adapters rely
+                on the system prompt for tool descriptions; native adapters use
+                this mapping to build provider tool declarations.
+            agent_callback_available: Whether agent delegation can be
+                dispatched by the runtime for this step.
+            agent_cards: Optional discovered agent cards. The fallback parser
+                uses this context only to repair unambiguous legacy shorthand
+                such as ``{"type":"agent_call","prompt":"list_directory(path='.')"}`
+                into a fully typed ``AgentCallAction``.
+
+        Returns:
+            A normalized and validated action result. The runtime dispatches
+            only this object, never raw provider payloads.
+        """
+        _ = agent_callback_available
+        raw_response = self.call(history)
+        action = self._parse_infer_response(raw_response, tools=tools, agent_cards=agent_cards)
+        return LLMActionResult(action=action, raw_response=raw_response, native=False)
+
+    async def call_action_stream(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, "BaseTool"],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+        chunk_callback: Callable[[str], Awaitable[None]] | None = None,
+    ) -> LLMActionResult:
+        """Return one action from a streaming model call.
+
+        The base implementation is intentionally simple and local-model
+        friendly: stream text chunks, emit them to the optional callback, join
+        the chunks, and parse the final text as one Protolink JSON action. API
+        providers with native streaming tool-call events override this method
+        and normalize those events into the same ``LLMActionResult`` contract.
+        """
+        _ = agent_callback_available
+        chunks: list[str] = []
+        async for chunk in self.call_stream(history):
+            chunks.append(chunk)
+            if chunk_callback is not None:
+                await chunk_callback(chunk)
+        raw_response = "".join(chunks)
+        action = self._parse_infer_response(raw_response, tools=tools, agent_cards=agent_cards)
+        return LLMActionResult(action=action, raw_response=raw_response, native=False)
+
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
     #
@@ -236,6 +339,7 @@ class LLM(ABC):
         query: str,
         tools: dict[str, "BaseTool"],
         agent_callback: Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None = None,
+        agent_cards: list[Any] | None = None,
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     ) -> "Part":
@@ -243,7 +347,7 @@ class LLM(ABC):
         Execute a controlled, multi-step inference loop against the configured LLM.
 
         This method implements a deterministic agent runtime over a stateless language model. The LLM is invoked
-        iteratively to *declare intent only* using a strict JSON action protocol. All side effects (tool execution,
+        iteratively to *declare intent only* using a strict typed action protocol. All side effects (tool execution,
         agent dispatch) are performed by the runtime, never by the LLM itself.
 
         Workflow Overview
@@ -252,12 +356,16 @@ class LLM(ABC):
 
         1. **Query Injection**: The user query is added to the conversation history.
 
-        2. **LLM Invocation**: The LLM generates a JSON response declaring its next action.
+        2. **LLM Invocation**: The provider adapter returns one normalized ``LLMActionResult``. Native-capable adapters
+           use provider tool/function calling and convert returned tool calls into Protolink actions. Fallback adapters
+           call the model for JSON text and parse that JSON into the same action models. Raw client API calls are
+           wrapped in a transient error handler with exponential backoff and random jitter.
 
-        3. **Response Parsing**: The runtime parses and validates the JSON response.
-           If parsing fails, corrective feedback is injected and the loop retries.
+        3. **Action Validation**: The action is validated against the type-safe ``LLMAction`` union. If validation
+           fails, recursive field-level diagnostics (detailing the exact error location and type) are extracted from the
+           Pydantic validation error and injected back into history for self-correction.
 
-        4. **Action Dispatch**: Based on the action type:
+        4. **Action Dispatch**: Based on the validated action type:
 
            - ``final``: The loop terminates and returns the response content.
            - ``tool_call``: The specified tool is executed, and its result is injected back into the conversation
@@ -296,6 +404,10 @@ class LLM(ABC):
             The callback receives the target agent's name, the action type (``tool_call`` or ``infer``), and the full
             payload. It should return the result from the delegated agent. If None, agent_call actions trigger
             self-correction guidance.
+        agent_cards : list[Any], optional
+            Discovered agent cards available for delegation. Provider-native adapters can use these to expose agent
+            delegation tools; prompt-fallback parsing uses them to repair unambiguous legacy shorthand emitted by
+            smaller local models.
         streaming : bool, default False
             Whether to invoke the underlying LLM in streaming mode. When True, the response is collected from an async
             generator before parsing.
@@ -315,22 +427,27 @@ class LLM(ABC):
         RuntimeError
             Raised in the following scenarios:
 
-            - **LLM call failure**: Network error, API error, or provider-specific issue.
+            - **LLM call failure**: Network error, API error, or provider-specific issue that persists after retries.
             - **Unrecoverable tool error**: Tool execution raises an exception other than ``TypeError`` (which triggers
-            self-correction).
-            - **Parse circuit breaker**: 3 consecutive JSON parse failures.
+              self-correction).
+            - **Parse circuit breaker**: 3 consecutive JSON parse or validation failures.
             - **Step limit exceeded**: ``MAX_INFER_STEPS`` reached without ``final``.
 
         Notes
         -----
         **Action Protocol**
 
-        The LLM must respond with JSON containing a ``type`` field. Supported actions:
+        The runtime dispatches only validated ``LLMAction`` instances. Provider-native adapters expose Protolink tools
+        as native functions/tools, then normalize returned provider calls into ``ToolCallAction`` or
+        ``AgentCallAction``. Providers without reliable native tool support use the prompt JSON fallback, which must
+        return a JSON object containing a ``type`` field matching the discriminated ``LLMAction`` union.
+
+        Supported actions:
 
         - ``final``: Produce the final response. Requires ``content`` field.
         - ``tool_call``: Execute a local tool. Requires ``tool`` and ``args`` fields.
         - ``agent_call``: Delegate to another agent. Requires ``agent``, ``action``, and action-specific fields
-        (``tool``/``args`` or ``prompt``).
+          (``tool``/``args`` or ``prompt``).
 
         Example valid responses::
 
@@ -347,19 +464,19 @@ class LLM(ABC):
            action (same signature), the runtime injects corrective guidance rather than re-executing, preventing
            infinite loops.
 
-        2. *Parse Failure Circuit Breaker*: After 3 consecutive JSON parse failures, raises ``RuntimeError`` early
-           rather than consuming the full step budget. Each failure injects corrective feedback to help the LLM
-           self-correct.
+        2. *Transient Error Resiliency*: API requests are protected by an exponential backoff handler with random
+           jitter. It retries on rate limits (429), server overloads (529), 5xx response codes, timeouts, and network
+           disconnects.
 
-        3. *Self-Correcting Recovery*: Instead of failing immediately on validation errors, the runtime injects
-           helpful context back into the conversation:
+        3. *Granular Field-Level Self-Correction*: When Pydantic validation fails, the
+           error message returned to the model includes the exact Pydantic validation trace
+           (location, message, error type) rather than a generic parsing error, facilitating
+           precise correction of schema violations.
 
-           - Unknown tool → lists available tools
-           - Missing required fields → shows expected JSON format
-           - Type errors (wrong args) → prompts to check input_schema
-           - Agent not found → provides error details
+        4. *Parse Failure Circuit Breaker*: After 3 consecutive JSON parse or schema validation failures, raises
+           ``RuntimeError`` early rather than consuming the full step budget. Each failure injects corrective feedback.
 
-        4. *Bounded Execution*: Hard limit of ``MAX_INFER_STEPS`` (default: 10) prevents runaway execution. If exceeded,
+        5. *Bounded Execution*: Hard limit of ``MAX_INFER_STEPS`` (default: 10) prevents runaway execution. If exceeded,
            raises ``RuntimeError``.
 
         See Also
@@ -367,6 +484,8 @@ class LLM(ABC):
         _inject_tool_call : Provider-specific hook for tool result injection.
         _inject_agent_call : Hook for agent delegation result injection.
         _compute_action_signature : Computes action fingerprints for deduplication.
+        _call_with_retry : Wrapped executor for LLM API calls with backoff.
+        _parse_infer_response : Validator for LLM responses using Pydantic action models.
         build_system_prompt : Constructs the system prompt with tools and agents.
         """
 
@@ -385,29 +504,66 @@ class LLM(ABC):
         while steps < MAX_INFER_STEPS:
             steps += 1
             await emit({"type": "llm_step", "step": steps})
+            action_error: ValueError | None = None
+            action_result: LLMActionResult | None = None
 
             # ─────────────────────────────────────────────────────────────────
-            # Step 1: Call the LLM
+            # Step 1: Ask the LLM adapter for one typed action
             # ─────────────────────────────────────────────────────────────────
             try:
                 if streaming:
-                    chunks = []
-                    async for chunk in self.call_stream(self.history):
-                        chunks.append(chunk)
-                        await emit({"type": "llm_chunk", "step": steps, "content": chunk})
-                    raw_response = "".join(chunks)
+
+                    async def stream_action(current_step=steps):
+                        async def emit_chunk(chunk: str) -> None:
+                            await emit({"type": "llm_chunk", "step": current_step, "content": chunk})
+
+                        return await self.call_action_stream(
+                            self.history,
+                            tools=tools,
+                            agent_callback_available=agent_callback is not None,
+                            agent_cards=agent_cards,
+                            chunk_callback=emit_chunk,
+                        )
+
+                    action_result = await self._call_with_retry(stream_action)
+                    raw_response = action_result.raw_response
                 else:
-                    raw_response = self.call(self.history)
-                await emit({"type": "llm_response", "step": steps, "streaming": streaming})
+                    action_result = await self._call_with_retry(
+                        self.call_action,
+                        self.history,
+                        tools=tools,
+                        agent_callback_available=agent_callback is not None,
+                        agent_cards=agent_cards,
+                    )
+                    raw_response = action_result.raw_response
+                    action_obj = action_result.action
+                await emit(
+                    {
+                        "type": "llm_response",
+                        "step": steps,
+                        "streaming": streaming,
+                        "native": action_result.native if action_result is not None else False,
+                        "metadata": action_result.metadata if action_result is not None else {},
+                    }
+                )
+            except ValueError as e:
+                action_error = e
             except Exception as e:
                 await emit({"type": "llm_error", "step": steps, "message": str(e), "recoverable": False})
                 raise RuntimeError(f"LLM call failed at step {steps}: {e}") from e
 
             # ─────────────────────────────────────────────────────────────────
-            # Step 2: Parse the response with retry budget
+            # Step 2: Normalize parsed action fields
             # ─────────────────────────────────────────────────────────────────
             try:
-                action, payload = self._parse_infer_response(raw_response)
+                if action_error is not None:
+                    raise action_error
+                if action_result is None:
+                    raise ValueError("LLM adapter did not return an action result")
+                action_obj = action_result.action
+                raw_response = action_result.raw_response
+                action = action_obj.type
+                payload = action_obj.model_dump(exclude_none=True)
                 parse_failures = 0  # Reset on success
             except ValueError as e:
                 parse_failures += 1
@@ -427,8 +583,12 @@ class LLM(ABC):
                     ) from e
                 # Inject error feedback to help LLM self-correct
                 self.history.add_system(
-                    f"Your previous response could not be parsed as valid JSON. Error: {e}\n"
-                    f"Please respond with a valid JSON object containing 'type' and required fields."
+                    f"Your previous response could not be parsed or validated. Error:\n{e}\n"
+                    f"Return exactly one JSON action object, for example:\n"
+                    f'{{"type":"final","content":"..."}}\n'
+                    f'{{"type":"tool_call","tool":"tool_name","args":{{}}}}\n'
+                    f'{{"type":"agent_call","agent":"agent_name","action":"infer","prompt":"..."}}\n'
+                    f'{{"type":"agent_call","agent":"agent_name","action":"tool_call","tool":"tool_name","args":{{}}}}'
                 )
                 continue
 
@@ -436,7 +596,7 @@ class LLM(ABC):
             # Step 3: Deduplication detection for repeated actions
             # ─────────────────────────────────────────────────────────────────
             await emit({"type": "llm_action", "step": steps, "action": action, "payload": payload})
-            action_signature = self._compute_action_signature(action, payload)
+            action_signature = self._compute_action_signature(action_obj)
             if action_signature in recent_actions:
                 # Detected repeated action - inject guidance to prevent infinite loop
                 await emit(
@@ -463,32 +623,20 @@ class LLM(ABC):
             # ─────────────────────────────────────────────────────────────────
             # Step 4: Handle action types
             # ─────────────────────────────────────────────────────────────────
-            if action == "final":
-                content = payload.get("content")
-                if content is None:
-                    self.history.add_system(
-                        "Your 'final' response is missing 'content'. Please provide: "
-                        '{"type": "final", "content": "<your response>"}'
-                    )
-                    continue
+            if isinstance(action_obj, FinalAction):
+                content = action_obj.content
                 # Add final response to history
                 self.history.add_assistant(raw_response)
                 await emit({"type": "llm_final", "step": steps, "content": content, "final": True})
                 return Part("infer_output", content)
 
-            elif action == "tool_call":
+            elif isinstance(action_obj, ToolCallAction):
                 # Add assistant call to history before result
                 self.history.add_assistant(raw_response)
 
                 # Validate tool_call payload
-                tool_name = payload.get("tool")
-                tool_args = payload.get("args", {})
-
-                if not tool_name:
-                    self.history.add_system(
-                        "Your 'tool_call' is missing 'tool' field. Please specify which tool to call."
-                    )
-                    continue
+                tool_name = action_obj.tool
+                tool_args = action_obj.args
 
                 if tool_name not in tools:
                     available = list(tools.keys())
@@ -541,7 +689,7 @@ class LLM(ABC):
                 )
                 continue
 
-            elif action == "agent_call":
+            elif isinstance(action_obj, AgentCallAction):
                 if not agent_callback:
                     self.history.add_system(
                         "agent_call is not available in this context. "
@@ -553,20 +701,8 @@ class LLM(ABC):
                 self.history.add_assistant(raw_response)
 
                 # Validate agent_call payload
-                agent_name = payload.get("agent")
-                agent_action = payload.get("action")
-
-                if not agent_name:
-                    self.history.add_system(
-                        "Your 'agent_call' is missing 'agent' field. Please specify which agent to call."
-                    )
-                    continue
-
-                if agent_action not in {"tool_call", "infer"}:
-                    self.history.add_system(
-                        f"Invalid agent_call action: '{agent_action}'. Must be 'tool_call' or 'infer'."
-                    )
-                    continue
+                agent_name = action_obj.agent
+                agent_action = action_obj.action
 
                 try:
                     await emit(
@@ -627,7 +763,7 @@ class LLM(ABC):
             f"The LLM may be stuck in a loop. Consider simplifying the task or checking prompts."
         )
 
-    def _compute_action_signature(self, action: str, payload: dict[str, Any]) -> str:
+    def _compute_action_signature(self, action: LLMAction) -> str:
         """
         Compute a unique signature for an action to detect duplicates.
 
@@ -636,72 +772,69 @@ class LLM(ABC):
 
         Parameters
         ----------
-        action : str
-            The action type (``final``, ``tool_call``, or ``agent_call``).
-        payload : dict[str, Any]
-            The action payload containing action-specific fields.
+        action : LLMAction
+            The action model instance.
 
         Returns
         -------
         str
             A deterministic string signature uniquely identifying this action.
-            For ``tool_call``: includes tool name and sorted args.
-            For ``agent_call``: includes agent, action type, and relevant params.
-            For other actions: includes MD5 hash of payload.
         """
         import hashlib
 
-        if action == "tool_call":
-            key = f"tool_call:{payload.get('tool')}:{sorted(payload.get('args', {}).items())}"
-        elif action == "agent_call":
-            agent = payload.get("agent")
-            agent_action = payload.get("action")
-            if agent_action == "tool_call":
-                key = f"agent_call:{agent}:tool_call:{payload.get('tool')}:{sorted(payload.get('args', {}).items())}"
+        def canonical(value: Any) -> str:
+            return json.dumps(value, sort_keys=True, default=json_history_default)
+
+        if isinstance(action, ToolCallAction):
+            key = f"tool_call:{action.tool}:{canonical(action.args or {})}"
+        elif isinstance(action, AgentCallAction):
+            if action.action == "tool_call":
+                key = f"agent_call:{action.agent}:tool_call:{action.tool}:{canonical(action.args or {})}"
             else:
-                key = f"agent_call:{agent}:infer:{payload.get('prompt', '')[:50]}"
+                key = f"agent_call:{action.agent}:infer:{action.prompt[:50] if action.prompt else ''}"
         else:
             # For final or other actions, use content hash
-            key = f"{action}:{hashlib.md5(str(payload).encode()).hexdigest()[:8]}"
+            content = getattr(action, "content", "")
+            key = f"final:{hashlib.md5(content.encode()).hexdigest()[:8]}"
 
         return key
 
-    def _parse_infer_response(self, response: str) -> tuple[str, dict[str, Any]]:
+    def _parse_infer_response(
+        self,
+        response: str,
+        *,
+        tools: dict[str, "BaseTool"] | None = None,
+        agent_cards: list[Any] | None = None,
+    ) -> LLMAction:
         """
-        Parse, validate, and normalize a raw LLM response for agent execution.
+        Parse, validate, and normalize a raw LLM response using Pydantic action models.
+
+        This method enforces a hard contract between the LLM and the runtime. The response must be a single,
+        well-formed JSON object declaring exactly one supported action. Validation is performed by Pydantic's
+        ``TypeAdapter`` against the discriminated ``LLMAction`` union.
+
+        On validation failure, field-level diagnostics are extracted from Pydantic's ``ValidationError`` and
+        formatted into a precise, human-readable error message to maximize the LLM's ability to self-correct
+        on the next iteration.
 
         Args:
-            response (str):
-                The raw string output returned by the language model.
+            response: The raw string output returned by the language model.
+            tools: Local tools available to the current agent, used only for
+                unambiguous fallback-shorthand repair.
+            agent_cards: Discovered agents available for delegation, used only
+                for unambiguous fallback-shorthand repair.
 
         Returns:
-            tuple[str, dict[str, Any]]:
-                A tuple containing:
-                - The declared action type (e.g. ``final``, ``tool_call``, ``agent_call``)
-                - A normalized payload dictionary for downstream execution
+            The parsed and validated action model (FinalAction, ToolCallAction, or AgentCallAction).
 
         Raises:
-            ValueError:
-                If the response is not valid JSON, does not declare a supported action, or is missing required fields
-                for the declared action type.
-
-        Notes:
-        This function enforces a hard contract between the LLM and the runtime by requiring the response to be a single,
-        well-formed JSON object declaring exactly one supported action. It validates both the structural integrity of
-        the JSON payload and the semantic correctness of required fields for each action type.
-
-        Unsupported actions, missing fields, or malformed JSON are rejected immediately with explicit errors, enabling
-        robust retry, logging, or failure handling at the orchestration layer.
-
-        The output of this function is guaranteed to be safe for downstream execution logic and free of implicit
-        assumptions or provider-specific artifacts.
+            ValueError: If the response is not valid JSON or fails Pydantic validation.
         """
         try:
             data = json.loads(response, strict=False)
         except json.JSONDecodeError as e:
             # Try to find JSON within the text (e.g. if wrapped in code blocks or mixed with text)
             try:
-                # Find the first { and the last }
                 start = response.find("{")
                 end = response.rfind("}")
 
@@ -713,21 +846,334 @@ class LLM(ABC):
             except json.JSONDecodeError:
                 raise ValueError(f"Invalid JSON: {e}\nRaw response: {response}") from e
 
-        action = data.get("type")
-        if action not in {"final", "tool_call", "agent_call"}:
-            raise ValueError(f"Unsupported action type: {action}\nRaw response: {response}")
+        from pydantic import ValidationError
 
-        if action == "final":
-            content = data.get("content")
-            if not isinstance(content, str):
-                raise ValueError(f"Final response must have a 'content' string.\nRaw response: {response}")
-            return action, {"content": content}
+        data = self._repair_fallback_action_payload(data, tools=tools or {}, agent_cards=agent_cards or [])
 
-        # tool_call or agent_call
-        if action in {"tool_call", "agent_call"} and not isinstance(data, dict):
-            raise ValueError(f"{action} response must be a JSON object.\nRaw response: {response}")
+        try:
+            return validate_action_payload(data)
+        except ValidationError as e:
+            diagnostics = self._format_validation_errors(e)
+            raise ValueError(
+                f"Action validation failed. Field-level errors:\n{diagnostics}\nParsed data: {data}"
+            ) from e
+        except Exception as e:
+            raise ValueError(f"Action validation failed: {e}\nParsed data: {data}") from e
 
-        return action, data
+    @staticmethod
+    def _repair_fallback_action_payload(
+        data: Any,
+        *,
+        tools: dict[str, "BaseTool"],
+        agent_cards: list[Any],
+    ) -> Any:
+        """Repair narrow, legacy prompt-fallback action shorthands.
+
+        The runtime still dispatches only strict ``LLMAction`` models. This
+        helper runs before validation and converts a few historical or
+        small-model-friendly forms into the canonical shape when the repair is
+        deterministic. It is intentionally conservative:
+
+        - ``payload`` dictionaries are flattened for older examples.
+        - ``prompt: "tool_name(arg=value)"`` is parsed as a function-call
+          shorthand for tool calls.
+        - A missing delegated-agent name is inferred only when exactly one
+          discovered agent advertises the requested tool.
+
+        If the target tool or agent cannot be inferred safely, the original data
+        is returned and normal Pydantic diagnostics drive self-correction.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        repaired = dict(data)
+        payload = repaired.get("payload")
+        if isinstance(payload, dict):
+            for key in ("agent", "action", "tool", "args", "prompt", "content"):
+                if key not in repaired and key in payload:
+                    repaired[key] = payload[key]
+            repaired.pop("payload", None)
+
+        if repaired.get("type") == "tool_call" and "args" not in repaired:
+            prompt = repaired.get("prompt")
+            parsed_call = LLM._parse_function_call_shorthand(prompt) if isinstance(prompt, str) else None
+            if parsed_call is not None:
+                tool_name, call_args, _agent_name = parsed_call
+                repaired.setdefault("tool", tool_name)
+                repaired["args"] = call_args
+                repaired.pop("prompt", None)
+
+        if repaired.get("type") != "agent_call":
+            return repaired
+
+        if repaired.get("action") not in {"tool_call", None}:
+            return repaired
+
+        prompt = repaired.get("prompt")
+        parsed_call = LLM._parse_function_call_shorthand(prompt) if isinstance(prompt, str) else None
+        if parsed_call is not None:
+            tool_name, call_args, agent_from_prompt = parsed_call
+            repaired.setdefault("action", "tool_call")
+            repaired.setdefault("tool", tool_name)
+            repaired.setdefault("args", call_args)
+            if agent_from_prompt and "agent" not in repaired:
+                repaired["agent"] = agent_from_prompt
+            repaired.pop("prompt", None)
+
+        tool_name = repaired.get("tool")
+        if isinstance(tool_name, str) and "agent" not in repaired:
+            agent_name = LLM._infer_unique_agent_for_tool(tool_name, agent_cards)
+            if agent_name:
+                repaired["agent"] = agent_name
+            elif tool_name in tools:
+                return {"type": "tool_call", "tool": tool_name, "args": repaired.get("args") or {}}
+
+        return repaired
+
+    @staticmethod
+    def _parse_function_call_shorthand(value: str | None) -> tuple[str, dict[str, Any], str | None] | None:
+        """Parse ``tool(arg=value)`` or ``agent.tool(arg=value)`` fallback text.
+
+        This is not a general expression evaluator; it accepts only Python AST
+        function-call syntax with literal arguments. Positional arguments are
+        supported only when they are a single dictionary literal, because there
+        is no reliable way to map arbitrary positional values to tool parameter
+        names without the target schema.
+        """
+        if not value:
+            return None
+        text = value.strip().strip("`")
+        try:
+            expr = ast.parse(text, mode="eval").body
+        except SyntaxError:
+            return None
+        if not isinstance(expr, ast.Call):
+            return None
+
+        agent_name: str | None = None
+        if isinstance(expr.func, ast.Name):
+            tool_name = expr.func.id
+        elif isinstance(expr.func, ast.Attribute):
+            tool_name = expr.func.attr
+            if isinstance(expr.func.value, ast.Name):
+                agent_name = expr.func.value.id
+        else:
+            return None
+
+        args: dict[str, Any] = {}
+        if len(expr.args) == 1 and not expr.keywords:
+            try:
+                literal = ast.literal_eval(expr.args[0])
+            except (ValueError, TypeError):
+                return None
+            if not isinstance(literal, dict):
+                return None
+            args = literal
+        elif expr.args:
+            return None
+
+        for keyword in expr.keywords:
+            if keyword.arg is None:
+                return None
+            try:
+                args[keyword.arg] = ast.literal_eval(keyword.value)
+            except (ValueError, TypeError):
+                return None
+
+        return tool_name, args, agent_name
+
+    @staticmethod
+    def _infer_unique_agent_for_tool(tool_name: str, agent_cards: list[Any]) -> str | None:
+        """Return the only discovered agent advertising ``tool_name``, if any."""
+        candidates: list[str] = []
+        for card in agent_cards:
+            agent_name = getattr(card, "name", None)
+            for skill in getattr(card, "skills", []) or []:
+                if getattr(skill, "id", None) == tool_name and agent_name:
+                    candidates.append(str(agent_name))
+        unique = sorted(set(candidates))
+        return unique[0] if len(unique) == 1 else None
+
+    @staticmethod
+    def _format_validation_errors(exc: Any) -> str:
+        """
+        Extract precise, field-level diagnostics from a Pydantic ``ValidationError``.
+
+        Produces a human-readable bullet list of every field error, including the full
+        location path (e.g. ``agent_call -> prompt``) and the Pydantic error message.
+        This feedback is injected into the conversation history so the LLM can self-correct
+        with maximum precision on the next turn.
+
+        Args:
+            exc: A Pydantic ``ValidationError`` instance.
+
+        Returns:
+            A multi-line string with one bullet per validation error.
+        """
+        lines: list[str] = []
+        try:
+            for error in exc.errors():
+                loc = " -> ".join(str(part) for part in error.get("loc", []))
+                msg = error.get("msg", "unknown error")
+                err_type = error.get("type", "")
+                if loc:
+                    lines.append(f"  - Field '{loc}': {msg} (type: {err_type})")
+                else:
+                    lines.append(f"  - {msg} (type: {err_type})")
+        except Exception:
+            lines.append(f"  - {exc}")
+        return "\n".join(lines) if lines else str(exc)
+
+    async def _call_with_retry(
+        self,
+        fn: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        """
+        Execute a callable with exponential backoff and jitter on transient failures.
+
+        This method wraps LLM API calls to handle transient errors gracefully:
+        - HTTP 429 (rate limit) / 529 (overloaded)
+        - HTTP 5xx (server errors)
+        - Connection timeouts and network errors
+
+        Non-transient errors (e.g. authentication failures, invalid requests) are raised
+        immediately without consuming the retry budget.
+
+        The backoff schedule uses exponential delay with random jitter to prevent the
+        "thundering herd" problem when multiple agents hit rate limits simultaneously.
+
+        Parameters
+        ----------
+        fn : Callable
+            The function to execute. May be sync or async.
+        *args : Any
+            Positional arguments forwarded to ``fn``.
+        **kwargs : Any
+            Keyword arguments forwarded to ``fn``. The retry controls
+            ``max_retries``, ``base_delay``, and ``max_delay`` may be provided
+            as keyword-only values and are consumed before calling ``fn``.
+        max_retries : int
+            Maximum number of retry attempts. Defaults to 3.
+        base_delay : float
+            Initial delay in seconds before the first retry. Defaults to 1.0.
+        max_delay : float
+            Maximum delay cap in seconds. Defaults to 30.0.
+
+        Returns
+        -------
+        Any
+            The return value of ``fn``.
+
+        Raises
+        ------
+        Exception
+            The last exception encountered if all retries are exhausted, or immediately
+            for non-transient errors.
+        """
+        import asyncio
+        import random
+
+        max_retries = int(kwargs.pop("max_retries", 3))
+        base_delay = float(kwargs.pop("base_delay", 1.0))
+        max_delay = float(kwargs.pop("max_delay", 30.0))
+        last_exception: Exception | None = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                result = fn(*args, **kwargs)
+                # If the callable returned a coroutine, await it
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
+            except Exception as e:
+                last_exception = e
+
+                # Determine if this is a retryable (transient) error
+                if not self._is_transient_error(e):
+                    raise
+
+                if attempt >= max_retries:
+                    raise
+
+                # Exponential backoff with jitter
+                delay = min(base_delay * (2**attempt), max_delay)
+                jitter = random.uniform(0, delay * 0.5)
+                await asyncio.sleep(delay + jitter)
+
+        # Should never reach here, but satisfy the type checker
+        raise last_exception  # type: ignore[misc]
+
+    @staticmethod
+    def _is_transient_error(exc: Exception) -> bool:
+        """
+        Determine whether an exception represents a transient failure worth retrying.
+
+        Checks for:
+        - HTTP status codes 429 (rate limit), 529 (overloaded), and 5xx (server errors)
+        - Connection-related errors (timeout, refused, reset)
+        - Provider-specific rate limit / overloaded exception types
+
+        Args:
+            exc: The exception to classify.
+
+        Returns:
+            True if the error is transient and the call should be retried.
+        """
+        # Check for HTTP status code on the exception object (common across providers)
+        status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+        if isinstance(status, int):
+            if status == 429 or status == 529 or 500 <= status < 600:
+                return True
+
+        # Check exception class name for provider-specific rate limit types
+        exc_name = type(exc).__name__.lower()
+        transient_names = {"ratelimiterror", "ratelimit", "overloaded", "overloadederror", "apitimeouterror"}
+        if exc_name in transient_names:
+            return True
+
+        # Check for connection-level errors
+        if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
+            return True
+
+        # Check the string representation as a last resort
+        msg = str(exc).lower()
+        if any(keyword in msg for keyword in ("rate limit", "429", "overloaded", "timeout", "timed out", "connection")):
+            return True
+
+        return False
+
+    def get_action_schema(self) -> dict[str, Any]:
+        """Get the exact Pydantic JSON schema for the runtime action union."""
+        from protolink.llms.actions import ACTION_ADAPTER
+
+        return ACTION_ADAPTER.json_schema()
+
+    def get_prompt_action_schema(self) -> dict[str, Any]:
+        """Get the root-object JSON schema used by prompt fallback adapters.
+
+        Native tool-capable providers should expose each real tool as a native
+        function/tool declaration instead of using this schema for every action.
+        The schema exists for JSON-mode fallbacks that can constrain a single
+        response object but cannot represent provider-native tool calls.
+        """
+        return prompt_action_schema()
+
+    def get_openai_action_schema(self) -> dict[str, Any]:
+        """Compatibility alias for the prompt fallback action schema.
+
+        OpenAI-native action acquisition no longer uses this method because a
+        generic action schema cannot safely express dynamic tool arguments under
+        strict structured outputs. Use provider tools instead.
+        """
+        return self.get_prompt_action_schema()
+
+    def get_inlined_action_schema(self) -> dict[str, Any]:
+        """Get the JSON schema for LLMAction with all reference definitions inlined."""
+        from protolink.llms.actions import inline_refs
+
+        return inline_refs(self.get_action_schema())
 
     def _inject_tool_call(
         self,
@@ -847,6 +1293,7 @@ class LLM(ABC):
         agent_cards: str | None = None,
         tools: str | None = None,
         *,
+        action_mode: Literal["json", "native"] | None = None,
         flow_instructions: str | None = None,
         override_system_prompt: bool = False,
         persist: bool = False,
@@ -868,6 +1315,11 @@ class LLM(ABC):
             user_instructions: Optional instructions from the user to customize behavior.
             agent_cards: JSON/text describing available agents for delegation.
             tools: JSON/text describing available tools for this agent.
+            action_mode: Explicit prompt protocol. ``"json"`` uses the simple
+                Protolink JSON action contract. ``"native"`` uses provider tool
+                instructions and leaves tool-call syntax to the backend. When
+                omitted, the LLM's ``uses_native_action_prompt`` property is
+                used.
             flow_instructions: Optional flow context instructions (e.g. pipeline step awareness).
             override_system_prompt: Whether to override completely the system prompt with the user defined prompt.
             persist: If True, updates the system prompt in history without wiping conversation turns.
@@ -888,19 +1340,33 @@ class LLM(ABC):
                     f"Your registered name in the system is '{agent_name}'. "
                     f"You are executing as '{agent_name}'. Do NOT attempt to delegate tasks to yourself."
                 )
-            self.system_prompt = BASE_SYSTEM_PROMPT.format(
-                base_instructions=BASE_INSTRUCTIONS,
-                reasoning_instructions=SYSTEM_REASONING_MAP.get(self._reasoning, ""),
-                agent_identity_prompt=agent_identity_prompt,
-                tool_call_prompt=TOOL_CALL_PROMPT.replace("{{tools}}", tools)
-                if tools
-                else "No tools are available for you to call. You cannot return a tool call response.",
-                agent_call_prompt=AGENT_LIST_PROMPT.replace("{{agent_cards_from_registry}}", agent_cards)
-                if agent_cards
-                else "",
-                user_instructions=user_instructions or "",
-                flow_instructions=flow_instructions or "",
-            )
+            resolved_action_mode = action_mode or ("native" if self.uses_native_action_prompt else "json")
+            if resolved_action_mode == "native":
+                self.system_prompt = NATIVE_SYSTEM_PROMPT.format(
+                    native_base_instructions=NATIVE_BASE_INSTRUCTIONS,
+                    native_reasoning_instructions=NATIVE_SYSTEM_REASONING_MAP.get(self._reasoning, ""),
+                    agent_identity_prompt=agent_identity_prompt,
+                    native_tool_prompt=NATIVE_TOOL_PROMPT if tools else NATIVE_NO_TOOL_PROMPT,
+                    native_agent_prompt=NATIVE_AGENT_LIST_PROMPT.replace("{{agent_cards_from_registry}}", agent_cards)
+                    if agent_cards
+                    else "",
+                    user_instructions=user_instructions or "",
+                    flow_instructions=flow_instructions or "",
+                )
+            else:
+                self.system_prompt = BASE_SYSTEM_PROMPT.format(
+                    base_instructions=BASE_INSTRUCTIONS,
+                    reasoning_instructions=SYSTEM_REASONING_MAP.get(self._reasoning, ""),
+                    agent_identity_prompt=agent_identity_prompt,
+                    tool_call_prompt=TOOL_CALL_PROMPT.replace("{{tools}}", tools)
+                    if tools
+                    else "No tools are available for you to call. You cannot return a tool call response.",
+                    agent_call_prompt=AGENT_LIST_PROMPT.replace("{{agent_cards_from_registry}}", agent_cards)
+                    if agent_cards
+                    else "",
+                    user_instructions=user_instructions or "",
+                    flow_instructions=flow_instructions or "",
+                )
 
         if persist:
             self.history.set_system(self.system_prompt)
@@ -1001,6 +1467,7 @@ class SyncLLM:
         query: str,
         tools: dict[str, "BaseTool"],
         agent_callback: Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None = None,
+        agent_cards: list[Any] | None = None,
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     ) -> "Part":
@@ -1015,6 +1482,7 @@ class SyncLLM:
                 query=query,
                 tools=tools,
                 agent_callback=agent_callback,
+                agent_cards=agent_cards,
                 streaming=streaming,
                 event_callback=event_callback,
             )

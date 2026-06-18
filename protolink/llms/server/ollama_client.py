@@ -3,12 +3,20 @@ from __future__ import annotations
 import http.client
 import json
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
+from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
 from protolink.llms.history import ConversationHistory
 from protolink.llms.server.base import ServerLLM
+from protolink.llms.tool_calling import (
+    chat_completion_tools,
+    native_tool_call_to_action,
+    parse_json_arguments,
+    should_include_agent_tools,
+)
+from protolink.tools import BaseTool
 from protolink.types import LLMProvider
 from protolink.utils.logging import get_logger
 
@@ -179,88 +187,186 @@ class OllamaLLM(ServerLLM):
         finally:
             self._client.close()
 
+    def call_action(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, BaseTool],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+    ) -> LLMActionResult:
+        """Return one typed action from Ollama.
+
+        By default Ollama uses the simple JSON prompt protocol because local
+        model tool-calling reliability varies substantially. When
+        ``supports_tool_calling=True`` is set for a model known to support
+        tools, Protolink sends native ``tools`` declarations and normalizes
+        returned tool calls into the same action protocol.
+        """
+        if not self._supports_tool_calling:
+            return super().call_action(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            )
+        if self._client is None:
+            raise ValueError("Ollama client not connected")
+
+        options = dict(self._model_params)
+        if "max_tokens" in options:
+            options["num_predict"] = options.pop("max_tokens")
+
+        tool_specs = chat_completion_tools(
+            tools,
+            include_agent_tools=should_include_agent_tools(
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            ),
+        )
+        payload = {
+            "model": self.model,
+            "messages": history.messages,
+            "stream": False,
+            "options": options,
+        }
+        if tool_specs:
+            payload["tools"] = tool_specs
+        headers = {"Content-Type": "application/json"}
+        try:
+            self._client.request(
+                method="POST",
+                url="/api/chat",
+                body=json.dumps(payload),
+                headers=headers,
+            )
+            response = self._client.getresponse()
+            data = response.read().decode("utf-8")
+        finally:
+            self._client.close()
+
+        if response.status != 200:
+            raise RuntimeError(f"Ollama API request failed with status {response.status}: {data}")
+        result = json.loads(data)
+        return self._action_from_chat_result(result)
+
+    async def call_action_stream(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, BaseTool],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+        chunk_callback: Callable[[str], Awaitable[None]] | None = None,
+    ) -> LLMActionResult:
+        """Return one action from an Ollama streaming chat response.
+
+        Ollama's ordinary Protolink path still streams plain JSON text and lets
+        the base class parse it after the stream finishes. When a caller opts a
+        known tool-capable model into ``supports_tool_calling=True``, this
+        method sends Ollama ``tools`` declarations and watches streamed
+        ``message.tool_calls`` events. Text deltas are forwarded immediately,
+        while the first tool call is normalized into the typed action protocol
+        once the response has been drained.
+        """
+        if not self._supports_tool_calling:
+            return await super().call_action_stream(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+                chunk_callback=chunk_callback,
+            )
+        if self._client is None:
+            raise ValueError("Ollama client not connected")
+
+        options = dict(self._model_params)
+        if "max_tokens" in options:
+            options["num_predict"] = options.pop("max_tokens")
+
+        tool_specs = chat_completion_tools(
+            tools,
+            include_agent_tools=should_include_agent_tools(
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            ),
+        )
+        payload = {
+            "model": self.model,
+            "messages": history.messages,
+            "stream": True,
+            "options": options,
+        }
+        if tool_specs:
+            payload["tools"] = tool_specs
+
+        headers = {"Content-Type": "application/json"}
+        output_text: list[str] = []
+        native_action: ToolCallAction | AgentCallAction | None = None
+
+        self._client.request("POST", "/api/chat", json.dumps(payload), headers)
+        response = self._client.getresponse()
+
+        if response.status != 200:
+            error_data = response.read().decode("utf-8")
+            self._client.close()
+            raise RuntimeError(f"Ollama API streaming request failed with status {response.status}: {error_data}")
+
+        try:
+            for line in response:
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line.decode("utf-8"))
+                except json.JSONDecodeError:
+                    continue
+
+                if "error" in chunk:
+                    raise RuntimeError(f"Ollama API returned an error during stream: {chunk['error']}")
+
+                message = chunk.get("message") or {}
+                content = str(message.get("content") or "")
+                if content:
+                    output_text.append(content)
+                    if chunk_callback is not None:
+                        await chunk_callback(content)
+
+                tool_calls = message.get("tool_calls") or []
+                if tool_calls and native_action is None:
+                    native_action = self._action_from_tool_call(tool_calls[0])
+        finally:
+            self._client.close()
+
+        if native_action is not None:
+            return LLMActionResult(
+                action=native_action,
+                raw_response=action_to_json(native_action),
+                native=True,
+                metadata={"provider": "ollama", "streaming": True},
+            )
+
+        content = "".join(output_text).strip()
+        if not content:
+            raise ValueError("Ollama stream did not contain content or tool_calls")
+        try:
+            action = self._parse_infer_response(content)
+            return LLMActionResult(action=action, raw_response=content, native=False, metadata={"provider": "ollama"})
+        except ValueError:
+            action = FinalAction(content=content)
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=True,
+                metadata={"provider": "ollama", "streaming": True},
+            )
+
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
     # ----------------------------------------------------------------------
 
     def _inject_tool_call(self, *, tool_name: str, tool_args: dict[str, Any], tool_result: Any):
-        """
-        Inject a completed tool invocation into the conversation history using Ollama's native tool-calling message
-        format.
-
-        Ollama follows a Chat Completions-style protocol for tool usage:
-        - The assistant declares a tool invocation via a ``tool_calls`` field
-        - The tool result is returned as a separate message with ``role="tool"`` and the corresponding ``tool_name``
-
-        Unlike OpenAI's Responses API, Ollama does not require a tool call correlation identifier. Tool results are
-        associated with their invocation implicitly by message order.
-
-        This method adapts the completed tool execution into Ollama's expected message format while keeping the base
-        inference loop provider-agnostic.
-
-        Conditional behavior:
-        ---------------------
-        If ``self._supports_tool_calling`` is set to ``False``, this method delegates to the base ``LLM`` implementation
-        instead of emitting Ollama-specific tool messages. In that case, tool results are injected using the
-        provider-agnostic fallback format defined by the base class (typically as a serialized system message).
-
-        This allows:
-        - Disabling native tool calling for models that do not reliably support it (e.g. some LLaMA variants)
-        - Preserving a single, deterministic inference loop
-        - Avoiding provider-specific branching outside this hook
-
-        When ``self._supports_tool_calling`` is ``True``, this method emits Ollama-native messages to enable structured
-        tool calling behavior.
-
-        Documentation: https://docs.ollama.com/capabilities/tool-calling
-
-        Args:
-            tool_name (str):
-                The name of the tool invoked by the model.
-
-            tool_args (dict[str, Any]):
-                The arguments supplied by the model for the tool invocation.
-
-            tool_result (Any):
-                The result returned by the tool. The value must be JSON-serializable, as it is injected directly into
-                the tool message content.
-
-        Returns:
-            None
-        """
-
-        # Fallback to provider-agnostic behavior if native tool calling is disabled
-        if not self._supports_tool_calling:
-            return super()._inject_tool_call(
-                tool_name=tool_name,
-                tool_args=tool_args,
-                tool_result=tool_result,
-            )
-
-        # Assistant declares the tool call
-        self.history.add_raw(
-            {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": tool_name,
-                            "arguments": tool_args,
-                        },
-                    }
-                ],
-            }
-        )
-
-        # Tool provides the execution result
-        self.history.add_raw(
-            {
-                "role": "tool",
-                "tool_name": tool_name,
-                "content": json.dumps(tool_result),
-            }
-        )
+        """Inject an Ollama tool result using the provider-neutral observation format."""
+        return super()._inject_tool_call(tool_name=tool_name, tool_args=tool_args, tool_result=tool_result)
 
     # ----------------------------------------------------------------------
     # Utils
@@ -290,3 +396,34 @@ class OllamaLLM(ServerLLM):
         except Exception as e:
             logger.exception(f"{e}")
             return False
+
+    def _action_from_chat_result(self, payload: dict[str, Any]) -> LLMActionResult:
+        """Normalize an Ollama chat response into one Protolink action."""
+        message = payload.get("message") or {}
+        tool_calls = message.get("tool_calls") or []
+        if tool_calls:
+            action = self._action_from_tool_call(tool_calls[0])
+            return LLMActionResult(
+                action=action,
+                raw_response=action_to_json(action),
+                native=True,
+                metadata={"provider": "ollama"},
+            )
+
+        content = str(message.get("content") or "").strip()
+        if not content:
+            raise ValueError("Ollama response did not contain content or tool_calls")
+        try:
+            action = self._parse_infer_response(content)
+            return LLMActionResult(action=action, raw_response=content, native=False, metadata={"provider": "ollama"})
+        except ValueError:
+            action = FinalAction(content=content)
+            return LLMActionResult(action=action, raw_response=content, native=True, metadata={"provider": "ollama"})
+
+    @staticmethod
+    def _action_from_tool_call(call: Any) -> ToolCallAction | AgentCallAction:
+        """Convert one Ollama tool-call payload into a Protolink action."""
+        function = call.get("function", {}) if isinstance(call, dict) else getattr(call, "function", {})
+        name = function.get("name") if isinstance(function, dict) else getattr(function, "name", None)
+        raw_args = function.get("arguments") if isinstance(function, dict) else getattr(function, "arguments", None)
+        return native_tool_call_to_action(str(name), parse_json_arguments(raw_args))

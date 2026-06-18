@@ -1039,6 +1039,7 @@ class Agent:
             )
 
         # Get Available Agents (Guardrail: excluding ourselves to prevent self-delegation loops)
+        discovered = []
         if self.card.capabilities.delegation:  # If the agent supports delegation
             discovered = await self.discover_agents()
             discovered = [agent for agent in discovered if agent.url != self.card.url]
@@ -1053,10 +1054,16 @@ class Agent:
         flow_instructions = task.flow_state.get("prompt", "") if task and task.flow_state else ""
 
         # Build the System Prompt
+        # Streaming uses JSON action text unless the provider can stream native
+        # tool-call events and normalize them through call_action_stream().
+        action_mode = "native" if streaming and self.llm.supports_native_action_stream else None
+        if streaming and action_mode is None:
+            action_mode = "json"
         _ = self.llm.build_system_prompt(
             user_instructions=self._system_prompt,
             agent_cards=agent_cards,
             tools=self._build_tools_prompt(),
+            action_mode=action_mode,
             flow_instructions=flow_instructions,
             override_system_prompt=self.override_system_prompt,
             persist=self._state.conversation is not None,
@@ -1093,6 +1100,7 @@ class Agent:
             query=query,
             tools=self.tools,
             agent_callback=self._handle_agent_call if self.card.capabilities.delegation else None,
+            agent_cards=discovered if self.card.capabilities.delegation else None,
             streaming=streaming,
             event_callback=emit_inference_event if self.telemetry or event_callback else None,
         )

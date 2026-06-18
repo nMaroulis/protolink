@@ -177,9 +177,11 @@ The `LLM` class defines the common interface that all LLM implementations must f
 |------|------------|---------|-------------|
 | `call()` | `history: ConversationHistory` | `str` | **Abstract.** Generate a single response from the model. |
 | `call_stream()` | `history: ConversationHistory` | `AsyncIterator[str]` | **Abstract.** Generate a streaming response, yielding chunks. |
+| `call_action()` | `history, tools, agent_callback_available=False, agent_cards=None` | `LLMActionResult` | Return one validated runtime action. Native providers override this to consume provider tool calls; fallback providers parse JSON text. |
+| `call_action_stream()` | `history, tools, agent_callback_available=False, agent_cards=None, chunk_callback=None` | `LLMActionResult` | Streaming equivalent of `call_action()`. Native-stream providers consume tool-call events; fallback providers stream JSON text and parse it after completion. |
 | `chat()` | `user_query: str, streaming: bool=False` | `str ⎪ AsyncIterator[str]` | High-level convenience method for standard chat usage. |
 | `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False, event_callback=None` | `Part` | **Async.** Execute controlled multi-step inference with tool calling, optional streaming LLM calls, and optional event observation. |
-| `build_system_prompt()` | `user_instructions, agent_cards, tools, override_system_prompt, persist=False` | `str` | Build the final system prompt. If `persist=True`, preserves existing conversation history. |
+| `build_system_prompt()` | `user_instructions, agent_cards, tools, action_mode=None, override_system_prompt=False, persist=False` | `str` | Build the final system prompt. `action_mode="json"` uses the portable JSON action contract; `action_mode="native"` uses provider-native tool instructions. If `persist=True`, preserves existing conversation history. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
 | `validate_connection()` | — | `bool` | **Abstract.** Validate that the LLM connection is working. |
 
@@ -188,6 +190,8 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | Property | Type | Description |
 |----------|-----|-------------|
 | `model_params` | `dict[str, Any]` | Get/set model-specific generation parameters. |
+| `uses_native_action_prompt` | `bool` | Whether non-streaming `infer()` should use provider-native tool instructions instead of JSON action instructions. |
+| `supports_native_action_stream` | `bool` | Whether streaming `infer()` can acquire tool/agent actions from native streaming provider events. |
 
 !!! note "Abstract Methods"
     The `LLM` base class is abstract. You should use one of the concrete implementations like `OpenAILLM` or `AnthropicLLM`.
@@ -238,17 +242,29 @@ async def infer(
 
 #### How It Works
 
-1. **Multi-step Loop**: The method executes a loop up to `MAX_INFER_STEPS` (default: 10).
-2. **Deterministic Execution**: At each step, the LLM is invoked with the current history.
-3. **JSON Action Protocol**: The LLM must respond with a strict JSON object declaring one of three actions:
-   - `"final"`: The task is complete. The content is added to history and returned to the user.
-   - `"tool_call"`: The LLM wants to execute a tool. The action is added to history, the runtime executes the tool, and feeds the result back.
-   - `"agent_call"`: The LLM wants to delegate to another agent.
-4. **History Recording**: All turns of the conversation (User input, Assistant reasoning, and Tool results) are automatically committed to the `ConversationHistory` object. If the agent's `state=["conversation"]` is enabled, this history is automatically persisted to the [Storage](storage.md) backend and resumed in the next session.
-5. **Validation & Error Handling**: 
-   - Malformed JSON or invalid actions raise `ValueError`.
-   - Tool execution failures raise `RuntimeError` but catchable within the loop context if desired (currently propagates).
-   - Exceeding the step limit raises `RuntimeError`.
+`infer()` always dispatches typed actions, but the LLM can produce those actions through two acquisition modes:
+
+| Mode | Used By | Model Instruction | Runtime Behavior |
+|------|---------|-------------------|------------------|
+| JSON action mode | Default for local/small models and providers without reliable native tools | Return one JSON object such as `{"type":"tool_call","tool":"search","args":{"q":"..."}}` | `call_action()` or fallback `call_action_stream()` parses the text, validates it with Pydantic, then dispatches it. |
+| Native action mode | OpenAI, Anthropic, Gemini, and opted-in tool-capable servers | Use the provider's tool/function interface | The adapter sends real tool declarations, receives native tool events, and normalizes them into the same typed action models. |
+
+The loop is otherwise identical in both modes:
+
+1. **Prompt selection**: `Agent.call_llm()` builds either the JSON prompt or the native-tool prompt. Streaming calls use the native prompt only when `llm.supports_native_action_stream` is true; otherwise they force JSON mode so small/local models keep the simple contract.
+2. **Action acquisition**: `LLM.infer()` calls `call_action()` for non-streaming runs or `call_action_stream()` for streaming runs. These methods return an `LLMActionResult`, not raw provider data.
+3. **Action validation**: JSON mode validates the parsed object against the typed action union. Native mode validates the normalized provider tool call against the same `FinalAction`, `ToolCallAction`, or `AgentCallAction` models.
+4. **Runtime dispatch**: The runtime executes local tools, delegates to agents, or returns a final answer. The LLM declares intent only; Protolink performs all side effects.
+5. **Observation injection**: Tool and agent results are added back to `ConversationHistory` through provider-specific injection hooks when needed, or through the provider-neutral fallback message format.
+6. **Iteration**: The loop repeats until a `final` action is produced or a guardrail stops execution.
+
+History is automatically committed to the `ConversationHistory` object. If the agent's `state=["conversation"]` is enabled, this history is persisted to the [Storage](storage.md) backend and resumed in later sessions.
+
+!!! info "What streaming JSON means"
+    Streaming JSON does not mean Protolink dispatches partial JSON fragments. It means the model streams ordinary text chunks that eventually form one complete JSON action object. Protolink forwards chunks to observers for UI feedback, buffers them internally, and validates the full JSON object only after the provider finishes the response.
+
+!!! tip "Small model support"
+    Ollama, llama.cpp, LM Studio, and OpenAI-compatible local servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model/server combination you know can reliably emit native tool calls.
 
 ### Inference Loop Safety Guardrails
 
@@ -316,155 +332,73 @@ A hard limit of `MAX_INFER_STEPS` (default: 10) prevents runaway execution:
     4. **Enable logging**: Add logging to track LLM decisions at each step
 
 
-#### Tool Call Handling (`_inject_tool_call`)
+#### Tool Call Handling (`call_action`, `call_action_stream`, `_inject_tool_call`)
 
-When a tool is executed, the result needs to be added back to the conversation history so the LLM can see it. Protolink uses a **provider-agnostic** approach by default but allows for provider-specific overrides.
+Tool calls have two separate phases:
+
+1. **Action acquisition**: The adapter gets one model decision and returns `LLMActionResult`.
+2. **Observation injection**: After Protolink executes the tool, the adapter adds the result back to history so the model can continue.
 
 ```python
+def call_action(...) -> LLMActionResult:
+    """Return one validated action for the current inference step."""
+
+async def call_action_stream(...) -> LLMActionResult:
+    """Return one validated action from a streaming inference step."""
+
 def _inject_tool_call(self, *, tool_name: str, tool_args: dict, tool_result: Any) -> None:
-    """
-    Handle the completion of a tool invocation.
-    
-    Default behavior: Inject result as a SYSTEM message.
-    """
+    """Inject the runtime observation after a tool has executed."""
 ```
 
-**Why System Messages?**
-By default, Protolink adds tool results as `system` messages containing a JSON dump of the result. This works across *any* LLM provider (OpenAI, Anthropic, Ollama, etc.) without needing to know their specific API schemas for tool roles.
+The base implementation is intentionally portable: it asks the model for JSON, validates that JSON, executes the tool, and injects the result as a provider-neutral observation. Native adapters override the acquisition methods to consume provider tool events, but still return the same Protolink action objects to the loop.
 
-**Provider-Specific Tool Call Semantics**
-Subclasses like `OpenAILLM` or `AnthropicLLM` override this method to use their native tool confirmation APIs (e.g., `role="tool"`, `tool_call_id`, etc.), ensuring strict compliance with those platforms while keeping the main loop in `LLM.infer()` generic.
+## Provider-Specific Action Modes
 
-## Provider-Specific Tool Call Semantics
+| Provider | Non-Streaming `infer()` | Streaming `infer()` | Notes |
+|----------|-------------------------|---------------------|-------|
+| OpenAI | Native Responses function tools | Native streamed function-call events | Uses real tool declarations and disables parallel tool calls so the runtime receives one action at a time. |
+| Anthropic | Native `tool_use` blocks | Native `input_json_delta` tool streams | Text deltas stream to observers; tool JSON is buffered until complete. |
+| Gemini | Native function declarations | Native streamed function-call parts | Function-call parts are normalized into Protolink actions. |
+| DeepSeek | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Can be disabled to use JSON mode. |
+| Grok | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Can be disabled to use JSON mode. |
+| Ollama | JSON mode by default; native tools only with `supports_tool_calling=True` | JSON stream by default; native tool stream only with `supports_tool_calling=True` | Keeps small/local model behavior simple unless the model is known to support tools. |
+| llama.cpp server/local | JSON mode by default; native tools only with `supports_tool_calling=True` | JSON stream by default; native tool stream only with `supports_tool_calling=True` | Depends on the model and chat template. |
+| LM Studio / OpenAI-compatible servers | JSON mode by default; native tools only with `supports_tool_calling=True` | JSON stream by default; native tool stream only with `supports_tool_calling=True` | Useful for vLLM, LocalAI, LM Studio, and custom servers. |
+| HuggingFace | JSON mode | JSON stream fallback when supported | Provider-native tool calling is not assumed. |
 
-While Protolink’s inference loop and JSON action protocol are fully **provider-agnostic**, the way **tool calls and tool results are injected into the conversation history is not**. Each provider enforces a different conversational contract, message schema, and role semantics.
+### Prompt Selection
 
-To handle this cleanly, Protolink defines a generic `_inject_tool_call` hook on `LLM`, which is overridden by provider-specific subclasses where native tool calling is supported.
+Protolink uses two prompt families:
 
----
+- **JSON prompt**: Describes `final`, `tool_call`, and `agent_call` JSON objects. This is the default compatibility path and is optimized for small/local model support.
+- **Native prompt**: Tells the model to use the provider tool interface. It does not include JSON action examples, so OpenAI, Anthropic, Gemini, and opted-in native providers are not given conflicting instructions.
 
-### OpenAI (Responses API)
+For streaming agent calls, Protolink chooses the prompt based on `supports_native_action_stream`:
 
-OpenAI’s **Responses API** enforces a strict and non-negotiable tool-calling protocol that differs from the legacy Chat Completions interface.
+```python
+action_mode = "native" if llm.supports_native_action_stream else "json"
+```
 
-A complete tool interaction is represented as a **correlated pair of messages**:
+This matters because native tool calls are not text. A provider may stream text deltas, function argument deltas, or SDK objects. `call_action_stream()` hides that provider shape and returns a single typed action to the infer loop.
 
-1. An `assistant` message declaring the tool invocation via a `tool_calls` field, including:
-   - A generated `tool_call_id`
-   - The tool (function) name
-   - The serialized tool arguments
+### Agent Delegation Tools
 
-2. A subsequent `user` message containing a `tool_result` content block, which supplies:
-   - The same `tool_call_id`
-   - The serialized tool execution result
+Native providers receive synthetic delegation tools only when both conditions are true:
 
-Important constraints enforced by the Responses API:
+- The current agent can dispatch agent calls.
+- Discovered agent cards are available.
 
-- A dedicated `tool` role is **explicitly forbidden**
-- Tool results **must** be embedded in a `user` message
-- The `tool_call_id` must match exactly between declaration and result
-- Any deviation from this schema results in request validation errors
-
-#### Implications for Protolink
-
-- `OpenAILLM` overrides `_inject_tool_call` to:
-  - Generate a unique `tool_call_id`
-  - Inject messages using the exact schema required by the Responses API
-- Tool execution itself is handled by the runtime; this method only adapts results into OpenAI’s required format
-
-This strictness is why OpenAI requires a fully custom implementation, even though the high-level behavior (execute tool → feed result back) is conceptually identical to other providers.
-
-Official references:
-- OpenAI Responses API – Tool calling  
-  https://platform.openai.com/docs/guides/tools
-- OpenAI Responses API – Message schema  
-  https://platform.openai.com/docs/api-reference/responses
-
----
-
-### Anthropic (Claude / Messages API)
-
-Anthropic models use a **block-based message format** rather than dedicated tool roles. Tool interactions are expressed through structured content blocks embedded within normal messages.
-
-A complete tool round-trip consists of:
-
-1. An `assistant` message containing a `tool_use` content block that declares:
-   - The name of the tool
-   - The structured input arguments
-
-2. A subsequent `user` message containing a `tool_result` content block that supplies:
-   - The identifier of the originating tool use
-   - The tool execution result
-
-Key characteristics of Anthropic’s protocol:
-
-- Tool interactions are represented via content blocks, not message roles
-- Tool outputs are conceptually treated as **user-provided information**
-- No `tool` or `system` role is introduced for tool results
-- Structural correctness at the block level is strictly enforced
-
-#### Implications for Protolink
-
-- `AnthropicLLM` overrides `_inject_tool_call` to:
-  - Inject a `tool_result` content block with the correct identifier
-  - Preserve Anthropic’s expected message ordering and block semantics
-- Tool correlation is handled via block semantics rather than explicit role-based IDs
-
-Anthropic is less restrictive about message roles than OpenAI, but equally strict about content structure.
-
----
-
-### Ollama / Server-Based Models
-
-Ollama follows a **Chat Completions–style** protocol for tool usage, closer to OpenAI’s legacy interface than the Responses API.
-
-When native tool calling is enabled:
-
-- The assistant declares a tool invocation via a `tool_calls` field
-- The tool result is returned as a separate message with:
-  - `role="tool"`
-  - The corresponding `tool_name`
-- No explicit tool call identifier is required
-- Tool calls and results are implicitly associated by message order
-
-#### Conditional Behavior in Protolink
-
-Ollama support is intentionally **conditional**:
-
-- If `self._supports_tool_calling` is `True`:
-  - Ollama-native tool messages are emitted
-- If `self._supports_tool_calling` is `False`:
-  - The method delegates to the base `LLM` implementation
-  - Tool results are injected using the provider-agnostic fallback
-    (typically a serialized `system` message)
-
-This design allows:
-
-- Disabling native tool calling for models that do not reliably support it (e.g. some LLaMA variants)
-- Preserving a single, deterministic inference loop
-- Avoiding provider-specific branching outside `_inject_tool_call`
-
-Official reference:
-- Ollama Tool Calling  
-  https://docs.ollama.com/capabilities/tool-calling
-
----
+This avoids exposing a callable delegation surface with no valid targets. JSON mode still supports `agent_call` objects directly and can self-correct if delegation is unavailable.
 
 ## Design Rationale
 
-This layered design allows Protolink to:
+This layered design keeps the core runtime strict while avoiding unnecessary prompt complexity:
 
-- Keep the core inference loop (`LLM.infer`) fully generic
-- Support strict APIs (OpenAI, Anthropic) without polluting the main control flow
-- Support looser or local models (Ollama, custom servers) safely and deterministically
-- Centralize all protocol-specific complexity inside small, well-defined overrides
-
-**In short:**
-
-- The inference logic is generic  
-- The message protocol is provider-specific  
-
-Protolink cleanly separates the two.
+- `LLM.infer()` dispatches one typed action at a time.
+- Provider adapters own provider-specific request and stream parsing.
+- Small/local models keep the simple JSON protocol by default.
+- Native providers use native tools without seeing JSON action instructions.
+- Every path converges on the same `FinalAction`, `ToolCallAction`, and `AgentCallAction` models.
 
 
 #### Example Usage
@@ -488,9 +422,9 @@ result = await llm.infer(
 print(result.content)  # "The weather in Tokyo is sunny."
 ```
 
-#### Response Format
+#### JSON Mode Response Format
 
-The LLM must respond with valid JSON:
+When an adapter is using JSON action mode, the model must respond with one valid JSON object:
 
 ```json
 {
@@ -507,54 +441,52 @@ The LLM must respond with valid JSON:
 }
 ```
 
-### Prompt Engineering Architecture
+### Prompt Architecture
 
-Protolink uses a sophisticated prompt engineering system to turn standard LLMs into autonomous agents. This system is located in `protolink/llms/prompts` and is responsible for creating the "blueprint" that guides the LLM's behavior.
+Protolink uses prompt families in `protolink/llms/prompts` to match the action acquisition mode. The runtime deliberately avoids giving the model two tool-calling contracts at once.
 
 #### The System Prompt Blueprint
 
-The `LLM.build_system_prompt()` method dynamically assembles a comprehensive system prompt that enforces a **deterministic execution loop**. This blueprint tells the LLM exactly how to behave, how to format its output, and what capabilities it has.
+The `LLM.build_system_prompt()` method dynamically assembles the prompt used by `infer()`. In JSON mode it describes the portable action objects. In native mode it tells the model to use the provider tool interface and leaves the function-call syntax to the backend SDK/API.
 
 By default, this method calls `reset_to_system(self, new_system_prompt: str)` which clears the history. However, when using the **`persist=True`** flag, it calls `set_system()`, which updates the instructions while keeping the conversation history intact—essential for persistent sessions.
 
 It is composed of several key components:
 
-1.  **Base Instructions (`BASE_SYSTEM_PROMPT`)**:
-    -   Defines the agent's role (operating in a deterministic runtime).
-    -   Enforces a strict **JSON output schema**.
-    -   Prohibits the LLM from executing actions itself (it must *declare* intent).
+1. **Base Instructions**:
+    - Define the agent's role inside a deterministic runtime.
+    - Prohibit the LLM from pretending to execute actions itself.
+    - Use either `BASE_SYSTEM_PROMPT` for JSON mode or `NATIVE_SYSTEM_PROMPT` for native mode.
 
-2.  **Tool Definitions (`TOOL_CALL_PROMPT`)**:
-    -   Injected only if `tools` are provided.
-    -   Lists available tools with their schemas.
-    -   Defines the `tool_call` JSON format.
+2. **Tool Instructions**:
+    - JSON mode injects `TOOL_CALL_PROMPT` with available tool schemas and the `tool_call` JSON format.
+    - Native mode injects a short instruction to use the provider tool interface; concrete schemas are sent through the provider API.
 
-3.  **Agent Capabilities (`AGENT_LIST_PROMPT`)**:
-    -   Injected only if `agent_cards` are provided.
-    -   Lists other available agents in the registry.
-    -   Defines the `agent_call` JSON format for delegation.
+3. **Agent Capabilities**:
+    - JSON mode injects `AGENT_LIST_PROMPT` with the `agent_call` JSON format.
+    - Native mode exposes synthetic delegation tools only when discovered agents are available.
 
-4.  **Semantic Context Injection**:
-    -   Injected automatically when the Agent is executing inside a Flow (`Pipeline`, `Router`, `Graph`).
-    -   Provides downstream topology awareness, dynamically commanding the LLM to format its output for the specific agent(s) receiving its output next.
+4. **Semantic Context Injection**:
+    - Injected automatically when the Agent is executing inside a Flow (`Pipeline`, `Router`, `Graph`).
+    - Provides downstream topology awareness for the current flow step.
 
-5.  **User Instructions**:
-    -   Your specific customization (e.g., "You are a coding assistant").
-    -   Appended to the blueprint to guide the specific task domain.
+5. **User Instructions**:
+    - Your specific customization (e.g., "You are a coding assistant").
+    - Appended to guide the task domain.
 
 #### How It Works
 
-When `infer()` is called, this blueprint ensures the LLM does not just generating text, but acts as a reasoning engine.
+When `infer()` is called, the prompt ensures the LLM acts as a reasoning engine while Protolink remains the executor.
 
 1.  **Input**: The LLM receives the Task context.
-2.  **Blueprint Enforcement**: The system prompt forces the LLM to choose a valid action: `final`, `tool_call`, or `agent_call`.
-3.  **Structured Output**: The LLM acts by returning a JSON object, not free text.
+2.  **Action Selection**: The model chooses a valid action: `final`, `tool_call`, or `agent_call`.
+3.  **Structured Output**: JSON mode returns a JSON object; native mode returns a provider tool call or final text.
     ```json
     { "type": "tool_call", "tool": "get_weather", "args": { ... } }
     ```
-4.  **Runtime Execution**: Protolink intercepts this JSON, executes the real Python code, and feeds the result back to the LLM.
+4.  **Runtime Execution**: Protolink validates the action, executes the real Python code or agent dispatch, and feeds the result back to the LLM.
 
-This separation of **Reasoning (LLM)** and **Execution (Runtime)**, mediated by the prompt blueprint, is what allows Protolink to be robust and provider-agnostic.
+This separation of **Reasoning (LLM)** and **Execution (Runtime)** is what allows Protolink to stay provider-agnostic while still using native provider tools where they are reliable.
 
 ## API-based LLMs
 
@@ -565,9 +497,10 @@ API-based LLMs connect to external services and require API keys or authenticati
 | Provider | Class | Default Model | API Key Env Var |
 |----------|-------|---------------|----------------|
 | OpenAI | `OpenAILLM` | `gpt-4o-mini` | `OPENAI_API_KEY` |
-| Anthropic | `AnthropicLLM` | `claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` |
-| Google Gemini | `GeminiLLM` | `gemini-1.5-flash` | `GEMINI_API_KEY` |
+| Anthropic | `AnthropicLLM` | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
+| Google Gemini | `GeminiLLM` | `gemini-3-flash-preview` | `GEMINI_API_KEY` |
 | DeepSeek | `DeepSeekLLM` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
+| Grok | `GrokLLM` | `grok-4-latest` | `XAI_API_KEY` or `GROK_API_KEY` |
 | HuggingFace | `HuggingFaceLLM` | `HuggingFaceH4/zephyr-7b-beta` | `HF_API_TOKEN` |
 
 ### OpenAILLM
@@ -626,7 +559,7 @@ Anthropic Claude API implementation using the official Anthropic client.
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `api_key` | `str ⎪ None` | `None` | Anthropic API key. Uses `ANTHROPIC_API_KEY` env var if not provided. |
-| `model` | `str ⎪ None` | `"claude-3-5-sonnet-20241022"` | Claude model name. |
+| `model` | `str ⎪ None` | `"claude-sonnet-4-20250514"` | Claude model name. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
 | `base_url` | `str ⎪ None` | `None` | Custom base URL for Anthropic-compatible APIs. |
 
@@ -634,7 +567,7 @@ Anthropic Claude API implementation using the official Anthropic client.
 from protolink.llms.api import AnthropicLLM
 
 # Basic usage
-llm = AnthropicLLM(model="claude-3-5-sonnet-20241022")
+llm = AnthropicLLM(model="claude-sonnet-4-20250514")
 
 # With custom parameters
 llm = AnthropicLLM(
@@ -665,7 +598,7 @@ Google Gemini API implementation.
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `api_key` | `str ⎪ None` | `None` | Google API key. Uses `GEMINI_API_KEY` env var if not provided. |
-| `model` | `str ⎪ None` | `"gemini-1.5-flash"` | Gemini model name. |
+| `model` | `str ⎪ None` | `"gemini-3-flash-preview"` | Gemini model name. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
 
 ### DeepSeekLLM
@@ -679,6 +612,22 @@ DeepSeek API implementation.
 | `api_key` | `str ⎪ None` | `None` | DeepSeek API key. Uses `DEEPSEEK_API_KEY` env var if not provided. |
 | `model` | `str ⎪ None` | `"deepseek-chat"` | DeepSeek model name. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+| `base_url` | `str ⎪ None` | `"https://api.deepseek.com"` | DeepSeek-compatible base URL. |
+| `supports_tool_calling` | `bool` | `True` | Whether to use native Chat Completions tool calls and streamed tool deltas. Set to `False` to force JSON mode. |
+
+### GrokLLM
+
+xAI Grok API implementation.
+
+#### Constructor
+
+| Parameter | Type | Default | Description |
+|-----------|-----|---------|-------------|
+| `api_key` | `str ⎪ None` | `None` | xAI API key. Uses `XAI_API_KEY` or `GROK_API_KEY` if not provided. |
+| `model` | `str ⎪ None` | `"grok-4-latest"` | Grok model name. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+| `base_url` | `str ⎪ None` | `"https://api.x.ai/v1"` | xAI-compatible base URL. |
+| `supports_tool_calling` | `bool` | `True` | Whether to use native Chat Completions tool calls and streamed tool deltas. Set to `False` to force JSON mode. |
 
 ### HuggingFaceLLM
 
@@ -725,10 +674,11 @@ Ollama server implementation for connecting to local or remote Ollama instances.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `base_url` | `str ⎪ None` | `None` | Ollama server URL. If not provided, uses `OLLAMA_HOST` environment variable. |
+| `base_url` | `str ⎪ None` | `None` | Ollama server URL. If not provided, uses the `OLLAMA_URL` environment variable. |
 | `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers (including auth). |
-| `model` | `str ⎪ None` | `"gemma3"` | Ollama model name. |
+| `model` | `str ⎪ None` | `"gemma4:e4b"` | Ollama model name. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, etc.). |
+| `supports_tool_calling` | `bool` | `False` | Whether this model/server should use native Ollama tool calling. Defaults to JSON mode for small-model reliability. |
 
 ```python
 from protolink.llms.server import OllamaLLM
@@ -747,7 +697,7 @@ llm = OllamaLLM(
 )
 
 # Using environment variables
-# Set OLLAMA_HOST=http://localhost:11434 or pass directly
+# Set OLLAMA_URL=http://localhost:11434 or pass directly
 llm = OllamaLLM(model="mistral", base_url="http://localhost:11434")
 ```
 
@@ -778,8 +728,9 @@ Llama.cpp server implementation for communicating directly with `llama-server`.
 |-----------|-----|---------|-------------|
 | `base_url` | `str ⎪ None` | `None` | `llama-server` URL. Defaults to `http://localhost:8080`. |
 | `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers. |
-| `model` | `str ⎪ None` | `"llama3"` | The requested model representation. |
+| `model` | `str ⎪ None` | `"gemma4:e4b"` | The requested model representation. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, etc.). |
+| `supports_tool_calling` | `bool` | `False` | Whether this `llama-server` model/template supports native Chat Completions tool calls. |
 
 ```python
 from protolink.llms.server import LlamaCPPServerLLM
@@ -853,6 +804,7 @@ Local LLM integration using the `llama-cpp-python` distribution explicitly loadi
 |-----------|-----|---------|-------------|
 | `model` | `str` | — | **Required.** Absolute Path to your downloaded `.gguf` model file. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters. |
+| `supports_tool_calling` | `bool` | `False` | Whether the loaded model/chat handler supports native tool calls. Defaults to JSON mode. |
 
 ```python
 from protolink.llms.local import LlamaCPPLocalLLM

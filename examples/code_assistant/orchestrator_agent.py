@@ -111,6 +111,7 @@ def create_orchestrator_agent(
     # is coordination, not deep reasoning.
     # ──────────────────────────────────────────────────────────────────
     llm = create_llm(llm_provider, **kwargs)
+    from protolink.telemetry import LocalTraceTelemetry
 
     agent = Agent(
         card={
@@ -127,6 +128,7 @@ def create_orchestrator_agent(
         llm=llm,
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
         verbosity=2,
+        telemetry=LocalTraceTelemetry(path=f"{os.getcwd()}/traces.json"),  # Log Telemetry Traces locally
     )
     agent.transport.timeout = 600
 
