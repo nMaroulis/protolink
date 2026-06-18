@@ -112,6 +112,8 @@ async def multiply_numbers(a: float, b: float) -> float:
 |-----------|------|-------------|
 | `name` | `str` | The tool's identifier (used in tool calls) |
 | `description` | `str` | Description shown to the LLM for tool selection |
+| `input_schema` | `dict[str, Any] ⎪ None` | Optional explicit input schema. If omitted, Protolink infers it from type hints. |
+| `output_schema` | `dict[str, Any] ⎪ None` | Optional explicit output schema. If omitted, Protolink infers a return type name. |
 | `tags` | `list[str]` | Optional categorization tags |
 
 ### When to Use Native Tools

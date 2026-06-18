@@ -38,7 +38,10 @@ graph TD
 
 ## State Modules
 
-Protolink version **v0.5.5** introduces four primary state modules. You can enable them individually or in combination via the `state` parameter in the `Agent` constructor.
+Protolink exposes four state module names through `StateMode`. You can enable them individually or in combination via the `state` parameter in the `Agent` constructor.
+
+!!! note "Current maturity"
+    `conversation` is the fully integrated automatic runtime path today: agents load LLM history before inference and save it afterward. `tools`, `task`, and `flow` are available as typed module slots for persistent extension work; they share the same storage backend, but only `flow` currently exposes a small `to_dict()` helper and tool/task modules intentionally stay minimal.
 
 ### 1. Conversation State (`conversation`)
 This is the most common module. It manages the `ConversationHistory` object used by LLMs.
@@ -46,18 +49,20 @@ This is the most common module. It manages the `ConversationHistory` object used
 - **Key Factor**: Uses the `session_id` provided in task metadata to partition history.
 - **Automatic Sync**: The `Agent` automatically loads history *before* inference and saves it *after* the task completes.
 
-### 2. Tool State (`tools`) - TBD
-Allows individual tools to persist their own internal data.
-- **Usage**: Useful for tools that need to "remember" previous results or maintain a cache across different tasks.
-- **Consistency**: Ensures that tool-specific memory is tied to the same session as the conversation.
+### 2. Tool State (`tools`)
+Provides a dedicated module slot for tool-specific persistence.
+- **Usage**: Useful for custom tools that need a shared storage handle for caches, counters, credentials, or external synchronization metadata.
+- **Current behavior**: The module is initialized with the agent storage backend. Tool authors decide what APIs or conventions to add on top.
 
-### 3. Task State (`task`) - TBD
-Manages metadata and operational status for tasks.
-- **Usage**: Used for tracking task lifecycles, especially in asynchronous or distributed environments where a task might be resumed by a different worker.
+### 3. Task State (`task`)
+Provides a dedicated module slot for task metadata persistence.
+- **Usage**: Useful for applications that want to index, replay, or resume task-related metadata outside the in-memory `Task` object.
+- **Current behavior**: Runtime task lifecycle transitions are managed on `Task.state` and recorded in `task.metadata["state_history"]`; the state module is a storage-backed extension point.
 
-### 4. Flow State (`flow`) - TBD
-Specifically designed for the **Structured Flows** architecture.
-- **Usage**: Persists the progress of `Pipeline`, `Parallel`, or `Switch` flows. It manages checkpoints so a flow can be interrupted and resumed without losing its place.
+### 4. Flow State (`flow`)
+Provides a storage-backed module for the **Structured Flows** architecture.
+- **Usage**: Intended for checkpointing flow progress or storing workflow context across runs.
+- **Current behavior**: `FlowState.to_dict()` returns the serialized storage contents. Flow orchestration also uses `task.flow_state` for per-task semantic context injection.
 
 ---
 
@@ -77,7 +82,7 @@ storage = SQLiteStorage(db_path="agent.db", namespace="support_bot")
 agent = Agent(
     card=card,
     storage=storage,
-    state=["conversation"]
+    state=["conversation"],
 )
 ```
 
@@ -87,7 +92,7 @@ agent = Agent(
 agent = Agent(
     card=card,
     storage=storage,
-    state=["conversation", "tools", "flow"]
+    state=["conversation", "tools", "task", "flow"],
 )
 ```
 
@@ -129,10 +134,12 @@ The `State` object is accessible via the `agent.state` property. You can use it 
 ### Manual State Interaction
 ```python
 # Get history manually
-history = agent.state.conversation.get_history("session_123")
+if agent.state.conversation:
+    history = agent.state.conversation.get_history("session_123")
 
 # Clear a session
-agent.state.conversation.clear_session("session_123")
+if agent.state.conversation:
+    agent.state.conversation.clear_session("session_123")
 
 # View everything as a dict
 all_data = agent.state.to_dict()

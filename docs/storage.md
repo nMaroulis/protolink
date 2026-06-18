@@ -153,11 +153,11 @@ Starting with version **v0.5.5**, Protolink includes a unified **State** system 
 | Module | Storage Usage |
 |--------|---------------|
 | **conversation** | Stores a serialized map of `session_id` to `ConversationHistory` lists. |
-| **tools** | Allows tools to persist their internal state across sessions. |
-| **task** | Persists task-related metadata and status. |
-| **flow** | Manages checkpointing and progress for structured flows. |
+| **tools** | Provides a storage-backed extension point for tool-specific state. |
+| **task** | Provides a storage-backed extension point for task metadata outside the live `Task` object. |
+| **flow** | Stores flow context when applications choose to checkpoint structured workflows. |
 
-This high-level system is the **recommended way** to manage persistence, as it ensures consistency and reduces boilerplate code in your `handle_task` implementation.
+This high-level system is the **recommended way** to manage LLM conversation persistence. For tool, task, and flow persistence, treat the modules as shared storage foundations and define application-specific conventions on top.
 
 ## Error Handling
 

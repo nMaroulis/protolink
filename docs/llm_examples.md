@@ -17,6 +17,13 @@ Common parameters for all wrappers include:
     - `AnthropicLLM`
     - `GeminiLLM`
     - `DeepSeekLLM`
+    - `GrokLLM`
+    - `HuggingFaceLLM`
+    - `OllamaLLM`
+    - `LlamaCPPServerLLM`
+    - `LlamaCPPLocalLLM`
+    - `LMStudioLLM`
+    - `OpenAICompatibleLLM`
 
 ---
 
@@ -40,7 +47,7 @@ query = "What's the capital of Greece?"
 print("Testing non-streaming response:")
 response = llm.chat(query)
 print(f"Response: {response}")
-# Output: Response: {'text': 'The capital of Greece is Athens.'}
+# Output: Response: The capital of Greece is Athens.
 ```
 
 ### Streaming Responses
@@ -71,7 +78,7 @@ The automated pipeline uses the `Agent` class to coordinate identity, communicat
 When an agent receives an `infer` task, it delegates to `LLM.infer()` which implements a **ReAct-style** (Reasoning + Acting) loop:
 
 1. **Query Injection**: User query added to conversation history
-2. **LLM Invocation**: LLM generates a JSON action declaration
+2. **LLM Invocation**: LLM generates a typed action through provider-native tools or the portable JSON action protocol
 3. **Action Dispatch**: Runtime executes the declared action
 4. **Result Injection**: Results fed back to LLM
 5. **Iteration**: Loop continues until `final` response
@@ -128,7 +135,7 @@ agent = Agent(
     system_prompt="You are a helpful assistant.",
 )
 
-agent.start()
+agent.start(background=True)
 ```
 
 ### 2. The Task
@@ -172,19 +179,19 @@ print(f"Response:\n{result.get_last_part_content()}")
 Now, we dynamically register a tool with the agent. Protolink automatically exposes this to the LLM.
 
 ```python
-# Stop the agent to modify it safeley (optional but good practice)
+# Stop the agent to modify it safely (optional but good practice)
 agent.stop()
 
 @agent.tool(
     name="weather_info", 
     description="Get weather information for a location", 
-    input_schema={"location": "str"}
+    input_schema={"location": str}
 )
 def get_weather(location: str) -> str:
     # Simulating an API call
     return f"The weather in {location} is sunny."
 
-agent.start()
+agent.start(background=True)
 ```
 
 ### 5. Execution: With Tools (Success Case)
@@ -276,7 +283,7 @@ COORDINATOR_URL = "http://localhost:8002"
 
 # Start the registry for agent discovery
 registry = Registry(url=REGISTRY_URL, transport="http")
-registry.start()
+registry.start(background=True)
 ```
 
 ### 2. Create the Weather Agent (Specialist)
@@ -336,7 +343,7 @@ coordinator = Agent(
     system_prompt=COORDINATOR_SYSTEM_PROMPT,
 )
 
-coordinator.start()
+coordinator.start(background=True)
 ```
 
 ### 4. Verify Agent Discovery
@@ -442,4 +449,3 @@ Please respond with a valid JSON object containing 'type' and required fields."
 ```
 
 These guardrails enable the LLM to self-correct without consuming the entire step budget.
-

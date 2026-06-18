@@ -41,11 +41,11 @@ All transports inherit from the base `Transport` class.
     - Allows multiple agents to communicate within the same Python process.
     - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
 
-### Planned Transports
+### Reserved Transports
 
-- **GRPCTransport** (TBD)
-  - Planned gRPC transport for agents.
-  - Intended for high‑performance, strongly‑typed communication.
+- **gRPC** (`"grpc"`)
+  - The `TransportType` alias reserves `"grpc"` for future support.
+  - The default transport factory does not currently register a gRPC transport class, so use HTTP, SSE JSON-RPC, WebSocket, or Runtime transports in application code today.
 
 ## Choosing a Transport
 
@@ -55,7 +55,7 @@ Some rough guidelines:
 - Use **HTTPTransport** when you want a simple, interoperable API surface (e.g. calling agents from other services or frontends) and for communicating with the Registry.
 - Use **SSEJSONRPCTransport** when you want HTTP-compatible streaming over `text/event-stream`.
 - Use **WebSocketTransport** when you need streaming and interactive sessions.
-- Plan for **GRPCTransport** if you need higher performance across services.
+- Track gRPC support if you need a future strongly typed service boundary; it is not a default runtime transport yet.
 
 The rest of this page dives into the API of each transport in more detail.
 
@@ -176,7 +176,7 @@ The tables below document each object type.
 | Field       | Type                                | Description                |
 |------------ |-------------------------------------|----------------------------|
 | `id`        | `str`                               | Unique message identifier. |
-| `role`      | `"user" ⎪ "agent" ⎪ "system"` | Sender role.               |
+| `role`      | `"user" ⎪ "agent" ⎪ "assistant" ⎪ "system"` | Sender role.               |
 | `parts`     | `list[Part]`                        | Content payloads.          |
 | `timestamp` | `str`                               | ISO‑8601 timestamp.        |
 
@@ -200,7 +200,7 @@ The tables below document each object type.
     {"type": "text", "content": "final report"}
   ],
   "metadata": {"kind": "report"},
-  "created_at": "2025-01-01T12:00:00Z"
+  "timestamp": "2025-01-01T12:00:00Z"
 }
 ```
 
@@ -209,7 +209,7 @@ The tables below document each object type.
 | `id` | `str`            | Unique artifact identifier. |
 | `parts`       | `list[Part]`     | Artifact content.           |
 | `metadata`    | `dict[str, Any]` | Artifact metadata.          |
-| `created_at`  | `str`            | ISO‑8601 timestamp.         |
+| `timestamp`   | `str`            | ISO‑8601 timestamp.         |
 
 ### Typical Usage
 

@@ -25,7 +25,11 @@ my_logger = FileLogger("agent_activity.log", extension="json", level="DEBUG")
 
 # Pass it directly to your Agent
 agent = Agent(
-    card={"name": "logger_agent", "url": "http://127.0.0.1:8000"},
+    card={
+        "name": "logger_agent",
+        "description": "Agent with file logging",
+        "url": "http://127.0.0.1:8000",
+    },
     transport="http",
     logger=my_logger,
 )

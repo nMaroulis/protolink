@@ -6,7 +6,7 @@ Agents are the core building blocks in Protolink.
 
 An **Agent** in Protolink is a unified component that acts as both **client and server**, unlike Google’s A2A protocol, which separates these concerns.
 
-It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLM**, **transport**, **memory**, **storage**, **telemetry**, and **logging**. T
+It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
 
 Agents **communicate through Tasks**, the fundamental unit of work:
 - **Receive tasks** via ``handle_task()``
@@ -21,12 +21,12 @@ High‑level ideas:
 - **Unified model**: a single `Agent` instance can send and receive messages.
 - **AgentCard**: a small model describing the agent (name, description, metadata).
 - **Modules**:
-  - **LLMs** (e.g. `OpenAILLM`, `AnthropicLLM`, `LlamaCPPLLM`, `OllamaLLM`).
+  - **LLMs** (e.g. `OpenAILLM`, `AnthropicLLM`, `LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`).
   - **Tools** (native Python functions or MCP‑backed tools).
-  - **Storage** (e.g. `InMemoryStorage`, `Storage`).
-  - **Telemetry** (e.g. `Telemetry`, `BaseTelemetry`).
+  - **Storage** (e.g. `InMemoryStorage`, `SQLiteStorage`).
+  - **Telemetry** (e.g. `LocalTraceTelemetry`, `LangfuseTelemetry`, `LangSmithTelemetry`).
   - **Logger** (e.g. `ConsoleLogger`, `FileLogger`).
-- **Transport abstraction**: agents communicate over transports such as HTTP, WebSocket, gRPC, or the in‑process runtime transport.
+- **Transport abstraction**: agents communicate over transports such as HTTP, SSE JSON-RPC, WebSocket, or the in-process runtime transport. The `grpc` alias is reserved for future support.
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
@@ -53,6 +53,7 @@ from protolink.llms.api import OpenAILLM
 agent_card = AgentCard(
     name="example_agent",
     description="A dummy agent",
+    url="http://localhost:8000",
 )
 
 # Option 2: Using dictionary (simpler)
@@ -62,13 +63,13 @@ card_dict = {
     "url": "http://localhost:8000"
 }
 
-transport = HTTPTransport()
-llm = OpenAILLM(model="gpt-5.2")
+transport = HTTPTransport(url="http://localhost:8000")
+llm = OpenAILLM(model="gpt-4o-mini")
 
 # Both approaches work
-agent = Agent(agent_card, transport, llm)
+agent = Agent(card=agent_card, transport=transport, llm=llm)
 # OR
-agent = Agent(card_dict, transport, llm)
+agent = Agent(card=card_dict, transport=transport, llm=llm)
 ```
 
 You can then attach tools and start the agent.
@@ -113,7 +114,7 @@ Common patterns:
 | -------------- | ---------------------------------------------- |
 | Agent          | Domain logic (what to do with a Task)          |
 | AgentServer    | Wiring & lifecycle (server orchestration)      |
-| Transport      | Protocol abstraction (HTTP vs WS vs gRPC)      |
+| Transport      | Protocol abstraction (HTTP, SSE, WS, runtime)  |
 | Backend        | Framework-specific routing (Starlette/FastAPI) |
 
 e.g.
@@ -380,8 +381,12 @@ The `SyncAgent` class does not re-implement any logic. Instead, it delegates cal
 
 ```python
 from protolink.agents import Agent
+from protolink.models import Task
 
-agent = Agent(card={"name": "my-agent", "url": "local://agent"}, transport="runtime")
+agent = Agent(
+    card={"name": "my-agent", "description": "Runtime demo agent", "url": "runtime://agent"},
+    transport="runtime",
+)
 
 # Use the .sync property for blocking calls
 response = agent.sync.invoke("Hello, agent!")
@@ -566,10 +571,10 @@ When an agent is initialized with the `state` parameter, it tracks internal stat
 
 | Module | Description |
 |--------|-------------|
-| `conversation` | Persists conversation history between the user and the agent. |
-| `tools` | Persists tool-specific state across sessions. |
-| `task` | Persists task-related metadata and status. |
-| `flow` | Persists flow state across runs. |
+| `conversation` | Persists LLM conversation history between tasks with the same `session_id`. |
+| `tools` | Provides a storage-backed extension point for tool-specific state. |
+| `task` | Provides a storage-backed extension point for task metadata outside the live `Task` object. |
+| `flow` | Provides storage-backed flow context; active flow prompts are carried on `task.flow_state`. |
 
 !!! tip "Session IDs"
     When using direct invocation methods like `invoke()` or `sync.invoke()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `state=["conversation"]` is enabled.
@@ -670,20 +675,8 @@ The `Agent` class provides a default implementation for `handle_task` that handl
     
     class EchoAgent(Agent):
         async def handle_task(self, task: Task) -> Task:
-            # Echo back all messages
-            response_messages = []
-            for message in task.messages:
-                response_messages.append(
-                    Message(
-                        content=f"Echo: {message.content}",
-                        role="assistant"
-                    )
-                )
-            
-            return Task(
-                messages=response_messages,
-                parent_task_id=task.id
-            )
+            last = task.get_last_part_content()
+            return task.complete(f"Echo: {last}")
     ```
 
 ## Error Handling

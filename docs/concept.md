@@ -182,7 +182,7 @@ This symmetry is intentional and keeps the **mental model consistent** across th
 
 - Agent registration  
 - Agent discovery  
-- Heartbeat and expiry (liveness)  
+- Registration metadata and status visibility
 - Filtering and metadata queries  
 
 > Agents interact with the registry **only via the `RegistryClient`**.
@@ -273,12 +273,14 @@ Traditional AI frameworks often trap you in a walled garden:
 
 ### Transport Independence
 
-Protolink agents speak HTTP today, but can speak WebSockets, gRPC, or in-memory queues tomorrow—without changing agent code. Just change the transport:
+Protolink agents can communicate over HTTP, SSE JSON-RPC, WebSocket, or in-process runtime transports without changing agent logic. Change the transport at construction time:
 
 ```python
 # Switch from HTTP to WebSocket with one line
 agent = Agent(card, transport="websocket")  # That's it!
 ```
+
+The `grpc` transport alias is reserved for future support, but it is not registered by the default transport factory yet.
 
 ### Universal Tooling
 
@@ -338,7 +340,7 @@ The inference runtime implements a **ReAct-style** (Reasoning + Acting) pattern:
 ├─────────────────────────────────────────────────────────┤
 │  1. User query added to conversation history            │
 │                         ↓                               │
-│  2. LLM generates JSON action                           │
+│  2. LLM generates a typed action                        │
 │                         ↓                               │
 │  3. Runtime parses and validates action                 │
 │                         ↓                               │
@@ -359,9 +361,14 @@ The LLM operates in a **thought → action → observation** cycle:
 
 ---
 
-### JSON Action Protocol
+### Action Protocol
 
-The LLM communicates via a strict JSON protocol with three action types:
+The LLM communicates through one of two acquisition modes:
+
+- **JSON action mode**: portable fallback used by local/small models and providers without reliable native tools.
+- **Native action mode**: provider-specific tool/function calls normalized into the same Protolink action models.
+
+Both modes converge on three action types:
 
 #### Final Response
 ```json
@@ -591,7 +598,7 @@ This section explains how discovery works at runtime.
 2. Agent creates a `RegistryClient`  
 3. Agent registers its `AgentCard`  
 4. Registry stores the agent metadata  
-5. Optional heartbeat begins  
+5. Agent remains discoverable until it unregisters or the registry is cleared
 
 ---
 

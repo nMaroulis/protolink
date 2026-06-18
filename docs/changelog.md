@@ -237,7 +237,7 @@ Memory is configured in the agent using the `memory` argument. If none is provid
 
 ### [v0.4.8] - 2026-04-19
 
-TBA
+Historical patch release.
 
 ### [v0.4.7] - 2026-02-08
 
@@ -301,15 +301,15 @@ and more...
 
 ## 🗺️ Roadmap
 
-Currently working on **v0.4.8**
-
-- Finalize LLM Inference Guardrails
+The near-term roadmap focuses on hardening the runtime paths that production agent systems depend on most.
 
 ### Upcoming Features
 
-- [ ] **Agent Task Handling**: Finalise logic for robust task management.
-- [ ] **Delegated Inference**: Logic for agent delegation and tool calling.
-- [ ] **Transport Layer**: Add gRPC transport support.
-- [ ] **Storage**: Add base classes and implementations (e.g., SQLite).
-- [ ] **Observability**: Add OpenTelemetry support out-of-the-box.
-- [x] **Integrations**: Finalise MCP adapter.
+- [x] **Agent Task Handling**: Enforced task lifecycle transitions and state history.
+- [x] **Delegated Inference**: Typed tool and agent actions in the LLM inference loop.
+- [x] **Storage**: In-memory and SQLite storage implementations.
+- [x] **Observability**: Local trace replay plus Langfuse and LangSmith integrations.
+- [x] **Integrations**: MCP adapter for external tool servers.
+- [ ] **Transport Layer**: Add a production-ready gRPC transport implementation and factory registration.
+- [ ] **State Modules**: Expand tool, task, and flow state modules beyond their current storage-backed extension points.
+- [ ] **OpenTelemetry**: Add first-class OpenTelemetry export alongside the existing telemetry integrations.

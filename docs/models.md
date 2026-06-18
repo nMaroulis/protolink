@@ -10,7 +10,6 @@ This section provides detailed API documentation for the core data models in Pro
 - [Task](#task)
 - [TaskState](#taskstate)
 - [Message](#message)
-- [Message](#message)
 - [Part](#part)
 - [Artifact](#artifact)
 - [EndpointSpec](#endpointspec)
@@ -71,7 +70,11 @@ dict[str, Any]  # JSON dictionary representation
 
 **Example:**
 ```python
-card = AgentCard(name="weather_agent", description="Weather service")
+card = AgentCard(
+    name="weather_agent",
+    description="Weather service",
+    url="https://api.example.com/weather",
+)
 json_data = card.to_dict()
 print(json_data["name"])  # "weather_agent"
 ```
@@ -162,7 +165,7 @@ class AgentCapabilities:
     tool_calling: bool = False
     multi_step_reasoning: bool = False
     timeout_support: bool = False
-    delegation: bool = False
+    delegation: bool = True
     rag: bool = False
     code_execution: bool = False
 ```
@@ -182,7 +185,7 @@ Defines the capabilities and limitations of an agent. This extends the A2A speci
 | `tool_calling` | `bool` | `False` | Can call external tools/APIs |
 | `multi_step_reasoning` | `bool` | `False` | Performs multi-step reasoning |
 | `timeout_support` | `bool` | `False` | Respects operation timeouts |
-| `delegation` | `bool` | `False` | Can delegate tasks to other agents |
+| `delegation` | `bool` | `True` | Can delegate tasks to other agents |
 | `rag` | `bool` | `False` | Supports Retrieval-Augmented Generation |
 | `code_execution` | `bool` | `False` | Has access to safe execution sandbox |
 
@@ -208,7 +211,7 @@ class AgentSkill:
     id: str
     description: str = ""
     input_schema: dict[str, Any] = field(default_factory=dict)
-    output_schema: str | None = None
+    output_schema: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
     examples: list[str] = field(default_factory=list)
 ```
@@ -222,7 +225,7 @@ Represents a task that an agent can perform. Skills are used to advertise specif
 | `id` | `str` | — | **Required.** Unique Human-readable identifier for the task |
 | `description` | `str` | `""` | Detailed description of what the task does |
 | `input_schema` | `dict[str, Any]` | `{}` | Flattened dictionary of parameter definitions with `type`, `required`, and `default` keys |
-| `output_schema` | `str ⎪ None` | `None` | The name of the return type (e.g., `"dict"`, `"str"`) |
+| `output_schema` | `dict[str, Any]` | `{}` | JSON-schema-like description of the output payload |
 | `tags` | `list[str]` | `[]` | List of tags for categorization |
 | `examples` | `list[str]` | `[]` | Example inputs or usage scenarios |
 
@@ -267,7 +270,7 @@ Type alias for supported security schemes in Protolink. These are used to specif
 |----------|------------|
 | **API key** | `apiKey` |
 | **HTTP** (bearer/basic/digest) | `http` |
-| **full OAuth OAuth2** | `oauth2` |
+| **OAuth 2.0** | `oauth2` |
 | **Certificates** | `mutualTLS` |
 | **OIDC auto-discovery** | `openIdConnect` |
 
@@ -312,7 +315,10 @@ Unit of work exchanged between agents. Tasks encapsulate a complete unit of work
 submitted -> working -> completed
 submitted -> working -> input-required -> working -> completed
 submitted -> working -> failed
+submitted -> failed
 submitted -> canceled
+input-required -> failed
+input-required -> canceled
 ```
 
 `completed`, `failed`, and `canceled` are terminal states. Once a task reaches one of them, it should not be processed again.
@@ -634,10 +640,10 @@ Enumeration of possible task states.
 ```python
 @dataclass
 class Message:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=IDGenerator.generate_message_id)
     role: MessageRoleType = "user"
     parts: list[Part] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = field(default_factory=utc_now)
 ```
 
 Single unit of communication between agents. Messages contain one or more parts and have a specific role.
@@ -655,6 +661,7 @@ Single unit of communication between agents. Messages contain one or more parts 
 
 - `"user"`: Message from a human user
 - `"agent"`: Message from an agent
+- `"assistant"`: LLM assistant response
 - `"system"`: System-level message
 
 ### Methods
@@ -702,8 +709,8 @@ Message  # Self for method chaining
 **Example:**
 ```python
 msg = Message(role="agent")
-msg.add_part(Part("text", "Here's the analysis:"))
-msg.add_part(Part("data", {"result": "success"}))
+msg.add_part(Part.text("Here's the analysis:"))
+msg.add_part(Part.json({"result": "success"}))
 ```
 
 ---
@@ -833,7 +840,7 @@ agent_msg = Message.agent("It's sunny and 75°F.")
 # Create message with multiple parts
 msg = Message(role="user")
 msg.add_text("Here's an image:")
-msg.add_part(Part("image", image_data))
+msg.add_part(Part(type="image", content=image_data))
 ```
 
 ---
@@ -928,10 +935,10 @@ infer_part = Part.infer(prompt="Who are you?")
 ```python
 @dataclass
 class Artifact:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=IDGenerator.generate_artifact_id)
     parts: list[Part] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=utc_now)
 ```
 
 Output produced by a task (v0.2.0+). Artifacts represent results from task execution - files, structured data, analysis results, etc.
@@ -943,7 +950,7 @@ Output produced by a task (v0.2.0+). Artifacts represent results from task execu
 | `id` | `str` | `uuid4()` | Unique artifact identifier |
 | `parts` | `list[Part]` | `[]` | Content parts of the artifact |
 | `metadata` | `dict[str, Any]` | `{}` | Artifact metadata |
-| `created_at` | `str` | `utc now` | Creation timestamp |
+| `timestamp` | `str` | `utc now` | Creation timestamp |
 
 ### Methods
 
@@ -988,8 +995,8 @@ from protolink.models import Artifact, Part
 # Create artifact with multiple parts
 artifact = Artifact()
 artifact.add_text("Analysis Results:")
-artifact.add_part(Part("data", {"results": [1, 2, 3]}))
-artifact.add_part(Part("chart", chart_image_data))
+artifact.add_part(Part.json({"results": [1, 2, 3]}))
+artifact.add_part(Part(type="image", content=chart_image_data))
 
 # Set metadata
 artifact.metadata["type"] = "analysis_report"
@@ -1016,7 +1023,7 @@ class EndpointSpec:
     request_source: RequestSourceType = "none"
 ```
 
-Defines the contract for a server endpoint. This model bridges the gap between the server implementation (Agent/Registry) and the underlying transport.
+Defines the contract for a server endpoint. This model lives in `protolink.server.endpoint_handler` and bridges the gap between the server implementation (Agent/Registry) and the underlying transport.
 
 ### Parameters
 

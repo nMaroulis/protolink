@@ -58,7 +58,7 @@ Configuration depends on the specific backend, but the general pattern is:
    ```
 
 !!! info "Choosing LLM extras"
-    If you only need a subset of LLMs (e.g. OpenAI API), it is advised to **install them manually** instead of using the `llms` extra, which will intall all the supported libraries.
+    If you only need a subset of LLMs (e.g. OpenAI API), it is advised to **install them manually** instead of using the `llms` extra, which will install all the supported libraries.
 
 2. **Instantiate the LLM** with the desired model and credentials:
 
@@ -131,8 +131,8 @@ llm = LMStudioLLM(model="local-model", base_url="http://localhost:1234/v1")
 response = llm.chat("Hello! How are you?")
 print(response)
 
-# Streaming also works identically
-for chunk in llm.chat("Hello!", streaming=True):
+# Streaming returns an async iterator
+async for chunk in llm.chat("Hello!", streaming=True):
     print(chunk, end="", flush=True)
 ```
 
@@ -501,7 +501,7 @@ API-based LLMs connect to external services and require API keys or authenticati
 | Google Gemini | `GeminiLLM` | `gemini-3-flash-preview` | `GEMINI_API_KEY` |
 | DeepSeek | `DeepSeekLLM` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
 | Grok | `GrokLLM` | `grok-4-latest` | `XAI_API_KEY` or `GROK_API_KEY` |
-| HuggingFace | `HuggingFaceLLM` | `HuggingFaceH4/zephyr-7b-beta` | `HF_API_TOKEN` |
+| HuggingFace | `HuggingFaceLLM` | Explicit `model` required | `HF_API_TOKEN` |
 
 ### OpenAILLM
 
@@ -638,7 +638,7 @@ HuggingFace Inference API implementation.
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `api_key` | `str ⎪ None` | `None` | HuggingFace API token. Uses `HF_API_TOKEN` env var if not provided. |
-| `model` | `str ⎪ None` | `"HuggingFaceH4/zephyr-7b-beta"` | HuggingFace model name. |
+| `model` | `str ⎪ None` | `""` | HuggingFace model name. Pass a concrete model id for production use. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
 
 !!! warning "Model Availability"
@@ -830,7 +830,7 @@ response = llm.chat("Hello, how are you?")
 print(response)
 
 # Streaming chat
-for chunk in llm.chat("Hello!", streaming=True):
+async for chunk in llm.chat("Hello!", streaming=True):
     print(chunk, end="", flush=True)
 ```
 
@@ -937,7 +937,7 @@ The LLM module defines several type aliases for clarity:
 ```python
 LLMType: TypeAlias = Literal["api", "local", "server"]
 LLMProvider: TypeAlias = Literal[
-    "openai", "anthropic", "gemini", "deepseek", 
+    "openai", "anthropic", "gemini", "deepseek", "grok",
     "huggingface", "llama.cpp-local", "llama.cpp-server",
     "lmstudio", "mock", "ollama", "openai-compatible"
 ]

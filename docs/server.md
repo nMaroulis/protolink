@@ -73,11 +73,9 @@ from protolink.discovery.registry import Registry
 from protolink.transport import HTTPTransport
 from protolink.server.registry import RegistryServer
 
-# Create Logic
-registry = Registry()
-
-# Create Transport
+# Create logic and transport
 transport = HTTPTransport(url="http://localhost:8000")
+registry = Registry(transport=transport)
 
 # Create Server (wiring)
 server = RegistryServer(registry, transport)
@@ -94,7 +92,7 @@ The server architecture relies on the `EndpointSpec` model to define routes in a
 
 ### EndpointSpec
 
-The `EndpointSpec` class (defined in `protolink.core.endpoint_handler`) is the **contract** between a Server and a Transport.
+The `EndpointSpec` class (defined in `protolink.server.endpoint_handler`) is the **contract** between a Server and a Transport.
 
 ```python
 @dataclass(frozen=True)

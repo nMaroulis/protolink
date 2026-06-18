@@ -307,13 +307,13 @@ _Current release: see [protolink on PyPI](https://pypi.org/project/protolink/)._
 }
 </style>
 
-## What is Protolink ?
+## What is Protolink?
 
 ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where AI agents **communicate directly with each other**.
 
 Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
-ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **true agent-to-agent collaboration**.
+ProtoLink implements and extends [Google's Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **true agent-to-agent collaboration**.
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
@@ -332,7 +332,7 @@ But today's frameworks often trap you in a **walled garden**:
 
 **Protolink breaks free from this model.**
 
-In Protolink, an Agent is an **autonomous, centralized object** that serves as the core unit of your system. It is designed to be **fully modular** so you can **plug in** any LLM, Tools, Transport, Storage, OpenTelemetry, and Authentication stack you need.
+In Protolink, an Agent is an **autonomous, centralized object** that serves as the core unit of your system. It is designed to be **fully modular** so you can **plug in** any LLM, tools, transport, storage, telemetry, and authentication stack you need.
 
 > **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
 
@@ -360,7 +360,7 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
   See [Getting Started](getting-started.md) and [Agents](agent.md) for the core concepts and basic setup.
 
 - **Choose your transport**  
-  Explore [Transports](transport.md) to switch between HTTP, WebSocket, runtime, and future transports with minimal code changes.
+  Explore [Transports](transport.md) to switch between HTTP, SSE JSON-RPC streaming, WebSocket, and in-process runtime transports with minimal code changes.
 
 - **Plug in LLMs & tools**  
   Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and both native & MCP tools as agent modules.
@@ -369,7 +369,7 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
 ## Key ideas
 
 - **Unified Agent model**: a single autonomous `AI Agent` instance handles both client and server responsibilities, incorporating LLMs and tools.
-- **Flexible transports**: HTTP, WebSocket, in‑process runtime, and planned JSON‑RPC / gRPC transports. Change one line of code to switch protocols.
+- **Flexible transports**: HTTP, SSE JSON-RPC streaming, WebSocket, and in-process runtime transports. The `grpc` type is reserved for future support, but it is not registered in the default transport factory yet.
 - **LLM‑ready architecture**: first‑class integration with API, local, and server‑hosted LLMs.
 - **Tools as modules**: native Python tools and MCP tools plugged directly into agents. Import tools from thousands of existing MCP servers instantly.
 - **Resilience by design**: by decoupling the Brain (LLM) from the Body (Agent), you are immune to provider outages or pricing changes.
@@ -385,4 +385,3 @@ Use this documentation to:
 ---
 
 _Protolink is open source under the MIT license. Contributions are welcome – see the repository’s **Contributing** section on GitHub._
-

@@ -1,9 +1,7 @@
-# Relevant Sources & Projects
+# Related Projects
 
-
-You can follow my **awesome list** for **agent-to-agent libraries** here:
-[awesome-a2a-libraries](https://github.com/nMaroulis/awesome-a2a-libraries)
+For a broader view of the agent-to-agent ecosystem, see the curated [awesome-a2a-libraries](https://github.com/nMaroulis/awesome-a2a-libraries) list.
 
 ![banner](https://raw.githubusercontent.com/nMaroulis/awesome-a2a-libraries/refs/heads/main/assets/banner.png)
 
-This list is updated on a regular basis and is a great resource for finding new and interesting agent-to-agent libraries and projects for many different languages not just python. Also other resources and projects are listed here which could help you get more into A2A.
+It tracks agent-to-agent libraries, protocols, examples, and research resources across multiple languages. Use it when comparing Protolink with other A2A implementations or looking for complementary tooling.
