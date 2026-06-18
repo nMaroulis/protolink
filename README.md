@@ -617,11 +617,40 @@ result = await orchestrated_flow.execute(task)
 
 Protolink provides non-invasive, out-of-the-box observability for agent task execution, LLM inferences, and tool calls. It utilizes Python's `contextvars` to automatically track execution states asynchronously without cluttering core method signatures.
 
-Currently supported telemetry integrations:
+Currently supported telemetry options:
+- **LocalTraceTelemetry** — built-in local traces for replay/debugging, with optional JSONL output
 - **[Langfuse](https://langfuse.com/)**
 - **[LangSmith](https://www.langchain.com/langsmith)**
 
-To use telemetry, simply install the optional dependency (`uv add "protolink[telemetry]"`) and inject the tracker to your agent. You can also broadcast events to multiple trackers using `MultiTelemetry`:
+For local debugging, use `LocalTraceTelemetry` without any external service:
+
+```python
+from protolink import Agent, AgentCard, LocalTraceTelemetry, Task, create_llm
+
+telemetry = LocalTraceTelemetry(path="traces.jsonl")
+
+agent = Agent(
+    card=AgentCard(name="debug_agent", description="Local debug agent", url="runtime://debug"),
+    llm=create_llm(
+        "mock",
+        sequential_responses=[
+            {"type": "final", "content": "done"}
+        ],
+    ),
+    telemetry=telemetry,
+)
+
+result = await agent.handle_task(Task.create_infer(prompt="Run a traced task"))
+trace = telemetry.recorder.replay()[-1]
+
+print(result.get_last_part_content())  # done
+print(trace["trace_id"])
+print([span["kind"] for span in trace["spans"]])  # task, llm, ...
+```
+
+Local traces capture task spans, LLM events, tool calls, retry counts, redacted payloads, and model metadata. This makes the infer loop easy to inspect before sending anything to Langfuse, LangSmith, or another observability backend.
+
+For hosted telemetry, install the optional dependency (`uv add "protolink[telemetry]"`) and inject the tracker to your agent. You can also broadcast events to multiple trackers using `MultiTelemetry`:
 
 ```python
 from protolink.telemetry import LangfuseTelemetry, LangSmithTelemetry, MultiTelemetry
