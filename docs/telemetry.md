@@ -67,7 +67,7 @@ telemetry_tracker = LangfuseTelemetry()
 
 # Inject into an agent
 agent = Agent(
-    card={"name": "ObserverAgent", "capabilities": {}},
+    card={"name": "ObserverAgent", "description": "Observed agent", "url": "runtime://observer"},
     telemetry=telemetry_tracker
 )
 ```
@@ -90,7 +90,7 @@ telemetry_tracker = LangSmithTelemetry()
 
 # Inject into an agent
 agent = Agent(
-    card={"name": "ObserverAgent", "capabilities": {}},
+    card={"name": "ObserverAgent", "description": "Observed agent", "url": "runtime://observer"},
     telemetry=telemetry_tracker
 )
 ```
@@ -110,7 +110,7 @@ multi_tracker = MultiTelemetry([langfuse_tracker, langsmith_tracker])
 
 # Inject into an agent
 agent = Agent(
-    card={"name": "ObserverAgent", "capabilities": {}},
+    card={"name": "ObserverAgent", "description": "Observed agent", "url": "runtime://observer"},
     telemetry=multi_tracker
 )
 ```
@@ -120,7 +120,7 @@ agent = Agent(
 You can also change or assign a telemetry tracker after agent initialization using the `.telemetry` property:
 
 ```python
-agent = Agent(card={"name": "ObserverAgent", "capabilities": {}})
+agent = Agent(card={"name": "ObserverAgent", "description": "Observed agent", "url": "runtime://observer"})
 
 # Later in your code...
 agent.telemetry = LangfuseTelemetry()
@@ -180,7 +180,7 @@ telemetry = LangfuseTelemetry()
 
 # Initialize Agent
 agent = Agent(
-    card={"name": "HelperAgent", "capabilities": {}},
+    card={"name": "HelperAgent", "description": "Observed helper", "url": "runtime://helper"},
     llm=llm,
     telemetry=telemetry
 )

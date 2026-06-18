@@ -11,7 +11,7 @@
 
 ## Release Notes
 
-### [v0.5.9] - TBD
+### [v0.6.0] - TBD
 
 NEW:
 
@@ -39,13 +39,29 @@ NEW:
   - Added `LocalTraceTelemetry` and `LocalTraceRecorder` for in-memory and JSONL task trace replay.
   - Local traces now capture trace IDs, span hierarchy, LLM action events, retry counts, token estimates, model metadata, and redacted payloads.
 
+- **Typed LLM action protocol**
+  - Added typed `FinalAction`, `ToolCallAction`, `AgentCallAction`, and `LLMActionResult` models for the `infer()` execution loop.
+  - Added provider-native action acquisition for OpenAI, Anthropic, Gemini, DeepSeek, Grok, Ollama, llama.cpp, LM Studio, and OpenAI-compatible servers where supported.
+  - Added native streaming action acquisition through `call_action_stream()` so providers can stream text while buffering tool-call deltas into one validated runtime action.
+  - Added provider-neutral tool schema builders and synthetic native delegation tools for agent calls.
+
 Changed:
 
 - `protolink.models` now exports `TaskState`.
 - Task validation now accepts empty message, artifact, and metadata containers and validates `Task.state` as a `TaskState`.
 - Flow execution no longer auto-wraps plain user messages without executable parts into inferred prompts.
 - Telemetry hooks now accept optional LLM metadata and expose detailed inference-loop events through `on_llm_event()`.
+- LLM prompt selection now separates JSON action prompts from native provider tool prompts, preventing native providers from seeing JSON tool-call instructions while keeping small/local models on the simple JSON protocol by default.
+- Ollama, llama.cpp, LM Studio, and OpenAI-compatible local servers now use native tool calling only when `supports_tool_calling=True`; otherwise they retain the JSON fallback path.
 - `.ruff_cache/` is now ignored by git.
+
+Infer Loop Updates:
+- The LLM no longer directly drives execution through fragile raw text.
+- Every step converges into typed actions: FinalAction, ToolCallAction, AgentCallAction.
+- Native providers like OpenAI/Anthropic/Gemini use real provider tool calling instead of being forced through prompt JSON.
+- Small/local models still get the simpler JSON protocol, which is the right call for Ollama/Gemma-style reliability.
+- Streaming now has a real action boundary through call_action_stream(), instead of pretending chunks are immediately executable.
+- The loop has retries, parse failure limits, duplicate-action detection, tool argument correction, unknown-tool correction, and structured events for observability.
 
 Fixed:
 
@@ -59,12 +75,14 @@ Docs:
 - Added Agent documentation for default task lifecycle behavior and streaming status updates.
 - Expanded model and transport docs for task lifecycle states, terminal states, transition history, and new task helper methods.
 - Added CLI documentation and local trace telemetry documentation.
+- Expanded LLM documentation for the typed `infer()` cycle, JSON vs native action modes, native streaming tool-call behavior, and provider support matrix.
 
 Tests:
 
 - Added lifecycle coverage for direct task construction, invalid transitions, `Task.complete()`, successful agent execution, and failed tool execution.
 - Added regression coverage for delegated `ToolOutput` serialization in the LLM inference loop.
 - Added coverage for top-level exports, CLI scaffolding, local trace capture, redaction, and retry metadata.
+- Added regression coverage for native action dispatch, native streaming action dispatch, provider tool-call normalization, streamed tool-call delta accumulation, and Ollama's opt-in native tool mode.
 
 ### [v0.5.8] - 2026-06-11
 
@@ -219,7 +237,7 @@ Memory is configured in the agent using the `memory` argument. If none is provid
 
 ### [v0.4.8] - 2026-04-19
 
-TBA
+Historical patch release.
 
 ### [v0.4.7] - 2026-02-08
 
@@ -283,15 +301,15 @@ and more...
 
 ## 🗺️ Roadmap
 
-Currently working on **v0.4.8**
-
-- Finalize LLM Inference Guardrails
+The near-term roadmap focuses on hardening the runtime paths that production agent systems depend on most.
 
 ### Upcoming Features
 
-- [ ] **Agent Task Handling**: Finalise logic for robust task management.
-- [ ] **Delegated Inference**: Logic for agent delegation and tool calling.
-- [ ] **Transport Layer**: Add gRPC transport support.
-- [ ] **Storage**: Add base classes and implementations (e.g., SQLite).
-- [ ] **Observability**: Add OpenTelemetry support out-of-the-box.
-- [x] **Integrations**: Finalise MCP adapter.
+- [x] **Agent Task Handling**: Enforced task lifecycle transitions and state history.
+- [x] **Delegated Inference**: Typed tool and agent actions in the LLM inference loop.
+- [x] **Storage**: In-memory and SQLite storage implementations.
+- [x] **Observability**: Local trace replay plus Langfuse and LangSmith integrations.
+- [x] **Integrations**: MCP adapter for external tool servers.
+- [ ] **Transport Layer**: Add a production-ready gRPC transport implementation and factory registration.
+- [ ] **State Modules**: Expand tool, task, and flow state modules beyond their current storage-backed extension points.
+- [ ] **OpenTelemetry**: Add first-class OpenTelemetry export alongside the existing telemetry integrations.

@@ -1,6 +1,6 @@
 # Flows
 
-Update **0.5.0** introduces **Structured Flows**, a new feature that allows you to define complex, structured workflows for your agents. Building on the core Agent-to-Agent (A2A) architecture, flows enable deterministic execution paths such as sequential pipelines, parallel execution, or complex graph structures.
+Structured Flows let you define complex, structured workflows for your agents. Building on the core Agent-to-Agent (A2A) architecture, flows enable deterministic execution paths such as sequential pipelines, parallel execution, conditional routing, and graph-shaped state machines.
 
 Unlike standard Agents that might rely on LLMs to dynamically map out interactions and routing, flows mandate strict execution paths, ensuring consistent and predictable outcomes for multistep tasks.
 
@@ -96,7 +96,7 @@ for art in result.artifacts:
 
 ### 3. Conditional Routing
 
-A `Router` allows conditional branching based on **LLM decision-making**. Instead of hardcoding unpredictable Python `if/else` statements, the Router injects your `routing_prompt` into the *preceding agent*, empowering the LLM itself to choose the correct path.
+A `Router` allows conditional branching based on **LLM decision-making** while keeping the actual branch transition explicit and inspectable. The Router injects your `routing_prompt` into the *preceding agent*, asking it to choose one of the named routes.
 
 The preceding agent evaluates its own task context and appends a structured tag (e.g., `[ROUTE: quality]`) to its final response. The Router safely extracts this tag, cleans the payload, and deterministically forwards the task to the chosen route.
 
@@ -150,5 +150,6 @@ graph.add_conditional_edge(
 
 graph.add_edge("final", "__END__")
 graph.set_entry_point("entry")
-```
 
+result = await graph.execute(task)
+```

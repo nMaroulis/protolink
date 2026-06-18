@@ -36,10 +36,10 @@ git clone https://github.com/nMaroulis/protolink.git
 cd protolink
 
 # Install in development mode
-uv pip install -e ".[dev]"
+uv pip install -e ".[dev,docs]"
 
 # Or with pip
-pip install -e ".[dev]"
+pip install -e ".[dev,docs]"
 ```
 
 This installs Protolink in editable mode with all development dependencies.
@@ -86,7 +86,7 @@ ruff check . --fix
 ty check .
 
 # Run tests
-pytest -v tests
+python -m pytest -v tests
 ```
 
 ### 5. Commit and Push
@@ -148,13 +148,13 @@ Run the test suite with pytest:
 
 ```bash
 # Run all tests
-pytest -v tests
+python -m pytest -v tests
 
 # Run specific test file
-pytest -v tests/test_agent.py
+python -m pytest -v tests/test_agent.py
 
 # Run with coverage
-pytest --cov=protolink tests
+python -m pytest --cov=protolink tests
 ```
 
 !!! info "Test Structure"
@@ -185,6 +185,9 @@ Preview documentation locally:
 ```bash
 # Serve docs
 mkdocs serve
+
+# Validate docs strictly
+mkdocs build --strict
 
 # Open http://127.0.0.1:8000
 ```
@@ -282,7 +285,7 @@ pytest -v -s tests/test_failing.py::test_function
 
 ```bash
 # Install in development mode
-pip install -e .
+python -m pip install -e .
 
 # Check Python path
 python -c "import protolink; print(protolink.__file__)"
@@ -293,7 +296,7 @@ python -c "import protolink; print(protolink.__file__)"
 - Use `uv` for faster dependency management
 - Enable debug logging: `export PROTOLINK_LOG_LEVEL=debug`
 - Use breakpoints: `import pdb; pdb.set_trace()`
-- Run tests in watch mode: `ptw tests`
+- For watch-mode testing, install a watcher such as `pytest-watch` locally and run it outside the core dependency set.
 
 ---
 
@@ -302,8 +305,8 @@ python -c "import protolink; print(protolink.__file__)"
 Maintainers can follow this process for releases:
 
 1. **Update Version** in `protolink/__version__.py`
-2. **Update Changelog** in `CHANGELOG.md`
-3. **Tag Release**: `git tag v0.1.0`
+2. **Update Changelog** in `docs/changelog.md`
+3. **Tag Release**: `git tag vX.Y.Z`
 4. **Push Tags**: `git push origin --tags`
 5. **Build Package**: `python -m build`
 6. **Upload to PyPI**: `python -m twine upload dist/*`
@@ -324,12 +327,4 @@ Please be respectful and constructive in all interactions. By participating in t
 
 ---
 
-Thank you for contributing to Protolink! 🚀
-
-
-<h3 style="text-align: center;"> 🎉🎉 Congratulations, You made it! 🎉🎉 </h3>
-<p style="text-align: center;">
-Want to see more? Stay tuned, as the project is actively maintained and everything is changing rapidly! 
-<br/>
-<img style="border: 5px solid #555;" src="https://media.tenor.com/sIzMTGPxIeMAAAAC/well-done.gif" alt="Good Job" width="320px">
-</p>
+Thank you for contributing to Protolink.

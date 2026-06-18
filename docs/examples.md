@@ -112,12 +112,12 @@ The repository includes several **standalone example scripts** that demonstrate 
 - Verifies both HTTP (Starlette and FastAPI backends) and WebSocket handshake verification
 - Demonstrates success and failure scenarios for both transports
 
-### 🤖 [`llms.py`](https://github.com/nMaroulis/protolink/blob/main/examples/llms.py)
-**Purpose**: LLM backend integration and testing
-- Tests OpenAI and Anthropic LLM implementations
-- Demonstrates both streaming and non-streaming responses
-- Safe import pattern for optional dependencies
-- Command-line interface for testing specific backends
+### 🤖 [LLM notebooks](https://github.com/nMaroulis/protolink/tree/main/examples/notebooks/llm_test)
+**Purpose**: LLM backend integration, inference loops, and delegation
+- Demonstrates direct API LLM usage
+- Shows `infer()` with local tool calling
+- Shows `agent_call` delegation between agents
+- Complements the [LLM Examples](llm_examples.md) guide
 
 ### 📋 [`registry.py`](https://github.com/nMaroulis/protolink/blob/main/examples/registry.py)
 **Purpose**: Registry discovery and autonomous agent behaviour
@@ -136,7 +136,7 @@ The repository includes several **standalone example scripts** that demonstrate 
 - Useful for test pipelines scaling native workflow isolation
 
 ### 📡 [`streaming_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/streaming_agent.py)
-**Purpose**: Real-time streaming with progress updates (v0.2.0+)
+**Purpose**: Real-time streaming with progress updates
 
 - Demonstrates streaming task handlers with progress events
 - Shows artifact production and streaming

@@ -12,7 +12,7 @@ This section provides detailed documentation for the type aliases used throughou
 - [LLMType](#llmtype)
 - [MimeType](#mimetype)
 - [PartType](#parttype)
-- [ReasoningLevelType](#reasoningleveltype)
+- [ReasoningLevel](#reasoninglevel)
 - [RequestSourceType](#requestsourcetype)
 - [MessageRoleType](#messageroletype)
 - [SecuritySchemeType](#securityschemetype)
@@ -222,11 +222,10 @@ Type alias for supported Large Language Model providers in Protolink.
 ### Usage Example
 
 ```python
-from protolink.types import LLMProvider
-from protolink.llms.api import OpenAILLM
+from protolink.llms.factory import create_llm
 
-# Specify provider when creating LLM
-llm = OpenAILLM(model="gpt-4", provider="openai")
+# Provider strings are accepted by create_llm()
+llm = create_llm("openai", model="gpt-4o-mini")
 ```
 
 ---
@@ -251,11 +250,14 @@ Type alias for different types of LLM deployment methods.
 
 ```python
 from protolink.types import LLMType
+from protolink.llms.api import OpenAILLM
+from protolink.llms.local import LlamaCPPLocalLLM
+from protolink.llms.server import OllamaLLM
 
 # Different LLM deployment types
-api_llm = OpenAILLM(model="gpt-4")  # API type
-local_llm = LocalLLM(model_path="./model.gguf")  # Local type
-server_llm = ServerLLM(endpoint="http://localhost:8080")  # Server type
+api_llm = OpenAILLM(model="gpt-4o-mini")  # API type
+local_llm = LlamaCPPLocalLLM(model="./model.gguf")  # Local type
+server_llm = OllamaLLM(base_url="http://localhost:11434", model="llama3")  # Server type
 ```
 
 ---
@@ -479,9 +481,9 @@ from protolink.types import MessageRoleType
 from protolink.models import Message
 
 # Create messages with different roles
-user_msg = Message(role="user", content="Hello, how are you?")
-agent_msg = Message(role="agent", content="I'm doing well, thank you!")
-system_msg = Message(role="system", content="You are a helpful assistant.")
+user_msg = Message.user("Hello, how are you?")
+agent_msg = Message.agent("I'm doing well, thank you!")
+system_msg = Message(role="system").add_text("You are a helpful assistant.")
 ```
 
 ---
@@ -528,7 +530,7 @@ Type alias for supported security schemes in Protolink. These are used to specif
 |----------|------------|
 | **API key** | `apiKey` |
 | **HTTP** (bearer/basic/digest) | `http` |
-| **full OAuth OAuth2** | `oauth2` |
+| **OAuth 2.0** | `oauth2` |
 | **Certificates** | `mutualTLS` |
 | **OIDC auto-discovery** | `openIdConnect` |
 
@@ -544,8 +546,8 @@ card = AgentCard(
     description="Agent with multiple auth methods",
     url="http://localhost:8000",
     security_schemes={
-        "bearer": {"type": "http", "description": "Bearer token authentication"},
-        "api_key": {"type": "apiKey", "description": "API key authentication"},
+        "http": {"type": "http", "scheme": "bearer", "description": "Bearer token authentication"},
+        "apiKey": {"type": "apiKey", "description": "API key authentication"},
         "oauth2": {"type": "oauth2", "description": "OAuth 2.0 authentication"}
     }
 )
@@ -563,15 +565,15 @@ Type alias for supported transport protocols.
 
 ### Supported Transports
 
-| Transport | Description |
-|-----------|-------------|
-| **http** | Standard HTTP transport |
-| **websocket** | WebSocket transport for bidirectional comms |
-| **sse** | Server-Sent Events transport using JSON-RPC-style envelopes |
-| **json-rpc** | Alias for SSE JSON-RPC streaming over HTTP |
-| **sse-json-rpc** | Explicit alias for SSE JSON-RPC streaming over HTTP |
-| **grpc** | gRPC transport |
-| **runtime** | In-memory transport for local agent composition |
+| Transport | Factory status | Description |
+|-----------|----------------|-------------|
+| **http** | Registered | Standard HTTP transport |
+| **websocket** | Registered | WebSocket transport for bidirectional comms |
+| **sse** | Registered | Server-Sent Events transport using JSON-RPC-style envelopes |
+| **json-rpc** | Registered | Alias for SSE JSON-RPC streaming over HTTP |
+| **sse-json-rpc** | Registered | Explicit alias for SSE JSON-RPC streaming over HTTP |
+| **runtime** | Registered | In-memory transport for local agent composition |
+| **grpc** | Reserved | Type alias placeholder for future gRPC transport support; not registered by the default factory yet |
 
 ---
 

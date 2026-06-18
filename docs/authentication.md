@@ -55,16 +55,18 @@ The authentication module revolves around three primary data models and abstract
 The `SecurityContext` represents an active, authenticated session. It encapsulates details about the authenticated principal, tokens, and expiration times.
 
 ```python
-from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
+
+from protolink.utils import utc_now
 
 @dataclass
 class SecurityContext:
     principal_id: str
     token: str
-    expires_at: datetime | None = None
-    issued_at: datetime | None = None
-    metadata: dict[str, Any] | None = None
+    expires_at: str | None = None
+    issued_at: str = field(default_factory=utc_now)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_expired(self) -> bool:
         """Check if the context token is past its expiration time."""
@@ -75,12 +77,15 @@ class SecurityContext:
 The `SecurityScheme` outlines the metadata of the authentication mechanism used. It directly corresponds to OpenAPI security schemes, allowing agents to advertise their security protocols in their dynamic agent card metadata.
 
 ```python
+from dataclasses import dataclass, field
+from typing import Any
+
 @dataclass
 class SecurityScheme:
     auth_type: str  # e.g., "apiKey", "http", "oauth2"
-    auth_scheme: str | None = None  # e.g., "bearer", "basic" (required if type is "http")
-    description: str | None = None
-    metadata: dict[str, Any] | None = None
+    auth_scheme: str | None  # e.g., "bearer", "basic" (required if type is "http")
+    description: str
+    metadata: dict[str, Any] = field(default_factory=dict)
 ```
 
 ### `Authenticator` (Base Class)
@@ -337,9 +342,9 @@ class LDAPAuthenticator(Authenticator):
 | :--- | :--- | :--- |
 | `principal_id` | `str` | The verified identity identifier of the client. |
 | `token` | `str` | The session or signature token. |
-| `expires_at` | `datetime \| None` | Optional token expiration date. |
-| `issued_at` | `datetime \| None` | Optional token creation date. |
-| `metadata` | `dict \| None` | Key-value pairs containing provider-specific information. |
+| `expires_at` | `str \| None` | Optional ISO timestamp for token expiration. |
+| `issued_at` | `str` | ISO timestamp for token creation. |
+| `metadata` | `dict` | Key-value pairs containing provider-specific information. |
 
 #### SecurityScheme
 
@@ -347,8 +352,8 @@ class LDAPAuthenticator(Authenticator):
 | :--- | :--- | :--- |
 | `auth_type` | `str` | General classification: `"apiKey"`, `"http"`, `"oauth2"`, `"openIdConnect"`. |
 | `auth_scheme` | `str \| None` | Required if type is `"http"`. Example: `"bearer"`, `"basic"`. |
-| `description` | `str \| None` | Human-readable explanation of the scheme. |
-| `metadata` | `dict \| None` | Scheme extensions or provider settings. |
+| `description` | `str` | Human-readable explanation of the scheme. |
+| `metadata` | `dict` | Scheme extensions or provider settings. |
 
 ### Authenticator Interface Methods
 

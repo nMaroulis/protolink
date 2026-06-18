@@ -4,11 +4,21 @@ import json
 import os
 import urllib.error
 import urllib.request
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
+from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.history import ConversationHistory
 from protolink.llms.server.base import ServerLLM
+from protolink.llms.tool_calling import (
+    ChatCompletionStreamAccumulator,
+    chat_completion_stream_delta,
+    chat_completion_tools,
+    native_tool_call_to_action,
+    parse_json_arguments,
+    should_include_agent_tools,
+)
+from protolink.tools import BaseTool
 from protolink.types import LLMProvider
 from protolink.utils.logging import get_logger
 
@@ -80,22 +90,28 @@ class OpenAICompatibleLLM(ServerLLM):
 
     def call(self, history: ConversationHistory) -> str:
         """Generate a single non-streaming chat completion."""
+        params = dict(self._model_params)
+        if "response_format" not in params:
+            params["response_format"] = {"type": "json_object"}
         payload = {
             "model": self.model,
             "messages": history.messages,
             "stream": False,
-            **self._model_params,
+            **params,
         }
         result = self._post_json(self._chat_completions_url, payload)
         return self._extract_message_content(result)
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming chat completion."""
+        params = dict(self._model_params)
+        if "response_format" not in params:
+            params["response_format"] = {"type": "json_object"}
         payload = {
             "model": self.model,
             "messages": history.messages,
             "stream": True,
-            **self._model_params,
+            **params,
         }
         request = urllib.request.Request(
             self._chat_completions_url,
@@ -121,6 +137,142 @@ class OpenAICompatibleLLM(ServerLLM):
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"OpenAI-compatible stream failed with HTTP {exc.code}: {detail}") from exc
+
+    def call_action(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, BaseTool],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+    ) -> LLMActionResult:
+        """Return one typed action from a chat-completions-compatible server.
+
+        Local and self-hosted OpenAI-compatible servers vary widely. By default
+        Protolink uses the prompt JSON fallback. If ``supports_tool_calling`` is
+        enabled for a known-good model/server, this method sends native function
+        tool declarations and normalizes returned ``tool_calls`` into the same
+        typed action protocol used by every provider.
+        """
+        if not self.supports_tool_calling:
+            return super().call_action(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            )
+
+        tool_specs = chat_completion_tools(
+            tools,
+            include_agent_tools=should_include_agent_tools(
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            ),
+        )
+        payload = {
+            "model": self.model,
+            "messages": history.messages,
+            "stream": False,
+            **self._model_params,
+        }
+        if tool_specs:
+            payload["tools"] = tool_specs
+            payload["tool_choice"] = "auto"
+        result = self._post_json(self._chat_completions_url, payload)
+        return self._action_from_chat_result(result)
+
+    async def call_action_stream(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, BaseTool],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+        chunk_callback: Callable[[str], Awaitable[None]] | None = None,
+    ) -> LLMActionResult:
+        """Return one action from an OpenAI-compatible streaming response."""
+        if not self.supports_tool_calling:
+            return await super().call_action_stream(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+                chunk_callback=chunk_callback,
+            )
+
+        tool_specs = chat_completion_tools(
+            tools,
+            include_agent_tools=should_include_agent_tools(
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            ),
+        )
+        payload = {
+            "model": self.model,
+            "messages": history.messages,
+            "stream": True,
+            **self._model_params,
+        }
+        if tool_specs:
+            payload["tools"] = tool_specs
+            payload["tool_choice"] = "auto"
+
+        request = urllib.request.Request(
+            self._chat_completions_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=self.headers,
+            method="POST",
+        )
+        output_text: list[str] = []
+        tool_accumulator = ChatCompletionStreamAccumulator()
+        try:
+            with urllib.request.urlopen(request, timeout=self.REQUEST_TIMEOUT) as response:
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line or line == "data: [DONE]":
+                        continue
+                    if line.startswith("data: "):
+                        line = line[6:]
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    text, tool_call_deltas = chat_completion_stream_delta(chunk)
+                    if text:
+                        output_text.append(text)
+                        if chunk_callback is not None:
+                            await chunk_callback(text)
+                    for tool_call_delta in tool_call_deltas:
+                        tool_accumulator.add_delta(tool_call_delta)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"OpenAI-compatible stream failed with HTTP {exc.code}: {detail}") from exc
+
+        action = tool_accumulator.to_action()
+        if action is not None:
+            return LLMActionResult(
+                action=action,
+                raw_response=action_to_json(action),
+                native=True,
+                metadata={"provider": self.provider, "streaming": True},
+            )
+
+        content = "".join(output_text).strip()
+        if not content:
+            raise ValueError("OpenAI-compatible stream did not contain content or tool_calls")
+        try:
+            action = self._parse_infer_response(content)
+            return LLMActionResult(
+                action=action, raw_response=content, native=False, metadata={"provider": self.provider}
+            )
+        except ValueError:
+            action = FinalAction(content=content)
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=True,
+                metadata={"provider": self.provider, "streaming": True},
+            )
 
     def validate_connection(self) -> bool:
         """Validate that the configured server exposes a models endpoint."""
@@ -177,6 +329,48 @@ class OpenAICompatibleLLM(ServerLLM):
         if content is None:
             content = (choices[0].get("message") or {}).get("content")
         return str(content or "")
+
+    def _action_from_chat_result(self, payload: dict[str, Any]) -> LLMActionResult:
+        """Normalize a Chat Completions payload into one Protolink action."""
+        choices = payload.get("choices") or []
+        if not choices:
+            raise ValueError("OpenAI-compatible response did not contain choices")
+
+        message = choices[0].get("message") or {}
+        tool_calls = message.get("tool_calls") or []
+        if tool_calls:
+            call = tool_calls[0]
+            function = call.get("function", {}) if isinstance(call, dict) else getattr(call, "function", None)
+            name = function.get("name") if isinstance(function, dict) else getattr(function, "name", None)
+            raw_args = function.get("arguments") if isinstance(function, dict) else getattr(function, "arguments", None)
+            action = native_tool_call_to_action(str(name), parse_json_arguments(raw_args))
+            return LLMActionResult(
+                action=action,
+                raw_response=action_to_json(action),
+                native=True,
+                metadata={"provider": self.provider},
+            )
+
+        content = str(message.get("content") or "").strip()
+        if not content:
+            raise ValueError("OpenAI-compatible response did not contain content or tool_calls")
+
+        try:
+            action = self._parse_infer_response(content)
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=False,
+                metadata={"provider": self.provider},
+            )
+        except ValueError:
+            action = FinalAction(content=content)
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=True,
+                metadata={"provider": self.provider},
+            )
 
 
 class LMStudioLLM(OpenAICompatibleLLM):

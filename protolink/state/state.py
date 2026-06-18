@@ -2,6 +2,7 @@
 Unified state management for ProtoLink agents.
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from protolink.storage.base import Storage
@@ -12,7 +13,9 @@ from .flow import FlowState
 from .task import TaskState
 from .tool import ToolState
 
-STATE_REGISTRY = {
+StateModule = ConversationState | ToolState | TaskState | FlowState
+
+STATE_REGISTRY: dict[StateMode, Callable[[Storage], StateModule]] = {
     "conversation": ConversationState,
     "tools": ToolState,
     "task": TaskState,
@@ -39,7 +42,7 @@ class State:
             enabled: A list of state module names to enable for this agent.
         """
         self._storage = storage
-        self._modules = {}
+        self._modules: dict[StateMode, StateModule] = {}
 
         for name in enabled:
             if name not in STATE_REGISTRY:
@@ -50,7 +53,8 @@ class State:
     @property
     def conversation(self) -> ConversationState | None:
         """Access the conversation history state module."""
-        return self._modules.get("conversation", None)
+        module = self._modules.get("conversation", None)
+        return module if isinstance(module, ConversationState) else None
 
     @conversation.setter
     def conversation(self, conversation: ConversationState):
@@ -60,7 +64,8 @@ class State:
     @property
     def tools(self) -> ToolState | None:
         """Access the tool-specific state module."""
-        return self._modules.get("tools", None)
+        module = self._modules.get("tools", None)
+        return module if isinstance(module, ToolState) else None
 
     @tools.setter
     def tools(self, tools: ToolState):
@@ -70,7 +75,8 @@ class State:
     @property
     def task(self) -> TaskState | None:
         """Access the task metadata state module."""
-        return self._modules.get("task", None)
+        module = self._modules.get("task", None)
+        return module if isinstance(module, TaskState) else None
 
     @task.setter
     def task(self, task: TaskState):
@@ -80,7 +86,8 @@ class State:
     @property
     def flow(self) -> FlowState | None:
         """Access the flow-specific state module."""
-        return self._modules.get("flow", None)
+        module = self._modules.get("flow", None)
+        return module if isinstance(module, FlowState) else None
 
     @flow.setter
     def flow(self, flow: FlowState):
@@ -105,6 +112,7 @@ class State:
         """
         data = {}
         for name, module in self._modules.items():
-            if hasattr(module, "to_dict"):
-                data[name] = module.to_dict()
+            to_dict = getattr(module, "to_dict", None)
+            if callable(to_dict):
+                data[name] = to_dict()
         return data

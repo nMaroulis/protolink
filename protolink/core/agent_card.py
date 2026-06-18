@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any, final
 
@@ -127,8 +128,12 @@ class AgentCard:
     def __post_init__(self):
         """Normalize fields after initialization."""
         # If capabilities is passed as a dict, convert it to AgentCapabilities and fill missing fields with defaults
-        if isinstance(self.capabilities, dict):
-            self.capabilities = AgentCapabilities(**self.capabilities)  # type: ignore[arg-type]
+        capabilities: Any = self.capabilities
+        if isinstance(capabilities, Mapping):
+            self.capabilities = AgentCapabilities(**dict(capabilities))
+            return
+        if not isinstance(capabilities, AgentCapabilities):
+            raise TypeError(f"capabilities must be AgentCapabilities or mapping, got {type(capabilities).__name__}")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""

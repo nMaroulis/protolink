@@ -45,37 +45,30 @@ Protolink exposes several extras to enable additional functionality:
 
     ```bash
     # Install with all optional dependencies
-    pip install -e "protolink[all]"
+    pip install "protolink[all]"
 
     # HTTP support (for web-based agents)
-    pip install -e "protolink[http]"
+    pip install "protolink[http]"
 
     # All supported LLM libraries
-    pip install -e "protolink[llms]"
+    pip install "protolink[llms]"
 
     # Development (all extras + testing tools)
-    pip install -e "protolink[dev]"
+    pip install "protolink[dev]"
     ```
 
-=== "uv & pip"
-    *Because.. why not?*
+=== "Source checkout"
     
     ```bash
-    # Install with all optional dependencies
-    uv pip install -e "protolink[all]"
+    git clone https://github.com/nmaroulis/protolink.git
+    cd protolink
 
-    # HTTP support (for web-based agents)
-    uv pip install -e "protolink[http]"
-
-    # All supported LLM libraries
-    uv pip install -e "protolink[llms]"
-
-    # Development (all extras + testing tools)
-    uv pip install -e "protolink[dev]"
+    # Editable install for local development
+    uv pip install -e ".[dev]"
     ```
 
 !!! info "Optional extras"
-    You usually only need the extras that match your use case. The `protolink[llms]` will install all the supported LLM libraries (OpenAI, Anthropic, Ollama etc.) so it is **advised to install manually the libraries that are needed for your project**.
+    You usually only need the extras that match your use case. `protolink[llms]` installs every supported LLM SDK, so production projects may prefer installing only the provider libraries they actually use.
 
 For development from source:
 
@@ -87,7 +80,7 @@ uv pip install -e ".[dev]"
 
 ## First Agent
 
-Below is a minimal example that wires together an agent, HTTP transport, an OpenAI LLM, and both native and MCP tools:
+Below is a compact example that wires together an agent, HTTP transport, an OpenAI-compatible LLM wrapper, and both native and MCP tools:
 
 ```python
 from protolink.agents import Agent
@@ -107,8 +100,8 @@ agent_card = AgentCard(
     url="http://127.0.0.1:8020",
 )
 
-# OpenAI API LLM
-llm = OpenAILLM(model="gpt-5.2")
+# OpenAI API LLM. If model is omitted, OpenAILLM uses its built-in default.
+llm = OpenAILLM(model="gpt-4o-mini")
 
 # Initialize the agent
 agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
@@ -118,7 +111,7 @@ agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
 async def add_numbers(a: int, b: int):
     return a + b
 
-# Add MCP tools and return them as protolink native tools
+# Add MCP tools and return them as Protolink native tools
 mcp_adapter = MCPToolAdapter(transport="sse", url="https://api.example.com/mcp/sse")
 mcp_tools = mcp_adapter.get_tools()
 for mcp_tool in mcp_tools:

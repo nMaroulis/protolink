@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_anthropic
+from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
 from protolink.llms.serialization import json_history_default
+from protolink.llms.tool_calling import (
+    anthropic_tools,
+    native_tool_call_to_action,
+    parse_json_arguments,
+    should_include_agent_tools,
+)
+from protolink.tools import BaseTool
 from protolink.types import LLMProvider
 from protolink.utils.logging import get_logger
 
@@ -25,6 +33,16 @@ class AnthropicLLM(APILLM):
         "top_p": 1.0,
         "max_tokens": 1024,
     }
+
+    @property
+    def uses_native_action_prompt(self) -> bool:
+        """Anthropic Messages uses native ``tool_use`` blocks for actions."""
+        return True
+
+    @property
+    def supports_native_action_stream(self) -> bool:
+        """Anthropic streams text deltas and ``tool_use`` input JSON deltas."""
+        return True
 
     def __init__(
         self,
@@ -62,25 +80,27 @@ class AnthropicLLM(APILLM):
 
     def call(self, history: ConversationHistory) -> str:
         """Generate a single response from the model."""
+        params = dict(self._model_params)
 
         response = self._client.messages.create(
             model=self.model,
             system=self.system_prompt,
             messages=self._to_anthropic_messages(history),
             stream=False,
-            **self._model_params,
+            **params,
         )
 
         return self._parse_output(response)
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response using Anthropic Messages API."""
+        params = dict(self._model_params)
 
         with self._client.messages.stream(
             model=self.model,
             system=self.system_prompt,
             messages=self._to_anthropic_messages(history),
-            **self._model_params,
+            **params,
         ) as stream:
             for event in stream:
                 if event.type != "content_block_delta":
@@ -89,6 +109,138 @@ class AnthropicLLM(APILLM):
                 delta = event.delta
                 if delta.type == "text_delta":
                     yield delta.text
+                elif delta.type == "input_json_delta":
+                    yield delta.partial_json
+
+    def call_action(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, BaseTool],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+    ) -> LLMActionResult:
+        """Return one typed action using Anthropic's native ``tool_use`` blocks.
+
+        Each Protolink tool becomes an Anthropic tool declaration with its own
+        input schema. Claude may emit a ``tool_use`` block, which is mapped into
+        the runtime action protocol, or regular text, which becomes a final
+        answer unless it validates as fallback JSON.
+        """
+        params = dict(self._model_params)
+        tool_specs = anthropic_tools(
+            tools,
+            include_agent_tools=should_include_agent_tools(
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            ),
+        )
+        request: dict[str, Any] = {
+            "model": self.model,
+            "system": self.system_prompt,
+            "messages": self._to_anthropic_messages(history),
+            "stream": False,
+            **params,
+        }
+        if tool_specs:
+            request["tools"] = tool_specs
+
+        response = self._client.messages.create(**request)
+        return self._action_from_response(response)
+
+    async def call_action_stream(
+        self,
+        history: ConversationHistory,
+        *,
+        tools: dict[str, BaseTool],
+        agent_callback_available: bool = False,
+        agent_cards: list[Any] | None = None,
+        chunk_callback: Callable[[str], Awaitable[None]] | None = None,
+    ) -> LLMActionResult:
+        """Return one action from an Anthropic Messages streaming call.
+
+        Claude streams regular answer text as ``text_delta`` events and native
+        tool arguments as ``input_json_delta`` fragments. The runtime emits text
+        deltas immediately, but buffers tool JSON until the tool request is
+        complete so validation still happens exactly once at the Protolink
+        action boundary.
+        """
+        params = dict(self._model_params)
+        tool_specs = anthropic_tools(
+            tools,
+            include_agent_tools=should_include_agent_tools(
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            ),
+        )
+        request: dict[str, Any] = {
+            "model": self.model,
+            "system": self.system_prompt,
+            "messages": self._to_anthropic_messages(history),
+            **params,
+        }
+        if tool_specs:
+            request["tools"] = tool_specs
+
+        output_text: list[str] = []
+        tool_name: str | None = None
+        tool_use_id: str | None = None
+        tool_input_chunks: list[str] = []
+        tool_input_obj: dict[str, Any] | None = None
+
+        with self._client.messages.stream(**request) as stream:
+            for event in stream:
+                event_type = str(getattr(event, "type", ""))
+                if event_type == "content_block_start":
+                    block = getattr(event, "content_block", None)
+                    if getattr(block, "type", None) == "tool_use":
+                        tool_name = str(getattr(block, "name", "") or "")
+                        tool_use_id = getattr(block, "id", None)
+                        initial_input = getattr(block, "input", None)
+                        if isinstance(initial_input, dict):
+                            tool_input_obj = initial_input
+                    continue
+
+                if event_type != "content_block_delta":
+                    continue
+
+                delta = getattr(event, "delta", None)
+                delta_type = getattr(delta, "type", None)
+                if delta_type == "text_delta":
+                    text = str(getattr(delta, "text", "") or "")
+                    if text:
+                        output_text.append(text)
+                        if chunk_callback is not None:
+                            await chunk_callback(text)
+                elif delta_type == "input_json_delta":
+                    partial = str(getattr(delta, "partial_json", "") or "")
+                    if partial:
+                        tool_input_chunks.append(partial)
+
+        if tool_name:
+            args = tool_input_obj if tool_input_obj is not None else parse_json_arguments("".join(tool_input_chunks))
+            action = native_tool_call_to_action(tool_name, args)
+            return LLMActionResult(
+                action=action,
+                raw_response=action_to_json(action),
+                native=True,
+                metadata={"provider": "anthropic", "tool_use_id": tool_use_id, "streaming": True},
+            )
+
+        text = "".join(output_text).strip()
+        if not text:
+            raise ValueError("Anthropic stream did not contain text or a tool_use block")
+        try:
+            action = self._parse_infer_response(text)
+            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "anthropic"})
+        except ValueError:
+            action = FinalAction(content=text)
+            return LLMActionResult(
+                action=action,
+                raw_response=text,
+                native=True,
+                metadata={"provider": "anthropic", "streaming": True},
+            )
 
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
@@ -183,14 +335,39 @@ class AnthropicLLM(APILLM):
         return messages
 
     def _parse_output(self, response: Any) -> str:
-        """Convert Anthropic response to plain text."""
-
+        """Convert Anthropic text blocks to plain text."""
         output_text = ""
         for block in response.content:
             if block.type == "text":
                 output_text += block.text
 
         return output_text
+
+    def _action_from_response(self, response: Any) -> LLMActionResult:
+        """Normalize Anthropic text/tool blocks into one Protolink action."""
+        output_text = ""
+        for block in response.content:
+            if block.type == "tool_use":
+                action = native_tool_call_to_action(str(block.name), dict(block.input or {}))
+                return LLMActionResult(
+                    action=action,
+                    raw_response=action_to_json(action),
+                    native=True,
+                    metadata={"provider": "anthropic", "tool_use_id": getattr(block, "id", None)},
+                )
+            if block.type == "text":
+                output_text += block.text
+
+        text = output_text.strip()
+        if not text:
+            raise ValueError("Anthropic response did not contain text or a tool_use block")
+
+        try:
+            action = self._parse_infer_response(text)
+            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "anthropic"})
+        except ValueError:
+            action = FinalAction(content=text)
+            return LLMActionResult(action=action, raw_response=text, native=True, metadata={"provider": "anthropic"})
 
     def validate_connection(self) -> bool:
         try:

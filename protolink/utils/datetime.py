@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
-from typing import overload
+from typing import Literal, overload
 
 
 @overload
-def utc_now(*, iso: bool = False) -> datetime: ...
+def utc_now(*, iso: Literal[True] = True) -> str: ...
+
+
 @overload
-def utc_now(*, iso: bool = True) -> str: ...
+def utc_now(*, iso: Literal[False]) -> datetime: ...
 
 
 def utc_now(*, iso: bool = True) -> datetime | str:

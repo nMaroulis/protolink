@@ -92,6 +92,22 @@ class ServerLLM(LLM):
         """Return whether this LLM supports tool calling."""
         return self._supports_tool_calling
 
+    @property
+    def uses_native_action_prompt(self) -> bool:
+        """Use native prompts only for explicitly tool-capable server models."""
+        return bool(getattr(self, "_supports_tool_calling", False))
+
+    @property
+    def supports_native_action_stream(self) -> bool:
+        """Return whether streaming inference can read native tool-call events.
+
+        Server backends are model- and template-dependent, so Protolink keeps
+        native tool streams behind the same explicit ``supports_tool_calling``
+        flag used for non-streaming native tools. When disabled, the base LLM
+        streaming path keeps using the simple JSON action contract.
+        """
+        return bool(getattr(self, "_supports_tool_calling", False))
+
     @supports_tool_calling.setter
     def supports_tool_calling(self, value: bool) -> None:
         """Set whether this LLM supports tool calling."""

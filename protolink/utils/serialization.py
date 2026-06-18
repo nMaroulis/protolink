@@ -6,7 +6,7 @@ for Protolink objects.
 
 import json
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast, overload
 
 from protolink.core.message import Message
 from protolink.core.task import Task
@@ -41,6 +41,14 @@ class Serializer:
 
         return json.dumps(obj, default=default_serializer, **kwargs)
 
+    @overload
+    @staticmethod
+    def deserialize_from_json(json_str: str, target_cls: None = None, **kwargs) -> dict[str, Any]: ...
+
+    @overload
+    @staticmethod
+    def deserialize_from_json(json_str: str, target_cls: type[T], **kwargs) -> T: ...
+
     @staticmethod
     def deserialize_from_json(json_str: str, target_cls: type[T] | None = None, **kwargs) -> dict[str, Any] | T:
         """Deserialize a JSON string to an object.
@@ -63,9 +71,9 @@ class Serializer:
             return data
 
         if target_cls == Message:
-            return Message.from_dict(data)  # type: ignore[return-value]
+            return cast(T, Message.from_dict(data))
         elif target_cls == Task:
-            return Task.from_dict(data)  # type: ignore[return-value]
+            return cast(T, Task.from_dict(data))
         else:
             raise ValueError(f"Unsupported target class: {target_cls.__name__}")
 
@@ -93,8 +101,16 @@ class Serializer:
         else:
             raise TypeError(f"Cannot serialize object of type {type(obj).__name__}")
 
+    @overload
     @staticmethod
-    def deserialize_from_dict(data: dict, target_cls: type[T] | None = None) -> dict[str, Any] | T:
+    def deserialize_from_dict(data: dict[str, Any], target_cls: None = None) -> dict[str, Any]: ...
+
+    @overload
+    @staticmethod
+    def deserialize_from_dict(data: dict[str, Any], target_cls: type[T]) -> T: ...
+
+    @staticmethod
+    def deserialize_from_dict(data: dict[str, Any], target_cls: type[T] | None = None) -> dict[str, Any] | T:
         """Deserialize a dictionary to an object.
 
         Args:
@@ -110,7 +126,8 @@ class Serializer:
         if target_cls is None:
             return data
 
-        if not hasattr(target_cls, "from_dict"):
+        from_dict = getattr(target_cls, "from_dict", None)
+        if not callable(from_dict):
             raise ValueError(f"Target class {target_cls.__name__} does not support from_dict")
 
-        return target_cls.from_dict(data)  # type: ignore[call-arg]
+        return cast(T, from_dict(data))

@@ -197,7 +197,7 @@ examples/code_assistant/
 
 1. **Install Protolink**
    ```bash
-   pip install protolink
+   pip install "protolink[http,llms]"
    ```
 
 2. **Configure your LLM provider**
@@ -218,7 +218,7 @@ examples/code_assistant/
 
         ```bash
         # Install from https://ollama.ai
-        ollama pull gemma4:latest
+        ollama pull gemma4:e4b
         ollama serve
         ```
 
@@ -319,7 +319,7 @@ All docstrings follow PEP 257 conventions.
 | 2 | **`agent_call` with `tool_call`** | Orchestrator → Coder (file operations) |
 | 3 | **Registry Discovery** | Agents find each other dynamically at runtime |
 | 4 | **LLM-Agnostic** | One-line switch: `create_llm("openai")` → `create_llm("anthropic")` |
-| 5 | **Transport-Agnostic** | All agents use HTTP; switchable to WebSocket/gRPC |
+| 5 | **Transport-Agnostic** | All agents use HTTP; switchable to SSE, WebSocket, or runtime transports |
 | 6 | **Tool-Only Agents** | Coder has tools but no LLM — pure determinism |
 | 7 | **LLM-Only Agents** | Planner has LLM but no tools — pure reasoning |
 | 8 | **Custom `handle_task`** | Planner subclasses Agent for observability |
