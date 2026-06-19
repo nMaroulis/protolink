@@ -260,6 +260,8 @@ The default `Agent` implementation manages `Task.state` for you:
 
 Every successful state change is appended to `task.metadata["state_history"]`. Streaming handlers emit matching `TaskStatusUpdateEvent` events and include the final serialized task in the final status event metadata.
 
+Before execution, the default runtime also normalizes `RunContext` into `task.metadata["run_context"]`. This gives applications one typed place for session IDs, trace IDs, workspace URIs, permission metadata, budgets, cancellation state, and parent/child agent chains. See [Runtime](runtime.md) for the full context and event-sink API.
+
 If you override `handle_task()` completely, you are responsible for preserving this lifecycle behavior. Prefer calling `await self.execute_task(task)` inside custom handlers when you only need to wrap or augment the default execution.
 
 #### The Inference Loop Integration

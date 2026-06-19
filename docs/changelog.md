@@ -15,6 +15,10 @@
 
 NEW:
 
+- **Runtime context and run events**
+  - Added `RunContext`, `RunBudget`, `RunEvent`, `EventSink`, and `InMemoryEventSink` for typed run metadata, stable progress streams, and golden-run testing.
+  - Default agent execution now normalizes runtime context into `task.metadata["run_context"]` while preserving legacy `session_id` and `trace_id` metadata.
+
 - **Optional LLM budget metrics**
   - Added `LLMModelProfile` and `LLM.configure_metrics()` for context-window and cost metadata without changing provider request payloads.
   - `LLM.infer()` now emits live `llm_context` and `llm_call_metrics` events when telemetry or an `event_callback` is attached.

@@ -1,8 +1,10 @@
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.core.agent_card import AgentCard, AgentSkill
 from protolink.core.artifact import Artifact
+from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
 from protolink.core.message import Message
 from protolink.core.part import Part, RouteDecision
+from protolink.core.run_context import RunBudget, RunContext
 from protolink.core.task import Task, TaskState
 from protolink.server.endpoint_handler import EndpointSpec
 
@@ -12,9 +14,14 @@ __all__ = [
     "Artifact",
     "ClientRequestSpec",
     "EndpointSpec",
+    "EventSink",
+    "InMemoryEventSink",
     "Message",
     "Part",
     "RouteDecision",
+    "RunBudget",
+    "RunContext",
+    "RunEvent",
     "Task",
     "TaskState",
 ]

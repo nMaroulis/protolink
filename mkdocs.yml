@@ -74,6 +74,7 @@ nav:
       - Logging: logging.md
       - Models: models.md
       - Registry: registry.md
+      - Runtime: runtime.md
       - Server: server.md
       - State: state.md
       - Storage: storage.md

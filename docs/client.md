@@ -118,6 +118,8 @@ async for event in client.send_task_streaming("http://localhost:8010", task):
         print("\nstream complete")
 ```
 
+Applications that need a stable UI or replay contract can normalize these transport events with `RunEvent.from_task_event(...)` or record them through `InMemoryEventSink`. See [Runtime](runtime.md) for the versioned run-event envelope.
+
 ---
 
 ### `send_message()`

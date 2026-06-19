@@ -350,6 +350,7 @@ result = add_tool(a=5, b=7)
 
 Protolink treats agentic systems as **distributed programs**, not probabilistic workflows.
 Every interaction between models, tools, and agents becomes an explicit action that the runtime can validate, execute, observe, and replay.
+Runs can also carry a typed `RunContext` and emit versioned `RunEvent`s, giving applications stable session, trace, budget, permission, and progress metadata without custom glue.
 
 At the heart of Protolink is the **infer loop**:
 

@@ -34,6 +34,7 @@ from collections.abc import AsyncIterator
 from typing import Any, Literal
 
 from protolink.client import AgentClient, RegistryClient
+from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
@@ -480,8 +481,18 @@ class Agent:
             The updated Task after applying all explicitly requested executions.
         """
         self._logger.debug(f"Received task: {task.to_dict()}")
+        RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
         if self.telemetry:
             await self.telemetry.on_task_start(task, self.card.name)
+            RunContext.ensure_task_context(
+                task,
+                default_session_id=task.metadata.get("session_id", task.id),
+                agent_name=self.card.name,
+            )
 
         try:
             result = await self.execute_task(task)
@@ -502,6 +513,11 @@ class Agent:
             TaskStatusUpdateEvent,
         )
 
+        context = RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
         previous_state = self._begin_task_if_needed(task)
         if previous_state is None:
             yield TaskStatusUpdateEvent(
@@ -533,7 +549,7 @@ class Agent:
                 )
                 return
 
-            session_id = task.metadata.get("session_id", task.id)
+            session_id = context.session_id or task.id
             if self.llm and self._state.conversation:
                 self.llm.history = self._state.conversation.get_history(
                     session_id, default_system_prompt=self.llm.system_prompt
@@ -633,6 +649,11 @@ class Agent:
         """
         if not self._client:
             raise RuntimeError("Agent has no transport configured, cannot send tasks.")
+        RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
         self._logger.debug(f"Sending to agent {agent_url} the task: {task.to_dict()}")
         result: Task = await self._client.send_task(agent_url, task)
         self._logger.debug(f"Received response Task from agent {agent_url}: {result.to_dict()}")
@@ -898,6 +919,11 @@ class Agent:
         if task.is_terminal:
             return task
 
+        context = RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
         self._begin_task_if_needed(task)
 
         try:
@@ -909,7 +935,7 @@ class Agent:
             # ---- Session Conversation State: Load session history ----
             # If conversation is enabled in the State, we attempt to resume context using session_id from task metadata.
             # If no session_id is found, we fall back to the task.id (stateless behavior).
-            session_id = task.metadata.get("session_id", task.id)
+            session_id = context.session_id or task.id
             if self.llm and self._state.conversation:
                 self.llm.history = self._state.conversation.get_history(
                     session_id, default_system_prompt=self.llm.system_prompt

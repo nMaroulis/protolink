@@ -1,5 +1,12 @@
 from protolink.__version__ import __version__
 from protolink.agents import Agent
+from protolink.core import (
+    EventSink,
+    InMemoryEventSink,
+    RunBudget,
+    RunContext,
+    RunEvent,
+)
 from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
 from protolink.llms import LLMModelProfile, create_llm
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task, TaskState
@@ -12,8 +19,10 @@ __all__ = [
     "AgentSkill",
     "Artifact",
     "BaseTool",
+    "EventSink",
     "Flow",
     "Graph",
+    "InMemoryEventSink",
     "LLMModelProfile",
     "LocalTraceRecorder",
     "LocalTraceTelemetry",
@@ -22,6 +31,9 @@ __all__ = [
     "Part",
     "Pipeline",
     "Router",
+    "RunBudget",
+    "RunContext",
+    "RunEvent",
     "Task",
     "TaskState",
     "Tool",
