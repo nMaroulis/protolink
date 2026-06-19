@@ -954,9 +954,14 @@ class Artifact:
     parts: list[Part] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=utc_now)
+    kind: str = "result"
+    name: str | None = None
+    uri: str | None = None
+    media_type: str | None = None
+    action_id: str | None = None
 ```
 
-Output produced by a task (v0.2.0+). Artifacts represent results from task execution - files, structured data, analysis results, etc.
+Structured output or preview produced during a run. Artifacts represent task results, resources, diagnostics, action previews, or other durable output without imposing an application-specific taxonomy.
 
 ### Parameters
 
@@ -966,6 +971,11 @@ Output produced by a task (v0.2.0+). Artifacts represent results from task execu
 | `parts` | `list[Part]` | `[]` | Content parts of the artifact |
 | `metadata` | `dict[str, Any]` | `{}` | Artifact metadata |
 | `timestamp` | `str` | `utc now` | Creation timestamp |
+| `kind` | `str` | `"result"` | Extensible artifact category |
+| `name` | `str ⎪ None` | `None` | Optional display or resource name |
+| `uri` | `str ⎪ None` | `None` | Optional represented resource URI |
+| `media_type` | `str ⎪ None` | `None` | Optional MIME type |
+| `action_id` | `str ⎪ None` | `None` | Related runtime action identifier |
 
 ### Methods
 
@@ -986,6 +996,10 @@ Add text content (convenience method).
 - `text`: Text content
 
 **Returns:** Self for method chaining
+
+#### `for_action(action_id: str) -> Artifact`
+
+Associate the artifact with a `RunAction` and return it for method chaining.
 
 #### `to_dict() -> dict[str, Any]`
 
@@ -1008,7 +1022,7 @@ Create from dictionary.
 from protolink.models import Artifact, Part
 
 # Create artifact with multiple parts
-artifact = Artifact()
+artifact = Artifact(kind="diagnostic", name="analysis report", media_type="application/json")
 artifact.add_text("Analysis Results:")
 artifact.add_part(Part.json({"results": [1, 2, 3]}))
 artifact.add_part(Part(type="image", content=chart_image_data))

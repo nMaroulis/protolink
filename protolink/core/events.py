@@ -22,6 +22,21 @@ _EVENT_TYPE_MAP = {
     "task_error": "task.error",
 }
 
+_RUNTIME_LLM_EVENT_TYPE_MAP = {
+    "action_requested": "action.requested",
+    "policy_decision": "action.policy",
+    "approval_required": "approval.required",
+    "approval_decision": "approval.decided",
+    "action_denied": "action.denied",
+    "tool_start": "action.started",
+    "tool_result": "action.completed",
+    "tool_error": "action.failed",
+    "agent_call_start": "action.started",
+    "agent_call_result": "action.completed",
+    "agent_call_error": "action.failed",
+}
+"""Stable run-event types promoted from inference runtime activity."""
+
 
 @dataclass
 class RunEvent:
@@ -127,7 +142,8 @@ class RunEvent:
         """
         payload = _event_to_dict(event)
         source_type = str(payload.get("type") or "run.event")
-        event_type = _EVENT_TYPE_MAP.get(source_type, source_type)
+        event_type = _normalized_event_type(source_type, payload)
+        payload = _promote_runtime_payload(payload)
         run_context = _coerce_context(context) or _context_from_payload(payload)
 
         return cls(
@@ -260,9 +276,18 @@ def _agent_name_from_payload(payload: dict[str, Any], context: RunContext | None
 def _severity_for_payload(source_type: str, payload: dict[str, Any]) -> str:
     if source_type == "task_error":
         return "error"
-    if source_type == "task_llm_stream" and payload.get("llm_event_type") == "llm_error":
+    if source_type == "task_llm_stream" and payload.get("llm_event_type") in {
+        "action_denied",
+        "agent_call_error",
+        "llm_error",
+        "tool_error",
+    }:
         return "error"
-    if source_type == "task_llm_stream" and payload.get("llm_event_type") in {"llm_parse_error", "llm_retry"}:
+    if source_type == "task_llm_stream" and payload.get("llm_event_type") in {
+        "approval_required",
+        "llm_parse_error",
+        "llm_retry",
+    }:
         return "warning"
     return "info"
 
@@ -288,6 +313,30 @@ def _summary_for_payload(source_type: str, payload: dict[str, Any]) -> str | Non
 
     if source_type == "task_llm_stream":
         llm_type = payload.get("llm_event_type") or "llm_event"
+        metadata = _dict_value(payload.get("metadata"))
+        if llm_type == "action_requested":
+            action = _dict_value(metadata.get("action"))
+            return f"Action requested: {action.get('name', 'unnamed')}"
+        if llm_type == "policy_decision":
+            decision = _dict_value(metadata.get("decision"))
+            return f"Policy decision: {decision.get('effect', 'unknown')}"
+        if llm_type == "approval_required":
+            request = _dict_value(metadata.get("request"))
+            action = _dict_value(request.get("action"))
+            return f"Approval required: {action.get('name', 'unnamed')}"
+        if llm_type == "approval_decision":
+            decision = _dict_value(metadata.get("decision"))
+            return "Approval granted" if decision.get("approved") else "Approval denied"
+        if llm_type == "action_denied":
+            return _optional_str(metadata.get("message")) or "Action denied"
+        if llm_type in {"tool_start", "agent_call_start"}:
+            target = metadata.get("tool") or metadata.get("agent") or "unnamed"
+            return f"Action started: {target}"
+        if llm_type in {"tool_result", "agent_call_result"}:
+            target = metadata.get("tool") or metadata.get("agent") or "unnamed"
+            return f"Action completed: {target}"
+        if llm_type in {"tool_error", "agent_call_error"}:
+            return _optional_str(metadata.get("message")) or "Action failed"
         content = payload.get("content")
         if payload.get("final") and content is not None:
             return _trim_summary(f"{llm_type}: {content}")
@@ -297,6 +346,39 @@ def _summary_for_payload(source_type: str, payload: dict[str, Any]) -> str | Non
         return _optional_str(payload.get("error_message")) or "Task failed"
 
     return _optional_str(payload.get("summary"))
+
+
+def _normalized_event_type(source_type: str, payload: dict[str, Any]) -> str:
+    """Return the stable run-event type for a task-stream payload."""
+    if source_type == "task_llm_stream":
+        llm_type = str(payload.get("llm_event_type") or "")
+        runtime_type = _RUNTIME_LLM_EVENT_TYPE_MAP.get(llm_type)
+        if runtime_type is not None:
+            return runtime_type
+    return _EVENT_TYPE_MAP.get(source_type, source_type)
+
+
+def _promote_runtime_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Promote stable action fields while preserving the original task event."""
+    if payload.get("type") != "task_llm_stream":
+        return payload
+
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        return payload
+
+    promoted = dict(payload)
+    for key in ("action", "action_id", "decision", "request"):
+        if key in metadata:
+            promoted[key] = metadata[key]
+    return promoted
+
+
+def _dict_value(value: Any) -> dict[str, Any]:
+    """Return a dictionary value or an empty typed dictionary."""
+    if isinstance(value, dict):
+        return value
+    return {}
 
 
 def _trim_summary(value: str, limit: int = 140) -> str:

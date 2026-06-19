@@ -28,12 +28,22 @@ is resolved, all handled automatically by Protolink.
 """
 
 import asyncio
+import inspect
 import threading
 import time
 from collections.abc import AsyncIterator
 from typing import Any, Literal
 
 from protolink.client import AgentClient, RegistryClient
+from protolink.core.actions import RunAction
+from protolink.core.policy import (
+    ActionAuthorization,
+    ActionAuthorizer,
+    ActionPolicyError,
+    ApprovalHandlerLike,
+    CapabilityPolicy,
+    Policy,
+)
 from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
 from protolink.discovery.registry import Registry
@@ -45,7 +55,7 @@ from protolink.server import AgentServer
 from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
 from protolink.telemetry.base import Telemetry
-from protolink.tools import BaseTool, Tool
+from protolink.tools import ActionBuilder, BaseTool, Tool
 from protolink.tools.schema import validate_tool_args
 from protolink.transport import Transport, get_transport
 from protolink.types import StateMode, TransportType
@@ -80,6 +90,8 @@ class Agent:
         expose_chat: bool = True,
         authenticator: Authenticator | None = None,
         credentials: str | None = None,
+        policy: Policy | None = None,
+        approval_handler: ApprovalHandlerLike | None = None,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -112,6 +124,14 @@ class Agent:
             expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
             authenticator: Optional Authenticator instance for verifying incoming requests to this agent.
             credentials: Optional credentials string used for authenticating outgoing requests.
+            policy: Optional runtime policy evaluated before concrete actions execute.
+                Defaults to a backward-compatible ``CapabilityPolicy`` that
+                allows actions unless a tool or ``RunContext`` rule restricts
+                one of their declared capabilities.
+            approval_handler: Optional synchronous or asynchronous application
+                callback that resolves typed approval checkpoints. Protolink
+                owns the safety contract; the application owns the user
+                experience used to obtain the decision.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
@@ -128,6 +148,11 @@ class Agent:
         # Tools & skills
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
+        # Runtime action authorization
+        self.action_authorizer = ActionAuthorizer(
+            policy=policy or CapabilityPolicy(),
+            approval_handler=approval_handler,
+        )
         # Logger - Maps verbosity to WARNING, INFO, DEBUG for default console logger.
         self._logger = (
             ConsoleLogger(name=f"protolink.agents.{self.card.name}", level={0: 50, 1: 20, 2: 10}.get(verbosity, 20))
@@ -567,7 +592,7 @@ class Agent:
                         message=f"Executing tool: {tool_name or 'unknown'}",
                         metadata={"agent": self.card.name, "part_type": part.type},
                     )
-                    outputs.append(await self.execute_tool(part))
+                    outputs.append(await self.execute_tool(part, task=task))
                 elif part.type == "infer":
                     async for event in self.call_llm_stream(part, task=task):
                         if isinstance(event, dict) and "__protolink_part__" in event:
@@ -788,8 +813,25 @@ class Agent:
         output_schema: dict[str, Any] | None = None,
         tags: list[str] | None = None,
         examples: list[Any] | None = None,
+        capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
+        action_builder: ActionBuilder | None = None,
     ):
-        """Decorator helper for defining inline tool functions."""
+        """Decorate a function as a tool with optional policy metadata.
+
+        Args:
+            name: Stable tool name exposed to agents and models.
+            description: Human-readable tool purpose.
+            input_schema: Optional JSON Schema for keyword arguments.
+            output_schema: Optional JSON Schema for the return value.
+            tags: Optional discovery and presentation tags.
+            examples: Optional usage examples.
+            capabilities: Permission capabilities required before execution.
+            action_builder: Optional callable that enriches the prepared
+                ``RunAction`` with metadata or preview artifacts.
+
+        Returns:
+            A decorator that registers the wrapped callable on this agent.
+        """
 
         # decorator for Native functions
         def decorator(func):
@@ -802,6 +844,8 @@ class Agent:
                     tags=tags,
                     func=func,
                     examples=examples,
+                    capabilities=capabilities,
+                    action_builder=action_builder,
                 )
             )
             return func
@@ -809,13 +853,125 @@ class Agent:
         return decorator
 
     async def call_tool(self, tool_name: str, **kwargs):
-        """Invoke a registered tool by name with provided kwargs."""
+        """Invoke a registered tool after runtime policy authorization.
+
+        Direct calls use a fresh run context. Task-based execution uses the
+        context propagated on the task, allowing per-run permissions and
+        cancellation state to participate in the decision.
+        """
         tool = self.tools.get(tool_name, None)
         if not tool:
             raise ValueError(f"Tool {tool_name} not found")
-        if not getattr(tool, "_protolink_validates_args", False):
-            kwargs = validate_tool_args(kwargs, getattr(tool, "input_schema", None))
-        return await tool(**kwargs)
+        context = RunContext(agent_chain=[self.card.name])
+        return await self.call_tool_in_context(tool_name, context, **kwargs)
+
+    async def call_tool_in_context(
+        self,
+        tool_name: str,
+        context: RunContext,
+        **kwargs: Any,
+    ) -> Any:
+        """Invoke a registered tool using an explicit run context.
+
+        This variant is intended for application runtimes and deterministic
+        flows that call tools directly while preserving per-run permissions,
+        cancellation, trace correlation, and approval behavior.
+
+        Args:
+            tool_name: Name of the registered tool to invoke.
+            context: Active typed runtime context.
+            **kwargs: Tool keyword arguments validated before authorization.
+
+        Returns:
+            The raw tool result.
+        """
+        tool = self.tools.get(tool_name)
+        if not tool:
+            raise ValueError(f"Tool {tool_name} not found")
+        _, call_args = await self._authorize_tool_action(tool, kwargs, context)
+        return await tool(**call_args)
+
+    async def authorize_action(
+        self,
+        action: RunAction,
+        context: RunContext | None = None,
+    ) -> ActionAuthorization:
+        """Authorize an arbitrary runtime action without executing it.
+
+        This public primitive supports deterministic flows and application
+        runtimes that prepare side effects outside the built-in tool dispatcher.
+        Tool execution paths call the same authorizer internally after enriching
+        actions with tool-declared capabilities and preview artifacts.
+
+        Args:
+            action: Concrete operation to evaluate.
+            context: Optional active run context. A fresh context associated
+                with this agent is created when omitted.
+
+        Returns:
+            A successful authorization record.
+
+        Raises:
+            ActionDeniedError: Policy or an approver denied the operation.
+            ApprovalRequiredError: Approval is required but no handler exists.
+        """
+        active_context = context or RunContext(agent_chain=[self.card.name])
+        return await self.action_authorizer.authorize(action, active_context)
+
+    async def _prepare_tool_action(
+        self,
+        tool: BaseTool,
+        arguments: dict[str, Any],
+        context: RunContext,
+    ) -> tuple[RunAction, dict[str, Any]]:
+        """Validate tool arguments and prepare their concrete runtime action."""
+        validate_args = getattr(tool, "validate_args", None)
+        if getattr(tool, "_protolink_validates_args", False) and callable(validate_args):
+            call_args = validate_args(arguments)
+        else:
+            call_args = validate_tool_args(arguments, getattr(tool, "input_schema", None))
+
+        declared_capabilities = tuple(getattr(tool, "capabilities", None) or ())
+        prepare = getattr(tool, "prepare_action", None)
+        if callable(prepare):
+            prepared = prepare(call_args, context)
+            if inspect.isawaitable(prepared):
+                prepared = await prepared
+            if not isinstance(prepared, RunAction):
+                raise TypeError(f"Tool '{tool.name}' prepare_action() must return RunAction")
+            action = prepared.with_capabilities(declared_capabilities)
+            action = action.with_artifacts(action.artifacts)
+        else:
+            action = RunAction(
+                kind="tool.call",
+                name=tool.name,
+                payload={"arguments": call_args},
+                capabilities=frozenset(declared_capabilities),
+                description=tool.description or None,
+            )
+
+        prepared_arguments = action.payload.get("arguments", call_args)
+        if not isinstance(prepared_arguments, dict):
+            raise TypeError(f"Tool action '{action.name}' payload.arguments must be a dictionary")
+
+        if getattr(tool, "_protolink_validates_args", False) and callable(validate_args):
+            prepared_arguments = validate_args(prepared_arguments)
+        else:
+            prepared_arguments = validate_tool_args(prepared_arguments, getattr(tool, "input_schema", None))
+        action_payload = dict(action.payload)
+        action_payload["arguments"] = prepared_arguments
+        return action.with_payload(action_payload), prepared_arguments
+
+    async def _authorize_tool_action(
+        self,
+        tool: BaseTool,
+        arguments: dict[str, Any],
+        context: RunContext,
+    ) -> tuple[ActionAuthorization, dict[str, Any]]:
+        """Prepare and authorize a tool operation immediately before execution."""
+        action, call_args = await self._prepare_tool_action(tool, arguments, context)
+        authorization = await self.authorize_action(action, context)
+        return authorization, call_args
 
     # ----------------------------------------------------------------------
     # Task & Tool Execution
@@ -946,7 +1102,7 @@ class Agent:
             # ---- Inspect Parts in the last item only ----
             for part in last_item.parts:
                 if part.type == "tool_call":
-                    outputs.append(await self.execute_tool(part))
+                    outputs.append(await self.execute_tool(part, task=task))
                 elif part.type == "infer":
                     outputs.append(await self.call_llm(part, task=task))
                 else:
@@ -970,7 +1126,7 @@ class Agent:
 
         return task
 
-    async def execute_tool(self, part: Part) -> Part:
+    async def execute_tool(self, part: Part, *, task: Task | None = None) -> Part:
         """
         Execute a single tool call described by a `tool_call` Part.
 
@@ -988,6 +1144,7 @@ class Agent:
                 - tool_name (str)
                 - args (dict)
                 - call_id (str)
+            task: Optional active task supplying the propagated ``RunContext``.
 
         Returns:
             A Part of type "tool_output" containing:
@@ -1011,13 +1168,20 @@ class Agent:
             await self.telemetry.on_tool_start(tool_name, args)
 
         try:
-            call_args = args
-            if not getattr(tool, "_protolink_validates_args", False):
-                call_args = validate_tool_args(args, getattr(tool, "input_schema", None))
+            context = (
+                RunContext.ensure_task_context(task, agent_name=self.card.name)
+                if task is not None
+                else RunContext(agent_chain=[self.card.name])
+            )
+            _, call_args = await self._authorize_tool_action(tool, args, context)
             result = await tool(**call_args)
             if self.telemetry:
                 await self.telemetry.on_tool_end(tool_name, result)
             return Part.tool_output(call_id=call_id, result=result)
+        except ActionPolicyError as e:
+            if self.telemetry:
+                await self.telemetry.on_tool_end(tool_name, None, error=str(e))
+            raise
         except Exception as e:
             if self.telemetry:
                 await self.telemetry.on_tool_end(tool_name, None, error=str(e))
@@ -1131,6 +1295,25 @@ class Agent:
             if event_callback:
                 await event_callback(event)
 
+        active_context = (
+            RunContext.ensure_task_context(task, agent_name=self.card.name)
+            if task is not None
+            else RunContext(agent_chain=[self.card.name])
+        )
+
+        async def authorize_inference_action(action: RunAction) -> ActionAuthorization:
+            """Prepare tool actions and enforce this agent's runtime policy."""
+            if action.kind == "tool.call":
+                tool = self.tools.get(action.name)
+                if tool is None:
+                    raise ValueError(f"Tool {action.name} not found")
+                arguments = action.payload.get("arguments", {})
+                if not isinstance(arguments, dict):
+                    raise TypeError("Tool action payload.arguments must be a dictionary")
+                authorization, _ = await self._authorize_tool_action(tool, arguments, active_context)
+                return authorization
+            return await self.authorize_action(action, active_context)
+
         response: Part = await self.llm.infer(
             query=query,
             tools=self.tools,
@@ -1138,6 +1321,7 @@ class Agent:
             agent_cards=discovered if self.card.capabilities.delegation else None,
             streaming=streaming,
             event_callback=emit_inference_event if self.telemetry or event_callback else None,
+            action_authorizer=authorize_inference_action,
         )
 
         if self.telemetry:
@@ -1615,6 +1799,7 @@ class Agent:
             "output_schema": tool.output_schema,
             "tags": tool.tags,
             "examples": getattr(tool, "examples", None),
+            "capabilities": list(getattr(tool, "capabilities", None) or ()),
         }
         # Check if it is an MCPToolAdapter
         if tool.__class__.__name__ == "MCPToolAdapter":
@@ -1651,6 +1836,7 @@ class Agent:
                         self.output_schema = None
                         self.tags = ["mcp"]
                         self.examples = []
+                        self.capabilities = tuple(tool_dict.get("capabilities") or ())
 
                     async def __call__(self, **kwargs):
                         raise RuntimeError(
@@ -1667,7 +1853,9 @@ class Agent:
                 url=mcp_config.get("url"),
                 headers=mcp_config.get("headers"),
             )
-            return adapter.wrap_tool(tool_dict["name"])
+            tool = adapter.wrap_tool(tool_dict["name"])
+            tool.capabilities = tuple(tool_dict.get("capabilities") or ())
+            return tool
         else:
             func_path = tool_dict.get("func_path")
             from collections.abc import Callable
@@ -1718,6 +1906,7 @@ class Agent:
                 output_schema=tool_dict.get("output_schema"),
                 tags=tool_dict.get("tags"),
                 examples=tool_dict.get("examples"),
+                capabilities=tool_dict.get("capabilities"),
                 func=func,
             )
 

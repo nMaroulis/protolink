@@ -80,7 +80,14 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal
 if TYPE_CHECKING:
     from protolink.tools import BaseTool
 
+from protolink.core.actions import RunAction
 from protolink.core.part import Part
+from protolink.core.policy import (
+    ActionAuthorization,
+    ActionDeniedError,
+    ActionPolicyError,
+    ApprovalRequiredError,
+)
 from protolink.llms.actions import (
     AgentCallAction,
     FinalAction,
@@ -410,6 +417,7 @@ class LLM(ABC):
         agent_cards: list[Any] | None = None,
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+        action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
     ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -484,6 +492,12 @@ class LLM(ABC):
             LLM chunks, parsed actions, tool execution results, delegated agent
             calls, final output, and recoverable errors. The callback is for
             observability only; the inference loop still returns a final ``Part``.
+        action_authorizer : Callable[[RunAction], Awaitable[ActionAuthorization]], optional
+            Runtime callback invoked after a model action has been validated but
+            before a tool or delegated agent operation executes. The callback
+            may enrich the action, enforce capability policy, and obtain an
+            application-owned approval decision. Direct LLM usage may omit it;
+            the ``Agent`` runtime supplies its configured authorizer.
 
         Returns
         -------
@@ -568,6 +582,36 @@ class LLM(ABC):
         async def emit(event: dict[str, Any]) -> None:
             if event_callback is not None:
                 await event_callback(event)
+
+        async def authorize_action(action: RunAction) -> ActionAuthorization | None:
+            """Authorize one concrete action and emit its structured lifecycle."""
+            if action_authorizer is None:
+                return None
+
+            try:
+                authorization = await action_authorizer(action)
+            except ApprovalRequiredError as exc:
+                await emit({"type": "action_requested", "action": exc.action.to_dict()})
+                await emit({"type": "policy_decision", "decision": exc.decision.to_dict()})
+                await emit({"type": "approval_required", "request": exc.request.to_dict()})
+                raise
+            except ActionDeniedError as exc:
+                await emit({"type": "action_requested", "action": exc.action.to_dict()})
+                await emit({"type": "policy_decision", "decision": exc.decision.to_dict()})
+                if exc.approval_request is not None:
+                    await emit({"type": "approval_required", "request": exc.approval_request.to_dict()})
+                if exc.approval_decision is not None:
+                    await emit({"type": "approval_decision", "decision": exc.approval_decision.to_dict()})
+                await emit({"type": "action_denied", "action": exc.action.to_dict(), "message": str(exc)})
+                raise
+
+            await emit({"type": "action_requested", "action": authorization.action.to_dict()})
+            await emit({"type": "policy_decision", "decision": authorization.policy_decision.to_dict()})
+            if authorization.approval_request is not None:
+                await emit({"type": "approval_required", "request": authorization.approval_request.to_dict()})
+            if authorization.approval_decision is not None:
+                await emit({"type": "approval_decision", "decision": authorization.approval_decision.to_dict()})
+            return authorization
 
         metrics_active = self.metrics_enabled and event_callback is not None
 
@@ -756,15 +800,34 @@ class LLM(ABC):
                 tool = tools[tool_name]
 
                 try:
+                    runtime_action = RunAction(
+                        kind="tool.call",
+                        name=tool_name,
+                        payload={"arguments": tool_args},
+                        capabilities=frozenset(getattr(tool, "capabilities", None) or ()),
+                        description=getattr(tool, "description", None) or None,
+                    )
+                    authorization = await authorize_action(runtime_action)
+                    if authorization is not None:
+                        authorized_arguments = authorization.action.payload.get("arguments", tool_args)
+                        if not isinstance(authorized_arguments, dict):
+                            raise TypeError("Authorized tool action payload.arguments must be a dictionary")
+                        tool_args = authorized_arguments
+                        action_id = authorization.action.action_id
+                    else:
+                        action_id = runtime_action.action_id
                     await emit(
                         {
                             "type": "tool_start",
                             "step": steps,
                             "tool": tool_name,
                             "args": tool_args,
+                            "action_id": action_id,
                         }
                     )
                     tool_result = await tool(**tool_args)
+                except ActionPolicyError:
+                    raise
                 except TypeError as e:
                     # Likely wrong arguments - help LLM correct
                     self.history.add_system(
@@ -790,6 +853,7 @@ class LLM(ABC):
                         "step": steps,
                         "tool": tool_name,
                         "result": tool_result,
+                        "action_id": action_id,
                     }
                 )
                 self._inject_tool_call(
@@ -815,6 +879,17 @@ class LLM(ABC):
                 agent_action = action_obj.action
 
                 try:
+                    runtime_action = RunAction(
+                        kind="agent.call",
+                        name=agent_name,
+                        payload=payload,
+                        capabilities=frozenset({"agent.delegate"}),
+                        description=f"Delegate {agent_action} action to agent '{agent_name}'",
+                    )
+                    authorization = await authorize_action(runtime_action)
+                    action_id = (
+                        authorization.action.action_id if authorization is not None else runtime_action.action_id
+                    )
                     await emit(
                         {
                             "type": "agent_call_start",
@@ -822,9 +897,12 @@ class LLM(ABC):
                             "agent": agent_name,
                             "action": agent_action,
                             "payload": payload,
+                            "action_id": action_id,
                         }
                     )
                     agent_result = await agent_callback(agent_name, agent_action, payload)
+                except ActionPolicyError:
+                    raise
                 except ValueError as e:
                     # Agent not found or validation error - help LLM correct
                     self.history.add_system(f"Agent call failed: {e}")
@@ -849,6 +927,7 @@ class LLM(ABC):
                         "agent": agent_name,
                         "action": agent_action,
                         "result": agent_result,
+                        "action_id": action_id,
                     }
                 )
                 self._inject_agent_call(

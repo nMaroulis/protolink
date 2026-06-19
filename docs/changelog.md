@@ -19,6 +19,12 @@ NEW:
   - Added `RunContext`, `RunBudget`, `RunEvent`, `EventSink`, and `InMemoryEventSink` for typed run metadata, stable progress streams, and golden-run testing.
   - Default agent execution now normalizes runtime context into `task.metadata["run_context"]` while preserving legacy `session_id` and `trace_id` metadata.
 
+- **Runtime actions, policy, and approvals**
+  - Added `RunAction`, structured artifact descriptors, `CapabilityPolicy`, `ActionAuthorizer`, and typed approval request/decision contracts.
+  - Tools can declare extensible capabilities and attach preview artifacts; policy is enforced immediately before direct, model-selected, and delegated actions execute.
+  - `RunEvent` now promotes action, policy, and approval activity into stable event types for application streams and golden-run tests.
+  - Added `examples/runtime_policy_and_approvals.py`, a provider-free walkthrough of previews, approvals, normalized events, and denied side effects.
+
 - **Optional LLM budget metrics**
   - Added `LLMModelProfile` and `LLM.configure_metrics()` for context-window and cost metadata without changing provider request payloads.
   - `LLM.infer()` now emits live `llm_context` and `llm_call_metrics` events when telemetry or an `event_callback` is attached.

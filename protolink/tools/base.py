@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from typing import Any, Protocol
 
 
@@ -8,5 +9,6 @@ class BaseTool(Protocol):
     output_schema: Any | None
     tags: list[str] | None
     examples: list[Any] | None
+    capabilities: Collection[str] | None
 
     async def __call__(self, **kwargs) -> Any: ...

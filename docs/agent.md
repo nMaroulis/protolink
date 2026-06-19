@@ -152,6 +152,8 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `expose_chat` | `bool` | `True` | Whether the Agent will expose a chat endpoint for interaction with a UI. |
 | `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
+| `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
+| `approval_handler` | `Callable ⎪ None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
 
 ```python
 from protolink.agents import Agent

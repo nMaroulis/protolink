@@ -35,6 +35,7 @@ from protolink.tools.adapters import MCPToolAdapter
 All tools in Protolink conform to the `BaseTool` protocol, which defines the minimal interface for a tool:
 
 ```python
+from collections.abc import Collection
 from typing import Any, Protocol
 
 class BaseTool(Protocol):
@@ -44,6 +45,7 @@ class BaseTool(Protocol):
     output_schema: dict[str, Any] | None
     tags: list[str] | None
     examples: list[Any] | None
+    capabilities: Collection[str] | None
 
     async def __call__(self, **kwargs) -> Any: ...
 ```
@@ -58,6 +60,7 @@ class BaseTool(Protocol):
 | `output_schema` | `dict[str, Any] ⎪ None` | JSON Schema object for the returned value |
 | `tags` | `list[str] ⎪ None` | Categorization tags for filtering and discovery |
 | `examples` | `list[Any] ⎪ None` | Example inputs, outputs, or usage scenarios advertised on `AgentSkill` |
+| `capabilities` | `Collection[str] ⎪ None` | Permission capabilities evaluated before execution |
 
 ### The `__call__` Method
 
@@ -123,6 +126,8 @@ async def multiply_numbers(a: float, b: float) -> float:
 | `output_schema` | `dict[str, Any] ⎪ None` | Optional explicit JSON Schema. If omitted, Protolink infers it from the return type hint. |
 | `tags` | `list[str]` | Optional categorization tags |
 | `examples` | `list[Any]` | Optional examples copied to the advertised `AgentSkill` |
+| `capabilities` | `Collection[str]` | Optional capability names enforced before execution |
+| `action_builder` | `Callable` | Optional action factory for metadata and approval preview artifacts |
 
 ### JSON Schema and Runtime Validation
 
@@ -145,6 +150,35 @@ async def book_hotel(booking: BookingRequest) -> dict[str, str]:
 ```
 
 The inferred input schema is a JSON Schema object with a nested `booking` property. Runtime calls such as `{"booking": {"location": "Athens", "guests": "2"}}` are coerced before the function receives a `BookingRequest` instance. Missing required fields, unexpected fields, invalid enums, and incompatible scalar values return a structured tool error instead of reaching user code.
+
+### Capabilities And Approval
+
+Declare capabilities for operations that should participate in runtime policy. Capability names are extensible strings rather than a fixed coding or filesystem taxonomy.
+
+```python
+from protolink import Agent, ApprovalDecision, CapabilityPolicy
+
+async def approve(request, context):
+    return ApprovalDecision(approved=True, request_id=request.request_id)
+
+agent = Agent(
+    card,
+    policy=CapabilityPolicy({"records.write": "require_approval"}),
+    approval_handler=approve,
+)
+
+@agent.tool(
+    name="publish_record",
+    description="Publish one record",
+    capabilities=["records.write"],
+)
+async def publish_record(record_id: str) -> dict[str, str]:
+    return {"record_id": record_id, "status": "published"}
+```
+
+Policy is evaluated after argument validation and immediately before the callable runs. See [Runtime](runtime.md#capability-policy) for wildcard rules, `RunContext.permissions`, approval handlers, and preview artifacts.
+
+Use `agent.call_tool_in_context(name, context, **arguments)` when a deterministic application path invokes a tool directly and needs the same per-run permissions, cancellation, and approval behavior as task execution.
 
 ### When to Use Native Tools
 

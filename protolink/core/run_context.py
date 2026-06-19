@@ -22,10 +22,9 @@ RUN_CONTEXT_METADATA_KEY = "run_context"
 class RunBudget:
     """Optional execution limits carried with a run.
 
-    Budgets are advisory in Phase 1. They provide a stable typed container that
-    higher layers can read, render, or enforce without inventing their own task
-    metadata shape. Future policy/runtime layers can use the same fields as
-    enforcement inputs.
+    Budgets are advisory runtime metadata. They provide a stable typed container
+    that applications and custom policies can read, render, or enforce without
+    inventing their own task metadata shape.
 
     Attributes:
         max_steps: Maximum logical runtime steps allowed for the run.
@@ -112,7 +111,7 @@ class RunContext:
             browser profile, dataset, project, account, or ticket collection.
         parent_run_id: Optional parent run for nested agent or tool execution.
         agent_chain: Ordered list of agents that have handled this run.
-        permissions: Domain-neutral permission grants or policy metadata.
+        permissions: Domain-neutral capability rules or scoped policy metadata.
         budget: Optional execution limits.
         canceled: Whether the run has been canceled by the caller or runtime.
         cancel_reason: Optional human-readable cancel reason.
