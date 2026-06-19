@@ -6,6 +6,7 @@ from protolink.llms._deps import require_llama_cpp
 from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
 from protolink.llms.history import ConversationHistory
 from protolink.llms.local.base import LocalLLM
+from protolink.llms.metrics import usage_metadata
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
     chat_completion_stream_delta,
@@ -232,7 +233,7 @@ class LlamaCPPLocalLLM(LocalLLM):
                 action=action,
                 raw_response=action_to_json(action),
                 native=True,
-                metadata={"provider": "llama.cpp-local"},
+                metadata=usage_metadata({"provider": "llama.cpp-local"}, payload),
             )
 
         content = str(message.get("content") or "").strip()
@@ -244,7 +245,7 @@ class LlamaCPPLocalLLM(LocalLLM):
                 action=action,
                 raw_response=content,
                 native=False,
-                metadata={"provider": "llama.cpp-local"},
+                metadata=usage_metadata({"provider": "llama.cpp-local"}, payload),
             )
         except ValueError:
             action = FinalAction(content=content)
@@ -252,7 +253,7 @@ class LlamaCPPLocalLLM(LocalLLM):
                 action=action,
                 raw_response=content,
                 native=True,
-                metadata={"provider": "llama.cpp-local"},
+                metadata=usage_metadata({"provider": "llama.cpp-local"}, payload),
             )
 
     @staticmethod

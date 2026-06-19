@@ -12,6 +12,7 @@ import httpx
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
+from protolink.llms.metrics import usage_metadata
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
     chat_completion_stream_delta,
@@ -328,7 +329,7 @@ class GrokLLM(APILLM):
                 action=action,
                 raw_response=action_to_json(action),
                 native=True,
-                metadata={"provider": "grok"},
+                metadata=usage_metadata({"provider": "grok"}, payload),
             )
 
         content = str(message.get("content") or "").strip()
@@ -336,7 +337,17 @@ class GrokLLM(APILLM):
             raise ValueError("Grok response did not contain content or tool_calls")
         try:
             action = self._parse_infer_response(content)
-            return LLMActionResult(action=action, raw_response=content, native=False, metadata={"provider": "grok"})
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=False,
+                metadata=usage_metadata({"provider": "grok"}, payload),
+            )
         except ValueError:
             action = FinalAction(content=content)
-            return LLMActionResult(action=action, raw_response=content, native=True, metadata={"provider": "grok"})
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=True,
+                metadata=usage_metadata({"provider": "grok"}, payload),
+            )

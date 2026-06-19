@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import importlib
 from enum import Enum
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from protolink.llms.base import LLM
+from protolink.llms.metrics import LLMModelProfile
 
 
 class LLMProvider(str, Enum):
@@ -61,13 +62,21 @@ class LLMFactory:
         Raises:
             ValueError: If the provider name is unknown.
         """
+        metrics_profile: LLMModelProfile | dict[str, Any] | None = kwargs.pop("metrics_profile", None)
+        metrics_enabled: bool | None = kwargs.pop("metrics_enabled", None)
+
         try:
             provider_key = str(provider).lower()
         except Exception as err:
             raise ValueError(f"Invalid provider type: {type(provider)}") from err
 
         client_class = cls._resolve_client(provider_key)
-        return client_class(**kwargs)
+        llm = client_class(**kwargs)
+        if metrics_profile is not None:
+            llm.configure_metrics(metrics_profile)
+        if metrics_enabled is not None:
+            llm.metrics_enabled = metrics_enabled
+        return llm
 
     @classmethod
     def _resolve_client(cls, provider_key: str) -> type[LLM]:

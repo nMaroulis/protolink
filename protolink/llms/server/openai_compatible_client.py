@@ -9,6 +9,7 @@ from typing import Any, ClassVar
 
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.history import ConversationHistory
+from protolink.llms.metrics import usage_metadata
 from protolink.llms.server.base import ServerLLM
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
@@ -348,7 +349,7 @@ class OpenAICompatibleLLM(ServerLLM):
                 action=action,
                 raw_response=action_to_json(action),
                 native=True,
-                metadata={"provider": self.provider},
+                metadata=usage_metadata({"provider": self.provider}, payload),
             )
 
         content = str(message.get("content") or "").strip()
@@ -361,7 +362,7 @@ class OpenAICompatibleLLM(ServerLLM):
                 action=action,
                 raw_response=content,
                 native=False,
-                metadata={"provider": self.provider},
+                metadata=usage_metadata({"provider": self.provider}, payload),
             )
         except ValueError:
             action = FinalAction(content=content)
@@ -369,7 +370,7 @@ class OpenAICompatibleLLM(ServerLLM):
                 action=action,
                 raw_response=content,
                 native=True,
-                metadata={"provider": self.provider},
+                metadata=usage_metadata({"provider": self.provider}, payload),
             )
 
 

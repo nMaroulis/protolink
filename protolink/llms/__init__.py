@@ -3,9 +3,10 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-__all__ = ["LMStudioLLM", "MockLLM", "OpenAICompatibleLLM", "create_llm"]
+__all__ = ["LLMModelProfile", "LMStudioLLM", "MockLLM", "OpenAICompatibleLLM", "create_llm"]
 
 _EXPORTS = {
+    "LLMModelProfile": "protolink.llms.metrics.LLMModelProfile",
     "LMStudioLLM": "protolink.llms.server.openai_compatible_client.LMStudioLLM",
     "MockLLM": "protolink.llms.mock_client.MockLLM",
     "OpenAICompatibleLLM": "protolink.llms.server.openai_compatible_client.OpenAICompatibleLLM",

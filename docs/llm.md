@@ -93,6 +93,53 @@ For local and server‑style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `Oll
 
 ---
 
+## Optional Budget Metrics
+
+LLM wrappers can emit per-call latency, token usage, context-window pressure, and estimated cost through the existing `infer()` event stream and telemetry hooks. This is optional and does not change the request payload sent to the provider.
+
+```python
+from protolink import LLMModelProfile, create_llm
+
+llm = create_llm(
+    "openai-compatible",
+    model="my-model",
+    metrics_profile=LLMModelProfile(
+        context_window=128_000,
+        input_cost_per_million=1.0,   # example value; use your provider's current pricing
+        output_cost_per_million=5.0,  # example value; use your provider's current pricing
+    ),
+)
+```
+
+You can also configure metrics after construction:
+
+```python
+llm.configure_metrics(
+    context_window=128_000,
+    input_cost_per_million=1.25,
+    output_cost_per_million=10.0,
+)
+```
+
+Provider-reported token usage is used when the SDK response includes it. Otherwise Protolink estimates token counts locally. If `tiktoken` is installed through `protolink[metrics]`, Protolink uses it for estimates; without it, Protolink falls back to a lightweight character heuristic. Prices and context windows change over time, so Protolink treats `LLMModelProfile` as application-owned metadata rather than a hardcoded billing catalog.
+
+When an `event_callback` or telemetry backend is attached, each model call inside the inference loop can emit:
+
+```python
+{
+    "type": "llm_call_metrics",
+    "step": 1,
+    "provider": "openai-compatible",
+    "model": "my-model",
+    "latency_ms": 842.37,
+    "usage": {"input_tokens": 1200, "output_tokens": 180, "estimated": False},
+    "context": {"used_tokens": 1200, "window_tokens": 200000, "used_percent": 0.6},
+    "cost": {"input_cost": 0.0036, "output_cost": 0.0027, "total_cost": 0.0063},
+}
+```
+
+This is especially useful for CLIs, dashboards, and budget-aware agents that want to show context pressure or session cost while a multi-step tool loop is running.
+
 ## LLM API Reference
 
 This section provides a detailed API reference for all LLM classes in Protolink. All LLM implementations inherit from the base `LLM` class and provide a consistent interface for generating responses.
@@ -164,6 +211,8 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `system_prompt` | `str` | Default system prompt for the model. |
 | `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. Automatically managed by the [Agent state system](agent.md#state-persistence) when enabled. |
 | `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
+| `metrics_profile` | `LLMModelProfile ⎪ None` | Optional model budget metadata for context-window percentage and cost estimates. |
+| `metrics_enabled` | `bool` | Whether metrics events are emitted when telemetry or an `event_callback` is attached. Defaults to `True`. |
 
 !!! info "History Performance"
     Protolink's `ConversationHistory` uses a **`collections.deque`** internally. This optimizes two critical hot-paths in agentic workflows:
@@ -181,6 +230,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `call_action_stream()` | `history, tools, agent_callback_available=False, agent_cards=None, chunk_callback=None` | `LLMActionResult` | Streaming equivalent of `call_action()`. Native-stream providers consume tool-call events; fallback providers stream JSON text and parse it after completion. |
 | `chat()` | `user_query: str, streaming: bool=False` | `str ⎪ AsyncIterator[str]` | High-level convenience method for standard chat usage. |
 | `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False, event_callback=None` | `Part` | **Async.** Execute controlled multi-step inference with tool calling, optional streaming LLM calls, and optional event observation. |
+| `configure_metrics()` | `profile=None, context_window=None, input_cost_per_million=None, output_cost_per_million=None` | `LLM` | Configure optional context/cost metadata used for emitted metrics. |
 | `build_system_prompt()` | `user_instructions, agent_cards, tools, action_mode=None, override_system_prompt=False, persist=False` | `str` | Build the final system prompt. `action_mode="json"` uses the portable JSON action contract; `action_mode="native"` uses provider-native tool instructions. If `persist=True`, preserves existing conversation history. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
 | `validate_connection()` | — | `bool` | **Abstract.** Validate that the LLM connection is working. |
@@ -584,7 +634,7 @@ llm = AnthropicLLM(
 
 | Parameter | Type | Default | Range/Description |
 |-----------|-----|---------|-------------------|
-| `max_tokens` | `int` | `4096` | Maximum tokens to generate |
+| `max_tokens` | `int` | `8192` | Maximum tokens to generate |
 | `temperature` | `float` | `1.0` | `0.0` to `1.0` - Controls randomness |
 | `top_p` | `float` | `1.0` | Nucleus sampling parameter |
 | `top_k` | `int ⎪ None` | `None` | Top-k sampling parameter |

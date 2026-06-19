@@ -11,7 +11,17 @@
 
 ## Release Notes
 
-### [v0.6.0] - TBD
+### [v0.6.1] - TBA
+
+NEW:
+
+- **Optional LLM budget metrics**
+  - Added `LLMModelProfile` and `LLM.configure_metrics()` for context-window and cost metadata without changing provider request payloads.
+  - `LLM.infer()` now emits live `llm_context` and `llm_call_metrics` events when telemetry or an `event_callback` is attached.
+  - Local traces now aggregate LLM call count, latency, token usage, context high-water marks, and estimated cost in LLM span metadata.
+  - Added the optional `protolink[metrics]` extra for sharper token estimates with `tiktoken`; core installs still use a dependency-free estimate.
+
+### [v0.6.0] - 2026-06-19
 
 NEW:
 

@@ -69,6 +69,16 @@ def _estimate_tokens(value: Any) -> int:
     return max(1, len(text) // 4)
 
 
+def _numeric(value: Any) -> float | None:
+    """Best-effort numeric conversion for telemetry aggregation."""
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _to_jsonable(value: Any) -> Any:
     """Convert framework and dataclass objects into JSON-compatible values.
 
@@ -359,6 +369,78 @@ class LocalTraceTelemetry(Telemetry):
         if span:
             span.events.append(event)
 
+    def _merge_llm_metrics(self, metrics: dict[str, Any]) -> None:
+        """Aggregate per-call LLM metrics into the active LLM span and trace."""
+        trace = self._trace()
+        span = self._current_span()
+        if not trace or not span:
+            return
+
+        targets = [span.metadata, trace.metadata]
+        for metadata in targets:
+            rollup = metadata.setdefault(
+                "llm_metrics",
+                {
+                    "call_count": 0,
+                    "total_latency_ms": 0.0,
+                    "total_input_tokens": 0,
+                    "total_output_tokens": 0,
+                    "total_tokens": 0,
+                    "estimated_token_calls": 0,
+                    "total_cost": None,
+                    "currency": None,
+                    "max_context_used_percent": None,
+                    "max_context_used_tokens": 0,
+                    "context_window_tokens": None,
+                },
+            )
+            rollup["call_count"] = int(rollup.get("call_count", 0)) + 1
+
+            latency_ms = _numeric(metrics.get("latency_ms"))
+            if latency_ms is not None:
+                rollup["total_latency_ms"] = round(float(rollup.get("total_latency_ms", 0.0)) + latency_ms, 3)
+
+            usage = metrics.get("usage") if isinstance(metrics.get("usage"), dict) else {}
+            if usage:
+                if usage.get("estimated"):
+                    rollup["estimated_token_calls"] = int(rollup.get("estimated_token_calls", 0)) + 1
+                for source_key, target_key in (
+                    ("input_tokens", "total_input_tokens"),
+                    ("output_tokens", "total_output_tokens"),
+                    ("total_tokens", "total_tokens"),
+                ):
+                    value = _numeric(usage.get(source_key))
+                    if value is not None:
+                        rollup[target_key] = int(rollup.get(target_key, 0)) + int(value)
+
+            context = metrics.get("context") if isinstance(metrics.get("context"), dict) else {}
+            if context:
+                used_tokens = _numeric(context.get("used_tokens"))
+                if used_tokens is not None:
+                    rollup["max_context_used_tokens"] = max(
+                        int(rollup.get("max_context_used_tokens", 0)),
+                        int(used_tokens),
+                    )
+                used_percent = _numeric(context.get("used_percent"))
+                if used_percent is not None:
+                    current_percent = _numeric(rollup.get("max_context_used_percent"))
+                    rollup["max_context_used_percent"] = round(
+                        max(current_percent or 0.0, used_percent),
+                        3,
+                    )
+                window_tokens = _numeric(context.get("window_tokens"))
+                if window_tokens is not None:
+                    rollup["context_window_tokens"] = int(window_tokens)
+
+            cost = metrics.get("cost") if isinstance(metrics.get("cost"), dict) else {}
+            if cost:
+                total_cost = _numeric(cost.get("total_cost"))
+                if total_cost is not None:
+                    existing_cost = _numeric(rollup.get("total_cost")) or 0.0
+                    rollup["total_cost"] = round(existing_cost + total_cost, 8)
+                if cost.get("currency"):
+                    rollup["currency"] = cost.get("currency")
+
     def _start_span(
         self,
         *,
@@ -536,7 +618,15 @@ class LocalTraceTelemetry(Telemetry):
         event_type = str(event.get("type", "llm_event"))
         payload = dict(event)
 
-        if event_type == "tool_start":
+        if event_type == "llm_context":
+            span = self._current_span()
+            context = event.get("context")
+            if span and isinstance(context, dict):
+                span.metadata["context"] = self._redact(context)
+        elif event_type == "llm_call_metrics":
+            metrics = {key: value for key, value in payload.items() if key != "type"}
+            self._merge_llm_metrics(metrics)
+        elif event_type == "tool_start":
             self._start_span(
                 name=f"Tool: {event.get('tool', 'unknown')}",
                 kind="tool",

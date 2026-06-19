@@ -8,6 +8,7 @@ from protolink.llms._deps import require_openai
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
+from protolink.llms.metrics import usage_metadata
 from protolink.llms.tool_calling import (
     native_tool_call_to_action,
     openai_responses_tools,
@@ -263,11 +264,15 @@ class OpenAILLM(APILLM):
             if getattr(item, "type", None) == "function_call":
                 args = parse_json_arguments(getattr(item, "arguments", None))
                 action = native_tool_call_to_action(str(item.name), args)
+                metadata = usage_metadata(
+                    {"provider": "openai", "call_id": getattr(item, "call_id", None)},
+                    response,
+                )
                 return LLMActionResult(
                     action=action,
                     raw_response=action_to_json(action),
                     native=True,
-                    metadata={"provider": "openai", "call_id": getattr(item, "call_id", None)},
+                    metadata=metadata,
                 )
             if getattr(item, "type", None) != "message" or getattr(item, "role", None) != "assistant":
                 continue
@@ -281,10 +286,20 @@ class OpenAILLM(APILLM):
 
         try:
             action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "openai"})
+            return LLMActionResult(
+                action=action,
+                raw_response=text,
+                native=False,
+                metadata=usage_metadata({"provider": "openai"}, response),
+            )
         except ValueError:
             action = FinalAction(content=text)
-            return LLMActionResult(action=action, raw_response=text, native=True, metadata={"provider": "openai"})
+            return LLMActionResult(
+                action=action,
+                raw_response=text,
+                native=True,
+                metadata=usage_metadata({"provider": "openai"}, response),
+            )
 
     def validate_connection(self) -> bool:
         try:

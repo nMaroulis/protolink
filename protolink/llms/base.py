@@ -91,6 +91,15 @@ from protolink.llms.actions import (
     validate_action_payload,
 )
 from protolink.llms.history import ConversationHistory
+from protolink.llms.metrics import (
+    LLMCallMetrics,
+    LLMContextUsage,
+    LLMModelProfile,
+    build_call_metrics,
+    context_usage_from_tokens,
+    estimate_token_count,
+    profile_from_value,
+)
 from protolink.llms.prompts import (
     AGENT_LIST_PROMPT,
     BASE_INSTRUCTIONS,
@@ -173,7 +182,66 @@ class LLM(ABC):
 
         self.history: ConversationHistory = ConversationHistory()
         self.system_prompt: str = self.build_system_prompt(action_mode="json")
+        self.metrics_enabled: bool = True
+        self._metrics_profile: LLMModelProfile | None = None
         self.sync = SyncLLM(self)
+
+    def configure_metrics(
+        self,
+        profile: LLMModelProfile | dict[str, Any] | None = None,
+        *,
+        context_window: int | None = None,
+        input_cost_per_million: float | None = None,
+        output_cost_per_million: float | None = None,
+        currency: str = "USD",
+        enabled: bool = True,
+    ) -> "LLM":
+        """Configure optional LLM budget metrics for this model.
+
+        Metrics are purely observational. They do not change prompt generation,
+        provider request payloads, retry behavior, or model responses. When an
+        ``event_callback`` or telemetry backend is attached, Protolink emits
+        per-call latency, usage, context-pressure, and cost events. Provider
+        token usage is preferred when available; otherwise Protolink uses local
+        estimates.
+
+        Args:
+            profile: Optional ``LLMModelProfile`` or dictionary. Pass this when
+                you already have model budget metadata.
+            context_window: Total context-window size in tokens. Used to
+                compute ``context.used_percent``.
+            input_cost_per_million: Input-token price per one million tokens.
+                Used only for estimated cost metadata.
+            output_cost_per_million: Output-token price per one million tokens.
+                Used only for estimated cost metadata.
+            currency: Currency code for cost estimates. Defaults to ``"USD"``.
+            enabled: Whether to emit metrics when an observer is attached.
+
+        Returns:
+            The LLM instance, so callers can configure fluently.
+        """
+        self.metrics_enabled = enabled
+        if profile is not None:
+            self._metrics_profile = profile_from_value(profile, provider=self.provider, model=self.model)
+            return self
+
+        if context_window is None and input_cost_per_million is None and output_cost_per_million is None:
+            return self
+
+        self._metrics_profile = LLMModelProfile(
+            context_window=context_window,
+            input_cost_per_million=input_cost_per_million,
+            output_cost_per_million=output_cost_per_million,
+            currency=currency,
+            provider=self.provider,
+            model=self.model,
+        )
+        return self
+
+    @property
+    def metrics_profile(self) -> LLMModelProfile | None:
+        """Return the optional model profile used for context/cost metrics."""
+        return self._metrics_profile
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)
@@ -501,16 +569,39 @@ class LLM(ABC):
             if event_callback is not None:
                 await event_callback(event)
 
+        metrics_active = self.metrics_enabled and event_callback is not None
+
         while steps < MAX_INFER_STEPS:
             steps += 1
             await emit({"type": "llm_step", "step": steps})
             action_error: ValueError | None = None
             action_result: LLMActionResult | None = None
+            call_metrics: LLMCallMetrics | None = None
+
+            if metrics_active:
+                context_tokens = estimate_token_count(self.history.messages, model=self.model)
+                context_usage: LLMContextUsage = context_usage_from_tokens(
+                    context_tokens,
+                    self.metrics_profile,
+                    estimated=True,
+                )
+                await emit(
+                    {
+                        "type": "llm_context",
+                        "step": steps,
+                        "provider": self.provider,
+                        "model": self.model,
+                        "context": context_usage.to_dict(),
+                    }
+                )
 
             # ─────────────────────────────────────────────────────────────────
             # Step 1: Ask the LLM adapter for one typed action
             # ─────────────────────────────────────────────────────────────────
             try:
+                import time
+
+                call_started_at = time.perf_counter()
                 if streaming:
 
                     async def stream_action(current_step=steps):
@@ -537,13 +628,32 @@ class LLM(ABC):
                     )
                     raw_response = action_result.raw_response
                     action_obj = action_result.action
+                latency_ms = round((time.perf_counter() - call_started_at) * 1000, 3)
+                response_metadata = dict(action_result.metadata if action_result is not None else {})
+                if metrics_active and action_result is not None:
+                    call_metrics = build_call_metrics(
+                        step=steps,
+                        provider=str(getattr(self, "provider", "")) or None,
+                        model=self.model,
+                        latency_ms=latency_ms,
+                        input_value=self.history.messages,
+                        output_value=action_result.raw_response,
+                        profile=self.metrics_profile,
+                        provider_usage=response_metadata.get("usage"),
+                        streaming=streaming,
+                        native=action_result.native,
+                    )
+                    metrics_payload = call_metrics.to_dict()
+                    response_metadata["metrics"] = metrics_payload
+                    await emit({"type": "llm_call_metrics", **metrics_payload})
                 await emit(
                     {
                         "type": "llm_response",
                         "step": steps,
                         "streaming": streaming,
                         "native": action_result.native if action_result is not None else False,
-                        "metadata": action_result.metadata if action_result is not None else {},
+                        "metadata": response_metadata,
+                        "metrics": call_metrics.to_dict() if call_metrics else None,
                     }
                 )
             except ValueError as e:

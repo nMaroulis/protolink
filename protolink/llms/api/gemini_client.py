@@ -8,6 +8,7 @@ from protolink.llms._deps import require_gemini
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
+from protolink.llms.metrics import usage_metadata
 from protolink.llms.tool_calling import (
     gemini_function_declarations,
     native_tool_call_to_action,
@@ -243,7 +244,7 @@ class GeminiLLM(APILLM):
                     action=action,
                     raw_response=action_to_json(action),
                     native=True,
-                    metadata={"provider": "gemini"},
+                    metadata=usage_metadata({"provider": "gemini"}, response),
                 )
 
         text = (getattr(response, "text", "") or "").strip()
@@ -252,7 +253,17 @@ class GeminiLLM(APILLM):
 
         try:
             action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "gemini"})
+            return LLMActionResult(
+                action=action,
+                raw_response=text,
+                native=False,
+                metadata=usage_metadata({"provider": "gemini"}, response),
+            )
         except ValueError:
             action = FinalAction(content=text)
-            return LLMActionResult(action=action, raw_response=text, native=True, metadata={"provider": "gemini"})
+            return LLMActionResult(
+                action=action,
+                raw_response=text,
+                native=True,
+                metadata=usage_metadata({"provider": "gemini"}, response),
+            )

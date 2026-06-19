@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
 from protolink.llms.history import ConversationHistory
+from protolink.llms.metrics import usage_metadata
 from protolink.llms.server.base import ServerLLM
 from protolink.llms.tool_calling import (
     chat_completion_tools,
@@ -30,7 +31,7 @@ class OllamaLLM(ServerLLM):
     DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"  # lightweight model
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
-        "num_predict": 4096,  # Prevent truncated JSON output
+        "num_predict": 8192,  # Prevent truncated JSON output
     }
     REQUEST_TIMEOUT: ClassVar[int] = 90
 
@@ -407,7 +408,7 @@ class OllamaLLM(ServerLLM):
                 action=action,
                 raw_response=action_to_json(action),
                 native=True,
-                metadata={"provider": "ollama"},
+                metadata=usage_metadata({"provider": "ollama"}, payload),
             )
 
         content = str(message.get("content") or "").strip()
@@ -415,10 +416,20 @@ class OllamaLLM(ServerLLM):
             raise ValueError("Ollama response did not contain content or tool_calls")
         try:
             action = self._parse_infer_response(content)
-            return LLMActionResult(action=action, raw_response=content, native=False, metadata={"provider": "ollama"})
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=False,
+                metadata=usage_metadata({"provider": "ollama"}, payload),
+            )
         except ValueError:
             action = FinalAction(content=content)
-            return LLMActionResult(action=action, raw_response=content, native=True, metadata={"provider": "ollama"})
+            return LLMActionResult(
+                action=action,
+                raw_response=content,
+                native=True,
+                metadata=usage_metadata({"provider": "ollama"}, payload),
+            )
 
     @staticmethod
     def _action_from_tool_call(call: Any) -> ToolCallAction | AgentCallAction:

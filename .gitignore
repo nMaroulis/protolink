@@ -129,6 +129,7 @@ _*.md
 # test files
 examples/_local/*
 examples/code_assistant/workspace/*
+examples/code_assistant/traces.json
 
 # assets
 *.excalidraw

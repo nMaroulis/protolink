@@ -8,6 +8,7 @@ from protolink.llms._deps import require_anthropic
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
+from protolink.llms.metrics import usage_metadata
 from protolink.llms.serialization import json_history_default
 from protolink.llms.tool_calling import (
     anthropic_tools,
@@ -349,11 +350,15 @@ class AnthropicLLM(APILLM):
         for block in response.content:
             if block.type == "tool_use":
                 action = native_tool_call_to_action(str(block.name), dict(block.input or {}))
+                metadata = usage_metadata(
+                    {"provider": "anthropic", "tool_use_id": getattr(block, "id", None)},
+                    response,
+                )
                 return LLMActionResult(
                     action=action,
                     raw_response=action_to_json(action),
                     native=True,
-                    metadata={"provider": "anthropic", "tool_use_id": getattr(block, "id", None)},
+                    metadata=metadata,
                 )
             if block.type == "text":
                 output_text += block.text
@@ -364,10 +369,20 @@ class AnthropicLLM(APILLM):
 
         try:
             action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "anthropic"})
+            return LLMActionResult(
+                action=action,
+                raw_response=text,
+                native=False,
+                metadata=usage_metadata({"provider": "anthropic"}, response),
+            )
         except ValueError:
             action = FinalAction(content=text)
-            return LLMActionResult(action=action, raw_response=text, native=True, metadata={"provider": "anthropic"})
+            return LLMActionResult(
+                action=action,
+                raw_response=text,
+                native=True,
+                metadata=usage_metadata({"provider": "anthropic"}, response),
+            )
 
     def validate_connection(self) -> bool:
         try:

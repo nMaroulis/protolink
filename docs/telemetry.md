@@ -16,6 +16,9 @@ uv add protolink[telemetry]
 uv add langfuse
 # Or install telemetry with just langsmith
 uv add langsmith
+
+# Optional: improve local token estimates for LLM metrics
+uv add "protolink[metrics]"
 ```
 
 ## Setup & Usage
@@ -47,6 +50,41 @@ async def add(a: int, b: int) -> int:
 result = await agent.handle_task(Task.create_tool_call(tool_name="add", args={"a": 2, "b": 3}))
 records = telemetry.recorder.replay()
 ```
+
+### LLM Metrics and Context Usage
+
+When an agent has both an LLM and telemetry, Protolink records live budget metrics for every model call inside `LLM.infer()`. This includes latency, token usage, context-window pressure, and estimated cost. Provider-reported usage is used when available; otherwise Protolink estimates usage without requiring extra dependencies.
+
+```python
+from protolink import Agent, AgentCard, LLMModelProfile, LocalTraceTelemetry, Task, create_llm
+
+telemetry = LocalTraceTelemetry(path="traces.jsonl")
+llm = create_llm(
+    "openai-compatible",
+    model="my-model",
+    metrics_profile=LLMModelProfile(
+        context_window=128_000,
+        input_cost_per_million=1.0,   # example value; use your provider's current pricing
+        output_cost_per_million=5.0,  # example value; use your provider's current pricing
+    ),
+)
+
+agent = Agent(
+    card=AgentCard(name="budgeted", description="Observed LLM agent", url="runtime://budgeted"),
+    llm=llm,
+    telemetry=telemetry,
+)
+
+result = await agent.handle_task(Task.create_infer(prompt="Plan the next release"))
+trace = telemetry.recorder.replay()[-1]
+llm_span = next(span for span in trace["spans"] if span["kind"] == "llm")
+print(llm_span["metadata"]["llm_metrics"])
+```
+
+The same data is emitted live as `llm_context` and `llm_call_metrics` events through `event_callback`, so terminal apps can render a status line such as context used, call latency, and session cost while the agent is still running.
+
+!!! note "Cost estimates"
+    Protolink does not ship a fixed provider pricing catalog. Prices and context windows are application-owned metadata passed through `LLMModelProfile`, which keeps the core package stable and avoids stale billing assumptions.
 
 ### Langfuse Example
 

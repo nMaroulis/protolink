@@ -67,6 +67,10 @@ telemetry = [
     "langsmith",
 ]
 
+metrics = [
+    "tiktoken>=0.7.0",
+]
+
 # Database Drivers
 db = [
 ]
@@ -78,6 +82,7 @@ all = [
     "protolink[mcp]",
     "protolink[db]",
     "protolink[telemetry]",
+    "protolink[metrics]",
 ]
 
 # Only for testing
