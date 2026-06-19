@@ -36,6 +36,13 @@ from typing import Any, Literal
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
+from protolink.core.cancellation import (
+    ActiveTaskExecution,
+    CancellationToken,
+    TaskCancellationRequest,
+    TaskExecutionRegistry,
+    mark_task_canceled,
+)
 from protolink.core.policy import (
     ActionAuthorization,
     ActionAuthorizer,
@@ -153,6 +160,9 @@ class Agent:
             policy=policy or CapabilityPolicy(),
             approval_handler=approval_handler,
         )
+        # Live task control is intentionally separate from serialized Task state.
+        self._task_executions = TaskExecutionRegistry()
+        self._control_tasks: set[asyncio.Task[Any]] = set()
         # Logger - Maps verbosity to WARNING, INFO, DEBUG for default console logger.
         self._logger = (
             ConsoleLogger(name=f"protolink.agents.{self.card.name}", level={0: 50, 1: 20, 2: 10}.get(verbosity, 20))
@@ -469,6 +479,125 @@ class Agent:
     # Message & Task handling - A2A Server Operations
     # ----------------------------------------------------------------------
 
+    @property
+    def active_task_ids(self) -> tuple[str, ...]:
+        """Return task IDs currently executing on this Agent.
+
+        This is a process-local runtime view intended for diagnostics and
+        control planes. Completed tasks are removed immediately and should be
+        retrieved from application storage rather than this active registry.
+        """
+        return self._task_executions.task_ids
+
+    def get_cancellation_token(self, task_id: str) -> CancellationToken | None:
+        """Return the live cooperative token for an active task.
+
+        Custom handlers may use this token to add cancellation checkpoints
+        inside long-running loops. The token is never serialized into ``Task``
+        or ``RunContext``.
+        """
+        return self._task_executions.get_token(task_id)
+
+    async def cancel_task(
+        self,
+        request: str | TaskCancellationRequest,
+        reason: str | None = None,
+    ) -> Task:
+        """Request best-effort cancellation of an active task.
+
+        Cancellation updates both the protocol ``Task`` state and serialized
+        ``RunContext``, then interrupts the owning ``asyncio.Task`` at its next
+        await point. Synchronous functions and already-issued external side
+        effects may not be immediately stoppable.
+
+        Args:
+            request: Active task ID or a typed A2A-style cancellation request.
+            reason: Optional reason used when ``request`` is a task ID. When a
+                typed request is supplied, an explicit argument takes precedence.
+
+        Returns:
+            The active task after its state changes to ``canceled``.
+
+        Raises:
+            TaskNotFoundError: The task is not active on this Agent.
+            TaskNotCancelableError: The task already reached a terminal state.
+        """
+        if isinstance(request, TaskCancellationRequest):
+            task_id = request.id
+            cancel_reason = reason if reason is not None else request.reason
+        else:
+            task_id = request
+            cancel_reason = reason
+        return self._task_executions.cancel(task_id, cancel_reason)
+
+    async def run_task(self, task: Task) -> Task:
+        """Run the configured task handler under live cancellation control.
+
+        ``AgentServer`` uses this wrapper rather than calling ``handle_task``
+        directly, so subclasses that override the handler still participate in
+        active-task registration and protocol cancellation. Direct callers of a
+        custom handler can use this method for the same guarantee.
+        """
+        if task.is_terminal:
+            return task
+
+        execution, owner = self._task_executions.register(task)
+        try:
+            execution.token.raise_if_cancelled()
+            return await self.handle_task(task)
+        except asyncio.CancelledError:
+            mark_task_canceled(task, execution.token.reason)
+            return task
+        finally:
+            if owner:
+                self._task_executions.unregister(task.id, execution.execution_task)
+
+    async def run_task_streaming(self, task: Task) -> AsyncIterator[Any]:
+        """Stream a task handler under live cancellation control.
+
+        A successfully canceled stream ends with one final
+        ``TaskStatusUpdateEvent`` whose state is ``canceled``. This keeps SSE,
+        WebSocket, runtime, and direct consumers aligned on the same lifecycle.
+        """
+        from protolink.core.events import TaskStatusUpdateEvent
+
+        if task.is_terminal:
+            yield TaskStatusUpdateEvent(
+                task_id=task.id,
+                previous_state=None,
+                new_state=self._state_value(task.state),
+                final=True,
+                metadata={"task": task.to_dict()},
+            )
+            return
+
+        execution, owner = self._task_executions.register(task)
+        try:
+            execution.token.raise_if_cancelled()
+            async for event in self.handle_task_streaming(task):
+                yield event
+        except asyncio.CancelledError:
+            mark_task_canceled(task, execution.token.reason)
+            yield self._canceled_status_event(task, execution)
+        finally:
+            if owner:
+                self._task_executions.unregister(task.id, execution.execution_task)
+
+    def _canceled_status_event(self, task: Task, execution: ActiveTaskExecution) -> Any:
+        """Build the final status event shared by cancellation wrappers."""
+        from protolink.core.events import TaskStatusUpdateEvent
+
+        return TaskStatusUpdateEvent(
+            task_id=task.id,
+            previous_state=execution.previous_state or TaskState.WORKING.value,
+            new_state=TaskState.CANCELED.value,
+            final=True,
+            metadata={
+                "task": task.to_dict(),
+                "cancel_reason": execution.token.reason,
+            },
+        )
+
     async def handle_task(self, task: Task) -> Task:
         """
         Default task handler for A2A-compatible agents.
@@ -530,7 +659,30 @@ class Agent:
             raise
 
     async def handle_task_streaming(self, task: Task) -> AsyncIterator:
-        """Process a task while streaming tool, LLM, and completion events."""
+        """Process a task while streaming under live cancellation control."""
+        if task.is_terminal:
+            async for event in self._handle_task_streaming_impl(task, CancellationToken()):
+                yield event
+            return
+
+        execution, owner = self._task_executions.register(task)
+        try:
+            execution.token.raise_if_cancelled()
+            async for event in self._handle_task_streaming_impl(task, execution.token):
+                yield event
+        except asyncio.CancelledError:
+            mark_task_canceled(task, execution.token.reason)
+            yield self._canceled_status_event(task, execution)
+        finally:
+            if owner:
+                self._task_executions.unregister(task.id, execution.execution_task)
+
+    async def _handle_task_streaming_impl(
+        self,
+        task: Task,
+        cancellation_token: CancellationToken,
+    ) -> AsyncIterator[Any]:
+        """Produce task events using an already registered cancellation token."""
         from protolink.core.events import (
             TaskArtifactUpdateEvent,
             TaskErrorEvent,
@@ -559,6 +711,7 @@ class Agent:
             previous_state=previous_state,
             new_state=self._state_value(task.state),
         )
+        cancellation_token.raise_if_cancelled()
 
         try:
             last_item = task.get_last_item()
@@ -583,6 +736,7 @@ class Agent:
             outputs: list[Part | Message] = []
 
             for part in last_item.parts:
+                cancellation_token.raise_if_cancelled()
                 if part.type == "tool_call":
                     tool_name = getattr(part.content, "tool_name", None)
                     if tool_name is None and isinstance(part.content, dict):
@@ -592,9 +746,19 @@ class Agent:
                         message=f"Executing tool: {tool_name or 'unknown'}",
                         metadata={"agent": self.card.name, "part_type": part.type},
                     )
-                    outputs.append(await self.execute_tool(part, task=task))
+                    outputs.append(
+                        await self.execute_tool(
+                            part,
+                            task=task,
+                            cancellation_token=cancellation_token,
+                        )
+                    )
                 elif part.type == "infer":
-                    async for event in self.call_llm_stream(part, task=task):
+                    async for event in self.call_llm_stream(
+                        part,
+                        task=task,
+                        cancellation_token=cancellation_token,
+                    ):
                         if isinstance(event, dict) and "__protolink_part__" in event:
                             outputs.append(Part.from_dict(event["__protolink_part__"]))
                             continue
@@ -615,6 +779,7 @@ class Agent:
                 else:
                     self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
 
+            cancellation_token.raise_if_cancelled()
             for out in outputs:
                 if isinstance(out, Message):
                     task.add_message(out)
@@ -1075,6 +1240,19 @@ class Agent:
         if task.is_terminal:
             return task
 
+        execution, owner = self._task_executions.register(task)
+        try:
+            execution.token.raise_if_cancelled()
+            return await self._execute_task_impl(task, execution.token)
+        except asyncio.CancelledError:
+            mark_task_canceled(task, execution.token.reason)
+            return task
+        finally:
+            if owner:
+                self._task_executions.unregister(task.id, execution.execution_task)
+
+    async def _execute_task_impl(self, task: Task, cancellation_token: CancellationToken) -> Task:
+        """Execute one task step using an already registered cancellation token."""
         context = RunContext.ensure_task_context(
             task,
             default_session_id=task.metadata.get("session_id", task.id),
@@ -1101,12 +1279,26 @@ class Agent:
 
             # ---- Inspect Parts in the last item only ----
             for part in last_item.parts:
+                cancellation_token.raise_if_cancelled()
                 if part.type == "tool_call":
-                    outputs.append(await self.execute_tool(part, task=task))
+                    outputs.append(
+                        await self.execute_tool(
+                            part,
+                            task=task,
+                            cancellation_token=cancellation_token,
+                        )
+                    )
                 elif part.type == "infer":
-                    outputs.append(await self.call_llm(part, task=task))
+                    outputs.append(
+                        await self.call_llm(
+                            part,
+                            task=task,
+                            cancellation_token=cancellation_token,
+                        )
+                    )
                 else:
                     self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
+            cancellation_token.raise_if_cancelled()
             # ---- Attach outputs to the Task ----
             for out in outputs:
                 if isinstance(out, Message):
@@ -1126,7 +1318,13 @@ class Agent:
 
         return task
 
-    async def execute_tool(self, part: Part, *, task: Task | None = None) -> Part:
+    async def execute_tool(
+        self,
+        part: Part,
+        *,
+        task: Task | None = None,
+        cancellation_token: CancellationToken | None = None,
+    ) -> Part:
         """
         Execute a single tool call described by a `tool_call` Part.
 
@@ -1145,6 +1343,8 @@ class Agent:
                 - args (dict)
                 - call_id (str)
             task: Optional active task supplying the propagated ``RunContext``.
+            cancellation_token: Optional live token for cooperative checks
+                before authorization and after the tool returns.
 
         Returns:
             A Part of type "tool_output" containing:
@@ -1168,13 +1368,23 @@ class Agent:
             await self.telemetry.on_tool_start(tool_name, args)
 
         try:
+            active_token = cancellation_token
+            if active_token is None and task is not None:
+                active_token = self.get_cancellation_token(task.id)
+            if active_token is not None:
+                active_token.raise_if_cancelled()
+
             context = (
                 RunContext.ensure_task_context(task, agent_name=self.card.name)
                 if task is not None
                 else RunContext(agent_chain=[self.card.name])
             )
             _, call_args = await self._authorize_tool_action(tool, args, context)
+            if active_token is not None:
+                active_token.raise_if_cancelled()
             result = await tool(**call_args)
+            if active_token is not None:
+                active_token.raise_if_cancelled()
             if self.telemetry:
                 await self.telemetry.on_tool_end(tool_name, result)
             return Part.tool_output(call_id=call_id, result=result)
@@ -1197,6 +1407,7 @@ class Agent:
         *,
         streaming: bool = False,
         event_callback=None,
+        cancellation_token: CancellationToken | None = None,
     ) -> Part:
         """
         Invoke the agent's LLM to process an inference request.
@@ -1220,6 +1431,8 @@ class Agent:
             event_callback: Optional async callback receiving provider-agnostic
                 inference events while the LLM loop runs. Used by
                 ``call_llm_stream()`` and task streaming transports.
+            cancellation_token: Optional live token checked throughout the
+                inference loop and before side-effect dispatch.
 
         Returns:
             Part: A Part of type ``infer_output`` containing the LLM's final response,
@@ -1236,6 +1449,12 @@ class Agent:
                 code="no_llm",
                 message="Agent has no LLM but received a infer instruction",
             )
+
+        active_token = cancellation_token
+        if active_token is None and task is not None:
+            active_token = self.get_cancellation_token(task.id)
+        if active_token is not None:
+            active_token.raise_if_cancelled()
 
         # Get Available Agents (Guardrail: excluding ourselves to prevent self-delegation loops)
         discovered = []
@@ -1314,14 +1533,28 @@ class Agent:
                 return authorization
             return await self.authorize_action(action, active_context)
 
+        async def handle_inference_agent_call(
+            agent_name: str,
+            action: str,
+            payload: dict[str, Any],
+        ) -> Any:
+            """Delegate work with child context and cancellation propagation."""
+            return await self._handle_agent_call(
+                agent_name,
+                action,
+                payload,
+                parent_context=active_context,
+            )
+
         response: Part = await self.llm.infer(
             query=query,
             tools=self.tools,
-            agent_callback=self._handle_agent_call if self.card.capabilities.delegation else None,
+            agent_callback=handle_inference_agent_call if self.card.capabilities.delegation else None,
             agent_cards=discovered if self.card.capabilities.delegation else None,
             streaming=streaming,
             event_callback=emit_inference_event if self.telemetry or event_callback else None,
             action_authorizer=authorize_inference_action,
+            cancellation_token=active_token,
         )
 
         if self.telemetry:
@@ -1329,7 +1562,13 @@ class Agent:
 
         return response
 
-    async def call_llm_stream(self, infer_part: Part, task: Task | None = None) -> AsyncIterator[Any]:
+    async def call_llm_stream(
+        self,
+        infer_part: Part,
+        task: Task | None = None,
+        *,
+        cancellation_token: CancellationToken | None = None,
+    ) -> AsyncIterator[Any]:
         """Invoke the agent LLM in streaming mode and yield task events.
 
         The returned iterator yields ``TaskLLMStreamEvent`` objects for
@@ -1365,6 +1604,7 @@ class Agent:
                     task=task,
                     streaming=True,
                     event_callback=emit,
+                    cancellation_token=cancellation_token,
                 )
                 await queue.put({"__protolink_part__": part.to_dict()})
             except Exception as exc:
@@ -1389,12 +1629,18 @@ class Agent:
         finally:
             if not runner.done():
                 runner.cancel()
+            try:
+                await runner
+            except asyncio.CancelledError:
+                pass
 
     async def _handle_agent_call(
         self,
         agent_name: str,
         action: str,
         payload: dict[str, Any],
+        *,
+        parent_context: RunContext | None = None,
     ) -> Any:
         """
         Handle agent delegation from the LLM inference loop.
@@ -1407,6 +1653,8 @@ class Agent:
             action: The action type - either "tool_call" (execute a tool on the remote agent) or "infer" (ask the
                 remote agent to generate a response).
             payload: The full agent_call payload from the LLM, containing tool/args or prompt.
+            parent_context: Optional active context used to create a correlated
+                child run for delegated work.
 
         Returns:
             The result from the delegated agent (typically the last part content from the response task).
@@ -1425,6 +1673,19 @@ class Agent:
                 f"Self-delegation is not allowed. You are '{self.card.name}' ({self.card.url}) and cannot delegate tasks to yourself."  # noqa: E501
             )
 
+        async def call_delegated_task(task: Task) -> Task:
+            if parent_context is not None:
+                parent_context.child().attach_to_task(task)
+            try:
+                return await self.call_agent(agent_url, task)
+            except asyncio.CancelledError:
+                self._schedule_delegated_cancellation(
+                    agent_url,
+                    task.id,
+                    "Parent task was canceled",
+                )
+                raise
+
         if action == "tool_call":
             tool_name = payload.get("tool")
             args = payload.get("args", {})
@@ -1432,17 +1693,33 @@ class Agent:
                 raise ValueError(f"tool_call agent_call must specify 'tool' field. Received payload: {payload}")
             # Create task with tool_call part for the remote agent to execute
             task = Task.create(Message(role="agent", parts=[Part.tool_call(tool_name=tool_name, args=args)]))
-            result_task = await self.call_agent(agent_url, task)
+            result_task = await call_delegated_task(task)
             return result_task.get_last_part_content()
 
         elif action == "infer":
             prompt = payload.get("prompt", "")
             # Create task with infer message for the remote agent to process
             task = Task.create(Message.infer(prompt=prompt))
-            result_task = await self.call_agent(agent_url, task)
+            result_task = await call_delegated_task(task)
             return result_task.get_last_part_content()
 
         raise ValueError(f"Unknown agent_call action: {action}")
+
+    def _schedule_delegated_cancellation(self, agent_url: str, task_id: str, reason: str) -> None:
+        """Schedule best-effort cancellation of a delegated child task."""
+        client = self._client
+        if client is None:
+            return
+
+        async def cancel_child() -> None:
+            try:
+                await client.cancel_task(agent_url, task_id, reason=reason)
+            except Exception as exc:
+                self._logger.debug(f"Could not cancel delegated task '{task_id}': {exc}")
+
+        control_task = asyncio.create_task(cancel_child())
+        self._control_tasks.add(control_task)
+        control_task.add_done_callback(self._control_tasks.discard)
 
     async def _resolve_agent_url(self, agent_name: str) -> str:
         """
@@ -2252,3 +2529,12 @@ class SyncAgent:
             Task with updated state and response messages
         """
         return asyncio.run(self._agent.call_agent(agent_url, task))
+
+    def cancel_task(self, task_id: str, reason: str | None = None) -> Task:
+        """Synchronously request cancellation of an active local task.
+
+        The active task must be running on another coroutine or Agent background
+        loop; a synchronous caller cannot cancel work while blocked inside that
+        same call stack.
+        """
+        return asyncio.run(self._agent.cancel_task(task_id, reason))

@@ -1,7 +1,5 @@
 """Runtime actions, capability policy, approvals, and events.
 
-This provider-free example demonstrates the Phase 2 runtime lifecycle:
-
 1. A mock model requests a tool call.
 2. Protolink validates the tool arguments and prepares a ``RunAction``.
 3. The tool's ``action_builder`` attaches a structured preview artifact.
@@ -10,9 +8,8 @@ This provider-free example demonstrates the Phase 2 runtime lifecycle:
 6. Protolink executes the tool and emits normalized ``RunEvent`` objects.
 7. A second run is denied by ``RunContext.permissions`` before the tool executes.
 
-The example uses generic records rather than coding-specific concepts. The same
-contracts can represent database mutations, browser actions, outbound messages,
-file operations, business workflows, or any other application side effect.
+The example uses generic records rather than coding-specific concepts. The same contracts can represent database
+mutations, browser actions, outbound messages,file operations, business workflows, or any other application side effect.
 """
 
 from __future__ import annotations

@@ -21,7 +21,7 @@ import threading
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from protolink.models import AgentCard, ClientRequestSpec, Message, Task
+from protolink.models import AgentCard, ClientRequestSpec, Message, Task, TaskCancellationRequest
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
 
@@ -86,6 +86,15 @@ class AgentClient:
         path="/tasks/stream",
         method="POST",
         request_source="body",
+    )
+
+    TASK_CANCEL_REQUEST = ClientRequestSpec(
+        name="cancel_task",
+        path="/tasks/cancel",
+        method="POST",
+        response_parser=Task.from_dict,
+        request_source="body",
+        channel="control",
     )
 
     def __init__(self, transport: Transport | TransportType, url: str | None = None, timeout: int = 300) -> None:
@@ -156,6 +165,44 @@ class AgentClient:
 
         async for event in subscribe(agent_url, task):
             yield event
+
+    async def cancel_task(
+        self,
+        agent_url: str,
+        task_id: str,
+        *,
+        reason: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Task:
+        """Request best-effort cancellation of a task running on an agent.
+
+        The task ID is known before submission because Protolink tasks are
+        client-created. This allows a second coroutine, UI action, or control
+        request to cancel a blocking or streaming execution already in flight.
+
+        Args:
+            agent_url: Target agent endpoint URL.
+            task_id: Identifier of the active task to cancel.
+            reason: Optional human-readable cancellation reason.
+            metadata: Additional A2A task-ID metadata.
+
+        Returns:
+            The remote task after the cancellation attempt is accepted.
+
+        Raises:
+            RuntimeError: The remote task is unknown, terminal, or currently
+                cannot be canceled.
+        """
+        request = TaskCancellationRequest(
+            id=task_id,
+            reason=reason,
+            metadata=metadata or {},
+        )
+        return await self._transport.send(
+            self.TASK_CANCEL_REQUEST,
+            agent_url,
+            data=request,
+        )
 
     async def send_message(self, agent_url: str, message: Message) -> Message:
         """Send a simple message to a remote agent and return its response.
@@ -292,6 +339,24 @@ class SyncAgentClient:
             else:
                 thread.join()
                 return
+
+    def cancel_task(
+        self,
+        agent_url: str,
+        task_id: str,
+        *,
+        reason: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Task:
+        """Synchronously request cancellation of a remote active task."""
+        return asyncio.run(
+            self._client.cancel_task(
+                agent_url,
+                task_id,
+                reason=reason,
+                metadata=metadata,
+            )
+        )
 
     def send_message(self, agent_url: str, message: Message) -> Message:
         """Synchronously send a message to a remote agent.

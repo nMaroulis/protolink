@@ -8,6 +8,7 @@ All transports implement a consistent interface:
 
 - **Ingress bridge**: Maps transport-specific events (HTTP POST, WS frames) to the internal `handle_task` implementation.
 - **Egress signaling**: Provides a generic `send` primitive to dispatch requests defined by `ClientRequestSpec` specifications.
+- **Control plane**: Routes operations such as task cancellation independently from the active work they control.
 - **Lifecycle management**: Handles the startup/shutdown sequence of underlying I/O reactors (e.g., `uvicorn` loops or connection pools).
 
 ## Relationship with Client Layer
@@ -29,6 +30,7 @@ All transports inherit from the base `Transport` class.
 - **WebSocketTransport**
     - Uses WebSocket for streaming requests and responses.
     - Built on top of libraries like `websockets` (and `httpx` for HTTP parts where applicable).
+    - Uses a dedicated control connection for cancellation so the request cannot wait behind the active task or stream.
     - Useful for real‑time, bidirectional communication or token‑level streaming.
 
 - **SSEJSONRPCTransport**
@@ -74,6 +76,7 @@ The rest of this page dives into the API of each transport in more detail.
 - **Server side**
   - Uses an ASGI app (Starlette or FastAPI) to expose endpoints like:
     - `POST /tasks/` — submit a `Task` to the agent.
+    - `POST /tasks/cancel` — request best-effort cancellation of an active task ID.
     - `GET /.well-known/agent.json` — agent metadata.
     - Registry endpoints (if acting as a registry).
   - Uses a backend implementation of `BackendInterface` to manage the ASGI app and `uvicorn` server.
@@ -159,6 +162,8 @@ The tables below document each object type.
 | `created_at` | `str`            | ISO‑8601 timestamp (UTC).                     |
 
 `completed`, `failed`, and `canceled` are terminal states. Default agents move incoming tasks to `working` before execution and then finish them as `completed`, `input-required`, or `failed` depending on the produced outputs.
+
+`POST /tasks/cancel` accepts an A2A-style task-ID payload such as `{"id": "task-id", "metadata": {"reason": "Stopped by user"}}`. The response is the updated serialized `Task`. The endpoint controls active execution only; it is not a durable task lookup API.
 
 #### Message
 
@@ -317,6 +322,7 @@ Unlike network transports (HTTP, WebSocket), RuntimeTransport avoids actual TCP 
 - **Global In-Memory Registry** — transports discover each other seamlessly through an automatic shared class-level global registry.
 - **Serialization Isolation** — message models natively pass through Pydantic dict boundaries, maintaining process and state safety equivalently to HTTP wire framing.
 - **Supports streaming** — agents can use generic `EndpointSpec` routing for real-time task streams.
+- **Supports cancellation** — the same `/tasks/cancel` endpoint dispatches in-process without opening a local socket.
 
 ### Usage
 

@@ -81,6 +81,7 @@ if TYPE_CHECKING:
     from protolink.tools import BaseTool
 
 from protolink.core.actions import RunAction
+from protolink.core.cancellation import CancellationToken
 from protolink.core.part import Part
 from protolink.core.policy import (
     ActionAuthorization,
@@ -418,6 +419,7 @@ class LLM(ABC):
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
         action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -498,6 +500,10 @@ class LLM(ABC):
             may enrich the action, enforce capability policy, and obtain an
             application-owned approval decision. Direct LLM usage may omit it;
             the ``Agent`` runtime supplies its configured authorizer.
+        cancellation_token : CancellationToken, optional
+            Live process-local token checked before model calls and action
+            dispatch. The owning Agent also cancels this coroutine directly so
+            awaited provider, tool, and delegation operations stop promptly.
 
         Returns
         -------
@@ -571,6 +577,9 @@ class LLM(ABC):
         build_system_prompt : Constructs the system prompt with tools and agents.
         """
 
+        if cancellation_token is not None:
+            cancellation_token.raise_if_cancelled()
+
         self.history.add_user(query)
 
         steps: int = 0
@@ -616,6 +625,8 @@ class LLM(ABC):
         metrics_active = self.metrics_enabled and event_callback is not None
 
         while steps < MAX_INFER_STEPS:
+            if cancellation_token is not None:
+                cancellation_token.raise_if_cancelled()
             steps += 1
             await emit({"type": "llm_step", "step": steps})
             action_error: ValueError | None = None
@@ -719,6 +730,8 @@ class LLM(ABC):
                 action = action_obj.type
                 payload = action_obj.model_dump(exclude_none=True)
                 parse_failures = 0  # Reset on success
+                if cancellation_token is not None:
+                    cancellation_token.raise_if_cancelled()
             except ValueError as e:
                 parse_failures += 1
                 await emit(
@@ -800,6 +813,8 @@ class LLM(ABC):
                 tool = tools[tool_name]
 
                 try:
+                    if cancellation_token is not None:
+                        cancellation_token.raise_if_cancelled()
                     runtime_action = RunAction(
                         kind="tool.call",
                         name=tool_name,
@@ -826,6 +841,8 @@ class LLM(ABC):
                         }
                     )
                     tool_result = await tool(**tool_args)
+                    if cancellation_token is not None:
+                        cancellation_token.raise_if_cancelled()
                 except ActionPolicyError:
                     raise
                 except TypeError as e:
@@ -879,6 +896,8 @@ class LLM(ABC):
                 agent_action = action_obj.action
 
                 try:
+                    if cancellation_token is not None:
+                        cancellation_token.raise_if_cancelled()
                     runtime_action = RunAction(
                         kind="agent.call",
                         name=agent_name,
@@ -901,6 +920,8 @@ class LLM(ABC):
                         }
                     )
                     agent_result = await agent_callback(agent_name, agent_action, payload)
+                    if cancellation_token is not None:
+                        cancellation_token.raise_if_cancelled()
                 except ActionPolicyError:
                     raise
                 except ValueError as e:

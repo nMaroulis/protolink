@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Literal, Protocol
 
-from protolink.models import AgentCard, Task
+from protolink.models import AgentCard, Task, TaskCancellationRequest
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport import Transport
 
@@ -32,8 +32,17 @@ class AgentInterface(Protocol):
     async def handle_task(self, task: Task) -> Task:
         """Handle an incoming task and return the updated task."""
 
+    async def run_task(self, task: Task) -> Task:
+        """Run the task handler under live cancellation control."""
+
     def handle_task_streaming(self, task: Task) -> AsyncIterator[Any]:
         """Stream task events."""
+
+    def run_task_streaming(self, task: Task) -> AsyncIterator[Any]:
+        """Stream the task handler under live cancellation control."""
+
+    async def cancel_task(self, request: TaskCancellationRequest) -> Task:
+        """Request cancellation of an active task."""
 
     def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's public metadata and capabilities."""
@@ -85,9 +94,17 @@ class AgentServer:
                 name="task",
                 path="/tasks/",
                 method="POST",
-                handler=self._agent.handle_task,
+                handler=self._agent.run_task,
                 request_source="body",
                 request_parser=Task.from_dict,
+            ),
+            EndpointSpec(
+                name="task_cancel",
+                path="/tasks/cancel",
+                method="POST",
+                handler=self._agent.cancel_task,
+                request_source="body",
+                request_parser=TaskCancellationRequest.from_dict,
             ),
             EndpointSpec(
                 name="agent_card",
@@ -120,7 +137,7 @@ class AgentServer:
                     name="task_stream",
                     path="/tasks/stream",
                     method="POST",
-                    handler=self._agent.handle_task_streaming,
+                    handler=self._agent.run_task_streaming,
                     request_source="body",
                     request_parser=Task.from_dict,
                     streaming=True,

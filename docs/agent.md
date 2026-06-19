@@ -243,9 +243,14 @@ async def main():
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
+| `run_task()` | `task: Task` | `Task` | Runs `handle_task()` inside active-task registration so it can be canceled by task ID. Server routes use this wrapper automatically. |
+| `run_task_streaming()` | `task: Task` | `AsyncIterator` | Runs the streaming handler inside active-task registration and guarantees a final canceled status event after successful cancellation. |
 | `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls, inference) and executes them. Can be overridden for custom orchestration. |
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Streams task status, LLM inference events, tool progress, artifact updates, and final completion for streaming-capable transports. |
 | `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()` to run the multi-step reasoning loop. For `tool_call` parts, it executes the tool directly. |
+| `cancel_task()` | `task_id | TaskCancellationRequest`, `reason=None` | `Task` | Marks an active task and its `RunContext` canceled, then interrupts its owning coroutine. |
+| `get_cancellation_token()` | `task_id: str` | `CancellationToken ⎪ None` | Returns the process-local token for checkpoints in custom long-running handlers. |
+| `active_task_ids` | — | `tuple[str, ...]` | Snapshot of task IDs currently registered on this Agent. |
 | `invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. Accepts an optional `session_id` for memory. |
 | `sync.invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
 | `sync.discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Synchronous version of `discover_agents()`. |
@@ -264,7 +269,25 @@ Every successful state change is appended to `task.metadata["state_history"]`. S
 
 Before execution, the default runtime also normalizes `RunContext` into `task.metadata["run_context"]`. This gives applications one typed place for session IDs, trace IDs, workspace URIs, permission metadata, budgets, cancellation state, and parent/child agent chains. See [Runtime](runtime.md) for the full context and event-sink API.
 
-If you override `handle_task()` completely, you are responsible for preserving this lifecycle behavior. Prefer calling `await self.execute_task(task)` inside custom handlers when you only need to wrap or augment the default execution.
+AgentServer routes call `run_task()` and `run_task_streaming()`, so fully overridden handlers still receive active-task registration and remote cancellation. Direct application code should also use these wrappers when it invokes a fully custom handler. Prefer calling `await self.execute_task(task)` inside custom handlers when you only need to wrap or augment the default execution.
+
+#### Live Task Cancellation
+
+`await agent.cancel_task(task.id, reason="Stopped by user")` controls work that is currently active on this Agent. It is different from `Task.cancel()`: the task helper records serializable lifecycle state, while the Agent API also signals a live `CancellationToken` and cancels the owning `asyncio.Task`.
+
+The default LLM, tool, streaming, and delegation paths already check this token. A custom CPU loop can retrieve it and add explicit checkpoints:
+
+```python
+async def handle_task(self, task: Task) -> Task:
+    token = self.get_cancellation_token(task.id)
+    for item in application_items:
+        if token is not None:
+            token.raise_if_cancelled()
+        await process(item)
+    return task.complete("done")
+```
+
+Only active runs appear in `active_task_ids`. Wait until task acceptance or a first status event before canceling; completed entries are removed and belong in application storage. Cancellation is best-effort because synchronous functions and external systems may not stop immediately. See [Runtime cancellation](runtime.md#canceling-running-tasks) for the complete contract.
 
 #### The Inference Loop Integration
 

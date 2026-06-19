@@ -38,6 +38,7 @@ This lifecycle is not limited to LLM-selected tool calls. The same `RunAction` a
 |------|-------------|
 | `Task` | What work and results are exchanged between participants? |
 | `RunContext` | Which run is this, and what constraints travel with it? |
+| `CancellationToken` | Has live cancellation been requested for active work? |
 | `RunAction` | What concrete operation is about to execute? |
 | `Artifact` | What output or pre-execution preview can be inspected? |
 | `PolicyDecision` | Is this action allowed, denied, or approval-gated? |
@@ -103,6 +104,123 @@ When work is delegated, `RunContext.child()` creates a new run identity while pr
 `RunContext.permissions` accepts capability rules using `allow`, `deny`, or `require_approval`. Boolean values are also supported: `True` allows and `False` denies. Runtime-owned policy and context rules are combined using the most restrictive result, so task metadata can narrow but cannot weaken the agent's configured policy. Budgets remain typed metadata for application or custom policy enforcement.
 
 This most-restrictive rule is important at trust boundaries. An incoming task may request fewer privileges for a run, but it cannot grant itself more authority than the receiving agent's policy allows.
+
+## Canceling Running Tasks
+
+Protolink distinguishes **cancellation state** from **live cancellation control**:
+
+- `Task.cancel()` changes the serializable protocol state to `canceled`.
+- `RunContext.cancel()` creates a serializable canceled context snapshot.
+- `CancellationToken` signals process-local code that active execution must stop.
+- The Agent's active-task registry connects a task ID to its token and owning `asyncio.Task` while that task is running.
+
+This separation keeps `Task` and `RunContext` safe to send through transports while allowing the runtime to interrupt an actual coroutine. A Python synchronization object is never placed in task metadata or sent to another agent.
+
+### Cancellation Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Client as AgentClient
+    participant Agent as Agent runtime
+    participant Work as LLM, tool, or child agent
+
+    App->>Agent: submit Task
+    Agent->>Agent: register task ID and token
+    Agent->>Work: await execution
+    App->>Client: cancel_task(agent_url, task.id)
+    Client->>Agent: POST /tasks/cancel
+    Agent->>Agent: mark Task and RunContext canceled
+    Agent-->>Work: cancel owning coroutine
+    Work-->>Agent: CancelledError at await boundary
+    Agent-->>App: final task.status = canceled
+    Agent->>Agent: remove active registry entry
+```
+
+The task ID is available before submission because Protolink tasks are created by the caller. A CLI or UI can therefore keep the ID associated with a running operation and issue cancellation from another coroutine or control request.
+
+### Direct Agent Cancellation
+
+```python
+import asyncio
+
+from protolink import Agent, AgentCard, Task
+
+agent = Agent(AgentCard(name="worker", description="Worker", url="runtime://worker"))
+task = Task.create_infer(prompt="Perform long-running work")
+
+running = asyncio.create_task(agent.run_task(task))
+# Cancellation targets active execution, so wait until registration completes.
+while task.id not in agent.active_task_ids:
+    await asyncio.sleep(0)
+canceled = await agent.cancel_task(task.id, reason="Stopped by user")
+result = await running
+
+assert canceled.state.value == "canceled"
+assert result.state.value == "canceled"
+```
+
+The default `handle_task()` path also registers direct calls through `execute_task()`. `run_task()` is the server-facing wrapper and should be used by direct callers that override `handle_task()` completely, because it guarantees active-task registration around custom logic.
+
+### Remote Cancellation
+
+```python
+task = Task.create_infer(prompt="Perform long-running work")
+running = asyncio.create_task(client.send_task(agent_url, task))
+
+# In a real application, enable the cancel control after the first status or
+# progress event confirms that the remote agent accepted the task.
+await task_started.wait()
+
+canceled = await client.cancel_task(
+    agent_url,
+    task.id,
+    reason="Stopped from the application",
+)
+result = await running
+```
+
+`AgentClient.cancel_task()` uses the A2A-style `POST /tasks/cancel` operation and returns the updated task. The same call works over HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport. WebSocket uses a separate control connection so cancellation cannot wait behind the request or stream it needs to stop.
+
+The synchronous client exposes the same operation as `client.sync.cancel_task(...)`. A synchronous call can only cancel work running on another thread, process, or event loop; it cannot interrupt itself while blocked in the same call stack.
+
+### Cooperative Checkpoints
+
+The default runtime checks the token:
+
+- before each task part;
+- before inference starts and at every inference step;
+- before and after model-selected tools and delegated agent calls;
+- before authorization and after an awaited tool returns;
+- before outputs are attached or the task is completed.
+
+The registry also calls `asyncio.Task.cancel()`, so an async model request, async tool, retry sleep, or delegated call normally stops immediately at its current `await` point. Custom handlers can retrieve the live token with `agent.get_cancellation_token(task.id)` and call `token.raise_if_cancelled()` inside CPU loops or between application-defined stages.
+
+Cancellation of a parent model-driven delegation schedules a best-effort cancellation request for the child task. The child receives its own `RunContext` with `parent_run_id`, preserving trace and run relationships.
+
+### Final State And Events
+
+Successful cancellation synchronizes all application-visible surfaces:
+
+- `Task.state` becomes `canceled` and `task.metadata["cancel_reason"]` is set.
+- `RunContext.canceled` becomes `True` and carries the same reason.
+- Streaming finishes with one final `task.status` / `TaskStatusUpdateEvent` whose state is `canceled`.
+- Cancellation is not emitted as `task.error` and is not converted to `failed`.
+- The active registry entry is removed in `finally`, including after errors and cancellation.
+
+Requests for unknown active IDs raise `TaskNotFoundError`. This includes a cancellation request that arrives before task registration or after cleanup, so applications should wait for task acceptance or the first streamed status before enabling a cancel control. A task still registered but already terminal raises `TaskNotCancelableError`. The registry contains active execution only; durable lookup of completed tasks belongs in application storage.
+
+### Best-Effort Guarantees
+
+Cancellation cannot safely promise that every external operation has stopped:
+
+- Async Python work is interruptible when it reaches an `await` or explicit token checkpoint.
+- A synchronous function running on the event-loop thread cannot process cancellation until it returns.
+- Moving synchronous work to a thread keeps the event loop responsive, but Python cannot forcibly terminate that thread.
+- A model provider, database, subprocess, or remote API may continue work after the local request is abandoned.
+- Destructive operations should place their commit as late as possible, check cancellation beforehand, or use a subprocess/service that supports its own cancellation or rollback protocol.
+
+For this reason, Protolink follows A2A's best-effort model: it attempts cancellation and reports the resulting task state, while tools and external systems remain responsible for stronger transactional guarantees.
 
 ## Runtime Actions And Artifacts
 
@@ -273,7 +391,7 @@ Applications can implement their own sinks for terminal rendering, WebSocket fan
 
 An event sink observes execution; it does not authorize it. Approval decisions still flow through the configured approval handler, while sinks distribute the resulting lifecycle to interested consumers.
 
-## Complete Runnable Example
+## Complete Runnable Examples
 
 `examples/runtime_policy_and_approvals.py` combines the runtime primitives in one provider-free script. It uses `MockLLM` to request a tool, creates a preview artifact, obtains application approval, captures normalized events, and then proves that a stricter per-run permission prevents a second side effect.
 
@@ -284,6 +402,12 @@ Run it from the repository root:
 ```
 
 The example uses an in-memory record so it is deterministic and requires no API key, service, or network port. Its approval handler automatically approves the first action for demonstration; a real application would replace that callback with its own interactive or remote decision workflow.
+
+`examples/task_cancellation.py` demonstrates live cancellation of a streamed async tool. It proves that the final side effect is not committed and prints the final normalized canceled event:
+
+```bash
+.venv/bin/python examples/task_cancellation.py
+```
 
 ## Golden Run Tests
 

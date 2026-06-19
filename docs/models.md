@@ -500,6 +500,8 @@ print(task.metadata["error"])  # "Weather API unavailable"
 
 Mark the task as canceled.
 
+This method updates lifecycle state only. To interrupt work currently executing on an Agent, use `await agent.cancel_task(task.id, reason=...)` or `await client.cancel_task(agent_url, task.id, reason=...)`. See [Runtime cancellation](runtime.md#canceling-running-tasks).
+
 **Parameters:**
 ```python
 reason: str | None  # Optional cancellation reason stored in metadata

@@ -122,6 +122,48 @@ Applications that need a stable UI or replay contract can normalize these transp
 
 ---
 
+### `cancel_task()`
+
+Requests best-effort cancellation of a task currently executing on an agent and returns the task after the request is accepted.
+
+```python
+async def cancel_task(
+    agent_url: str,
+    task_id: str,
+    *,
+    reason: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> Task
+```
+
+The task ID is known before submission because the caller creates the `Task`. Cancellation should be sent from another coroutine or control handler after the task has been accepted, usually after the first streamed status or progress event.
+
+```python
+import asyncio
+
+task = Task.create_infer(prompt="Perform long-running work")
+running = asyncio.create_task(client.send_task(agent_url, task))
+
+# Wait for application-specific acceptance or progress before canceling.
+await task_started.wait()
+canceled = await client.cancel_task(
+    agent_url,
+    task.id,
+    reason="Stopped by the user",
+    metadata={"source": "cli"},
+)
+result = await running
+
+assert canceled.state.value == "canceled"
+assert result.state.value == "canceled"
+```
+
+`cancel_task()` uses the A2A-style `POST /tasks/cancel` operation over HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport. Cancellation is a control-plane request: WebSocket sends it over a separate connection so it does not queue behind the active task stream.
+
+Cancellation is intentionally best-effort. Async work normally stops at an `await` boundary; synchronous work and external systems may need their own cooperative cancellation or rollback mechanism. See [Runtime cancellation](runtime.md#canceling-running-tasks) for lifecycle, custom-handler, and side-effect guidance.
+
+---
+
 ### `send_message()`
 
 Convenience wrapper that creates a Task from a Message, sends it, and returns the response message.
@@ -176,6 +218,7 @@ Internally, these methods use `asyncio.run()` to handle the asynchronous transpo
 |--------------|------------------------|-------------|
 | `send_task()` | `client.sync.send_task()` | Synchronously send a task and wait for the result. |
 | `send_task_streaming()` | `client.sync.send_task_streaming()` | Synchronously iterate over streamed task events. |
+| `cancel_task()` | `client.sync.cancel_task()` | Synchronously request cancellation of a task running elsewhere. |
 | `send_message()` | `client.sync.send_message()` | Synchronously send a message and wait for the response message. |
 | `get_agent_card()` | `client.sync.get_agent_card()` | Synchronously retrieve an agent's public card. |
 
@@ -217,6 +260,7 @@ class ClientRequestSpec:
     method: HttpMethod           # HTTP method (e.g., "POST")
     response_parser: Callable    # Function to parse response data
     request_source: str          # Where to put request data ("body", "query", etc.)
+    channel: str = "default"     # Multiplexed transport channel
 ```
 
 ### Built-in Request Specs
@@ -224,6 +268,7 @@ class ClientRequestSpec:
 | Spec | Path | Method | Description |
 |------|------|--------|-------------|
 | `TASK_REQUEST` | `/tasks/` | POST | Send a task to an agent |
+| `TASK_CANCEL_REQUEST` | `/tasks/cancel` | POST | Cancel an active task over a control channel |
 | `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | Retrieve agent metadata |
 | `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | Send task with streaming |
 

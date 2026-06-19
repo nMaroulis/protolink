@@ -100,6 +100,8 @@ agent.start()
 
 The agent is now fully initialized and prepared to **discover & be discovered by peers**, send & receive **tasks** across your system.
 
+Running tasks can be canceled by task ID across local and remote transports, with final canceled state propagated through `RunContext` and streamed runtime events.
+
 **Note**: `agent.start()` automatically **adapts** to the current environment under the hood, working seamlessly in **standard Python scripts, async applications, and Jupyter notebooks** with both **blocking** and **background** execution modes. When `background=True`, it runs the agent non-blocking using an **event loop task** or a **dedicated background thread** depending on the runtime context. See how Protolink handles [agent execution **lifecycle**](https://nmaroulis.github.io/protolink/agent/#lifecycle-methods).
 
 ## Features

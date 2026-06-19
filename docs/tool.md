@@ -180,6 +180,23 @@ Policy is evaluated after argument validation and immediately before the callabl
 
 Use `agent.call_tool_in_context(name, context, **arguments)` when a deterministic application path invokes a tool directly and needs the same per-run permissions, cancellation, and approval behavior as task execution.
 
+### Tool Cancellation
+
+Tools invoked by a running task participate in that task's live cancellation automatically. Protolink checks the token before authorization, before calling the tool, and after the awaited result returns. It also cancels the owning task, so an async tool normally receives `asyncio.CancelledError` at its current `await` point.
+
+```python
+@agent.tool(name="build_report", description="Build a report in stages")
+async def build_report() -> str:
+    data = await load_data()
+    report = await render_report(data)
+    await commit_report(report)
+    return "committed"
+```
+
+Cancellation can interrupt the first two awaits, but it cannot undo a commit that an external system already accepted. Side-effecting tools should therefore delay irreversible commits, use transactional APIs, or forward cancellation to a subprocess or remote service that supports it.
+
+Synchronous Python tools cannot be forcibly stopped safely. If they run on the event-loop thread, the cancellation request is processed only after they return. If an application moves them to a worker thread, the event loop remains responsive but the thread itself may continue. These limits are why Protolink defines cancellation as best-effort rather than a rollback guarantee.
+
 ### When to Use Native Tools
 
 Native tools are ideal for:

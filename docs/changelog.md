@@ -15,6 +15,12 @@
 
 NEW:
 
+- **Live task cancellation**
+  - Added `CancellationToken`, `TaskCancellationRequest`, and an active-task registry that separates serializable canceled state from process-local execution control.
+  - Added direct and remote task-ID cancellation through `Agent.cancel_task()` and `AgentClient.cancel_task()` across HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport.
+  - Default task, streaming, LLM, tool, and delegated-agent paths now propagate cancellation and produce a final `canceled` task state instead of a failure event.
+  - Added `examples/task_cancellation.py` plus direct, streaming, runtime, and WebSocket cancellation coverage.
+
 - **Runtime context and run events**
   - Added `RunContext`, `RunBudget`, `RunEvent`, `EventSink`, and `InMemoryEventSink` for typed run metadata, stable progress streams, and golden-run testing.
   - Default agent execution now normalizes runtime context into `task.metadata["run_context"]` while preserving legacy `session_id` and `trace_id` metadata.
@@ -103,6 +109,7 @@ Fixed:
 
 Docs:
 
+- Added an end-to-end runtime cancellation guide covering active registration, cooperative checkpoints, control-plane transport behavior, final events, and best-effort side-effect guarantees.
 - Updated README task semantics to describe `Task.state` and `metadata["state_history"]`.
 - Added Agent documentation for default task lifecycle behavior and streaming status updates.
 - Expanded model and transport docs for task lifecycle states, terminal states, transition history, and new task helper methods.
@@ -112,6 +119,7 @@ Docs:
 
 Tests:
 
+- Added cancellation coverage for typed request round-trips, pre-canceled inference, interrupted async tools, final stream status, custom remote handlers, and WebSocket control channels.
 - Added lifecycle coverage for direct task construction, invalid transitions, `Task.complete()`, successful agent execution, and failed tool execution.
 - Added regression coverage for delegated `ToolOutput` serialization in the LLM inference loop.
 - Added coverage for top-level exports, CLI scaffolding, local trace capture, redaction, and retry metadata.

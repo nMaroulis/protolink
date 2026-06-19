@@ -224,7 +224,7 @@ class WebSocketTransport(Transport):
             payload.setdefault("params", {})
             payload["params"].update(params)
 
-        loop_key = f"{base_url}_{id(asyncio.get_running_loop())}"
+        loop_key = f"{base_url}_{id(asyncio.get_running_loop())}_{request_spec.channel}"
         lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
         async with lock:
             conn = await self._ensure_client_connection(base_url, loop_key)
@@ -276,7 +276,7 @@ class WebSocketTransport(Transport):
             "data": self._serialize_result(task),
         }
 
-        loop_key = f"{agent_url}_{id(asyncio.get_running_loop())}"
+        loop_key = f"{agent_url}_{id(asyncio.get_running_loop())}_default"
         lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
         async with lock:
             conn = await self._ensure_client_connection(agent_url, loop_key)

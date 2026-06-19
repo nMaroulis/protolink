@@ -2,6 +2,7 @@ from protolink.client.request_spec import ClientRequestSpec
 from protolink.core.actions import RunAction
 from protolink.core.agent_card import AgentCard, AgentSkill
 from protolink.core.artifact import Artifact
+from protolink.core.cancellation import TaskCancellationRequest
 from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
 from protolink.core.message import Message
 from protolink.core.part import Part, RouteDecision
@@ -25,5 +26,6 @@ __all__ = [
     "RunContext",
     "RunEvent",
     "Task",
+    "TaskCancellationRequest",
     "TaskState",
 ]

@@ -1,6 +1,14 @@
 """Core module for Protolink framework."""
 
 from protolink.core.actions import RunAction
+from protolink.core.cancellation import (
+    CancellationToken,
+    TaskAlreadyRunningError,
+    TaskCancellationError,
+    TaskCancellationRequest,
+    TaskNotCancelableError,
+    TaskNotFoundError,
+)
 from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
 from protolink.core.policy import (
     ActionAuthorization,
@@ -27,6 +35,7 @@ __all__ = [
     "ApprovalHandler",
     "ApprovalRequest",
     "ApprovalRequiredError",
+    "CancellationToken",
     "CapabilityPolicy",
     "EventSink",
     "InMemoryEventSink",
@@ -37,4 +46,9 @@ __all__ = [
     "RunBudget",
     "RunContext",
     "RunEvent",
+    "TaskAlreadyRunningError",
+    "TaskCancellationError",
+    "TaskCancellationRequest",
+    "TaskNotCancelableError",
+    "TaskNotFoundError",
 ]
