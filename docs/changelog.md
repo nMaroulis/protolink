@@ -16,7 +16,8 @@
 NEW:
 
 - **Built-in LLM history compaction**
-  - Added `LLM.compact_history()` with `recent`, `tokens`, and `summary` strategies plus structured before/after results.
+  - Added the LLM-owned `HistoryCompactor` component with `recent`, `tokens`, and `summary` strategies plus structured before/after results.
+  - `LLM.compact_history()` remains as a concise facade while compaction algorithms, summaries, prompts, and tool construction live in the dedicated component.
   - Added the reserved `protolink_compact_history` runtime tool so agents can compact persistent context in response to explicit user requests.
   - Compaction preserves the leading system prompt and protected recent turns; summary generation is isolated and atomic on provider failures.
 

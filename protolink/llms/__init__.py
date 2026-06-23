@@ -6,6 +6,7 @@ from typing import Any
 __all__ = [
     "HistoryCompactionResult",
     "HistoryCompactionStrategy",
+    "HistoryCompactor",
     "LLMModelProfile",
     "LMStudioLLM",
     "MockLLM",
@@ -16,6 +17,7 @@ __all__ = [
 _EXPORTS = {
     "HistoryCompactionResult": "protolink.llms.compaction.HistoryCompactionResult",
     "HistoryCompactionStrategy": "protolink.llms.compaction.HistoryCompactionStrategy",
+    "HistoryCompactor": "protolink.llms.compaction.HistoryCompactor",
     "LLMModelProfile": "protolink.llms.metrics.LLMModelProfile",
     "LMStudioLLM": "protolink.llms.server.openai_compatible_client.LMStudioLLM",
     "MockLLM": "protolink.llms.mock_client.MockLLM",

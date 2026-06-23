@@ -142,7 +142,7 @@ This is especially useful for CLIs, dashboards, and budget-aware agents that wan
 
 ## History Compaction
 
-Every LLM wrapper inherits `LLM.compact_history()`. It mutates the existing `ConversationHistory` in place and returns a `HistoryCompactionResult` with before/after message and estimated-token counts.
+Every LLM wrapper owns a modular `HistoryCompactor` at `llm.compactor`. Its `compact()` method mutates the current `ConversationHistory` in place and returns a `HistoryCompactionResult` with before/after message and estimated-token counts. `LLM.compact_history()` remains as a convenient facade, so existing direct usage stays concise.
 
 ```python
 # Fastest: keep the system prompt and 19 newest messages.
@@ -163,7 +163,18 @@ report = llm.compact_history(
 )
 
 print(report.to_dict())
+
+# Equivalent component-oriented API:
+report = llm.compactor.compact("tokens", max_tokens=8_000)
 ```
+
+Three **strategies** cover different cost and fidelity needs:
+
+- ``"recent"`` keeps the system prompt and newest messages. It is the simplest and fastest option and makes no model call.
+- ``"tokens"`` keeps the newest chronological suffix that fits an estimated token budget. It makes no model call and uses the same optional tokenizer/fallback heuristic as LLM metrics.
+- ``"summary"`` asks this LLM to summarize older messages in one isolated call, replaces them with a system summary, and preserves the newest messages verbatim.
+
+The summary call receives a temporary ``ConversationHistory`` and does not write into the live history. If it fails or returns an empty summary, the live history remains unchanged.
 
 | Strategy | Model calls | Behavior | Best for |
 |----------|-------------|----------|----------|
@@ -259,6 +270,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `model_params` | `dict[str, Any]` | Model-specific parameters (temperature, max_tokens, etc.). |
 | `system_prompt` | `str` | Default system prompt for the model. |
 | `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. Automatically managed by the [Agent state system](agent.md#state-persistence) when enabled. |
+| `compactor` | `HistoryCompactor` | LLM-owned component that handles compaction algorithms, isolated summaries, and the reserved agent tool. |
 | `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
 | `metrics_profile` | `LLMModelProfile ⎪ None` | Optional model budget metadata for context-window percentage and cost estimates. |
 | `metrics_enabled` | `bool` | Whether metrics events are emitted when telemetry or an `event_callback` is attached. Defaults to `True`. |
@@ -280,6 +292,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `chat()` | `user_query: str, streaming: bool=False` | `str ⎪ AsyncIterator[str]` | High-level convenience method for standard chat usage. |
 | `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False, event_callback=None` | `Part` | **Async.** Execute controlled multi-step inference with tool calling, optional streaming LLM calls, and optional event observation. |
 | `compact_history()` | `strategy="recent", max_messages=20, max_tokens=4000, preserve_recent=6, summary_max_tokens=512` | `HistoryCompactionResult` | Compact live history using a message window, estimated token budget, or model-generated summary. |
+| `compactor.compact()` | Same as `compact_history()` | `HistoryCompactionResult` | Component-oriented form of the same operation. |
 | `configure_metrics()` | `profile=None, context_window=None, input_cost_per_million=None, output_cost_per_million=None` | `LLM` | Configure optional context/cost metadata used for emitted metrics. |
 | `build_system_prompt()` | `user_instructions, agent_cards, tools, action_mode=None, override_system_prompt=False, persist=False` | `str` | Build the final system prompt. `action_mode="json"` uses the portable JSON action contract; `action_mode="native"` uses provider-native tool instructions. If `persist=True`, preserves existing conversation history. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |

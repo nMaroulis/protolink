@@ -1,10 +1,11 @@
 import json
 from collections.abc import AsyncIterator
+from copy import deepcopy
 from typing import ClassVar
 
 import pytest
 
-from protolink import HistoryCompactionResult, HistoryCompactionStrategy
+from protolink import HistoryCompactionResult, HistoryCompactionStrategy, HistoryCompactor
 from protolink.core import ActionAuthorization, PolicyDecision, PolicyEffect, RunAction
 from protolink.llms.base import LLM
 from protolink.llms.compaction import HISTORY_COMPACTION_TOOL_NAME
@@ -46,8 +47,36 @@ def _seed_history(llm: LLM, count: int = 6) -> None:
 
 def test_compaction_types_are_part_of_public_api() -> None:
     strategy: HistoryCompactionStrategy = "recent"
+    llm = CompactionLLM()
+
     assert strategy == "recent"
     assert HistoryCompactionResult.__name__ == "HistoryCompactionResult"
+    assert isinstance(llm.compactor, HistoryCompactor)
+
+
+def test_compactor_follows_history_replaced_for_a_persistent_session() -> None:
+    llm = CompactionLLM()
+    compactor = llm.compactor
+    llm.history = ConversationHistory(system_prompt="resumed session")
+    for index in range(4):
+        llm.history.add_user(f"resumed-{index}")
+
+    result = compactor.compact("recent", max_messages=2)
+
+    assert result.after_messages == 2
+    assert [message["content"] for message in llm.history.messages] == ["resumed session", "resumed-3"]
+
+
+@pytest.mark.asyncio
+async def test_copied_llm_tool_stays_bound_to_copied_compactor() -> None:
+    llm = CompactionLLM()
+    _seed_history(llm, count=4)
+    copied_llm = deepcopy(llm)
+
+    await copied_llm.compactor.tool(strategy="recent", max_messages=2)
+
+    assert len(copied_llm.history) == 2
+    assert len(llm.history) == 5
 
 
 def test_recent_compaction_preserves_system_and_newest_messages() -> None:

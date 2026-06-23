@@ -27,7 +27,13 @@ from protolink.core import (
     TaskNotFoundError,
 )
 from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
-from protolink.llms import HistoryCompactionResult, HistoryCompactionStrategy, LLMModelProfile, create_llm
+from protolink.llms import (
+    HistoryCompactionResult,
+    HistoryCompactionStrategy,
+    HistoryCompactor,
+    LLMModelProfile,
+    create_llm,
+)
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task, TaskState
 from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
 from protolink.tools import BaseTool, Tool
@@ -53,6 +59,7 @@ __all__ = [
     "Graph",
     "HistoryCompactionResult",
     "HistoryCompactionStrategy",
+    "HistoryCompactor",
     "InMemoryEventSink",
     "LLMModelProfile",
     "LocalTraceRecorder",
