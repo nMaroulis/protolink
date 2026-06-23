@@ -140,6 +140,55 @@ When an `event_callback` or telemetry backend is attached, each model call insid
 
 This is especially useful for CLIs, dashboards, and budget-aware agents that want to show context pressure or session cost while a multi-step tool loop is running.
 
+## History Compaction
+
+Every LLM wrapper inherits `LLM.compact_history()`. It mutates the existing `ConversationHistory` in place and returns a `HistoryCompactionResult` with before/after message and estimated-token counts.
+
+```python
+# Fastest: keep the system prompt and 19 newest messages.
+report = llm.compact_history("recent", max_messages=20)
+
+# Local and budget-aware: keep a recent suffix near 8,000 estimated tokens.
+report = llm.compact_history(
+    "tokens",
+    max_tokens=8_000,
+    preserve_recent=6,
+)
+
+# Highest context fidelity: summarize old turns, preserve the newest 8 verbatim.
+report = llm.compact_history(
+    "summary",
+    preserve_recent=8,
+    summary_max_tokens=600,
+)
+
+print(report.to_dict())
+```
+
+| Strategy | Model calls | Behavior | Best for |
+|----------|-------------|----------|----------|
+| `recent` | 0 | Keeps the leading system prompt and newest `max_messages` messages. | A simple, fast sliding window. |
+| `tokens` | 0 | Keeps the newest chronological suffix near `max_tokens`, using `tiktoken` when installed or the built-in estimate otherwise. | Deterministic context-budget control. |
+| `summary` | 1 | Replaces older turns with a model-generated system summary and keeps `preserve_recent` turns verbatim. | Retaining decisions and constraints from long sessions. |
+
+The `tokens` limit is deliberately soft when the leading system prompt plus protected recent messages already exceed the budget: Protolink preserves those messages instead of silently removing the active request. The `summary` strategy makes its model call with a temporary history. The live history is changed only after a non-empty summary is returned, so a provider failure leaves it untouched.
+
+### Agent-requested compaction
+
+`LLM.infer()` exposes the reserved `protolink_compact_history` built-in tool in both JSON-action and provider-native tool modes. Its prompt tells the model to use that tool when a user explicitly asks to compact, trim, or summarize the agent's context. The action is dispatched through the normal policy boundary with the `llm.history.compact` capability.
+
+```python
+response = await agent.invoke(
+    "Compact your history using the summary strategy, then tell me what you retained.",
+    session_id="customer-42",
+)
+```
+
+When `state=["conversation"]` is enabled, the compacted history is saved through the normal session-state path at the end of the task. The built-in tool name is reserved and should not be reused for an application tool.
+
+!!! note "Compaction is explicit"
+    Protolink does not compact history automatically based on an arbitrary context threshold. Applications can call `compact_history()` deterministically, while agents can select the built-in tool in response to an explicit request. This keeps context loss visible and policy-controlled.
+
 ## LLM API Reference
 
 This section provides a detailed API reference for all LLM classes in Protolink. All LLM implementations inherit from the base `LLM` class and provide a consistent interface for generating responses.
@@ -230,6 +279,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `call_action_stream()` | `history, tools, agent_callback_available=False, agent_cards=None, chunk_callback=None` | `LLMActionResult` | Streaming equivalent of `call_action()`. Native-stream providers consume tool-call events; fallback providers stream JSON text and parse it after completion. |
 | `chat()` | `user_query: str, streaming: bool=False` | `str ⎪ AsyncIterator[str]` | High-level convenience method for standard chat usage. |
 | `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False, event_callback=None` | `Part` | **Async.** Execute controlled multi-step inference with tool calling, optional streaming LLM calls, and optional event observation. |
+| `compact_history()` | `strategy="recent", max_messages=20, max_tokens=4000, preserve_recent=6, summary_max_tokens=512` | `HistoryCompactionResult` | Compact live history using a message window, estimated token budget, or model-generated summary. |
 | `configure_metrics()` | `profile=None, context_window=None, input_cost_per_million=None, output_cost_per_million=None` | `LLM` | Configure optional context/cost metadata used for emitted metrics. |
 | `build_system_prompt()` | `user_instructions, agent_cards, tools, action_mode=None, override_system_prompt=False, persist=False` | `str` | Build the final system prompt. `action_mode="json"` uses the portable JSON action contract; `action_mode="native"` uses provider-native tool instructions. If `persist=True`, preserves existing conversation history. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
@@ -304,7 +354,7 @@ The loop is otherwise identical in both modes:
 1. **Prompt selection**: `Agent.call_llm()` builds either the JSON prompt or the native-tool prompt. Streaming calls use the native prompt only when `llm.supports_native_action_stream` is true; otherwise they force JSON mode so small/local models keep the simple contract.
 2. **Action acquisition**: `LLM.infer()` calls `call_action()` for non-streaming runs or `call_action_stream()` for streaming runs. These methods return an `LLMActionResult`, not raw provider data.
 3. **Action validation**: JSON mode validates the parsed object against the typed action union. Native mode validates the normalized provider tool call against the same `FinalAction`, `ToolCallAction`, or `AgentCallAction` models.
-4. **Runtime dispatch**: The runtime executes local tools, delegates to agents, or returns a final answer. The LLM declares intent only; Protolink performs all side effects.
+4. **Runtime dispatch**: The runtime executes local tools, the reserved history-compaction tool, delegates to agents, or returns a final answer. The LLM declares intent only; Protolink performs all side effects.
 5. **Observation injection**: Tool and agent results are added back to `ConversationHistory` through provider-specific injection hooks when needed, or through the provider-neutral fallback message format.
 6. **Iteration**: The loop repeats until a `final` action is produced or a guardrail stops execution.
 

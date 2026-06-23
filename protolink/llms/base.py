@@ -98,6 +98,16 @@ from protolink.llms.actions import (
     prompt_action_schema,
     validate_action_payload,
 )
+from protolink.llms.compaction import (
+    HISTORY_COMPACTION_TOOL_NAME,
+    HistoryCompactionResult,
+    HistoryCompactionStrategy,
+    append_history_compaction_prompt,
+    build_summary_history,
+    compact_conversation_history,
+    create_history_compaction_tool,
+    extract_summary,
+)
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import (
     LLMCallMetrics,
@@ -250,6 +260,67 @@ class LLM(ABC):
     def metrics_profile(self) -> LLMModelProfile | None:
         """Return the optional model profile used for context/cost metrics."""
         return self._metrics_profile
+
+    def compact_history(
+        self,
+        strategy: HistoryCompactionStrategy = "recent",
+        *,
+        max_messages: int = 20,
+        max_tokens: int = 4_000,
+        preserve_recent: int = 6,
+        summary_max_tokens: int = 512,
+    ) -> HistoryCompactionResult:
+        """Compact this LLM's conversation history in place.
+
+        Three strategies cover different cost and fidelity needs:
+
+        - ``"recent"`` keeps the system prompt and newest messages. It is the
+          simplest and fastest option and makes no model call.
+        - ``"tokens"`` keeps the newest chronological suffix that fits an
+          estimated token budget. It makes no model call and uses the same
+          optional tokenizer/fallback heuristic as LLM metrics.
+        - ``"summary"`` asks this LLM to summarize older messages in one
+          isolated call, replaces them with a system summary, and preserves the
+          newest messages verbatim.
+
+        The summary call receives a temporary ``ConversationHistory`` and does
+        not write into the live history. If it fails or returns an empty
+        summary, the live history remains unchanged.
+
+        Args:
+            strategy: ``"recent"``, ``"tokens"``, or ``"summary"``.
+            max_messages: Retained-message limit for ``"recent"``, including
+                the leading system prompt when one exists.
+            max_tokens: Estimated token ceiling for ``"tokens"``. The leading
+                system prompt and protected recent messages may exceed it.
+            preserve_recent: Newest non-system messages that ``"tokens"`` and
+                ``"summary"`` must preserve verbatim.
+            summary_max_tokens: Requested maximum summary length for the
+                intelligent ``"summary"`` strategy.
+
+        Returns:
+            A ``HistoryCompactionResult`` with message and token deltas.
+        """
+        summarizer = self._summarize_history_messages if strategy == "summary" else None
+        return compact_conversation_history(
+            self.history,
+            strategy=strategy,
+            model=self.model,
+            max_messages=max_messages,
+            max_tokens=max_tokens,
+            preserve_recent=preserve_recent,
+            summary_max_tokens=summary_max_tokens,
+            summarizer=summarizer,
+        )
+
+    def _summarize_history_messages(
+        self,
+        messages: list[dict[str, Any]],
+        summary_max_tokens: int,
+    ) -> str:
+        """Summarize old messages through one isolated provider call."""
+        summary_history = build_summary_history(messages, summary_max_tokens)
+        return extract_summary(self.call(summary_history))
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)
@@ -577,6 +648,11 @@ class LLM(ABC):
         build_system_prompt : Constructs the system prompt with tools and agents.
         """
 
+        if HISTORY_COMPACTION_TOOL_NAME in tools:
+            raise ValueError(f"{HISTORY_COMPACTION_TOOL_NAME!r} is reserved by the LLM runtime")
+        tools = dict(tools)
+        tools[HISTORY_COMPACTION_TOOL_NAME] = create_history_compaction_tool(self.compact_history)
+
         if cancellation_token is not None:
             cancellation_token.raise_if_cancelled()
 
@@ -816,7 +892,7 @@ class LLM(ABC):
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
                     runtime_action = RunAction(
-                        kind="tool.call",
+                        kind=("llm.history.compact" if tool_name == HISTORY_COMPACTION_TOOL_NAME else "tool.call"),
                         name=tool_name,
                         payload={"arguments": tool_args},
                         capabilities=frozenset(getattr(tool, "capabilities", None) or ()),
@@ -1545,6 +1621,7 @@ class LLM(ABC):
         if override_system_prompt:
             self.system_prompt = user_instructions or ""
         else:
+            tools = append_history_compaction_prompt(tools)
             # Guardrail: Prevent agent from delegating to itself and provide ID
             agent_identity_prompt = ""
             if agent_name:

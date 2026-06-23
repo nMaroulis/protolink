@@ -236,6 +236,22 @@ class ConversationHistory:
         """
         return [msg.to_dict() for msg in self._messages]
 
+    def replace(self, messages_data: Iterable[dict[str, Any]]) -> None:
+        """Replace all messages while preserving this history object's identity.
+
+        This is primarily useful for transformations such as history
+        compaction. Rebuilding the internal deque in one operation keeps
+        external references to the ``ConversationHistory`` instance valid and
+        rehydrates every message through the canonical ``LLMMessage`` model.
+
+        Args:
+            messages_data: Full message dictionaries in chronological order,
+                such as the output of :meth:`to_list`.
+
+        Time: O(N)
+        """
+        self._messages = deque(LLMMessage.from_dict(message) for message in messages_data)
+
     @classmethod
     def from_list(cls, messages_data: list[dict[str, Any]]) -> ConversationHistory:
         """Create a history instance from a list of full message dictionaries.

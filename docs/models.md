@@ -1117,6 +1117,9 @@ Manages conversation state in a provider-agnostic way.
 #### `to_list() -> list[dict[str, Any]]`
 Convert the entire history into a list of full message dictionaries. Used for persistence.
 
+#### `replace(messages_data: Iterable[dict[str, Any]]) -> None`
+Replace all messages from full message dictionaries while preserving the `ConversationHistory` object's identity. Used by history transformations such as `LLM.compact_history()`.
+
 #### `from_list(messages_data: list[dict[str, Any]]) -> ConversationHistory` `classmethod`
 Restore a conversation history from a list of message dictionaries.
 
@@ -1134,3 +1137,6 @@ Wipes all history and sets a new system prompt.
 
 #### `set_system(system_prompt: str)`
 Updates the system prompt (at index 0) while preserving all subsequent conversation turns.
+
+#### `truncate(max_messages: int)`
+Keep at most `max_messages` messages using the low-level deque truncation operation. For provider-neutral compaction with structured results, token budgets, and summarization, prefer [`LLM.compact_history()`](llm.md#history-compaction).

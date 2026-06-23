@@ -15,6 +15,15 @@
 
 NEW:
 
+- **Built-in LLM history compaction**
+  - Added `LLM.compact_history()` with `recent`, `tokens`, and `summary` strategies plus structured before/after results.
+  - Added the reserved `protolink_compact_history` runtime tool so agents can compact persistent context in response to explicit user requests.
+  - Compaction preserves the leading system prompt and protected recent turns; summary generation is isolated and atomic on provider failures.
+
+### [v0.6.1] - 2026-06-21
+
+NEW:
+
 - **Live task cancellation**
   - Added `CancellationToken`, `TaskCancellationRequest`, and an active-task registry that separates serializable canceled state from process-local execution control.
   - Added direct and remote task-ID cancellation through `Agent.cancel_task()` and `AgentClient.cancel_task()` across HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport.
