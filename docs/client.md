@@ -120,6 +120,8 @@ async for event in client.send_task_streaming("http://localhost:8010", task):
 
 Applications that need a stable UI or replay contract can normalize these transport events with `RunEvent.from_task_event(...)` or record them through `InMemoryEventSink`. See [Runtime](runtime.md) for the versioned run-event envelope.
 
+SSE and WebSocket transports recursively convert nested Protolink models and dataclasses into JSON-compatible values. Tool and delegated-agent events therefore preserve structured results such as `ToolOutput` inside `content` or `metadata`; clients do not need a custom encoder for these framework event payloads.
+
 ---
 
 ### `cancel_task()`

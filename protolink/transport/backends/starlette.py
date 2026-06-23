@@ -220,25 +220,3 @@ class StarletteBackend(BackendInterface):
             finally:
                 self._server_task = None
                 self._server_instance = None
-
-    # ----------------------------------------------------------------------
-    # Utilities
-    # ----------------------------------------------------------------------
-
-    def _serialize_result(self, result):
-        """Recursively normalize rich domain models into strictly JSON-compatible structures.
-
-        Starlette's native `JSONResponse` requires purely dict/list primitives. This utility ensures
-        that Protolink `BaseModel`s, DataClasses, or arbitrary nested lists are aggressively flattened
-        prior to final response dispatch.
-        """
-        if hasattr(result, "to_json"):
-            return result.to_json()
-        elif hasattr(result, "to_dict"):
-            return result.to_dict()
-        elif hasattr(result, "model_dump"):
-            return result.model_dump()
-        elif isinstance(result, list):
-            return [self._serialize_result(item) for item in result]
-        else:
-            return result

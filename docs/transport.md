@@ -128,6 +128,9 @@ transport = HTTPTransport(url="http://localhost:8000", backend="fastapi", valida
 
 `HTTPTransport` sends and receives JSON payloads that match the core models' `to_dict()` methods. A typical `Task` request body looks like this:
 
+!!! note "Recursive JSON normalization"
+    Starlette and FastAPI normalize transport results recursively before JSON encoding. Nested Protolink dataclasses such as `ToolOutput`, objects exposing `to_dict()` or `model_dump()`, mappings, and collections are converted into JSON-compatible values even when they appear inside event content or metadata. WebSocket responses use the same normalization path.
+
 ```json
 {
   "id": "8c1e93b3-9f72-4a37-8c4c-3d2d8a9c4f7c",
@@ -467,6 +470,8 @@ data: {"jsonrpc":"2.0","id":"...","ok":true,"result":{"type":"task_llm_stream"},
 ```
 
 The stream ends when `final` is `true`. If an error occurs, the envelope uses `ok: false` and includes an `error` object.
+
+Event results are normalized recursively before the SSE frame is encoded. For example, a `TaskLLMStreamEvent` carrying a delegated tool result inside `metadata` sends the structured `ToolOutput` fields (`call_id`, `result`, and `error`) as JSON rather than failing the stream when it encounters the Python dataclass. The same guarantee applies to WebSocket stream payloads.
 
 ### API
 

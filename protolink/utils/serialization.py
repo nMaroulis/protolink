@@ -5,6 +5,7 @@ for Protolink objects.
 """
 
 import json
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from typing import Any, TypeVar, cast, overload
 
@@ -79,23 +80,31 @@ class Serializer:
 
     @staticmethod
     def serialize_to_dict(obj: Any) -> dict[str, Any] | Any:
-        """Serialize an object to a dictionary.
+        """Recursively convert an object into JSON-compatible values.
 
         Args:
             obj: Object to serialize
 
         Returns:
-            Dictionary representation of the object
+            A JSON-compatible dictionary, list, or primitive value.
 
         Raises:
-            TypeError: If the object cannot be converted to a dictionary
+            TypeError: If the object cannot be converted to JSON-compatible values.
         """
-        if hasattr(obj, "to_dict"):
-            return obj.to_dict()
+        if hasattr(obj, "to_json"):
+            return Serializer.serialize_to_dict(obj.to_json())
+        elif hasattr(obj, "to_dict"):
+            return Serializer.serialize_to_dict(obj.to_dict())
+        elif hasattr(obj, "model_dump"):
+            return Serializer.serialize_to_dict(obj.model_dump())
+        elif is_dataclass(obj) and not isinstance(obj, type):
+            return Serializer.serialize_to_dict(asdict(obj))
         elif isinstance(obj, dict):
             return {k: Serializer.serialize_to_dict(v) for k, v in obj.items()}
         elif isinstance(obj, (list, tuple, set)):
             return [Serializer.serialize_to_dict(item) for item in obj]
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
         elif isinstance(obj, (str, int, float, bool)) or obj is None:
             return obj
         else:

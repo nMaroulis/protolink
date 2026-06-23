@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from protolink.server.endpoint_handler import EndpointSpec
+from protolink.utils.serialization import Serializer
 
 if TYPE_CHECKING:
     from protolink.security.auth import Authenticator
@@ -44,3 +45,7 @@ class BackendInterface(ABC):
 
         parsed = urlparse(url.rstrip("/"))
         return parsed.hostname, parsed.port
+
+    def _serialize_result(self, result: object) -> object:
+        """Recursively normalize a transport result into JSON-compatible values."""
+        return Serializer.serialize_to_dict(result)

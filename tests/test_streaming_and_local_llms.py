@@ -1,11 +1,18 @@
+import json
+
 import pytest
 
 from protolink.agents import Agent
 from protolink.client import AgentClient
+from protolink.core.events import TaskLLMStreamEvent
+from protolink.core.part import ToolOutput
 from protolink.core.task import Task
 from protolink.llms import create_llm
+from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport import Transport
+from protolink.transport.backends import FastAPIBackend, StarletteBackend
 from protolink.transport.sse_jsonrpc_transport import SSEJSONRPCTransport
+from protolink.transport.websocket_transport import WebSocketTransport
 
 
 class _FakeStreamingTransport(Transport):
@@ -57,6 +64,67 @@ def test_sse_jsonrpc_parse_event():
 
     assert result == {"type": "event"}
     assert final is True
+
+
+@pytest.mark.parametrize("backend_type", [StarletteBackend, FastAPIBackend])
+@pytest.mark.asyncio
+async def test_sse_backend_serializes_nested_tool_output(backend_type):
+    tool_output = ToolOutput(call_id="call-1", result={"path": ".", "entries": ["README.md"]})
+
+    async def stream_handler(_task):
+        yield TaskLLMStreamEvent(
+            task_id="task-1",
+            agent_name="coder",
+            llm_event_type="tool_result",
+            metadata={"action": {"output": tool_output}},
+        )
+
+    endpoint = EndpointSpec(
+        name="task_stream",
+        path="/tasks/stream",
+        method="POST",
+        handler=stream_handler,
+        streaming=True,
+        mode="stream",
+        request_source="body",
+    )
+    backend = backend_type()
+
+    frames = [
+        frame
+        async for frame in backend._stream_sse(
+            ep=endpoint,
+            handler_input={"task_id": "task-1"},
+            payload={"task_id": "task-1"},
+            request_id="request-1",
+        )
+    ]
+
+    event_envelope = json.loads(frames[0].removeprefix("data: "))
+    assert event_envelope["ok"] is True
+    assert event_envelope["result"]["metadata"]["action"]["output"] == {
+        "call_id": "call-1",
+        "result": {"path": ".", "entries": ["README.md"]},
+        "error": None,
+    }
+    assert json.loads(frames[-1].removeprefix("data: "))["final"] is True
+
+
+def test_websocket_transport_serializes_nested_tool_output():
+    transport = WebSocketTransport(url="ws://localhost:9999")
+    event = TaskLLMStreamEvent(
+        task_id="task-1",
+        llm_event_type="tool_result",
+        metadata={"output": ToolOutput(call_id="call-1", result="done")},
+    )
+
+    payload = transport._serialize_result(event)
+
+    assert payload["metadata"]["output"] == {
+        "call_id": "call-1",
+        "result": "done",
+        "error": None,
+    }
 
 
 @pytest.mark.asyncio

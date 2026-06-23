@@ -8,14 +8,13 @@ from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
-from pydantic import BaseModel
-
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport.base import Transport
 from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
+from protolink.utils.serialization import Serializer
 
 try:
     import websockets
@@ -490,17 +489,7 @@ class WebSocketTransport(Transport):
         that rich domain models (like Pydantic ``BaseModel``, custom DataClasses, or nested lists)
         are aggressively flattened into basic Python dictionaries prior to `json.dumps()` serialization.
         """
-        if hasattr(result, "to_json"):
-            return result.to_json()
-        if hasattr(result, "to_dict"):
-            return result.to_dict()
-        if hasattr(result, "model_dump"):
-            return result.model_dump()
-        if isinstance(result, BaseModel):
-            return result.model_dump()
-        if isinstance(result, list):
-            return [self._serialize_result(item) for item in result]
-        return result
+        return Serializer.serialize_to_dict(result)
 
     def _get_host_port(self, url: str) -> tuple[str | None, int | None]:
         """Parse a ``ws://`` or ``wss://`` URL and return (host, port)."""

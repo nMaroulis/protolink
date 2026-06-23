@@ -11,7 +11,7 @@
 
 ## Release Notes
 
-### [v0.6.1] - TBA
+### [v0.6.2] - 2026-06-24
 
 NEW:
 
@@ -20,6 +20,21 @@ NEW:
   - `LLM.compact_history()` remains as a concise facade while compaction algorithms, summaries, prompts, and tool construction live in the dedicated component.
   - Added the reserved `protolink_compact_history` runtime tool so agents can compact persistent context in response to explicit user requests.
   - Compaction preserves the leading system prompt and protected recent turns; summary generation is isolated and atomic on provider failures.
+
+FIXED:
+
+- **Nested transport payload serialization**
+  - Starlette and FastAPI SSE backends now recursively normalize nested framework objects before encoding JSON-RPC event frames.
+  - Delegated and tool-result events containing a `ToolOutput` dataclass in `content` or `metadata` no longer terminate the stream with `TypeError: Object of type ToolOutput is not JSON serializable`.
+  - WebSocket streaming now uses the same shared recursive serializer for consistent event payloads across network transports.
+
+DOCS:
+
+- Documented recursive JSON normalization and structured tool-result behavior in the transport and client streaming guides.
+
+TESTS:
+
+- Added Starlette, FastAPI, and WebSocket regression coverage for nested `ToolOutput` stream payloads.
 
 ### [v0.6.1] - 2026-06-21
 
