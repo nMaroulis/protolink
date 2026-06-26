@@ -11,7 +11,7 @@
 
 # Release Notes
 
-## [v0.6.3] - [Unreleased]
+## [v0.6.3] - 2026-06-26
 
 ### Added
 
@@ -25,6 +25,10 @@
   - Added `StateOperationRequest`, `StateStoreReport`, and `StateOperationResult` for typed describe, reset, and compact reports over agent state.
   - Added `Agent.describe_state()`, `Agent.reset_state()`, and `Agent.compact_state()` plus matching `AgentClient` request specs for `POST /state/describe`, `POST /state/reset`, and `POST /state/compact`.
   - State operations run through runtime policy capabilities (`state.describe`, `state.reset`, `state.compact`, and `llm.history.compact`) before reading or mutating state.
+- **Run reports, replay, and redaction**
+  - Added `RunReport`, `RunRecorder`, `RunReplay`, `assert_run_events()`, `assert_no_denied_actions()`, and `assert_budget_under()` for durable app-facing run summaries and golden-run integration tests.
+  - Added `RedactionPolicy` and `DEFAULT_REDACTION_POLICY` so reports and local telemetry share one recursive secret-masking surface.
+  - `RunEvent` now exposes optional `span_id`, `parent_span_id`, `action_id`, `parent_action_id`, and `delegation_id` fields for causal UI routes and replay tools.
 
 ### Changed
 

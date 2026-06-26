@@ -28,7 +28,7 @@ class LlamaCPPLocalLLM(LocalLLM):
     provider: ClassVar[LLMProvider] = "llama.cpp-local"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 0.8,
-        "max_tokens": 1024,
+        "max_tokens": 8192,
     }
 
     def __init__(

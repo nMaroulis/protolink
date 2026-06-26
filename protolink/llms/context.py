@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from protolink.core.redaction import RedactionPolicy
 from protolink.core.run_context import RunContext
 from protolink.llms.history import ConversationHistory, LLMMessage, LLMMessageRole
 from protolink.llms.metrics import LLMModelProfile, estimate_token_count
@@ -68,9 +69,14 @@ class ContextManifest:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: utc_now())
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the manifest into a JSON-compatible dictionary."""
-        return {
+    def to_dict(self, *, redaction_policy: RedactionPolicy | None = None) -> dict[str, Any]:
+        """Serialize the manifest into a JSON-compatible dictionary.
+
+        Args:
+            redaction_policy: Optional policy used to mask secrets before the
+                dictionary is returned.
+        """
+        data = {
             "run_id": self.run_id,
             "session_id": self.session_id,
             "agent_name": self.agent_name,
@@ -87,6 +93,9 @@ class ContextManifest:
             "metadata": self.metadata,
             "created_at": self.created_at,
         }
+        if redaction_policy is not None:
+            return redaction_policy.redact(data)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ContextManifest:

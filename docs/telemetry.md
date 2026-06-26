@@ -83,7 +83,9 @@ print(llm_span["metadata"]["llm_metrics"])
 
 The same data is emitted live as `context_prepared`, `llm_context`, and `llm_call_metrics` events through `event_callback`, so terminal apps can render a status line such as context used, call latency, and session cost while the agent is still running.
 
-For application-facing stream snapshots, use `RunEvent` and `InMemoryEventSink` from the [Runtime](runtime.md) layer. Telemetry keeps detailed traces and spans; run events provide the stable progress envelope for UIs, CLIs, and golden tests.
+For application-facing stream snapshots, use `RunEvent`, `RunRecorder`, and `RunReport` from the [Runtime](runtime.md) layer. Telemetry keeps detailed traces and spans; run events and reports provide the stable progress envelope for UIs, CLIs, durable summaries, and golden tests.
+
+Local trace telemetry and runtime reports share the same default `RedactionPolicy`, so common secret-bearing fields such as API keys, tokens, passwords, authorization headers, and credentials are masked consistently before data is persisted.
 
 !!! note "Cost estimates"
     Protolink does not ship a fixed provider pricing catalog. Prices and context windows are application-owned metadata passed through `LLMModelProfile`, which keeps the core package stable and avoids stale billing assumptions.

@@ -1,6 +1,7 @@
 from protolink.__version__ import __version__
 from protolink.agents import Agent
 from protolink.core import (
+    DEFAULT_REDACTION_POLICY,
     ActionAuthorization,
     ActionAuthorizer,
     ActionDeniedError,
@@ -22,15 +23,22 @@ from protolink.core import (
     Policy,
     PolicyDecision,
     PolicyEffect,
+    RedactionPolicy,
     RunAction,
     RunBudget,
     RunContext,
     RunEvent,
+    RunRecorder,
+    RunReplay,
+    RunReport,
     TaskAlreadyRunningError,
     TaskCancellationError,
     TaskCancellationRequest,
     TaskNotCancelableError,
     TaskNotFoundError,
+    assert_budget_under,
+    assert_no_denied_actions,
+    assert_run_events,
 )
 from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
 from protolink.llms import (
@@ -50,6 +58,7 @@ from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
 from protolink.tools import BaseTool, Tool
 
 __all__ = [
+    "DEFAULT_REDACTION_POLICY",
     "ActionAuthorization",
     "ActionAuthorizer",
     "ActionDeniedError",
@@ -91,11 +100,15 @@ __all__ = [
     "Policy",
     "PolicyDecision",
     "PolicyEffect",
+    "RedactionPolicy",
     "Router",
     "RunAction",
     "RunBudget",
     "RunContext",
     "RunEvent",
+    "RunRecorder",
+    "RunReplay",
+    "RunReport",
     "StateOperationRequest",
     "StateOperationResult",
     "StateStoreReport",
@@ -108,6 +121,9 @@ __all__ = [
     "TaskState",
     "Tool",
     "__version__",
+    "assert_budget_under",
+    "assert_no_denied_actions",
+    "assert_run_events",
     "build_context_manifest",
     "create_llm",
 ]

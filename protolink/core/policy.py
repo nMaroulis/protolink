@@ -15,6 +15,7 @@ from enum import Enum
 from typing import Any, Protocol
 
 from protolink.core.actions import RunAction
+from protolink.core.redaction import RedactionPolicy
 from protolink.core.run_context import RunContext
 from protolink.utils import utc_now
 from protolink.utils.id_generator import IDGenerator
@@ -101,9 +102,14 @@ class ApprovalRequest:
     created_at: str = field(default_factory=lambda: utc_now())
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the request into a JSON-compatible dictionary."""
-        return {
+    def to_dict(self, *, redaction_policy: RedactionPolicy | None = None) -> dict[str, Any]:
+        """Serialize the request into a JSON-compatible dictionary.
+
+        Args:
+            redaction_policy: Optional policy used to mask secrets before the
+                dictionary is returned.
+        """
+        data = {
             "request_id": self.request_id,
             "run_id": self.run_id,
             "action": self.action.to_dict(),
@@ -111,6 +117,9 @@ class ApprovalRequest:
             "created_at": self.created_at,
             "metadata": self.metadata,
         }
+        if redaction_policy is not None:
+            return redaction_policy.redact(data)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ApprovalRequest:

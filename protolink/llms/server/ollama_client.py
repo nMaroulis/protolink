@@ -31,7 +31,8 @@ class OllamaLLM(ServerLLM):
     DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"  # lightweight model
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
-        "num_predict": 8192,  # Prevent truncated JSON output
+        "num_predict": 8192,
+        "num_ctx": 8192,  # Prevent truncated JSON output
     }
     REQUEST_TIMEOUT: ClassVar[int] = 90
 

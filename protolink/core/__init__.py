@@ -32,9 +32,19 @@ from protolink.core.policy import (
     PolicyDecision,
     PolicyEffect,
 )
+from protolink.core.redaction import DEFAULT_REDACTION_POLICY, RedactionPolicy
+from protolink.core.report import (
+    RunRecorder,
+    RunReplay,
+    RunReport,
+    assert_budget_under,
+    assert_no_denied_actions,
+    assert_run_events,
+)
 from protolink.core.run_context import RunBudget, RunContext
 
 __all__ = [
+    "DEFAULT_REDACTION_POLICY",
     "ActionAuthorization",
     "ActionAuthorizer",
     "ActionDeniedError",
@@ -56,13 +66,20 @@ __all__ = [
     "Policy",
     "PolicyDecision",
     "PolicyEffect",
+    "RedactionPolicy",
     "RunAction",
     "RunBudget",
     "RunContext",
     "RunEvent",
+    "RunRecorder",
+    "RunReplay",
+    "RunReport",
     "TaskAlreadyRunningError",
     "TaskCancellationError",
     "TaskCancellationRequest",
     "TaskNotCancelableError",
     "TaskNotFoundError",
+    "assert_budget_under",
+    "assert_no_denied_actions",
+    "assert_run_events",
 ]

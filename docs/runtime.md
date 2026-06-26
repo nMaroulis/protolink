@@ -412,6 +412,9 @@ Each `RunEvent` includes:
 | `agent_name` | Agent that emitted or handled the event. |
 | `sequence` | Monotonic event sequence assigned by the sink. |
 | `step` | Optional LLM or runtime step. |
+| `span_id` / `parent_span_id` | Optional causal span IDs for UI trees and replay views. |
+| `action_id` / `parent_action_id` | Optional runtime action IDs for tool, approval, and delegated-agent events. |
+| `delegation_id` | Optional delegated-agent operation ID. |
 | `severity` | `info`, `warning`, or `error` for renderers and logs. |
 | `summary` | Short progress text for CLIs, UIs, and logs. |
 | `payload` | Full original task-event payload. |
@@ -441,11 +444,11 @@ Action lifecycle activity is also promoted into stable event types:
 | `action.completed` | The operation completed successfully. |
 | `action.denied` / `action.failed` | Policy denied the operation or execution failed. |
 
-The promoted `manifest`, `action`, `request`, `decision`, and `action_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
+The promoted `manifest`, `action`, `request`, `decision`, `action_id`, `parent_action_id`, `span_id`, `parent_span_id`, and `delegation_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
 
 ## Event Sinks
 
-`EventSink` is the protocol for consumers of normalized `RunEvent` objects. `InMemoryEventSink` is the built-in implementation for tests, local apps, and replay tooling.
+`EventSink` is the protocol for consumers of normalized `RunEvent` objects. `InMemoryEventSink` is the built-in implementation for tests, local apps, and replay tooling. Use `RunRecorder` when you also want a durable `RunReport` after the stream completes.
 
 ```python
 from protolink import InMemoryEventSink, RunEvent
@@ -459,6 +462,48 @@ assert sink.to_list()[0]["sequence"] == 1
 Applications can implement their own sinks for terminal rendering, WebSocket fanout, database persistence, or custom observability systems without changing agent execution code.
 
 An event sink observes execution; it does not authorize it. Approval decisions still flow through the configured approval handler, while sinks distribute the resulting lifecycle to interested consumers.
+
+## Run Reports And Replay
+
+`RunReport` is the durable app-facing summary built from normalized events. It collects context manifests, action records, approval checkpoints, artifacts, LLM metrics, and the final serialized task when the final stream event includes it.
+
+```python
+from protolink import (
+    RedactionPolicy,
+    RunContext,
+    RunRecorder,
+    RunReplay,
+    assert_budget_under,
+    assert_no_denied_actions,
+    assert_run_events,
+)
+
+context = RunContext.from_task(task)
+recorder = RunRecorder(context=context)
+
+async for task_event in agent.handle_task_streaming(task):
+    await recorder.record_task_event(task_event)
+
+report = recorder.to_report(metadata={"source": "integration-test"})
+safe_json = report.to_dict(redaction_policy=RedactionPolicy())
+
+replay = RunReplay(safe_json)
+assert_run_events(replay, ["context.prepared", "llm.call.started", "llm.call.completed"])
+assert_no_denied_actions(replay)
+assert_budget_under(replay, max_total_tokens=8_000)
+```
+
+`RunReplay` never re-executes tools or model calls. It is a read-only view over report events with helpers such as `event_types`, `iter_events()`, and `find_events("context.prepared")`.
+
+The assertion helpers are intentionally small:
+
+| Helper | Use |
+|------|-----|
+| `assert_run_events(...)` | Verify that stable event types appeared, either exactly or as an ordered subsequence. |
+| `assert_no_denied_actions(...)` | Fail if policy, approval, or action events denied runtime work. |
+| `assert_budget_under(...)` | Aggregate report metrics and context manifests, then fail if token or runtime limits are exceeded. |
+
+Use `RedactionPolicy` whenever persisting reports, approval payloads, context manifests, or telemetry data. The default policy masks common fields such as API keys, tokens, passwords, secrets, authorization headers, and credentials.
 
 ## Complete Runnable Examples
 

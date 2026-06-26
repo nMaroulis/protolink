@@ -18,22 +18,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from protolink.core.redaction import DEFAULT_REDACTION_POLICY
 from protolink.models import Part, Task
 from protolink.telemetry.base import Telemetry
 from protolink.utils.id_generator import IDGenerator
 
 Redactor = Callable[[Any], Any]
-
-_SENSITIVE_KEYS = {
-    "api_key",
-    "apikey",
-    "authorization",
-    "client_secret",
-    "credentials",
-    "password",
-    "secret",
-    "token",
-}
 
 _current_trace: contextvars.ContextVar[Any] = contextvars.ContextVar("protolink_local_trace", default=None)
 _current_span_stack: contextvars.ContextVar[tuple[str, ...]] = contextvars.ContextVar(
@@ -108,27 +98,7 @@ def default_redactor(value: Any) -> Any:
     trace. Callers may layer a custom redactor on top through
     ``LocalTraceTelemetry(redactor=...)`` for application-specific policy.
     """
-    value = _to_jsonable(value)
-    if isinstance(value, dict):
-        redacted = {}
-        for key, item in value.items():
-            normalized = key.lower().replace("-", "_")
-            looks_secret = (
-                normalized in _SENSITIVE_KEYS
-                or normalized.endswith("_api_key")
-                or normalized.endswith("_secret")
-                or normalized.endswith("_token")
-                or normalized.endswith("_password")
-                or normalized.endswith("_credentials")
-            )
-            if looks_secret:
-                redacted[key] = "[REDACTED]"
-            else:
-                redacted[key] = default_redactor(item)
-        return redacted
-    if isinstance(value, list):
-        return [default_redactor(item) for item in value]
-    return value
+    return DEFAULT_REDACTION_POLICY.redact(value)
 
 
 @dataclass

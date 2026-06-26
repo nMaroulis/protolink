@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from protolink.core.redaction import RedactionPolicy
 from protolink.core.run_context import RUN_CONTEXT_METADATA_KEY, RunContext
 from protolink.utils import utc_now
 
@@ -60,6 +61,11 @@ class RunEvent:
         agent_name: Agent that emitted or handled the event.
         sequence: Monotonic sequence number assigned by an event sink.
         step: Optional inference/runtime step number.
+        span_id: Optional causal span identifier for UI trees and traces.
+        parent_span_id: Optional parent span identifier.
+        action_id: Optional runtime action identifier related to the event.
+        parent_action_id: Optional parent action identifier for nested actions.
+        delegation_id: Optional delegated-agent operation identifier.
         severity: Event severity for renderers and logs.
         summary: Short human-readable summary suitable for progress UIs.
         payload: Full structured event payload.
@@ -76,6 +82,11 @@ class RunEvent:
     agent_name: str | None = None
     sequence: int | None = None
     step: int | None = None
+    span_id: str | None = None
+    parent_span_id: str | None = None
+    action_id: str | None = None
+    parent_action_id: str | None = None
+    delegation_id: str | None = None
     severity: str = "info"
     summary: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
@@ -85,9 +96,14 @@ class RunEvent:
     version: str = RUN_EVENT_VERSION
     timestamp: str = field(default_factory=lambda: utc_now())
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the event into a JSON-compatible dictionary."""
-        return {
+    def to_dict(self, *, redaction_policy: RedactionPolicy | None = None) -> dict[str, Any]:
+        """Serialize the event into a JSON-compatible dictionary.
+
+        Args:
+            redaction_policy: Optional policy used to mask secrets before the
+                dictionary is returned.
+        """
+        data = {
             "event_id": self.event_id,
             "version": self.version,
             "type": self.type,
@@ -96,6 +112,11 @@ class RunEvent:
             "agent_name": self.agent_name,
             "sequence": self.sequence,
             "step": self.step,
+            "span_id": self.span_id,
+            "parent_span_id": self.parent_span_id,
+            "action_id": self.action_id,
+            "parent_action_id": self.parent_action_id,
+            "delegation_id": self.delegation_id,
             "severity": self.severity,
             "summary": self.summary,
             "payload": self.payload,
@@ -103,6 +124,9 @@ class RunEvent:
             "timestamp": self.timestamp,
             "metadata": self.metadata,
         }
+        if redaction_policy is not None:
+            return redaction_policy.redact(data)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "RunEvent":
@@ -116,6 +140,11 @@ class RunEvent:
             agent_name=_optional_str(data.get("agent_name")),
             sequence=_optional_int(data.get("sequence")),
             step=_optional_int(data.get("step")),
+            span_id=_optional_str(data.get("span_id")),
+            parent_span_id=_optional_str(data.get("parent_span_id")),
+            action_id=_optional_str(data.get("action_id")),
+            parent_action_id=_optional_str(data.get("parent_action_id")),
+            delegation_id=_optional_str(data.get("delegation_id")),
             severity=str(data.get("severity") or "info"),
             summary=_optional_str(data.get("summary")),
             payload=dict(data.get("payload") or {}),
@@ -150,6 +179,7 @@ class RunEvent:
         event_type = _normalized_event_type(source_type, payload)
         payload = _promote_runtime_payload(payload)
         run_context = _coerce_context(context) or _context_from_payload(payload)
+        relationships = _relationships_from_payload(payload)
 
         return cls(
             type=event_type,
@@ -158,6 +188,11 @@ class RunEvent:
             agent_name=_agent_name_from_payload(payload, run_context),
             sequence=sequence,
             step=_optional_int(payload.get("step")),
+            span_id=relationships["span_id"],
+            parent_span_id=relationships["parent_span_id"],
+            action_id=relationships["action_id"],
+            parent_action_id=relationships["parent_action_id"],
+            delegation_id=relationships["delegation_id"],
             severity=_severity_for_payload(source_type, payload),
             summary=_summary_for_payload(source_type, payload),
             payload=payload,
@@ -391,10 +426,65 @@ def _promote_runtime_payload(payload: dict[str, Any]) -> dict[str, Any]:
         return payload
 
     promoted = dict(payload)
-    for key in ("action", "action_id", "decision", "manifest", "request"):
+    for key in (
+        "action",
+        "action_id",
+        "decision",
+        "delegation_id",
+        "manifest",
+        "parent_action_id",
+        "parent_span_id",
+        "request",
+        "span_id",
+    ):
         if key in metadata:
             promoted[key] = metadata[key]
     return promoted
+
+
+def _relationships_from_payload(payload: dict[str, Any]) -> dict[str, str | None]:
+    """Extract causal IDs from promoted runtime payloads."""
+    metadata = _dict_value(payload.get("metadata"))
+    action = _dict_value(payload.get("action")) or _dict_value(metadata.get("action"))
+    request = _dict_value(payload.get("request")) or _dict_value(metadata.get("request"))
+    request_action = _dict_value(request.get("action"))
+    decision = _dict_value(payload.get("decision")) or _dict_value(metadata.get("decision"))
+
+    sources = (payload, metadata, action, request, request_action, decision)
+
+    def first_string(key: str) -> str | None:
+        for source in sources:
+            value = source.get(key)
+            if value is not None:
+                return str(value)
+        return None
+
+    action_id = first_string("action_id")
+    parent_action_id = first_string("parent_action_id")
+    delegation_id = first_string("delegation_id")
+    llm_type = payload.get("llm_event_type")
+    if delegation_id is None and llm_type in {"agent_call_start", "agent_call_result", "agent_call_error"}:
+        delegation_id = action_id
+
+    span_id = first_string("span_id")
+    if (
+        span_id is None
+        and action_id is not None
+        and str(payload.get("llm_event_type", "")).startswith(
+            ("action_", "approval_", "policy_", "tool_", "agent_call_")
+        )
+    ):
+        span_id = action_id
+
+    parent_span_id = first_string("parent_span_id") or parent_action_id
+
+    return {
+        "span_id": span_id,
+        "parent_span_id": parent_span_id,
+        "action_id": action_id,
+        "parent_action_id": parent_action_id,
+        "delegation_id": delegation_id,
+    }
 
 
 def _dict_value(value: Any) -> dict[str, Any]:
