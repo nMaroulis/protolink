@@ -216,8 +216,8 @@ class TestAgent:
     def test_agent_with_registry_string(self, agent_card):
         """Test agent initialization with registry URL string."""
         with (
-            patch("protolink.agents.base.RegistryClient") as mock_client_class,
-            patch("protolink.agents.base.get_transport") as mock_get_transport,
+            patch("protolink.agents.mixins.RegistryClient") as mock_client_class,
+            patch("protolink.agents.mixins.get_transport") as mock_get_transport,
         ):
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance

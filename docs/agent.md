@@ -131,6 +131,10 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 !!! info "Unified Agent Model"
     Unlike the original A2A specification, Protolink's `Agent` combines client and server functionality in a single class. You can send tasks/messages to other agents while also serving incoming requests.
 
+### Implementation Layout
+
+`protolink.agents.base.Agent` is the stable public facade. Internally, the agent package keeps the constructor and dependency wiring in `base.py`, the core task and LLM execution loop in `engine.py`, reusable behavior chunks in `mixins.py`, state-request normalization in `helpers.py`, and the blocking convenience facade in `sync.py`.
+
 ## Constructor
 
 | Parameter | Type | Default | Description |

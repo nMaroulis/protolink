@@ -133,8 +133,8 @@ Protolink uses **ty** for static type checking.
 # Run type checks
 ty check .
 
-# Check specific files
-ty check protolink/agents/base.py
+# Check one package area
+ty check protolink/agents
 ```
 
 !!! tip "Type Safety"
