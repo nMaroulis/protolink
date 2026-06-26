@@ -1,6 +1,14 @@
 """Core module for Protolink framework."""
 
 from protolink.core.actions import RunAction
+from protolink.core.budget import (
+    BudgetDecision,
+    BudgetDecisionEffect,
+    BudgetEnforcer,
+    BudgetExceededError,
+    BudgetPolicy,
+    BudgetUsage,
+)
 from protolink.core.cancellation import (
     CancellationToken,
     TaskAlreadyRunningError,
@@ -35,6 +43,12 @@ __all__ = [
     "ApprovalHandler",
     "ApprovalRequest",
     "ApprovalRequiredError",
+    "BudgetDecision",
+    "BudgetDecisionEffect",
+    "BudgetEnforcer",
+    "BudgetExceededError",
+    "BudgetPolicy",
+    "BudgetUsage",
     "CancellationToken",
     "CapabilityPolicy",
     "EventSink",

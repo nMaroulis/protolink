@@ -1620,6 +1620,7 @@ class Agent:
             event_callback=emit_inference_event if self.telemetry or event_callback else None,
             action_authorizer=authorize_inference_action,
             cancellation_token=active_token,
+            run_context=active_context,
         )
 
         if self.telemetry:

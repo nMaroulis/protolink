@@ -13,6 +13,14 @@
 
 ## [v0.6.3] - [Unreleased]
 
+### Added
+
+- **Context manifests and enforceable run budgets**
+  - Added `ContextManifest`, `ContextItem`, and `build_context_manifest()` so applications can inspect estimated system, history, tool/delegation, user, total, and context-window usage before every LLM call.
+  - Added `BudgetPolicy`, `BudgetEnforcer`, `BudgetDecision`, `BudgetUsage`, and `BudgetExceededError` to enforce `RunBudget` limits for steps, LLM calls, tool calls, runtime seconds, input tokens, and output tokens.
+  - `LLM.infer()` now emits additive `context_prepared`, `llm_call_started`, `llm_call_completed`, `budget_warning`, and `budget_exceeded` events while preserving existing low-level LLM events.
+  - `RunEvent` now promotes those events into stable `context.prepared`, `llm.call.started`, `llm.call.completed`, `budget.warning`, and `budget.exceeded` types for UI and golden-run consumers.
+  - `LLMModelProfile` now accepts descriptive capability metadata such as `supports_tools`, `supports_streaming`, `supports_json_schema`, and `tokenizer` without becoming a live model catalog.
 
 ### Changed
 

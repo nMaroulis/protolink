@@ -618,11 +618,21 @@ class LocalTraceTelemetry(Telemetry):
         event_type = str(event.get("type", "llm_event"))
         payload = dict(event)
 
-        if event_type == "llm_context":
+        if event_type == "context_prepared":
+            span = self._current_span()
+            manifest = event.get("manifest")
+            if span and isinstance(manifest, dict):
+                span.metadata["context_manifest"] = self._redact(manifest)
+        elif event_type == "llm_context":
             span = self._current_span()
             context = event.get("context")
             if span and isinstance(context, dict):
                 span.metadata["context"] = self._redact(context)
+        elif event_type in {"budget_warning", "budget_exceeded"}:
+            trace = self._trace()
+            decision = event.get("decision")
+            if trace and isinstance(decision, dict):
+                trace.metadata.setdefault("budget_decisions", []).append(self._redact(decision))
         elif event_type == "llm_call_metrics":
             metrics = {key: value for key, value in payload.items() if key != "type"}
             self._merge_llm_metrics(metrics)

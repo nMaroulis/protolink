@@ -81,6 +81,7 @@ if TYPE_CHECKING:
     from protolink.tools import BaseTool
 
 from protolink.core.actions import RunAction
+from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError, BudgetPolicy
 from protolink.core.cancellation import CancellationToken
 from protolink.core.part import Part
 from protolink.core.policy import (
@@ -89,6 +90,7 @@ from protolink.core.policy import (
     ActionPolicyError,
     ApprovalRequiredError,
 )
+from protolink.core.run_context import RunContext
 from protolink.llms.actions import (
     AgentCallAction,
     FinalAction,
@@ -103,6 +105,7 @@ from protolink.llms.compaction import (
     HistoryCompactionStrategy,
     HistoryCompactor,
 )
+from protolink.llms.context import ContextManifest, build_context_manifest
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import (
     LLMCallMetrics,
@@ -110,7 +113,6 @@ from protolink.llms.metrics import (
     LLMModelProfile,
     build_call_metrics,
     context_usage_from_tokens,
-    estimate_token_count,
     profile_from_value,
 )
 from protolink.llms.prompts import (
@@ -131,6 +133,15 @@ from protolink.tools import BaseTool
 from protolink.types import LLMProvider, LLMType, ReasoningLevel
 
 MAX_INFER_STEPS: int = 10  # safety against infinite loops
+
+
+def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext:
+    """Normalize an optional run context value for direct LLM usage."""
+    if isinstance(value, RunContext):
+        return value
+    if isinstance(value, dict):
+        return RunContext.from_dict(value)
+    return RunContext()
 
 
 class LLM(ABC):
@@ -460,6 +471,8 @@ class LLM(ABC):
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
         action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
         cancellation_token: CancellationToken | None = None,
+        run_context: RunContext | dict[str, Any] | None = None,
+        budget_policy: BudgetPolicy | None = None,
     ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -544,6 +557,12 @@ class LLM(ABC):
             Live process-local token checked before model calls and action
             dispatch. The owning Agent also cancels this coroutine directly so
             awaited provider, tool, and delegation operations stop promptly.
+        run_context : RunContext | dict, optional
+            Active run context used to correlate context manifests and enforce
+            ``RunBudget`` limits during the inference loop.
+        budget_policy : BudgetPolicy, optional
+            Policy used by the built-in ``BudgetEnforcer``. Omit this to use
+            the default allow/warn/deny policy.
 
         Returns
         -------
@@ -620,6 +639,8 @@ class LLM(ABC):
         if cancellation_token is not None:
             cancellation_token.raise_if_cancelled()
 
+        active_context = _coerce_run_context(run_context)
+        budget_enforcer = BudgetEnforcer(active_context, policy=budget_policy)
         self.history.add_user(query)
 
         steps: int = 0
@@ -631,6 +652,17 @@ class LLM(ABC):
         async def emit(event: dict[str, Any]) -> None:
             if event_callback is not None:
                 await event_callback(event)
+
+        async def emit_budget_decision(decision: BudgetDecision) -> None:
+            if decision.effect == "warn":
+                await emit({"type": "budget_warning", "decision": decision.to_dict()})
+            elif not decision.allowed:
+                await emit({"type": "budget_exceeded", "decision": decision.to_dict()})
+
+        async def enforce_budget(decision: BudgetDecision) -> None:
+            await emit_budget_decision(decision)
+            if not decision.allowed:
+                raise BudgetExceededError(decision)
 
         async def authorize_action(action: RunAction) -> ActionAuthorization | None:
             """Authorize one concrete action and emit its structured lifecycle."""
@@ -668,15 +700,28 @@ class LLM(ABC):
             if cancellation_token is not None:
                 cancellation_token.raise_if_cancelled()
             steps += 1
+            await enforce_budget(budget_enforcer.check_step(steps))
             await emit({"type": "llm_step", "step": steps})
             action_error: ValueError | None = None
             action_result: LLMActionResult | None = None
             call_metrics: LLMCallMetrics | None = None
+            manifest: ContextManifest = build_context_manifest(
+                history=self.history,
+                query=query,
+                run_context=active_context,
+                provider=str(getattr(self, "provider", "")) or None,
+                model=self.model,
+                profile=self.metrics_profile,
+                tools=tools,
+                agent_cards=agent_cards,
+            )
+            manifest_payload = manifest.to_dict()
+            await emit({"type": "context_prepared", "step": steps, "manifest": manifest_payload})
+            await enforce_budget(budget_enforcer.check_llm_call(input_tokens=manifest.total_estimated_tokens))
 
             if metrics_active:
-                context_tokens = estimate_token_count(self.history.messages, model=self.model)
                 context_usage: LLMContextUsage = context_usage_from_tokens(
-                    context_tokens,
+                    manifest.total_estimated_tokens,
                     self.metrics_profile,
                     estimated=True,
                 )
@@ -686,6 +731,7 @@ class LLM(ABC):
                         "step": steps,
                         "provider": self.provider,
                         "model": self.model,
+                        "manifest": manifest_payload,
                         "context": context_usage.to_dict(),
                     }
                 )
@@ -696,6 +742,16 @@ class LLM(ABC):
             try:
                 import time
 
+                await emit(
+                    {
+                        "type": "llm_call_started",
+                        "step": steps,
+                        "provider": self.provider,
+                        "model": self.model,
+                        "streaming": streaming,
+                        "manifest": manifest_payload,
+                    }
+                )
                 call_started_at = time.perf_counter()
                 if streaming:
 
@@ -725,7 +781,10 @@ class LLM(ABC):
                     action_obj = action_result.action
                 latency_ms = round((time.perf_counter() - call_started_at) * 1000, 3)
                 response_metadata = dict(action_result.metadata if action_result is not None else {})
-                if metrics_active and action_result is not None:
+                needs_call_metrics = (
+                    metrics_active or budget_enforcer.has_output_token_limit
+                ) and action_result is not None
+                if needs_call_metrics and action_result is not None:
                     call_metrics = build_call_metrics(
                         step=steps,
                         provider=str(getattr(self, "provider", "")) or None,
@@ -740,7 +799,22 @@ class LLM(ABC):
                     )
                     metrics_payload = call_metrics.to_dict()
                     response_metadata["metrics"] = metrics_payload
-                    await emit({"type": "llm_call_metrics", **metrics_payload})
+                    if metrics_active:
+                        await emit({"type": "llm_call_metrics", **metrics_payload})
+                    await enforce_budget(budget_enforcer.record_output_tokens(call_metrics.usage.output_tokens))
+                await emit(
+                    {
+                        "type": "llm_call_completed",
+                        "step": steps,
+                        "provider": self.provider,
+                        "model": self.model,
+                        "latency_ms": latency_ms,
+                        "streaming": streaming,
+                        "native": action_result.native if action_result is not None else False,
+                        "metrics": call_metrics.to_dict() if call_metrics else None,
+                        "budget": budget_enforcer.usage.to_dict(),
+                    }
+                )
                 await emit(
                     {
                         "type": "llm_response",
@@ -753,6 +827,8 @@ class LLM(ABC):
                 )
             except ValueError as e:
                 action_error = e
+            except BudgetExceededError:
+                raise
             except Exception as e:
                 await emit({"type": "llm_error", "step": steps, "message": str(e), "recoverable": False})
                 raise RuntimeError(f"LLM call failed at step {steps}: {e}") from e
@@ -855,6 +931,7 @@ class LLM(ABC):
                 try:
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
+                    await enforce_budget(budget_enforcer.check_tool_call())
                     runtime_action = RunAction(
                         kind="tool.call",
                         name=tool_name,
@@ -884,6 +961,8 @@ class LLM(ABC):
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
                 except ActionPolicyError:
+                    raise
+                except BudgetExceededError:
                     raise
                 except TypeError as e:
                     # Likely wrong arguments - help LLM correct
@@ -963,6 +1042,8 @@ class LLM(ABC):
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
                 except ActionPolicyError:
+                    raise
+                except BudgetExceededError:
                     raise
                 except ValueError as e:
                     # Agent not found or validation error - help LLM correct

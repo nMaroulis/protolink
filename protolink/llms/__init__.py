@@ -4,6 +4,8 @@ import importlib
 from typing import Any
 
 __all__ = [
+    "ContextItem",
+    "ContextManifest",
     "HistoryCompactionRequest",
     "HistoryCompactionResult",
     "HistoryCompactionStrategy",
@@ -12,10 +14,13 @@ __all__ = [
     "LMStudioLLM",
     "MockLLM",
     "OpenAICompatibleLLM",
+    "build_context_manifest",
     "create_llm",
 ]
 
 _EXPORTS = {
+    "ContextItem": "protolink.llms.context.ContextItem",
+    "ContextManifest": "protolink.llms.context.ContextManifest",
     "HistoryCompactionRequest": "protolink.llms.compaction.HistoryCompactionRequest",
     "HistoryCompactionResult": "protolink.llms.compaction.HistoryCompactionResult",
     "HistoryCompactionStrategy": "protolink.llms.compaction.HistoryCompactionStrategy",
@@ -24,6 +29,7 @@ _EXPORTS = {
     "LMStudioLLM": "protolink.llms.server.openai_compatible_client.LMStudioLLM",
     "MockLLM": "protolink.llms.mock_client.MockLLM",
     "OpenAICompatibleLLM": "protolink.llms.server.openai_compatible_client.OpenAICompatibleLLM",
+    "build_context_manifest": "protolink.llms.context.build_context_manifest",
     "create_llm": "protolink.llms.factory.create_llm",
 }
 

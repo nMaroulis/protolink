@@ -39,6 +39,8 @@ This lifecycle is not limited to LLM-selected tool calls. The same `RunAction` a
 | `Task` | What work and results are exchanged between participants? |
 | `RunContext` | Which run is this, and what constraints travel with it? |
 | `CancellationToken` | Has live cancellation been requested for active work? |
+| `ContextManifest` | What estimated prompt context is about to enter a model? |
+| `BudgetPolicy` / `BudgetEnforcer` | Is the run still under its configured execution limits? |
 | `RunAction` | What concrete operation is about to execute? |
 | `Artifact` | What output or pre-execution preview can be inspected? |
 | `PolicyDecision` | Is this action allowed, denied, or approval-gated? |
@@ -50,7 +52,7 @@ This lifecycle is not limited to LLM-selected tool calls. The same `RunAction` a
 
 Protolink does not define a universal permission taxonomy, approval screen, or domain-specific action type. Applications choose capability names, build meaningful preview artifacts, and decide whether approval appears in a terminal, desktop UI, web application, editor, or external service. The runtime only guarantees that the decision occurs before execution and that the result is represented consistently.
 
-`RunBudget` is currently a typed carrier rather than a built-in global quota engine. Applications and custom policies can enforce its values according to their own accounting rules.
+`RunBudget` is enforced by the default LLM inference loop through `BudgetEnforcer`. The built-in policy allows work under budget, emits warning events near limits, and raises before model or tool execution when a hard limit would be exceeded. Applications can still provide their own policy when they want compaction, truncation, approval, or domain-specific accounting.
 
 ## Runtime Context
 
@@ -101,9 +103,66 @@ When work is delegated, `RunContext.child()` creates a new run identity while pr
 | `canceled` | Whether the run has been canceled. |
 | `metadata` | Application metadata that should travel with the run. |
 
-`RunContext.permissions` accepts capability rules using `allow`, `deny`, or `require_approval`. Boolean values are also supported: `True` allows and `False` denies. Runtime-owned policy and context rules are combined using the most restrictive result, so task metadata can narrow but cannot weaken the agent's configured policy. Budgets remain typed metadata for application or custom policy enforcement.
+`RunContext.permissions` accepts capability rules using `allow`, `deny`, or `require_approval`. Boolean values are also supported: `True` allows and `False` denies. Runtime-owned policy and context rules are combined using the most restrictive result, so task metadata can narrow but cannot weaken the agent's configured policy. `RunContext.budget` is enforced by the built-in LLM loop for steps, LLM calls, tool calls, runtime seconds, input tokens, and output tokens.
 
 This most-restrictive rule is important at trust boundaries. An incoming task may request fewer privileges for a run, but it cannot grant itself more authority than the receiving agent's policy allows.
+
+## Context Manifests And Budgets
+
+Before every LLM call, Protolink prepares a `ContextManifest`. It is provider-neutral and estimates the context that is about to enter the model: compiled system instructions, runtime affordances such as tools and delegation targets, prior conversation history, and the current user query.
+
+```python
+from protolink import ContextManifest, LLMModelProfile, RunBudget, RunContext, create_llm
+
+llm = create_llm("mock")
+llm.configure_metrics(LLMModelProfile(context_window=8192))
+
+context = RunContext(
+    run_id="run_budgeted",
+    budget=RunBudget(max_steps=4, max_llm_calls=2, max_input_tokens=6000),
+)
+
+events = []
+
+async def capture(event):
+    events.append(event)
+
+await llm.infer(
+    query="Summarize this context",
+    tools={},
+    run_context=context,
+    event_callback=capture,
+)
+
+manifest = ContextManifest.from_dict(events[1]["manifest"])
+```
+
+`ContextManifest` includes:
+
+| Field | Description |
+|------|-------------|
+| `run_id` / `session_id` / `agent_name` | Correlation fields copied from `RunContext`. |
+| `provider` / `model` | Model identity supplied by the LLM wrapper. |
+| `system_tokens` | Estimated non-tool system prompt budget. |
+| `tool_prompt_tokens` | Estimated tool and delegation declarations included in the prompt. |
+| `history_tokens` | Estimated prior conversation budget. |
+| `user_tokens` | Estimated current query budget. |
+| `total_estimated_tokens` | Additive estimate used for pre-call input-token budget checks. |
+| `context_window` | Optional model context window from `LLMModelProfile`. |
+| `context_items` | Per-section token records for UIs and tests. |
+
+`BudgetEnforcer` applies `RunBudget` during inference:
+
+| Limit | Enforcement point |
+|------|-------------|
+| `max_steps` | Before each inference step begins. |
+| `max_llm_calls` | Before a model call starts. |
+| `max_tool_calls` | Before a model-selected tool executes. |
+| `max_input_tokens` | Before a model call, using the current `ContextManifest`. |
+| `max_output_tokens` | After provider usage or local output estimates are available. |
+| `max_runtime_seconds` | On every budget check. |
+
+Warnings are emitted as `budget.warning`; hard denials are emitted as `budget.exceeded` and raise `BudgetExceededError` before the protected operation proceeds.
 
 ## Canceling Running Tasks
 
@@ -347,7 +406,7 @@ Each `RunEvent` includes:
 | Field | Description |
 |------|-------------|
 | `version` | Stable run-event envelope version. |
-| `type` | Normalized event type such as `task.status`, `task.artifact`, `action.requested`, `approval.required`, or `llm.stream`. |
+| `type` | Normalized event type such as `task.status`, `task.artifact`, `context.prepared`, `llm.call.started`, `action.requested`, `approval.required`, or `llm.stream`. |
 | `run_id` | Logical run identifier from `RunContext`. |
 | `task_id` | Task correlated with the event. |
 | `agent_name` | Agent that emitted or handled the event. |
@@ -360,7 +419,17 @@ Each `RunEvent` includes:
 
 `RunEvent.from_task_event(event)` can also recover context from the final task payload when the event includes a serialized task.
 
-Action lifecycle activity is promoted out of raw LLM metadata into stable event types:
+LLM context, budget, and call lifecycle activity is promoted out of raw LLM metadata into stable event types:
+
+| Event type | Meaning |
+|------|-------------|
+| `context.prepared` | A `ContextManifest` was prepared before an LLM call. |
+| `llm.call.started` | A model call is about to start. |
+| `llm.call.completed` | A model call returned and usage/latency metadata is available. |
+| `budget.warning` | Usage is near a configured `RunBudget` limit. |
+| `budget.exceeded` | A configured budget limit denied further execution. |
+
+Action lifecycle activity is also promoted into stable event types:
 
 | Event type | Meaning |
 |------|-------------|
@@ -372,7 +441,7 @@ Action lifecycle activity is promoted out of raw LLM metadata into stable event 
 | `action.completed` | The operation completed successfully. |
 | `action.denied` / `action.failed` | Policy denied the operation or execution failed. |
 
-The promoted `action`, `request`, `decision`, and `action_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
+The promoted `manifest`, `action`, `request`, `decision`, and `action_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
 
 ## Event Sinks
 

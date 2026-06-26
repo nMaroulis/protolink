@@ -23,6 +23,11 @@ _EVENT_TYPE_MAP = {
 }
 
 _RUNTIME_LLM_EVENT_TYPE_MAP = {
+    "context_prepared": "context.prepared",
+    "llm_call_started": "llm.call.started",
+    "llm_call_completed": "llm.call.completed",
+    "budget_warning": "budget.warning",
+    "budget_exceeded": "budget.exceeded",
     "action_requested": "action.requested",
     "policy_decision": "action.policy",
     "approval_required": "approval.required",
@@ -279,12 +284,14 @@ def _severity_for_payload(source_type: str, payload: dict[str, Any]) -> str:
     if source_type == "task_llm_stream" and payload.get("llm_event_type") in {
         "action_denied",
         "agent_call_error",
+        "budget_exceeded",
         "llm_error",
         "tool_error",
     }:
         return "error"
     if source_type == "task_llm_stream" and payload.get("llm_event_type") in {
         "approval_required",
+        "budget_warning",
         "llm_parse_error",
         "llm_retry",
     }:
@@ -314,6 +321,22 @@ def _summary_for_payload(source_type: str, payload: dict[str, Any]) -> str | Non
     if source_type == "task_llm_stream":
         llm_type = payload.get("llm_event_type") or "llm_event"
         metadata = _dict_value(payload.get("metadata"))
+        if llm_type == "context_prepared":
+            manifest = _dict_value(metadata.get("manifest"))
+            total = manifest.get("total_estimated_tokens")
+            if total is not None:
+                return f"Context prepared: {total} estimated tokens"
+            return "Context prepared"
+        if llm_type == "llm_call_started":
+            model = metadata.get("model") or "model"
+            return f"LLM call started: {model}"
+        if llm_type == "llm_call_completed":
+            model = metadata.get("model") or "model"
+            latency = metadata.get("latency_ms")
+            return f"LLM call completed: {model}{f' in {latency} ms' if latency is not None else ''}"
+        if llm_type in {"budget_warning", "budget_exceeded"}:
+            decision = _dict_value(metadata.get("decision"))
+            return _optional_str(decision.get("message")) or str(llm_type)
         if llm_type == "action_requested":
             action = _dict_value(metadata.get("action"))
             return f"Action requested: {action.get('name', 'unnamed')}"
@@ -368,7 +391,7 @@ def _promote_runtime_payload(payload: dict[str, Any]) -> dict[str, Any]:
         return payload
 
     promoted = dict(payload)
-    for key in ("action", "action_id", "decision", "request"):
+    for key in ("action", "action_id", "decision", "manifest", "request"):
         if key in metadata:
             promoted[key] = metadata[key]
     return promoted

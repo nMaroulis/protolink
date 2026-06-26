@@ -9,6 +9,12 @@ from protolink.core import (
     ApprovalHandler,
     ApprovalRequest,
     ApprovalRequiredError,
+    BudgetDecision,
+    BudgetDecisionEffect,
+    BudgetEnforcer,
+    BudgetExceededError,
+    BudgetPolicy,
+    BudgetUsage,
     CancellationToken,
     CapabilityPolicy,
     EventSink,
@@ -28,11 +34,14 @@ from protolink.core import (
 )
 from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
 from protolink.llms import (
+    ContextItem,
+    ContextManifest,
     HistoryCompactionRequest,
     HistoryCompactionResult,
     HistoryCompactionStrategy,
     HistoryCompactor,
     LLMModelProfile,
+    build_context_manifest,
     create_llm,
 )
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task, TaskState
@@ -53,8 +62,16 @@ __all__ = [
     "ApprovalRequiredError",
     "Artifact",
     "BaseTool",
+    "BudgetDecision",
+    "BudgetDecisionEffect",
+    "BudgetEnforcer",
+    "BudgetExceededError",
+    "BudgetPolicy",
+    "BudgetUsage",
     "CancellationToken",
     "CapabilityPolicy",
+    "ContextItem",
+    "ContextManifest",
     "EventSink",
     "Flow",
     "Graph",
@@ -87,5 +104,6 @@ __all__ = [
     "TaskState",
     "Tool",
     "__version__",
+    "build_context_manifest",
     "create_llm",
 ]

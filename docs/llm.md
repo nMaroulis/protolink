@@ -93,9 +93,9 @@ For local and server‑style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `Oll
 
 ---
 
-## Optional Budget Metrics
+## Model Profiles, Context Manifests, And Budget Metrics
 
-LLM wrappers can emit per-call latency, token usage, context-window pressure, and estimated cost through the existing `infer()` event stream and telemetry hooks. This is optional and does not change the request payload sent to the provider.
+LLM wrappers can emit pre-call context manifests plus per-call latency, token usage, context-window pressure, and estimated cost through the existing `infer()` event stream and telemetry hooks. This is optional and does not change the request payload sent to the provider.
 
 ```python
 from protolink import LLMModelProfile, create_llm
@@ -107,6 +107,10 @@ llm = create_llm(
         context_window=128_000,
         input_cost_per_million=1.0,   # example value; use your provider's current pricing
         output_cost_per_million=5.0,  # example value; use your provider's current pricing
+        supports_tools=True,
+        supports_streaming=True,
+        supports_json_schema=True,
+        tokenizer="cl100k_base",
     ),
 )
 ```
@@ -121,9 +125,28 @@ llm.configure_metrics(
 )
 ```
 
-Provider-reported token usage is used when the SDK response includes it. Otherwise Protolink estimates token counts locally. If `tiktoken` is installed through `protolink[metrics]`, Protolink uses it for estimates; without it, Protolink falls back to a lightweight character heuristic. Prices and context windows change over time, so Protolink treats `LLMModelProfile` as application-owned metadata rather than a hardcoded billing catalog.
+Provider-reported token usage is used when the SDK response includes it. Otherwise Protolink estimates token counts locally. If `tiktoken` is installed through `protolink[metrics]`, Protolink uses it for estimates; without it, Protolink falls back to a lightweight character heuristic. Prices, model limits, and capabilities change over time, so Protolink treats `LLMModelProfile` as application-owned metadata rather than a hardcoded billing catalog.
 
-When an `event_callback` or telemetry backend is attached, each model call inside the inference loop can emit:
+Before each model call, Protolink emits a provider-neutral `context_prepared` event:
+
+```python
+{
+    "type": "context_prepared",
+    "step": 1,
+    "manifest": {
+        "run_id": "run_123",
+        "agent_name": "researcher",
+        "system_tokens": 900,
+        "tool_prompt_tokens": 300,
+        "history_tokens": 2200,
+        "user_tokens": 120,
+        "total_estimated_tokens": 3520,
+        "context_window": 128000,
+    },
+}
+```
+
+When an `event_callback` or telemetry backend is attached, each model call inside the inference loop can also emit:
 
 ```python
 {
@@ -139,6 +162,8 @@ When an `event_callback` or telemetry backend is attached, each model call insid
 ```
 
 This is especially useful for CLIs, dashboards, and budget-aware agents that want to show context pressure or session cost while a multi-step tool loop is running.
+
+If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before the provider is invoked; `max_tool_calls` is checked before model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
 
 ## History Compaction
 
@@ -293,7 +318,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. Automatically managed by the [Agent state system](agent.md#state-persistence) when enabled. |
 | `compactor` | `HistoryCompactor` | LLM-owned component that handles compaction algorithms and isolated summary calls. It is not exposed to the model as a tool. |
 | `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
-| `metrics_profile` | `LLMModelProfile ⎪ None` | Optional model budget metadata for context-window percentage and cost estimates. |
+| `metrics_profile` | `LLMModelProfile ⎪ None` | Optional application-owned model metadata for context-window percentages, cost estimates, context manifests, and descriptive capabilities such as tool, streaming, and JSON-schema support. |
 | `metrics_enabled` | `bool` | Whether metrics events are emitted when telemetry or an `event_callback` is attached. Defaults to `True`. |
 
 !!! info "History Performance"

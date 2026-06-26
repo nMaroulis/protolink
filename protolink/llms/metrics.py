@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import importlib
 import json
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any
 
 from protolink.llms.serialization import json_history_default
@@ -24,7 +24,9 @@ class LLMModelProfile:
     Prices and context windows change over time, so Protolink does not require
     or assume a global pricing catalog. Applications can pass a profile for the
     model they selected, and Protolink will compute percentages and estimated
-    costs from normalized usage metadata.
+    costs from normalized usage metadata. Capability fields are intentionally
+    descriptive rather than catalog-backed: applications can tell Protolink what
+    the selected model supports without requiring a live pricing/model database.
     """
 
     context_window: int | None = None
@@ -33,6 +35,11 @@ class LLMModelProfile:
     currency: str = "USD"
     provider: str | None = None
     model: str | None = None
+    supports_tools: bool | None = None
+    supports_streaming: bool | None = None
+    supports_json_schema: bool | None = None
+    tokenizer: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def resolved(self, *, provider: str | None = None, model: str | None = None) -> LLMModelProfile:
         """Return a profile with provider/model defaults filled in."""
@@ -43,6 +50,11 @@ class LLMModelProfile:
             currency=self.currency,
             provider=self.provider or provider,
             model=self.model or model,
+            supports_tools=self.supports_tools,
+            supports_streaming=self.supports_streaming,
+            supports_json_schema=self.supports_json_schema,
+            tokenizer=self.tokenizer,
+            metadata=dict(self.metadata),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -150,6 +162,11 @@ def profile_from_value(
         currency=str(value.get("currency") or "USD"),
         provider=str(value.get("provider") or provider) if value.get("provider") or provider else None,
         model=str(value.get("model") or model) if value.get("model") or model else None,
+        supports_tools=_coerce_optional_bool(value.get("supports_tools")),
+        supports_streaming=_coerce_optional_bool(value.get("supports_streaming")),
+        supports_json_schema=_coerce_optional_bool(value.get("supports_json_schema")),
+        tokenizer=str(value.get("tokenizer")) if value.get("tokenizer") else None,
+        metadata=dict(value.get("metadata") or {}),
     )
 
 
@@ -414,6 +431,20 @@ def _coerce_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _coerce_optional_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return bool(value)
 
 
 def _stringify_for_count(value: Any) -> str:

@@ -53,7 +53,7 @@ records = telemetry.recorder.replay()
 
 ### LLM Metrics and Context Usage
 
-When an agent has both an LLM and telemetry, Protolink records live budget metrics for every model call inside `LLM.infer()`. This includes latency, token usage, context-window pressure, and estimated cost. Provider-reported usage is used when available; otherwise Protolink estimates usage without requiring extra dependencies.
+When an agent has both an LLM and telemetry, Protolink records live context and budget metadata for every model call inside `LLM.infer()`. This includes the pre-call context manifest, latency, token usage, context-window pressure, and estimated cost. Provider-reported usage is used when available; otherwise Protolink estimates usage without requiring extra dependencies.
 
 ```python
 from protolink import Agent, AgentCard, LLMModelProfile, LocalTraceTelemetry, Task, create_llm
@@ -81,7 +81,7 @@ llm_span = next(span for span in trace["spans"] if span["kind"] == "llm")
 print(llm_span["metadata"]["llm_metrics"])
 ```
 
-The same data is emitted live as `llm_context` and `llm_call_metrics` events through `event_callback`, so terminal apps can render a status line such as context used, call latency, and session cost while the agent is still running.
+The same data is emitted live as `context_prepared`, `llm_context`, and `llm_call_metrics` events through `event_callback`, so terminal apps can render a status line such as context used, call latency, and session cost while the agent is still running.
 
 For application-facing stream snapshots, use `RunEvent` and `InMemoryEventSink` from the [Runtime](runtime.md) layer. Telemetry keeps detailed traces and spans; run events provide the stable progress envelope for UIs, CLIs, and golden tests.
 

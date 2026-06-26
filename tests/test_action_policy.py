@@ -273,14 +273,18 @@ async def test_golden_approval_stream_includes_action_artifact_and_policy_events
     llm_events = [
         event["payload"].get("llm_event_type") if event["type"] == "llm.stream" else event["type"]
         for event in stream
-        if event["type"] == "llm.stream" or event["type"].startswith(("action.", "approval."))
+        if event["type"] == "llm.stream"
+        or event["type"].startswith(("action.", "approval.", "budget.", "context.", "llm.call"))
     ]
 
     assert llm_events == [
         "llm_step",
+        "context.prepared",
         "llm_context",
+        "llm.call.started",
         "llm_chunk",
         "llm_call_metrics",
+        "llm.call.completed",
         "llm_response",
         "llm_action",
         "action.requested",
@@ -290,9 +294,12 @@ async def test_golden_approval_stream_includes_action_artifact_and_policy_events
         "action.started",
         "action.completed",
         "llm_step",
+        "context.prepared",
         "llm_context",
+        "llm.call.started",
         "llm_chunk",
         "llm_call_metrics",
+        "llm.call.completed",
         "llm_response",
         "llm_action",
         "llm_final",

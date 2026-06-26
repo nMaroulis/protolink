@@ -98,6 +98,10 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
         summary = event["summary"]
         if event["type"] == "task.artifact":
             summary = "Artifact produced"
+        elif event["type"] == "context.prepared":
+            summary = "Context prepared"
+        elif event["type"] == "llm.call.completed":
+            summary = "LLM call completed"
         snapshot.append(
             {
                 "sequence": event["sequence"],
@@ -137,6 +141,17 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
         },
         {
             "sequence": 3,
+            "type": "context.prepared",
+            "run_id": "run_golden",
+            "agent_name": "golden_agent",
+            "severity": "info",
+            "summary": "Context prepared",
+            "final": False,
+            "payload_type": "task_llm_stream",
+            "llm_event_type": "context_prepared",
+        },
+        {
+            "sequence": 4,
             "type": "llm.stream",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
@@ -147,7 +162,18 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
             "llm_event_type": "llm_context",
         },
         {
-            "sequence": 4,
+            "sequence": 5,
+            "type": "llm.call.started",
+            "run_id": "run_golden",
+            "agent_name": "golden_agent",
+            "severity": "info",
+            "summary": "LLM call started: mock-gpt",
+            "final": False,
+            "payload_type": "task_llm_stream",
+            "llm_event_type": "llm_call_started",
+        },
+        {
+            "sequence": 6,
             "type": "llm.stream",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
@@ -158,7 +184,7 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
             "llm_event_type": "llm_chunk",
         },
         {
-            "sequence": 5,
+            "sequence": 7,
             "type": "llm.stream",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
@@ -169,7 +195,18 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
             "llm_event_type": "llm_call_metrics",
         },
         {
-            "sequence": 6,
+            "sequence": 8,
+            "type": "llm.call.completed",
+            "run_id": "run_golden",
+            "agent_name": "golden_agent",
+            "severity": "info",
+            "summary": "LLM call completed",
+            "final": False,
+            "payload_type": "task_llm_stream",
+            "llm_event_type": "llm_call_completed",
+        },
+        {
+            "sequence": 9,
             "type": "llm.stream",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
@@ -180,7 +217,7 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
             "llm_event_type": "llm_response",
         },
         {
-            "sequence": 7,
+            "sequence": 10,
             "type": "llm.stream",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
@@ -191,7 +228,7 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
             "llm_event_type": "llm_action",
         },
         {
-            "sequence": 8,
+            "sequence": 11,
             "type": "llm.stream",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
@@ -202,7 +239,7 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
             "llm_event_type": "llm_final",
         },
         {
-            "sequence": 9,
+            "sequence": 12,
             "type": "task.artifact",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
@@ -213,7 +250,7 @@ async def test_golden_run_event_stream_snapshot_from_mock_agent():
             "llm_event_type": None,
         },
         {
-            "sequence": 10,
+            "sequence": 13,
             "type": "task.status",
             "run_id": "run_golden",
             "agent_name": "golden_agent",
