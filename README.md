@@ -121,6 +121,8 @@ Running tasks can be canceled by task ID across local and remote transports, wit
 - **Planned Integrations**:
   - **Advanced Orchestration Patterns**
     - Multi-step workflows, supervisory agents, role routing, and hierarchical control systems.
+- **Runtime Control Plane**: Typed client/server requests for cancellation, state inspection/reset/compaction, and LLM history compaction without exposing maintenance operations to the model prompt.
+- **Observable & Replayable Runs**: `RunContext`, `RunEvent`, `RunReport`, budgets, policy decisions, approvals, and redaction for production-facing UIs and tests.
 
 ## 💡 Protolink vs Google's A2A
 
