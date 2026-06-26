@@ -10,12 +10,25 @@ Shows how `agent.sync.invoke()` handles session history automatically using a de
 Useful for building conversational bots and multi-turn interaction assistants.
 """
 
-from protolink.agents import Agent
-from protolink.llms.server import OllamaLLM
+from protolink import Agent, create_llm
 
-# Choose any LLM you want throught the protolink.llms package (API, local etc.)
-# For example: from protolink.llms.api import AnthropicLLM, OpenAILLM, GeminiLLM ...
-llm = OllamaLLM(base_url="http://localhost:11434", model="gemma4:e4b")  # 8b model for light inference
+
+def memory_demo_response(history, _system_prompt):
+    """Return deterministic responses that reveal whether history is present."""
+    user_messages = [str(message.get("content", "")) for message in history.messages if message.get("role") == "user"]
+    current = user_messages[-1] if user_messages else ""
+    previous = user_messages[:-1]
+
+    if "capital of greece" in current.lower():
+        return "The capital of Greece is Athens."
+    if "5+4" in current:
+        return "5 + 4 is 9."
+    if "before" in current.lower():
+        if previous:
+            return "Before this, you asked: " + " | ".join(previous)
+        return "I do not have earlier questions in this session."
+    return "I can answer this deterministic state example."
+
 
 # Define stateless agent
 agent_stateless = Agent(
@@ -25,7 +38,7 @@ agent_stateless = Agent(
         "url": "local/agent_stateless",
     },
     transport="runtime",
-    llm=llm,
+    llm=create_llm("mock", response_callback=memory_demo_response),
 )
 
 # Define stateful agent with memory
@@ -36,7 +49,7 @@ agent_stateful = Agent(
         "url": "local/agent_stateful",
     },
     transport="runtime",
-    llm=llm,
+    llm=create_llm("mock", response_callback=memory_demo_response),
     state=["conversation"],  # Session memory is not reset between tasks
 )
 

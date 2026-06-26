@@ -21,6 +21,10 @@
   - `LLM.infer()` now emits additive `context_prepared`, `llm_call_started`, `llm_call_completed`, `budget_warning`, and `budget_exceeded` events while preserving existing low-level LLM events.
   - `RunEvent` now promotes those events into stable `context.prepared`, `llm.call.started`, `llm.call.completed`, `budget.warning`, and `budget.exceeded` types for UI and golden-run consumers.
   - `LLMModelProfile` now accepts descriptive capability metadata such as `supports_tools`, `supports_streaming`, `supports_json_schema`, and `tokenizer` without becoming a live model catalog.
+- **State inspection and state control reports**
+  - Added `StateOperationRequest`, `StateStoreReport`, and `StateOperationResult` for typed describe, reset, and compact reports over agent state.
+  - Added `Agent.describe_state()`, `Agent.reset_state()`, and `Agent.compact_state()` plus matching `AgentClient` request specs for `POST /state/describe`, `POST /state/reset`, and `POST /state/compact`.
+  - State operations run through runtime policy capabilities (`state.describe`, `state.reset`, `state.compact`, and `llm.history.compact`) before reading or mutating state.
 
 ### Changed
 

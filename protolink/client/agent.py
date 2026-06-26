@@ -28,6 +28,8 @@ from protolink.models import (
     HistoryCompactionRequest,
     HistoryCompactionResult,
     Message,
+    StateOperationRequest,
+    StateOperationResult,
     Task,
     TaskCancellationRequest,
 )
@@ -111,6 +113,33 @@ class AgentClient:
         path="/llm/history/compact",
         method="POST",
         response_parser=HistoryCompactionResult.from_dict,
+        request_source="body",
+        channel="control",
+    )
+
+    DESCRIBE_STATE_REQUEST = ClientRequestSpec(
+        name="describe_state",
+        path="/state/describe",
+        method="POST",
+        response_parser=StateOperationResult.from_dict,
+        request_source="body",
+        channel="control",
+    )
+
+    RESET_STATE_REQUEST = ClientRequestSpec(
+        name="reset_state",
+        path="/state/reset",
+        method="POST",
+        response_parser=StateOperationResult.from_dict,
+        request_source="body",
+        channel="control",
+    )
+
+    COMPACT_STATE_REQUEST = ClientRequestSpec(
+        name="compact_state",
+        path="/state/compact",
+        method="POST",
+        response_parser=StateOperationResult.from_dict,
         request_source="body",
         channel="control",
     )
@@ -252,6 +281,77 @@ class AgentClient:
         )
         return await self._transport.send(
             self.COMPACT_HISTORY_REQUEST,
+            agent_url,
+            data=request,
+        )
+
+    async def describe_state(
+        self,
+        agent_url: str,
+        *,
+        session_id: str | None = None,
+        stores: tuple[str, ...] | list[str] | None = None,
+        include_data: bool = False,
+        metadata: dict[str, Any] | None = None,
+    ) -> StateOperationResult:
+        """Describe persistent state on a remote agent."""
+        request = StateOperationRequest(
+            session_id=session_id,
+            stores=tuple(stores or ()),
+            include_data=include_data,
+            metadata=metadata or {},
+        )
+        return await self._transport.send(
+            self.DESCRIBE_STATE_REQUEST,
+            agent_url,
+            data=request,
+        )
+
+    async def reset_state(
+        self,
+        agent_url: str,
+        *,
+        session_id: str | None = None,
+        stores: tuple[str, ...] | list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> StateOperationResult:
+        """Reset persistent state on a remote agent."""
+        request = StateOperationRequest(
+            session_id=session_id,
+            stores=tuple(stores or ()),
+            metadata=metadata or {},
+        )
+        return await self._transport.send(
+            self.RESET_STATE_REQUEST,
+            agent_url,
+            data=request,
+        )
+
+    async def compact_state(
+        self,
+        agent_url: str,
+        *,
+        session_id: str,
+        strategy: HistoryCompactionStrategy = "tokens",
+        max_messages: int = 20,
+        max_tokens: int = 4_000,
+        preserve_recent: int = 6,
+        summary_max_tokens: int = 512,
+        metadata: dict[str, Any] | None = None,
+    ) -> StateOperationResult:
+        """Compact persistent conversation state on a remote agent."""
+        request = StateOperationRequest(
+            session_id=session_id,
+            stores=("conversation",),
+            strategy=strategy,
+            max_messages=max_messages,
+            max_tokens=max_tokens,
+            preserve_recent=preserve_recent,
+            summary_max_tokens=summary_max_tokens,
+            metadata=metadata or {},
+        )
+        return await self._transport.send(
+            self.COMPACT_STATE_REQUEST,
             agent_url,
             data=request,
         )
@@ -432,6 +532,70 @@ class SyncAgentClient:
                 preserve_recent=preserve_recent,
                 summary_max_tokens=summary_max_tokens,
                 session_id=session_id,
+                metadata=metadata,
+            )
+        )
+
+    def describe_state(
+        self,
+        agent_url: str,
+        *,
+        session_id: str | None = None,
+        stores: tuple[str, ...] | list[str] | None = None,
+        include_data: bool = False,
+        metadata: dict[str, Any] | None = None,
+    ) -> StateOperationResult:
+        """Synchronously describe persistent state on a remote agent."""
+        return asyncio.run(
+            self._client.describe_state(
+                agent_url,
+                session_id=session_id,
+                stores=stores,
+                include_data=include_data,
+                metadata=metadata,
+            )
+        )
+
+    def reset_state(
+        self,
+        agent_url: str,
+        *,
+        session_id: str | None = None,
+        stores: tuple[str, ...] | list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> StateOperationResult:
+        """Synchronously reset persistent state on a remote agent."""
+        return asyncio.run(
+            self._client.reset_state(
+                agent_url,
+                session_id=session_id,
+                stores=stores,
+                metadata=metadata,
+            )
+        )
+
+    def compact_state(
+        self,
+        agent_url: str,
+        *,
+        session_id: str,
+        strategy: HistoryCompactionStrategy = "tokens",
+        max_messages: int = 20,
+        max_tokens: int = 4_000,
+        preserve_recent: int = 6,
+        summary_max_tokens: int = 512,
+        metadata: dict[str, Any] | None = None,
+    ) -> StateOperationResult:
+        """Synchronously compact persistent conversation state on a remote agent."""
+        return asyncio.run(
+            self._client.compact_state(
+                agent_url,
+                session_id=session_id,
+                strategy=strategy,
+                max_messages=max_messages,
+                max_tokens=max_tokens,
+                preserve_recent=preserve_recent,
+                summary_max_tokens=summary_max_tokens,
                 metadata=metadata,
             )
         )

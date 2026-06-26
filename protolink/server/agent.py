@@ -16,8 +16,15 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Literal, Protocol
 
-from protolink.models import AgentCard, HistoryCompactionRequest, HistoryCompactionResult, Task, TaskCancellationRequest
+from protolink.models import (
+    AgentCard,
+    HistoryCompactionRequest,
+    HistoryCompactionResult,
+    Task,
+    TaskCancellationRequest,
+)
 from protolink.server.endpoint_handler import EndpointSpec
+from protolink.state.operations import StateOperationRequest, StateOperationResult
 from protolink.transport import Transport
 
 
@@ -46,6 +53,15 @@ class AgentInterface(Protocol):
 
     async def compact_history(self, request: HistoryCompactionRequest) -> HistoryCompactionResult:
         """Compact the agent's LLM conversation history."""
+
+    async def describe_state(self, request: StateOperationRequest) -> StateOperationResult:
+        """Describe the agent's persistent state."""
+
+    async def reset_state(self, request: StateOperationRequest) -> StateOperationResult:
+        """Reset the agent's persistent state."""
+
+    async def compact_state(self, request: StateOperationRequest) -> StateOperationResult:
+        """Compact the agent's persistent conversation state."""
 
     def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's public metadata and capabilities."""
@@ -116,6 +132,30 @@ class AgentServer:
                 handler=self._agent.compact_history,
                 request_source="body",
                 request_parser=HistoryCompactionRequest.from_dict,
+            ),
+            EndpointSpec(
+                name="describe_state",
+                path="/state/describe",
+                method="POST",
+                handler=self._agent.describe_state,
+                request_source="body",
+                request_parser=StateOperationRequest.from_dict,
+            ),
+            EndpointSpec(
+                name="reset_state",
+                path="/state/reset",
+                method="POST",
+                handler=self._agent.reset_state,
+                request_source="body",
+                request_parser=StateOperationRequest.from_dict,
+            ),
+            EndpointSpec(
+                name="compact_state",
+                path="/state/compact",
+                method="POST",
+                handler=self._agent.compact_state,
+                request_source="body",
+                request_parser=StateOperationRequest.from_dict,
             ),
             EndpointSpec(
                 name="agent_card",

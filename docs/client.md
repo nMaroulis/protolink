@@ -200,6 +200,37 @@ When the target agent has `state=["conversation"]` and `session_id` is supplied,
 
 ---
 
+### State Control Plane
+
+Inspect, reset, or compact a remote agent's persistent state without sending a
+model-visible task.
+
+```python
+state = await client.describe_state(
+    agent_url,
+    session_id="customer-42",
+)
+
+reset = await client.reset_state(
+    agent_url,
+    session_id="customer-42",
+)
+
+compacted = await client.compact_state(
+    agent_url,
+    session_id="customer-42",
+    strategy="tokens",
+    max_tokens=8_000,
+)
+```
+
+These methods return `StateOperationResult`. They use control-channel request
+specs: `DESCRIBE_STATE_REQUEST` (`POST /state/describe`),
+`RESET_STATE_REQUEST` (`POST /state/reset`), and `COMPACT_STATE_REQUEST`
+(`POST /state/compact`).
+
+---
+
 ### `send_message()`
 
 Convenience wrapper that creates a Task from a Message, sends it, and returns the response message.
@@ -256,6 +287,9 @@ Internally, these methods use `asyncio.run()` to handle the asynchronous transpo
 | `send_task_streaming()` | `client.sync.send_task_streaming()` | Synchronously iterate over streamed task events. |
 | `cancel_task()` | `client.sync.cancel_task()` | Synchronously request cancellation of a task running elsewhere. |
 | `compact_history()` | `client.sync.compact_history()` | Synchronously request LLM history compaction from an agent. |
+| `describe_state()` | `client.sync.describe_state()` | Synchronously inspect remote persistent state. |
+| `reset_state()` | `client.sync.reset_state()` | Synchronously reset remote persistent state. |
+| `compact_state()` | `client.sync.compact_state()` | Synchronously compact remote persistent conversation state. |
 | `send_message()` | `client.sync.send_message()` | Synchronously send a message and wait for the response message. |
 | `get_agent_card()` | `client.sync.get_agent_card()` | Synchronously retrieve an agent's public card. |
 
@@ -307,6 +341,9 @@ class ClientRequestSpec:
 | `TASK_REQUEST` | `/tasks/` | POST | Send a task to an agent |
 | `TASK_CANCEL_REQUEST` | `/tasks/cancel` | POST | Cancel an active task over a control channel |
 | `COMPACT_HISTORY_REQUEST` | `/llm/history/compact` | POST | Compact the target agent's LLM history over a control channel |
+| `DESCRIBE_STATE_REQUEST` | `/state/describe` | POST | Inspect target agent state over a control channel |
+| `RESET_STATE_REQUEST` | `/state/reset` | POST | Reset target agent state over a control channel |
+| `COMPACT_STATE_REQUEST` | `/state/compact` | POST | Compact target agent conversation state over a control channel |
 | `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | Retrieve agent metadata |
 | `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | Send task with streaming |
 

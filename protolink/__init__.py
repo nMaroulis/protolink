@@ -45,6 +45,7 @@ from protolink.llms import (
     create_llm,
 )
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task, TaskState
+from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
 from protolink.tools import BaseTool, Tool
 
@@ -95,6 +96,9 @@ __all__ = [
     "RunBudget",
     "RunContext",
     "RunEvent",
+    "StateOperationRequest",
+    "StateOperationResult",
+    "StateStoreReport",
     "Task",
     "TaskAlreadyRunningError",
     "TaskCancellationError",

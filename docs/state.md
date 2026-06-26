@@ -145,6 +145,84 @@ if agent.state.conversation:
 all_data = agent.state.to_dict()
 ```
 
+## State Control Plane
+
+Agents expose typed state inspection and mutation operations for applications
+that need to prove what state exists without reading private storage directly.
+These methods are available locally on `Agent` and remotely through
+`AgentClient` request specs.
+
+```python
+from protolink import StateOperationRequest
+
+report = await agent.describe_state("customer-42")
+assert report.stores[0].name == "conversation"
+
+reset = await agent.reset_state("customer-42")
+assert "conversation" in reset.cleared
+
+compacted = await agent.compact_state(
+    "customer-42",
+    strategy="tokens",
+    max_tokens=8_000,
+)
+```
+
+The result is a `StateOperationResult`:
+
+| Field | Description |
+|------|-------------|
+| `operation` | `describe`, `reset`, or `compact`. |
+| `session_id` | Target session when supplied. |
+| `stores` | Per-store `StateStoreReport` entries. |
+| `cleared` | Store names cleared by reset. |
+| `compacted` | Store names compacted by compact. |
+| `missing` | Requested stores that were not enabled or did not exist. |
+| `errors` | Store-scoped errors that prevented part of the operation. |
+
+Each `StateStoreReport` includes the store name, whether it is enabled, whether
+state exists, item/message counts when known, and operation metadata. Passing
+`include_data=True` to `describe_state()` includes the inspected payload in the
+report for debugging or export workflows.
+
+### Remote State Operations
+
+`AgentClient` uses the same control-plane pattern as cancellation and history
+compaction:
+
+```python
+report = await client.describe_state(agent_url, session_id="customer-42")
+reset = await client.reset_state(agent_url, session_id="customer-42")
+compacted = await client.compact_state(
+    agent_url,
+    session_id="customer-42",
+    strategy="recent",
+    max_messages=20,
+)
+```
+
+The remote endpoints are:
+
+| Operation | Endpoint | Capability |
+|------|----------|------------|
+| `describe_state()` | `POST /state/describe` | `state.describe` |
+| `reset_state()` | `POST /state/reset` | `state.reset` |
+| `compact_state()` | `POST /state/compact` | `state.compact` and `llm.history.compact` |
+
+### Reset Semantics
+
+Conversation state is session-keyed, so `reset_state("customer-42")` precisely
+clears that conversation session. Calling `reset_state()` without a session ID
+performs a full reset of the agent storage namespace for all enabled stores.
+Partial full-store resets are rejected because the current storage abstraction
+is namespace-based; ProtoLink reports that limitation instead of clearing more
+state than requested.
+
+`compact_state()` currently targets conversation state. It loads the persisted
+session, runs the LLM-owned `HistoryCompactor`, saves the compacted history, and
+returns before/after counts in the report metadata. The operation is still a
+control-plane request and is never shown to the model as a tool.
+
 ---
 
 ## Comparison: Manual vs. Automated State

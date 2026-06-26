@@ -249,6 +249,9 @@ async def main():
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Streams task status, LLM inference events, tool progress, artifact updates, and final completion for streaming-capable transports. |
 | `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()`. For `tool_call` parts, it executes the tool directly. |
 | `compact_history()` | `request: HistoryCompactionRequest` | `HistoryCompactionResult` | Control-plane method behind `POST /llm/history/compact`. Calls `llm.compact_history()` without exposing compaction to the model prompt. |
+| `describe_state()` | `request/session_id` | `StateOperationResult` | Control-plane method behind `POST /state/describe`. Reports enabled stores and optional session state. |
+| `reset_state()` | `request/session_id` | `StateOperationResult` | Control-plane method behind `POST /state/reset`. Clears a conversation session or performs a full state reset when no session is supplied. |
+| `compact_state()` | `request/session_id` | `StateOperationResult` | Control-plane method behind `POST /state/compact`. Compacts persisted conversation state through the LLM-owned compactor. |
 | `cancel_task()` | `task_id | TaskCancellationRequest`, `reason=None` | `Task` | Marks an active task and its `RunContext` canceled, then interrupts its owning coroutine. |
 | `get_cancellation_token()` | `task_id: str` | `CancellationToken ⎪ None` | Returns the process-local token for checkpoints in custom long-running handlers. |
 | `active_task_ids` | — | `tuple[str, ...]` | Snapshot of task IDs currently registered on this Agent. |

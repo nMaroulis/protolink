@@ -55,12 +55,13 @@ from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
-from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
+from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult, HistoryCompactionStrategy
 from protolink.logging import BaseLogger, ConsoleLogger, get_agent_farewell, get_agent_greeting
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.security.auth import Authenticator
 from protolink.server import AgentServer
 from protolink.state import State
+from protolink.state.operations import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import InMemoryStorage, Storage
 from protolink.telemetry.base import Telemetry
 from protolink.tools import ActionBuilder, BaseTool, Tool
@@ -69,6 +70,49 @@ from protolink.transport import Transport, get_transport
 from protolink.types import StateMode, TransportType
 from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
+
+
+def _coerce_state_operation_request(
+    request: str | StateOperationRequest | dict[str, Any] | None = None,
+    *,
+    session_id: str | None = None,
+    stores: tuple[str, ...] | list[str] | None = None,
+    include_data: bool | None = None,
+    strategy: HistoryCompactionStrategy | None = None,
+    max_messages: int | None = None,
+    max_tokens: int | None = None,
+    preserve_recent: int | None = None,
+    summary_max_tokens: int | None = None,
+) -> StateOperationRequest:
+    """Normalize public state-control arguments into one request object."""
+    if isinstance(request, StateOperationRequest):
+        base = request.to_dict()
+    elif isinstance(request, dict):
+        base = StateOperationRequest.from_dict(request).to_dict()
+    elif isinstance(request, str):
+        base = StateOperationRequest(session_id=request).to_dict()
+    elif request is None:
+        base = StateOperationRequest().to_dict()
+    else:
+        raise TypeError("state operation request must be a session id, StateOperationRequest, dictionary, or None")
+
+    if session_id is not None:
+        base["session_id"] = session_id
+    if stores is not None:
+        base["stores"] = list(stores)
+    if include_data is not None:
+        base["include_data"] = include_data
+    if strategy is not None:
+        base["strategy"] = strategy
+    if max_messages is not None:
+        base["max_messages"] = max_messages
+    if max_tokens is not None:
+        base["max_tokens"] = max_tokens
+    if preserve_recent is not None:
+        base["preserve_recent"] = preserve_recent
+    if summary_max_tokens is not None:
+        base["summary_max_tokens"] = summary_max_tokens
+    return StateOperationRequest.from_dict(base)
 
 
 class Agent:
@@ -594,6 +638,219 @@ class Agent:
             self._state.conversation.save_history(session_id, self.llm.history)
 
         return result
+
+    async def describe_state(
+        self,
+        request: str | StateOperationRequest | dict[str, Any] | None = None,
+        *,
+        session_id: str | None = None,
+        stores: tuple[str, ...] | list[str] | None = None,
+        include_data: bool = False,
+    ) -> StateOperationResult:
+        """Describe enabled state stores through the control plane.
+
+        This method reports what state stores are enabled and, for conversation
+        state, whether a specific session exists. It does not expose a model
+        tool and does not mutate state.
+        """
+        active_request = _coerce_state_operation_request(
+            request,
+            session_id=session_id,
+            stores=stores,
+            include_data=include_data,
+        )
+        authorized_request = await self._authorize_state_operation(
+            "describe",
+            "describe_state",
+            active_request,
+            capabilities=frozenset({"state.describe"}),
+            description="Describe this agent's persistent state.",
+        )
+        return self._state.describe(authorized_request)
+
+    async def reset_state(
+        self,
+        request: str | StateOperationRequest | dict[str, Any] | None = None,
+        *,
+        session_id: str | None = None,
+        stores: tuple[str, ...] | list[str] | None = None,
+    ) -> StateOperationResult:
+        """Reset persistent state and return a structured report.
+
+        Passing a ``session_id`` precisely clears conversation state for that
+        session. Omitting ``session_id`` performs a full agent-state reset for
+        all enabled stores. Partial full resets are rejected because the current
+        storage abstraction is namespace-based.
+        """
+        active_request = _coerce_state_operation_request(
+            request,
+            session_id=session_id,
+            stores=stores,
+        )
+        authorized_request = await self._authorize_state_operation(
+            "reset",
+            "reset_state",
+            active_request,
+            capabilities=frozenset({"state.reset"}),
+            description="Reset this agent's persistent state.",
+        )
+        return self._state.reset(authorized_request)
+
+    async def compact_state(
+        self,
+        request: str | StateOperationRequest | dict[str, Any] | None = None,
+        *,
+        session_id: str | None = None,
+        strategy: HistoryCompactionStrategy = "tokens",
+        max_messages: int = 20,
+        max_tokens: int = 4_000,
+        preserve_recent: int = 6,
+        summary_max_tokens: int = 512,
+    ) -> StateOperationResult:
+        """Compact persistent conversation state and return a state report.
+
+        Conversation state is currently the built-in compactable store. The
+        operation loads the selected session, runs the LLM-owned
+        ``HistoryCompactor``, saves the compacted session, and reports the
+        before/after counts.
+        """
+        active_request = _coerce_state_operation_request(
+            request,
+            session_id=session_id,
+            stores=("conversation",),
+            strategy=strategy,
+            max_messages=max_messages,
+            max_tokens=max_tokens,
+            preserve_recent=preserve_recent,
+            summary_max_tokens=summary_max_tokens,
+        )
+        authorized_request = await self._authorize_state_operation(
+            "compact",
+            "compact_state",
+            active_request,
+            capabilities=frozenset({"state.compact", "llm.history.compact"}),
+            description="Compact this agent's persistent conversation state.",
+        )
+        return self._compact_state_conversation(authorized_request)
+
+    async def _authorize_state_operation(
+        self,
+        kind: str,
+        name: str,
+        request: StateOperationRequest,
+        *,
+        capabilities: frozenset[str],
+        description: str,
+    ) -> StateOperationRequest:
+        """Authorize a state control-plane operation and return authorized args."""
+        context = RunContext(
+            session_id=request.session_id,
+            agent_chain=[self.card.name],
+        )
+        action = RunAction(
+            kind=f"state.{kind}",
+            name=name,
+            payload={"arguments": request.to_dict()},
+            capabilities=capabilities,
+            description=description,
+        )
+        authorization = await self.authorize_action(action, context)
+        arguments = authorization.action.payload.get("arguments", request.to_dict())
+        if not isinstance(arguments, dict):
+            raise TypeError("State operation action payload.arguments must be a dictionary")
+        return StateOperationRequest.from_dict(arguments)
+
+    def _compact_state_conversation(self, request: StateOperationRequest) -> StateOperationResult:
+        """Compact one persisted conversation session and build a result."""
+        if not request.session_id:
+            message = "compact_state requires session_id"
+            return StateOperationResult(
+                operation="compact",
+                stores=(
+                    StateStoreReport(
+                        name="conversation",
+                        enabled=self._state.conversation is not None,
+                        error=message,
+                    ),
+                ),
+                errors=({"store": "conversation", "message": message},),
+            )
+
+        if self.llm is None:
+            message = "Agent has no LLM but received a state compaction request"
+            return StateOperationResult(
+                operation="compact",
+                session_id=request.session_id,
+                stores=(
+                    StateStoreReport(
+                        name="conversation",
+                        enabled=self._state.conversation is not None,
+                        error=message,
+                    ),
+                ),
+                errors=({"store": "conversation", "message": message},),
+            )
+
+        conversation = self._state.conversation
+        if conversation is None:
+            return StateOperationResult(
+                operation="compact",
+                session_id=request.session_id,
+                stores=(StateStoreReport(name="conversation", enabled=False, error="state store is not enabled"),),
+                missing=("conversation",),
+            )
+
+        before = self._state.describe(StateOperationRequest(session_id=request.session_id, stores=("conversation",)))
+        before_store = before.stores[0] if before.stores else None
+        if before_store is None or not before_store.exists:
+            return StateOperationResult(
+                operation="compact",
+                session_id=request.session_id,
+                stores=(
+                    StateStoreReport(
+                        name="conversation",
+                        enabled=True,
+                        exists=False,
+                        error="conversation session not found",
+                    ),
+                ),
+                missing=("conversation",),
+            )
+
+        self.llm.history = conversation.get_history(
+            request.session_id,
+            default_system_prompt=self.llm.system_prompt,
+        )
+        compaction = self.llm.compact_history(
+            request.strategy,
+            max_messages=request.max_messages,
+            max_tokens=request.max_tokens,
+            preserve_recent=request.preserve_recent,
+            summary_max_tokens=request.summary_max_tokens,
+        )
+        conversation.save_history(request.session_id, self.llm.history)
+        after = self._state.describe(StateOperationRequest(session_id=request.session_id, stores=("conversation",)))
+        after_store = after.stores[0] if after.stores else None
+
+        report = StateStoreReport(
+            name="conversation",
+            enabled=True,
+            exists=after_store.exists if after_store else True,
+            item_count=after_store.item_count if after_store else None,
+            message_count=after_store.message_count if after_store else None,
+            compacted=True,
+            metadata={
+                "before": before_store.to_dict(),
+                "after": after_store.to_dict() if after_store else None,
+                "compaction": compaction.to_dict(),
+            },
+        )
+        return StateOperationResult(
+            operation="compact",
+            session_id=request.session_id,
+            stores=(report,),
+            compacted=("conversation",),
+        )
 
     async def run_task(self, task: Task) -> Task:
         """Run the configured task handler under live cancellation control.
