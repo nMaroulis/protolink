@@ -78,6 +78,16 @@ Run these notebooks in order to build a complete weather monitoring system:
 
 The repository includes several **standalone example scripts** that demonstrate specific Protolink capabilities:
 
+### 🧩 Protolink 0.6.3 runtime-control examples
+
+The 0.6.3 examples are small, provider-free scripts intended for application integrators:
+
+- [`v063_context_budget.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_context_budget.py) shows `ContextManifest`, `LLMModelProfile`, and enforced `RunBudget` behavior before a model call.
+- [`v063_history_compaction.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_history_compaction.py) shows local `recent`, `tokens`, and isolated `summary` compaction plus remote `AgentClient.compact_history()` over the request-spec endpoint.
+- [`v063_state_control.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_state_control.py) shows client/server state `describe`, `compact`, and `reset` requests for one persistent conversation session.
+- [`v063_run_reports.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `RunRecorder`, `RunReport`, `RunReplay`, golden-run assertions, and redaction.
+- [`v063_protoagent_policy_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_protoagent_policy_mesh.py) sketches the ProtoAgent Explorer/Coder/Architect structure abstractly. The prompts are intentionally tiny; the example focuses on tool capabilities, `CapabilityPolicy`, diff-preview `action_builder`s, and approval-gated workspace writes.
+
 ### 📝 [`basic_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/basic_agent.py)
 **Purpose**: Minimal agent setup focused on core concepts
 

@@ -29,6 +29,8 @@
   - Added `RunReport`, `RunRecorder`, `RunReplay`, `assert_run_events()`, `assert_no_denied_actions()`, and `assert_budget_under()` for durable app-facing run summaries and golden-run integration tests.
   - Added `RedactionPolicy` and `DEFAULT_REDACTION_POLICY` so reports and local telemetry share one recursive secret-masking surface.
   - `RunEvent` now exposes optional `span_id`, `parent_span_id`, `action_id`, `parent_action_id`, and `delegation_id` fields for causal UI routes and replay tools.
+- **Runnable integration examples**
+  - Added provider-free `examples/v063_*.py` scripts covering context budgets, request-spec history compaction, state control endpoints, run reports/replay/redaction, and an abstract ProtoAgent-style policy mesh with tool capabilities and approval previews.
 
 ### Changed
 

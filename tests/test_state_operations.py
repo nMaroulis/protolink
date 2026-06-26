@@ -128,8 +128,20 @@ async def test_agent_client_state_operations_use_request_spec_endpoints() -> Non
     await agent.server.start()
 
     try:
-        await _seed_conversation(agent, "session_remote")
-        described = await client.describe_state("runtime://remote-state", session_id="session_remote")
+        for index in range(4):
+            await _seed_conversation(agent, "session_remote", prompt=f"remember remote {index}")
+        described = await client.describe_state(
+            "runtime://remote-state",
+            session_id="session_remote",
+            include_data=True,
+        )
+        compacted = await client.compact_state(
+            "runtime://remote-state",
+            session_id="session_remote",
+            strategy="recent",
+            max_messages=4,
+        )
+        after_compact = await client.describe_state("runtime://remote-state", session_id="session_remote")
         reset = await client.reset_state("runtime://remote-state", session_id="session_remote")
         after = await client.describe_state("runtime://remote-state", session_id="session_remote")
     finally:
@@ -137,5 +149,9 @@ async def test_agent_client_state_operations_use_request_spec_endpoints() -> Non
 
     assert isinstance(described, StateOperationResult)
     assert described.stores[0].exists is True
+    assert described.stores[0].data is not None
+    assert compacted.stores[0].metadata["compaction"]["strategy"] == "recent"
+    assert compacted.stores[0].metadata["compaction"]["after_messages"] == 4
+    assert after_compact.stores[0].message_count == 4
     assert reset.cleared == ("conversation",)
     assert after.stores[0].exists is False

@@ -645,7 +645,7 @@ class Agent:
         *,
         session_id: str | None = None,
         stores: tuple[str, ...] | list[str] | None = None,
-        include_data: bool = False,
+        include_data: bool | None = None,
     ) -> StateOperationResult:
         """Describe enabled state stores through the control plane.
 
@@ -701,18 +701,20 @@ class Agent:
         request: str | StateOperationRequest | dict[str, Any] | None = None,
         *,
         session_id: str | None = None,
-        strategy: HistoryCompactionStrategy = "tokens",
-        max_messages: int = 20,
-        max_tokens: int = 4_000,
-        preserve_recent: int = 6,
-        summary_max_tokens: int = 512,
+        strategy: HistoryCompactionStrategy | None = None,
+        max_messages: int | None = None,
+        max_tokens: int | None = None,
+        preserve_recent: int | None = None,
+        summary_max_tokens: int | None = None,
     ) -> StateOperationResult:
         """Compact persistent conversation state and return a state report.
 
         Conversation state is currently the built-in compactable store. The
         operation loads the selected session, runs the LLM-owned
         ``HistoryCompactor``, saves the compacted session, and reports the
-        before/after counts.
+        before/after counts. Explicit keyword arguments override fields on
+        ``request``; omitted keywords preserve request-spec values delivered by
+        remote clients.
         """
         active_request = _coerce_state_operation_request(
             request,
