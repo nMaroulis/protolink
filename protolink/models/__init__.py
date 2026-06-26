@@ -8,6 +8,7 @@ from protolink.core.message import Message
 from protolink.core.part import Part, RouteDecision
 from protolink.core.run_context import RunBudget, RunContext
 from protolink.core.task import Task, TaskState
+from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
 from protolink.server.endpoint_handler import EndpointSpec
 
 __all__ = [
@@ -17,6 +18,8 @@ __all__ = [
     "ClientRequestSpec",
     "EndpointSpec",
     "EventSink",
+    "HistoryCompactionRequest",
+    "HistoryCompactionResult",
     "InMemoryEventSink",
     "Message",
     "Part",

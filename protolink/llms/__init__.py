@@ -4,6 +4,7 @@ import importlib
 from typing import Any
 
 __all__ = [
+    "HistoryCompactionRequest",
     "HistoryCompactionResult",
     "HistoryCompactionStrategy",
     "HistoryCompactor",
@@ -15,6 +16,7 @@ __all__ = [
 ]
 
 _EXPORTS = {
+    "HistoryCompactionRequest": "protolink.llms.compaction.HistoryCompactionRequest",
     "HistoryCompactionResult": "protolink.llms.compaction.HistoryCompactionResult",
     "HistoryCompactionStrategy": "protolink.llms.compaction.HistoryCompactionStrategy",
     "HistoryCompactor": "protolink.llms.compaction.HistoryCompactor",

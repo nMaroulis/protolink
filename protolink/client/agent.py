@@ -21,7 +21,16 @@ import threading
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from protolink.models import AgentCard, ClientRequestSpec, Message, Task, TaskCancellationRequest
+from protolink.llms.compaction import HistoryCompactionStrategy
+from protolink.models import (
+    AgentCard,
+    ClientRequestSpec,
+    HistoryCompactionRequest,
+    HistoryCompactionResult,
+    Message,
+    Task,
+    TaskCancellationRequest,
+)
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
 
@@ -93,6 +102,15 @@ class AgentClient:
         path="/tasks/cancel",
         method="POST",
         response_parser=Task.from_dict,
+        request_source="body",
+        channel="control",
+    )
+
+    COMPACT_HISTORY_REQUEST = ClientRequestSpec(
+        name="compact_history",
+        path="/llm/history/compact",
+        method="POST",
+        response_parser=HistoryCompactionResult.from_dict,
         request_source="body",
         channel="control",
     )
@@ -200,6 +218,40 @@ class AgentClient:
         )
         return await self._transport.send(
             self.TASK_CANCEL_REQUEST,
+            agent_url,
+            data=request,
+        )
+
+    async def compact_history(
+        self,
+        agent_url: str,
+        *,
+        strategy: HistoryCompactionStrategy = "recent",
+        max_messages: int = 20,
+        max_tokens: int = 4_000,
+        preserve_recent: int = 6,
+        summary_max_tokens: int = 512,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> HistoryCompactionResult:
+        """Request LLM-history compaction from an agent control endpoint.
+
+        This uses the transport-neutral ``COMPACT_HISTORY_REQUEST`` spec and
+        calls ``POST /llm/history/compact`` on the target agent. It does not
+        send a task, does not create a model-visible tool, and does not modify
+        the LLM prompt.
+        """
+        request = HistoryCompactionRequest(
+            strategy=strategy,
+            max_messages=max_messages,
+            max_tokens=max_tokens,
+            preserve_recent=preserve_recent,
+            summary_max_tokens=summary_max_tokens,
+            session_id=session_id,
+            metadata=metadata or {},
+        )
+        return await self._transport.send(
+            self.COMPACT_HISTORY_REQUEST,
             agent_url,
             data=request,
         )
@@ -354,6 +406,32 @@ class SyncAgentClient:
                 agent_url,
                 task_id,
                 reason=reason,
+                metadata=metadata,
+            )
+        )
+
+    def compact_history(
+        self,
+        agent_url: str,
+        *,
+        strategy: HistoryCompactionStrategy = "recent",
+        max_messages: int = 20,
+        max_tokens: int = 4_000,
+        preserve_recent: int = 6,
+        summary_max_tokens: int = 512,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> HistoryCompactionResult:
+        """Synchronously request LLM-history compaction from an agent."""
+        return asyncio.run(
+            self._client.compact_history(
+                agent_url,
+                strategy=strategy,
+                max_messages=max_messages,
+                max_tokens=max_tokens,
+                preserve_recent=preserve_recent,
+                summary_max_tokens=summary_max_tokens,
+                session_id=session_id,
                 metadata=metadata,
             )
         )

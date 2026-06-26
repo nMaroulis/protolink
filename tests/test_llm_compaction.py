@@ -5,12 +5,23 @@ from typing import ClassVar
 
 import pytest
 
-from protolink import HistoryCompactionResult, HistoryCompactionStrategy, HistoryCompactor
-from protolink.core import ActionAuthorization, PolicyDecision, PolicyEffect, RunAction
+from protolink import (
+    Agent,
+    AgentCard,
+    ApprovalDecision,
+    CapabilityPolicy,
+    HistoryCompactionRequest,
+    HistoryCompactionResult,
+    HistoryCompactionStrategy,
+    HistoryCompactor,
+    PolicyEffect,
+    RunAction,
+)
+from protolink.client import AgentClient
 from protolink.llms.base import LLM
-from protolink.llms.compaction import HISTORY_COMPACTION_TOOL_NAME
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import estimate_token_count
+from protolink.transport import RuntimeTransport
 
 
 class CompactionLLM(LLM):
@@ -50,7 +61,9 @@ def test_compaction_types_are_part_of_public_api() -> None:
     llm = CompactionLLM()
 
     assert strategy == "recent"
+    assert HistoryCompactionRequest(strategy="tokens").strategy == "tokens"
     assert HistoryCompactionResult.__name__ == "HistoryCompactionResult"
+    assert HistoryCompactionResult.from_dict({"strategy": "recent"}).strategy == "recent"
     assert isinstance(llm.compactor, HistoryCompactor)
 
 
@@ -67,13 +80,12 @@ def test_compactor_follows_history_replaced_for_a_persistent_session() -> None:
     assert [message["content"] for message in llm.history.messages] == ["resumed session", "resumed-3"]
 
 
-@pytest.mark.asyncio
-async def test_copied_llm_tool_stays_bound_to_copied_compactor() -> None:
+def test_copied_llm_compactor_stays_bound_to_copied_owner() -> None:
     llm = CompactionLLM()
     _seed_history(llm, count=4)
     copied_llm = deepcopy(llm)
 
-    await copied_llm.compactor.tool(strategy="recent", max_messages=2)
+    copied_llm.compactor.compact(strategy="recent", max_messages=2)
 
     assert len(copied_llm.history) == 2
     assert len(llm.history) == 5
@@ -153,55 +165,90 @@ def test_summary_compaction_is_atomic_when_model_call_fails() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_request_can_dispatch_builtin_history_compaction() -> None:
-    llm = CompactionLLM(
-        [
-            json.dumps(
-                {
-                    "type": "tool_call",
-                    "tool": HISTORY_COMPACTION_TOOL_NAME,
-                    "args": {"strategy": "recent", "max_messages": 3},
-                }
-            ),
-            json.dumps({"type": "final", "content": "History compacted."}),
-        ]
-    )
+async def test_agent_compact_history_request_dispatches_without_model_tool() -> None:
+    llm = CompactionLLM()
     _seed_history(llm, count=4)
-    authorized_actions: list[RunAction] = []
+    agent = Agent(AgentCard(name="compactor", description="test", url="runtime://compactor"), llm=llm, verbosity=0)
 
-    async def authorize(action: RunAction) -> ActionAuthorization:
-        authorized_actions.append(action)
-        return ActionAuthorization(
-            action=action,
-            policy_decision=PolicyDecision(
-                effect=PolicyEffect.ALLOW,
-                reason="test allows compaction",
-                policy_name="test",
-            ),
-        )
+    result = await agent.compact_history(HistoryCompactionRequest(strategy="recent", max_messages=3))
 
-    result = await llm.infer(
-        query="Compact your history using the simple strategy.",
-        tools={},
-        action_authorizer=authorize,
-    )
-
-    assert result.content == "History compacted."
-    assert authorized_actions[0].kind == "llm.history.compact"
-    assert authorized_actions[0].capabilities == frozenset({"llm.history.compact"})
+    assert result.after_messages == 3
+    assert llm.call_histories == []
     assert all("message-0" not in message["content"] for message in llm.history.messages)
-    assert HISTORY_COMPACTION_TOOL_NAME in llm.system_prompt
+    assert "protolink_compact_history" not in llm.system_prompt
 
 
 @pytest.mark.asyncio
-async def test_builtin_history_tool_name_is_reserved() -> None:
+async def test_agent_compact_history_request_uses_runtime_policy_boundary() -> None:
     llm = CompactionLLM()
+    _seed_history(llm, count=4)
+    approval_actions: list[RunAction] = []
 
-    with pytest.raises(ValueError, match="is reserved by the LLM runtime"):
-        await llm.infer(
-            query="hello",
-            tools={HISTORY_COMPACTION_TOOL_NAME: object()},  # type: ignore[dict-item]
+    async def approve(request, _context):
+        approval_actions.append(request.action)
+        return ApprovalDecision(
+            approved=True,
+            request_id=request.request_id,
+            reason="test approves compaction",
+            decided_by="tester",
         )
+
+    agent = Agent(
+        AgentCard(name="policy_compactor", description="test", url="runtime://policy-compactor"),
+        llm=llm,
+        policy=CapabilityPolicy({"llm.history.compact": PolicyEffect.REQUIRE_APPROVAL}),
+        approval_handler=approve,
+        verbosity=0,
+    )
+
+    result = await agent.compact_history(HistoryCompactionRequest(strategy="recent", max_messages=2))
+
+    assert result.after_messages == 2
+    assert approval_actions[0].kind == "llm.history.compact"
+    assert approval_actions[0].capabilities == frozenset({"llm.history.compact"})
+
+
+@pytest.mark.asyncio
+async def test_agent_client_compact_history_uses_request_spec_endpoint() -> None:
+    llm = CompactionLLM()
+    _seed_history(llm, count=4)
+    agent = Agent(
+        AgentCard(name="remote_compactor", description="test", url="runtime://remote-compactor"),
+        transport=RuntimeTransport(url="runtime://remote-compactor"),
+        llm=llm,
+        verbosity=0,
+    )
+    client = AgentClient(RuntimeTransport(url="runtime://compaction-client"))
+    assert agent.server is not None
+    await agent.server.start()
+
+    try:
+        result = await client.compact_history(
+            "runtime://remote-compactor",
+            strategy="recent",
+            max_messages=2,
+        )
+    finally:
+        await agent.server.stop()
+
+    assert isinstance(result, HistoryCompactionResult)
+    assert result.after_messages == 2
+    assert llm.call_histories == []
+
+
+@pytest.mark.asyncio
+async def test_llm_infer_does_not_reserve_or_prompt_history_compaction_tool() -> None:
+    llm = CompactionLLM([json.dumps({"type": "final", "content": "ok"})])
+    old_builtin_name = "protolink_compact_history"
+
+    response = await llm.infer(
+        query="hello",
+        tools={old_builtin_name: object()},  # type: ignore[dict-item]
+    )
+    llm.build_system_prompt(tools="")
+
+    assert response.content == "ok"
+    assert old_builtin_name not in llm.system_prompt
 
 
 def test_invalid_compaction_options_do_not_mutate_history() -> None:

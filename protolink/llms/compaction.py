@@ -1,8 +1,8 @@
 """Provider-neutral conversation history compaction.
 
-``HistoryCompactor`` is composed into each base LLM and owns compaction policy,
-summary generation, and agent-tool integration. Pure helpers in this module
-perform the underlying history transformations without provider SDK coupling.
+``HistoryCompactor`` is composed into each base LLM and owns compaction policy
+plus isolated summary generation. Pure helpers in this module perform the
+underlying history transformations without provider SDK coupling.
 """
 
 from __future__ import annotations
@@ -15,7 +15,6 @@ from typing import Any, Literal, Protocol, TypeAlias
 from protolink.llms.history import ConversationHistory, LLMMessage, LLMMessageRole
 from protolink.llms.metrics import estimate_token_count
 from protolink.llms.serialization import json_history_default
-from protolink.tools import Tool
 
 HistoryCompactionStrategy: TypeAlias = Literal["recent", "tokens", "summary"]
 """Supported history compaction algorithms."""
@@ -23,8 +22,60 @@ HistoryCompactionStrategy: TypeAlias = Literal["recent", "tokens", "summary"]
 HistorySummarizer: TypeAlias = Callable[[list[dict[str, Any]], int], str]
 """Callback used to summarize chronological full-message dictionaries."""
 
-HISTORY_COMPACTION_TOOL_NAME = "protolink_compact_history"
-"""Reserved runtime tool name used for agent-requested compaction."""
+
+@dataclass(frozen=True)
+class HistoryCompactionRequest:
+    """Transport-neutral request to compact an agent's LLM history.
+
+    The request is used by client/server control endpoints and direct Agent
+    calls. It is intentionally not a task part or model tool, so applications
+    can request context maintenance without increasing the LLM prompt surface.
+
+    Args:
+        strategy: Compaction algorithm: ``"recent"``, ``"tokens"``, or
+            ``"summary"``.
+        max_messages: Retained-message limit for ``"recent"``.
+        max_tokens: Estimated token ceiling for ``"tokens"``.
+        preserve_recent: Newest non-system messages protected by ``"tokens"``
+            and ``"summary"``.
+        summary_max_tokens: Requested maximum summary length.
+        session_id: Optional persistent conversation session to load, compact,
+            and save when the agent has ``state=["conversation"]`` enabled.
+        metadata: Additional application metadata for logs or future control
+            policies. The compactor ignores it.
+    """
+
+    strategy: HistoryCompactionStrategy = "recent"
+    max_messages: int = 20
+    max_tokens: int = 4_000
+    preserve_recent: int = 6
+    summary_max_tokens: int = 512
+    session_id: str | None = None
+    metadata: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the request for a transport body."""
+        data = asdict(self)
+        if self.metadata is None:
+            data["metadata"] = {}
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> HistoryCompactionRequest:
+        """Create a request from a JSON-compatible dictionary."""
+        strategy = data.get("strategy", "recent")
+        if strategy not in {"recent", "tokens", "summary"}:
+            raise ValueError("strategy must be one of: recent, tokens, summary")
+        session_id = data.get("session_id")
+        return cls(
+            strategy=strategy,
+            max_messages=int(data.get("max_messages", 20)),
+            max_tokens=int(data.get("max_tokens", 4_000)),
+            preserve_recent=int(data.get("preserve_recent", 6)),
+            summary_max_tokens=int(data.get("summary_max_tokens", 512)),
+            session_id=str(session_id) if session_id is not None else None,
+            metadata=dict(data.get("metadata") or {}),
+        )
 
 
 @dataclass(frozen=True)
@@ -45,8 +96,21 @@ class HistoryCompactionResult:
         return self.removed_messages > 0 or self.summary_created
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize the report for tool results, telemetry, or logging."""
+        """Serialize the report for task results, telemetry, or logging."""
         return {**asdict(self), "changed": self.changed}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> HistoryCompactionResult:
+        """Create a compaction report from a JSON-compatible dictionary."""
+        return cls(
+            strategy=data.get("strategy", "recent"),
+            before_messages=int(data.get("before_messages", 0)),
+            after_messages=int(data.get("after_messages", 0)),
+            removed_messages=int(data.get("removed_messages", 0)),
+            before_tokens=int(data.get("before_tokens", 0)),
+            after_tokens=int(data.get("after_tokens", 0)),
+            summary_created=bool(data.get("summary_created", False)),
+        )
 
 
 class _CompactionTarget(Protocol):
@@ -63,10 +127,14 @@ class _CompactionTarget(Protocol):
 class HistoryCompactor:
     """LLM-owned service for compacting live conversation history.
 
-    The compactor keeps history algorithms, summary generation, built-in tool
-    construction, and prompt wiring out of the base LLM class. It retains a
-    reference to its owning LLM rather than a specific history object because
-    agents may replace ``llm.history`` when loading persistent sessions.
+    The compactor keeps history algorithms and summary generation out of the
+    base LLM class. It retains a reference to its owning LLM rather than a
+    specific history object because agents may replace ``llm.history`` when
+    loading persistent sessions.
+
+    Compaction is not exposed to the model as a built-in tool and is never
+    appended to the model prompt. Applications and the Agent runtime call this
+    component directly when they receive an explicit control-plane request.
 
     Applications normally access this component through ``llm.compactor`` or
     the convenience facade ``llm.compact_history()``.
@@ -91,9 +159,10 @@ class HistoryCompactor:
 
         ``recent`` keeps the system prompt and newest messages without a model
         call. ``tokens`` keeps the newest chronological suffix under an
-        estimated token budget. ``summary`` makes one isolated model call to
-        replace older messages with durable context while preserving recent
-        messages verbatim.
+        estimated token budget without a model call. ``summary`` makes one
+        isolated model call with a dedicated summarization prompt to replace
+        older messages with durable context while preserving recent messages
+        verbatim.
 
         Args:
             strategy: ``"recent"``, ``"tokens"``, or ``"summary"``.
@@ -111,6 +180,8 @@ class HistoryCompactor:
         Notes:
             Summary generation uses a temporary ``ConversationHistory``. The
             live history is replaced only after a non-empty summary returns.
+            The normal agent inference loop, tool registry, and system prompt
+            are not involved.
         """
         summarizer = self._summarize_messages if strategy == "summary" else None
         return _compact_conversation_history(
@@ -124,27 +195,6 @@ class HistoryCompactor:
             summarizer=summarizer,
         )
 
-    @property
-    def tool(self) -> Tool:
-        """Return a reserved agent tool bound to this compactor.
-
-        The lightweight wrapper is created on access so copied LLM instances
-        can never retain a tool closure bound to the original compactor.
-        """
-        return self._build_tool()
-
-    def append_tool_prompt(self, tools: str | None) -> str:
-        """Append JSON-mode instructions for the built-in compaction tool."""
-        builtin = (
-            'Built-in tool:\n    "name": protolink_compact_history,\n'
-            '    "description": Compact this agent\'s live context/history. When the user explicitly asks to '
-            "compact, trim, or summarize the context/history, call this tool before answering.\n"
-            '    "input_schema": {"strategy": {"enum": ["recent", "tokens", "summary"]}, '
-            '"max_messages": {"type": "integer"}, "max_tokens": {"type": "integer"}, '
-            '"preserve_recent": {"type": "integer"}, "summary_max_tokens": {"type": "integer"}}'
-        )
-        return f"{tools}\n\n{builtin}" if tools else builtin
-
     def _summarize_messages(
         self,
         messages: list[dict[str, Any]],
@@ -153,53 +203,6 @@ class HistoryCompactor:
         """Summarize older messages through one isolated owner call."""
         summary_history = _build_summary_history(messages, summary_max_tokens)
         return _extract_summary(self._llm.call(summary_history))
-
-    def _build_tool(self) -> Tool:
-        """Create the reserved runtime tool for agent-selected compaction."""
-
-        def invoke(
-            strategy: HistoryCompactionStrategy = "recent",
-            max_messages: int = 20,
-            max_tokens: int = 4_000,
-            preserve_recent: int = 6,
-            summary_max_tokens: int = 512,
-        ) -> dict[str, Any]:
-            return self.compact(
-                strategy=strategy,
-                max_messages=max_messages,
-                max_tokens=max_tokens,
-                preserve_recent=preserve_recent,
-                summary_max_tokens=summary_max_tokens,
-            ).to_dict()
-
-        return Tool(
-            name=HISTORY_COMPACTION_TOOL_NAME,
-            description=(
-                "Compact this agent's live conversation context/history. Use it when the user explicitly asks to "
-                "compact, trim, or summarize context. Choose recent for a cheap message window, tokens for an "
-                "estimated token budget, or summary for an intelligent summary of older turns."
-            ),
-            input_schema={
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "strategy": {
-                        "type": "string",
-                        "enum": ["recent", "tokens", "summary"],
-                        "default": "recent",
-                    },
-                    "max_messages": {"type": "integer", "minimum": 2, "default": 20},
-                    "max_tokens": {"type": "integer", "minimum": 1, "default": 4_000},
-                    "preserve_recent": {"type": "integer", "minimum": 1, "default": 6},
-                    "summary_max_tokens": {"type": "integer", "minimum": 1, "default": 512},
-                },
-                "required": [],
-            },
-            output_schema={"type": "object"},
-            tags=["protolink", "llm", "history"],
-            capabilities=["llm.history.compact"],
-            func=invoke,
-        )
 
 
 def _build_summary_history(

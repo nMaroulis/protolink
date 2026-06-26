@@ -166,6 +166,40 @@ Cancellation is intentionally best-effort. Async work normally stops at an `awai
 
 ---
 
+### `compact_history()`
+
+Requests LLM conversation-history compaction from an agent over the control plane.
+
+```python
+async def compact_history(
+    agent_url: str,
+    *,
+    strategy: str = "recent",
+    max_messages: int = 20,
+    max_tokens: int = 4000,
+    preserve_recent: int = 6,
+    summary_max_tokens: int = 512,
+    session_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> HistoryCompactionResult
+```
+
+This uses the built-in `COMPACT_HISTORY_REQUEST` spec (`POST /llm/history/compact`). It does not send a `Task`, does not create a model-visible tool, and does not add anything to the LLM prompt.
+
+```python
+report = await client.compact_history(
+    agent_url,
+    strategy="tokens",
+    max_tokens=8_000,
+    preserve_recent=6,
+    session_id="customer-42",
+)
+```
+
+When the target agent has `state=["conversation"]` and `session_id` is supplied, the agent loads that session history, compacts it, and saves it back.
+
+---
+
 ### `send_message()`
 
 Convenience wrapper that creates a Task from a Message, sends it, and returns the response message.
@@ -221,6 +255,7 @@ Internally, these methods use `asyncio.run()` to handle the asynchronous transpo
 | `send_task()` | `client.sync.send_task()` | Synchronously send a task and wait for the result. |
 | `send_task_streaming()` | `client.sync.send_task_streaming()` | Synchronously iterate over streamed task events. |
 | `cancel_task()` | `client.sync.cancel_task()` | Synchronously request cancellation of a task running elsewhere. |
+| `compact_history()` | `client.sync.compact_history()` | Synchronously request LLM history compaction from an agent. |
 | `send_message()` | `client.sync.send_message()` | Synchronously send a message and wait for the response message. |
 | `get_agent_card()` | `client.sync.get_agent_card()` | Synchronously retrieve an agent's public card. |
 
@@ -271,6 +306,7 @@ class ClientRequestSpec:
 |------|------|--------|-------------|
 | `TASK_REQUEST` | `/tasks/` | POST | Send a task to an agent |
 | `TASK_CANCEL_REQUEST` | `/tasks/cancel` | POST | Cancel an active task over a control channel |
+| `COMPACT_HISTORY_REQUEST` | `/llm/history/compact` | POST | Compact the target agent's LLM history over a control channel |
 | `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | Retrieve agent metadata |
 | `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | Send task with streaming |
 

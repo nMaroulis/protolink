@@ -186,19 +186,40 @@ The `tokens` limit is deliberately soft when the leading system prompt plus prot
 
 ### Agent-requested compaction
 
-`LLM.infer()` exposes the reserved `protolink_compact_history` built-in tool in both JSON-action and provider-native tool modes. Its prompt tells the model to use that tool when a user explicitly asks to compact, trim, or summarize the agent's context. The action is dispatched through the normal policy boundary with the `llm.history.compact` capability.
+Agent-requested compaction is a control-plane request, not a model tool and not a task part. Call the Agent method directly or use the client request spec. The compaction capability is never appended to the model prompt and is never exposed through provider-native or JSON tool calling, which keeps the prompt smaller and friendlier to very small models.
 
 ```python
-response = await agent.invoke(
-    "Compact your history using the summary strategy, then tell me what you retained.",
+from protolink import HistoryCompactionRequest
+
+report = await agent.compact_history(
+    HistoryCompactionRequest(
+        strategy="summary",
+        preserve_recent=8,
+        summary_max_tokens=600,
+        session_id="customer-42",
+    )
+)
+```
+
+For remote agents, use the client spec-backed convenience method:
+
+```python
+from protolink.client import AgentClient
+
+client = AgentClient("runtime", url="runtime://client")
+report = await client.compact_history(
+    "runtime://agent",
+    strategy="summary",
+    preserve_recent=8,
+    summary_max_tokens=600,
     session_id="customer-42",
 )
 ```
 
-When `state=["conversation"]` is enabled, the compacted history is saved through the normal session-state path at the end of the task. The built-in tool name is reserved and should not be reused for an application tool.
+The remote path is `POST /llm/history/compact`, represented by `AgentClient.COMPACT_HISTORY_REQUEST` and an `EndpointSpec` registered by `AgentServer`. When `state=["conversation"]` is enabled and `session_id` is supplied, the Agent loads the session history before compaction and saves the compacted history afterward. The runtime action is still evaluated through the policy boundary with the `llm.history.compact` capability, so applications can allow, deny, or require approval for context loss.
 
 !!! note "Compaction is explicit"
-    Protolink does not compact history automatically based on an arbitrary context threshold. Applications can call `compact_history()` deterministically, while agents can select the built-in tool in response to an explicit request. This keeps context loss visible and policy-controlled.
+    Protolink does not compact history automatically based on an arbitrary context threshold. Applications can call `llm.compact_history()` for local use, `agent.compact_history()` inside an Agent process, or `AgentClient.compact_history()` over a transport. Natural-language requests such as “please compact your context” are application intent; convert them into a control-plane request before calling the Agent if you want deterministic behavior.
 
 ## LLM API Reference
 
@@ -270,7 +291,7 @@ The `LLM` class defines the common interface that all LLM implementations must f
 | `model_params` | `dict[str, Any]` | Model-specific parameters (temperature, max_tokens, etc.). |
 | `system_prompt` | `str` | Default system prompt for the model. |
 | `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. Automatically managed by the [Agent state system](agent.md#state-persistence) when enabled. |
-| `compactor` | `HistoryCompactor` | LLM-owned component that handles compaction algorithms, isolated summaries, and the reserved agent tool. |
+| `compactor` | `HistoryCompactor` | LLM-owned component that handles compaction algorithms and isolated summary calls. It is not exposed to the model as a tool. |
 | `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
 | `metrics_profile` | `LLMModelProfile ⎪ None` | Optional model budget metadata for context-window percentage and cost estimates. |
 | `metrics_enabled` | `bool` | Whether metrics events are emitted when telemetry or an `event_callback` is attached. Defaults to `True`. |
@@ -367,7 +388,7 @@ The loop is otherwise identical in both modes:
 1. **Prompt selection**: `Agent.call_llm()` builds either the JSON prompt or the native-tool prompt. Streaming calls use the native prompt only when `llm.supports_native_action_stream` is true; otherwise they force JSON mode so small/local models keep the simple contract.
 2. **Action acquisition**: `LLM.infer()` calls `call_action()` for non-streaming runs or `call_action_stream()` for streaming runs. These methods return an `LLMActionResult`, not raw provider data.
 3. **Action validation**: JSON mode validates the parsed object against the typed action union. Native mode validates the normalized provider tool call against the same `FinalAction`, `ToolCallAction`, or `AgentCallAction` models.
-4. **Runtime dispatch**: The runtime executes local tools, the reserved history-compaction tool, delegates to agents, or returns a final answer. The LLM declares intent only; Protolink performs all side effects.
+4. **Runtime dispatch**: The runtime executes local tools, delegates to agents, or returns a final answer. The LLM declares intent only; Protolink performs all side effects. History compaction is handled outside this loop by `Agent.compact_history()` and the client/server request spec.
 5. **Observation injection**: Tool and agent results are added back to `ConversationHistory` through provider-specific injection hooks when needed, or through the provider-neutral fallback message format.
 6. **Iteration**: The loop repeats until a `final` action is produced or a guardrail stops execution.
 

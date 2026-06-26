@@ -55,6 +55,7 @@ from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
+from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
 from protolink.logging import BaseLogger, ConsoleLogger, get_agent_farewell, get_agent_greeting
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task
 from protolink.security.auth import Authenticator
@@ -529,6 +530,70 @@ class Agent:
             task_id = request
             cancel_reason = reason
         return self._task_executions.cancel(task_id, cancel_reason)
+
+    async def compact_history(
+        self,
+        request: HistoryCompactionRequest | dict[str, Any] | None = None,
+    ) -> HistoryCompactionResult:
+        """Compact this agent's LLM history through a control-plane request.
+
+        This method backs the ``/llm/history/compact`` endpoint and the
+        matching ``AgentClient`` request spec. It is intentionally outside
+        ``Task`` execution and outside ``LLM.infer()``, so compaction is never
+        advertised to the model as a tool and never consumes prompt budget.
+
+        When ``request.session_id`` is provided and conversation state is
+        enabled, the session history is loaded before compaction and saved
+        afterward. The operation is authorized through the
+        ``llm.history.compact`` runtime capability before any history mutation.
+        """
+        if self.llm is None:
+            raise RuntimeError("Agent has no LLM but received a history compaction request")
+
+        if request is None:
+            active_request = HistoryCompactionRequest()
+        elif isinstance(request, HistoryCompactionRequest):
+            active_request = request
+        elif isinstance(request, dict):
+            active_request = HistoryCompactionRequest.from_dict(request)
+        else:
+            raise TypeError("history compaction request must be a HistoryCompactionRequest or dictionary")
+        context = RunContext(
+            session_id=active_request.session_id,
+            agent_chain=[self.card.name],
+        )
+        action = RunAction(
+            kind="llm.history.compact",
+            name="compact_history",
+            payload={"arguments": active_request.to_dict()},
+            capabilities=frozenset({"llm.history.compact"}),
+            description="Compact this agent's LLM conversation history.",
+        )
+        authorization = await self.authorize_action(action, context)
+        arguments = authorization.action.payload.get("arguments", active_request.to_dict())
+        if not isinstance(arguments, dict):
+            raise TypeError("History compaction action payload.arguments must be a dictionary")
+        authorized_request = HistoryCompactionRequest.from_dict(arguments)
+
+        session_id = authorized_request.session_id
+        if session_id and self._state.conversation:
+            self.llm.history = self._state.conversation.get_history(
+                session_id,
+                default_system_prompt=self.llm.system_prompt,
+            )
+
+        result = self.llm.compact_history(
+            authorized_request.strategy,
+            max_messages=authorized_request.max_messages,
+            max_tokens=authorized_request.max_tokens,
+            preserve_recent=authorized_request.preserve_recent,
+            summary_max_tokens=authorized_request.summary_max_tokens,
+        )
+
+        if session_id and self._state.conversation:
+            self._state.conversation.save_history(session_id, self.llm.history)
+
+        return result
 
     async def run_task(self, task: Task) -> Task:
         """Run the configured task handler under live cancellation control.

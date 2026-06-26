@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Literal, Protocol
 
-from protolink.models import AgentCard, Task, TaskCancellationRequest
+from protolink.models import AgentCard, HistoryCompactionRequest, HistoryCompactionResult, Task, TaskCancellationRequest
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport import Transport
 
@@ -43,6 +43,9 @@ class AgentInterface(Protocol):
 
     async def cancel_task(self, request: TaskCancellationRequest) -> Task:
         """Request cancellation of an active task."""
+
+    async def compact_history(self, request: HistoryCompactionRequest) -> HistoryCompactionResult:
+        """Compact the agent's LLM conversation history."""
 
     def get_agent_card(self, *, as_json: bool = True) -> AgentCard | dict[str, Any]:
         """Return the agent's public metadata and capabilities."""
@@ -105,6 +108,14 @@ class AgentServer:
                 handler=self._agent.cancel_task,
                 request_source="body",
                 request_parser=TaskCancellationRequest.from_dict,
+            ),
+            EndpointSpec(
+                name="compact_history",
+                path="/llm/history/compact",
+                method="POST",
+                handler=self._agent.compact_history,
+                request_source="body",
+                request_parser=HistoryCompactionRequest.from_dict,
             ),
             EndpointSpec(
                 name="agent_card",

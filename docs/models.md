@@ -1140,3 +1140,37 @@ Updates the system prompt (at index 0) while preserving all subsequent conversat
 
 #### `truncate(max_messages: int)`
 Keep at most `max_messages` messages using the low-level deque truncation operation. For provider-neutral compaction with structured results, token budgets, and summarization, prefer [`LLM.compact_history()`](llm.md#history-compaction).
+
+---
+
+## HistoryCompactionRequest
+
+```python
+@dataclass(frozen=True)
+class HistoryCompactionRequest:
+    strategy: Literal["recent", "tokens", "summary"] = "recent"
+    max_messages: int = 20
+    max_tokens: int = 4000
+    preserve_recent: int = 6
+    summary_max_tokens: int = 512
+    session_id: str | None = None
+    metadata: dict[str, Any] | None = None
+```
+
+Transport-neutral control payload used by `Agent.compact_history()` and `AgentClient.compact_history()`. It is not a `Task` part and is not shown to the model.
+
+## HistoryCompactionResult
+
+```python
+@dataclass(frozen=True)
+class HistoryCompactionResult:
+    strategy: Literal["recent", "tokens", "summary"]
+    before_messages: int
+    after_messages: int
+    removed_messages: int
+    before_tokens: int
+    after_tokens: int
+    summary_created: bool = False
+```
+
+Structured report returned by direct LLM compaction, Agent control-plane compaction, and the client request spec.

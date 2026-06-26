@@ -28,6 +28,7 @@ from protolink.core import (
 )
 from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
 from protolink.llms import (
+    HistoryCompactionRequest,
     HistoryCompactionResult,
     HistoryCompactionStrategy,
     HistoryCompactor,
@@ -57,6 +58,7 @@ __all__ = [
     "EventSink",
     "Flow",
     "Graph",
+    "HistoryCompactionRequest",
     "HistoryCompactionResult",
     "HistoryCompactionStrategy",
     "HistoryCompactor",

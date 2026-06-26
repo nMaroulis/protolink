@@ -99,7 +99,6 @@ from protolink.llms.actions import (
     validate_action_payload,
 )
 from protolink.llms.compaction import (
-    HISTORY_COMPACTION_TOOL_NAME,
     HistoryCompactionResult,
     HistoryCompactionStrategy,
     HistoryCompactor,
@@ -157,7 +156,7 @@ class LLM(ABC):
     - `history` (ConversationHistory): Tracks conversation messages for multi-turn
       interactions.
     - `compactor` (HistoryCompactor): Owns provider-neutral history compaction,
-      summary generation, and the agent-facing compaction tool.
+      summary generation, and isolated request-level compaction calls.
     - `system_prompt` (str): Optional system instructions used as context for the
       model when generating responses. Uses default prompts for agent, tool and llm calling.
     - `_reasoning` (ReasoningLevel): Whether to use chain of thought (CoT) for the model, adds reasoning steps to the
@@ -618,11 +617,6 @@ class LLM(ABC):
         build_system_prompt : Constructs the system prompt with tools and agents.
         """
 
-        if HISTORY_COMPACTION_TOOL_NAME in tools:
-            raise ValueError(f"{HISTORY_COMPACTION_TOOL_NAME!r} is reserved by the LLM runtime")
-        tools = dict(tools)
-        tools[HISTORY_COMPACTION_TOOL_NAME] = self.compactor.tool
-
         if cancellation_token is not None:
             cancellation_token.raise_if_cancelled()
 
@@ -862,7 +856,7 @@ class LLM(ABC):
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
                     runtime_action = RunAction(
-                        kind=("llm.history.compact" if tool_name == HISTORY_COMPACTION_TOOL_NAME else "tool.call"),
+                        kind="tool.call",
                         name=tool_name,
                         payload={"arguments": tool_args},
                         capabilities=frozenset(getattr(tool, "capabilities", None) or ()),
@@ -1591,7 +1585,6 @@ class LLM(ABC):
         if override_system_prompt:
             self.system_prompt = user_instructions or ""
         else:
-            tools = self.compactor.append_tool_prompt(tools)
             # Guardrail: Prevent agent from delegating to itself and provide ID
             agent_identity_prompt = ""
             if agent_name:

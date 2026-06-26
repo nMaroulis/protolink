@@ -245,9 +245,10 @@ async def main():
 |------|------------|---------|-------------|
 | `run_task()` | `task: Task` | `Task` | Runs `handle_task()` inside active-task registration so it can be canceled by task ID. Server routes use this wrapper automatically. |
 | `run_task_streaming()` | `task: Task` | `AsyncIterator` | Runs the streaming handler inside active-task registration and guarantees a final canceled status event after successful cancellation. |
-| `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls, inference) and executes them. Can be overridden for custom orchestration. |
+| `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls and inference) and executes them. Can be overridden for custom orchestration. |
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Streams task status, LLM inference events, tool progress, artifact updates, and final completion for streaming-capable transports. |
-| `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()` to run the multi-step reasoning loop. For `tool_call` parts, it executes the tool directly. |
+| `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()`. For `tool_call` parts, it executes the tool directly. |
+| `compact_history()` | `request: HistoryCompactionRequest` | `HistoryCompactionResult` | Control-plane method behind `POST /llm/history/compact`. Calls `llm.compact_history()` without exposing compaction to the model prompt. |
 | `cancel_task()` | `task_id | TaskCancellationRequest`, `reason=None` | `Task` | Marks an active task and its `RunContext` canceled, then interrupts its owning coroutine. |
 | `get_cancellation_token()` | `task_id: str` | `CancellationToken ⎪ None` | Returns the process-local token for checkpoints in custom long-running handlers. |
 | `active_task_ids` | — | `tuple[str, ...]` | Snapshot of task IDs currently registered on this Agent. |

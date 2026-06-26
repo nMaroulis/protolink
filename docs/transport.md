@@ -168,6 +168,8 @@ The tables below document each object type.
 
 `POST /tasks/cancel` accepts an A2A-style task-ID payload such as `{"id": "task-id", "metadata": {"reason": "Stopped by user"}}`. The response is the updated serialized `Task`. The endpoint controls active execution only; it is not a durable task lookup API.
 
+`POST /llm/history/compact` accepts a control-plane history-compaction payload such as `{"strategy": "tokens", "max_tokens": 8000, "preserve_recent": 6, "session_id": "customer-42"}`. The response is a serialized `HistoryCompactionResult`. This endpoint does not create a `Task` and does not expose compaction as a model tool.
+
 #### Message
 
 ```json
