@@ -12,7 +12,7 @@
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%">
 </div>
 
-> 📌 The framework is currently in **alpha** and is subject to change.
+> 📌 The framework is currently in **beta** and is subject to change.
 
 ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and **integrate tools seamlessly**. Build **distributed multi-agent systems** with minimal boilerplate and production-oriented architecture.
 
@@ -22,7 +22,10 @@ ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-p
 
 > ProtoLink is an **A2A-native agent runtime** for building distributed, typed, observable agent systems. LangChain composes model calls; ProtoLink runs agents.
 
+
 #### 🎯 The Philosophy
+
+Find more in the Protolink [whitepaper](https://nmaroulis.github.io/protolink/whitepaper).
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
@@ -116,7 +119,7 @@ Running tasks can be canceled by task ID across local and remote transports, wit
   - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
   - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
   - **Enhanced Security**: **OAuth 2.0** and **API key support**.
-  - **Comprehensive Logging**: Built-in support for **console** (colored) and **file-based** logging (including structured **JSON** output).
+  - **Comprehensive Logging**: Built-in support for **console** (colored), **file-based** logging (including structured **JSON** output), and a no-op quiet logger.
   - Built-in support for streaming and async operations.
 - **Planned Integrations**:
   - **Advanced Orchestration Patterns**
@@ -678,6 +681,7 @@ Protolink provides a flexible logging system to track agent activity across diff
 
 - [ConsoleLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/console.py): Provides colored, human-readable logs in the terminal.
 - [FileLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/file.py): Persists logs to disk, with optional **JSON** formatting for easy ingestion into log management tools.
+- [QuietLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/quiet.py): Implements the logger interface while intentionally dropping every log message.
 - [BaseLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/base.py): Abstract base class for creating custom logging implementations.
 
 ## License

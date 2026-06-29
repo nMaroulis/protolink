@@ -8,8 +8,8 @@ class BaseLogger(ABC):
     """
     Abstract base class for all Protolink loggers.
 
-    Any custom logger provided to the Agent or other Protolink components
-    should implement this interface to ensure compatibility.
+    Any custom logger provided to the Agent or other Protolink components should implement this interface to
+    ensure compatibility.
     """
 
     @property

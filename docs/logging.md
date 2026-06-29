@@ -1,16 +1,16 @@
 # Logging
 
-Protolink provides a unified logging package to manage both console and file-based logs consistently.
+Protolink provides a unified logging package to manage console, file-based, and intentionally silent logs consistently.
 
 ## Overview
 
 Protolink's logging is built around a common `BaseLogger` abstract class, which ensures that custom and built-in loggers expose the standard logging methods. 
 
 <div align="center" style="font-family: 'Courier New', monospace; color:#888; font-size:14px; margin-bottom:12px;">
-  [ ConsoleLogger ]   [ FileLogger ]   [ BaseLogger ]
+  [ ConsoleLogger ]   [ FileLogger ]   [ QuietLogger ]   [ BaseLogger ]
 </div>
 
-By default, an Agent utilizes the `ConsoleLogger` to output colorful text to `stdout`, but it's very easy to substitute this with the `FileLogger` or even a custom subclass if you use platforms like Datadog or Sentry.
+By default, an Agent utilizes the `ConsoleLogger` to output colorful text to `stdout`, but it's very easy to substitute this with the `FileLogger`, `QuietLogger`, or a custom subclass if you use platforms like Datadog or Sentry.
 
 ## Configuration
 
@@ -18,7 +18,7 @@ You can pass a logger instance directly when initializing your `Agent`. If you d
 
 ```python
 from protolink.agents import Agent
-from protolink.logging import ConsoleLogger, FileLogger
+from protolink.logging import ConsoleLogger, FileLogger, QuietLogger
 
 # Using the built-in FileLogger (e.g., as JSON)
 my_logger = FileLogger("agent_activity.log", extension="json", level="DEBUG")
@@ -36,7 +36,27 @@ agent = Agent(
 ```
 
 !!! tip "Default Fallback"
-    If you don't supply a `logger`, Protolink instantiates a `ConsoleLogger` for you automatically. The log level is derived from the `verbosity` argument passed to the Agent (`0` -> WARNING, `1` -> INFO, `2` -> DEBUG).
+    If you don't supply a `logger`, Protolink instantiates a `ConsoleLogger` for you automatically. The log level is derived from the `verbosity` argument passed to the Agent (`0` suppresses the standard Agent logger methods, `1` -> INFO, `2` -> DEBUG).
+
+Use `QuietLogger` when you want a logger object but no emitted output at all:
+
+```python
+from protolink.agents import Agent
+from protolink.logging import QuietLogger
+
+agent = Agent(
+    card={
+        "name": "quiet_agent",
+        "description": "Agent with no log output",
+        "url": "http://127.0.0.1:8000",
+    },
+    transport="http",
+    logger=QuietLogger(name="quiet_agent"),
+)
+```
+
+!!! note "Quiet vs. low verbosity"
+    `verbosity=0` keeps the default console logger but suppresses Protolink's standard Agent log calls. `QuietLogger` is a reusable no-op `BaseLogger` that creates no handlers and drops every `debug()`, `info()`, `warning()`, `error()`, and `exception()` call wherever it is injected.
 
 ---
 
@@ -86,3 +106,13 @@ Appends formatted logs to a given file. Can automatically output structured JSON
 
 !!! success "Structured JSON Logging"
     If the file you provide ends in `.json`, or if you pass `extension="json"` explicitly, the `FileLogger` automatically swaps out standard text formatting for structural JSON. This makes it extremely easy to ingest logs into tools like Elasticsearch or CloudWatch.
+
+### QuietLogger
+
+Implements `BaseLogger` while intentionally ignoring every log message. It does not create Python logging handlers, write to stdout or stderr, or persist records to disk.
+
+#### Constructor
+
+| Parameter | Type | Default | Description |
+|-----------|-----|---------|-------------|
+| `name` | `str` | `"protolink"` | The logical logger name returned by the `name` property. |

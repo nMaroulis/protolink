@@ -37,6 +37,13 @@ _Current release: see [protolink on PyPI](https://pypi.org/project/protolink/)._
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">WP</div>
+    <div class="nav-content">
+      <a href="whitepaper">Whitepaper</a>
+      <div class="nav-desc">Architecture, runtime model, and design philosophy</div>
+    </div>
+  </div>
+  <div class="nav-item">
     <div class="nav-emoji">🚀</div>
     <div class="nav-content">
       <a href="getting-started">Getting Started</a>
@@ -217,63 +224,63 @@ _Current release: see [protolink on PyPI](https://pypi.org/project/protolink/)._
 }
 
 /* Add subtle gradient backgrounds for different sections */
-.nav-item:nth-child(1), .nav-item:nth-child(2) {
+.nav-item:nth-child(1), .nav-item:nth-child(2), .nav-item:nth-child(3) {
   border-left-color: #8b5cf6;
 }
 
-.nav-item:nth-child(1):hover, .nav-item:nth-child(2):hover {
+.nav-item:nth-child(1):hover, .nav-item:nth-child(2):hover, .nav-item:nth-child(3):hover {
   border-left-color: #7c3aed;
   box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1);
 }
 
-.nav-item:nth-child(1):hover .nav-emoji, .nav-item:nth-child(2):hover .nav-emoji {
+.nav-item:nth-child(1):hover .nav-emoji, .nav-item:nth-child(2):hover .nav-emoji, .nav-item:nth-child(3):hover .nav-emoji {
   background: rgba(139, 92, 246, 0.1);
 }
 
-.nav-item:nth-child(3), .nav-item:nth-child(4), .nav-item:nth-child(5), 
-.nav-item:nth-child(6), .nav-item:nth-child(7), .nav-item:nth-child(8), 
-.nav-item:nth-child(9), .nav-item:nth-child(10), .nav-item:nth-child(11) {
+.nav-item:nth-child(4), .nav-item:nth-child(5), .nav-item:nth-child(6), 
+.nav-item:nth-child(7), .nav-item:nth-child(8), .nav-item:nth-child(9), 
+.nav-item:nth-child(10), .nav-item:nth-child(11), .nav-item:nth-child(12) {
   border-left-color: #06b6d4;
 }
 
-.nav-item:nth-child(3):hover, .nav-item:nth-child(4):hover, .nav-item:nth-child(5):hover,
-.nav-item:nth-child(6):hover, .nav-item:nth-child(7):hover, .nav-item:nth-child(8):hover,
-.nav-item:nth-child(9):hover, .nav-item:nth-child(10):hover, .nav-item:nth-child(11):hover {
+.nav-item:nth-child(4):hover, .nav-item:nth-child(5):hover, .nav-item:nth-child(6):hover,
+.nav-item:nth-child(7):hover, .nav-item:nth-child(8):hover, .nav-item:nth-child(9):hover,
+.nav-item:nth-child(10):hover, .nav-item:nth-child(11):hover, .nav-item:nth-child(12):hover {
   border-left-color: #0891b2;
   box-shadow: 0 4px 20px rgba(6, 182, 212, 0.1);
 }
 
-.nav-item:nth-child(3):hover .nav-emoji, .nav-item:nth-child(4):hover .nav-emoji, 
-.nav-item:nth-child(5):hover .nav-emoji, .nav-item:nth-child(6):hover .nav-emoji, 
-.nav-item:nth-child(7):hover .nav-emoji, .nav-item:nth-child(8):hover .nav-emoji, 
-.nav-item:nth-child(9):hover .nav-emoji, .nav-item:nth-child(10):hover .nav-emoji, 
-.nav-item:nth-child(11):hover .nav-emoji {
+.nav-item:nth-child(4):hover .nav-emoji, .nav-item:nth-child(5):hover .nav-emoji, 
+.nav-item:nth-child(6):hover .nav-emoji, .nav-item:nth-child(7):hover .nav-emoji, 
+.nav-item:nth-child(8):hover .nav-emoji, .nav-item:nth-child(9):hover .nav-emoji, 
+.nav-item:nth-child(10):hover .nav-emoji, .nav-item:nth-child(11):hover .nav-emoji, 
+.nav-item:nth-child(12):hover .nav-emoji {
   background: rgba(6, 182, 212, 0.1);
 }
 
-.nav-item:nth-child(12) {
+.nav-item:nth-child(13) {
   border-left-color: #10b981;
 }
 
-.nav-item:nth-child(12):hover {
+.nav-item:nth-child(13):hover {
   border-left-color: #059669;
   box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
 }
 
-.nav-item:nth-child(12):hover .nav-emoji {
+.nav-item:nth-child(13):hover .nav-emoji {
   background: rgba(16, 185, 129, 0.1);
 }
 
-.nav-item:nth-child(13) {
+.nav-item:nth-child(14) {
   border-left-color: #f59e0b;
 }
 
-.nav-item:nth-child(13):hover {
+.nav-item:nth-child(14):hover {
   border-left-color: #d97706;
   box-shadow: 0 4px 20px rgba(245, 158, 11, 0.1);
 }
 
-.nav-item:nth-child(13):hover .nav-emoji {
+.nav-item:nth-child(14):hover .nav-emoji {
   background: rgba(245, 158, 11, 0.1);
 }
 

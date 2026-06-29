@@ -108,7 +108,7 @@ class Agent(
             logger: Custom logger instance. If not provided, a ConsoleLogger will be used.
             discovery_ttl: Time to live in seconds for caching Agent information discovered from the Registry.
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
-            verbosity: Verbosity level - 0 for silent, 1 for normal, 2 for verbose (debug mode).
+            verbosity: Verbosity level - 0 for silent standard Agent logs, 1 for normal, 2 for verbose (debug mode).
             expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
             authenticator: Optional Authenticator instance for verifying incoming requests to this agent.
             credentials: Optional credentials string used for authenticating outgoing requests.
@@ -144,7 +144,7 @@ class Agent(
         # Live task control is intentionally separate from serialized Task state.
         self._task_executions = TaskExecutionRegistry()
         self._control_tasks: set[asyncio.Task[Any]] = set()
-        # Logger - Maps verbosity to WARNING, INFO, DEBUG for default console logger.
+        # Logger - Maps verbosity to silent, INFO, DEBUG for default console logger.
         self._logger = (
             ConsoleLogger(name=f"protolink.agents.{self.card.name}", level={0: 50, 1: 20, 2: 10}.get(verbosity, 20))
             if logger is None

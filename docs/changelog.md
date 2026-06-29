@@ -11,6 +11,14 @@
 
 # Release Notes
 
+## [Unreleased]
+
+### Added
+
+- Added `QuietLogger`, a no-op `BaseLogger` implementation for agents and integrations that need the logging interface without emitting output.
+- Added the ProtoLink ***Whitepaper***.
+
+
 ## [v0.6.3] - 2026-06-26
 
 ### Added

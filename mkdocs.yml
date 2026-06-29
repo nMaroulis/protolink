@@ -64,6 +64,7 @@ nav:
   - Overview:
       - Home: index.md
       - Concept: concept.md
+      - Whitepaper: whitepaper.md
       - Getting Started: getting-started.md
       - CLI: cli.md
   - API Reference:
