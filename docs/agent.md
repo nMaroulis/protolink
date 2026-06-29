@@ -158,6 +158,8 @@ This section provides a detailed API reference for the `Agent` base class in `pr
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
 | `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
 | `approval_handler` | `Callable ⎪ None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
+| `run_store` | `RunStore ⎪ None` | `None` | Optional durable task/run store. When provided, the default runtime records task snapshots after direct, server, and streaming execution paths. |
+| `registry_heartbeat_interval` | `float ⎪ None` | `None` | Optional seconds between registry heartbeat requests after successful registration. Use with a registry TTL to prune dead agents automatically. |
 
 ```python
 from protolink.agents import Agent
@@ -172,6 +174,23 @@ transport = HTTPTransport(url=url)
 
 agent = Agent(card=card, transport=transport, llm=llm)
 ```
+
+### Durable Task Snapshots
+
+Agents remain stateless by default, but production services and CLIs often need a durable record of the task state that was returned to a user. Pass a `RunStore` implementation to `run_store` to persist snapshots without changing task execution code.
+
+```python
+from protolink import Agent, AgentCard, SQLiteRunStore
+
+store = SQLiteRunStore("runs.db")
+agent = Agent(
+    AgentCard(name="worker", description="Worker", url="runtime://worker"),
+    llm=llm,
+    run_store=store,
+)
+```
+
+The built-in `SQLiteRunStore` indexes task ID, state, run ID, session ID, trace ID, and agent name. Applications can implement the same `RunStore` protocol for Postgres, object storage, or an existing application database. The store is observational: it records completed, failed, canceled, and streamed task snapshots, but active cancellation and live execution still use the process-local task registry.
 
 ## Lifecycle Methods
 

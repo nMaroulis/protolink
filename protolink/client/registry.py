@@ -24,6 +24,13 @@ class RegistryClient:
         request_source="body",
     )
 
+    HEARTBEAT_REQUEST = ClientRequestSpec(
+        name="heartbeat",
+        path="/agents/heartbeat",
+        method="POST",
+        request_source="body",
+    )
+
     DISCOVER_REQUEST = ClientRequestSpec(
         name="discover",
         path="/agents/",
@@ -52,6 +59,22 @@ class RegistryClient:
     async def unregister(self, agent_url: str) -> dict[str, str]:
         response = await self.transport.send(
             request_spec=self.UNREGISTER_REQUEST, base_url=self.transport.url, data={"agent_url": agent_url}
+        )
+        return response
+
+    async def heartbeat(self, agent_url: str) -> dict[str, str]:
+        """Refresh the registry liveness timestamp for a registered agent.
+
+        Args:
+            agent_url: Stable URL of the registered agent.
+
+        Returns:
+            Registry status payload.
+        """
+        response = await self.transport.send(
+            request_spec=self.HEARTBEAT_REQUEST,
+            base_url=self.transport.url,
+            data={"agent_url": agent_url},
         )
         return response
 

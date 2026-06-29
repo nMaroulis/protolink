@@ -61,6 +61,18 @@ Some rough guidelines:
 
 The rest of this page dives into the API of each transport in more detail.
 
+## Transport Conformance Expectations
+
+Agent-facing transports should preserve the same logical contract even when their wire formats differ:
+
+- `AgentClient.send_task()` submits a serialized `Task` and receives a parsed `Task`.
+- `AgentClient.get_agent_card()` returns the same public `AgentCard` exposed by the server.
+- Streaming transports emit task events until the final task status update closes the stream. An LLM sub-event may carry `final=True` for the model step without closing the whole task stream.
+- Control-plane routes such as `POST /tasks/cancel` and registry heartbeats must not depend on the active request/stream connection.
+- Request parsers may be synchronous or asynchronous; transports must normalize both.
+
+The repository includes `tests/test_transport_conformance.py` to keep Runtime, HTTP, and WebSocket behavior aligned. Add new transports to that suite before treating them as production-ready.
+
 ---
 
 ## HTTPTransport

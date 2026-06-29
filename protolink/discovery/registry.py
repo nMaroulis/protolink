@@ -11,8 +11,10 @@ import time
 from typing import Any, Literal
 
 from protolink.client import RegistryClient
+from protolink.core.registry import RegistryEntry
 from protolink.models import AgentCard
 from protolink.server import RegistryServer
+from protolink.storage import Storage
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
 from protolink.utils.logging import get_logger
@@ -41,7 +43,13 @@ class Registry:
     """
 
     def __init__(
-        self, transport: TransportType | Transport = "http", url: str | None = None, verbosity: Literal[0, 1, 2] = 1
+        self,
+        transport: TransportType | Transport = "http",
+        url: str | None = None,
+        verbosity: Literal[0, 1, 2] = 1,
+        *,
+        entry_ttl_seconds: float | None = None,
+        storage: Storage | None = None,
     ):
         """Initialize the registry.
 
@@ -49,6 +57,10 @@ class Registry:
             transport: Transport instance
             url: Registry URL
             verbosity: Verbosity level [0: Warning, 1: Info, 2: Debug]
+            entry_ttl_seconds: Optional liveness TTL. Entries whose heartbeat
+                is older than this value are pruned before discovery/status.
+            storage: Optional generic storage used to persist registry entries
+                across process restarts.
         """
         self.logger = get_logger(__name__, verbosity)
 
@@ -60,8 +72,13 @@ class Registry:
         elif not isinstance(transport, Transport):
             raise ValueError("transport must be a TransportType or Transport instance")
 
-        # Local store for agent cards
+        # Local store for agent cards. ``_agents`` remains public-ish for
+        # compatibility with tests and examples; ``_entries`` carries liveness
+        # metadata for production discovery.
         self._agents: dict[str, AgentCard] = {}
+        self._entries: dict[str, RegistryEntry] = {}
+        self._entry_ttl_seconds = entry_ttl_seconds
+        self._storage = storage
 
         # Secondary indexes for O(1) discovery lookups
         self._index_name: dict[str, set[str]] = {}
@@ -80,6 +97,8 @@ class Registry:
         self._background_task: asyncio.Task | None = None
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
+
+        self._load_persisted_entries()
 
     # ------------------------------------------------------------------
     # Registry Server Lifecycle
@@ -298,6 +317,19 @@ class Registry:
             response = {"status": str(e)}
         return response
 
+    async def heartbeat(self, agent_url: str) -> dict[str, str]:
+        """Refresh an agent's liveness timestamp via the registry client.
+
+        Time: O(1) network request.
+        """
+        try:
+            self.logger.debug(f"Heartbeat for agent {agent_url}.")
+            response = await self._client.heartbeat(agent_url)
+        except Exception as e:
+            self.logger.exception(f"Failed to heartbeat agent {agent_url}: {e}")
+            response = {"status": str(e)}
+        return response
+
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         """Discover agents via the registry client.
 
@@ -319,12 +351,14 @@ class Registry:
             await self.handle_unregister(card.url)
 
         self._agents[card.url] = card
+        self._entries[card.url] = RegistryEntry(card=card, last_seen=time.time())
 
         # Update indexes
         self._index_name.setdefault(card.name, set()).add(card.url)
         self._index_role.setdefault(card.role, set()).add(card.url)
         for tag in card.tags:
             self._index_tags.setdefault(tag, set()).add(card.url)
+        self._persist_entries()
 
         self.logger.info(
             f"Agent {card.name} registered on address {card.url}.",
@@ -334,12 +368,27 @@ class Registry:
         )
         return {"status": "agent registered successfully"}
 
+    async def handle_heartbeat(self, agent_url: str) -> dict[str, str]:
+        """Refresh liveness metadata for one registered agent.
+
+        Heartbeats are intentionally small: they do not mutate the card or
+        indexes, only the ``last_seen`` timestamp used by TTL pruning.
+        """
+        self._prune_expired()
+        entry = self._entries.get(agent_url)
+        if entry is None:
+            return {"status": "agent not found"}
+        self._entries[agent_url] = RegistryEntry(card=entry.card, last_seen=time.time(), metadata=entry.metadata)
+        self._persist_entries()
+        return {"status": "agent heartbeat recorded"}
+
     async def handle_unregister(self, agent_url: str) -> dict[str, str]:
         """Process an unregistration request and clean up discovery indexes.
 
         Time: O(T) where T is the number of tags.
         """
         card = self._agents.pop(agent_url, None)
+        self._entries.pop(agent_url, None)
         if card:
             # Clean up indexes
             if card.name in self._index_name:
@@ -357,6 +406,7 @@ class Registry:
                     self._index_tags[tag].discard(agent_url)
                     if not self._index_tags[tag]:
                         del self._index_tags[tag]
+        self._persist_entries()
 
         return {"status": "agent unregistered successfully"}
 
@@ -374,6 +424,7 @@ class Registry:
         Time: O(K) where K is the number of potential candidates in the intersected sets.
         Improved from O(N) linear scan.
         """
+        self._prune_expired()
         if not filter_by:
             if as_json:
                 return [c.to_dict() for c in self._agents.values()]
@@ -417,6 +468,7 @@ class Registry:
         Returns:
             HTML string with registry status information
         """
+        self._prune_expired()
         return to_registry_status_html("Registry", "HTTP", self._agents, self.start_time)
 
     # ------------------------------------------------------------------
@@ -436,13 +488,22 @@ class Registry:
 
         Time: O(F) where F is the number of filters.
         """
-        return all(getattr(card, k, None) == v for k, v in filter_by.items())
+        for key, value in filter_by.items():
+            current = getattr(card, key, None)
+            if key == "tags":
+                expected = value if isinstance(value, list) else [value]
+                if not all(tag in card.tags for tag in expected):
+                    return False
+            elif current != value:
+                return False
+        return True
 
     def list_urls(self) -> list[str]:
         """List all registered agent URLs.
 
         Time: O(N)
         """
+        self._prune_expired()
         return list(self._agents.keys())
 
     def count(self) -> int:
@@ -450,6 +511,7 @@ class Registry:
 
         Time: O(1)
         """
+        self._prune_expired()
         return len(self._agents)
 
     def clear(self) -> None:
@@ -458,9 +520,77 @@ class Registry:
         Time: O(1)
         """
         self._agents.clear()
+        self._entries.clear()
         self._index_name.clear()
         self._index_role.clear()
         self._index_tags.clear()
+        self._persist_entries()
+
+    def get_entry(self, agent_url: str) -> RegistryEntry | None:
+        """Return liveness metadata for one registered agent URL."""
+        self._prune_expired()
+        return self._entries.get(agent_url)
+
+    def _remove_indexes(self, card: AgentCard, agent_url: str) -> None:
+        """Remove one agent URL from all secondary indexes."""
+        if card.name in self._index_name:
+            self._index_name[card.name].discard(agent_url)
+            if not self._index_name[card.name]:
+                del self._index_name[card.name]
+
+        if card.role in self._index_role:
+            self._index_role[card.role].discard(agent_url)
+            if not self._index_role[card.role]:
+                del self._index_role[card.role]
+
+        for tag in card.tags:
+            if tag in self._index_tags:
+                self._index_tags[tag].discard(agent_url)
+                if not self._index_tags[tag]:
+                    del self._index_tags[tag]
+
+    def _add_indexes(self, card: AgentCard, agent_url: str) -> None:
+        """Add one agent URL to all secondary indexes."""
+        self._index_name.setdefault(card.name, set()).add(agent_url)
+        self._index_role.setdefault(card.role, set()).add(agent_url)
+        for tag in card.tags:
+            self._index_tags.setdefault(tag, set()).add(agent_url)
+
+    def _prune_expired(self) -> None:
+        """Remove stale entries when a registry TTL is configured."""
+        if self._entry_ttl_seconds is None:
+            return
+        now = time.time()
+        expired = [url for url, entry in self._entries.items() if entry.is_expired(self._entry_ttl_seconds, now=now)]
+        for url in expired:
+            card = self._agents.pop(url, None)
+            self._entries.pop(url, None)
+            if card is not None:
+                self._remove_indexes(card, url)
+        if expired:
+            self._persist_entries()
+
+    def _persist_entries(self) -> None:
+        """Persist registry entries when storage is configured."""
+        if self._storage is None:
+            return
+        self._storage.save({"entries": [entry.to_dict() for entry in self._entries.values()]})
+
+    def _load_persisted_entries(self) -> None:
+        """Load persisted registry entries and rebuild secondary indexes."""
+        if self._storage is None:
+            return
+        payload = self._storage.load()
+        if not isinstance(payload, dict):
+            return
+        for item in payload.get("entries") or []:
+            if not isinstance(item, dict):
+                continue
+            entry = RegistryEntry.from_dict(item)
+            self._entries[entry.card.url] = entry
+            self._agents[entry.card.url] = entry.card
+            self._add_indexes(entry.card, entry.card.url)
+        self._prune_expired()
 
     def __repr__(self) -> str:
         return f"Registry(agents={self.count()})"

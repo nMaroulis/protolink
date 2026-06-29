@@ -80,6 +80,8 @@ class Agent(
         credentials: str | None = None,
         policy: Policy | None = None,
         approval_handler: ApprovalHandlerLike | None = None,
+        run_store: Any | None = None,
+        registry_heartbeat_interval: float | None = None,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -120,6 +122,12 @@ class Agent(
                 callback that resolves typed approval checkpoints. Protolink
                 owns the safety contract; the application owns the user
                 experience used to obtain the decision.
+            run_store: Optional persistent task/run store. When provided, the
+                agent records task snapshots after direct, server, and streaming
+                execution paths.
+            registry_heartbeat_interval: Optional seconds between registry
+                heartbeat requests after successful registration. Leave ``None``
+                to disable automatic heartbeats.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
@@ -144,6 +152,10 @@ class Agent(
         # Live task control is intentionally separate from serialized Task state.
         self._task_executions = TaskExecutionRegistry()
         self._control_tasks: set[asyncio.Task[Any]] = set()
+        self.run_store = run_store
+        self._session_locks: dict[str, asyncio.Lock] = {}
+        self._registry_heartbeat_interval = registry_heartbeat_interval
+        self._registry_heartbeat_task: asyncio.Task[Any] | None = None
         # Logger - Maps verbosity to silent, INFO, DEBUG for default console logger.
         self._logger = (
             ConsoleLogger(name=f"protolink.agents.{self.card.name}", level={0: 50, 1: 20, 2: 10}.get(verbosity, 20))

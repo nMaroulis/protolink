@@ -22,6 +22,9 @@ class RegistryInterface(Protocol):
     async def handle_unregister(self, agent_url: str) -> dict[str, str]:
         """Handle an incoming unregister request by an Agent."""
 
+    async def handle_heartbeat(self, agent_url: str) -> dict[str, str]:
+        """Refresh liveness metadata for a registered Agent."""
+
     async def handle_discover(self, filter_by: dict[str, Any] | None = None) -> list[dict[str, Any]] | list[AgentCard]:
         """Return a the Registry's list of registered Agents."""
 
@@ -48,6 +51,9 @@ class RegistryServer:
         return AgentCard.from_dict(request)
 
     async def unregister_parser(self, request: Any) -> str:
+        return request.get("agent_url")
+
+    async def heartbeat_parser(self, request: Any) -> str:
         return request.get("agent_url")
 
     async def discover_parser(self, request: Any) -> dict[str, Any] | None:
@@ -85,6 +91,14 @@ class RegistryServer:
                     handler=self._registry.handle_unregister,
                     request_source="body",
                     request_parser=self.unregister_parser,
+                ),
+                EndpointSpec(
+                    name="heartbeat",
+                    path="/agents/heartbeat",
+                    method="POST",
+                    handler=self._registry.handle_heartbeat,
+                    request_source="body",
+                    request_parser=self.heartbeat_parser,
                 ),
                 EndpointSpec(
                     name="discover",

@@ -54,6 +54,7 @@ from protolink.llms import (
 )
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task, TaskState
 from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
+from protolink.storage import RunReportRecord, RunStore, SQLiteRunStore, TaskRecord
 from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
 from protolink.tools import BaseTool, Tool
 
@@ -109,6 +110,9 @@ __all__ = [
     "RunRecorder",
     "RunReplay",
     "RunReport",
+    "RunReportRecord",
+    "RunStore",
+    "SQLiteRunStore",
     "StateOperationRequest",
     "StateOperationResult",
     "StateStoreReport",
@@ -118,6 +122,7 @@ __all__ = [
     "TaskCancellationRequest",
     "TaskNotCancelableError",
     "TaskNotFoundError",
+    "TaskRecord",
     "TaskState",
     "Tool",
     "__version__",

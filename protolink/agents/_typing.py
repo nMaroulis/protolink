@@ -48,6 +48,10 @@ class _AgentMixinBase(Protocol):
     _logger: BaseLogger
     _task_executions: TaskExecutionRegistry
     _control_tasks: set[asyncio.Task[Any]]
+    run_store: Any | None
+    _session_locks: dict[str, asyncio.Lock]
+    _registry_heartbeat_interval: float | None
+    _registry_heartbeat_task: asyncio.Task[Any] | None
     _system_prompt: str | None
     _verbosity: Literal[0, 1, 2]
     _background_task: asyncio.Task[Any] | None

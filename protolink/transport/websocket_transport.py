@@ -89,7 +89,8 @@ class WebSocketTransport(Transport):
         endpoints:
             Endpoint specifications to expose over this transport.
         """
-        self._endpoints = {(ep.method, ep.path): ep for ep in endpoints}
+        for ep in endpoints:
+            self._endpoints[(ep.method.upper(), ep.path)] = ep
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -318,7 +319,7 @@ class WebSocketTransport(Transport):
         thereby completely eliminating `Future attached to a different loop` exceptions.
         """
         existing = self._client_conns.get(loop_key)
-        if existing is not None and not getattr(existing, "closed", False):
+        if existing is not None and self._connection_is_open(existing):
             return existing
 
         headers = self._build_headers()
@@ -328,6 +329,27 @@ class WebSocketTransport(Transport):
             conn = await websockets.connect(base_url, extra_headers=headers)
         self._client_conns[loop_key] = conn
         return conn
+
+    @staticmethod
+    def _connection_is_open(conn: Any) -> bool:
+        """Return whether a cached WebSocket client connection is reusable."""
+        closed = getattr(conn, "closed", None)
+        if isinstance(closed, bool):
+            return not closed
+
+        open_attr = getattr(conn, "open", None)
+        if isinstance(open_attr, bool):
+            return open_attr
+
+        state = getattr(conn, "state", None)
+        protocol = getattr(conn, "protocol", None)
+        protocol_state = getattr(protocol, "state", None)
+        active_state = state if state is not None else protocol_state
+        state_name = getattr(active_state, "name", None)
+        if state_name is not None:
+            return state_name == "OPEN"
+
+        return True
 
     # ------------------------------------------------------------------
     # Authentication & Security
@@ -393,7 +415,7 @@ class WebSocketTransport(Transport):
                         raw = raw.decode("utf-8", errors="replace")
                     req = json.loads(raw)
                     request_id = req.get("id")
-                    method = req.get("method")
+                    method = str(req.get("method")).upper()
                     path = req.get("path")
 
                     if not request_id or not method or not path:
@@ -436,21 +458,22 @@ class WebSocketTransport(Transport):
                         sent_final = False
                         async for event in stream_obj:
                             event_payload = self._serialize_result(event)
-                            final = False
+                            event_final = False
                             if isinstance(event_payload, dict):
-                                final = bool(event_payload.get("final", False))
+                                event_final = bool(event_payload.get("final", False))
+                            stream_final = self._is_stream_terminal_event(event_payload, event_final=event_final)
                             await websocket.send(
                                 json.dumps(
                                     {
                                         "id": request_id,
                                         "ok": True,
                                         "result": event_payload,
-                                        "final": final,
+                                        "final": stream_final,
                                         "stream": True,
                                     }
                                 )
                             )
-                            if final:
+                            if stream_final:
                                 sent_final = True
                                 break
 
@@ -495,6 +518,18 @@ class WebSocketTransport(Transport):
         """Parse a ``ws://`` or ``wss://`` URL and return (host, port)."""
         parsed = urlparse(url.rstrip("/"))
         return parsed.hostname, parsed.port
+
+    @staticmethod
+    def _is_stream_terminal_event(event_payload: Any, *, event_final: bool) -> bool:
+        """Return whether a streamed payload should close the transport stream."""
+        if not event_final:
+            return False
+        if not isinstance(event_payload, dict):
+            return True
+        event_type = event_payload.get("type")
+        if event_type is None:
+            return True
+        return event_type == "task_status_update"
 
     # ------------------------------------------------------------------
     # Utility

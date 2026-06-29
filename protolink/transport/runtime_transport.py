@@ -152,14 +152,22 @@ class RuntimeTransport(Transport):
                 dict_payload: dict[str, Any] = payload.to_dict()
                 if endpoint.request_parser:
                     payload = endpoint.request_parser(dict_payload)
+                    if inspect.isawaitable(payload):
+                        payload = await payload
                 else:
                     payload = dict_payload
             elif isinstance(payload, BaseModel):
                 dict_payload = payload.model_dump()
                 if endpoint.request_parser:
                     payload = endpoint.request_parser(dict_payload)
+                    if inspect.isawaitable(payload):
+                        payload = await payload
                 else:
                     payload = dict_payload
+            elif endpoint.request_parser:
+                payload = endpoint.request_parser(payload)
+                if inspect.isawaitable(payload):
+                    payload = await payload
 
         # Process the request payload inside the endpoint handler
         result: Any
@@ -234,6 +242,8 @@ class RuntimeTransport(Transport):
         payload: Any = task
         if endpoint.request_parser:
             payload = endpoint.request_parser(task.to_dict())
+            if inspect.isawaitable(payload):
+                payload = await payload
 
         # Begin generator sequence
         result = endpoint.handler(payload)

@@ -93,6 +93,30 @@ For local and server‑style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `Oll
 
 ---
 
+## Agent History Isolation And Concurrency
+
+An `LLM` instance still exposes `llm.history` for direct usage and backward-compatible introspection. When the same LLM is plugged into an `Agent`, Protolink binds a task-local `ConversationHistory` around each run so concurrent tasks do not interleave messages on one shared mutable history object.
+
+For stateless agents, each task receives a fresh history seeded by the compiled system prompt. After the task finishes, `llm.history` points at a copy of the last completed task history for debugging and simple scripts.
+
+For persistent conversation state, enable `state=["conversation"]`. The Agent loads the requested `session_id`, serializes concurrent tasks for that same session with an async lock, saves the completed history back to state, and exposes a copy as `llm.history` after completion.
+
+```python
+from protolink import Agent, AgentCard, RunContext, Task, create_llm
+
+agent = Agent(
+    AgentCard(name="assistant", description="Assistant", url="runtime://assistant"),
+    llm=create_llm("mock", default_response="ok"),
+    state=["conversation"],
+)
+
+task = Task.create_infer(prompt="remember this")
+RunContext(session_id="customer-42").attach_to_task(task)
+await agent.execute_task(task)
+```
+
+Direct `llm.infer(...)` calls are unchanged: they use the LLM's default history unless you explicitly call `llm.use_history(history)`.
+
 ## Model Profiles, Context Manifests, And Budget Metrics
 
 LLM wrappers can emit pre-call context manifests plus per-call latency, token usage, context-window pressure, and estimated cost through the existing `infer()` event stream and telemetry hooks. This is optional and does not change the request payload sent to the provider.

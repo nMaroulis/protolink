@@ -39,6 +39,7 @@ agent = Agent(
     transport="http",
     registry="http",
     registry_url="http://localhost:9000",
+    registry_heartbeat_interval=15,
 )
 ```
 
@@ -127,6 +128,45 @@ When multiple indexed filters are applied, the Registry performs set intersectio
 
 If a query uses non-indexed fields, or if the indexed path returns no candidates while agents are still present, the Registry falls back to a full scan to preserve correctness.
 
+## Liveness And Persistence
+
+By default, the registry is an in-memory discovery service. For longer-running systems, two optional knobs make it more robust:
+
+- `entry_ttl_seconds` prunes agents whose `last_seen` timestamp is older than the configured TTL.
+- `storage` persists registered entries through the generic `Storage` interface, so a registry can rebuild its in-memory indexes after restart.
+
+Agents can keep their entry fresh by setting `registry_heartbeat_interval` on the Agent. After successful registration, the agent periodically calls `RegistryClient.heartbeat(agent_url)`. Heartbeats update liveness metadata only; they do not mutate the agent card or discovery indexes.
+
+```python
+from protolink import Agent, AgentCard
+from protolink.discovery import Registry
+from protolink.storage import SQLiteStorage
+
+registry = Registry(
+    url="http://localhost:9000",
+    transport="http",
+    entry_ttl_seconds=45,
+    storage=SQLiteStorage("registry.db", namespace="registry"),
+)
+
+agent = Agent(
+    AgentCard(name="worker", description="Worker", url="http://localhost:9010"),
+    transport="http",
+    registry="http",
+    registry_url="http://localhost:9000",
+    registry_heartbeat_interval=15,
+)
+```
+
+The public registry API now includes:
+
+| Method | Purpose |
+|------|-------------|
+| `register(card)` | Add or replace an agent card and update secondary indexes. |
+| `heartbeat(agent_url)` | Refresh `last_seen` for a registered agent. |
+| `unregister(agent_url)` | Remove an agent and its indexes. |
+| `discover(filter_by=None)` | Return live agent cards, pruning expired entries first. |
+
 ## Constructor
 
 ```python
@@ -134,6 +174,9 @@ Registry(
     transport: TransportType | Transport = "http",
     url: str | None = None,
     verbosity: Literal[0, 1, 2] = 1,
+    *,
+    entry_ttl_seconds: float | None = None,
+    storage: Storage | None = None,
 )
 ```
 
@@ -142,6 +185,8 @@ Registry(
 | `transport` | `TransportType | Transport` | `"http"` | Transport instance or registered transport string. |
 | `url` | `str | None` | `None` | Registry URL. Required when `transport` is a string. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity: `0` = warning, `1` = info, `2` = debug. |
+| `entry_ttl_seconds` | `float | None` | `None` | Optional liveness TTL. Expired entries are pruned before discovery, status, and count/list operations. |
+| `storage` | `Storage | None` | `None` | Optional persistence for serialized registry entries. |
 
 !!! info "Single source of truth"
     The Registry's public URL is derived from its transport and used by agents for registration and discovery.

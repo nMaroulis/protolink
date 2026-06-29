@@ -17,7 +17,16 @@
 
 - Added `QuietLogger`, a no-op `BaseLogger` implementation for agents and integrations that need the logging interface without emitting output.
 - Added the ProtoLink ***Whitepaper***.
+- Added task-local LLM **history scopes** for **concurrent agent execution**, including same-session locking for persistent conversation state.
+- Added `RunStore`, `SQLiteRunStore`, `TaskRecord`, and `RunReportRecord` for durable task snapshots and run-report persistence.
+- Added **registry** entry **liveness metadata**, optional **TTL** pruning, persistent registry **entry storage**, and `RegistryClient.heartbeat()`.
+- Added **transport conformance** coverage for Runtime, HTTP, and WebSocket agent contracts.
 
+### Fixed
+
+- Fixed `Agent.start(register=False)` so the lifecycle now honors the public `register` argument.
+- Fixed RuntimeTransport async request-parser handling.
+- Fixed WebSocket route registration, stale client-connection reuse, and task-stream closure semantics.
 
 ## [v0.6.3] - 2026-06-26
 

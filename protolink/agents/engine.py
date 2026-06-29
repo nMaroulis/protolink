@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from protolink.core.actions import RunAction
@@ -11,6 +12,7 @@ from protolink.core.cancellation import ActiveTaskExecution, CancellationToken, 
 from protolink.core.policy import ActionAuthorization, ActionPolicyError
 from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
+from protolink.llms.history import ConversationHistory
 from protolink.models import Artifact, Message, Part, Task
 
 from ._typing import _AgentMixinBase
@@ -33,9 +35,12 @@ class AgentExecutionMixin(_AgentMixinBase):
         execution, owner = self._task_executions.register(task)
         try:
             execution.token.raise_if_cancelled()
-            return await self.handle_task(task)
+            result = await self.handle_task(task)
+            self._persist_task_snapshot(result)
+            return result
         except asyncio.CancelledError:
             mark_task_canceled(task, execution.token.reason)
+            self._persist_task_snapshot(task)
             return task
         finally:
             if owner:
@@ -69,6 +74,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             mark_task_canceled(task, execution.token.reason)
             yield self._canceled_status_event(task, execution)
         finally:
+            self._persist_task_snapshot(task)
             if owner:
                 self._task_executions.unregister(task.id, execution.execution_task)
 
@@ -207,6 +213,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             if last_item is None:
                 previous_state = self._state_value(task.state)
                 task.update_state(TaskState.COMPLETED)
+                self._persist_task_snapshot(task)
                 yield TaskStatusUpdateEvent(
                     task_id=task.id,
                     previous_state=previous_state,
@@ -216,70 +223,64 @@ class AgentExecutionMixin(_AgentMixinBase):
                 )
                 return
 
-            session_id = context.session_id or task.id
-            if self.llm and self._state.conversation:
-                self.llm.history = self._state.conversation.get_history(
-                    session_id, default_system_prompt=self.llm.system_prompt
-                )
-
             outputs: list[Part | Message] = []
 
-            for part in last_item.parts:
-                cancellation_token.raise_if_cancelled()
-                if part.type == "tool_call":
-                    tool_name = getattr(part.content, "tool_name", None)
-                    if tool_name is None and isinstance(part.content, dict):
-                        tool_name = part.content.get("tool_name")
-                    yield TaskProgressEvent(
-                        task_id=task.id,
-                        message=f"Executing tool: {tool_name or 'unknown'}",
-                        metadata={"agent": self.card.name, "part_type": part.type},
-                    )
-                    outputs.append(
-                        await self.execute_tool(
+            async with self._llm_history_scope(task, context):
+                for part in last_item.parts:
+                    cancellation_token.raise_if_cancelled()
+                    if part.type == "tool_call":
+                        tool_name = getattr(part.content, "tool_name", None)
+                        if tool_name is None and isinstance(part.content, dict):
+                            tool_name = part.content.get("tool_name")
+                        yield TaskProgressEvent(
+                            task_id=task.id,
+                            message=f"Executing tool: {tool_name or 'unknown'}",
+                            metadata={"agent": self.card.name, "part_type": part.type},
+                        )
+                        outputs.append(
+                            await self.execute_tool(
+                                part,
+                                task=task,
+                                cancellation_token=cancellation_token,
+                            )
+                        )
+                    elif part.type == "infer":
+                        async for event in self.call_llm_stream(
                             part,
                             task=task,
                             cancellation_token=cancellation_token,
-                        )
-                    )
-                elif part.type == "infer":
-                    async for event in self.call_llm_stream(
-                        part,
-                        task=task,
-                        cancellation_token=cancellation_token,
-                    ):
-                        if isinstance(event, dict) and "__protolink_part__" in event:
-                            outputs.append(Part.from_dict(event["__protolink_part__"]))
-                            continue
-                        if isinstance(event, TaskErrorEvent):
-                            previous_state = self._state_value(task.state)
-                            if not task.is_terminal:
-                                task.fail(event.error_message)
+                        ):
+                            if isinstance(event, dict) and "__protolink_part__" in event:
+                                outputs.append(Part.from_dict(event["__protolink_part__"]))
+                                continue
+                            if isinstance(event, TaskErrorEvent):
+                                previous_state = self._state_value(task.state)
+                                if not task.is_terminal:
+                                    task.fail(event.error_message)
+                                yield event
+                                self._persist_task_snapshot(task)
+                                yield TaskStatusUpdateEvent(
+                                    task_id=task.id,
+                                    previous_state=previous_state,
+                                    new_state=self._state_value(task.state),
+                                    final=True,
+                                    metadata={"task": task.to_dict()},
+                                )
+                                return
                             yield event
-                            yield TaskStatusUpdateEvent(
-                                task_id=task.id,
-                                previous_state=previous_state,
-                                new_state=self._state_value(task.state),
-                                final=True,
-                                metadata={"task": task.to_dict()},
-                            )
-                            return
-                        yield event
-                else:
-                    self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
+                    else:
+                        self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
 
-            cancellation_token.raise_if_cancelled()
-            for out in outputs:
-                if isinstance(out, Message):
-                    task.add_message(out)
-                else:
-                    task.add_artifact(Artifact(parts=[out]))
-
-            if self.llm and self._state.conversation:
-                self._state.conversation.save_history(session_id, self.llm.history)
+                cancellation_token.raise_if_cancelled()
+                for out in outputs:
+                    if isinstance(out, Message):
+                        task.add_message(out)
+                    else:
+                        task.add_artifact(Artifact(parts=[out]))
 
             previous_state = self._state_value(task.state)
             self._finalize_task_state(task, outputs)
+            self._persist_task_snapshot(task)
 
             for artifact in task.artifacts:
                 yield TaskArtifactUpdateEvent(task_id=task.id, artifact=artifact)
@@ -295,6 +296,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             previous_state = self._state_value(task.state)
             if not task.is_terminal:
                 task.fail(str(e))
+            self._persist_task_snapshot(task)
             yield TaskErrorEvent(
                 task_id=task.id,
                 error_code="task_failed",
@@ -410,9 +412,12 @@ class AgentExecutionMixin(_AgentMixinBase):
         execution, owner = self._task_executions.register(task)
         try:
             execution.token.raise_if_cancelled()
-            return await self._execute_task_impl(task, execution.token)
+            result = await self._execute_task_impl(task, execution.token)
+            self._persist_task_snapshot(result)
+            return result
         except asyncio.CancelledError:
             mark_task_canceled(task, execution.token.reason)
+            self._persist_task_snapshot(task)
             return task
         finally:
             if owner:
@@ -433,49 +438,37 @@ class AgentExecutionMixin(_AgentMixinBase):
                 task.update_state(TaskState.COMPLETED)
                 return task
 
-            # ---- Session Conversation State: Load session history ----
-            # If conversation is enabled in the State, we attempt to resume context using session_id from task metadata.
-            # If no session_id is found, we fall back to the task.id (stateless behavior).
-            session_id = context.session_id or task.id
-            if self.llm and self._state.conversation:
-                self.llm.history = self._state.conversation.get_history(
-                    session_id, default_system_prompt=self.llm.system_prompt
-                )
-
             outputs: list[Part | Message] = []
 
-            # ---- Inspect Parts in the last item only ----
-            for part in last_item.parts:
+            async with self._llm_history_scope(task, context):
+                # ---- Inspect Parts in the last item only ----
+                for part in last_item.parts:
+                    cancellation_token.raise_if_cancelled()
+                    if part.type == "tool_call":
+                        outputs.append(
+                            await self.execute_tool(
+                                part,
+                                task=task,
+                                cancellation_token=cancellation_token,
+                            )
+                        )
+                    elif part.type == "infer":
+                        outputs.append(
+                            await self.call_llm(
+                                part,
+                                task=task,
+                                cancellation_token=cancellation_token,
+                            )
+                        )
+                    else:
+                        self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
                 cancellation_token.raise_if_cancelled()
-                if part.type == "tool_call":
-                    outputs.append(
-                        await self.execute_tool(
-                            part,
-                            task=task,
-                            cancellation_token=cancellation_token,
-                        )
-                    )
-                elif part.type == "infer":
-                    outputs.append(
-                        await self.call_llm(
-                            part,
-                            task=task,
-                            cancellation_token=cancellation_token,
-                        )
-                    )
-                else:
-                    self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
-            cancellation_token.raise_if_cancelled()
-            # ---- Attach outputs to the Task ----
-            for out in outputs:
-                if isinstance(out, Message):
-                    task.add_message(out)
-                else:
-                    task.add_artifact(Artifact(parts=[out]))
-            # ---- Session Conversation State: Save session history ----
-            # Persist the current state of the conversation (including the latest responses) back to storage.
-            if self.llm and self._state.conversation:
-                self._state.conversation.save_history(session_id, self.llm.history)
+                # ---- Attach outputs to the Task ----
+                for out in outputs:
+                    if isinstance(out, Message):
+                        task.add_message(out)
+                    else:
+                        task.add_artifact(Artifact(parts=[out]))
 
             self._finalize_task_state(task, outputs)
         except Exception as exc:
@@ -484,6 +477,53 @@ class AgentExecutionMixin(_AgentMixinBase):
             raise
 
         return task
+
+    @asynccontextmanager
+    async def _llm_history_scope(self, task: Task, context: RunContext):
+        """Bind task-local LLM history and serialize same-session updates.
+
+        Stateless runs receive a fresh isolated history object. Persistent
+        conversation runs load the requested session under a per-session lock,
+        execute against a task-local history, then save that same history back
+        after successful execution. The lock prevents concurrent tasks for the
+        same session from overwriting each other's conversation turns.
+        """
+        if self.llm is None:
+            yield
+            return
+
+        session_id = context.session_id or task.id
+        if self._state.conversation:
+            lock = self._session_locks.setdefault(session_id, asyncio.Lock())
+            async with lock:
+                history = self._state.conversation.get_history(
+                    session_id,
+                    default_system_prompt=self.llm.system_prompt,
+                )
+                with self.llm.use_history(history):
+                    yield
+                    completed_history = self.llm.history
+                self._state.conversation.save_history(session_id, completed_history)
+                self.llm.history = completed_history.copy()
+            return
+
+        with self.llm.use_history(ConversationHistory()) as history:
+            yield
+        self.llm.history = history.copy()
+
+    def _persist_task_snapshot(self, task: Task) -> None:
+        """Persist a task snapshot when this agent has a run store."""
+        run_store = getattr(self, "run_store", None)
+        if run_store is None:
+            return
+        try:
+            run_store.save_task(
+                task,
+                context=RunContext.from_task(task),
+                agent_name=self.card.name,
+            )
+        except Exception as exc:
+            self._logger.debug(f"Failed to persist task snapshot {task.id}: {exc}")
 
     async def execute_tool(
         self,

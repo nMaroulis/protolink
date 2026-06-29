@@ -505,6 +505,37 @@ The assertion helpers are intentionally small:
 
 Use `RedactionPolicy` whenever persisting reports, approval payloads, context manifests, or telemetry data. The default policy masks common fields such as API keys, tokens, passwords, secrets, authorization headers, and credentials.
 
+## Persistent Run Store
+
+`RunReport` is the durable summary for normalized events. `SQLiteRunStore` adds a small built-in persistence layer for task snapshots and run reports when an application wants a searchable local record without designing a database first.
+
+```python
+from protolink import Agent, AgentCard, RunContext, SQLiteRunStore, Task
+
+store = SQLiteRunStore("runs.db")
+agent = Agent(
+    AgentCard(name="worker", description="Worker", url="runtime://worker"),
+    llm=llm,
+    run_store=store,
+)
+
+task = Task.create_infer(prompt="produce a summary")
+RunContext(run_id="run_123", session_id="session_abc").attach_to_task(task)
+result = await agent.execute_task(task)
+
+record = store.get_task_record(result.id)
+recent = store.list_task_records(session_id="session_abc")
+```
+
+`SQLiteRunStore` keeps two JSON payload tables:
+
+| Record | Indexed fields |
+|------|-------------|
+| Task snapshots | `task_id`, `state`, `run_id`, `session_id`, `trace_id`, `agent_name`, timestamps |
+| Run reports | `run_id`, `session_id`, `trace_id`, `agent_name`, timestamp |
+
+The store is intentionally separate from the generic `Storage` key/value interface. `Storage` backs agent state such as conversations; `RunStore` records execution facts for lookup, replay, audit, and tests. Larger deployments can implement the same `RunStore` protocol against their own persistence layer.
+
 ## Complete Runnable Examples
 
 `examples/runtime_policy_and_approvals.py` combines the runtime primitives in one provider-free script. It uses `MockLLM` to request a tool, creates a preview artifact, obtains application approval, captures normalized events, and then proves that a stricter per-run permission prevents a second side effect.

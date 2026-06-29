@@ -236,6 +236,18 @@ class ConversationHistory:
         """
         return [msg.to_dict() for msg in self._messages]
 
+    def copy(self) -> ConversationHistory:
+        """Return an independent copy of this conversation history.
+
+        The copied history preserves every canonical message field, including
+        provider-specific metadata such as tool-call payloads. Agents use this
+        when a run needs an isolated working history without mutating the
+        LLM's default history object.
+
+        Time: O(N)
+        """
+        return ConversationHistory.from_list(self.to_list())
+
     def replace(self, messages_data: Iterable[dict[str, Any]]) -> None:
         """Replace all messages while preserving this history object's identity.
 

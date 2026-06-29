@@ -9,6 +9,7 @@ import pytest
 
 from protolink.discovery.registry import Registry
 from protolink.models import AgentCard
+from protolink.storage import SQLiteStorage
 from protolink.transport import HTTPTransport, Transport
 
 
@@ -152,6 +153,16 @@ class TestRegistry:
         registry._client.unregister.assert_called_once_with("http://test-agent.local")
 
     @pytest.mark.asyncio
+    async def test_heartbeat_agent(self, dummy_transport):
+        """Test sending a liveness heartbeat through the registry facade."""
+        registry = Registry(transport=dummy_transport)
+        registry._client.heartbeat = AsyncMock()
+
+        await registry.heartbeat("http://test-agent.local")
+
+        registry._client.heartbeat.assert_called_once_with("http://test-agent.local")
+
+    @pytest.mark.asyncio
     async def test_discover_agents(self, dummy_transport):
         """Test discovering agents."""
         registry = Registry(transport=dummy_transport)
@@ -211,6 +222,47 @@ class TestRegistry:
         # Should not raise an exception
         await registry.handle_unregister("http://nonexistent.local")
         assert registry.count() == 0
+
+    @pytest.mark.asyncio
+    async def test_handle_heartbeat_updates_entry_liveness(self, dummy_transport, agent_card):
+        """Heartbeat should refresh RegistryEntry.last_seen without changing indexes."""
+        registry = Registry(transport=dummy_transport)
+        await registry.handle_register(agent_card)
+        before = registry.get_entry(agent_card.url)
+        assert before is not None
+
+        await asyncio.sleep(0.001)
+        response = await registry.handle_heartbeat(agent_card.url)
+
+        after = registry.get_entry(agent_card.url)
+        assert response == {"status": "agent heartbeat recorded"}
+        assert after is not None
+        assert after.last_seen > before.last_seen
+        assert registry.list_urls() == [agent_card.url]
+
+    @pytest.mark.asyncio
+    async def test_ttl_prunes_stale_entries(self, dummy_transport, agent_card):
+        """A configured TTL should remove agents that miss heartbeats."""
+        registry = Registry(transport=dummy_transport, entry_ttl_seconds=0.01)
+        await registry.handle_register(agent_card)
+
+        await asyncio.sleep(0.02)
+
+        assert await registry.handle_discover() == []
+        assert registry.count() == 0
+
+    @pytest.mark.asyncio
+    async def test_registry_persists_entries_with_storage(self, dummy_transport, agent_card, tmp_path):
+        """Registry entries should survive process-local Registry reconstruction."""
+        storage = SQLiteStorage(db_path=str(tmp_path / "registry.db"), namespace="registry")
+        registry = Registry(transport=dummy_transport, storage=storage)
+        await registry.handle_register(agent_card)
+
+        restored = Registry(transport=DummyTransport(), storage=storage)
+
+        assert restored.count() == 1
+        assert restored.list_urls() == [agent_card.url]
+        assert restored.get_entry(agent_card.url) is not None
 
     @pytest.mark.asyncio
     async def test_handle_discover_no_filter(self, dummy_transport, agent_card, agent_card2):

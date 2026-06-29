@@ -79,6 +79,7 @@ class AgentLifecycleMixin(_AgentMixinBase):
             try:
                 await self.registry_client.register(self.card)
                 self._logger.info(f"Registered to registry at {self.registry_client.url}")
+                self._start_registry_heartbeat()
             except ConnectionError as e:
                 self._logger.exception(
                     f"Failed to register to registry: {e}. Agent will continue running but won't be discoverable."
@@ -102,6 +103,28 @@ class AgentLifecycleMixin(_AgentMixinBase):
             await self._stop()
             self._logger.info(get_agent_farewell(self.card.name))
 
+    def _start_registry_heartbeat(self) -> None:
+        """Start the optional registry heartbeat loop after registration."""
+        if self._registry_heartbeat_interval is None or self.registry_client is None:
+            return
+        if self._registry_heartbeat_task is not None and not self._registry_heartbeat_task.done():
+            return
+        self._registry_heartbeat_task = asyncio.create_task(self._registry_heartbeat_loop())
+
+    async def _registry_heartbeat_loop(self) -> None:
+        """Keep this agent's registry entry alive until shutdown."""
+        assert self.registry_client is not None
+        interval = max(float(self._registry_heartbeat_interval or 0), 0.1)
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                await self.registry_client.heartbeat(self.card.url)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._logger.debug(f"Registry heartbeat failed for {self.card.url}: {exc}")
+            self._registry_heartbeat_task = asyncio.create_task(self._registry_heartbeat_loop())
+
     async def _stop(self) -> None:
         """Internal async shutdown primitive."""
 
@@ -109,6 +132,11 @@ class AgentLifecycleMixin(_AgentMixinBase):
         if getattr(self, "_stopped", False):
             return
         self._stopped = True
+
+        if self._registry_heartbeat_task and not self._registry_heartbeat_task.done():
+            self._registry_heartbeat_task.cancel()
+            await asyncio.gather(self._registry_heartbeat_task, return_exceptions=True)
+        self._registry_heartbeat_task = None
 
         # 1. Unregister from registry first (while transport is still alive)
         if self.registry_client:
@@ -164,7 +192,7 @@ class AgentLifecycleMixin(_AgentMixinBase):
         async def _lifecycle():
             try:
                 self._logger.info(get_agent_greeting(self.card.name))
-                await self._serve()
+                await self._serve(register=register)
                 # Signal that startup completed successfully if in background mode
                 if hasattr(self, "_ready_event"):
                     self._ready_event.set()

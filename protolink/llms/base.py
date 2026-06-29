@@ -75,6 +75,8 @@ import asyncio
 import json
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 if TYPE_CHECKING:
@@ -206,12 +208,102 @@ class LLM(ABC):
         self._model_params: dict[str, Any] = model_params
         self._reasoning: ReasoningLevel = reasoning
 
-        self.history: ConversationHistory = ConversationHistory()
+        self._history: ConversationHistory = ConversationHistory()
+        self._active_history: ContextVar[ConversationHistory | None] = ContextVar(
+            f"protolink_llm_history_{id(self)}",
+            default=None,
+        )
         self.compactor: HistoryCompactor = HistoryCompactor(self)
         self.system_prompt: str = self.build_system_prompt(action_mode="json")
         self.metrics_enabled: bool = True
         self._metrics_profile: LLMModelProfile | None = None
         self.sync = SyncLLM(self)
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Return deepcopy/pickle state without the task-local context variable."""
+        state = dict(self.__dict__)
+        state.pop("_active_history", None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore deepcopy/pickle state and recreate runtime-local helpers."""
+        self.__dict__.update(state)
+        self._active_history = self._new_history_context_var()
+        self.compactor = HistoryCompactor(self)
+
+    def _new_history_context_var(self) -> ContextVar[ConversationHistory | None]:
+        """Create the context-local history binding for this LLM instance."""
+        return ContextVar(
+            f"protolink_llm_history_{id(self)}",
+            default=None,
+        )
+
+    def _ensure_history_context(self) -> None:
+        """Initialize history internals for normal and ``__new__`` construction."""
+        if not hasattr(self, "_history"):
+            self._history = ConversationHistory()
+        if not hasattr(self, "_active_history"):
+            self._active_history = self._new_history_context_var()
+
+    @property
+    def history(self) -> ConversationHistory:
+        """Return the current conversation history for this execution context.
+
+        During an agent run, ProtoLink installs a task-local history with
+        :meth:`use_history`. Provider adapters and subclass hooks can keep
+        using ``self.history`` while concurrent tasks receive isolated history
+        objects. Outside a run context, this property returns the LLM's default
+        history for direct LLM usage and backward compatibility.
+        """
+        self._ensure_history_context()
+        active_history = self._active_history.get()
+        return active_history if active_history is not None else self._history
+
+    @history.setter
+    def history(self, value: ConversationHistory) -> None:
+        """Set the active or default conversation history.
+
+        If a task-local history is active, assignment updates that context only.
+        Otherwise, assignment updates the LLM's default history. This preserves
+        existing direct ``llm.history = ...`` usage while preventing concurrent
+        agent runs from sharing mutable conversation state.
+        """
+        if not isinstance(value, ConversationHistory):
+            raise TypeError(f"history must be ConversationHistory, got {type(value).__name__}")
+        self._ensure_history_context()
+        if self._active_history.get() is None:
+            self._history = value
+        else:
+            self._active_history.set(value)
+
+    @property
+    def has_active_history(self) -> bool:
+        """Return whether this LLM is currently using task-local history."""
+        self._ensure_history_context()
+        return self._active_history.get() is not None
+
+    @contextmanager
+    def use_history(self, history: ConversationHistory):
+        """Temporarily bind a task-local conversation history.
+
+        The binding is implemented with ``contextvars``, so it is isolated per
+        asyncio task and safely follows awaits. This lets one LLM instance serve
+        concurrent agent runs without interleaving their messages.
+
+        Args:
+            history: Conversation history to use inside the context.
+
+        Yields:
+            The same history object for convenience.
+        """
+        if not isinstance(history, ConversationHistory):
+            raise TypeError(f"history must be ConversationHistory, got {type(history).__name__}")
+        self._ensure_history_context()
+        token = self._active_history.set(history)
+        try:
+            yield history
+        finally:
+            self._active_history.reset(token)
 
     def configure_metrics(
         self,
