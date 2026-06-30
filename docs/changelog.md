@@ -61,11 +61,11 @@ protolink dashboard --store .protolink-devtools/runs.db --open
 ### Changed
 
 - **Agent codebase reafctor with MixIns**: Agent is now the stable public facade, with behavior split into:
-  - [engine.py](/Users/nick/windsurf_projects/protolink/protolink/agents/engine.py): task execution, streaming, LLM calls, delegation
-  - [mixins.py](/Users/nick/windsurf_projects/protolink/protolink/agents/mixins.py): lifecycle, control plane, communication, tools, config, serialization
-  - [helpers.py](/Users/nick/windsurf_projects/protolink/protolink/agents/helpers.py): state request normalization
-  - [sync.py](/Users/nick/windsurf_projects/protolink/protolink/agents/sync.py): SyncAgent
-  - [_typing.py](/Users/nick/windsurf_projects/protolink/protolink/agents/_typing.py): internal structural typing support for mixins
+  - `engine.py`: task execution, streaming, LLM calls, delegation
+  - `mixins.py`: lifecycle, control plane, communication, tools, config, serialization
+  - `helpers.py`: state request normalization
+  - `sync.py`: SyncAgent
+  - `_typing.py`: internal structural typing support for mixins
 
 - **LLM history compaction**: instead of having it as a tool which will just stress the model's context more, it's now a client/server spec, so it's called via an endpoint.
   - Kept the LLM-owned `HistoryCompactor` component with `recent`, `tokens`, and `summary` strategies plus structured before/after results.
