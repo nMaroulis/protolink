@@ -63,6 +63,16 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
     assert "/api/agents/chat" in dashboard_html
     assert "Ping all" in dashboard_html
     assert "Agent chat" in dashboard_html
+    assert 'data-icon="refresh"' in dashboard_html
+    assert "handleChatKeydown" in dashboard_html
+    assert "toggleChatDebug" in dashboard_html
+    assert "resetChat" in dashboard_html
+    assert "Last latency" in dashboard_html
+    assert "Average latency" in dashboard_html
+    assert "Messages sent" in dashboard_html
+    assert "Uptime" in dashboard_html
+    assert "Skills and schemas" in dashboard_html
+    assert "Studio Preview" not in dashboard_html
     assert "Protolink Studio" in dashboard_html
     assert "Protolink Studio is coming soon" in dashboard_html
     assert "studio-canvas" in dashboard_html
@@ -106,7 +116,7 @@ def test_dashboard_agent_actions_use_http_contracts(monkeypatch):
 
     def fake_ping_urlopen(request, timeout):
         calls.append((request.full_url, timeout, getattr(request, "data", None)))
-        return FakeResponse(b"<html>ok</html>")
+        return FakeResponse(b"<html><script>let startTime = 1000;</script></html>")
 
     monkeypatch.setattr("protolink.devtools.agents.urlopen", fake_ping_urlopen)
 
@@ -114,6 +124,8 @@ def test_dashboard_agent_actions_use_http_contracts(monkeypatch):
 
     assert ping["ok"] is True
     assert ping["url"] == "http://agent.local/status"
+    assert ping["start_time"] == 1000.0
+    assert ping["uptime_seconds"] > 0
     assert calls[0] == ("http://agent.local/status", 1.25, None)
 
     def fake_chat_urlopen(request, timeout):

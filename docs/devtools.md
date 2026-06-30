@@ -215,10 +215,18 @@ The dashboard currently focuses on:
 - Registry card summaries with selected-agent details.
 - Ping controls for HTTP agents with latency/status feedback.
 - A chat panel for agents that advertise `capabilities.has_llm=true` and expose the standard `POST /chat` endpoint.
+- Chat-side diagnostics for served dashboards: last response latency, average latency, message count, active session ID, and last proxy/agent error.
+- A chat reset control that clears the visible conversation, starts a fresh dashboard session ID, and resets the local latency/debug counters.
 - Run replay buttons that load the same replay projection used by `protolink run replay`.
 - A disabled Studio preview for the future topology canvas.
 
 It intentionally avoids provider-specific visualizations. Provider details belong in the structured run events and reports; the dashboard should remain generic enough for any Protolink agent system.
+
+The chat panel is meant for fast local probing, not for becoming a production chat product. Select an HTTP LLM agent from the registry, keep or edit the session ID, and send a message through the dashboard proxy. Pressing Enter submits the message, while Shift+Enter keeps editing a multi-line prompt. The Debug toggle opens a small live diagnostics strip so you can see whether a slow response is coming from the dashboard proxy, the agent endpoint, or the model/tool path behind that agent.
+
+Agent health indicators follow the same idea as the terminal renderers: runtime-only agents are clearly marked as local/runtime, unprobed HTTP agents stay unknown, active probes show a pending state, successful probes show online latency, and failed probes show the last error. When an HTTP agent's status page exposes a start timestamp, the dashboard can also show uptime after the agent is pinged.
+
+The selected-agent panel is intentionally more than a name/URL preview. It shows role, version, protocol, transport, input/output formats, security schemes, capability flags, tags, skills, and advertised input/output schemas for each skill. Empty schema sections are explicit so users can tell the difference between "not advertised" and a dashboard loading issue.
 
 ## Protolink Studio Preview
 

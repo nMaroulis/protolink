@@ -31,6 +31,11 @@ protolink run replay dashboard_demo_1 --store .protolink-devtools/runs.db
 protolink dashboard --store .protolink-devtools/runs.db --open
 ```
 
+### Changed
+
+- Refined the local dashboard styling with icon-bearing controls, clearer agent health indicators, a primary refresh action, and a richer chat panel with Enter-to-send behavior, reset, and latency/session/error diagnostics.
+- Expanded the dashboard selected-agent view with uptime when available, formats, security schemes, capabilities, tags, skills, and advertised input/output schemas.
+
 ### Fixed
 
 - Fixed `Agent.start(register=False)` so the lifecycle now honors the public `register` argument.

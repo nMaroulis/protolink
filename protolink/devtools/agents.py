@@ -8,6 +8,7 @@ surface remains available without adding a frontend or HTTP-client dependency.
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any
 from urllib.error import HTTPError
@@ -35,7 +36,7 @@ def ping_agent(agent_url: str, *, timeout: float = 3.0) -> dict[str, Any]:
     request = Request(status_url, headers={"Accept": "text/html, application/json, */*"})
     try:
         with urlopen(request, timeout=timeout) as response:
-            response.read(512)
+            raw_body = response.read(128_000)
             status = getattr(response, "status", 200)
     except HTTPError as exc:
         latency_ms = round((time.perf_counter() - started) * 1000)
@@ -54,6 +55,7 @@ def ping_agent(agent_url: str, *, timeout: float = 3.0) -> dict[str, Any]:
         "latency_ms": latency_ms,
         "url": status_url,
         "error": None,
+        **_parse_status_details(raw_body),
     }
 
 
@@ -118,3 +120,51 @@ def _require_http_url(agent_url: str) -> str:
 def _join_url(base_url: str, path: str) -> str:
     """Join a normalized base URL and endpoint path."""
     return base_url.rstrip("/") + "/" + path.lstrip("/")
+
+
+def _parse_status_details(raw_body: bytes) -> dict[str, Any]:
+    """Extract optional agent status metadata from a status response body."""
+    body = raw_body.decode("utf-8", errors="replace")
+    details: dict[str, Any] = {}
+
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        payload = None
+
+    if isinstance(payload, dict):
+        for source, target in (
+            ("start_time", "start_time"),
+            ("startTime", "start_time"),
+            ("started_at", "started_at"),
+            ("startedAt", "started_at"),
+            ("uptime_seconds", "uptime_seconds"),
+            ("uptimeSeconds", "uptime_seconds"),
+        ):
+            if source in payload:
+                details[target] = payload[source]
+
+    match = re.search(r"\blet\s+startTime\s*=\s*([0-9]+(?:\.[0-9]+)?);", body)
+    if match and "start_time" not in details:
+        details["start_time"] = float(match.group(1))
+
+    start_time = _coerce_float(details.get("start_time"))
+    if start_time is not None:
+        details["start_time"] = start_time
+        details.setdefault("uptime_seconds", max(0, round(time.time() - start_time)))
+
+    uptime = _coerce_float(details.get("uptime_seconds"))
+    if uptime is not None:
+        details["uptime_seconds"] = max(0, round(uptime))
+
+    return details
+
+
+def _coerce_float(value: Any) -> float | None:
+    """Return ``value`` as a float when it looks numeric."""
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None

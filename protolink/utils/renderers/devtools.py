@@ -178,7 +178,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .side-meta { display: grid; gap: 8px; padding: 12px; border: 1px solid rgba(255,255,255,.10); border-radius: 8px; background: rgba(255,255,255,.05); }
 .side-meta span { color: #c7d2e0; font-size: 12px; overflow-wrap: anywhere; }
 .nav { display: grid; gap: 7px; }
-.nav button { text-align: left; border: 0; border-radius: 8px; padding: 10px 12px; color: #dbe4ef; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: space-between; min-height: 40px; }
+.nav button { text-align: left; border: 0; border-radius: 8px; padding: 10px 12px; color: #dbe4ef; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; }
 .nav button:hover { background: rgba(255,255,255,.08); }
 .nav button.active { color: #fff; background: rgba(15,159,146,.26); box-shadow: inset 3px 0 0 var(--teal); }
 .soon-mini { font-size: 10px; color: #fff; background: rgba(189,125,17,.95); border-radius: 999px; padding: 2px 6px; }
@@ -189,12 +189,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
 .lede { margin: 6px 0 0; max-width: 740px; color: var(--muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.btn, .mini-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; cursor: pointer; color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; }
+.btn, .mini-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; cursor: pointer; color: var(--ink); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease, background .16s ease; }
 .btn { padding: 8px 11px; box-shadow: var(--shadow-soft); }
 .mini-btn { min-height: 28px; padding: 4px 8px; font-size: 12px; box-shadow: none; }
-.btn:hover, .mini-btn:hover { border-color: rgba(15,159,146,.42); box-shadow: 0 0 0 3px rgba(15,159,146,.10); }
-.btn.primary, .mini-btn.primary { background: var(--teal); border-color: var(--teal); color: #fff; }
+.btn:hover, .mini-btn:hover { border-color: rgba(15,159,146,.42); box-shadow: 0 0 0 3px rgba(15,159,146,.10); transform: translateY(-1px); }
+.btn.primary, .mini-btn.primary { background: linear-gradient(135deg, var(--teal), #167fbc); border-color: rgba(15,159,146,.88); color: #fff; }
 .btn:disabled, .mini-btn:disabled { opacity: .48; cursor: not-allowed; box-shadow: none; }
+.btn:disabled:hover, .mini-btn:disabled:hover { transform: none; border-color: var(--line); }
+.icon { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; flex: 0 0 auto; }
+.mini-btn .icon { width: 14px; height: 14px; }
+.nav .icon { width: 15px; height: 15px; color: #b9c7da; }
+.nav-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.icon-muted { color: var(--muted); }
 .alerts { display: grid; gap: 8px; margin-bottom: 14px; }
 .alert { border: 1px solid var(--amber); background: var(--amber-soft); color: #6d4608; border-radius: 8px; padding: 10px 12px; }
 .grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -214,32 +220,100 @@ table { width: 100%; border-collapse: collapse; }
 th, td { padding: 10px 12px; border-bottom: 1px solid #edf1f6; text-align: left; vertical-align: top; }
 th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; background: #fbfcfe; }
 td { font-size: 13px; overflow-wrap: anywhere; }
-.pill { display: inline-flex; border-radius: 999px; padding: 2px 8px; font-size: 12px; border: 1px solid var(--line); background: var(--panel-2); font-weight: 650; white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 8px; font-size: 12px; border: 1px solid var(--line); background: var(--panel-2); font-weight: 650; white-space: nowrap; }
 .pill.ok { color: var(--green); background: var(--green-soft); border-color: rgba(36,138,87,.18); }
 .pill.warn { color: var(--amber); background: var(--amber-soft); border-color: rgba(189,125,17,.22); }
 .pill.error { color: var(--coral); background: var(--coral-soft); border-color: rgba(214,91,72,.20); }
 .pill.idle { color: var(--muted); }
+.status-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; flex: 0 0 auto; background: #9aa5b5; box-shadow: 0 0 0 3px rgba(154,165,181,.16); }
+.status-dot.online { background: var(--green); box-shadow: 0 0 0 3px rgba(36,138,87,.15), 0 0 12px rgba(36,138,87,.28); }
+.status-dot.offline { background: var(--coral); box-shadow: 0 0 0 3px rgba(214,91,72,.15); }
+.status-dot.pending { background: var(--amber); box-shadow: 0 0 0 3px rgba(189,125,17,.15); animation: pulseDot 1.15s ease-in-out infinite; }
+.status-dot.runtime { background: var(--indigo); box-shadow: 0 0 0 3px rgba(86,101,216,.14); }
+.status-dot.unknown { background: #98a2b3; box-shadow: 0 0 0 3px rgba(105,115,134,.14); }
+@keyframes pulseDot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.72); opacity: .62; } }
+.health-cell { display: inline-flex; align-items: center; gap: 8px; min-width: max-content; }
+.agent-cell { display: flex; align-items: center; gap: 10px; min-width: 180px; }
+.agent-avatar { width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, var(--teal-soft), var(--indigo-soft)); border: 1px solid rgba(15,159,146,.18); color: var(--ink); font-weight: 820; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 7px 16px rgba(24,33,47,.08); flex: 0 0 auto; }
+.agent-avatar.small { width: 28px; height: 28px; font-size: 12px; border-radius: 8px; }
+.agent-main { display: grid; gap: 2px; min-width: 0; }
+.agent-name { font-weight: 760; overflow-wrap: anywhere; }
+.agent-meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; display: flex; align-items: center; gap: 6px; }
+.online-summary { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .detail-item { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
 .detail-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
 .detail-value { font-weight: 700; overflow-wrap: anywhere; }
 .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-detail-shell { display: grid; gap: 14px; }
+.agent-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 14px; border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: linear-gradient(135deg, #ffffff 0%, #f7fbff 62%, #f2fbf9 100%); box-shadow: var(--shadow-soft); }
+.agent-hero-main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.agent-hero h3 { margin: 0; font-size: 18px; line-height: 1.2; overflow-wrap: anywhere; }
+.agent-hero p { margin: 5px 0 0; color: var(--muted); max-width: 760px; }
+.agent-hero-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.agent-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 10px; }
+.agent-stat { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 10px 12px; min-height: 72px; }
+.agent-stat .detail-value { font-size: 15px; }
+.schema-grid { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 10px; }
+.schema-card { border: 1px solid var(--line); background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 6px 18px rgba(24,33,47,.05); }
+.schema-head { padding: 10px 12px; border-bottom: 1px solid #edf1f6; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fbfcfe; }
+.schema-title { display: grid; gap: 2px; min-width: 0; }
+.schema-title strong { overflow-wrap: anywhere; }
+.schema-title span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.schema-body { padding: 10px 12px; display: grid; gap: 10px; }
+.schema-pre { margin: 0; white-space: pre-wrap; overflow: auto; max-height: 210px; border: 1px solid #e3e9f2; border-radius: 8px; background: #111827; color: #e5e7eb; padding: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.empty-muted { color: var(--muted); font-size: 13px; border: 1px dashed #cfd8e5; border-radius: 8px; padding: 10px; background: #fbfcfe; }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 0 8px; }
+.section-title h3 { margin: 0; font-size: 14px; }
 .view { display: none; }
 .view.active { display: block; }
-.chat-layout { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.chat-layout { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 16px; align-items: stretch; }
 .chat-sidebar { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); padding: 14px; display: grid; gap: 12px; align-content: start; }
-.chat-box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); display: grid; grid-template-rows: auto 1fr auto; min-height: 640px; overflow: hidden; }
-.chat-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.messages { padding: 18px; overflow: auto; background: linear-gradient(180deg, #fbfcfe 0%, #f5f8fb 100%); display: flex; flex-direction: column; gap: 12px; }
-.msg { display: grid; gap: 4px; max-width: min(680px, 88%); }
-.msg.user { align-self: flex-end; }
+.chat-agent-card { border: 1px solid var(--line); background: linear-gradient(180deg, #fff, #f8fbff); border-radius: 8px; padding: 13px; display: grid; gap: 10px; }
+.chat-agent-card .detail-item { background: #fff; }
+.chat-box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); display: grid; grid-template-rows: auto auto 1fr auto; min-height: 680px; overflow: hidden; position: relative; }
+.chat-head { padding: 15px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; background: linear-gradient(180deg, #fff, #f9fbff); }
+.chat-title-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.chat-title-main { display: grid; gap: 2px; min-width: 0; }
+.chat-title-main strong { overflow-wrap: anywhere; }
+.chat-title-main span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.chat-head-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.debug-panel { display: none; border-bottom: 1px solid var(--line); background: linear-gradient(135deg, rgba(232,235,255,.65), rgba(223,246,242,.58)); padding: 12px 16px; }
+.debug-panel.visible { display: block; }
+.debug-grid { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 10px; }
+.debug-item { border: 1px solid rgba(86,101,216,.16); background: rgba(255,255,255,.78); border-radius: 8px; padding: 9px 10px; box-shadow: 0 7px 16px rgba(24,33,47,.05); }
+.debug-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
+.debug-value { font-weight: 760; overflow-wrap: anywhere; }
+.debug-value.warn { color: var(--amber); }
+.debug-value.error { color: var(--coral); }
+.messages { padding: 22px; overflow: auto; background: radial-gradient(circle at top left, rgba(15,159,146,.08), transparent 34%), radial-gradient(circle at bottom right, rgba(86,101,216,.07), transparent 28%), linear-gradient(180deg, #fbfcfe 0%, #f3f7fb 100%); display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
+.messages::-webkit-scrollbar { width: 8px; }
+.messages::-webkit-scrollbar-thumb { background: #cdd7e6; border-radius: 999px; border: 2px solid #f5f8fb; }
+.msg { display: flex; align-items: flex-end; gap: 10px; max-width: min(720px, 84%); animation: msgIn .22s ease-out; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.msg.user { align-self: flex-end; flex-direction: row-reverse; }
 .msg.agent, .msg.system { align-self: flex-start; }
-.bubble { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fff; white-space: pre-wrap; box-shadow: 0 5px 18px rgba(24,33,47,.06); }
-.msg.user .bubble { background: var(--teal); color: #fff; border-color: var(--teal); }
+.msg-avatar { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-weight: 780; font-size: 12px; flex: 0 0 auto; border: 1px solid var(--line); background: #fff; box-shadow: 0 4px 14px rgba(24,33,47,.06); }
+.msg.user .msg-avatar { background: linear-gradient(135deg, var(--teal), #167fbc); color: #fff; border-color: rgba(15,159,146,.5); }
+.msg.agent .msg-avatar { color: var(--indigo); background: var(--indigo-soft); border-color: rgba(86,101,216,.18); }
+.msg.system .msg-avatar { color: var(--amber); background: var(--amber-soft); border-color: rgba(189,125,17,.22); }
+.msg-body { display: grid; gap: 4px; min-width: 0; max-width: 100%; }
+.bubble { border: 1px solid var(--line); border-radius: 8px 8px 8px 3px; padding: 12px 14px; background: rgba(255,255,255,.96); white-space: pre-wrap; box-shadow: 0 5px 18px rgba(24,33,47,.06); line-height: 1.55; overflow-wrap: anywhere; }
+.msg.user .bubble { background: linear-gradient(135deg, var(--teal), #167fbc); color: #fff; border-color: rgba(15,159,146,.72); border-radius: 8px 8px 3px 8px; }
 .msg.system .bubble { background: var(--amber-soft); border-color: rgba(189,125,17,.26); color: #6d4608; }
-.msg-meta { color: var(--muted); font-size: 11px; }
-.chat-compose { border-top: 1px solid var(--line); padding: 12px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
-.chat-compose textarea { width: 100%; min-height: 48px; max-height: 140px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.msg.pending .bubble { color: var(--muted); }
+.msg-meta { color: var(--muted); font-size: 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+.typing-dots { display: inline-flex; gap: 4px; align-items: center; }
+.typing-dots span { width: 5px; height: 5px; border-radius: 999px; background: currentColor; opacity: .42; animation: dotPulse 1.1s ease-in-out infinite; }
+.typing-dots span:nth-child(2) { animation-delay: .14s; }
+.typing-dots span:nth-child(3) { animation-delay: .28s; }
+@keyframes dotPulse { 0%, 100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-3px); opacity: .9; } }
+.chat-compose { border-top: 1px solid var(--line); padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; background: rgba(255,255,255,.82); }
+.chat-input-wrap { border: 1px solid var(--line); border-radius: 8px; background: #fff; display: grid; gap: 6px; padding: 9px 10px 7px; box-shadow: inset 0 1px 0 rgba(255,255,255,.75); transition: border-color .16s ease, box-shadow .16s ease; }
+.chat-input-wrap:focus-within { border-color: rgba(15,159,146,.46); box-shadow: 0 0 0 3px rgba(15,159,146,.11); }
+.chat-compose textarea { width: 100%; min-height: 46px; max-height: 150px; resize: none; border: 0; outline: 0; padding: 0; background: transparent; line-height: 1.45; }
+.compose-meta { color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; gap: 10px; }
+.compose-meta span { overflow-wrap: anywhere; }
 .field { display: grid; gap: 5px; }
 .field label { color: var(--muted); font-size: 12px; }
 .field input, .field select { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: #fff; min-width: 0; }
@@ -274,6 +348,10 @@ td { font-size: 13px; overflow-wrap: anywhere; }
   .shell { grid-template-columns: 1fr; }
   .side { position: sticky; top: 0; z-index: 5; }
   .grid, .bands, .studio-layout, .chat-layout { grid-template-columns: 1fr; }
+  .agent-hero { grid-template-columns: 1fr; }
+  .agent-hero-actions { justify-content: flex-start; }
+  .agent-stat-grid, .schema-grid { grid-template-columns: 1fr; }
+  .debug-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
 }
 </style>
 </head>
@@ -289,11 +367,11 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       <span id="side-store">Store: -</span>
     </div>
     <nav class="nav">
-      <button id="nav-dashboard" onclick="showView('dashboard')">Dashboard</button>
-      <button id="nav-runs" onclick="showView('runs')">Runs</button>
-      <button id="nav-registry" onclick="showView('registry')">Registry</button>
-      <button id="nav-chat" onclick="showView('chat')">Chat</button>
-      <button id="nav-studio" onclick="showView('studio')">Studio <span class="soon-mini">Soon</span></button>
+      <button id="nav-dashboard" onclick="showView('dashboard')"><span class="nav-label" data-icon="dashboard">Dashboard</span></button>
+      <button id="nav-runs" onclick="showView('runs')"><span class="nav-label" data-icon="timeline">Runs</span></button>
+      <button id="nav-registry" onclick="showView('registry')"><span class="nav-label" data-icon="registry">Registry</span></button>
+      <button id="nav-chat" onclick="showView('chat')"><span class="nav-label" data-icon="chat">Chat</span></button>
+      <button id="nav-studio" onclick="showView('studio')"><span class="nav-label" data-icon="studio">Studio</span> <span class="soon-mini">Soon</span></button>
     </nav>
     <div class="side-foot">Local devtools over registry cards, run reports, agent status, and chat.</div>
   </aside>
@@ -305,46 +383,71 @@ td { font-size: 13px; overflow-wrap: anywhere; }
           <h1>Dashboard</h1>
           <p class="lede">Inspect persisted task snapshots, run reports, registry cards, agent health, and chat-ready HTTP agents from one local surface.</p>
         </div>
-        <div class="actions"><button class="btn" onclick="refresh()">Refresh</button><button class="btn" onclick="pingAll()">Ping all</button><button class="btn primary" onclick="showView('studio')">Studio Preview</button></div>
+        <div class="actions"><button class="btn primary" data-icon="refresh" onclick="refresh()">Refresh</button><button class="btn" data-icon="ping" onclick="pingAll()">Ping all</button></div>
       </div>
       <div class="alerts" id="alerts"></div>
       <div class="grid" id="metrics"></div>
       <div class="bands"><div class="panel"><h2>Recent tasks</h2><div id="task-table"></div></div><div class="panel"><h2>Registry health</h2><div id="health-table"></div></div></div>
     </section>
     <section id="view-runs" class="view">
-      <div class="top"><div><p class="kicker">Replay substrate</p><h1>Runs</h1><p class="lede">Task snapshots and run reports from the configured SQLite run store.</p></div><div class="actions"><button class="btn" onclick="refresh()">Refresh</button></div></div>
+      <div class="top"><div><p class="kicker">Replay substrate</p><h1>Runs</h1><p class="lede">Task snapshots and run reports from the configured SQLite run store.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
       <div class="panel"><h2>Run store</h2><div id="runs-table"></div></div>
       <div class="panel"><h2>Replay</h2><div class="panel-body" id="replay-panel">Select a run or task to replay it from the live dashboard server.</div></div>
     </section>
     <section id="view-registry" class="view">
-      <div class="top"><div><p class="kicker">Discovery</p><h1>Registry</h1><p class="lede">Agent cards currently visible to the dashboard snapshot, with status probes and chat entry points for HTTP agents.</p></div><div class="actions"><button class="btn" onclick="refresh()">Refresh</button><button class="btn" onclick="pingAll()">Ping all</button></div></div>
+      <div class="top"><div><p class="kicker">Discovery</p><h1>Registry</h1><p class="lede">Agent cards currently visible to the dashboard snapshot, with status probes and chat entry points for HTTP agents.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button><button class="btn" data-icon="ping" onclick="pingAll()">Ping all</button></div></div>
       <div class="panel"><h2>Agents</h2><div id="registry-table"></div></div>
       <div class="panel"><h2>Selected agent</h2><div class="panel-body" id="agent-detail"></div></div>
     </section>
     <section id="view-chat" class="view">
-      <div class="top"><div><p class="kicker">Agent chat</p><h1>Chat</h1><p class="lede">Talk to any HTTP agent that advertises LLM chat support. Static dashboard files show the panel, while live chat requires the served dashboard.</p></div><div class="actions"><button class="btn" onclick="refresh()">Refresh</button></div></div>
+      <div class="top"><div><p class="kicker">Agent chat</p><h1>Chat</h1><p class="lede">Talk to any HTTP agent that advertises LLM chat support. Static dashboard files show the panel, while live chat requires the served dashboard.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
       <div class="chat-layout">
         <aside class="chat-sidebar">
           <div class="field"><label>Agent</label><select id="chat-agent-select" onchange="selectChatAgent(this.value)"></select></div>
-          <div class="field"><label>Session</label><input id="chat-session" /></div>
+          <div class="field"><label>Session</label><input id="chat-session" oninput="chatSessionId = this.value || chatSessionId; renderDebugPanel()" /></div>
           <div id="chat-agent-detail"></div>
         </aside>
         <div class="chat-box">
-          <div class="chat-head"><strong id="chat-title">Chat</strong><span class="pill idle" id="chat-status">idle</span></div>
+          <div class="chat-head">
+            <div class="chat-title-wrap">
+              <span class="agent-avatar small" id="chat-avatar">A</span>
+              <div class="chat-title-main"><strong id="chat-title">Chat</strong><span id="chat-subtitle">Select an agent</span></div>
+            </div>
+            <div class="chat-head-actions">
+              <span class="pill idle" id="chat-status">idle</span>
+              <button class="mini-btn" data-icon="reset" id="chat-reset" onclick="resetChat()">Reset</button>
+              <button class="mini-btn" data-icon="activity" id="chat-debug-toggle" onclick="toggleChatDebug()">Debug</button>
+            </div>
+          </div>
+          <div class="debug-panel" id="chat-debug-panel">
+            <div class="debug-grid">
+              <div class="debug-item"><div class="debug-label">Last latency</div><div class="debug-value" id="debug-latency">-</div></div>
+              <div class="debug-item"><div class="debug-label">Average latency</div><div class="debug-value" id="debug-avg-latency">-</div></div>
+              <div class="debug-item"><div class="debug-label">Messages sent</div><div class="debug-value" id="debug-count">0</div></div>
+              <div class="debug-item"><div class="debug-label">Session</div><div class="debug-value" id="debug-session">-</div></div>
+              <div class="debug-item"><div class="debug-label">Last error</div><div class="debug-value" id="debug-error">none</div></div>
+            </div>
+          </div>
           <div class="messages" id="chat-messages"></div>
-          <div class="chat-compose"><textarea id="chat-input" placeholder="Type a message to the selected agent"></textarea><button class="btn primary" id="chat-send" onclick="sendChat()">Send</button></div>
+          <div class="chat-compose">
+            <div class="chat-input-wrap">
+              <textarea id="chat-input" placeholder="Type a message to the selected agent" oninput="handleChatInput()" onkeydown="handleChatKeydown(event)"></textarea>
+              <div class="compose-meta"><span>Proxy /chat</span><span id="chat-compose-state">idle</span></div>
+            </div>
+            <button class="btn primary" data-icon="send" id="chat-send" onclick="sendChat()">Send</button>
+          </div>
         </div>
       </div>
     </section>
     <section id="view-studio" class="view">
-      <div class="top"><div><p class="kicker">Canvas preview</p><h1>Protolink Studio</h1><p class="lede">The visual agent builder is disabled while the blueprint format settles.</p></div><div class="actions"><button class="btn" disabled>Connect</button><button class="btn primary" disabled>Export JSON</button></div></div>
+      <div class="top"><div><p class="kicker">Canvas preview</p><h1>Protolink Studio</h1><p class="lede">The visual agent builder is disabled while the blueprint format settles.</p></div><div class="actions"><button class="btn" data-icon="plug" disabled>Connect</button><button class="btn primary" data-icon="download" disabled>Export JSON</button></div></div>
       <div class="studio-layout">
         <aside class="palette">
           <h2>Palette</h2>
-          <button class="btn" disabled>Add Agent</button>
-          <button class="btn" disabled>Add LLM</button>
-          <button class="btn" disabled>Add Tool</button>
-          <button class="btn" disabled>Add Registry</button>
+          <button class="btn" data-icon="agent" disabled>Add Agent</button>
+          <button class="btn" data-icon="spark" disabled>Add LLM</button>
+          <button class="btn" data-icon="tool" disabled>Add Tool</button>
+          <button class="btn" data-icon="registry" disabled>Add Registry</button>
         </aside>
         <div class="canvas-wrap">
           <div class="canvas" id="studio-canvas">
@@ -356,7 +459,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
           <h2>Selection</h2>
           <div class="field"><label>Label</label><input id="node-label" disabled /></div>
           <div class="field"><label>Kind</label><select id="node-kind" disabled><option>agent</option><option>llm</option><option>tool</option><option>registry</option></select></div>
-          <button class="btn" disabled>Delete</button>
+          <button class="btn" data-icon="details" disabled>Delete</button>
           <h2 style="margin-top:16px;">Blueprint</h2>
           <div class="code" id="blueprint-json"></div>
         </aside>
@@ -371,7 +474,47 @@ let blueprint = JSON.parse(JSON.stringify(snapshot.studio?.blueprint || {nodes: 
 let selectedAgentIndex = 0;
 let chatMessages = [];
 let health = {};
-let chatSessionId = "dashboard_" + Math.random().toString(36).slice(2, 10);
+let chatSessionId = newChatSessionId();
+let chatPending = false;
+let chatDebugOpen = false;
+let chatDebugStats = {sent: 0, latencies: [], lastLatency: null, lastError: null};
+
+const ICON_PATHS = {
+  activity: '<path d="M22 12h-4l-3 8-6-16-3 8H2"/>',
+  agent: '<path d="M12 8V4"/><rect x="6" y="8" width="12" height="10" rx="3"/><path d="M9 13h.01M15 13h.01"/><path d="M10 18v2h4v-2"/>',
+  chat: '<path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/>',
+  dashboard: '<rect x="3" y="3" width="7" height="8" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="15" width="7" height="6" rx="1"/>',
+  details: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+  ping: '<path d="M12 18.5h.01"/><path d="M8.5 15a5 5 0 0 1 7 0"/><path d="M5 11.5a10 10 0 0 1 14 0"/><path d="M2 8a14 14 0 0 1 20 0"/>',
+  play: '<path d="m8 5 11 7-11 7z"/>',
+  plug: '<path d="M9 7V2M15 7V2"/><path d="M7 7h10v5a5 5 0 0 1-10 0z"/><path d="M12 17v5"/>',
+  refresh: '<path d="M21 12a9 9 0 0 1-15.4 6.4"/><path d="M3 12A9 9 0 0 1 18.4 5.6"/><path d="M21 4v5h-5"/><path d="M3 20v-5h5"/>',
+  registry: '<path d="M4 6h16v12H4z"/><path d="M8 6v12M16 6v12"/><path d="M4 10h16M4 14h16"/>',
+  reset: '<path d="M3 12a9 9 0 0 1 9-9 9.7 9.7 0 0 1 6.4 2.4"/><path d="M18 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.7 9.7 0 0 1-6.4-2.4"/><path d="M6 21v-5h5"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+  spark: '<path d="m12 2 1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+  status: '<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-5"/>',
+  studio: '<path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M9 14h6v6H9z"/><path d="M10 7h4M12 10v4"/>',
+  timeline: '<path d="M4 5v14"/><circle cx="4" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><path d="M8 6h12M8 18h12M8 12h8"/>',
+  tool: '<path d="m14.7 6.3 3-3a3 3 0 0 1-4 4l-7.4 7.4a2 2 0 1 0 3 3l7.4-7.4a3 3 0 0 1 4-4l-3 3"/>'
+};
+
+function icon(name) {
+  const body = ICON_PATHS[name] || ICON_PATHS.spark;
+  return `<svg class="icon icon-${escAttr(name)}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+}
+
+function hydrateIcons(root = document) {
+  for (const el of root.querySelectorAll('[data-icon]:not([data-icon-ready])')) {
+    el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon));
+    el.setAttribute('data-icon-ready', 'true');
+  }
+}
+
+function newChatSessionId() {
+  return "dashboard_" + Math.random().toString(36).slice(2, 10);
+}
 
 function showView(name) {
   for (const el of document.querySelectorAll('.view')) el.classList.remove('active');
@@ -380,6 +523,7 @@ function showView(name) {
   document.getElementById('nav-' + name).classList.add('active');
   if (name === 'chat') renderChat();
   if (name === 'studio') renderStudio();
+  hydrateIcons();
 }
 
 async function refresh() {
@@ -395,13 +539,14 @@ function render() {
   const agents = snapshot.registry?.agents || [];
   const tasks = snapshot.runs?.tasks || [];
   const reports = snapshot.runs?.reports || [];
+  const onlineCount = agents.filter(agent => healthStatus(agent).state === 'online').length;
   const alerts = [];
   if (snapshot.registry?.error) alerts.push('Registry: ' + snapshot.registry.error);
   if (snapshot.runs?.error) alerts.push('Run store: ' + snapshot.runs.error);
   document.getElementById('alerts').innerHTML = alerts.map(message => `<div class="alert">${esc(message)}</div>`).join('');
   document.getElementById('side-store').textContent = 'Store: ' + (snapshot.runs?.store || 'not configured');
   document.getElementById('metrics').innerHTML = [
-    metric('Agents', agents.length, snapshot.registry?.url || 'snapshot', 'teal'),
+    metric('Agents', agents.length, onlineCount ? `${onlineCount} online` : snapshot.registry?.url || 'snapshot', 'teal'),
     metric('Tasks', tasks.length, 'snapshots', 'indigo'),
     metric('Reports', reports.length, 'stored runs', 'amber'),
     metric('Store', snapshot.runs?.store ? 'on' : 'off', snapshot.runs?.error || 'local', snapshot.runs?.error ? 'coral' : 'teal')
@@ -416,36 +561,151 @@ function render() {
   renderAgentDetail();
   renderChat();
   renderStudio();
+  hydrateIcons();
 }
 
 function metric(label, value, hint, accent) { return `<div class="metric" data-accent="${esc(accent || 'teal')}"><div class="label">${esc(label)}</div><div class="value">${esc(String(value))}</div><div class="label">${esc(hint || '')}</div></div>`; }
-function enabledCaps(caps) { return Object.entries(caps).filter(([,v]) => v === true).map(([k]) => k).join(', ') || '-'; }
+function enabledCaps(caps) { return Object.entries(caps || {}).filter(([,v]) => v === true).map(([k]) => k).join(', ') || '-'; }
 function agentKey(agent) { return agent.url || agent.name || 'agent'; }
 function isHttpAgent(agent) { return /^https?:\\/\\//.test(String(agent.url || '')); }
 function hasChat(agent) { return Boolean(agent.capabilities?.has_llm); }
 function endpoint(agent, path) { return String(agent.url || '').replace(/\\/+$/, '') + path; }
-function agentHealth(agent) {
+function pick(source, ...keys) {
+  for (const key of keys) {
+    if (source && source[key] !== undefined && source[key] !== null && source[key] !== '') return source[key];
+  }
+  return null;
+}
+function protocolVersion(agent) { return pick(agent, 'protocol_version', 'protocolVersion') || '-'; }
+function listField(agent, snake, camel, fallback = []) {
+  const value = pick(agent, snake, camel);
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value) return [value];
+  return fallback;
+}
+function initials(value) {
+  const text = String(value || 'agent').replace(/[_-]+/g, ' ').trim();
+  const parts = text.split(/\\s+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : text.slice(0, 2)).toUpperCase();
+}
+function formatDuration(seconds) {
+  const total = Number(seconds);
+  if (!Number.isFinite(total) || total < 0) return '-';
+  const whole = Math.round(total);
+  const days = Math.floor(whole / 86400);
+  const hours = Math.floor((whole % 86400) / 3600);
+  const mins = Math.floor((whole % 3600) / 60);
+  const secs = whole % 60;
+  if (days) return `${days}d ${hours}h`;
+  if (hours) return `${hours}h ${mins}m`;
+  if (mins) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+function timestampLabel(value) {
+  if (!value) return '-';
+  const numeric = Number(value);
+  const date = Number.isFinite(numeric) ? new Date(numeric * 1000) : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString();
+}
+function agentUptime(agent) {
+  const item = health[agentKey(agent)] || {};
+  const metadata = agent.metadata || {};
+  const uptime = pick(item, 'uptime_seconds', 'uptimeSeconds') ?? pick(agent, 'uptime_seconds', 'uptimeSeconds') ?? pick(metadata, 'uptime_seconds', 'uptimeSeconds');
+  if (uptime !== null) return {value: formatDuration(uptime), hint: 'from status probe'};
+  const start = pick(item, 'start_time', 'startTime') ?? pick(agent, 'start_time', 'startTime') ?? pick(metadata, 'start_time', 'startTime');
+  if (start !== null) return {value: formatDuration(Date.now() / 1000 - Number(start)), hint: timestampLabel(start)};
+  return {value: 'not reported', hint: isHttpAgent(agent) ? 'ping agent to refresh' : 'runtime snapshot'};
+}
+function pillList(items, empty = 'none') {
+  const values = (items || []).map(item => String(item)).filter(Boolean);
+  if (!values.length) return `<span class="pill idle">${esc(empty)}</span>`;
+  return values.map(item => `<span class="pill">${esc(item)}</span>`).join('');
+}
+function capabilityPills(caps) {
+  const entries = Object.entries(caps || {}).filter(([, value]) => value === true || (typeof value === 'number' && value > 0) || (typeof value === 'string' && value));
+  if (!entries.length) return '<span class="pill idle">none</span>';
+  return entries.map(([key, value]) => {
+    const label = value === true ? key : `${key}: ${value}`;
+    return `<span class="pill ${value === true ? 'ok' : ''}">${esc(label)}</span>`;
+  }).join('');
+}
+function skillName(skill) { return typeof skill === 'string' ? skill : skill.id || skill.name || 'skill'; }
+function skillDescription(skill) { return typeof skill === 'string' ? '' : skill.description || ''; }
+function skillInputSchema(skill) { return typeof skill === 'string' ? {} : pick(skill, 'input_schema', 'inputSchema') || {}; }
+function skillOutputSchema(skill) { return typeof skill === 'string' ? {} : pick(skill, 'output_schema', 'outputSchema') || {}; }
+function hasSchema(schema) { return schema && typeof schema === 'object' && Object.keys(schema).length > 0; }
+function schemaSummary(schema) {
+  if (!hasSchema(schema)) return 'not advertised';
+  const properties = schema.properties && typeof schema.properties === 'object' ? Object.keys(schema.properties) : [];
+  const type = schema.type || 'schema';
+  if (properties.length) return `${type} · ${properties.length} field${properties.length === 1 ? '' : 's'}`;
+  return type;
+}
+function schemaBlock(schema, emptyText) {
+  if (!hasSchema(schema)) return `<div class="empty-muted">${esc(emptyText)}</div>`;
+  return `<pre class="schema-pre">${esc(JSON.stringify(schema, null, 2))}</pre>`;
+}
+function renderSkillSchemas(skills) {
+  const normalized = skills || [];
+  if (!normalized.length) return '<div class="empty-muted">No skills or schemas are advertised by this agent card.</div>';
+  return `<div class="schema-grid">${normalized.map(skill => {
+    const input = skillInputSchema(skill);
+    const output = skillOutputSchema(skill);
+    return `
+      <div class="schema-card">
+        <div class="schema-head">
+          <div class="schema-title"><strong>${esc(skillName(skill))}</strong><span>${esc(skillDescription(skill) || 'No description')}</span></div>
+          <span class="pill idle">${esc(schemaSummary(input))}</span>
+        </div>
+        <div class="schema-body">
+          <div><div class="detail-label">Input schema</div>${schemaBlock(input, 'No input schema advertised.')}</div>
+          <div><div class="detail-label">Output schema</div>${schemaBlock(output, 'No output schema advertised.')}</div>
+        </div>
+      </div>
+    `;
+  }).join('')}</div>`;
+}
+function healthStatus(agent) {
   const item = health[agentKey(agent)];
-  if (item?.pending) return raw('<span class="pill warn">pinging</span>');
-  if (!isHttpAgent(agent)) return raw('<span class="pill idle">runtime</span>');
-  if (!item) return raw('<span class="pill idle">unknown</span>');
-  if (item.ok) return raw(`<span class="pill ok">${esc(item.latency_ms ?? '-')} ms</span>`);
-  return raw(`<span class="pill error">${esc(item.error || 'offline')}</span>`);
+  if (item?.pending) return {state: 'pending', label: 'pinging', detail: 'status probe in flight'};
+  if (!isHttpAgent(agent)) return {state: 'runtime', label: 'runtime', detail: 'in-process transport'};
+  if (!item) return {state: 'unknown', label: 'unknown', detail: 'not pinged yet'};
+  if (item.ok) return {state: 'online', label: `${item.latency_ms ?? '-'} ms`, detail: 'online'};
+  return {state: 'offline', label: 'offline', detail: item.error || 'offline'};
+}
+function statusDotHtml(state) { return `<span class="status-dot ${escAttr(state || 'unknown')}"></span>`; }
+function agentHealth(agent) {
+  const status = healthStatus(agent);
+  const cls = status.state === 'online' ? 'ok' : status.state === 'offline' ? 'error' : status.state === 'pending' ? 'warn' : 'idle';
+  const label = status.state === 'offline' ? status.detail : status.label;
+  return raw(`<span class="health-cell">${statusDotHtml(status.state)}<span class="pill ${cls}">${esc(label)}</span></span>`);
+}
+function agentCell(agent) {
+  const status = healthStatus(agent);
+  return raw(`
+    <div class="agent-cell">
+      <span class="agent-avatar">${esc(initials(agent.name || agent.url))}</span>
+      <div class="agent-main">
+        <div class="agent-name">${esc(agent.name || '-')}</div>
+        <div class="agent-meta">${statusDotHtml(status.state)} ${esc(status.detail || status.label)}</div>
+      </div>
+    </div>
+  `);
 }
 function agentActions(agent, index) {
   const pingDisabled = isHttpAgent(agent) ? '' : ' disabled';
   const chatDisabled = isHttpAgent(agent) && hasChat(agent) ? '' : ' disabled';
-  const status = isHttpAgent(agent) ? `<a class="mini-btn" href="${esc(endpoint(agent, '/status'))}" target="_blank" rel="noreferrer">Status</a>` : '<button class="mini-btn" disabled>Status</button>';
-  return raw(`<div class="actions"><button class="mini-btn" onclick="selectAgent(${index})">Details</button><button class="mini-btn" onclick="pingAgent(${index})"${pingDisabled}>Ping</button><button class="mini-btn" onclick="openChat(${index})"${chatDisabled}>Chat</button>${status}</div>`);
+  const status = isHttpAgent(agent) ? `<a class="mini-btn" data-icon="status" href="${esc(endpoint(agent, '/status'))}" target="_blank" rel="noreferrer">Status</a>` : '<button class="mini-btn" data-icon="status" disabled>Status</button>';
+  return raw(`<div class="actions"><button class="mini-btn" data-icon="details" onclick="selectAgent(${index})">Details</button><button class="mini-btn" data-icon="ping" onclick="pingAgent(${index})"${pingDisabled}>Ping</button><button class="mini-btn" data-icon="chat" onclick="openChat(${index})"${chatDisabled}>Chat</button>${status}</div>`);
 }
-function agentHealthRow(agent, index) { return [agent.name || '-', agent.url || '-', agentHealth(agent), agentActions(agent, index)]; }
+function agentHealthRow(agent, index) { return [agentCell(agent), agent.url || '-', agentHealth(agent), agentActions(agent, index)]; }
 function registryRow(agent, index) {
-  const name = `<button class="mini-btn" onclick="selectAgent(${index})">${esc(agent.name || '-')}</button>`;
-  return [raw(name), agent.transport || '-', agent.url || '-', enabledCaps(agent.capabilities || {}), agentHealth(agent), agentActions(agent, index)];
+  return [agentCell(agent), agent.transport || '-', agent.url || '-', enabledCaps(agent.capabilities || {}), agentHealth(agent), agentActions(agent, index)];
 }
 function replayButton(id) {
   if (!id) return '-';
-  return raw(`<button class="mini-btn" onclick="replayRun('${escAttr(id)}')">${esc(id)}</button>`);
+  return raw(`<button class="mini-btn" data-icon="play" onclick="replayRun('${escAttr(id)}')">${esc(id)}</button>`);
 }
 function pill(value) { const cls = value === 'completed' ? 'ok' : value === 'failed' ? 'error' : value === 'canceled' ? 'warn' : ''; return raw(`<span class="pill ${cls}">${esc(value || '-')}</span>`); }
 function table(headers, rows) {
@@ -472,20 +732,63 @@ function renderAgentDetail() {
     target.innerHTML = '<div style="color:var(--muted);">No registry agents in this snapshot.</div>';
     return;
   }
-  const skills = (agent.skills || []).map(skill => typeof skill === 'string' ? skill : skill.id || skill.name || JSON.stringify(skill));
+  const status = healthStatus(agent);
+  const uptime = agentUptime(agent);
+  const skills = agent.skills || [];
   const tags = agent.tags || [];
+  const inputFormats = listField(agent, 'input_formats', 'inputFormats', ['text/plain']);
+  const outputFormats = listField(agent, 'output_formats', 'outputFormats', ['text/plain']);
+  const security = pick(agent, 'security_schemes', 'securitySchemes') || {};
+  const statusUrl = isHttpAgent(agent) ? endpoint(agent, '/status') : '';
+  const chatDisabled = isHttpAgent(agent) && hasChat(agent) ? '' : ' disabled';
   target.innerHTML = `
-    <div class="detail-grid">
-      <div class="detail-item"><div class="detail-label">Name</div><div class="detail-value">${esc(agent.name || '-')}</div></div>
-      <div class="detail-item"><div class="detail-label">Role</div><div class="detail-value">${esc(agent.role || '-')}</div></div>
-      <div class="detail-item"><div class="detail-label">Transport</div><div class="detail-value">${esc(agent.transport || '-')}</div></div>
-      <div class="detail-item"><div class="detail-label">Protocol</div><div class="detail-value">${esc(agent.protocol_version || '-')}</div></div>
+    <div class="agent-detail-shell">
+      <div class="agent-hero">
+        <div class="agent-hero-main">
+          <span class="agent-avatar">${esc(initials(agent.name || agent.url))}</span>
+          <div>
+            <h3>${esc(agent.name || '-')}</h3>
+            <p>${esc(agent.description || 'No description advertised.')}</p>
+            <div style="margin-top:10px;" class="tag-row">${pillList(tags, 'no tags')}</div>
+          </div>
+        </div>
+        <div class="agent-hero-actions">
+          <button class="mini-btn" data-icon="ping" onclick="pingAgent(${selectedAgentIndex})"${isHttpAgent(agent) ? '' : ' disabled'}>Ping</button>
+          <button class="mini-btn" data-icon="chat" onclick="openChat(${selectedAgentIndex})"${chatDisabled}>Chat</button>
+          ${statusUrl ? `<a class="mini-btn" data-icon="status" href="${esc(statusUrl)}" target="_blank" rel="noreferrer">Status</a>` : '<button class="mini-btn" data-icon="status" disabled>Status</button>'}
+        </div>
+      </div>
+
+      <div class="agent-stat-grid">
+        <div class="agent-stat"><div class="detail-label">Health</div><div class="detail-value">${statusDotHtml(status.state)} ${esc(status.detail || status.label)}</div></div>
+        <div class="agent-stat"><div class="detail-label">Uptime</div><div class="detail-value">${esc(uptime.value)}</div><div class="agent-meta">${esc(uptime.hint)}</div></div>
+        <div class="agent-stat"><div class="detail-label">Transport</div><div class="detail-value">${esc(agent.transport || '-')}</div></div>
+        <div class="agent-stat"><div class="detail-label">Protocol</div><div class="detail-value">${esc(protocolVersion(agent))}</div></div>
+        <div class="agent-stat"><div class="detail-label">Role</div><div class="detail-value">${esc(agent.role || '-')}</div></div>
+        <div class="agent-stat"><div class="detail-label">Version</div><div class="detail-value">${esc(agent.version || '-')}</div></div>
+        <div class="agent-stat"><div class="detail-label">Inputs</div><div class="detail-value">${inputFormats.length}</div><div class="agent-meta">${esc(inputFormats.join(', '))}</div></div>
+        <div class="agent-stat"><div class="detail-label">Outputs</div><div class="detail-value">${outputFormats.length}</div><div class="agent-meta">${esc(outputFormats.join(', '))}</div></div>
+      </div>
+
       <div class="detail-item"><div class="detail-label">URL</div><div class="detail-value">${esc(agent.url || '-')}</div></div>
-      <div class="detail-item"><div class="detail-label">Capabilities</div><div class="detail-value">${esc(enabledCaps(agent.capabilities || {}))}</div></div>
+
+      <div>
+        <div class="section-title"><h3>Capabilities</h3><span class="pill idle">${esc(Object.keys(agent.capabilities || {}).length)} advertised</span></div>
+        <div class="tag-row">${capabilityPills(agent.capabilities || {})}</div>
+      </div>
+
+      <div>
+        <div class="section-title"><h3>Security</h3><span class="pill idle">${esc(Object.keys(security).length)} scheme${Object.keys(security).length === 1 ? '' : 's'}</span></div>
+        <div class="tag-row">${Object.keys(security).length ? Object.entries(security).map(([key, value]) => `<span class="pill">${esc(key)}${value?.type ? ` · ${esc(value.type)}` : ''}</span>`).join('') : '<span class="pill idle">none</span>'}</div>
+      </div>
+
+      <div>
+        <div class="section-title"><h3>Skills and schemas</h3><span class="pill idle">${esc(skills.length)} skill${skills.length === 1 ? '' : 's'}</span></div>
+        ${renderSkillSchemas(skills)}
+      </div>
     </div>
-    <div style="margin-top:12px;color:var(--muted);">${esc(agent.description || '')}</div>
-    <div style="margin-top:12px;" class="tag-row">${[...tags, ...skills].map(item => `<span class="pill">${esc(item)}</span>`).join('') || '<span class="pill idle">no tags or skills</span>'}</div>
   `;
+  hydrateIcons(target);
 }
 
 async function pingAgent(index) {
@@ -525,8 +828,21 @@ function openChat(index) {
 }
 
 function selectChatAgent(index) {
-  selectedAgentIndex = Math.max(0, Number(index) || 0);
+  const agents = snapshot.registry?.agents || [];
+  selectedAgentIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(agents.length - 1, 0)));
   renderAgentDetail();
+  renderChat();
+}
+
+function resetChat() {
+  chatMessages = [];
+  chatPending = false;
+  chatDebugStats = {sent: 0, latencies: [], lastLatency: null, lastError: null};
+  chatSessionId = newChatSessionId();
+  const sessionInput = document.getElementById('chat-session');
+  const input = document.getElementById('chat-input');
+  if (sessionInput) sessionInput.value = chatSessionId;
+  if (input) input.value = '';
   renderChat();
 }
 
@@ -534,33 +850,144 @@ function renderChat() {
   const agents = snapshot.registry?.agents || [];
   const select = document.getElementById('chat-agent-select');
   if (!select) return;
-  if (!document.getElementById('chat-session').value) document.getElementById('chat-session').value = chatSessionId;
+  selectedAgentIndex = Math.max(0, Math.min(selectedAgentIndex, Math.max(agents.length - 1, 0)));
+  const sessionInput = document.getElementById('chat-session');
+  if (!sessionInput.value) sessionInput.value = chatSessionId;
+  chatSessionId = sessionInput.value || chatSessionId;
   select.innerHTML = agents.map((agent, index) => `<option value="${index}" ${index === selectedAgentIndex ? 'selected' : ''}>${esc(agent.name || agent.url || 'agent')}</option>`).join('');
   const agent = agents[selectedAgentIndex];
   const canChat = Boolean(agent && isHttpAgent(agent) && hasChat(agent));
-  document.getElementById('chat-title').textContent = agent ? `Chat with ${agent.name || agent.url}` : 'Chat';
-  document.getElementById('chat-status').textContent = canChat ? 'ready' : agent ? 'unavailable' : 'no agent';
-  document.getElementById('chat-status').className = `pill ${canChat ? 'ok' : 'idle'}`;
-  document.getElementById('chat-send').disabled = !canChat;
+  const status = agent ? healthStatus(agent) : {state: 'unknown', label: 'no agent', detail: 'No registry agents'};
+  const statusClass = canChat ? 'ok' : status.state === 'offline' ? 'error' : status.state === 'pending' ? 'warn' : 'idle';
+  document.getElementById('chat-avatar').textContent = agent ? initials(agent.name || agent.url) : 'A';
+  document.getElementById('chat-title').textContent = agent ? (agent.name || agent.url) : 'Chat';
+  document.getElementById('chat-subtitle').textContent = agent ? `${agent.transport || 'transport'} · ${agent.url || 'no url'}` : 'Select an agent';
+  document.getElementById('chat-status').innerHTML = `${statusDotHtml(canChat ? status.state : status.state)} ${esc(canChat ? 'ready' : agent ? 'unavailable' : 'no agent')}`;
+  document.getElementById('chat-status').className = `pill ${statusClass}`;
   document.getElementById('chat-agent-detail').innerHTML = agent
-    ? `<div class="detail-item"><div class="detail-label">Endpoint</div><div class="detail-value">${esc(agent.url || '-')}</div></div><div style="margin-top:8px;color:var(--muted);">${canChat ? 'POST /chat through the dashboard proxy.' : 'Chat requires an HTTP agent with has_llm=true.'}</div>`
+    ? `
+      <div class="chat-agent-card">
+        ${agentCell(agent).__html}
+        <div class="detail-grid">
+          <div class="detail-item"><div class="detail-label">Chat</div><div class="detail-value">${esc(canChat ? 'available' : 'unavailable')}</div></div>
+          <div class="detail-item"><div class="detail-label">Probe</div><div class="detail-value">${esc(status.detail || status.label)}</div></div>
+        </div>
+        <div class="detail-item"><div class="detail-label">Endpoint</div><div class="detail-value">${esc(agent.url || '-')}</div></div>
+        <div style="color:var(--muted);">${canChat ? 'POST /chat through the dashboard proxy.' : 'Chat requires an HTTP agent with has_llm=true.'}</div>
+      </div>
+    `
     : '<div style="color:var(--muted);">No agents available.</div>';
   const messages = chatMessages.length
     ? chatMessages
     : [{role: 'system', text: 'Select an HTTP LLM agent, then send a message through the dashboard proxy.', time: timeLabel()}];
-  document.getElementById('chat-messages').innerHTML = messages.map(message => `<div class="msg ${esc(message.role)}"><div class="bubble">${esc(message.text)}</div><div class="msg-meta">${esc(message.time || '')}</div></div>`).join('');
+  const visibleMessages = chatPending
+    ? [...messages, {role: 'agent', text: 'Waiting for response', time: timeLabel(), pending: true}]
+    : messages;
+  document.getElementById('chat-messages').innerHTML = visibleMessages.map(message => renderChatMessage(message, agent)).join('');
+  renderDebugPanel();
+  handleChatInput();
+  hydrateIcons();
+  requestAnimationFrame(() => {
+    const box = document.getElementById('chat-messages');
+    if (box) box.scrollTop = box.scrollHeight;
+  });
+}
+
+function renderChatMessage(message, agent) {
+  const role = message.role || 'system';
+  const label = role === 'user' ? 'You' : role === 'agent' ? (agent?.name || 'Agent') : 'System';
+  const avatar = role === 'user' ? 'ME' : role === 'agent' ? initials(agent?.name || 'agent') : '!';
+  const latency = message.latencyMs ? ` · ${message.latencyMs} ms` : '';
+  const bubble = message.pending
+    ? `${esc(message.text)} <span class="typing-dots"><span></span><span></span><span></span></span>`
+    : esc(message.text);
+  return `
+    <div class="msg ${esc(role)} ${message.pending ? 'pending' : ''}">
+      <div class="msg-avatar">${esc(avatar)}</div>
+      <div class="msg-body">
+        <div class="bubble">${bubble}</div>
+        <div class="msg-meta"><span>${esc(label)}</span><span>${esc(message.time || '')}${esc(latency)}</span></div>
+      </div>
+    </div>
+  `;
+}
+
+function handleChatInput() {
+  const input = document.getElementById('chat-input');
+  const send = document.getElementById('chat-send');
+  if (!input || !send) return;
+  const agent = (snapshot.registry?.agents || [])[selectedAgentIndex];
+  const canChat = Boolean(agent && isHttpAgent(agent) && hasChat(agent));
+  const text = input.value.trim();
+  send.disabled = !canChat || chatPending || !text;
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 150) + 'px';
+  const state = document.getElementById('chat-compose-state');
+  if (state) state.textContent = chatPending ? 'waiting' : canChat ? (text ? `${text.length} chars` : 'ready') : 'unavailable';
+}
+
+function handleChatKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    sendChat();
+  }
+}
+
+function toggleChatDebug() {
+  chatDebugOpen = !chatDebugOpen;
+  renderDebugPanel();
+}
+
+function renderDebugPanel() {
+  const panel = document.getElementById('chat-debug-panel');
+  if (!panel) return;
+  panel.classList.toggle('visible', chatDebugOpen);
+  const toggle = document.getElementById('chat-debug-toggle');
+  if (toggle) toggle.className = `mini-btn ${chatDebugOpen ? 'primary' : ''}`;
+  const avg = chatDebugStats.latencies.length
+    ? Math.round(chatDebugStats.latencies.reduce((sum, value) => sum + value, 0) / chatDebugStats.latencies.length)
+    : null;
+  const latencyEl = document.getElementById('debug-latency');
+  const avgEl = document.getElementById('debug-avg-latency');
+  const countEl = document.getElementById('debug-count');
+  const sessionEl = document.getElementById('debug-session');
+  const errorEl = document.getElementById('debug-error');
+  if (latencyEl) {
+    latencyEl.textContent = chatDebugStats.lastLatency == null ? '-' : `${chatDebugStats.lastLatency} ms`;
+    latencyEl.className = `debug-value ${chatDebugStats.lastLatency > 5000 ? 'warn' : ''}`;
+  }
+  if (avgEl) {
+    avgEl.textContent = avg == null ? '-' : `${avg} ms`;
+    avgEl.className = `debug-value ${avg > 5000 ? 'warn' : ''}`;
+  }
+  if (countEl) countEl.textContent = String(chatDebugStats.sent);
+  if (sessionEl) sessionEl.textContent = chatSessionId;
+  if (errorEl) {
+    errorEl.textContent = chatDebugStats.lastError || 'none';
+    errorEl.className = `debug-value ${chatDebugStats.lastError ? 'error' : ''}`;
+  }
+}
+
+function recordChatDebug(latencyMs, error) {
+  chatDebugStats.sent += 1;
+  chatDebugStats.lastLatency = latencyMs;
+  chatDebugStats.lastError = error || null;
+  if (latencyMs != null) chatDebugStats.latencies.push(latencyMs);
 }
 
 async function sendChat() {
   const agent = (snapshot.registry?.agents || [])[selectedAgentIndex];
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!agent || !text) return;
+  const canChat = Boolean(agent && isHttpAgent(agent) && hasChat(agent));
+  if (!agent || !text || !canChat || chatPending) return;
   input.value = '';
+  handleChatInput();
   chatSessionId = document.getElementById('chat-session').value || chatSessionId;
   chatMessages.push({role: 'user', text, time: timeLabel()});
-  chatMessages.push({role: 'agent', text: 'Waiting for response...', time: timeLabel()});
+  chatPending = true;
   renderChat();
+  const started = performance.now();
   try {
     const res = await fetch('/api/agents/chat', {
       method: 'POST',
@@ -568,12 +995,15 @@ async function sendChat() {
       body: JSON.stringify({url: agent.url, message: text, session_id: chatSessionId})
     });
     const data = await res.json();
-    chatMessages.pop();
-    chatMessages.push({role: data.error ? 'system' : 'agent', text: data.response || data.error || 'No response', time: timeLabel()});
+    const latencyMs = Math.round(performance.now() - started);
+    recordChatDebug(latencyMs, data.error || null);
+    chatMessages.push({role: data.error ? 'system' : 'agent', text: data.response || data.error || 'No response', time: timeLabel(), latencyMs});
   } catch (err) {
-    chatMessages.pop();
-    chatMessages.push({role: 'system', text: 'Serve the dashboard locally to use chat actions.', time: timeLabel()});
+    const latencyMs = Math.round(performance.now() - started);
+    recordChatDebug(latencyMs, 'Serve the dashboard locally to use chat actions.');
+    chatMessages.push({role: 'system', text: 'Serve the dashboard locally to use chat actions.', time: timeLabel(), latencyMs});
   }
+  chatPending = false;
   renderChat();
 }
 

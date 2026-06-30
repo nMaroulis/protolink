@@ -212,6 +212,10 @@ When the dashboard is served, it can call the local JSON endpoints behind the pa
 
 Those actions require HTTP agent URLs from the registry. Runtime-only demo agents still appear in the registry and Studio preview, but they are marked as runtime agents because there is no network endpoint for the browser dashboard to ping.
 
+The dashboard chat view also includes a Debug toggle for local agent probing. It tracks the last chat latency, average latency for the current dashboard session, sent-message count, current session ID, and the last proxy or agent error. This mirrors the standalone chat renderer's debugging affordance while keeping the dashboard centered on registry-driven agent discovery. Enter sends the active chat prompt; Shift+Enter preserves a newline. Use Reset when you want to clear the current local conversation and start a fresh dashboard session.
+
+The selected-agent panel shows the agent card as an operational profile: health, uptime when reported by `/status`, role, version, protocol, transport, endpoint, input/output formats, security schemes, capability flags, tags, skills, and advertised skill schemas.
+
 The dashboard still has a Studio tab, but it is deliberately disabled and marked as coming soon. It previews the future direction without exposing a public `protolink studio` command before the blueprint format and execution story are ready.
 
 See [Developer Tools](devtools.md) for the architecture, renderer APIs, and provider-free example.
