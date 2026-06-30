@@ -173,8 +173,13 @@ button, input, select, textarea { font: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(15,159,146,.22); outline-offset: 2px; }
 .shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
 .side { background: var(--nav); color: #f8fafc; padding: 22px 18px; display: flex; flex-direction: column; gap: 20px; border-right: 1px solid rgba(255,255,255,.08); }
+.brand-card { width: 100%; display: flex; align-items: center; gap: 11px; text-align: left; border: 0; border-radius: 0; padding: 3px 0; color: #f8fafc; background: transparent; cursor: pointer; transition: transform .18s ease, color .18s ease; }
+.brand-card:hover { transform: translateX(2px); color: #fff; }
+.brand-logo { width: 38px; height: 38px; display: grid; place-items: center; background: transparent; border: 0; box-shadow: none; flex: 0 0 auto; }
+.brand-logo img { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; transition: transform .18s ease, filter .18s ease; filter: drop-shadow(0 8px 12px rgba(0,0,0,.22)); }
+.brand-card:hover .brand-logo img { transform: rotate(-4deg) scale(1.08); filter: drop-shadow(0 10px 16px rgba(15,159,146,.28)); }
 .brand { font-size: 20px; font-weight: 780; letter-spacing: 0; }
-.sub { color: #bac5d4; font-size: 12px; margin-top: 2px; }
+.sub { display: block; color: #bac5d4; font-size: 12px; margin-top: 2px; }
 .side-meta { display: grid; gap: 8px; padding: 12px; border: 1px solid rgba(255,255,255,.10); border-radius: 8px; background: rgba(255,255,255,.05); }
 .side-meta span { color: #c7d2e0; font-size: 12px; overflow-wrap: anywhere; }
 .nav { display: grid; gap: 7px; }
@@ -204,18 +209,30 @@ h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
 .alerts { display: grid; gap: 8px; margin-bottom: 14px; }
 .alert { border: 1px solid var(--amber); background: var(--amber-soft); color: #6d4608; border-radius: 8px; padding: 10px 12px; }
 .grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.metric { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; box-shadow: var(--shadow-soft); min-height: 96px; position: relative; overflow: hidden; }
+.metric { width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; box-shadow: var(--shadow-soft); min-height: 104px; position: relative; overflow: hidden; cursor: pointer; color: var(--ink); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .metric::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--teal); }
 .metric[data-accent="indigo"]::before { background: var(--indigo); }
 .metric[data-accent="amber"]::before { background: var(--amber); }
 .metric[data-accent="coral"]::before { background: var(--coral); }
+.metric:hover { transform: translateY(-2px); border-color: rgba(15,159,146,.38); box-shadow: 0 16px 34px rgba(24,33,47,.12); }
+.metric-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.metric-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--teal); background: var(--teal-soft); border: 1px solid rgba(15,159,146,.14); }
+.metric[data-accent="indigo"] .metric-icon { color: var(--indigo); background: var(--indigo-soft); border-color: rgba(86,101,216,.14); }
+.metric[data-accent="amber"] .metric-icon { color: var(--amber); background: var(--amber-soft); border-color: rgba(189,125,17,.18); }
+.metric[data-accent="coral"] .metric-icon { color: var(--coral); background: var(--coral-soft); border-color: rgba(214,91,72,.18); }
 .metric .label { color: var(--muted); font-size: 12px; }
 .metric .value { font-size: 30px; font-weight: 800; margin-top: 4px; letter-spacing: 0; overflow-wrap: anywhere; }
+.metric .hint { color: var(--muted); font-size: 12px; margin-top: 4px; overflow-wrap: anywhere; }
+.store-state { display: inline-flex; align-items: center; gap: 8px; font-size: 24px; font-weight: 820; letter-spacing: 0; }
+.store-state.on { color: var(--green); }
+.store-state.off { color: var(--coral); }
+.dashboard-stack { display: grid; gap: 14px; }
 .bands { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); gap: 14px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); overflow: hidden; }
 .panel + .panel { margin-top: 14px; }
 .panel h2 { margin: 0; padding: 14px 16px; border-bottom: 1px solid var(--line); font-size: 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .panel-body { padding: 14px 16px; }
+.panel-note { padding: 10px 16px; color: var(--muted); font-size: 13px; border-bottom: 1px solid #edf1f6; background: linear-gradient(90deg, #fbfcfe, #f5fbfa); }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 10px 12px; border-bottom: 1px solid #edf1f6; text-align: left; vertical-align: top; }
 th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; background: #fbfcfe; }
@@ -225,6 +242,10 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 .pill.warn { color: var(--amber); background: var(--amber-soft); border-color: rgba(189,125,17,.22); }
 .pill.error { color: var(--coral); background: var(--coral-soft); border-color: rgba(214,91,72,.20); }
 .pill.idle { color: var(--muted); }
+.pill.capability-badge { color: var(--indigo); background: var(--indigo-soft); border-color: rgba(86,101,216,.22); }
+.badge-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 160px; }
+.transport-badge { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 760; border: 1px solid #d8dee8; background: #eef2f7; color: #586272; white-space: nowrap; text-transform: uppercase; letter-spacing: .02em; }
+.transport-badge.unknown { color: #697386; background: #f5f7fa; }
 .status-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; flex: 0 0 auto; background: #9aa5b5; box-shadow: 0 0 0 3px rgba(154,165,181,.16); }
 .status-dot.online { background: var(--green); box-shadow: 0 0 0 3px rgba(36,138,87,.15), 0 0 12px rgba(36,138,87,.28); }
 .status-dot.offline { background: var(--coral); box-shadow: 0 0 0 3px rgba(214,91,72,.15); }
@@ -358,18 +379,18 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 <body>
 <div class="shell">
   <aside class="side">
-    <div>
-      <div class="brand">Protolink</div>
-      <div class="sub">runtime dashboard</div>
-    </div>
+    <button class="brand-card" onclick="showView('dashboard')" aria-label="Open Protolink dashboard">
+      <span class="brand-logo"><img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/logo_sm.png" alt="" /></span>
+      <span><span class="brand">Protolink</span><span class="sub">runtime dashboard</span></span>
+    </button>
     <div class="side-meta">
       <span>Local inspection</span>
       <span id="side-store">Store: -</span>
     </div>
     <nav class="nav">
       <button id="nav-dashboard" onclick="showView('dashboard')"><span class="nav-label" data-icon="dashboard">Dashboard</span></button>
-      <button id="nav-runs" onclick="showView('runs')"><span class="nav-label" data-icon="timeline">Runs</span></button>
       <button id="nav-registry" onclick="showView('registry')"><span class="nav-label" data-icon="registry">Registry</span></button>
+      <button id="nav-runs" onclick="showView('runs')"><span class="nav-label" data-icon="timeline">Runs</span></button>
       <button id="nav-chat" onclick="showView('chat')"><span class="nav-label" data-icon="chat">Chat</span></button>
       <button id="nav-studio" onclick="showView('studio')"><span class="nav-label" data-icon="studio">Studio</span> <span class="soon-mini">Soon</span></button>
     </nav>
@@ -387,7 +408,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       </div>
       <div class="alerts" id="alerts"></div>
       <div class="grid" id="metrics"></div>
-      <div class="bands"><div class="panel"><h2>Recent tasks</h2><div id="task-table"></div></div><div class="panel"><h2>Registry health</h2><div id="health-table"></div></div></div>
+      <div class="dashboard-stack"><div class="panel"><h2>Registry <span class="online-summary" id="dashboard-registry-summary"></span></h2><div class="panel-note">For full agent details, schemas, transports, and security metadata, open the Registry tab.</div><div id="health-table"></div></div></div>
     </section>
     <section id="view-runs" class="view">
       <div class="top"><div><p class="kicker">Replay substrate</p><h1>Runs</h1><p class="lede">Task snapshots and run reports from the configured SQLite run store.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
@@ -546,12 +567,13 @@ function render() {
   document.getElementById('alerts').innerHTML = alerts.map(message => `<div class="alert">${esc(message)}</div>`).join('');
   document.getElementById('side-store').textContent = 'Store: ' + (snapshot.runs?.store || 'not configured');
   document.getElementById('metrics').innerHTML = [
-    metric('Agents', agents.length, onlineCount ? `${onlineCount} online` : snapshot.registry?.url || 'snapshot', 'teal'),
-    metric('Tasks', tasks.length, 'snapshots', 'indigo'),
-    metric('Reports', reports.length, 'stored runs', 'amber'),
-    metric('Store', snapshot.runs?.store ? 'on' : 'off', snapshot.runs?.error || 'local', snapshot.runs?.error ? 'coral' : 'teal')
+    metric('Agents', agents.length, onlineCount ? `${onlineCount} online` : snapshot.registry?.url || 'snapshot', 'teal', 'registry', 'registry'),
+    metric('Tasks', tasks.length, 'open in Runs', 'indigo', 'runs', 'timeline'),
+    metric('Reports', reports.length, 'stored run reports', 'amber', 'runs', 'play'),
+    metric('Store', raw(storeStateHtml(Boolean(snapshot.runs?.store), snapshot.runs?.error)), snapshot.runs?.error || 'local run store', snapshot.runs?.error ? 'coral' : 'teal', 'runs', 'status')
   ].join('');
-  document.getElementById('task-table').innerHTML = table(['Task', 'State', 'Run', 'Updated'], tasks.slice(0, 8).map(t => [t.task_id, pill(t.state), t.run_id || '-', t.updated_at || '-']));
+  const registrySummary = document.getElementById('dashboard-registry-summary');
+  if (registrySummary) registrySummary.innerHTML = `${statusDotHtml(onlineCount ? 'online' : agents.length ? 'unknown' : 'runtime')} ${esc(agents.length ? `${agents.length} visible` : 'no agents')}`;
   document.getElementById('health-table').innerHTML = table(['Agent', 'URL', 'Health', 'Actions'], agents.slice(0, 8).map((a, index) => agentHealthRow(a, index)));
   document.getElementById('runs-table').innerHTML = table(['Kind', 'ID', 'Session', 'Agent', 'Time'], [
     ...reports.map(r => ['report', replayButton(r.run_id), r.session_id || '-', r.agent_name || '-', r.created_at || '-']),
@@ -564,8 +586,15 @@ function render() {
   hydrateIcons();
 }
 
-function metric(label, value, hint, accent) { return `<div class="metric" data-accent="${esc(accent || 'teal')}"><div class="label">${esc(label)}</div><div class="value">${esc(String(value))}</div><div class="label">${esc(hint || '')}</div></div>`; }
-function enabledCaps(caps) { return Object.entries(caps || {}).filter(([,v]) => v === true).map(([k]) => k).join(', ') || '-'; }
+function metric(label, value, hint, accent, view, iconName) {
+  const action = view ? ` onclick="showView('${escAttr(view)}')"` : '';
+  return `<button type="button" class="metric" data-accent="${esc(accent || 'teal')}"${action}><div class="metric-top"><div class="label">${esc(label)}</div><span class="metric-icon">${icon(iconName || 'dashboard')}</span></div><div class="value">${cellHtml(value)}</div><div class="hint">${esc(hint || '')}</div></button>`;
+}
+function storeStateHtml(isOn, error) {
+  const state = isOn && !error ? 'on' : 'off';
+  const dot = isOn && !error ? 'online' : 'offline';
+  return `<span class="store-state ${state}">${statusDotHtml(dot)}${esc(state)}</span>`;
+}
 function agentKey(agent) { return agent.url || agent.name || 'agent'; }
 function isHttpAgent(agent) { return /^https?:\\/\\//.test(String(agent.url || '')); }
 function hasChat(agent) { return Boolean(agent.capabilities?.has_llm); }
@@ -627,8 +656,25 @@ function capabilityPills(caps) {
   if (!entries.length) return '<span class="pill idle">none</span>';
   return entries.map(([key, value]) => {
     const label = value === true ? key : `${key}: ${value}`;
-    return `<span class="pill ${value === true ? 'ok' : ''}">${esc(label)}</span>`;
+    return `<span class="pill capability-badge">${esc(label)}</span>`;
   }).join('');
+}
+function capabilityBadges(caps) { return raw(`<div class="badge-row">${capabilityPills(caps)}</div>`); }
+function transportKind(value) {
+  const clean = String(value || '').toLowerCase().trim();
+  if (!clean || clean === '-') return 'unknown';
+  if (clean.startsWith('https')) return 'https';
+  if (clean.startsWith('http')) return 'http';
+  if (clean.includes('runtime')) return 'runtime';
+  if (clean.includes('websocket')) return 'websocket';
+  if (clean === 'ws') return 'ws';
+  if (clean.includes('sse-json-rpc')) return 'sse-json-rpc';
+  if (clean.includes('sse')) return 'sse';
+  return clean.replace(/[^a-z0-9]+/g, '-') || 'unknown';
+}
+function transportBadge(value) {
+  const label = String(value || '-');
+  return raw(`<span class="transport-badge ${escAttr(transportKind(label))}">${esc(label)}</span>`);
 }
 function skillName(skill) { return typeof skill === 'string' ? skill : skill.id || skill.name || 'skill'; }
 function skillDescription(skill) { return typeof skill === 'string' ? '' : skill.description || ''; }
@@ -693,15 +739,18 @@ function agentCell(agent) {
     </div>
   `);
 }
-function agentActions(agent, index) {
+function agentActionButtons(agent, index, includeDetails) {
   const pingDisabled = isHttpAgent(agent) ? '' : ' disabled';
   const chatDisabled = isHttpAgent(agent) && hasChat(agent) ? '' : ' disabled';
   const status = isHttpAgent(agent) ? `<a class="mini-btn" data-icon="status" href="${esc(endpoint(agent, '/status'))}" target="_blank" rel="noreferrer">Status</a>` : '<button class="mini-btn" data-icon="status" disabled>Status</button>';
-  return raw(`<div class="actions"><button class="mini-btn" data-icon="details" onclick="selectAgent(${index})">Details</button><button class="mini-btn" data-icon="ping" onclick="pingAgent(${index})"${pingDisabled}>Ping</button><button class="mini-btn" data-icon="chat" onclick="openChat(${index})"${chatDisabled}>Chat</button>${status}</div>`);
+  const details = includeDetails ? `<button class="mini-btn" data-icon="details" onclick="selectAgent(${index})">Details</button>` : '';
+  return raw(`<div class="actions">${details}<button class="mini-btn" data-icon="ping" onclick="pingAgent(${index})"${pingDisabled}>Ping</button><button class="mini-btn" data-icon="chat" onclick="openChat(${index})"${chatDisabled}>Chat</button>${status}</div>`);
 }
-function agentHealthRow(agent, index) { return [agentCell(agent), agent.url || '-', agentHealth(agent), agentActions(agent, index)]; }
+function agentActions(agent, index) { return agentActionButtons(agent, index, true); }
+function dashboardAgentActions(agent, index) { return agentActionButtons(agent, index, false); }
+function agentHealthRow(agent, index) { return [agentCell(agent), agent.url || '-', agentHealth(agent), dashboardAgentActions(agent, index)]; }
 function registryRow(agent, index) {
-  return [agentCell(agent), agent.transport || '-', agent.url || '-', enabledCaps(agent.capabilities || {}), agentHealth(agent), agentActions(agent, index)];
+  return [agentCell(agent), transportBadge(agent.transport), agent.url || '-', capabilityBadges(agent.capabilities || {}), agentHealth(agent), agentActions(agent, index)];
 }
 function replayButton(id) {
   if (!id) return '-';
@@ -741,6 +790,7 @@ function renderAgentDetail() {
   const security = pick(agent, 'security_schemes', 'securitySchemes') || {};
   const statusUrl = isHttpAgent(agent) ? endpoint(agent, '/status') : '';
   const chatDisabled = isHttpAgent(agent) && hasChat(agent) ? '' : ' disabled';
+  const transportHtml = transportBadge(agent.transport).__html;
   target.innerHTML = `
     <div class="agent-detail-shell">
       <div class="agent-hero">
@@ -762,7 +812,7 @@ function renderAgentDetail() {
       <div class="agent-stat-grid">
         <div class="agent-stat"><div class="detail-label">Health</div><div class="detail-value">${statusDotHtml(status.state)} ${esc(status.detail || status.label)}</div></div>
         <div class="agent-stat"><div class="detail-label">Uptime</div><div class="detail-value">${esc(uptime.value)}</div><div class="agent-meta">${esc(uptime.hint)}</div></div>
-        <div class="agent-stat"><div class="detail-label">Transport</div><div class="detail-value">${esc(agent.transport || '-')}</div></div>
+        <div class="agent-stat"><div class="detail-label">Transport</div><div class="detail-value">${transportHtml}</div></div>
         <div class="agent-stat"><div class="detail-label">Protocol</div><div class="detail-value">${esc(protocolVersion(agent))}</div></div>
         <div class="agent-stat"><div class="detail-label">Role</div><div class="detail-value">${esc(agent.role || '-')}</div></div>
         <div class="agent-stat"><div class="detail-label">Version</div><div class="detail-value">${esc(agent.version || '-')}</div></div>

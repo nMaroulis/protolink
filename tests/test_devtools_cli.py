@@ -63,7 +63,17 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
     assert "/api/agents/chat" in dashboard_html
     assert "Ping all" in dashboard_html
     assert "Agent chat" in dashboard_html
+    assert "https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/logo_sm.png" in dashboard_html
     assert 'data-icon="refresh"' in dashboard_html
+    assert dashboard_html.index('id="nav-registry"') < dashboard_html.index('id="nav-runs"')
+    assert "dashboard-registry-summary" in dashboard_html
+    assert "For full agent details, schemas, transports, and security metadata" in dashboard_html
+    assert "dashboardAgentActions" in dashboard_html
+    assert "transport-badge" in dashboard_html
+    assert "capability-badge" in dashboard_html
+    assert "badge-row" in dashboard_html
+    assert "store-state" in dashboard_html
+    assert "Recent tasks" not in dashboard_html
     assert "handleChatKeydown" in dashboard_html
     assert "toggleChatDebug" in dashboard_html
     assert "resetChat" in dashboard_html

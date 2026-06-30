@@ -128,6 +128,18 @@ Running tasks can be canceled by task ID across local and remote transports, wit
 - **Observable & Replayable Runs**: `RunContext`, `RunEvent`, `RunReport`, budgets, policy decisions, approvals, and redaction for production-facing UIs and tests.
 - **Developer Tools**: `protolink doctor`, registry inspection, run replay, and a local dashboard with agent ping, HTTP chat, registry health, and a disabled Studio preview for future topology work.
 
+## Dashboard Preview
+
+![Protolink dashboard overview](https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif)
+
+Run the dashboard against an existing run store and a live registry (both optional):
+
+```bash
+protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
+```
+
+The command serves a dependency-free local HTML dashboard over Protolink's public devtool collectors. It reads persisted task snapshots and `RunReport` records from `SQLiteRunStore`, pulls `AgentCard` entries from the registry, and exposes live dashboard actions through local endpoints for snapshot refresh, run replay, HTTP agent `/status` probes, and standard agent chat. The page does not create agents; it projects the runtime state your agents already emit through `AgentCard`, `RunContext`, `RunEvent`, and `RunReport`.
+
 ## 💡 Protolink vs Google's A2A
 
 ProtoLink implements Google’s A2A protocol at the **wire level**, while providing a higher-level agent runtime that unifies client, server, transport, tools, and LLMs into a single composable abstraction **the Agent**.

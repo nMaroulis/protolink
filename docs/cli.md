@@ -212,6 +212,8 @@ When the dashboard is served, it can call the local JSON endpoints behind the pa
 
 Those actions require HTTP agent URLs from the registry. Runtime-only demo agents still appear in the registry and Studio preview, but they are marked as runtime agents because there is no network endpoint for the browser dashboard to ping.
 
+The dashboard landing view puts four cards at the top: Agents, Tasks, Reports, and Store. Agents opens the registry view, while Tasks, Reports, and Store route to the Runs view where persisted task snapshots and run reports can be inspected and replayed. Under the cards, the dashboard keeps Registry as the primary table so agent discovery and health stay immediately visible. The sidebar places Registry directly after Dashboard, and the dashboard overview intentionally keeps only quick actions there; use the Registry tab for the full agent card, schemas, transport badge, capability badges, and security metadata.
+
 The dashboard chat view also includes a Debug toggle for local agent probing. It tracks the last chat latency, average latency for the current dashboard session, sent-message count, current session ID, and the last proxy or agent error. This mirrors the standalone chat renderer's debugging affordance while keeping the dashboard centered on registry-driven agent discovery. Enter sends the active chat prompt; Shift+Enter preserves a newline. Use Reset when you want to clear the current local conversation and start a fresh dashboard session.
 
 The selected-agent panel shows the agent card as an operational profile: health, uptime when reported by `/status`, role, version, protocol, transport, endpoint, input/output formats, security schemes, capability flags, tags, skills, and advertised skill schemas.
