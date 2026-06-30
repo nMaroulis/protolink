@@ -51,6 +51,13 @@ _Current release: see [protolink on PyPI](https://pypi.org/project/protolink/)._
     </div>
   </div>
   <div class="nav-item">
+    <div class="nav-emoji">CLI</div>
+    <div class="nav-content">
+      <a href="devtools">Developer Tools</a>
+      <div class="nav-desc">Doctor, registry, replay, dashboard, and Studio preview</div>
+    </div>
+  </div>
+  <div class="nav-item">
     <div class="nav-emoji">🤖</div>
     <div class="nav-content">
       <a href="agent">Agent</a>

@@ -21,6 +21,16 @@
 - Added `RunStore`, `SQLiteRunStore`, `TaskRecord`, and `RunReportRecord` for durable task snapshots and run-report persistence.
 - Added **registry** entry **liveness metadata**, optional **TTL** pruning, persistent registry **entry storage**, and `RegistryClient.heartbeat()`.
 - Added **transport conformance** coverage for Runtime, HTTP, and WebSocket agent contracts.
+- Added developer tooling commands for `doctor`, registry inspection, run listing/replay, and a local dashboard with a disabled Studio preview.
+- Added `examples/devtools_dashboard.py`, a provider-free dashboard demo with multiple registered agents and persisted run reports.
+> To try it:
+```bash
+protolink doctor
+protolink dashboard
+python examples/devtools_studio.py --output-dir .protolink-devtools
+protolink run replay run_devtools_demo --store .protolink-devtools/runs.db
+protolink dashboard --store .protolink-devtools/runs.db --open
+```
 
 ### Fixed
 

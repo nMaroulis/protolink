@@ -67,6 +67,7 @@ nav:
       - Whitepaper: whitepaper.md
       - Getting Started: getting-started.md
       - CLI: cli.md
+      - Developer Tools: devtools.md
   - API Reference:
       - Agent: agent.md
       - Client: client.md
