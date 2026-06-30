@@ -95,8 +95,10 @@ The 0.6.3 examples are small, provider-free scripts intended for application int
 - Creates several agents and registers their cards in an in-process registry
 - Runs a small task loop and records each streamed run with `RunRecorder`
 - Saves durable task snapshots and `RunReport` records to `SQLiteRunStore`
-- Renders static dashboard HTML using `DevtoolsHtmlRenderer`
+- Renders static dashboard HTML using `DevtoolsHtmlRenderer`, including the disabled Studio preview
 - Prints follow-up commands for `protolink run list`, `protolink run replay`, and `protolink dashboard`
+- Supports `--serve-live` to start provider-free HTTP agents, an HTTP registry, and the dashboard so ping/chat actions can be clicked
+- The dashboard also contains registry health, selected-agent detail, run replay, and chat panels
 
 ### 📝 [`basic_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/basic_agent.py)
 **Purpose**: Minimal agent setup focused on core concepts

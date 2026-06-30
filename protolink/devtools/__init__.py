@@ -6,6 +6,7 @@ contracts rather than private agent internals, so applications can reuse the
 collectors and renderers in their own CLIs or notebooks.
 """
 
+from .agents import chat_with_agent, ping_agent
 from .doctor import build_doctor_report
 from .models import CheckResult, DoctorReport, RunReplayItem, RunReplayView
 from .registry import fetch_registry_agents, inspect_registry_agent
@@ -18,7 +19,9 @@ __all__ = [
     "RunReplayView",
     "build_doctor_report",
     "build_run_replay_view",
+    "chat_with_agent",
     "fetch_registry_agents",
     "inspect_registry_agent",
     "list_run_store_records",
+    "ping_agent",
 ]

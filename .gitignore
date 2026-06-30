@@ -133,3 +133,6 @@ examples/code_assistant/traces.json
 
 # assets
 *.excalidraw
+
+# devtools
+runs.db

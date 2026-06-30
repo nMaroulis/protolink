@@ -193,7 +193,7 @@ Open the local dashboard:
 protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
 ```
 
-The dashboard is a local, dependency-free HTML surface over the same collectors used by the CLI. It is useful when a run has enough events that a table is easier to scan than terminal output, or when you want to show registered agents and stored run reports side by side.
+The dashboard is a local, dependency-free HTML surface over the same collectors used by the CLI. It is useful when a run has enough events that a table is easier to scan than terminal output, or when you want to show registered agents, health probes, agent chat, and stored run reports side by side.
 
 Write a static dashboard snapshot:
 
@@ -202,6 +202,15 @@ protolink dashboard --store runs.db --output dashboard.html
 ```
 
 Static output is useful for demos, bug reports, and notebooks because the generated file embeds the current snapshot. It will not live-refresh, but it can be opened without starting a server.
+
+When the dashboard is served, it can call the local JSON endpoints behind the page:
+
+- `/api/snapshot` refreshes registry and run-store data.
+- `/api/runs/{run_id}` loads the same replay projection used by `protolink run replay`.
+- `/api/agents/ping` probes an HTTP agent's `/status` endpoint and returns latency/status data.
+- `/api/agents/chat` proxies a message to an HTTP LLM agent's `POST /chat` endpoint.
+
+Those actions require HTTP agent URLs from the registry. Runtime-only demo agents still appear in the registry and Studio preview, but they are marked as runtime agents because there is no network endpoint for the browser dashboard to ping.
 
 The dashboard still has a Studio tab, but it is deliberately disabled and marked as coming soon. It previews the future direction without exposing a public `protolink studio` command before the blueprint format and execution story are ready.
 

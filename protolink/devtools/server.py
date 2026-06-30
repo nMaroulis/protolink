@@ -7,7 +7,9 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
+from protolink.devtools.agents import chat_with_agent, ping_agent
 from protolink.devtools.registry import fetch_registry_agents
 from protolink.devtools.runs import build_run_replay_view, list_run_store_records
 from protolink.utils.renderers.devtools import DevtoolsHtmlRenderer
@@ -68,14 +70,58 @@ def serve_dashboard(
                 self._send_json(build_dashboard_snapshot(registry_url=registry_url, store_path=store_path))
                 return
             if self.path.startswith("/api/runs/") and store_path is not None:
-                run_id = self.path.removeprefix("/api/runs/").split("?", 1)[0]
+                run_id = unquote(self.path.removeprefix("/api/runs/").split("?", 1)[0])
                 self._send_json(build_run_replay_view(store_path, run_id).to_dict())
                 return
+            self.send_error(404, "Not found")
+
+        def do_POST(self) -> None:
+            """Serve dashboard action endpoints."""
+            if self.path == "/api/agents/ping":
+                payload = self._read_json()
+                try:
+                    result = ping_agent(str(payload.get("url") or ""), timeout=float(payload.get("timeout") or 3.0))
+                except Exception as exc:
+                    result = {
+                        "ok": False,
+                        "status": None,
+                        "latency_ms": None,
+                        "url": payload.get("url"),
+                        "error": str(exc),
+                    }
+                self._send_json(result)
+                return
+
+            if self.path == "/api/agents/chat":
+                payload = self._read_json()
+                try:
+                    result = chat_with_agent(
+                        str(payload.get("url") or ""),
+                        str(payload.get("message") or ""),
+                        session_id=str(payload.get("session_id") or "dashboard"),
+                        timeout=float(payload.get("timeout") or 30.0),
+                    )
+                except Exception as exc:
+                    result = {"response": None, "error": str(exc), "url": payload.get("url")}
+                self._send_json(result)
+                return
+
             self.send_error(404, "Not found")
 
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             """Keep dashboard request logs quiet by default."""
             return
+
+        def _read_json(self) -> dict[str, Any]:
+            """Read a small JSON request body."""
+            length = int(self.headers.get("Content-Length") or 0)
+            if length <= 0:
+                return {}
+            try:
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            except json.JSONDecodeError:
+                return {}
+            return payload if isinstance(payload, dict) else {}
 
         def _send_html(self, html: str) -> None:
             self.send_response(200)

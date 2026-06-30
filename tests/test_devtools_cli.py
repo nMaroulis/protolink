@@ -5,7 +5,7 @@ import pytest
 
 from protolink import RunContext, RunEvent, RunReport, SQLiteRunStore, Task
 from protolink.cli import main as cli_main
-from protolink.devtools import build_run_replay_view, list_run_store_records
+from protolink.devtools import build_run_replay_view, chat_with_agent, list_run_store_records, ping_agent
 from protolink.devtools.server import build_dashboard_snapshot
 from protolink.utils.renderers.devtools import DevtoolsHtmlRenderer
 
@@ -59,8 +59,12 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
 
     assert "Protolink Dashboard" in dashboard_html
     assert "window.__PROTOLINK_SNAPSHOT__" in dashboard_html
+    assert "/api/agents/ping" in dashboard_html
+    assert "/api/agents/chat" in dashboard_html
+    assert "Ping all" in dashboard_html
+    assert "Agent chat" in dashboard_html
     assert "Protolink Studio" in dashboard_html
-    assert "Coming soon" in dashboard_html
+    assert "Protolink Studio is coming soon" in dashboard_html
     assert "studio-canvas" in dashboard_html
 
 
@@ -79,6 +83,61 @@ def test_dashboard_snapshot_and_renderer_include_registry_and_store(tmp_path: Pa
     assert snapshot["runs"]["reports"][0]["run_id"] == "run_cli"
     assert "run_cli" in html
     assert "Protolink Studio" in html
+    assert "Selected agent" in html
+
+
+def test_dashboard_agent_actions_use_http_contracts(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, body: bytes) -> None:
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, *_args):
+            return self.body
+
+    def fake_ping_urlopen(request, timeout):
+        calls.append((request.full_url, timeout, getattr(request, "data", None)))
+        return FakeResponse(b"<html>ok</html>")
+
+    monkeypatch.setattr("protolink.devtools.agents.urlopen", fake_ping_urlopen)
+
+    ping = ping_agent("http://agent.local/", timeout=1.25)
+
+    assert ping["ok"] is True
+    assert ping["url"] == "http://agent.local/status"
+    assert calls[0] == ("http://agent.local/status", 1.25, None)
+
+    def fake_chat_urlopen(request, timeout):
+        calls.append((request.full_url, timeout, json.loads(request.data.decode("utf-8"))))
+        return FakeResponse(b'{"response":"hello from agent"}')
+
+    monkeypatch.setattr("protolink.devtools.agents.urlopen", fake_chat_urlopen)
+
+    chat = chat_with_agent("http://agent.local", "hello", session_id="session_dev", timeout=5.0)
+
+    assert chat["response"] == "hello from agent"
+    assert calls[-1] == (
+        "http://agent.local/chat",
+        5.0,
+        {"message": "hello", "session_id": "session_dev"},
+    )
+
+
+def test_dashboard_agent_actions_reject_non_http_urls():
+    with pytest.raises(ValueError):
+        ping_agent("runtime://agent")
+
+    with pytest.raises(ValueError):
+        chat_with_agent("runtime://agent", "hello")
 
 
 def _seed_run_store(store_path: Path) -> str:
