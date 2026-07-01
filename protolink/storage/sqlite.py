@@ -1,3 +1,5 @@
+"""SQLite-backed key-value storage adapter for agent state."""
+
 import json
 import sqlite3
 from typing import Any

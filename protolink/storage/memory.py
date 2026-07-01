@@ -1,3 +1,5 @@
+"""In-memory storage adapter with optional TTL cleanup."""
+
 import heapq
 import time
 from typing import Any, ClassVar

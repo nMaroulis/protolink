@@ -72,7 +72,6 @@ protolink dashboard --store .protolink-devtools/runs.db --open
   - `LLM.compact_history()` remains as a concise facade while compaction algorithms and isolated summary prompts live in the dedicated component.
   - Added `HistoryCompactionRequest`, `Agent.compact_history()`, and `AgentClient.COMPACT_HISTORY_REQUEST` (`POST /llm/history/compact`) so agents can compact persistent context through the same client/server spec pattern as other control endpoints.
 
-
 ## [v0.6.2] - 2026-06-24
 
 ### Added
