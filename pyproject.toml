@@ -33,6 +33,18 @@ invalid-return-type = "error"
 missing-argument = "error"
 possibly-unresolved-reference = "warn"
 
+[tool.ty.analysis]
+# These imports are behind optional extras. Keep core type checks independent of
+# heavyweight provider SDKs while still using their types when locally installed.
+allowed-unresolved-imports = [
+    "anthropic.**",
+    "google.genai.**",
+    "huggingface_hub.**",
+    "llama_cpp.**",
+    "mcp.**",
+    "openai.**",
+]
+
 [project.urls]
 Documentation = "https://nmaroulis.github.io/protolink/"
 Repository = "https://github.com/nMaroulis/protolink"

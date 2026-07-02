@@ -39,10 +39,16 @@ import asyncio
 from collections.abc import Callable
 from typing import Any
 
-from mcp import ClientSession
-from mcp.client.sse import sse_client
-from mcp.client.stdio import StdioServerParameters, stdio_client
-from mcp.types import Tool
+try:
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+    from mcp.types import Tool
+except ImportError as exc:
+    raise ImportError(
+        "MCP tool support requires the optional 'mcp' dependency. "
+        "Install it with: pip install 'protolink[mcp]' or uv add 'protolink[mcp]'."
+    ) from exc
 
 from protolink.tools.base import BaseTool
 from protolink.tools.tool import Tool as ProtoTool
