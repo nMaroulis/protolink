@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import hmac
 import json
 import socket
+import time
 from typing import Any
 
 import httpx
@@ -29,6 +32,21 @@ def get_free_port() -> int:
     port = s.getsockname()[1]
     s.close()
     return port
+
+
+def _b64url_json(value: dict[str, Any]) -> str:
+    """Encode a JSON object as an unpadded base64url JWT segment."""
+    data = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def create_hs256_jwt(claims: dict[str, Any], secret: str) -> str:
+    """Create a compact HS256 JWT for the authentication example."""
+    header = _b64url_json({"alg": "HS256", "typ": "JWT"})
+    payload = _b64url_json(claims)
+    signature = hmac.new(secret.encode("utf-8"), f"{header}.{payload}".encode("ascii"), hashlib.sha256).digest()
+    signature_segment = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{header}.{payload}.{signature_segment}"
 
 
 class SecureEchoAgent(Agent):
@@ -103,14 +121,13 @@ async def run_tests() -> None:
     # ------------------------------------------------------------------
     print("\n--- Initializing Bearer Token Auth (FastAPI) Agent ---")
     bearer_port = get_free_port()
-    bearer_auth = BearerTokenAuth(secret="test-secret")
+    jwt_secret = "test-secret"
+    bearer_auth = BearerTokenAuth(secret=jwt_secret)
     bearer_agent = SecureEchoAgent("bearer_agent", bearer_port, bearer_auth, backend="fastapi")
     bearer_agent.start(background=True)
 
     try:
-        # Generate valid dummy token
-        payload = base64.urlsafe_b64encode(json.dumps({"sub": "test-user"}).encode()).decode().rstrip("=")
-        valid_token = f"header.{payload}.signature"
+        valid_token = create_hs256_jwt({"sub": "test-user", "exp": int(time.time()) + 300}, jwt_secret)
 
         # Test 4: Bearer Token Authentication (Success)
         print("\n--- Test 4: Bearer Token Authentication (Success) ---")

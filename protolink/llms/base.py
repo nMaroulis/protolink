@@ -70,7 +70,6 @@ See Also:
     - `protolink.llms.local.base.LocalLLM`: Base class for local models
 """
 
-import ast
 import asyncio
 import json
 from abc import ABC, abstractmethod
@@ -100,7 +99,6 @@ from protolink.llms.actions import (
     LLMActionResult,
     ToolCallAction,
     prompt_action_schema,
-    validate_action_payload,
 )
 from protolink.llms.compaction import (
     HistoryCompactionResult,
@@ -116,6 +114,13 @@ from protolink.llms.metrics import (
     build_call_metrics,
     context_usage_from_tokens,
     profile_from_value,
+)
+from protolink.llms.parsing import (
+    format_validation_errors,
+    infer_unique_agent_for_tool,
+    parse_function_call_shorthand,
+    parse_infer_response,
+    repair_fallback_action_payload,
 )
 from protolink.llms.prompts import (
     AGENT_LIST_PROMPT,
@@ -1229,59 +1234,8 @@ class LLM(ABC):
         tools: dict[str, "BaseTool"] | None = None,
         agent_cards: list[Any] | None = None,
     ) -> LLMAction:
-        """
-        Parse, validate, and normalize a raw LLM response using Pydantic action models.
-
-        This method enforces a hard contract between the LLM and the runtime. The response must be a single,
-        well-formed JSON object declaring exactly one supported action. Validation is performed by Pydantic's
-        ``TypeAdapter`` against the discriminated ``LLMAction`` union.
-
-        On validation failure, field-level diagnostics are extracted from Pydantic's ``ValidationError`` and
-        formatted into a precise, human-readable error message to maximize the LLM's ability to self-correct
-        on the next iteration.
-
-        Args:
-            response: The raw string output returned by the language model.
-            tools: Local tools available to the current agent, used only for
-                unambiguous fallback-shorthand repair.
-            agent_cards: Discovered agents available for delegation, used only
-                for unambiguous fallback-shorthand repair.
-
-        Returns:
-            The parsed and validated action model (FinalAction, ToolCallAction, or AgentCallAction).
-
-        Raises:
-            ValueError: If the response is not valid JSON or fails Pydantic validation.
-        """
-        try:
-            data = json.loads(response, strict=False)
-        except json.JSONDecodeError as e:
-            # Try to find JSON within the text (e.g. if wrapped in code blocks or mixed with text)
-            try:
-                start = response.find("{")
-                end = response.rfind("}")
-
-                if start != -1 and end != -1 and start < end:
-                    json_str = response[start : end + 1]
-                    data = json.loads(json_str, strict=False)
-                else:
-                    raise e
-            except json.JSONDecodeError:
-                raise ValueError(f"Invalid JSON: {e}\nRaw response: {response}") from e
-
-        from pydantic import ValidationError
-
-        data = self._repair_fallback_action_payload(data, tools=tools or {}, agent_cards=agent_cards or [])
-
-        try:
-            return validate_action_payload(data)
-        except ValidationError as e:
-            diagnostics = self._format_validation_errors(e)
-            raise ValueError(
-                f"Action validation failed. Field-level errors:\n{diagnostics}\nParsed data: {data}"
-            ) from e
-        except Exception as e:
-            raise ValueError(f"Action validation failed: {e}\nParsed data: {data}") from e
+        """Parse a raw model response into a validated runtime action."""
+        return parse_infer_response(response, tools=tools, agent_cards=agent_cards)
 
     @staticmethod
     def _repair_fallback_action_payload(
@@ -1290,162 +1244,23 @@ class LLM(ABC):
         tools: dict[str, "BaseTool"],
         agent_cards: list[Any],
     ) -> Any:
-        """Repair narrow, legacy prompt-fallback action shorthands.
-
-        The runtime still dispatches only strict ``LLMAction`` models. This
-        helper runs before validation and converts a few historical or
-        small-model-friendly forms into the canonical shape when the repair is
-        deterministic. It is intentionally conservative:
-
-        - ``payload`` dictionaries are flattened for older examples.
-        - ``prompt: "tool_name(arg=value)"`` is parsed as a function-call
-          shorthand for tool calls.
-        - A missing delegated-agent name is inferred only when exactly one
-          discovered agent advertises the requested tool.
-
-        If the target tool or agent cannot be inferred safely, the original data
-        is returned and normal Pydantic diagnostics drive self-correction.
-        """
-        if not isinstance(data, dict):
-            return data
-
-        repaired = dict(data)
-        payload = repaired.get("payload")
-        if isinstance(payload, dict):
-            for key in ("agent", "action", "tool", "args", "prompt", "content"):
-                if key not in repaired and key in payload:
-                    repaired[key] = payload[key]
-            repaired.pop("payload", None)
-
-        if repaired.get("type") == "tool_call" and "args" not in repaired:
-            prompt = repaired.get("prompt")
-            parsed_call = LLM._parse_function_call_shorthand(prompt) if isinstance(prompt, str) else None
-            if parsed_call is not None:
-                tool_name, call_args, _agent_name = parsed_call
-                repaired.setdefault("tool", tool_name)
-                repaired["args"] = call_args
-                repaired.pop("prompt", None)
-
-        if repaired.get("type") != "agent_call":
-            return repaired
-
-        if repaired.get("action") not in {"tool_call", None}:
-            return repaired
-
-        prompt = repaired.get("prompt")
-        parsed_call = LLM._parse_function_call_shorthand(prompt) if isinstance(prompt, str) else None
-        if parsed_call is not None:
-            tool_name, call_args, agent_from_prompt = parsed_call
-            repaired.setdefault("action", "tool_call")
-            repaired.setdefault("tool", tool_name)
-            repaired.setdefault("args", call_args)
-            if agent_from_prompt and "agent" not in repaired:
-                repaired["agent"] = agent_from_prompt
-            repaired.pop("prompt", None)
-
-        tool_name = repaired.get("tool")
-        if isinstance(tool_name, str) and "agent" not in repaired:
-            agent_name = LLM._infer_unique_agent_for_tool(tool_name, agent_cards)
-            if agent_name:
-                repaired["agent"] = agent_name
-            elif tool_name in tools:
-                return {"type": "tool_call", "tool": tool_name, "args": repaired.get("args") or {}}
-
-        return repaired
+        """Compatibility wrapper for fallback action repair."""
+        return repair_fallback_action_payload(data, tools=tools, agent_cards=agent_cards)
 
     @staticmethod
     def _parse_function_call_shorthand(value: str | None) -> tuple[str, dict[str, Any], str | None] | None:
-        """Parse ``tool(arg=value)`` or ``agent.tool(arg=value)`` fallback text.
-
-        This is not a general expression evaluator; it accepts only Python AST
-        function-call syntax with literal arguments. Positional arguments are
-        supported only when they are a single dictionary literal, because there
-        is no reliable way to map arbitrary positional values to tool parameter
-        names without the target schema.
-        """
-        if not value:
-            return None
-        text = value.strip().strip("`")
-        try:
-            expr = ast.parse(text, mode="eval").body
-        except SyntaxError:
-            return None
-        if not isinstance(expr, ast.Call):
-            return None
-
-        agent_name: str | None = None
-        if isinstance(expr.func, ast.Name):
-            tool_name = expr.func.id
-        elif isinstance(expr.func, ast.Attribute):
-            tool_name = expr.func.attr
-            if isinstance(expr.func.value, ast.Name):
-                agent_name = expr.func.value.id
-        else:
-            return None
-
-        args: dict[str, Any] = {}
-        if len(expr.args) == 1 and not expr.keywords:
-            try:
-                literal = ast.literal_eval(expr.args[0])
-            except (ValueError, TypeError):
-                return None
-            if not isinstance(literal, dict):
-                return None
-            args = literal
-        elif expr.args:
-            return None
-
-        for keyword in expr.keywords:
-            if keyword.arg is None:
-                return None
-            try:
-                args[keyword.arg] = ast.literal_eval(keyword.value)
-            except (ValueError, TypeError):
-                return None
-
-        return tool_name, args, agent_name
+        """Compatibility wrapper for literal function-call shorthand parsing."""
+        return parse_function_call_shorthand(value)
 
     @staticmethod
     def _infer_unique_agent_for_tool(tool_name: str, agent_cards: list[Any]) -> str | None:
-        """Return the only discovered agent advertising ``tool_name``, if any."""
-        candidates: list[str] = []
-        for card in agent_cards:
-            agent_name = getattr(card, "name", None)
-            for skill in getattr(card, "skills", []) or []:
-                if getattr(skill, "id", None) == tool_name and agent_name:
-                    candidates.append(str(agent_name))
-        unique = sorted(set(candidates))
-        return unique[0] if len(unique) == 1 else None
+        """Compatibility wrapper for delegated-tool agent inference."""
+        return infer_unique_agent_for_tool(tool_name, agent_cards)
 
     @staticmethod
     def _format_validation_errors(exc: Any) -> str:
-        """
-        Extract precise, field-level diagnostics from a Pydantic ``ValidationError``.
-
-        Produces a human-readable bullet list of every field error, including the full
-        location path (e.g. ``agent_call -> prompt``) and the Pydantic error message.
-        This feedback is injected into the conversation history so the LLM can self-correct
-        with maximum precision on the next turn.
-
-        Args:
-            exc: A Pydantic ``ValidationError`` instance.
-
-        Returns:
-            A multi-line string with one bullet per validation error.
-        """
-        lines: list[str] = []
-        try:
-            for error in exc.errors():
-                loc = " -> ".join(str(part) for part in error.get("loc", []))
-                msg = error.get("msg", "unknown error")
-                err_type = error.get("type", "")
-                if loc:
-                    lines.append(f"  - Field '{loc}': {msg} (type: {err_type})")
-                else:
-                    lines.append(f"  - {msg} (type: {err_type})")
-        except Exception:
-            lines.append(f"  - {exc}")
-        return "\n".join(lines) if lines else str(exc)
+        """Compatibility wrapper for validation diagnostics formatting."""
+        return format_validation_errors(exc)
 
     async def _call_with_retry(
         self,

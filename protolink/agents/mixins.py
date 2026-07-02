@@ -1446,6 +1446,9 @@ class AgentSerializationMixin(_AgentMixinBase):
                     "type": "bearer",
                     "secret": getattr(self.authenticator, "secret", ""),
                     "algorithm": getattr(self.authenticator, "algorithm", "HS256"),
+                    "issuer": getattr(self.authenticator, "issuer", None),
+                    "audience": getattr(self.authenticator, "audience", None),
+                    "leeway_seconds": getattr(self.authenticator, "leeway_seconds", 0),
                 }
             elif auth_type == "APIKeyAuth":
                 data["authenticator"] = {
@@ -1495,6 +1498,9 @@ class AgentSerializationMixin(_AgentMixinBase):
                     authenticator = BearerTokenAuth(
                         secret=auth_config.get("secret", ""),
                         algorithm=auth_config.get("algorithm", "HS256"),
+                        issuer=auth_config.get("issuer"),
+                        audience=auth_config.get("audience"),
+                        leeway_seconds=auth_config.get("leeway_seconds", 0),
                     )
                 elif t == "api_key":
                     from protolink.security.auth import APIKeyAuth

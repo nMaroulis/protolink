@@ -4,7 +4,10 @@ ProtoLink - Security & Authentication
 OAuth 2.0, Bearer tokens authorization for enterprise deployments.
 """
 
+import base64
+import hmac
 import json
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -12,6 +15,50 @@ from typing import Any
 
 from protolink.types import HttpAuthScheme, SecuritySchemeType
 from protolink.utils import utc_now
+
+_HMAC_JWT_ALGORITHMS: dict[str, str] = {
+    "HS256": "sha256",
+    "HS384": "sha384",
+    "HS512": "sha512",
+}
+
+
+def _decode_base64url(segment: str, *, label: str) -> bytes:
+    """Decode one unpadded base64url JWT segment."""
+    if not segment:
+        raise ValueError(f"JWT {label} segment is empty")
+    padding = "=" * (-len(segment) % 4)
+    try:
+        return base64.b64decode(
+            (segment + padding).encode("ascii"),
+            altchars=b"-_",
+            validate=True,
+        )
+    except Exception as exc:
+        raise ValueError(f"JWT {label} segment is not valid base64url") from exc
+
+
+def _json_segment(segment: str, *, label: str) -> dict[str, Any]:
+    """Decode a JWT JSON segment into a mapping."""
+    try:
+        value = json.loads(_decode_base64url(segment, label=label))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"JWT {label} segment is not valid JSON") from exc
+    if not isinstance(value, dict):
+        raise ValueError(f"JWT {label} segment must be a JSON object")
+    return value
+
+
+def _numeric_date(value: Any, *, claim: str) -> float:
+    """Convert a JWT NumericDate claim into seconds since the Unix epoch."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"JWT claim '{claim}' must be a numeric date")
+    return float(value)
+
+
+def _numeric_date_to_iso(value: float) -> str:
+    """Return an ISO timestamp for a JWT NumericDate value."""
+    return datetime.fromtimestamp(value, timezone.utc).isoformat()
 
 
 @dataclass
@@ -133,15 +180,19 @@ class Authenticator(ABC):
 
 
 class BearerTokenAuth(Authenticator):
-    """Bearer token authentication (JWT or opaque).
+    """Bearer JWT authentication.
 
-    Validates bearer tokens against a secret or verification endpoint.
-    Suitable for simple deployments with pre-issued tokens.
+    Validates compact JSON Web Tokens signed with an HMAC SHA algorithm. This
+    keeps the default implementation dependency-free while still checking the
+    important security properties: algorithm, signature, expiration, not-before
+    time, issuer, and audience.
 
     Example:
         auth = BearerTokenAuth(
             secret="your-secret-key",
-            algorithm="HS256"
+            algorithm="HS256",
+            issuer="https://auth.example.com",
+            audience="protolink-agent",
         )
         context = await auth.authenticate(token)
     """
@@ -151,48 +202,141 @@ class BearerTokenAuth(Authenticator):
         return SecurityScheme(
             auth_type="http",
             auth_scheme="bearer",
-            description="Bearer token authentication (JWT or opaque)",
+            description="Bearer JWT authentication",
+            metadata={
+                "algorithms": list(_HMAC_JWT_ALGORITHMS),
+                "issuer": self.issuer,
+                "audience": self.audience,
+            },
         )
 
-    def __init__(self, secret: str = "", algorithm: str = "HS256"):
-        """Initialize bearer token auth.
+    def __init__(
+        self,
+        secret: str,
+        algorithm: str = "HS256",
+        *,
+        issuer: str | None = None,
+        audience: str | None = None,
+        leeway_seconds: int = 0,
+    ) -> None:
+        """Initialize bearer JWT authentication.
 
         Args:
-            secret: Secret key for JWT validation
-            algorithm: JWT algorithm (HS256, RS256, etc.)
+            secret: Shared HMAC signing secret used to verify JWT signatures.
+            algorithm: HMAC JWT algorithm. Supported values are ``HS256``,
+                ``HS384``, and ``HS512``.
+            issuer: Optional required ``iss`` claim.
+            audience: Optional required ``aud`` claim. The token may provide
+                either a string or a list of strings.
+            leeway_seconds: Clock-skew allowance for ``exp``, ``nbf``, and
+                ``iat`` checks.
+
+        Raises:
+            ValueError: If the configuration cannot safely validate tokens.
         """
+        if not secret:
+            raise ValueError("BearerTokenAuth requires a non-empty JWT signing secret")
+        if algorithm not in _HMAC_JWT_ALGORITHMS:
+            supported = ", ".join(sorted(_HMAC_JWT_ALGORITHMS))
+            raise ValueError(f"Unsupported JWT algorithm '{algorithm}'. Supported algorithms: {supported}")
+        if leeway_seconds < 0:
+            raise ValueError("leeway_seconds must be non-negative")
+
         self.secret = secret
         self.algorithm = algorithm
+        self.issuer = issuer
+        self.audience = audience
+        self.leeway_seconds = leeway_seconds
 
     async def authenticate(self, credentials: str) -> SecurityContext:
-        """Authenticate bearer token.
+        """Validate a signed JWT and return its security context.
 
         Args:
-            credentials: Bearer token string
+            credentials: Compact JWT string from an Authorization bearer token.
 
         Returns:
-            AuthContext extracted from token
+            SecurityContext extracted from verified token claims.
+
+        Raises:
+            Exception: If the token is malformed, unsigned, expired, uses the
+                wrong algorithm, has the wrong issuer/audience, or fails
+                signature verification.
         """
         try:
-            # TODO(): Implement proper JWT validation
-            # For demo: parse JWT format (in production, use PyJWT)
-            # Expected format: header.payload.signature
             parts = credentials.split(".")
             if len(parts) != 3:
-                raise ValueError("Invalid token format")
+                raise ValueError("JWT must contain header, payload, and signature segments")
 
-            # Decode payload (base64)
-            import base64
+            header_segment, payload_segment, signature_segment = parts
+            header = _json_segment(header_segment, label="header")
+            payload = _json_segment(payload_segment, label="payload")
 
-            payload_str = parts[1] + "=" * (4 - len(parts[1]) % 4)
-            payload_bytes = base64.urlsafe_b64decode(payload_str)
-            payload = json.loads(payload_bytes)
+            alg = header.get("alg")
+            if alg != self.algorithm:
+                raise ValueError(f"JWT algorithm mismatch: expected {self.algorithm}, got {alg!r}")
+            if alg not in _HMAC_JWT_ALGORITHMS:
+                raise ValueError(f"Unsupported JWT algorithm: {alg!r}")
+
+            signing_input = f"{header_segment}.{payload_segment}".encode("ascii")
+            expected = hmac.new(
+                self.secret.encode("utf-8"),
+                signing_input,
+                _HMAC_JWT_ALGORITHMS[alg],
+            ).digest()
+            expected_segment = base64.urlsafe_b64encode(expected).rstrip(b"=")
+            if not hmac.compare_digest(expected_segment, signature_segment.encode("ascii")):
+                raise ValueError("JWT signature verification failed")
+
+            now = time.time()
+            leeway = float(self.leeway_seconds)
+            expires_at: str | None = None
+            issued_at: str | None = None
+
+            if "exp" in payload:
+                exp = _numeric_date(payload["exp"], claim="exp")
+                if now > exp + leeway:
+                    raise ValueError("JWT has expired")
+                expires_at = _numeric_date_to_iso(exp)
+            if "nbf" in payload:
+                nbf = _numeric_date(payload["nbf"], claim="nbf")
+                if now + leeway < nbf:
+                    raise ValueError("JWT is not valid yet")
+            if "iat" in payload:
+                iat = _numeric_date(payload["iat"], claim="iat")
+                if now + leeway < iat:
+                    raise ValueError("JWT issued-at time is in the future")
+                issued_at = _numeric_date_to_iso(iat)
+
+            if self.issuer is not None and payload.get("iss") != self.issuer:
+                raise ValueError("JWT issuer mismatch")
+            if self.audience is not None:
+                aud = payload.get("aud")
+                if isinstance(aud, str):
+                    audiences = {aud}
+                elif isinstance(aud, list) and all(isinstance(item, str) for item in aud):
+                    audiences = set(aud)
+                else:
+                    raise ValueError("JWT audience claim is missing or invalid")
+                if self.audience not in audiences:
+                    raise ValueError("JWT audience mismatch")
+
+            metadata = payload.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            extra_claims = {
+                key: value
+                for key, value in payload.items()
+                if key not in {"sub", "exp", "nbf", "iat", "iss", "aud", "jti", "metadata"}
+            }
+            if extra_claims:
+                metadata = {**metadata, "claims": extra_claims}
 
             return SecurityContext(
-                principal_id=payload.get("sub", "unknown"),
+                principal_id=str(payload.get("sub") or payload.get("client_id") or "unknown"),
                 token=credentials,
-                expires_at=payload.get("exp"),
-                metadata=payload.get("metadata", {}),
+                expires_at=expires_at,
+                issued_at=issued_at or utc_now(),
+                metadata=metadata,
             )
         except Exception as e:
             raise Exception(f"Token authentication failed: {e}")  # noqa: B904

@@ -46,6 +46,12 @@ Protolink groups LLM backends into three broad categories:
 
 You can also use other LLM clients directly without going through Protolink's `LLM` wrappers if you prefer.
 
+## Runtime Boundaries
+
+The public LLM facade remains `protolink.llms.base.LLM`. Internally, the base class owns orchestration: history binding, metrics, budgets, retries, tool execution, agent delegation, and final response handling. The strict action parser lives in `protolink.llms.parsing`, where raw model text is converted into one validated `LLMAction` and narrow fallback shorthands are repaired only when the target tool or agent is unambiguous.
+
+Provider adapters should keep provider-specific request and stream handling in their own modules, then return a typed action to the shared infer loop. That keeps the user-facing API simple while still allowing native tool-calling providers and JSON-fallback models to share the same runtime contract.
+
 ## Configuration
 
 Configuration depends on the specific backend, but the general pattern is:

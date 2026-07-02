@@ -83,10 +83,13 @@ ruff format .
 ruff check . --fix
 
 # Type checking
-ty check .
+ty check protolink
 
 # Run tests
 python -m pytest -v tests
+
+# Validate docs
+mkdocs build --strict
 ```
 
 ### 5. Commit and Push
@@ -131,7 +134,7 @@ Protolink uses **ty** for static type checking.
 
 ```bash
 # Run type checks
-ty check .
+ty check protolink
 
 # Check one package area
 ty check protolink/agents
@@ -198,6 +201,8 @@ Deploy documentation (maintainers only):
 mkdocs gh-deploy
 ```
 
+Pull requests run `mkdocs build --strict`. Pushes to `main` that touch docs, the README, `mkdocs.yml`, or docs dependencies publish the MkDocs site automatically through GitHub Actions.
+
 ---
 
 ## Project Structure
@@ -209,7 +214,7 @@ protolink/
 │   ├── client/         # Client code
 │   ├── core/           # Core models
 │   ├── discovery/      # Registry and discovery
-│   ├── llms/           # LLM integrations
+│   ├── llms/           # LLM integrations, infer loop, parsing, and metrics
 │   ├── models/         # Exposes core models for importation
 │   ├── server/         # Server implementations
 │   ├── transport/      # Transport layers

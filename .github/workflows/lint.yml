@@ -7,79 +7,95 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    name: Unit Tests
+  lint:
+    name: Ruff
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[test]"  # Install with test extras
-    
+        pip install -e ".[test]"
+
+    - name: Run Ruff
+      run: |
+        ruff check .
+        ruff format --check .
+
+  typecheck:
+    name: ty
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Run ty
+      run: |
+        ty check protolink
+
+  test:
+    name: Tests (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.13']
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
     - name: Run tests
       run: |
         pytest -v --cov=protolink --cov-report=xml
-    
+
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      if: matrix.python-version == '3.10'
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
-  
-  lint:
-    name: Lint with Ruff
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[test]"
-    
-    - name: Run Ruff
-      run: |
-        # Check for syntax errors
-        ruff check .
-        # Check for style issues
-        ruff format --check .
-        # Check for import sorting
-        ruff check --select I .
-        # Check for common issues
-        ruff check --select F401,F403,F405,E402 .
-        # Check for type issues
-        ruff check --select UP .
 
-  typecheck:
-    name: Type Check (ty - non-blocking)
+  package:
+    name: Package
     runs-on: ubuntu-latest
-    needs: lint
 
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: Install build tools
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[test]"
+        pip install -e ".[build]"
 
-    - name: Run ty (non-blocking)
-      continue-on-error: true
+    - name: Build and check package
       run: |
-        ty check .
-
+        python -m build
+        twine check dist/*

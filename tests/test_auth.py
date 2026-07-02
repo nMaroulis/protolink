@@ -1,5 +1,10 @@
 import base64
+import hashlib
+import hmac
+import json
 import socket
+import time
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -24,6 +29,20 @@ def get_free_port() -> int:
     port = s.getsockname()[1]
     s.close()
     return port
+
+
+def _b64url_json(value: dict[str, Any]) -> str:
+    data = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def make_hs256_jwt(claims: dict[str, Any], secret: str = "super-secret") -> str:
+    """Create a compact HS256 JWT for auth tests."""
+    header = _b64url_json({"alg": "HS256", "typ": "JWT"})
+    payload = _b64url_json(claims)
+    signature = hmac.new(secret.encode("utf-8"), f"{header}.{payload}".encode("ascii"), hashlib.sha256).digest()
+    signature_segment = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
+    return f"{header}.{payload}.{signature_segment}"
 
 
 @pytest.mark.asyncio
@@ -142,15 +161,63 @@ def test_agent_security_scheme_mapping():
 
 
 @pytest.mark.asyncio
+async def test_bearer_token_auth_validates_signature_and_registered_claims():
+    auth = BearerTokenAuth(
+        secret="super-secret",
+        issuer="https://issuer.example",
+        audience="protolink-agent",
+    )
+    now = int(time.time())
+    token = make_hs256_jwt(
+        {
+            "sub": "test-user",
+            "iss": "https://issuer.example",
+            "aud": ["protolink-agent", "other-service"],
+            "iat": now,
+            "exp": now + 60,
+            "metadata": {"scope": "read"},
+            "tenant": "demo",
+        }
+    )
+
+    context = await auth.authenticate(token)
+    assert context.principal_id == "test-user"
+    assert context.expires_at is not None
+    assert context.metadata["scope"] == "read"
+    assert context.metadata["claims"] == {"tenant": "demo"}
+
+    tampered = token.rsplit(".", 1)[0] + ".invalid"
+    with pytest.raises(Exception, match="signature verification failed"):
+        await auth.authenticate(tampered)
+
+    expired = make_hs256_jwt(
+        {
+            "sub": "test-user",
+            "iss": "https://issuer.example",
+            "aud": "protolink-agent",
+            "exp": now - 1,
+        }
+    )
+    with pytest.raises(Exception, match="expired"):
+        await auth.authenticate(expired)
+
+    wrong_issuer = make_hs256_jwt(
+        {
+            "sub": "test-user",
+            "iss": "https://other.example",
+            "aud": "protolink-agent",
+            "exp": now + 60,
+        }
+    )
+    with pytest.raises(Exception, match="issuer mismatch"):
+        await auth.authenticate(wrong_issuer)
+
+
+@pytest.mark.asyncio
 async def test_http_server_backend_authentication_starlette():
     port = get_free_port()
     auth = BearerTokenAuth(secret="super-secret")
-    # Generate a dummy valid JWT token
-    import base64
-    import json
-
-    token_payload = base64.urlsafe_b64encode(json.dumps({"sub": "test-user"}).encode()).decode().rstrip("=")
-    valid_token = f"header.{token_payload}.signature"
+    valid_token = make_hs256_jwt({"sub": "test-user", "exp": int(time.time()) + 60})
 
     transport = HTTPTransport(
         url=f"http://127.0.0.1:{port}",
@@ -198,11 +265,7 @@ async def test_http_server_backend_authentication_starlette():
 async def test_http_server_backend_authentication_fastapi():
     port = get_free_port()
     auth = BearerTokenAuth(secret="super-secret")
-    import base64
-    import json
-
-    token_payload = base64.urlsafe_b64encode(json.dumps({"sub": "test-user"}).encode()).decode().rstrip("=")
-    valid_token = f"header.{token_payload}.signature"
+    valid_token = make_hs256_jwt({"sub": "test-user", "exp": int(time.time()) + 60})
 
     transport = HTTPTransport(
         url=f"http://127.0.0.1:{port}",

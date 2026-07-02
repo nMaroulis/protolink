@@ -31,11 +31,18 @@ protolink run replay dashboard_demo_1 --store .protolink-devtools/runs.db
 protolink dashboard --store .protolink-devtools/runs.db --open
 ```
 
+### Changed
+
+- Tightened GitHub Actions so Ruff, blocking `ty check protolink`, multi-version tests, package build checks, and strict docs builds run as first-class CI gates.
+- Updated docs automation so pull requests validate MkDocs output and pushes to `main` publish the documentation site automatically.
+- Split LLM response parsing and fallback action repair into `protolink.llms.parsing`, keeping the public `LLM` facade stable while making the infer loop easier to maintain.
+
 ### Fixed
 
 - Fixed `Agent.start(register=False)` so the lifecycle now honors the public `register` argument.
 - Fixed RuntimeTransport async request-parser handling.
 - Fixed WebSocket route registration, stale client-connection reuse, and task-stream closure semantics.
+- Hardened `BearerTokenAuth` so bearer JWTs now verify HMAC signatures, algorithms, registered time claims, and optional issuer/audience constraints instead of accepting unsigned demo payloads.
 
 ## [v0.6.3] - 2026-06-26
 

@@ -128,7 +128,7 @@ The 0.6.3 examples are small, provider-free scripts intended for application int
 ### 🔒 [`authentication.py`](https://github.com/nMaroulis/protolink/blob/main/examples/authentication.py)
 **Purpose**: Authentication, credentials propagation, and security verification
 
-- Demonstrates API Key, Basic, and Bearer (JWT) token authentication providers
+- Demonstrates API key, Basic, and signed Bearer JWT authentication providers
 - Covers server-side route authentication (returning `401 Unauthorized` for failed requests)
 - Covers client-side lazy authentication (automatic signature/credential injection on outgoing requests)
 - Verifies both HTTP (Starlette and FastAPI backends) and WebSocket handshake verification

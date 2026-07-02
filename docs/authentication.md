@@ -132,16 +132,20 @@ Protolink includes several production-ready security providers out of the box.
     ```
 
 === "Bearer Token Authentication"
-    `BearerTokenAuth` is designed to validate JSON Web Tokens (JWT) or dummy JWT tokens. It signature-checks and decodes JWT values based on a shared secret.
+    `BearerTokenAuth` validates compact JSON Web Tokens (JWTs) signed with a shared HMAC secret. It checks the declared algorithm, signature, `exp`, `nbf`, `iat`, and optional issuer/audience claims before returning a `SecurityContext`.
     
     ```python
     from protolink.security.auth import BearerTokenAuth
     
     auth = BearerTokenAuth(
         secret="your-jwt-shared-signing-secret",
-        algorithm="HS256"
+        algorithm="HS256",
+        issuer="https://auth.example.com",
+        audience="protolink-agent",
     )
     ```
+
+    Supported algorithms are `HS256`, `HS384`, and `HS512`. Use `APIKeyAuth` for static opaque service tokens.
 
 === "Basic Authentication"
     `BasicAuth` implements standard HTTP Basic access authentication. It validates `username:password` values, automatically decoding Base64 strings sent via standard `Authorization: Basic <base64>` headers.
@@ -359,3 +363,13 @@ class LDAPAuthenticator(Authenticator):
 
 - `authenticate(credentials: str) -> SecurityContext`
 - `refresh_token(context: SecurityContext) -> SecurityContext`
+
+### BearerTokenAuth Options
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| `secret` | `str` | Required HMAC signing secret. Empty secrets are rejected. |
+| `algorithm` | `str` | JWT signing algorithm. Supported values: `HS256`, `HS384`, `HS512`. |
+| `issuer` | `str \| None` | Optional required `iss` claim. |
+| `audience` | `str \| None` | Optional required `aud` claim. Token audiences may be a string or list. |
+| `leeway_seconds` | `int` | Optional clock-skew allowance for registered time claims. |

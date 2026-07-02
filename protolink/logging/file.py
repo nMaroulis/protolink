@@ -78,14 +78,13 @@ class FileLogger(BaseLogger):
         Initialize the file logger.
 
         Args:
-            filepath: Path to the log file. If the path's parent directory does not exist,
-                      it will be created.
+            filepath: Path to the log file. If the path's parent directory does not exist, it will be created.
             name: The name of the logger instance.
             level: The logging level. Defaults to INFO.
             fmt: The format string for the log message (used when not in JSON mode).
             datefmt: The format string for the timestamp.
-            extension: Override the file extension or format logic. If 'json', it writes
-                       structured JSON logs. If None, it deduces the format from the filepath.
+            extension: Override the file extension or format logic. If 'json', it writes structured JSON logs.
+                       If None, it deduces the format from the filepath.
         """
         self._name = name
         self._logger = std_logging.getLogger(f"file.{name}.{filepath}")

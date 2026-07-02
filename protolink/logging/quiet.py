@@ -9,9 +9,8 @@ class QuietLogger(BaseLogger):
     """
     Logger implementation that intentionally drops every log message.
 
-    Use this logger when an Agent or integration needs a ``BaseLogger``
-    instance but the application should not emit console output, file logs, or
-    structured log records.
+    Use this logger when an Agent or integration needs a ``BaseLogger` instance but the application should not emit
+    console output, file logs, or structured log records.
     """
 
     def __init__(self, name: str = "protolink") -> None:
