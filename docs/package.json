@@ -1,0 +1,24 @@
+{
+  "name": "protolink-docs",
+  "version": "0.6.4",
+  "private": true,
+  "description": "Docusaurus documentation site for ProtoLink.",
+  "scripts": {
+    "start": "NO_UPDATE_NOTIFIER=1 docusaurus start",
+    "build": "NO_UPDATE_NOTIFIER=1 docusaurus build",
+    "serve": "NO_UPDATE_NOTIFIER=1 docusaurus serve",
+    "clear": "NO_UPDATE_NOTIFIER=1 docusaurus clear"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.10.1",
+    "@docusaurus/preset-classic": "3.10.1",
+    "@docusaurus/theme-mermaid": "3.10.1",
+    "@mdx-js/react": "^3.1.0",
+    "@mermaid-js/layout-elk": "^0.1.9",
+    "clsx": "^2.1.1",
+    "prism-react-renderer": "^2.4.1"
+  },
+  "engines": {
+    "node": ">=18.0"
+  }
+}

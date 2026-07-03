@@ -96,8 +96,11 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
+# Documentation build output and Docusaurus dependencies
+docs/build/
+docs/site/
+docs/node_modules/
+docs/.docusaurus/
 
 # mypy
 .mypy_cache/

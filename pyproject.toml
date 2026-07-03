@@ -122,11 +122,8 @@ dev = [
     "protolink[notebook]",
 ]
 
-#Build docs
-docs = [
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.7.6",
-]
+# Documentation is built with Docusaurus from docs/package.json.
+docs = []
 
 # Build tools
 build = [

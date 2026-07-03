@@ -86,8 +86,10 @@ The preferred way to contribute is via the **standard GitHub fork-and-pull-reque
 7. (Optional) **Preview documentation changes**:
 
    ```bash
-   mkdocs serve
-   # open http://127.0.0.1:8000
+   cd docs
+   npm install
+   npm run start
+   # open http://localhost:3000/protolink/
    ```
 
 8. **Commit with a clear message** and push to *your fork*:
@@ -150,19 +152,18 @@ If your change requires additional test fixtures or helper utilities, place them
 
 - User-facing changes should be reflected in the docs under `docs/`.
 - The README should stay focused on a high-level overview and quick start.
-- Detailed guides and reference material belong in the MkDocs documentation.
+- Detailed guides and reference material belong in the Docusaurus documentation.
 
 To build/preview the docs locally:
 
 ```bash
-mkdocs serve
+cd docs
+npm install
+npm run start
+npm run build
 ```
 
-To deploy (for maintainers):
-
-```bash
-mkdocs gh-deploy
-```
+Documentation deployment is handled by the GitHub Pages workflow after pushes to `main`.
 
 ---
 

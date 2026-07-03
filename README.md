@@ -688,7 +688,7 @@ agent = Agent(
 )
 ```
 
-See the [Telemetry Documentation](https://nmaroulis.github.io/protolink/telemetry/) for full setup instructions and custom integrations.
+See the [Telemetry Documentation](https://nmaroulis.github.io/protolink/docs/telemetry/) for full setup instructions and custom integrations.
 
 #### Logging:
 
