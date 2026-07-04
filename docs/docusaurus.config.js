@@ -3,7 +3,7 @@ const darkCodeTheme = require('prism-react-renderer').themes.dracula;
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'ProtoLink',
+  title: 'protolink',
   tagline: 'A2A-native runtime substrate for professional agent systems.',
   favicon: 'img/logo_sm.png',
 
@@ -28,6 +28,12 @@ const config = {
   },
 
   themes: ['@docusaurus/theme-mermaid'],
+  stylesheets: [
+    {
+      href: 'https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&display=swap',
+      type: 'text/css',
+    },
+  ],
 
   presets: [
     [
@@ -67,7 +73,7 @@ const config = {
         respectPrefersColorScheme: true,
       },
       navbar: {
-        title: 'ProtoLink',
+        title: 'protolink',
         logo: {
           alt: 'ProtoLink logo',
           src: 'img/logo_sm.png',
@@ -81,13 +87,13 @@ const config = {
             label: 'Docs',
           },
           {
-            to: '/docs/runtime',
-            label: 'Runtime',
+            to: '/docs/agent',
+            label: 'API',
             position: 'left',
           },
           {
-            to: '/docs/agent',
-            label: 'API',
+            to: '/docs/whitepaper',
+            label: 'Whitepaper',
             position: 'left',
           },
           {

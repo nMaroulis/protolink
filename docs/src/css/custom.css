@@ -54,7 +54,15 @@ html {
 }
 
 .navbar__brand {
-  font-weight: 800;
+  font-family: Comfortaa, "Avenir Next Rounded", "Nunito Sans", ui-rounded, var(--ifm-font-family-base);
+  font-size: 1.04rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+
+.navbar__title {
+  color: var(--protolink-ink);
 }
 
 .navbar__logo img {

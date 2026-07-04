@@ -184,6 +184,8 @@ pre-commit run --all-files
 Preview documentation locally:
 
 ```bash
+cd docs
+
 # Serve docs
 npm run start
 
@@ -196,10 +198,11 @@ npm run build
 Deploy documentation (maintainers only):
 
 ```bash
+cd docs
 npm run build
 ```
 
-Pull requests run `npm run build`. Pushes to `main` that touch docs, the README, Docusaurus configuration, or docs dependencies publish the Docusaurus site automatically through GitHub Actions.
+Pull requests run `npm run build` from `docs/`. Pushes to `main` that touch docs, the README, Docusaurus configuration, or docs dependencies publish `docs/build` to the `gh-pages` branch through GitHub Actions.
 
 ---
 
