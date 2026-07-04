@@ -4,156 +4,193 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import clsx from 'clsx';
 import styles from './index.module.css';
 
-const lanes = [
+const pathways = [
   {
     eyebrow: 'Start',
-    title: 'Build your first agent',
-    body: 'Install ProtoLink, define an AgentCard, attach tools or an LLM, and run it locally or over HTTP.',
+    title: 'Create an agent',
+    body: 'Define an AgentCard, plug in an LLM or tools, and start a local or networked agent with minimal boilerplate.',
     to: '/docs/getting-started',
   },
   {
-    eyebrow: 'Runtime',
-    title: 'Control execution',
-    body: 'Use run contexts, budgets, cancellation, reports, replay, and approval checkpoints as public contracts.',
-    to: '/docs/runtime',
+    eyebrow: 'Protocol',
+    title: 'Understand the A2A core',
+    body: 'Work with AgentCard, Task, Message, Part, Artifact, and TaskState as the shared language between agents.',
+    to: '/docs/concept',
   },
   {
-    eyebrow: 'Integrate',
-    title: 'Connect models and tools',
-    body: 'Wire LLM providers, native tools, MCP adapters, transports, registries, telemetry, and storage modules.',
+    eyebrow: 'Capabilities',
+    title: 'Add LLMs and tools',
+    body: 'Use API, server, or local models; expose native Python tools; and adapt MCP tools into the same agent surface.',
     to: '/docs/llm',
   },
   {
-    eyebrow: 'Operate',
-    title: 'Inspect live systems',
-    body: 'Use the CLI, doctor checks, dashboard, traces, and run-store views for local debugging and production readiness.',
-    to: '/docs/devtools',
+    eyebrow: 'Systems',
+    title: 'Compose flows and meshes',
+    body: 'Build coordinators, workers, deterministic flows, registry-backed discovery, and multi-agent examples.',
+    to: '/docs/examples',
   },
 ];
 
-const pillars = [
-  ['A2A protocol core', 'Task, Message, Part, Artifact, and AgentCard stay at the center.'],
-  ['Composable runtime', 'Agents, flows, tools, transports, policies, and telemetry remain independently replaceable.'],
-  ['Deterministic control', 'Budgets, approvals, cancellation, reports, and replay make behavior inspectable.'],
+const agentShapes = [
+  ['Tool-only', 'Deterministic capabilities without an LLM.'],
+  ['LLM-only', 'Reasoning, transformation, and conversation.'],
+  ['Hybrid', 'LLM decisions with typed tool execution.'],
+  ['Coordinator', 'Discovery, delegation, and multi-agent routing.'],
 ];
 
-function LaneCard({lane}) {
+const foundations = [
+  ['Identity', 'AgentCard declares name, URL, transport, skills, tags, formats, and security schemes.'],
+  ['Work exchange', 'Tasks carry Messages, Parts, Artifacts, state, and metadata across local or remote boundaries.'],
+  ['Capability surface', 'Native tools, MCP adapters, schemas, examples, LLMs, and peer agents become discoverable contracts.'],
+  ['Deployment path', 'Start in-process with RuntimeTransport, then move the same agent to HTTP, SSE JSON-RPC, or WebSocket.'],
+];
+
+function PathwayCard({pathway}) {
   return (
-    <Link className={styles.laneCard} to={lane.to}>
-      <span>{lane.eyebrow}</span>
-      <h3>{lane.title}</h3>
-      <p>{lane.body}</p>
+    <Link className={styles.pathwayCard} to={pathway.to}>
+      <span>{pathway.eyebrow}</span>
+      <h3>{pathway.title}</h3>
+      <p>{pathway.body}</p>
     </Link>
   );
 }
 
-function RuntimeMap() {
+function AgentMesh({logo}) {
   return (
-    <div className={styles.runtimeMap} aria-label="ProtoLink runtime map">
-      <div className={styles.mapHeader}>
-        <span>Runtime path</span>
-        <code>Task -&gt; Agent -&gt; Action -&gt; Report</code>
+    <div className={styles.agentMesh} aria-label="ProtoLink agent mesh">
+      <div className={clsx(styles.meshLine, styles.lineLlm)} />
+      <div className={clsx(styles.meshLine, styles.lineTools)} />
+      <div className={clsx(styles.meshLine, styles.lineRegistry)} />
+      <div className={clsx(styles.meshLine, styles.lineTransport)} />
+
+      <div className={clsx(styles.meshNode, styles.meshCenter)}>
+        <img src={logo} alt="" />
+        <strong>Agent</strong>
+        <span>identity, lifecycle, task handling</span>
       </div>
-      <div className={styles.mapGrid}>
-        <div className={styles.mapNode}>
-          <strong>Client</strong>
-          <span>Typed requests and streaming events</span>
-        </div>
-        <div className={styles.mapNode}>
-          <strong>Transport</strong>
-          <span>HTTP, SSE JSON-RPC, WebSocket, runtime</span>
-        </div>
-        <div className={clsx(styles.mapNode, styles.mapNodeAccent)}>
-          <strong>Agent</strong>
-          <span>LLM loop, tools, state, policy</span>
-        </div>
-        <div className={styles.mapNode}>
-          <strong>Run control</strong>
-          <span>Budgets, cancellation, approval gates</span>
-        </div>
-        <div className={styles.mapNode}>
-          <strong>Observability</strong>
-          <span>Events, telemetry, reports, replay</span>
-        </div>
+
+      <div className={clsx(styles.meshNode, styles.meshLlm)}>
+        <small>LLM</small>
+        <strong>API, server, local</strong>
+        <span>one action contract</span>
+      </div>
+
+      <div className={clsx(styles.meshNode, styles.meshTools)}>
+        <small>Tools</small>
+        <strong>Native + MCP</strong>
+        <span>schemas and capabilities</span>
+      </div>
+
+      <div className={clsx(styles.meshNode, styles.meshRegistry)}>
+        <small>Discovery</small>
+        <strong>Registry</strong>
+        <span>agent cards and indexes</span>
+      </div>
+
+      <div className={clsx(styles.meshNode, styles.meshTransport)}>
+        <small>Transport</small>
+        <strong>HTTP, SSE, WS, runtime</strong>
+        <span>same agent contract</span>
+      </div>
+
+      <div className={styles.protocolRail}>
+        <span>Task</span>
+        <span>Message</span>
+        <span>Part</span>
+        <span>Artifact</span>
       </div>
     </div>
   );
 }
 
 export default function Home() {
-  const logo = useBaseUrl('/img/logo.png');
+  const logo = useBaseUrl('/img/logo_sm.png');
 
   return (
     <Layout
-      title="Professional agent runtime documentation"
-      description="ProtoLink documentation for A2A-native agent systems, runtime control, transports, LLMs, tools, and operations.">
+      title="A2A-native autonomous agent systems"
+      description="ProtoLink documentation for autonomous agents, A2A protocol objects, LLMs, tools, transports, discovery, flows, and production-ready multi-agent systems.">
       <main className={styles.page}>
         <section className={styles.hero}>
           <div className={styles.heroInner}>
             <div className={styles.heroCopy}>
-              <p className={styles.kicker}>ProtoLink documentation</p>
-              <h1>A professional runtime substrate for A2A-native agent systems.</h1>
+              <p className={styles.kicker}>A2A-native Python framework</p>
+              <h1>Build autonomous agents that communicate through protocol-native tasks.</h1>
               <p className={styles.lede}>
-                ProtoLink turns agents, tools, transports, policies, state, telemetry, and run control into a coherent Python runtime that stays inspectable from local prototypes to production meshes.
+                ProtoLink helps you build distributed, LLM-powered agent systems where every agent is an entity with identity, tools, optional memory, transport, discovery, and a clean task contract.
+              </p>
+              <p className={styles.positioning}>
+                Focus on your agent logic - ProtoLink handles communication, authentication, LLM integration, and tool management for you.
               </p>
               <div className={styles.heroActions}>
                 <Link className={clsx('button button--primary', styles.primaryButton)} to="/docs/getting-started">
                   Start building
                 </Link>
-                <Link className={clsx('button button--secondary', styles.secondaryButton)} to="/docs/whitepaper">
+                <Link className={clsx('button button--secondary', styles.secondaryButton)} to="/docs/concept">
+                  Understand the model
+                </Link>
+                <Link className={styles.ghostLink} to="/docs/whitepaper">
                   Read the whitepaper
                 </Link>
               </div>
             </div>
-            <div className={styles.heroVisual}>
-              <img src={logo} alt="ProtoLink logo" />
-              <div className={styles.signalPanel}>
-                <span>Current focus</span>
-                <strong>agent runtime, control plane, and interoperable transports</strong>
-              </div>
-            </div>
+            <AgentMesh logo={logo} />
           </div>
         </section>
 
-        <section className={styles.lanes} aria-labelledby="pathways">
+        <section className={styles.pathways} aria-labelledby="pathways">
           <div className={styles.sectionHeader}>
             <span>Documentation paths</span>
-            <h2 id="pathways">Choose the surface you are working on.</h2>
+            <h2 id="pathways">Start from the part of the system you are building.</h2>
           </div>
-          <div className={styles.laneGrid}>
-            {lanes.map((lane) => (
-              <LaneCard key={lane.title} lane={lane} />
+          <div className={styles.pathwayGrid}>
+            {pathways.map((pathway) => (
+              <PathwayCard key={pathway.title} pathway={pathway} />
             ))}
           </div>
         </section>
 
-        <section className={styles.systemSection}>
+        <section className={styles.agentSection}>
           <div>
             <div className={styles.sectionHeader}>
-              <span>System model</span>
-              <h2>One runtime, many deployment shapes.</h2>
+              <span>Design thesis</span>
+              <h2>Agents are entities, not functions.</h2>
             </div>
             <p>
-              The docs keep the protocol model visible while drilling into the implementation surfaces that matter: agents, LLM inference, tool execution, transport conformance, state, storage, telemetry, and release discipline.
+              An agent can receive work, initiate work, discover peers, expose capabilities, call its model, stream progress, and shut down cleanly. The model is one pluggable module inside that entity, alongside tools, transports, state, telemetry, authentication, logging, and policy.
             </p>
-            <div className={styles.pillars}>
-              {pillars.map(([title, body]) => (
-                <div className={styles.pillar} key={title}>
-                  <strong>{title}</strong>
-                  <span>{body}</span>
-                </div>
-              ))}
-            </div>
           </div>
-          <RuntimeMap />
+          <div className={styles.shapeGrid}>
+            {agentShapes.map(([title, body]) => (
+              <div className={styles.shapeCard} key={title}>
+                <strong>{title}</strong>
+                <span>{body}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.foundationSection}>
+          <div className={styles.sectionHeader}>
+            <span>What stays stable</span>
+            <h2>A small protocol core, surrounded by swappable modules.</h2>
+          </div>
+          <div className={styles.foundationGrid}>
+            {foundations.map(([title, body]) => (
+              <div className={styles.foundationCard} key={title}>
+                <strong>{title}</strong>
+                <p>{body}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className={styles.referenceBand}>
           <div>
-            <span>Reference depth</span>
-            <h2>The complete documentation corpus is live in Docusaurus.</h2>
+            <span>From prototype to mesh</span>
+            <h2>Build one agent, then let the same contracts scale to a system.</h2>
             <p>
-              All existing pages remain available, with Docusaurus admonitions, tabs, Mermaid diagrams, themed code blocks, sidebars, local assets, and a docs-first information architecture.
+              The docs cover the full surface: agents, clients, LLMs, tools, transports, registry discovery, state, storage, telemetry, structured flows, examples, and the runtime controls that make production behavior inspectable.
             </p>
           </div>
           <Link className={styles.referenceLink} to="/docs">

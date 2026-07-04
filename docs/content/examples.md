@@ -90,6 +90,10 @@ The 0.6.3 examples are small, provider-free scripts intended for application int
 - [`v063_run_reports.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `RunRecorder`, `RunReport`, `RunReplay`, golden-run assertions, and redaction.
 - [`v063_protoagent_policy_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_protoagent_policy_mesh.py) sketches the ProtoAgent Explorer/Coder/Architect structure abstractly. The prompts are intentionally tiny; the example focuses on tool capabilities, `CapabilityPolicy`, diff-preview `action_builder`s, and approval-gated workspace writes.
 
+### Production case study: [ProtoAgent](protoagent_case_study.md)
+
+ProtoAgent is a full local-first coding assistant built on ProtoLink. Read the case study to see how the runtime engine powers its Architect, Explorer, and Coder agent deck, approval-gated diffs, completion validation, Context Loom evidence, cancellation, history control, and run reports.
+
 ### 🛠️ [`devtools_dashboard.py`](https://github.com/nMaroulis/protolink/blob/main/examples/devtools_dashboard.py)
 **Purpose**: Local devtools, run replay, registry snapshot, and dashboard
 

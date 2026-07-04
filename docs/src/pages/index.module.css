@@ -1,77 +1,105 @@
 .page {
   background:
-    linear-gradient(180deg, rgba(247, 251, 255, 0.98) 0%, #ffffff 42%),
+    linear-gradient(180deg, rgba(247, 251, 255, 0.98) 0%, #ffffff 46%),
     #ffffff;
 }
 
 .hero {
   border-bottom: 1px solid var(--protolink-border);
   background:
-    linear-gradient(135deg, rgba(0, 132, 255, 0.12), rgba(16, 185, 129, 0.08) 45%, rgba(255, 255, 255, 0) 72%),
-    radial-gradient(circle at 82% 18%, rgba(15, 23, 42, 0.08), transparent 32%);
+    linear-gradient(135deg, rgba(10, 132, 255, 0.13), rgba(20, 184, 166, 0.08) 48%, rgba(255, 255, 255, 0) 76%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0));
 }
 
 .heroInner {
+  display: grid;
+  grid-template-columns: minmax(0, 0.98fr) minmax(440px, 0.92fr);
+  align-items: center;
+  gap: 42px;
   width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.62fr);
-  align-items: center;
-  gap: 44px;
-  padding: 54px 0 54px;
+  padding: 58px 0 58px;
 }
 
 .heroCopy {
-  max-width: 760px;
+  max-width: 780px;
 }
 
 .kicker,
 .sectionHeader span,
 .referenceBand span,
-.laneCard span,
-.mapHeader span {
+.pathwayCard span,
+.meshNode small {
   display: inline-flex;
   color: var(--protolink-blue-700);
-  font-size: 0.78rem;
-  font-weight: 750;
+  font-size: 0.76rem;
+  font-weight: 780;
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
+.kicker {
+  font-family: Comfortaa, "Avenir Next Rounded", "Nunito Sans", ui-rounded, var(--ifm-font-family-base);
+  font-size: clamp(0.98rem, 1.7vw, 1.18rem);
+  line-height: 1.25;
+  text-transform: none;
+}
+
 .heroCopy h1 {
-  margin: 16px 0 22px;
+  margin: 15px 0 20px;
   color: var(--protolink-ink);
-  font-size: clamp(2.65rem, 5.2vw, 4.65rem);
-  line-height: 0.98;
+  font-family: Comfortaa, "Avenir Next Rounded", "Nunito Sans", ui-rounded, var(--ifm-font-family-base);
+  font-weight: 700;
+  font-size: clamp(2.55rem, 5vw, 4.45rem);
+  line-height: 1.04;
   letter-spacing: 0;
 }
 
 .lede {
-  max-width: 720px;
+  max-width: 710px;
   margin: 0;
   color: var(--protolink-muted);
   font-size: 1.08rem;
   line-height: 1.62;
 }
 
+.positioning {
+  width: fit-content;
+  max-width: 100%;
+  margin: 22px 0 0;
+  padding: 0.64rem 0.8rem;
+  border: 1px solid rgba(10, 132, 255, 0.18);
+  border-left: 4px solid var(--protolink-blue);
+  border-radius: 8px;
+  color: var(--protolink-ink);
+  font-weight: 740;
+  background: rgba(255, 255, 255, 0.7);
+}
+
 .heroActions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
   margin-top: 24px;
 }
 
 .primaryButton,
-.secondaryButton {
+.secondaryButton,
+.ghostLink {
   border-radius: 8px;
+  font-weight: 740;
+}
+
+.primaryButton,
+.secondaryButton {
   padding: 0.78rem 1.05rem;
-  font-weight: 720;
 }
 
 .primaryButton {
   color: #ffffff;
-  background: var(--protolink-blue);
   border-color: var(--protolink-blue);
+  background: var(--protolink-blue);
 }
 
 .primaryButton:hover {
@@ -80,70 +108,181 @@
 
 .secondaryButton {
   color: var(--protolink-ink);
-  background: rgba(255, 255, 255, 0.72);
   border-color: var(--protolink-border-strong);
+  background: rgba(255, 255, 255, 0.75);
 }
 
-.heroVisual {
+.ghostLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 0.2rem;
+  color: var(--protolink-blue-700);
+}
+
+.ghostLink:hover {
+  color: var(--protolink-blue);
+  text-decoration: none;
+}
+
+.agentMesh {
   position: relative;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 18px;
-  min-height: 360px;
-  padding: 28px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid var(--protolink-border);
+  border-radius: 12px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.62)),
-    repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.05) 0, rgba(15, 23, 42, 0.05) 1px, transparent 1px, transparent 28px),
+    radial-gradient(circle at 50% 42%, rgba(10, 132, 255, 0.13), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 251, 255, 0.72)),
+    repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.045) 0, rgba(15, 23, 42, 0.045) 1px, transparent 1px, transparent 28px),
     repeating-linear-gradient(0deg, rgba(15, 23, 42, 0.04) 0, rgba(15, 23, 42, 0.04) 1px, transparent 1px, transparent 28px);
   box-shadow: 0 24px 72px rgba(15, 23, 42, 0.08);
 }
 
-.heroVisual img {
-  width: min(250px, 74%);
-  border-radius: 28px;
-  box-shadow: 0 24px 64px rgba(0, 85, 190, 0.16);
+.meshLine {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 49%;
+  height: 1px;
+  width: 34%;
+  background: linear-gradient(90deg, rgba(10, 132, 255, 0.08), rgba(10, 132, 255, 0.7));
+  transform-origin: left center;
 }
 
-.signalPanel {
+.lineLlm {
+  transform: rotate(-126deg);
+}
+
+.lineTools {
+  transform: rotate(-36deg);
+}
+
+.lineRegistry {
+  transform: rotate(34deg);
+}
+
+.lineTransport {
+  transform: rotate(145deg);
+}
+
+.meshNode {
+  position: absolute;
+  z-index: 2;
   display: grid;
   gap: 4px;
-  width: 100%;
+  width: 150px;
+  min-height: 90px;
   box-sizing: border-box;
-  padding: 16px 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(14px);
+  padding: 12px;
+  border: 1px solid var(--protolink-border);
+  border-radius: 10px;
+  color: var(--protolink-ink);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
 }
 
-.signalPanel span {
-  color: var(--protolink-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
+.meshNode strong,
+.meshNode span {
+  display: block;
 }
 
-.signalPanel strong {
+.meshNode strong {
   color: var(--protolink-ink);
   font-size: 0.98rem;
+  line-height: 1.22;
 }
 
-.lanes,
-.systemSection,
+.meshNode span {
+  color: var(--protolink-muted);
+  font-size: 0.84rem;
+  line-height: 1.36;
+}
+
+.meshCenter {
+  z-index: 3;
+  left: 50%;
+  top: 47%;
+  place-items: center;
+  width: 148px;
+  min-height: 140px;
+  padding: 16px;
+  text-align: center;
+  border-color: rgba(10, 132, 255, 0.3);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(239, 248, 255, 0.9)),
+    #ffffff;
+  transform: translate(-50%, -50%);
+}
+
+.meshCenter img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(10, 132, 255, 0.2);
+}
+
+.meshCenter strong {
+  font-size: 1.34rem;
+}
+
+.meshLlm {
+  left: 6%;
+  top: 10%;
+}
+
+.meshTools {
+  right: 5%;
+  top: 13%;
+}
+
+.meshRegistry {
+  right: 5%;
+  bottom: 20%;
+}
+
+.meshTransport {
+  left: 6%;
+  bottom: 22%;
+}
+
+.protocolRail {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  left: 22px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.protocolRail span {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.48rem 0.4rem;
+  border: 1px solid rgba(10, 132, 255, 0.18);
+  border-radius: 8px;
+  color: var(--protolink-blue-700);
+  font-size: 0.84rem;
+  font-weight: 760;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.pathways,
+.agentSection,
+.foundationSection,
 .referenceBand {
   width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
 }
 
-.lanes {
-  padding: 74px 0 40px;
+.pathways {
+  padding: 74px 0 42px;
 }
 
 .sectionHeader {
-  max-width: 720px;
+  max-width: 760px;
   margin-bottom: 28px;
 }
 
@@ -151,151 +290,118 @@
 .referenceBand h2 {
   margin: 10px 0 0;
   color: var(--protolink-ink);
-  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-size: clamp(2rem, 4vw, 3.15rem);
   line-height: 1.04;
   letter-spacing: 0;
 }
 
-.laneGrid {
+.pathwayGrid,
+.foundationGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
-.laneCard {
-  display: flex;
-  min-height: 252px;
-  flex-direction: column;
-  gap: 14px;
-  padding: 24px;
+.pathwayCard,
+.foundationCard,
+.shapeCard {
   border: 1px solid var(--protolink-border);
-  border-radius: 12px;
+  border-radius: 8px;
   color: inherit;
   background: #ffffff;
   box-shadow: 0 16px 42px rgba(15, 23, 42, 0.05);
-  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
-.laneCard:hover {
+.pathwayCard {
+  display: flex;
+  min-height: 246px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.pathwayCard:hover {
   color: inherit;
   text-decoration: none;
-  border-color: rgba(0, 132, 255, 0.42);
+  border-color: rgba(10, 132, 255, 0.44);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.09);
   transform: translateY(-4px);
-  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.09);
 }
 
-.laneCard h3 {
-  margin: 0;
+.pathwayCard h3,
+.shapeCard strong,
+.foundationCard strong {
   color: var(--protolink-ink);
-  font-size: 1.32rem;
 }
 
-.laneCard p {
+.pathwayCard h3 {
   margin: 0;
-  color: var(--protolink-muted);
-  line-height: 1.62;
+  font-size: 1.28rem;
+  line-height: 1.2;
 }
 
-.systemSection {
+.pathwayCard p,
+.foundationCard p,
+.agentSection p,
+.referenceBand p {
+  color: var(--protolink-muted);
+  line-height: 1.66;
+}
+
+.pathwayCard p,
+.foundationCard p {
+  margin: 0;
+}
+
+.agentSection {
   display: grid;
-  grid-template-columns: minmax(0, 0.82fr) minmax(360px, 1fr);
-  gap: 48px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(380px, 1fr);
+  gap: 54px;
   align-items: start;
-  padding: 58px 0 70px;
+  padding: 58px 0 68px;
 }
 
-.systemSection p {
-  color: var(--protolink-muted);
-  font-size: 1.03rem;
-  line-height: 1.76;
+.agentSection p {
+  margin: 0;
+  font-size: 1.04rem;
 }
 
-.pillars {
-  display: grid;
-  gap: 12px;
-  margin-top: 26px;
-}
-
-.pillar {
-  display: grid;
-  gap: 3px;
-  padding: 16px 18px;
-  border: 1px solid var(--protolink-border);
-  border-radius: 10px;
-  background: #ffffff;
-}
-
-.pillar strong {
-  color: var(--protolink-ink);
-}
-
-.pillar span {
-  color: var(--protolink-muted);
-}
-
-.runtimeMap {
-  padding: 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
-}
-
-.mapHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 6px 6px 18px;
-}
-
-.mapHeader code {
-  padding: 0.35rem 0.55rem;
-  border: 1px solid var(--protolink-border);
-  border-radius: 8px;
-  color: var(--protolink-ink);
-  background: rgba(248, 250, 252, 0.9);
-}
-
-.mapGrid {
+.shapeGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.mapNode {
-  min-height: 140px;
+.shapeCard {
+  display: grid;
+  gap: 7px;
+  min-height: 132px;
   padding: 18px;
-  border: 1px solid var(--protolink-border);
-  border-radius: 12px;
-  background: #ffffff;
 }
 
-.mapNodeAccent {
-  grid-column: span 2;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--protolink-blue), #0559c9);
-  border-color: rgba(0, 132, 255, 0.42);
-}
-
-.mapNode strong,
-.mapNode span {
-  display: block;
-}
-
-.mapNode strong {
-  margin-bottom: 8px;
-  color: inherit;
-  font-size: 1.05rem;
-}
-
-.mapNode span {
+.shapeCard span {
   color: var(--protolink-muted);
-  line-height: 1.52;
+  line-height: 1.5;
 }
 
-.mapNodeAccent span {
-  color: rgba(255, 255, 255, 0.78);
+.foundationSection {
+  padding: 18px 0 74px;
+}
+
+.foundationGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.foundationCard {
+  display: grid;
+  gap: 10px;
+  min-height: 160px;
+  padding: 22px;
+}
+
+.foundationCard strong {
+  font-size: 1.08rem;
 }
 
 .referenceBand {
@@ -305,18 +411,16 @@
   gap: 32px;
   margin-bottom: 80px;
   padding: 34px;
-  border: 1px solid rgba(0, 132, 255, 0.18);
-  border-radius: 18px;
+  border: 1px solid rgba(10, 132, 255, 0.18);
+  border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(0, 132, 255, 0.08), rgba(16, 185, 129, 0.06)),
+    linear-gradient(135deg, rgba(10, 132, 255, 0.08), rgba(20, 184, 166, 0.06)),
     #ffffff;
 }
 
 .referenceBand p {
-  max-width: 720px;
+  max-width: 770px;
   margin: 12px 0 0;
-  color: var(--protolink-muted);
-  line-height: 1.7;
 }
 
 .referenceLink {
@@ -337,105 +441,103 @@
 
 :global([data-theme='dark']) .page {
   background:
-    linear-gradient(180deg, rgba(10, 132, 255, 0.08) 0%, rgba(13, 21, 32, 0) 46%),
+    linear-gradient(180deg, rgba(10, 132, 255, 0.08) 0%, rgba(13, 21, 32, 0) 48%),
     #0d1520;
 }
 
 :global([data-theme='dark']) .hero {
   background:
-    linear-gradient(135deg, rgba(10, 132, 255, 0.18), rgba(16, 185, 129, 0.07) 45%, rgba(13, 21, 32, 0) 74%),
-    radial-gradient(circle at 82% 18%, rgba(83, 173, 255, 0.14), transparent 34%);
+    linear-gradient(135deg, rgba(10, 132, 255, 0.16), rgba(45, 212, 191, 0.06) 48%, rgba(13, 21, 32, 0) 76%),
+    linear-gradient(180deg, rgba(13, 21, 32, 0.72), rgba(13, 21, 32, 0));
 }
 
-:global([data-theme='dark']) .secondaryButton {
-  color: var(--protolink-ink);
-  background: rgba(16, 28, 42, 0.82);
-  border-color: var(--protolink-border-strong);
-}
-
-:global([data-theme='dark']) .kicker,
-:global([data-theme='dark']) .sectionHeader span,
-:global([data-theme='dark']) .referenceBand span,
-:global([data-theme='dark']) .laneCard span,
-:global([data-theme='dark']) .mapHeader span {
-  color: var(--ifm-color-primary-light);
-}
-
-:global([data-theme='dark']) .heroVisual,
-:global([data-theme='dark']) .laneCard,
-:global([data-theme='dark']) .pillar,
-:global([data-theme='dark']) .mapNode,
-:global([data-theme='dark']) .runtimeMap,
+:global([data-theme='dark']) .secondaryButton,
+:global([data-theme='dark']) .positioning,
+:global([data-theme='dark']) .pathwayCard,
+:global([data-theme='dark']) .foundationCard,
+:global([data-theme='dark']) .shapeCard,
 :global([data-theme='dark']) .referenceBand {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(16, 28, 42, 0.86);
   box-shadow: 0 22px 66px rgba(0, 0, 0, 0.26);
 }
 
-:global([data-theme='dark']) .heroVisual {
+:global([data-theme='dark']) .secondaryButton,
+:global([data-theme='dark']) .secondaryButton:hover {
+  color: var(--protolink-ink);
+}
+
+:global([data-theme='dark']) .agentMesh {
+  border-color: rgba(255, 255, 255, 0.12);
   background:
+    radial-gradient(circle at 50% 42%, rgba(83, 173, 255, 0.16), transparent 34%),
     linear-gradient(180deg, rgba(16, 28, 42, 0.88), rgba(13, 21, 32, 0.78)),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.055) 0, rgba(255, 255, 255, 0.055) 1px, transparent 1px, transparent 28px),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045) 0, rgba(255, 255, 255, 0.045) 1px, transparent 1px, transparent 28px);
+  box-shadow: 0 22px 66px rgba(0, 0, 0, 0.26);
 }
 
-:global([data-theme='dark']) .signalPanel {
+:global([data-theme='dark']) .meshNode,
+:global([data-theme='dark']) .protocolRail span {
   border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(13, 21, 32, 0.82);
+  background: rgba(16, 28, 42, 0.9);
 }
 
-:global([data-theme='dark']) .laneCard:hover {
-  border-color: rgba(83, 173, 255, 0.42);
+:global([data-theme='dark']) .meshCenter {
+  border-color: rgba(83, 173, 255, 0.36);
+  background:
+    linear-gradient(180deg, rgba(16, 28, 42, 0.95), rgba(12, 34, 58, 0.9)),
+    rgba(16, 28, 42, 0.92);
+}
+
+:global([data-theme='dark']) .kicker,
+:global([data-theme='dark']) .sectionHeader span,
+:global([data-theme='dark']) .referenceBand span,
+:global([data-theme='dark']) .pathwayCard span,
+:global([data-theme='dark']) .meshNode small,
+:global([data-theme='dark']) .ghostLink,
+:global([data-theme='dark']) .protocolRail span {
+  color: var(--ifm-color-primary-light);
+}
+
+:global([data-theme='dark']) .pathwayCard:hover {
+  border-color: rgba(83, 173, 255, 0.44);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
-}
-
-:global([data-theme='dark']) .runtimeMap {
-  background: linear-gradient(180deg, rgba(16, 28, 42, 0.92), rgba(13, 24, 36, 0.92));
-}
-
-:global([data-theme='dark']) .mapHeader code {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(13, 21, 32, 0.92);
-}
-
-:global([data-theme='dark']) .mapNodeAccent {
-  border-color: rgba(83, 173, 255, 0.48);
-  background: linear-gradient(135deg, #0a84ff, #074da8);
 }
 
 :global([data-theme='dark']) .referenceBand {
   background:
-    linear-gradient(135deg, rgba(10, 132, 255, 0.14), rgba(16, 185, 129, 0.08)),
+    linear-gradient(135deg, rgba(10, 132, 255, 0.14), rgba(45, 212, 191, 0.06)),
     rgba(16, 28, 42, 0.86);
 }
 
-@media (max-width: 996px) {
+@media (max-width: 1060px) {
   .heroInner,
-  .systemSection {
+  .agentSection {
     grid-template-columns: 1fr;
   }
 
-  .heroInner {
-    min-height: auto;
-    padding-top: 42px;
+  .agentMesh {
+    min-height: 420px;
   }
 
-  .laneGrid {
+  .pathwayGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 720px) {
   .heroInner,
-  .lanes,
-  .systemSection,
+  .pathways,
+  .agentSection,
+  .foundationSection,
   .referenceBand {
     width: min(100% - 28px, 1180px);
   }
 
   .heroInner {
-    gap: 22px;
-    padding: 28px 0 34px;
+    gap: 26px;
+    padding: 30px 0 36px;
   }
 
   .heroCopy h1 {
@@ -444,46 +546,104 @@
     line-height: 1.02;
   }
 
-  .lede {
+  .lede,
+  .agentSection p {
     font-size: 1rem;
-    line-height: 1.52;
+    line-height: 1.55;
   }
 
   .heroActions {
-    margin-top: 20px;
+    align-items: stretch;
+    flex-direction: column;
   }
 
-  .heroVisual {
-    min-height: 154px;
-    padding: 16px;
-    border-radius: 14px;
+  .primaryButton,
+  .secondaryButton,
+  .ghostLink {
+    justify-content: center;
+    width: 100%;
   }
 
-  .heroVisual img {
-    width: 112px;
-    border-radius: 16px;
+  .agentMesh {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    min-height: auto;
+    padding: 14px;
   }
 
-  .signalPanel {
+  .meshLine {
     display: none;
   }
 
-  .lanes {
-    padding: 42px 0 32px;
+  .meshNode,
+  .meshCenter,
+  .meshLlm,
+  .meshTools,
+  .meshRegistry,
+  .meshTransport {
+    position: static;
+    width: 100%;
+    min-height: auto;
+    transform: none;
   }
 
-  .laneGrid,
-  .mapGrid {
+  .meshCenter {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-content: stretch;
+    column-gap: 12px;
+    text-align: left;
+  }
+
+  .meshCenter img {
+    flex: 0 0 auto;
+    grid-row: span 2;
+  }
+
+  .meshCenter strong,
+  .meshCenter span {
+    min-width: 0;
+  }
+
+  .protocolRail {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pathways {
+    padding: 42px 0 30px;
+  }
+
+  .pathwayGrid,
+  .shapeGrid,
+  .foundationGrid {
     grid-template-columns: 1fr;
   }
 
-  .mapNodeAccent {
-    grid-column: span 1;
+  .pathwayCard {
+    min-height: 0;
   }
 
-  .mapHeader,
+  .agentSection {
+    gap: 24px;
+    padding: 34px 0 48px;
+  }
+
+  .foundationSection {
+    padding-bottom: 48px;
+  }
+
   .referenceBand {
     align-items: flex-start;
     flex-direction: column;
+    margin-bottom: 48px;
+    padding: 24px;
+  }
+
+  .referenceLink {
+    width: 100%;
+    text-align: center;
   }
 }

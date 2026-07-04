@@ -59,14 +59,46 @@ html {
   font-weight: 650;
   letter-spacing: 0;
   text-transform: lowercase;
+  padding: 0.16rem 0.42rem 0.16rem 0.18rem;
+  border-radius: 999px;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.navbar__brand:hover,
+.navbar__brand:focus-visible {
+  color: var(--protolink-blue);
+  text-decoration: none;
+  background: rgba(10, 132, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(10, 132, 255, 0.18),
+    0 0 22px rgba(10, 132, 255, 0.22);
+  transform: translateY(-1px);
 }
 
 .navbar__title {
   color: var(--protolink-ink);
+  transition: color 160ms ease, text-shadow 160ms ease;
+}
+
+.navbar__brand:hover .navbar__title,
+.navbar__brand:focus-visible .navbar__title {
+  color: var(--protolink-blue);
+  text-shadow: 0 0 18px rgba(10, 132, 255, 0.42);
 }
 
 .navbar__logo img {
   border-radius: 7px;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.navbar__brand:hover .navbar__logo img,
+.navbar__brand:focus-visible .navbar__logo img {
+  filter: drop-shadow(0 0 9px rgba(10, 132, 255, 0.38));
+  transform: scale(1.035);
 }
 
 .main-wrapper {
@@ -278,6 +310,45 @@ html {
   color: var(--protolink-muted);
   font-size: 0.82rem;
   text-align: right;
+}
+
+.doc-media-frame {
+  margin: 1.5rem 0 2.2rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(10, 132, 255, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(10, 132, 255, 0.075), rgba(16, 185, 129, 0.045)),
+    var(--protolink-surface);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+}
+
+.doc-media-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 6px;
+  background: #020617;
+}
+
+.doc-media-frame figcaption {
+  margin: 0.8rem 0.15rem 0.1rem;
+  color: var(--protolink-muted);
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+
+[data-theme='dark'] .doc-media-frame {
+  border-color: rgba(66, 153, 225, 0.22);
+  background:
+    linear-gradient(180deg, rgba(10, 132, 255, 0.13), rgba(16, 185, 129, 0.08)),
+    var(--protolink-surface);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.26);
+}
+
+[data-theme='dark'] .doc-media-frame img {
+  border-color: rgba(148, 163, 184, 0.18);
 }
 
 .docs-compass {
