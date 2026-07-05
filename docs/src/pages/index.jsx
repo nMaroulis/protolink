@@ -881,11 +881,19 @@ export default function Home() {
             </div>
             <div className={styles.heroComposer}>
               <div className={styles.composerCue}>
-                <span>Try it here</span>
+                <span className={styles.cueArrows} aria-hidden="true">
+                  <i />
+                  <i />
+                </span>
+                <span className={styles.cueLabel}>Try it here</span>
                 <strong>
                   Choose a module, pick an implementation, and watch the agent
                   code assemble.
                 </strong>
+                <span className={styles.cueArrows} aria-hidden="true">
+                  <i />
+                  <i />
+                </span>
               </div>
               <PluggableAgent logo={logo} />
             </div>

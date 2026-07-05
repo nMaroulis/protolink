@@ -1049,10 +1049,28 @@
 }
 
 .kicker {
+  overflow: hidden;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0.42rem 0.72rem;
+  border: 1px solid rgba(10, 132, 255, 0.2);
+  border-radius: 999px;
+  color: var(--protolink-blue-700);
+  background:
+    linear-gradient(90deg, rgba(10, 132, 255, 0.2), rgba(10, 132, 255, 0.08) 42%, transparent 78%),
+    linear-gradient(90deg, rgba(10, 132, 255, 0.08), rgba(255, 255, 255, 0.82)),
+    rgba(255, 255, 255, 0.8);
+  background-position: left center, 0 0, 0 0;
+  background-repeat: no-repeat;
+  background-size: 34% 100%, 100% 100%, auto;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
   font-family: Comfortaa, "Avenir Next Rounded", "Nunito Sans", ui-rounded, var(--ifm-font-family-base);
   font-size: clamp(0.98rem, 1.7vw, 1.18rem);
   line-height: 1.25;
   text-transform: none;
+  animation: kickerBreath 6.4s ease-in-out infinite;
 }
 
 .heroCopy h1 {
@@ -1120,18 +1138,15 @@
   width: fit-content;
   max-width: 100%;
   margin: 0 auto;
-  padding: 0.44rem 0.62rem;
-  border: 1px solid rgba(10, 132, 255, 0.2);
-  border-radius: 999px;
+  padding: 0 0.2rem;
+  border: 0;
   color: var(--protolink-muted);
-  background:
-    linear-gradient(90deg, rgba(10, 132, 255, 0.08), rgba(255, 255, 255, 0.82)),
-    rgba(255, 255, 255, 0.8);
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+  background: transparent;
+  box-shadow: none;
   font-size: 0.78rem;
 }
 
-.composerCue span {
+.cueLabel {
   flex: 0 0 auto;
   color: var(--protolink-blue-700);
   font-family: var(--ifm-font-family-monospace);
@@ -1140,16 +1155,68 @@
   text-transform: uppercase;
 }
 
-.composerCue span::before {
-  content: ">";
-  margin-right: 6px;
-  color: var(--protolink-blue);
-}
-
 .composerCue strong {
   min-width: 0;
   color: var(--protolink-ink);
   font-weight: 720;
+}
+
+.cueArrows {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  gap: 1px;
+  margin-left: 1px;
+  color: var(--protolink-blue);
+}
+
+.cueArrows i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.32;
+  transform: rotate(45deg);
+  animation: cueArrowGlow 1.75s ease-in-out infinite;
+}
+
+.cueArrows i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+@keyframes cueArrowGlow {
+  0% {
+    opacity: 0.24;
+  }
+
+  40% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.24;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kicker,
+  .cueArrows i {
+    animation: none;
+  }
+}
+
+@keyframes kickerBreath {
+  0%,
+  100% {
+    background-size: 34% 100%, 100% 100%, auto;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+  }
+
+  50% {
+    background-size: 118% 100%, 100% 100%, auto;
+    box-shadow: 0 15px 42px rgba(10, 132, 255, 0.13);
+  }
 }
 
 .primaryButton {
@@ -1801,7 +1868,6 @@
 
 :global([data-theme='dark']) .secondaryButton,
 :global([data-theme='dark']) .positioning,
-:global([data-theme='dark']) .composerCue,
 :global([data-theme='dark']) .pathwayCard,
 :global([data-theme='dark']) .foundationCard,
 :global([data-theme='dark']) .shapeCard,
@@ -1819,6 +1885,15 @@
 
 :global([data-theme='dark']) .positioning {
   color: color-mix(in srgb, var(--protolink-ink) 84%, var(--ifm-color-primary-light));
+}
+
+:global([data-theme='dark']) .kicker {
+  border-color: rgba(64, 156, 255, 0.28);
+  background:
+    linear-gradient(90deg, rgba(64, 156, 255, 0.24), rgba(10, 132, 255, 0.1) 42%, transparent 78%),
+    linear-gradient(90deg, rgba(10, 132, 255, 0.16), rgba(16, 28, 42, 0.86)),
+    rgba(16, 28, 42, 0.86);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.24);
 }
 
 :global([data-theme='dark']) .composerCue strong {
@@ -1974,11 +2049,12 @@
   }
 
   .composerCue {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px 9px;
+    justify-content: center;
     width: 100%;
-    border-radius: 9px;
+    padding: 0 0.2rem;
   }
 
   .plugWorkbench {
