@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-changelog" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.1">
+<title data-rh="true">Changelog | protolink</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://nmaroulis.github.io/protolink/img/banner.png"><meta data-rh="true" name="twitter:image" content="https://nmaroulis.github.io/protolink/img/banner.png"><meta data-rh="true" property="og:url" content="https://nmaroulis.github.io/protolink/docs/changelog/"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="keywords" content="ProtoLink, agent-to-agent, A2A, Python agents, LLM tools, runtime control, multi-agent systems"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Changelog | protolink"><meta data-rh="true" name="description" content="All notable changes to the Protolink project will be documented in this file."><meta data-rh="true" property="og:description" content="All notable changes to the Protolink project will be documented in this file."><link data-rh="true" rel="icon" href="/protolink/img/logo_sm.png"><link data-rh="true" rel="canonical" href="https://nmaroulis.github.io/protolink/docs/changelog/"><link data-rh="true" rel="alternate" href="https://nmaroulis.github.io/protolink/docs/changelog/" hreflang="en"><link data-rh="true" rel="alternate" href="https://nmaroulis.github.io/protolink/docs/changelog/" hreflang="x-default"><link data-rh="true" rel="preconnect" href="https://T7EUHV2RT6-dsn.algolia.net" crossorigin="anonymous"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Changelog","item":"https://nmaroulis.github.io/protolink/docs/changelog"}]}</script><link rel="search" type="application/opensearchdescription+xml" title="protolink" href="/protolink/opensearch.xml">
+
+<meta name="algolia-site-verification" content="45AFD9E85485A956">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&amp;display=swap"><link rel="stylesheet" href="/protolink/assets/css/styles.662a3ea2.css">
+<script src="/protolink/assets/js/runtime~main.fb25d378.js" defer="defer"></script>
+<script src="/protolink/assets/js/main.78bc4540.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")),document.documentElement.setAttribute("data-theme-choice",t||"system")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><link rel="preload" as="image" href="/protolink/img/logo_sm.png"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top navbarHideable_m1mJ"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/protolink/"><div class="navbar__logo"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--light_NVdE"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--dark_xIcU"></div><b class="navbar__title text--truncate">protolink</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/protolink/docs/">Docs</a><a class="navbar__item navbar__link" href="/protolink/docs/agent/">API</a><a class="navbar__item navbar__link" href="/protolink/docs/whitepaper/">Whitepaper</a><a class="navbar__item navbar__link" href="/protolink/docs/examples/">Examples</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/protolink/docs/changelog/">Changelog</a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><a href="https://github.com/nMaroulis/protolink" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a><a href="https://pypi.org/project/protolink/" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">PyPI<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><button type="button" class="DocSearch DocSearch-Button" aria-label="Search (Meta+k)" aria-keyshortcuts="Meta+k"><span class="DocSearch-Button-Container"><svg width="20" height="20" class="DocSearch-Search-Icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="currentColor" fill="none" stroke-width="1.4"></circle><path d="m21 21-4.3-4.3" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="DocSearch-Button-Placeholder">Search</span></span><span class="DocSearch-Button-Keys"></span></button></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd sidebarWithHideableNavbar_wUlq"><a tabindex="-1" class="sidebarLogo_isFc" href="/protolink/"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--light_NVdE"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--dark_xIcU"><b>protolink</b></a><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="true" href="/protolink/docs/"><span title="Overview" class="categoryLinkLabel_W154">Overview</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/"><span title="Documentation" class="linkLabel_WmDU">Documentation</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/concept/"><span title="Concept" class="linkLabel_WmDU">Concept</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/whitepaper/"><span title="ProtoLink Whitepaper" class="linkLabel_WmDU">ProtoLink Whitepaper</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/getting-started/"><span title="Getting Started" class="linkLabel_WmDU">Getting Started</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/cli/"><span title="CLI" class="linkLabel_WmDU">CLI</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/devtools/"><span title="Developer Tools" class="linkLabel_WmDU">Developer Tools</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="true" href="/protolink/docs/agent/"><span title="API Reference" class="categoryLinkLabel_W154">API Reference</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/agent/"><span title="Agents" class="linkLabel_WmDU">Agents</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/client/"><span title="Client" class="linkLabel_WmDU">Client</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/flows/"><span title="Flows" class="linkLabel_WmDU">Flows</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/llm/"><span title="LLMs" class="linkLabel_WmDU">LLMs</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/logging/"><span title="Logging" class="linkLabel_WmDU">Logging</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/models/"><span title="Models API Reference" class="linkLabel_WmDU">Models API Reference</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/registry/"><span title="Registry" class="linkLabel_WmDU">Registry</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/runtime/"><span title="Runtime" class="linkLabel_WmDU">Runtime</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/server/"><span title="Server API Reference" class="linkLabel_WmDU">Server API Reference</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/state/"><span title="State Management" class="linkLabel_WmDU">State Management</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/storage/"><span title="Storage" class="linkLabel_WmDU">Storage</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/telemetry/"><span title="Telemetry" class="linkLabel_WmDU">Telemetry</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/tool/"><span title="Tools" class="linkLabel_WmDU">Tools</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/transport/"><span title="Transport" class="linkLabel_WmDU">Transport</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/authentication/"><span title="Authentication &amp; Security" class="linkLabel_WmDU">Authentication &amp; Security</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/types/"><span title="Type Aliases API Reference" class="linkLabel_WmDU">Type Aliases API Reference</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="true" href="/protolink/docs/examples/"><span title="Examples" class="categoryLinkLabel_W154">Examples</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/examples/"><span title="Examples" class="linkLabel_WmDU">Examples</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/llm_examples/"><span title="LLM Examples" class="linkLabel_WmDU">LLM Examples</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/ticket_booking_example/"><span title="Ticket Booking Example" class="linkLabel_WmDU">Ticket Booking Example</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/code_assistant_example/"><span title="Code Assistant Example" class="linkLabel_WmDU">Code Assistant Example</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/protoagent_case_study/"><span title="ProtoAgent" class="linkLabel_WmDU">ProtoAgent</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/protolink/docs/development/"><span title="Project" class="categoryLinkLabel_W154">Project</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/development/"><span title="Development &amp; Contribution" class="linkLabel_WmDU">Development &amp; Contribution</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/protolink/docs/changelog/"><span title="Changelog" class="linkLabel_WmDU">Changelog</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/relevant/"><span title="Related Projects" class="linkLabel_WmDU">Related Projects</span></a></li></ul></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/protolink/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_YNFT"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">Project</span></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">Changelog</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>Changelog</h1></header>
+<div class="theme-admonition theme-admonition-info admonition_xJq3 alert alert--info"><div class="admonitionHeading_Gvgb"><span class="admonitionIcon_Rf37"><svg viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 2.3c3.14 0 5.7 2.56 5.7 5.7s-2.56 5.7-5.7 5.7A5.71 5.71 0 0 1 1.3 8c0-3.14 2.56-5.7 5.7-5.7zM7 1C3.14 1 0 4.14 0 8s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7zm1 3H6v5h2V4zm0 6H6v2h2v-2z"></path></svg></span>About this Changelog</div><div class="admonitionContent_BuS1"><p>All notable changes to the <strong>Protolink</strong> project will be documented in this file.</p><p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/" target="_blank" rel="noopener noreferrer" class="">Keep a Changelog</a>,
+and this project adheres to <a href="https://semver.org/spec/v2.0.0.html" target="_blank" rel="noopener noreferrer" class="">Semantic Versioning</a>.</p></div></div>
+<hr>
+<h1>Release Notes</h1>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v064---2026-07-03">[v0.6.4] - 2026-07-03<a href="#v064---2026-07-03" class="hash-link" aria-label="Direct link to [v0.6.4] - 2026-07-03" title="Direct link to [v0.6.4] - 2026-07-03" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added">Added<a href="#added" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class="">Added <code>QuietLogger</code>, a no-op <code>BaseLogger</code> implementation for agents and integrations that need the logging interface without emitting output.</li>
+<li class="">Added the ProtoLink <em><strong>Whitepaper</strong></em>.</li>
+<li class="">Added task-local LLM <strong>history scopes</strong> for <strong>concurrent agent execution</strong>, including same-session locking for persistent conversation state.</li>
+<li class="">Added <code>RunStore</code>, <code>SQLiteRunStore</code>, <code>TaskRecord</code>, and <code>RunReportRecord</code> for durable task snapshots and run-report persistence.</li>
+<li class="">Added <strong>registry</strong> entry <strong>liveness metadata</strong>, optional <strong>TTL</strong> pruning, persistent registry <strong>entry storage</strong>, and <code>RegistryClient.heartbeat()</code>.</li>
+<li class="">Added <strong>transport conformance</strong> coverage for Runtime, HTTP, and WebSocket agent contracts.</li>
+<li class="">Added developer tooling commands for <code>doctor</code>, registry inspection, run listing/replay, and a local dashboard with registry health, HTTP agent ping, HTTP agent chat, run replay, and a disabled Studio preview.</li>
+<li class="">Added <code>examples/devtools_dashboard.py</code>, a provider-free dashboard demo with multiple registered agents, persisted run reports, and optional <code>--serve-live</code> HTTP mode for clickable <strong>dashboard</strong> ping/chat.</li>
+</ul>
+<blockquote>
+<p>To try it:</p>
+</blockquote>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">protolink doctor</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">python examples/devtools_dashboard.py --output-dir .protolink-devtools</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">protolink run replay dashboard_demo_1 </span><span class="token parameter variable" style="color:#36acaa">--store</span><span class="token plain"> .protolink-devtools/runs.db</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">protolink dashboard </span><span class="token parameter variable" style="color:#36acaa">--store</span><span class="token plain"> .protolink-devtools/runs.db </span><span class="token parameter variable" style="color:#36acaa">--open</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed">Changed<a href="#changed" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class="">Tightened GitHub Actions so Ruff, blocking <code>ty check protolink</code>, multi-version tests, package build checks, and strict docs builds run as first-class CI gates.</li>
+<li class="">Migrated the documentation site from MkDocs Material to Docusaurus with a custom ProtoLink theme, preserved docs corpus, Mermaid diagrams, admonitions, tabs, and GitHub Pages artifact deployment.</li>
+<li class="">Split LLM response parsing and fallback action repair into <code>protolink.llms.parsing</code>, keeping the public <code>LLM</code> facade stable while making the infer loop easier to maintain.</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="fixed">Fixed<a href="#fixed" class="hash-link" aria-label="Direct link to Fixed" title="Direct link to Fixed" translate="no">​</a></h3>
+<ul>
+<li class="">Fixed <code>Agent.start(register=False)</code> so the lifecycle now honors the public <code>register</code> argument.</li>
+<li class="">Fixed RuntimeTransport async request-parser handling.</li>
+<li class="">Fixed WebSocket route registration, stale client-connection reuse, and task-stream closure semantics.</li>
+<li class="">Hardened <code>BearerTokenAuth</code> so bearer JWTs now verify HMAC signatures, algorithms, registered time claims, and optional issuer/audience constraints instead of accepting unsigned demo payloads.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v063---2026-06-26">[v0.6.3] - 2026-06-26<a href="#v063---2026-06-26" class="hash-link" aria-label="Direct link to [v0.6.3] - 2026-06-26" title="Direct link to [v0.6.3] - 2026-06-26" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-1">Added<a href="#added-1" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Context manifests and enforceable run budgets</strong>
+<ul>
+<li class="">Added <code>ContextManifest</code>, <code>ContextItem</code>, and <code>build_context_manifest()</code> so applications can inspect estimated system, history, tool/delegation, user, total, and context-window usage before every LLM call.</li>
+<li class="">Added <code>BudgetPolicy</code>, <code>BudgetEnforcer</code>, <code>BudgetDecision</code>, <code>BudgetUsage</code>, and <code>BudgetExceededError</code> to enforce <code>RunBudget</code> limits for steps, LLM calls, tool calls, runtime seconds, input tokens, and output tokens.</li>
+<li class=""><code>LLM.infer()</code> now emits additive <code>context_prepared</code>, <code>llm_call_started</code>, <code>llm_call_completed</code>, <code>budget_warning</code>, and <code>budget_exceeded</code> events while preserving existing low-level LLM events.</li>
+<li class=""><code>RunEvent</code> now promotes those events into stable <code>context.prepared</code>, <code>llm.call.started</code>, <code>llm.call.completed</code>, <code>budget.warning</code>, and <code>budget.exceeded</code> types for UI and golden-run consumers.</li>
+<li class=""><code>LLMModelProfile</code> now accepts descriptive capability metadata such as <code>supports_tools</code>, <code>supports_streaming</code>, <code>supports_json_schema</code>, and <code>tokenizer</code> without becoming a live model catalog.</li>
+</ul>
+</li>
+<li class=""><strong>State inspection and state control reports</strong>
+<ul>
+<li class="">Added <code>StateOperationRequest</code>, <code>StateStoreReport</code>, and <code>StateOperationResult</code> for typed describe, reset, and compact reports over agent state.</li>
+<li class="">Added <code>Agent.describe_state()</code>, <code>Agent.reset_state()</code>, and <code>Agent.compact_state()</code> plus matching <code>AgentClient</code> request specs for <code>POST /state/describe</code>, <code>POST /state/reset</code>, and <code>POST /state/compact</code>.</li>
+<li class="">State operations run through runtime policy capabilities (<code>state.describe</code>, <code>state.reset</code>, <code>state.compact</code>, and <code>llm.history.compact</code>) before reading or mutating state.</li>
+</ul>
+</li>
+<li class=""><strong>Run reports, replay, and redaction</strong>
+<ul>
+<li class="">Added <code>RunReport</code>, <code>RunRecorder</code>, <code>RunReplay</code>, <code>assert_run_events()</code>, <code>assert_no_denied_actions()</code>, and <code>assert_budget_under()</code> for durable app-facing run summaries and golden-run integration tests.</li>
+<li class="">Added <code>RedactionPolicy</code> and <code>DEFAULT_REDACTION_POLICY</code> so reports and local telemetry share one recursive secret-masking surface.</li>
+<li class=""><code>RunEvent</code> now exposes optional <code>span_id</code>, <code>parent_span_id</code>, <code>action_id</code>, <code>parent_action_id</code>, and <code>delegation_id</code> fields for causal UI routes and replay tools.</li>
+</ul>
+</li>
+<li class=""><strong>Runnable integration examples</strong>
+<ul>
+<li class="">Added provider-free <code>examples/v063_*.py</code> scripts covering context budgets, request-spec history compaction, state control endpoints, run reports/replay/redaction, and an abstract ProtoAgent-style policy mesh with tool capabilities and approval previews.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-1">Changed<a href="#changed-1" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p><strong>Agent codebase reafctor with MixIns</strong>: Agent is now the stable public facade, with behavior split into:</p>
+<ul>
+<li class=""><code>engine.py</code>: task execution, streaming, LLM calls, delegation</li>
+<li class=""><code>mixins.py</code>: lifecycle, control plane, communication, tools, config, serialization</li>
+<li class=""><code>helpers.py</code>: state request normalization</li>
+<li class=""><code>sync.py</code>: SyncAgent</li>
+<li class=""><code>_typing.py</code>: internal structural typing support for mixins</li>
+</ul>
+</li>
+<li class="">
+<p><strong>LLM history compaction</strong>: instead of having it as a tool which will just stress the model&#x27;s context more, it&#x27;s now a client/server spec, so it&#x27;s called via an endpoint.</p>
+<ul>
+<li class="">Kept the LLM-owned <code>HistoryCompactor</code> component with <code>recent</code>, <code>tokens</code>, and <code>summary</code> strategies plus structured before/after results.</li>
+<li class=""><code>LLM.compact_history()</code> remains as a concise facade while compaction algorithms and isolated summary prompts live in the dedicated component.</li>
+<li class="">Added <code>HistoryCompactionRequest</code>, <code>Agent.compact_history()</code>, and <code>AgentClient.COMPACT_HISTORY_REQUEST</code> (<code>POST /llm/history/compact</code>) so agents can compact persistent context through the same client/server spec pattern as other control endpoints.</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v062---2026-06-24">[v0.6.2] - 2026-06-24<a href="#v062---2026-06-24" class="hash-link" aria-label="Direct link to [v0.6.2] - 2026-06-24" title="Direct link to [v0.6.2] - 2026-06-24" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-2">Added<a href="#added-2" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Built-in LLM history compaction</strong>
+<ul>
+<li class="">Added the LLM-owned <code>HistoryCompactor</code> component with <code>recent</code>, <code>tokens</code>, and <code>summary</code> strategies plus structured before/after results.</li>
+<li class=""><code>LLM.compact_history()</code> remains as a concise facade while compaction algorithms, summaries, prompts, and tool construction live in the dedicated component.</li>
+<li class="">Added the reserved <code>protolink_compact_history</code> runtime tool so agents can compact persistent context in response to explicit user requests.</li>
+<li class="">Compaction preserves the leading system prompt and protected recent turns; summary generation is isolated and atomic on provider failures.</li>
+</ul>
+</li>
+<li class="">Tests:<!-- -->
+<ul>
+<li class="">Added Starlette, FastAPI, and WebSocket regression coverage for nested <code>ToolOutput</code> stream payloads.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="fixed-1">Fixed<a href="#fixed-1" class="hash-link" aria-label="Direct link to Fixed" title="Direct link to Fixed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Nested transport payload serialization</strong>
+<ul>
+<li class="">Starlette and FastAPI SSE backends now recursively normalize nested framework objects before encoding JSON-RPC event frames.</li>
+<li class="">Delegated and tool-result events containing a <code>ToolOutput</code> dataclass in <code>content</code> or <code>metadata</code> no longer terminate the stream with <code>TypeError: Object of type ToolOutput is not JSON serializable</code>.</li>
+<li class="">WebSocket streaming now uses the same shared recursive serializer for consistent event payloads across network transports.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-2">Changed<a href="#changed-2" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class="">Documented recursive JSON normalization and structured tool-result behavior in the transport and client streaming guides.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v061---2026-06-21">[v0.6.1] - 2026-06-21<a href="#v061---2026-06-21" class="hash-link" aria-label="Direct link to [v0.6.1] - 2026-06-21" title="Direct link to [v0.6.1] - 2026-06-21" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-3">Added<a href="#added-3" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p><strong>Live task cancellation</strong></p>
+<ul>
+<li class="">Added <code>CancellationToken</code>, <code>TaskCancellationRequest</code>, and an active-task registry that separates serializable canceled state from process-local execution control.</li>
+<li class="">Added direct and remote task-ID cancellation through <code>Agent.cancel_task()</code> and <code>AgentClient.cancel_task()</code> across HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport.</li>
+<li class="">Default task, streaming, LLM, tool, and delegated-agent paths now propagate cancellation and produce a final <code>canceled</code> task state instead of a failure event.</li>
+<li class="">Added <code>examples/task_cancellation.py</code> plus direct, streaming, runtime, and WebSocket cancellation coverage.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Runtime context and run events</strong></p>
+<ul>
+<li class="">Added <code>RunContext</code>, <code>RunBudget</code>, <code>RunEvent</code>, <code>EventSink</code>, and <code>InMemoryEventSink</code> for typed run metadata, stable progress streams, and golden-run testing.</li>
+<li class="">Default agent execution now normalizes runtime context into <code>task.metadata[&quot;run_context&quot;]</code> while preserving legacy <code>session_id</code> and <code>trace_id</code> metadata.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Runtime actions, policy, and approvals</strong></p>
+<ul>
+<li class="">Added <code>RunAction</code>, structured artifact descriptors, <code>CapabilityPolicy</code>, <code>ActionAuthorizer</code>, and typed approval request/decision contracts.</li>
+<li class="">Tools can declare extensible capabilities and attach preview artifacts; policy is enforced immediately before direct, model-selected, and delegated actions execute.</li>
+<li class=""><code>RunEvent</code> now promotes action, policy, and approval activity into stable event types for application streams and golden-run tests.</li>
+<li class="">Added <code>examples/runtime_policy_and_approvals.py</code>, a provider-free walkthrough of previews, approvals, normalized events, and denied side effects.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Optional LLM budget metrics</strong></p>
+<ul>
+<li class="">Added <code>LLMModelProfile</code> and <code>LLM.configure_metrics()</code> for context-window and cost metadata without changing provider request payloads.</li>
+<li class=""><code>LLM.infer()</code> now emits live <code>llm_context</code> and <code>llm_call_metrics</code> events when telemetry or an <code>event_callback</code> is attached.</li>
+<li class="">Local traces now aggregate LLM call count, latency, token usage, context high-water marks, and estimated cost in LLM span metadata.</li>
+<li class="">Added the optional <code>protolink[metrics]</code> extra for sharper token estimates with <code>tiktoken</code>; core installs still use a dependency-free estimate.</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v060---2026-06-19">[v0.6.0] - 2026-06-19<a href="#v060---2026-06-19" class="hash-link" aria-label="Direct link to [v0.6.0] - 2026-06-19" title="Direct link to [v0.6.0] - 2026-06-19" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-4">Added<a href="#added-4" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p><strong>Task lifecycle enforcement</strong></p>
+<ul>
+<li class=""><code>Task.state</code> now uses enforced <code>TaskState</code> transitions instead of acting as a loose label.</li>
+<li class="">Added terminal-state awareness through <code>Task.is_terminal</code> for <code>completed</code>, <code>failed</code>, and <code>canceled</code> tasks.</li>
+<li class="">Added lifecycle helpers: <code>Task.begin()</code>, <code>Task.require_input()</code>, and <code>Task.cancel()</code>.</li>
+<li class="">Successful state transitions are recorded in <code>task.metadata[&quot;state_history&quot;]</code>.</li>
+<li class="">Direct task construction now normalizes serialized state values and rebuilds the last-item cache.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Agent-managed task states</strong></p>
+<ul>
+<li class="">Default <code>Agent.execute_task()</code> now moves non-terminal tasks to <code>working</code>, finalizes successful runs as <code>completed</code>, marks error outputs and exceptions as <code>failed</code>, and supports <code>input-required</code> status outputs.</li>
+<li class="">Streaming task handling now emits lifecycle-aware status updates and includes the final serialized task in final status event metadata.</li>
+<li class=""><code>TaskLifecycle</code> now applies protocol-safe transition paths before completing, requiring input, failing, or canceling tasks.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>LLM history serialization helper</strong></p>
+<ul>
+<li class="">Added <code>protolink.llms.serialization.json_history_default()</code> for framework object serialization in LLM conversation history.</li>
+<li class="">Base and Anthropic LLM history injection now serialize dataclasses, <code>to_dict()</code> objects, and <code>model_dump()</code> objects consistently.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>First-run developer experience</strong></p>
+<ul>
+<li class="">Added top-level exports for common primitives such as <code>Agent</code>, <code>AgentCard</code>, <code>Task</code>, <code>Tool</code>, <code>Pipeline</code>, <code>create_llm</code>, and local tracing utilities.</li>
+<li class="">Added the <code>protolink init agent</code> CLI command with runnable <code>basic</code> and <code>tool</code> starter templates.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Local observability</strong></p>
+<ul>
+<li class="">Added <code>LocalTraceTelemetry</code> and <code>LocalTraceRecorder</code> for in-memory and JSONL task trace replay.</li>
+<li class="">Local traces now capture trace IDs, span hierarchy, LLM action events, retry counts, token estimates, model metadata, and redacted payloads.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Typed LLM action protocol</strong></p>
+<ul>
+<li class="">Added typed <code>FinalAction</code>, <code>ToolCallAction</code>, <code>AgentCallAction</code>, and <code>LLMActionResult</code> models for the <code>infer()</code> execution loop.</li>
+<li class="">Added provider-native action acquisition for OpenAI, Anthropic, Gemini, DeepSeek, Grok, Ollama, llama.cpp, LM Studio, and OpenAI-compatible servers where supported.</li>
+<li class="">Added native streaming action acquisition through <code>call_action_stream()</code> so providers can stream text while buffering tool-call deltas into one validated runtime action.</li>
+<li class="">Added provider-neutral tool schema builders and synthetic native delegation tools for agent calls.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Structured route decisions</strong></p>
+<ul>
+<li class="">Added <code>RouteDecision</code> plus <code>Part.route(...)</code> and <code>Part.decision(...)</code> for serializable, trace-visible flow routing.</li>
+<li class=""><code>Router</code> now prefers structured route parts and JSON-shaped route decisions before falling back to legacy <code>[ROUTE: key]</code> text tags.</li>
+<li class="">Legacy text-tag routing now records the chosen route as structured task metadata and a route part for replayability.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>First-class tool JSON Schema</strong></p>
+<ul>
+<li class="">Native <code>Tool</code> wrappers now infer full JSON Schema objects for inputs and outputs instead of flat parameter maps or return type strings.</li>
+<li class="">Added nested schema preservation for Pydantic models, dataclasses, typed dictionaries, enums, arrays, objects, unions, and literals.</li>
+<li class="">Added runtime validation/coercion for tool arguments before execution, including custom <code>BaseTool</code> implementations with JSON Schema input contracts.</li>
+<li class="">Tool examples now flow into advertised <code>AgentSkill.examples</code>.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Docs</strong></p>
+<ul>
+<li class="">Added an end-to-end runtime cancellation guide covering active registration, cooperative checkpoints, control-plane transport behavior, final events, and best-effort side-effect guarantees.</li>
+<li class="">Updated README task semantics to describe <code>Task.state</code> and <code>metadata[&quot;state_history&quot;]</code>.</li>
+<li class="">Added Agent documentation for default task lifecycle behavior and streaming status updates.</li>
+<li class="">Expanded model and transport docs for task lifecycle states, terminal states, transition history, and new task helper methods.</li>
+<li class="">Added CLI documentation and local trace telemetry documentation.</li>
+<li class="">Expanded LLM documentation for the typed <code>infer()</code> cycle, JSON vs native action modes, native streaming tool-call behavior, and provider support matrix.</li>
+<li class="">Updated flow docs for structured route decisions and updated tool/model docs for first-class JSON Schema, Pydantic support, runtime validation, and skill examples.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Tests</strong></p>
+<ul>
+<li class="">Added cancellation coverage for typed request round-trips, pre-canceled inference, interrupted async tools, final stream status, custom remote handlers, and WebSocket control channels.</li>
+<li class="">Added lifecycle coverage for direct task construction, invalid transitions, <code>Task.complete()</code>, successful agent execution, and failed tool execution.</li>
+<li class="">Added regression coverage for delegated <code>ToolOutput</code> serialization in the LLM inference loop.</li>
+<li class="">Added coverage for top-level exports, CLI scaffolding, local trace capture, redaction, and retry metadata.</li>
+<li class="">Added regression coverage for native action dispatch, native streaming action dispatch, provider tool-call normalization, streamed tool-call delta accumulation, and Ollama&#x27;s opt-in native tool mode.</li>
+<li class="">Added coverage for route decision part round-trips, structured Router branching, nested/Pydantic tool schema inference, runtime argument coercion, custom <code>BaseTool</code> schema validation, and AgentSkill examples.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-3">Changed<a href="#changed-3" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class=""><code>protolink.models</code> now exports <code>TaskState</code>.</li>
+<li class="">Task validation now accepts empty message, artifact, and metadata containers and validates <code>Task.state</code> as a <code>TaskState</code>.</li>
+<li class="">Flow execution no longer auto-wraps plain user messages without executable parts into inferred prompts.</li>
+<li class="">Flow transition bridging now ignores structured <code>route</code> and <code>decision</code> control parts when preparing downstream agent prompts.</li>
+<li class="">Telemetry hooks now accept optional LLM metadata and expose detailed inference-loop events through <code>on_llm_event()</code>.</li>
+<li class="">LLM prompt selection now separates JSON action prompts from native provider tool prompts, preventing native providers from seeing JSON tool-call instructions while keeping small/local models on the simple JSON protocol by default.</li>
+<li class="">Ollama, llama.cpp, LM Studio, and OpenAI-compatible local servers now use native tool calling only when <code>supports_tool_calling=True</code>; otherwise they retain the JSON fallback path.</li>
+<li class=""><code>.ruff_cache/</code> is now ignored by git.</li>
+</ul>
+<p>Infer Loop Updates:</p>
+<ul>
+<li class="">The LLM no longer directly drives execution through fragile raw text.</li>
+<li class="">Every step converges into typed actions: FinalAction, ToolCallAction, AgentCallAction.</li>
+<li class="">Native providers like OpenAI/Anthropic/Gemini use real provider tool calling instead of being forced through prompt JSON.</li>
+<li class="">Small/local models still get the simpler JSON protocol, which is the right call for Ollama/Gemma-style reliability.</li>
+<li class="">Streaming now has a real action boundary through call_action_stream(), instead of pretending chunks are immediately executable.</li>
+<li class="">The loop has retries, parse failure limits, duplicate-action detection, tool argument correction, unknown-tool correction, and structured events for observability.</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="fixed-2">Fixed<a href="#fixed-2" class="hash-link" aria-label="Direct link to Fixed" title="Direct link to Fixed" translate="no">​</a></h3>
+<ul>
+<li class="">Fixed delegated agent tool results crashing LLM history injection when the remote tool output is hydrated as a <code>ToolOutput</code> dataclass.</li>
+<li class="">Fixed task execution leaving tasks in non-terminal states after successful default agent execution.</li>
+<li class="">Fixed invalid direct lifecycle jumps such as <code>submitted -&gt; completed</code> by requiring transition through <code>working</code>.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v058---2026-06-11">[v0.5.8] - 2026-06-11<a href="#v058---2026-06-11" class="hash-link" aria-label="Direct link to [v0.5.8] - 2026-06-11" title="Direct link to [v0.5.8] - 2026-06-11" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-5">Added<a href="#added-5" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p><strong>SSE JSON-RPC streaming transport</strong></p>
+<ul>
+<li class="">Added <code>SSEJSONRPCTransport</code> for <code>text/event-stream</code> task streams over HTTP.</li>
+<li class="">Registered transport aliases: <code>&quot;sse&quot;</code>, <code>&quot;json-rpc&quot;</code>, and <code>&quot;sse-json-rpc&quot;</code>.</li>
+<li class="">Starlette and FastAPI backends now serialize streaming endpoint events as JSON-RPC-style SSE envelopes.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Agent-level LLM streaming</strong></p>
+<ul>
+<li class=""><code>Agent.handle_task_streaming()</code> now streams task status, LLM events, tool progress, artifacts, and completion.</li>
+<li class=""><code>LLM.infer()</code> accepts <code>streaming=True</code> and an optional <code>event_callback</code> observer for chunks, tool calls, agent calls, parse errors, and final output.</li>
+<li class=""><code>AgentClient.send_task_streaming()</code> now validates transport streaming support before subscribing.</li>
+<li class=""><code>client.sync.send_task_streaming()</code> provides a blocking iterator for scripts and CLI interfaces.</li>
+<li class="">Agent cards now reflect the selected transport&#x27;s streaming capability for discovery and registry filtering.</li>
+<li class=""><code>AgentCard.to_dict()</code> and <code>AgentCard.from_dict()</code> now preserve the <code>transport</code> field.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Local and OpenAI-compatible LLMs</strong></p>
+<ul>
+<li class="">Added <code>OpenAICompatibleLLM</code> for servers exposing <code>/v1/chat/completions</code> and <code>/v1/models</code>.</li>
+<li class="">Added <code>LMStudioLLM</code> for LM Studio&#x27;s local OpenAI-compatible server.</li>
+<li class="">Added provider keys <code>&quot;lmstudio&quot;</code> and <code>&quot;openai-compatible&quot;</code>.</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Tests</strong></p>
+<ul>
+<li class="">Added focused coverage for lazy mock LLM creation, SSE JSON-RPC event parsing, <code>AgentClient</code> streaming checks, sync streaming iteration, and agent LLM stream attachment.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-4">Changed<a href="#changed-4" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class="">Provider, server LLM, and transport exports are now lazy-loaded so optional SDKs are only required when the selected provider or transport needs them.</li>
+<li class=""><code>create_llm()</code> lazy factory entries now cover all documented providers, including Grok, Hugging Face, LM Studio, OpenAI-compatible servers, and Mock LLMs.</li>
+<li class="">Agent <code>verbosity=0</code> now suppresses transport server access logs more aggressively.</li>
+<li class="">Documentation updated for streaming, SSE JSON-RPC, LM Studio, OpenAI-compatible local servers, and the new client/server transport flow.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v057---2026-06-07">[v0.5.7] - 2026-06-07<a href="#v057---2026-06-07" class="hash-link" aria-label="Direct link to [v0.5.7] - 2026-06-07" title="Direct link to [v0.5.7] - 2026-06-07" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-6">Added<a href="#added-6" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p>Authentication now works with all transports (http, websocket)</p>
+<ul>
+<li class="">Integrated to Agent. Now passable to agent as an argument<!-- -->
+<ul>
+<li class=""><code>authenticator</code>: Optional Authenticator instance for verifying incoming requests to this agent.</li>
+<li class=""><code>credentials</code>: Optional credentials string used for authenticating outgoing requests.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Import</strong> / <strong>Export</strong> Agent from/to <code>yaml</code></p>
+<ul>
+<li class="">Agent can now serialize itself and save to yaml file<!-- -->
+<ul>
+<li class=""><code>to_yaml</code>: Saves the agent configuration to a YAML file</li>
+</ul>
+</li>
+<li class="">Agent can now load from yaml file<!-- -->
+<ul>
+<li class=""><code>from_yaml</code>: Loads the agent configuration from a YAML file</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v056---2026-05-17">[v0.5.6] - 2026-05-17<a href="#v056---2026-05-17" class="hash-link" aria-label="Direct link to [v0.5.6] - 2026-05-17" title="Direct link to [v0.5.6] - 2026-05-17" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-7">Added<a href="#added-7" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p><strong>Flows Refactor &amp; Upgrade</strong></p>
+<ul>
+<li class=""><strong>Semantic Context Injection</strong>: Flows dynamically build instruction prompts based on their downstream topology. This prompt is injected into the <code>task.flow_state[&quot;prompt&quot;]</code> for executing agents to utilize seamlessly. This way agents are aware of their downstream context and can format their output accordingly.</li>
+<li class="">Correct <strong>Task</strong> management. Added flow_state to Task, so that we provide additional context to the agents.</li>
+<li class=""><strong>NEW Flow Examples</strong> for each Use case (Graph, Pipeline, Parallel, Router).</li>
+<li class="">Removed <strong>Structured Agent</strong></li>
+<li class="">Better <strong>State</strong> Management</li>
+<li class=""><strong>Flow Sync</strong> Module</li>
+</ul>
+</li>
+<li class="">
+<p><strong>Other</strong></p>
+<ul>
+<li class=""><strong>Agent Sync</strong> Module</li>
+<li class=""><strong>LLM Sync</strong> Module</li>
+<li class=""><strong>Added GuardRails</strong>:<!-- -->
+<ul>
+<li class="">Added context for Agent ID and prevent agent from calling himself.</li>
+<li class="">Removed self from fetched agents.</li>
+</ul>
+</li>
+<li class=""><strong>Agent Discovery TTL</strong></li>
+<li class=""><strong>Mock LLM</strong> for testing</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="fixed-3">Fixed<a href="#fixed-3" class="hash-link" aria-label="Direct link to Fixed" title="Direct link to Fixed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>HUGE BUG fix</strong>: Agent URL received from registry was wrong most of the time.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v055---2026-05-16">[v0.5.5] - 2026-05-16<a href="#v055---2026-05-16" class="hash-link" aria-label="Direct link to [v0.5.5] - 2026-05-16" title="Direct link to [v0.5.5] - 2026-05-16" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-5">Changed<a href="#changed-5" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<p><strong>NEW Feature - State (API Refactor)</strong></p>
+<ul>
+<li class=""><strong>State Management</strong>: Refactored agent state management, specifically around conversation history persistence. The syntax has been simplyfied:</li>
+</ul>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">agent </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> Agent</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    card</span><span class="token operator" style="color:#393A34">=</span><span class="token plain">card</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">.</span><span class="token punctuation" style="color:#393A34">.</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    state</span><span class="token operator" style="color:#393A34">=</span><span class="token punctuation" style="color:#393A34">[</span><span class="token string" style="color:#e3116c">&quot;conversation&quot;</span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain">  </span><span class="token comment" style="color:#999988;font-style:italic"># Session memory is not reset between tasks</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token punctuation" style="color:#393A34">)</span><br></div></code></pre></div></div>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-8">Added<a href="#added-8" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class="">
+<p><strong>protolink.state</strong> module. The State class manages:</p>
+<ul>
+<li class=""><strong>Session memory</strong> - Session memory is not reset between tasks</li>
+<li class=""><strong>Conversation history</strong> - Conversation history persistence</li>
+<li class=""><strong>Tool call history</strong> - Tool call history persistence</li>
+<li class=""><strong>Flow state</strong> - Flow state persistence</li>
+</ul>
+</li>
+<li class="">
+<p><strong>DSA Optimization</strong>:</p>
+<ul>
+<li class=""><strong>Conversation History</strong>: Use Message Double Ended Queue for O(1) append and pop operations.</li>
+<li class=""><strong>Registry Storage</strong>: Optimize agent pop operations to O(1)</li>
+<li class="">and more...</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v054---2026-05-12">[v0.5.4] - 2026-05-12<a href="#v054---2026-05-12" class="hash-link" aria-label="Direct link to [v0.5.4] - 2026-05-12" title="Direct link to [v0.5.4] - 2026-05-12" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-6">Changed<a href="#changed-6" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Agent Lifecycle</strong>: Fixed issues with agent start/stop logic, specifically around event loop tasks and background threads. The syntax has been simplyfied:</li>
+<li class=""><strong>Proper Thread Management</strong>: Removed asyncio event loop and background threads for starting/stopping.</li>
+</ul>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">agent</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">start</span><span class="token punctuation" style="color:#393A34">(</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">agent</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">stop</span><span class="token punctuation" style="color:#393A34">(</span><span class="token punctuation" style="color:#393A34">)</span><br></div></code></pre></div></div>
+<p>That&#x27;s it. The <code>start()</code> method will start the agent in a background thread and will properly wait for all queues to empty. The <code>stop()</code> function will properly wait for all queues to empty, and gracefully shutdown the agent and background threads.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v053---2026-05-03">[v0.5.3] - 2026-05-03<a href="#v053---2026-05-03" class="hash-link" aria-label="Direct link to [v0.5.3] - 2026-05-03" title="Direct link to [v0.5.3] - 2026-05-03" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="fixed-4">Fixed<a href="#fixed-4" class="hash-link" aria-label="Direct link to Fixed" title="Direct link to Fixed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Tooling Schema</strong>: Tool schema is now correctly inferred from the function signature and type hints. It is also correctly appended to the Agent Card prompt, so other agents are aware of available tools and schemas.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v052---2026-05-02">[v0.5.2] - 2026-05-02<a href="#v052---2026-05-02" class="hash-link" aria-label="Direct link to [v0.5.2] - 2026-05-02" title="Direct link to [v0.5.2] - 2026-05-02" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-9">Added<a href="#added-9" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Logging Module</strong>: Added explicit <code>file</code> logger (json) and <code>console</code> logger (color).</li>
+<li class="">Plug in Logging to the Agent using the <code>logger</code> argument. If none is provided, a default logger using the ConsoleLogger, so the IO is appended to the terminal.</li>
+<li class="">Added <strong>context memory</strong>:<!-- -->
+<ul>
+<li class="">&quot;none&quot; - No context memory.</li>
+<li class="">&quot;session&quot; - Session based context memory. Agent remembers all messages exchanged during the current session with other agents.
+Memory is configured in the agent using the <code>memory</code> argument. If none is provided, no memory is used.</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v051---2026-04-28">[v0.5.1] - 2026-04-28<a href="#v051---2026-04-28" class="hash-link" aria-label="Direct link to [v0.5.1] - 2026-04-28" title="Direct link to [v0.5.1] - 2026-04-28" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-10">Added<a href="#added-10" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Telemetry</strong>: Add LangSmith and Langfuse telemetry implementations</li>
+<li class=""><strong>BaseTelemetry</strong>: Add base telemetry class</li>
+<li class=""><strong>LangfuseTelemetry</strong>: Langfuse telemetry implementation</li>
+<li class=""><strong>LangsmithTelemetry</strong>: Langsmith telemetry implementation</li>
+<li class=""><strong>MultiTelemetry</strong>: Multiplex multiple telemetry implementations.</li>
+<li class=""><strong>Agent</strong>: Plug in to the Agent using the <code>telemetry</code> argument. If none is provided, no telemetry is collected.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v050---2026-04-22">[v0.5.0] - 2026-04-22<a href="#v050---2026-04-22" class="hash-link" aria-label="Direct link to [v0.5.0] - 2026-04-22" title="Direct link to [v0.5.0] - 2026-04-22" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-11">Added<a href="#added-11" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Flows</strong>: Build deterministic execution paths out of the box (<code>Pipeline</code>, <code>Parallel</code>, <code>Router</code>, <code>Graph</code>).</li>
+<li class=""><strong>StructuredAgent</strong>: Wrap any complex flow to run autonomously as a generic, network-ready A2A agent.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v048---2026-04-19">[v0.4.8] - 2026-04-19<a href="#v048---2026-04-19" class="hash-link" aria-label="Direct link to [v0.4.8] - 2026-04-19" title="Direct link to [v0.4.8] - 2026-04-19" translate="no">​</a></h2>
+<p>Historical patch release.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v047---2026-02-08">[v0.4.7] - 2026-02-08<a href="#v047---2026-02-08" class="hash-link" aria-label="Direct link to [v0.4.7] - 2026-02-08" title="Direct link to [v0.4.7] - 2026-02-08" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-12">Added<a href="#added-12" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>LLM Inference Guardrails</strong>:<!-- -->
+<ul>
+<li class="">Implemented robust guardrails for LLM inference.</li>
+<li class="">Added agent calling for delegated inference.</li>
+<li class="">Final result processing.</li>
+</ul>
+</li>
+<li class="">NEW <strong>GrokLLM</strong>:</li>
+<li class="">Ticket Example</li>
+<li class="">Verbosity in Agent and Registry
+and more...</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v046---2026-02-05">[v0.4.6] - 2026-02-05<a href="#v046---2026-02-05" class="hash-link" aria-label="Direct link to [v0.4.6] - 2026-02-05" title="Direct link to [v0.4.6] - 2026-02-05" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-13">Added<a href="#added-13" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>LLM Automated Inference</strong>:<!-- -->
+<ul>
+<li class="">Implemented robust tool calling capabilities.</li>
+<li class="">Added agent calling for delegated inference.</li>
+<li class="">Final result processing.</li>
+</ul>
+</li>
+<li class=""><strong>Agent Orchestration</strong>:<!-- -->
+<ul>
+<li class="">Centralized handling for LLM inference, tool execution, and result aggregation.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-7">Changed<a href="#changed-7" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>LLM API</strong>: Refactored for better type safety and extensibility.</li>
+<li class=""><strong>Agent Constructor</strong>: Simplified initialization options.</li>
+<li class=""><strong>Transport Factory</strong>: Improved factory patterns for transport creation.</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="fixed-5">Fixed<a href="#fixed-5" class="hash-link" aria-label="Direct link to Fixed" title="Direct link to Fixed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Agent Stability</strong>: Resolved race conditions in agent message handling.</li>
+<li class=""><strong>HTTP Backend</strong>: Fixed issues with stream termination.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="v045---2026-01-26">[v0.4.5] - 2026-01-26<a href="#v045---2026-01-26" class="hash-link" aria-label="Direct link to [v0.4.5] - 2026-01-26" title="Direct link to [v0.4.5] - 2026-01-26" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="added-14">Added<a href="#added-14" class="hash-link" aria-label="Direct link to Added" title="Direct link to Added" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>LLM Automated Inference</strong>:<!-- -->
+<ul>
+<li class="">Implemented robust tool calling capabilities.</li>
+<li class="">Added agent calling for delegated inference.</li>
+<li class="">Final result processing.</li>
+</ul>
+</li>
+<li class=""><strong>Agent Orchestration</strong>:<!-- -->
+<ul>
+<li class="">Centralized handling for LLM inference, tool execution, and result aggregation.</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="changed-8">Changed<a href="#changed-8" class="hash-link" aria-label="Direct link to Changed" title="Direct link to Changed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>LLM API</strong>: Refactored for better type safety and extensibility.</li>
+<li class=""><strong>Agent Constructor</strong>: Simplified initialization options.</li>
+<li class=""><strong>Transport Factory</strong>: Improved factory patterns for transport creation.</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="fixed-6">Fixed<a href="#fixed-6" class="hash-link" aria-label="Direct link to Fixed" title="Direct link to Fixed" translate="no">​</a></h3>
+<ul>
+<li class=""><strong>Agent Stability</strong>: Resolved race conditions in agent message handling.</li>
+<li class=""><strong>HTTP Backend</strong>: Fixed issues with stream termination.</li>
+</ul>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="-v044">&lt; [v0.4.4]<a href="#-v044" class="hash-link" aria-label="Direct link to &lt; [v0.4.4]" title="Direct link to &lt; [v0.4.4]" translate="no">​</a></h2>
+<p>Changelog starts after this version.</p>
+<h1>Roadmap</h1>
+<p>The near-term roadmap focuses on hardening the runtime paths that production agent systems depend on most.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="upcoming-features">Upcoming Features<a href="#upcoming-features" class="hash-link" aria-label="Direct link to Upcoming Features" title="Direct link to Upcoming Features" translate="no">​</a></h2>
+<ul class="contains-task-list containsTaskList_mC6p">
+<li class="task-list-item"><input type="checkbox" disabled="" checked=""> <strong>Agent Task Handling</strong>: Enforced task lifecycle transitions and state history.</li>
+<li class="task-list-item"><input type="checkbox" disabled="" checked=""> <strong>Delegated Inference</strong>: Typed tool and agent actions in the LLM inference loop.</li>
+<li class="task-list-item"><input type="checkbox" disabled="" checked=""> <strong>Storage</strong>: In-memory and SQLite storage implementations.</li>
+<li class="task-list-item"><input type="checkbox" disabled="" checked=""> <strong>Observability</strong>: Local trace replay plus Langfuse and LangSmith integrations.</li>
+<li class="task-list-item"><input type="checkbox" disabled="" checked=""> <strong>Integrations</strong>: MCP adapter for external tool servers.</li>
+<li class="task-list-item"><input type="checkbox" disabled=""> <strong>Transport Layer</strong>: Add a production-ready <strong>gRPC</strong> transport implementation and factory registration.</li>
+<li class="task-list-item"><input type="checkbox" disabled=""> <strong>State Modules</strong>: Expand tool, task, and flow state modules beyond their current storage-backed extension points.</li>
+<li class="task-list-item"><input type="checkbox" disabled=""> <strong>OpenTelemetry</strong>: Add first-class OpenTelemetry export alongside the existing telemetry integrations.</li>
+</ul></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col noPrint_WFHX"><a href="https://github.com/nMaroulis/protolink/tree/main/docs/content/content/changelog.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/protolink/docs/development/"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Development &amp; Contribution</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/protolink/docs/relevant/"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Related Projects</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#v064---2026-07-03" class="table-of-contents__link toc-highlight">[v0.6.4] - 2026-07-03</a><ul><li><a href="#added" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#changed" class="table-of-contents__link toc-highlight">Changed</a></li><li><a href="#fixed" class="table-of-contents__link toc-highlight">Fixed</a></li></ul></li><li><a href="#v063---2026-06-26" class="table-of-contents__link toc-highlight">[v0.6.3] - 2026-06-26</a><ul><li><a href="#added-1" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#changed-1" class="table-of-contents__link toc-highlight">Changed</a></li></ul></li><li><a href="#v062---2026-06-24" class="table-of-contents__link toc-highlight">[v0.6.2] - 2026-06-24</a><ul><li><a href="#added-2" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#fixed-1" class="table-of-contents__link toc-highlight">Fixed</a></li><li><a href="#changed-2" class="table-of-contents__link toc-highlight">Changed</a></li></ul></li><li><a href="#v061---2026-06-21" class="table-of-contents__link toc-highlight">[v0.6.1] - 2026-06-21</a><ul><li><a href="#added-3" class="table-of-contents__link toc-highlight">Added</a></li></ul></li><li><a href="#v060---2026-06-19" class="table-of-contents__link toc-highlight">[v0.6.0] - 2026-06-19</a><ul><li><a href="#added-4" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#changed-3" class="table-of-contents__link toc-highlight">Changed</a></li><li><a href="#fixed-2" class="table-of-contents__link toc-highlight">Fixed</a></li></ul></li><li><a href="#v058---2026-06-11" class="table-of-contents__link toc-highlight">[v0.5.8] - 2026-06-11</a><ul><li><a href="#added-5" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#changed-4" class="table-of-contents__link toc-highlight">Changed</a></li></ul></li><li><a href="#v057---2026-06-07" class="table-of-contents__link toc-highlight">[v0.5.7] - 2026-06-07</a><ul><li><a href="#added-6" class="table-of-contents__link toc-highlight">Added</a></li></ul></li><li><a href="#v056---2026-05-17" class="table-of-contents__link toc-highlight">[v0.5.6] - 2026-05-17</a><ul><li><a href="#added-7" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#fixed-3" class="table-of-contents__link toc-highlight">Fixed</a></li></ul></li><li><a href="#v055---2026-05-16" class="table-of-contents__link toc-highlight">[v0.5.5] - 2026-05-16</a><ul><li><a href="#changed-5" class="table-of-contents__link toc-highlight">Changed</a></li><li><a href="#added-8" class="table-of-contents__link toc-highlight">Added</a></li></ul></li><li><a href="#v054---2026-05-12" class="table-of-contents__link toc-highlight">[v0.5.4] - 2026-05-12</a><ul><li><a href="#changed-6" class="table-of-contents__link toc-highlight">Changed</a></li></ul></li><li><a href="#v053---2026-05-03" class="table-of-contents__link toc-highlight">[v0.5.3] - 2026-05-03</a><ul><li><a href="#fixed-4" class="table-of-contents__link toc-highlight">Fixed</a></li></ul></li><li><a href="#v052---2026-05-02" class="table-of-contents__link toc-highlight">[v0.5.2] - 2026-05-02</a><ul><li><a href="#added-9" class="table-of-contents__link toc-highlight">Added</a></li></ul></li><li><a href="#v051---2026-04-28" class="table-of-contents__link toc-highlight">[v0.5.1] - 2026-04-28</a><ul><li><a href="#added-10" class="table-of-contents__link toc-highlight">Added</a></li></ul></li><li><a href="#v050---2026-04-22" class="table-of-contents__link toc-highlight">[v0.5.0] - 2026-04-22</a><ul><li><a href="#added-11" class="table-of-contents__link toc-highlight">Added</a></li></ul></li><li><a href="#v048---2026-04-19" class="table-of-contents__link toc-highlight">[v0.4.8] - 2026-04-19</a></li><li><a href="#v047---2026-02-08" class="table-of-contents__link toc-highlight">[v0.4.7] - 2026-02-08</a><ul><li><a href="#added-12" class="table-of-contents__link toc-highlight">Added</a></li></ul></li><li><a href="#v046---2026-02-05" class="table-of-contents__link toc-highlight">[v0.4.6] - 2026-02-05</a><ul><li><a href="#added-13" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#changed-7" class="table-of-contents__link toc-highlight">Changed</a></li><li><a href="#fixed-5" class="table-of-contents__link toc-highlight">Fixed</a></li></ul></li><li><a href="#v045---2026-01-26" class="table-of-contents__link toc-highlight">[v0.4.5] - 2026-01-26</a><ul><li><a href="#added-14" class="table-of-contents__link toc-highlight">Added</a></li><li><a href="#changed-8" class="table-of-contents__link toc-highlight">Changed</a></li><li><a href="#fixed-6" class="table-of-contents__link toc-highlight">Fixed</a></li></ul></li><li><a href="#-v044" class="table-of-contents__link toc-highlight">&lt; [v0.4.4]</a></li><li><a href="#upcoming-features" class="table-of-contents__link toc-highlight">Upcoming Features</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer"><div class="container container-fluid"><div class="row footer__links"><div class="theme-layout-footer-column col footer__col"><div class="footer__title">Start</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/getting-started/">Getting Started</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/cli/">CLI</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/devtools/">Developer Tools</a></li></ul></div><div class="theme-layout-footer-column col footer__col"><div class="footer__title">Build</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/agent/">Agents</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/runtime/">Runtime</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/transport/">Transports</a></li></ul></div><div class="theme-layout-footer-column col footer__col"><div class="footer__title">Project</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://github.com/nMaroulis/protolink" target="_blank" rel="noopener noreferrer" class="footer__link-item">GitHub<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a></li><li class="footer__item"><a href="https://pypi.org/project/protolink/" target="_blank" rel="noopener noreferrer" class="footer__link-item">PyPI<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/changelog/">Changelog</a></li></ul></div></div><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 Nikolaos Maroulis. MIT licensed. Built with Docusaurus.</div></div></div></footer></div>
+</body>
+</html>

@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-whitepaper" data-has-hydrated="false">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="Docusaurus v3.10.1">
+<title data-rh="true">ProtoLink Whitepaper | protolink</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:image" content="https://nmaroulis.github.io/protolink/img/banner.png"><meta data-rh="true" name="twitter:image" content="https://nmaroulis.github.io/protolink/img/banner.png"><meta data-rh="true" property="og:url" content="https://nmaroulis.github.io/protolink/docs/whitepaper/"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="keywords" content="ProtoLink, agent-to-agent, A2A, Python agents, LLM tools, runtime control, multi-agent systems"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="ProtoLink Whitepaper | protolink"><meta data-rh="true" name="description" content="An A2A-Native Runtime for Autonomous, Pluggable Agent Systems"><meta data-rh="true" property="og:description" content="An A2A-Native Runtime for Autonomous, Pluggable Agent Systems"><link data-rh="true" rel="icon" href="/protolink/img/logo_sm.png"><link data-rh="true" rel="canonical" href="https://nmaroulis.github.io/protolink/docs/whitepaper/"><link data-rh="true" rel="alternate" href="https://nmaroulis.github.io/protolink/docs/whitepaper/" hreflang="en"><link data-rh="true" rel="alternate" href="https://nmaroulis.github.io/protolink/docs/whitepaper/" hreflang="x-default"><link data-rh="true" rel="preconnect" href="https://T7EUHV2RT6-dsn.algolia.net" crossorigin="anonymous"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ProtoLink Whitepaper","item":"https://nmaroulis.github.io/protolink/docs/whitepaper"}]}</script><link rel="search" type="application/opensearchdescription+xml" title="protolink" href="/protolink/opensearch.xml">
+
+<meta name="algolia-site-verification" content="45AFD9E85485A956">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&amp;display=swap"><link rel="stylesheet" href="/protolink/assets/css/styles.662a3ea2.css">
+<script src="/protolink/assets/js/runtime~main.fb25d378.js" defer="defer"></script>
+<script src="/protolink/assets/js/main.78bc4540.js" defer="defer"></script>
+</head>
+<body>
+<svg style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"/></symbol>
+</defs></svg>
+<script>!function(){var t=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",t||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")),document.documentElement.setAttribute("data-theme-choice",t||"system")}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><link rel="preload" as="image" href="/protolink/img/logo_sm.png"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top navbarHideable_m1mJ"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/protolink/"><div class="navbar__logo"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--light_NVdE"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--dark_xIcU"></div><b class="navbar__title text--truncate">protolink</b></a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/protolink/docs/">Docs</a><a class="navbar__item navbar__link" href="/protolink/docs/agent/">API</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/protolink/docs/whitepaper/">Whitepaper</a><a class="navbar__item navbar__link" href="/protolink/docs/examples/">Examples</a><a class="navbar__item navbar__link" href="/protolink/docs/changelog/">Changelog</a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><a href="https://github.com/nMaroulis/protolink" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a><a href="https://pypi.org/project/protolink/" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">PyPI<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="system mode" aria-label="Switch between dark and light mode (currently system mode)"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" class="toggleIcon_g3eP systemToggleIcon_QzmC"><path fill="currentColor" d="m12 21c4.971 0 9-4.029 9-9s-4.029-9-9-9-9 4.029-9 9 4.029 9 9 9zm4.95-13.95c1.313 1.313 2.05 3.093 2.05 4.95s-0.738 3.637-2.05 4.95c-1.313 1.313-3.093 2.05-4.95 2.05v-14c1.857 0 3.637 0.737 4.95 2.05z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><button type="button" class="DocSearch DocSearch-Button" aria-label="Search (Meta+k)" aria-keyshortcuts="Meta+k"><span class="DocSearch-Button-Container"><svg width="20" height="20" class="DocSearch-Search-Icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="currentColor" fill="none" stroke-width="1.4"></circle><path d="m21 21-4.3-4.3" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="DocSearch-Button-Placeholder">Search</span></span><span class="DocSearch-Button-Keys"></span></button></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Scroll back to top" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd sidebarWithHideableNavbar_wUlq"><a tabindex="-1" class="sidebarLogo_isFc" href="/protolink/"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--light_NVdE"><img src="/protolink/img/logo_sm.png" alt="ProtoLink logo" class="themedComponent_mlkZ themedComponent--dark_xIcU"><b>protolink</b></a><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret menu__link--active" role="button" aria-expanded="true" href="/protolink/docs/"><span title="Overview" class="categoryLinkLabel_W154">Overview</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/"><span title="Documentation" class="linkLabel_WmDU">Documentation</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/concept/"><span title="Concept" class="linkLabel_WmDU">Concept</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="/protolink/docs/whitepaper/"><span title="ProtoLink Whitepaper" class="linkLabel_WmDU">ProtoLink Whitepaper</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/getting-started/"><span title="Getting Started" class="linkLabel_WmDU">Getting Started</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/cli/"><span title="CLI" class="linkLabel_WmDU">CLI</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/devtools/"><span title="Developer Tools" class="linkLabel_WmDU">Developer Tools</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="true" href="/protolink/docs/agent/"><span title="API Reference" class="categoryLinkLabel_W154">API Reference</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/agent/"><span title="Agents" class="linkLabel_WmDU">Agents</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/client/"><span title="Client" class="linkLabel_WmDU">Client</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/flows/"><span title="Flows" class="linkLabel_WmDU">Flows</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/llm/"><span title="LLMs" class="linkLabel_WmDU">LLMs</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/logging/"><span title="Logging" class="linkLabel_WmDU">Logging</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/models/"><span title="Models API Reference" class="linkLabel_WmDU">Models API Reference</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/registry/"><span title="Registry" class="linkLabel_WmDU">Registry</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/runtime/"><span title="Runtime" class="linkLabel_WmDU">Runtime</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/server/"><span title="Server API Reference" class="linkLabel_WmDU">Server API Reference</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/state/"><span title="State Management" class="linkLabel_WmDU">State Management</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/storage/"><span title="Storage" class="linkLabel_WmDU">Storage</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/telemetry/"><span title="Telemetry" class="linkLabel_WmDU">Telemetry</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/tool/"><span title="Tools" class="linkLabel_WmDU">Tools</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/transport/"><span title="Transport" class="linkLabel_WmDU">Transport</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/authentication/"><span title="Authentication &amp; Security" class="linkLabel_WmDU">Authentication &amp; Security</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/types/"><span title="Type Aliases API Reference" class="linkLabel_WmDU">Type Aliases API Reference</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="true" href="/protolink/docs/examples/"><span title="Examples" class="categoryLinkLabel_W154">Examples</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/examples/"><span title="Examples" class="linkLabel_WmDU">Examples</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/llm_examples/"><span title="LLM Examples" class="linkLabel_WmDU">LLM Examples</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/ticket_booking_example/"><span title="Ticket Booking Example" class="linkLabel_WmDU">Ticket Booking Example</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/code_assistant_example/"><span title="Code Assistant Example" class="linkLabel_WmDU">Code Assistant Example</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/protoagent_case_study/"><span title="ProtoAgent" class="linkLabel_WmDU">ProtoAgent</span></a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="categoryLink_byQd menu__link menu__link--sublist menu__link--sublist-caret" role="button" aria-expanded="true" href="/protolink/docs/development/"><span title="Project" class="categoryLinkLabel_W154">Project</span></a></div><ul class="menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/development/"><span title="Development &amp; Contribution" class="linkLabel_WmDU">Development &amp; Contribution</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/changelog/"><span title="Changelog" class="linkLabel_WmDU">Changelog</span></a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="/protolink/docs/relevant/"><span title="Related Projects" class="linkLabel_WmDU">Related Projects</span></a></li></ul></li></ul></nav></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col docItemCol_VOVn"><div class="docItemContainer_Djhp"><article><nav class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl" aria-label="Breadcrumbs"><ul class="breadcrumbs"><li class="breadcrumbs__item"><a aria-label="Home page" class="breadcrumbs__link" href="/protolink/"><svg viewBox="0 0 24 24" class="breadcrumbHomeIcon_YNFT"><path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" fill="currentColor"></path></svg></a></li><li class="breadcrumbs__item"><span class="breadcrumbs__link">Overview</span></li><li class="breadcrumbs__item breadcrumbs__item--active"><span class="breadcrumbs__link">ProtoLink Whitepaper</span></li></ul></nav><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><div class="theme-doc-markdown markdown"><header><h1>ProtoLink Whitepaper</h1></header>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="an-a2a-native-runtime-for-autonomous-pluggable-agent-systems">An A2A-Native Runtime for Autonomous, Pluggable Agent Systems<a href="#an-a2a-native-runtime-for-autonomous-pluggable-agent-systems" class="hash-link" aria-label="Direct link to An A2A-Native Runtime for Autonomous, Pluggable Agent Systems" title="Direct link to An A2A-Native Runtime for Autonomous, Pluggable Agent Systems" translate="no">​</a></h2>
+<p>ProtoLink is a Python framework for building distributed multi-agent systems
+where agents are not just function calls wrapped around a model. In ProtoLink,
+an agent is an autonomous runtime entity: it has an identity, a lifecycle, an
+LLM if it needs one, tools if it exposes capabilities, state if it needs memory,
+telemetry if it must be observed, policy if it can cause side effects, and
+transports if it must communicate with other agents or applications.</p>
+<p>The core idea is deliberately simple:</p>
+<blockquote>
+<p>Agents are entities, not functions. A ProtoLink system is built by composing
+autonomous agents that communicate through protocol-native tasks.</p>
+</blockquote>
+<p>ProtoLink implements and extends Google&#x27;s Agent-to-Agent (A2A) model. A2A gives
+the system the right public language: agent cards, tasks, messages, parts,
+artifacts, task states, and discovery. ProtoLink keeps that language at the
+center, then adds the runtime substrate needed to make those protocol objects
+useful in real systems: LLM execution, tool calling, agent delegation, transports,
+registry discovery, structured flows, state, cancellation, budgets, approvals,
+telemetry, normalized events, run reports, and replay.</p>
+<p>The result is a framework for treating agent systems as distributed programs,
+not as opaque prompt graphs.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="abstract">Abstract<a href="#abstract" class="hash-link" aria-label="Direct link to Abstract" title="Direct link to Abstract" translate="no">​</a></h2>
+<p>Modern agent applications need more than a model call. They need identity,
+communication, tool execution, delegation, state, policy, observability, and a
+way to move from local experiments to distributed deployments without rewriting
+the system.</p>
+<p>Many frameworks begin with the model and build orchestration outward. ProtoLink
+begins with the agent. The model is one pluggable module inside an autonomous
+entity. Tools, transports, storage, telemetry, authentication, and runtime
+policy are also modules. The public contract between agents remains A2A-native:
+a <code>Task</code> is exchanged, <code>Message</code> and <code>Artifact</code> objects carry content, and
+<code>Part</code> objects describe atomic actions or outputs.</p>
+<p>ProtoLink extends that protocol foundation with a deterministic runtime:</p>
+<ul>
+<li class="">LLMs declare one typed action at a time.</li>
+<li class="">The runtime validates, authorizes, executes, observes, and records that action.</li>
+<li class="">Tool calls and agent delegations are explicit <code>Part</code> and action records.</li>
+<li class=""><code>RunContext</code> carries session, trace, permission, budget, cancellation, and
+parent-child execution metadata.</li>
+<li class=""><code>RunEvent</code> and <code>RunReport</code> provide stable application-facing streams and
+replayable summaries.</li>
+<li class="">Structured flows remain <code>Flow.execute(Task) -&gt; Task</code>, so deterministic
+orchestration does not abandon the A2A data model.</li>
+</ul>
+<p>The design goal is not to hide distributed systems complexity behind magic. The
+goal is to make the useful boundaries explicit, typed, inspectable, swappable,
+and easy to assemble.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="the-problem">The Problem<a href="#the-problem" class="hash-link" aria-label="Direct link to The Problem" title="Direct link to The Problem" translate="no">​</a></h2>
+<p>Agent applications often start as a single script:</p>
+<ol>
+<li class="">Send a prompt to an LLM.</li>
+<li class="">Ask the model to pick a tool.</li>
+<li class="">Parse the response.</li>
+<li class="">Run some Python.</li>
+<li class="">Feed the result back to the model.</li>
+<li class="">Repeat until the output looks final.</li>
+</ol>
+<p>That is enough for a demo, but it becomes fragile as soon as the system grows.
+The application needs multiple specialized agents, different model providers,
+streaming progress, persistence, cancellation, tool schemas, approvals, traces,
+state cleanup, deployment topology, and tests that can prove what happened.</p>
+<p>Without a shared runtime layer, each application invents private conventions:</p>
+<ul>
+<li class=""><code>metadata[&quot;session_id&quot;]</code> in one service and <code>metadata[&quot;thread&quot;]</code> in another.</li>
+<li class="">One ad hoc format for tool calls and another for delegated agent calls.</li>
+<li class="">Provider-native tool calling in one model and JSON prompt parsing in another.</li>
+<li class="">Streaming events that are easy to render but hard to replay.</li>
+<li class="">Flow graphs that orchestrate work but are disconnected from the wire protocol.</li>
+<li class="">Approvals that happen after a tool has already been partially prepared.</li>
+<li class="">Cancellation that marks a task as stopped but cannot reach active execution.</li>
+</ul>
+<p>The problem is not that these systems are impossible to build. The problem is
+that the repeated glue becomes the product. ProtoLink exists to move that glue
+into a reusable runtime while keeping the application logic visible.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="design-thesis">Design Thesis<a href="#design-thesis" class="hash-link" aria-label="Direct link to Design Thesis" title="Direct link to Design Thesis" translate="no">​</a></h2>
+<p>ProtoLink&#x27;s design starts from five principles.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="1-the-agent-is-the-unit-of-autonomy">1. The Agent Is The Unit Of Autonomy<a href="#1-the-agent-is-the-unit-of-autonomy" class="hash-link" aria-label="Direct link to 1. The Agent Is The Unit Of Autonomy" title="Direct link to 1. The Agent Is The Unit Of Autonomy" translate="no">​</a></h3>
+<p>An agent is not a callback. It is a runtime entity that can receive work, initiate
+work, discover peers, maintain state, expose tools, call its model, delegate to
+other agents, stream progress, and shut down cleanly.</p>
+<p>This matters because real multi-agent systems are not just nested function calls.
+A weather agent, a booking agent, a code-reading agent, and an approval-gated
+file-writing agent should be able to exist as separate processes, local in-memory
+actors, or remote services without changing their business logic.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="2-protocol-objects-are-the-shared-language">2. Protocol Objects Are The Shared Language<a href="#2-protocol-objects-are-the-shared-language" class="hash-link" aria-label="Direct link to 2. Protocol Objects Are The Shared Language" title="Direct link to 2. Protocol Objects Are The Shared Language" translate="no">​</a></h3>
+<p>ProtoLink keeps A2A-style primitives at the center:</p>
+<ul>
+<li class=""><code>AgentCard</code> declares identity, capabilities, skills, tags, formats, security,
+and transport metadata.</li>
+<li class=""><code>Task</code> is the shared unit of work.</li>
+<li class=""><code>Message</code> carries communication.</li>
+<li class=""><code>Part</code> is the atomic action or content unit.</li>
+<li class=""><code>Artifact</code> records outputs, previews, and generated results.</li>
+<li class=""><code>TaskState</code> tracks lifecycle.</li>
+</ul>
+<p>This gives agents a portable, serializable language. A workflow step, a remote
+task submission, a streaming update, and a replay report all point back to the
+same task model.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="3-pluggability-is-a-runtime-property">3. Pluggability Is A Runtime Property<a href="#3-pluggability-is-a-runtime-property" class="hash-link" aria-label="Direct link to 3. Pluggability Is A Runtime Property" title="Direct link to 3. Pluggability Is A Runtime Property" translate="no">​</a></h3>
+<p>LLMs, tools, transports, storage, telemetry, authentication, logging, and policy
+are not special cases scattered through application code. They are modules
+plugged into the agent.</p>
+<p>That is the difference between a model wrapper and an agent runtime. You can
+replace OpenAI with Ollama, HTTP with an in-process runtime transport, local
+traces with LangSmith or Langfuse, in-memory state with SQLite, or a permissive
+policy with approval-gated side effects without rewriting the agent&#x27;s task
+contract.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="4-the-model-declares-intent-the-runtime-executes">4. The Model Declares Intent, The Runtime Executes<a href="#4-the-model-declares-intent-the-runtime-executes" class="hash-link" aria-label="Direct link to 4. The Model Declares Intent, The Runtime Executes" title="Direct link to 4. The Model Declares Intent, The Runtime Executes" translate="no">​</a></h3>
+<p>ProtoLink treats LLM output as a proposal, not as authority. The LLM can propose
+a <code>final</code>, <code>tool_call</code>, or <code>agent_call</code> action. The runtime parses and validates
+that action, checks cancellation and budgets, authorizes side effects, executes
+the operation, records events, and feeds the result back to the model.</p>
+<p>This separation lets the system use provider-native tool calling when available
+and JSON action fallback when a smaller or local model is better served by a
+simple text contract. The runtime-facing behavior remains the same.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="5-production-control-should-be-domain-neutral">5. Production Control Should Be Domain-Neutral<a href="#5-production-control-should-be-domain-neutral" class="hash-link" aria-label="Direct link to 5. Production Control Should Be Domain-Neutral" title="Direct link to 5. Production Control Should Be Domain-Neutral" translate="no">​</a></h3>
+<p><code>RunContext</code>, <code>RunAction</code>, <code>PolicyDecision</code>, <code>ApprovalRequest</code>, <code>RunEvent</code>, and
+<code>RunReport</code> do not assume that the application is a coding assistant, a browser
+agent, a support bot, a booking system, or a data pipeline. They carry generic
+execution metadata and structured action records. The application supplies the
+domain meaning.</p>
+<p>That keeps the framework reusable while still making serious runtime concerns
+first-class.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="architecture-at-a-glance">Architecture At A Glance<a href="#architecture-at-a-glance" class="hash-link" aria-label="Direct link to Architecture At A Glance" title="Direct link to Architecture At A Glance" translate="no">​</a></h2>
+<p>At the top level, ProtoLink is centered on the <code>Agent</code> facade. The agent owns
+its identity and wires together the subsystems that make the entity operational.
+Client/server layers provide intent-level communication APIs. Transports handle
+protocol and runtime details. The registry provides discovery. The runtime layer
+normalizes execution context, policy, events, and reports.</p>
+<!-- -->
+<p>The architectural dependency direction is important:</p>
+<ul>
+<li class="">The agent owns client and server components.</li>
+<li class="">The client and server use transports.</li>
+<li class="">Transports know about protocols, routes, serialization, event loops, and I/O.</li>
+<li class="">Agent logic does not need to know whether a peer is local, HTTP, SSE, or
+WebSocket.</li>
+</ul>
+<p>This is the core ports-and-adapters shape of ProtoLink. The agent expresses
+intent. The client/server layer turns intent into requests and handlers. The
+transport performs the protocol work.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="why-build-on-a2a">Why Build On A2A?<a href="#why-build-on-a2a" class="hash-link" aria-label="Direct link to Why Build On A2A?" title="Direct link to Why Build On A2A?" translate="no">​</a></h2>
+<p>A2A is valuable because it defines an interoperable grammar for agent systems.
+It gives agents a way to describe themselves and exchange work without assuming
+that every participant shares the same framework internals.</p>
+<p>ProtoLink uses that foundation for:</p>
+<ul>
+<li class="">Agent identity through <code>AgentCard</code>.</li>
+<li class="">Capability and skill declaration.</li>
+<li class="">Task exchange.</li>
+<li class="">Message and artifact history.</li>
+<li class="">Task state transitions.</li>
+<li class="">Discovery through a registry-oriented pattern.</li>
+</ul>
+<p>But A2A intentionally leaves many runtime concerns out of scope. It does not
+define how an agent should embed an LLM, how tools should be registered, how a
+model should choose between tools and peer agents, how state should be loaded,
+how approvals should be requested, how budgets should be enforced, or how a UI
+should replay a run.</p>
+<p>ProtoLink extends A2A at the runtime layer.</p>
+<table><thead><tr><th>Concern</th><th>A2A foundation</th><th>ProtoLink extension</th></tr></thead><tbody><tr><td>Identity</td><td>Agent card</td><td>Runtime <code>Agent</code> entity with card, lifecycle, modules, state, and policy</td></tr><tr><td>Work unit</td><td>Task</td><td>Deterministic task execution over explicit <code>Part</code> actions</td></tr><tr><td>Capability declaration</td><td>Skills/capabilities</td><td>Native tools, MCP tools, schemas, tags, examples, and runtime capabilities</td></tr><tr><td>Communication</td><td>Protocol objects</td><td>Agent-owned client/server and pluggable transports</td></tr><tr><td>Discovery</td><td>Agent metadata</td><td>Registry service with indexed lookup and dynamic capability injection</td></tr><tr><td>LLMs</td><td>Out of scope</td><td>Provider-agnostic LLM wrappers and controlled inference loop</td></tr><tr><td>Runtime metadata</td><td>Task metadata</td><td>Typed <code>RunContext</code> with session, trace, permissions, budget, and cancellation</td></tr><tr><td>Side effects</td><td>Out of scope</td><td><code>RunAction</code>, policies, approval checkpoints, preview artifacts</td></tr><tr><td>Observability</td><td>Out of scope</td><td><code>RunEvent</code>, telemetry, <code>RunReport</code>, <code>RunReplay</code>, redaction</td></tr><tr><td>Workflows</td><td>Out of scope</td><td>Structured flows over <code>Task</code> input/output</td></tr></tbody></table>
+<p>The important design choice is that the extension does not replace the protocol
+model. It builds on it.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="the-protocol-core">The Protocol Core<a href="#the-protocol-core" class="hash-link" aria-label="Direct link to The Protocol Core" title="Direct link to The Protocol Core" translate="no">​</a></h2>
+<p>ProtoLink&#x27;s core data model is small but expressive.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="task">Task<a href="#task" class="hash-link" aria-label="Direct link to Task" title="Direct link to Task" translate="no">​</a></h3>
+<p>A <code>Task</code> is the unit of work exchanged between agents. It contains messages,
+artifacts, metadata, flow state, creation time, and lifecycle state. The default
+lifecycle is:</p>
+<div class="language-text codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-text codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">submitted -&gt; working -&gt; completed</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">submitted -&gt; working -&gt; input-required</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">submitted -&gt; working -&gt; failed</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">submitted -&gt; working -&gt; canceled</span><br></div></code></pre></div></div>
+<p>Terminal states cannot transition further. Successful transitions are recorded
+in <code>task.metadata[&quot;state_history&quot;]</code>, which gives applications and tests a
+timeline without requiring a separate task database.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="message">Message<a href="#message" class="hash-link" aria-label="Direct link to Message" title="Direct link to Message" translate="no">​</a></h3>
+<p>A <code>Message</code> is communicative. It is sent by a user, an agent, a system, or an
+assistant-style participant. Messages contain ordered <code>Part</code> objects.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="part">Part<a href="#part" class="hash-link" aria-label="Direct link to Part" title="Direct link to Part" translate="no">​</a></h3>
+<p>A <code>Part</code> is the atomic unit. It can be plain text, JSON, a tool call, a tool
+output, an inference request, an inference result, an error, a status, a route
+decision, media, and other serializable content.</p>
+<p>The executable parts are especially important:</p>
+<ul>
+<li class=""><code>Part.infer(...)</code> asks an agent to invoke its LLM.</li>
+<li class=""><code>Part.tool_call(...)</code> asks an agent to execute one registered tool.</li>
+<li class=""><code>Part.route(...)</code> or <code>Part.decision(...)</code> records a structured flow branch.</li>
+</ul>
+<p>The runtime does not guess. If the last task item contains no executable part,
+the default agent handler does not invent one.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="artifact">Artifact<a href="#artifact" class="hash-link" aria-label="Direct link to Artifact" title="Direct link to Artifact" translate="no">​</a></h3>
+<p>An <code>Artifact</code> contains produced output. Tool outputs, inference outputs,
+approval previews, generated files, intermediate results, and final reports can
+be represented as artifacts. Artifacts also carry descriptors such as <code>kind</code>,
+<code>name</code>, <code>uri</code>, <code>media_type</code>, metadata, and action IDs.</p>
+<p>This is important for approvals and replay. A side effect can attach a preview
+artifact before execution, and a UI can render it without running the operation.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="the-agent-as-autonomous-runtime-entity">The Agent As Autonomous Runtime Entity<a href="#the-agent-as-autonomous-runtime-entity" class="hash-link" aria-label="Direct link to The Agent As Autonomous Runtime Entity" title="Direct link to The Agent As Autonomous Runtime Entity" translate="no">​</a></h2>
+<p>The public <code>Agent</code> class is the stable facade. Internally, the implementation is
+split across mixins and an execution engine so that lifecycle, communication,
+tool registration, configuration, control-plane operations, serialization, and
+task execution remain separable.</p>
+<p>An agent can be:</p>
+<ul>
+<li class="">Tool-only: deterministic capabilities with no LLM.</li>
+<li class="">LLM-only: reasoning or transformation without side-effecting tools.</li>
+<li class="">Hybrid: LLM plus tools.</li>
+<li class="">Coordinator: LLM plus registry discovery and delegation.</li>
+<li class="">Worker: specialized endpoint for a narrow capability.</li>
+<li class="">Local actor: using <code>RuntimeTransport</code>.</li>
+<li class="">Network service: using HTTP, SSE JSON-RPC, or WebSocket.</li>
+</ul>
+<p>The constructor wires in the major modules:</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> protolink </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> Agent</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> AgentCard</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> create_llm</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> protolink</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">storage </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> SQLiteStorage</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> protolink</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">telemetry </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> LocalTraceTelemetry</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">agent </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> Agent</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    card</span><span class="token operator" style="color:#393A34">=</span><span class="token plain">AgentCard</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        name</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;researcher&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        description</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;Researches and summarizes technical questions&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        url</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;runtime://researcher&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        capabilities</span><span class="token operator" style="color:#393A34">=</span><span class="token punctuation" style="color:#393A34">{</span><span class="token string" style="color:#e3116c">&quot;streaming&quot;</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token boolean" style="color:#36acaa">True</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;delegation&quot;</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token boolean" style="color:#36acaa">True</span><span class="token punctuation" style="color:#393A34">}</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        tags</span><span class="token operator" style="color:#393A34">=</span><span class="token punctuation" style="color:#393A34">[</span><span class="token string" style="color:#e3116c">&quot;research&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;summarization&quot;</span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    transport</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;runtime&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    llm</span><span class="token operator" style="color:#393A34">=</span><span class="token plain">create_llm</span><span class="token punctuation" style="color:#393A34">(</span><span class="token string" style="color:#e3116c">&quot;mock&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> default_response</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;ready&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    storage</span><span class="token operator" style="color:#393A34">=</span><span class="token plain">SQLiteStorage</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">db_path</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;researcher.db&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    state</span><span class="token operator" style="color:#393A34">=</span><span class="token punctuation" style="color:#393A34">[</span><span class="token string" style="color:#e3116c">&quot;conversation&quot;</span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    telemetry</span><span class="token operator" style="color:#393A34">=</span><span class="token plain">LocalTraceTelemetry</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">path</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;traces.jsonl&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token punctuation" style="color:#393A34">)</span><br></div></code></pre></div></div>
+<p>The exact LLM, storage backend, telemetry backend, transport, authentication
+strategy, and policy can change. The agent contract stays the same.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="agentcard-identity-and-capability">AgentCard: Identity And Capability<a href="#agentcard-identity-and-capability" class="hash-link" aria-label="Direct link to AgentCard: Identity And Capability" title="Direct link to AgentCard: Identity And Capability" translate="no">​</a></h3>
+<p><code>AgentCard</code> is the public description of an agent. It includes:</p>
+<ul>
+<li class=""><code>name</code></li>
+<li class=""><code>description</code></li>
+<li class=""><code>url</code></li>
+<li class=""><code>transport</code></li>
+<li class=""><code>version</code></li>
+<li class=""><code>protocolVersion</code></li>
+<li class=""><code>capabilities</code></li>
+<li class=""><code>skills</code></li>
+<li class=""><code>inputFormats</code></li>
+<li class=""><code>outputFormats</code></li>
+<li class=""><code>securitySchemes</code></li>
+<li class=""><code>tags</code></li>
+</ul>
+<p>ProtoLink extends the base identity concept with runtime-relevant capability
+flags such as <code>has_llm</code>, <code>tool_calling</code>, <code>delegation</code>, <code>streaming</code>,
+<code>multi_step_reasoning</code>, <code>rag</code>, <code>code_execution</code>, and <code>max_concurrency</code>.</p>
+<p>Tools registered on the agent can become advertised skills. That lets peer
+agents discover not only that an agent exists, but what it can do and how to
+call it.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="agent-lifecycle">Agent Lifecycle<a href="#agent-lifecycle" class="hash-link" aria-label="Direct link to Agent Lifecycle" title="Direct link to Agent Lifecycle" translate="no">​</a></h3>
+<p>The lifecycle is intentionally straightforward:</p>
+<ol>
+<li class="">Instantiate the agent with a card and modules.</li>
+<li class="">Configure transport, client, server, registry, tools, state, and policy.</li>
+<li class="">Start the agent.</li>
+<li class="">Register with the registry if configured.</li>
+<li class="">Receive and execute tasks.</li>
+<li class="">Send tasks or messages to peers when needed.</li>
+<li class="">Stop cleanly and unregister.</li>
+</ol>
+<p><code>start(background=True)</code> isolates runtime execution in a background thread or
+event loop when useful for notebooks, tests, and multi-agent scripts.
+<code>background=False</code> lets the agent own the main process for standalone services.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="the-llm-runtime">The LLM Runtime<a href="#the-llm-runtime" class="hash-link" aria-label="Direct link to The LLM Runtime" title="Direct link to The LLM Runtime" translate="no">​</a></h2>
+<p>ProtoLink&#x27;s LLM layer supports API models, server-hosted models, and local
+models behind a consistent interface. The agent runtime does not care whether a
+model is OpenAI, Anthropic, Gemini, DeepSeek, Grok, Hugging Face, Ollama,
+llama.cpp, LM Studio, OpenAI-compatible, mock, or custom.</p>
+<p>The deeper idea is not just provider switching. It is action normalization.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="inference-as-controlled-action-loop">Inference As Controlled Action Loop<a href="#inference-as-controlled-action-loop" class="hash-link" aria-label="Direct link to Inference As Controlled Action Loop" title="Direct link to Inference As Controlled Action Loop" translate="no">​</a></h3>
+<p><code>LLM.infer()</code> implements a deterministic loop over a stateless model:</p>
+<!-- -->
+<p>The model can produce:</p>
+<ul>
+<li class=""><code>final</code>: return a final answer.</li>
+<li class=""><code>tool_call</code>: call a local tool.</li>
+<li class=""><code>agent_call</code>: delegate to another agent.</li>
+</ul>
+<p>Every action is validated before dispatch. Tool arguments are checked against
+schemas. Agent names are resolved through discovery or URLs. Repeated actions
+are detected. Parse failures trigger corrective feedback, and a parse circuit
+breaker stops runaway correction loops. A hard inference step limit protects
+against infinite loops.</p>
+<p>The runtime is the actor that actually executes side effects. The model only
+declares intent.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="native-tools-and-json-fallback">Native Tools And JSON Fallback<a href="#native-tools-and-json-fallback" class="hash-link" aria-label="Direct link to Native Tools And JSON Fallback" title="Direct link to Native Tools And JSON Fallback" translate="no">​</a></h3>
+<p>Some providers support native tool or function calling. Others, especially
+small local models, are easier to operate with a simple JSON action contract.
+ProtoLink supports both.</p>
+<p>Provider-native adapters normalize provider-specific tool calls into the same
+internal action shapes. Fallback adapters ask the model for one JSON object and
+parse it into the same typed action union. Streaming follows the same principle:
+native streaming action events are used where available; plain text streaming is
+collected and parsed through the JSON action path.</p>
+<p>This is crucial for portability. Application code should not change because the
+agent moved from a frontier API model to a local server model. The runtime
+contract remains:</p>
+<ol>
+<li class="">one action,</li>
+<li class="">validation,</li>
+<li class="">authorization,</li>
+<li class="">execution,</li>
+<li class="">observation,</li>
+<li class="">repeat.</li>
+</ol>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="semantic-context-injection">Semantic Context Injection<a href="#semantic-context-injection" class="hash-link" aria-label="Direct link to Semantic Context Injection" title="Direct link to Semantic Context Injection" translate="no">​</a></h3>
+<p>When an agent calls its LLM, ProtoLink builds a system prompt that can include:</p>
+<ul>
+<li class="">the agent&#x27;s own role instructions,</li>
+<li class="">registered tool schemas,</li>
+<li class="">discovered peer agent cards,</li>
+<li class="">flow instructions injected by structured flows,</li>
+<li class="">action contract guidance,</li>
+<li class="">native or JSON-mode behavior depending on the provider.</li>
+</ul>
+<p>This is dynamic semantic context injection. Agents do not hardcode all peers or
+flow topologies. They receive the relevant contracts at runtime. A coordinator
+can discover a weather agent and a booking agent from the registry; a pipeline
+can tell a researcher that the next step is a summarizer; a router can tell an
+agent which structured route keys are available.</p>
+<p>The agent remains decoupled, while its behavior adapts to the live mesh.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="tools-as-capabilities">Tools As Capabilities<a href="#tools-as-capabilities" class="hash-link" aria-label="Direct link to Tools As Capabilities" title="Direct link to Tools As Capabilities" translate="no">​</a></h2>
+<p>ProtoLink tools are async callables behind a common <code>BaseTool</code> protocol. Native
+tools are regular Python functions registered on an agent. MCP tools are
+imported from Model Context Protocol servers and exposed through the same
+interface.</p>
+<p>Tools carry:</p>
+<ul>
+<li class=""><code>name</code></li>
+<li class=""><code>description</code></li>
+<li class=""><code>input_schema</code></li>
+<li class=""><code>output_schema</code></li>
+<li class=""><code>tags</code></li>
+<li class=""><code>examples</code></li>
+<li class=""><code>capabilities</code></li>
+</ul>
+<p>Native tools can infer JSON Schema from Python type hints, dataclasses, typed
+dictionaries, enums, and Pydantic models. At runtime, ProtoLink validates and
+lightly coerces arguments before user code runs. Invalid arguments become
+structured tool errors instead of unchecked exceptions inside application code.</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> pydantic </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> BaseModel</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> Field</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token keyword" style="color:#00009f">class</span><span class="token plain"> </span><span class="token class-name">BookingRequest</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">BaseModel</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    location</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token builtin">str</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    guests</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token builtin">int</span><span class="token plain"> </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> Field</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">gt</span><span class="token operator" style="color:#393A34">=</span><span class="token number" style="color:#36acaa">0</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token decorator annotation punctuation" style="color:#393A34">@agent</span><span class="token decorator annotation punctuation" style="color:#393A34">.</span><span class="token decorator annotation punctuation" style="color:#393A34">tool</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    name</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;book_hotel&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    description</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;Book a hotel&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    capabilities</span><span class="token operator" style="color:#393A34">=</span><span class="token punctuation" style="color:#393A34">[</span><span class="token string" style="color:#e3116c">&quot;booking.write&quot;</span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    examples</span><span class="token operator" style="color:#393A34">=</span><span class="token punctuation" style="color:#393A34">[</span><span class="token punctuation" style="color:#393A34">{</span><span class="token string" style="color:#e3116c">&quot;booking&quot;</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token punctuation" style="color:#393A34">{</span><span class="token string" style="color:#e3116c">&quot;location&quot;</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;Athens&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;guests&quot;</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token number" style="color:#36acaa">2</span><span class="token punctuation" style="color:#393A34">}</span><span class="token punctuation" style="color:#393A34">}</span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token keyword" style="color:#00009f">async</span><span class="token plain"> </span><span class="token keyword" style="color:#00009f">def</span><span class="token plain"> </span><span class="token function" style="color:#d73a49">book_hotel</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">booking</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> BookingRequest</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"> </span><span class="token operator" style="color:#393A34">-</span><span class="token operator" style="color:#393A34">&gt;</span><span class="token plain"> </span><span class="token builtin">dict</span><span class="token punctuation" style="color:#393A34">[</span><span class="token builtin">str</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token builtin">str</span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token keyword" style="color:#00009f">return</span><span class="token plain"> </span><span class="token punctuation" style="color:#393A34">{</span><span class="token string" style="color:#e3116c">&quot;location&quot;</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> booking</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">location</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;status&quot;</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;confirmed&quot;</span><span class="token punctuation" style="color:#393A34">}</span><br></div></code></pre></div></div>
+<p>The tool is local Python code, but it becomes part of the agent&#x27;s public
+capability surface. Another agent can discover it, ask for it, and receive a
+structured <code>tool_output</code>.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="mcp-integration">MCP Integration<a href="#mcp-integration" class="hash-link" aria-label="Direct link to MCP Integration" title="Direct link to MCP Integration" translate="no">​</a></h3>
+<p>MCP is a tool ecosystem. A2A is an agent communication protocol. ProtoLink uses
+both in their natural roles.</p>
+<p><code>MCPToolAdapter</code> connects to local stdio MCP servers or remote SSE MCP servers
+and wraps their tools as ProtoLink-native tools. From the agent&#x27;s perspective,
+a weather function written locally and a remote MCP tool are both capabilities
+available through the same tool registry.</p>
+<p>That makes MCP a plug-in surface for external tools while A2A remains the
+language agents use to exchange work.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="runcontext-the-execution-envelope">RunContext: The Execution Envelope<a href="#runcontext-the-execution-envelope" class="hash-link" aria-label="Direct link to RunContext: The Execution Envelope" title="Direct link to RunContext: The Execution Envelope" translate="no">​</a></h2>
+<p>The protocol task describes what is being exchanged. A runtime also needs to
+know how the work is executing.</p>
+<p><code>RunContext</code> is ProtoLink&#x27;s typed execution envelope. It is stored under
+<code>task.metadata[&quot;run_context&quot;]</code> and mirrors common keys such as <code>session_id</code> and
+<code>trace_id</code> for compatibility. It carries metadata that belongs to execution, not
+to the business payload.</p>
+<p>Important fields include:</p>
+<table><thead><tr><th>Field</th><th>Purpose</th></tr></thead><tbody><tr><td><code>run_id</code></td><td>One logical execution attempt</td></tr><tr><td><code>session_id</code></td><td>Conversation or application continuity</td></tr><tr><td><code>trace_id</code></td><td>Observability correlation</td></tr><tr><td><code>workspace_uri</code></td><td>Generic execution boundary such as a folder, dataset, account, ticket set, or browser profile</td></tr><tr><td><code>parent_run_id</code></td><td>Parent run for nested work</td></tr><tr><td><code>agent_chain</code></td><td>Ordered agents that handled the run</td></tr><tr><td><code>permissions</code></td><td>Domain-neutral runtime permission rules</td></tr><tr><td><code>budget</code></td><td>Optional <code>RunBudget</code> execution limits</td></tr><tr><td><code>canceled</code></td><td>Serializable cancellation state</td></tr><tr><td><code>metadata</code></td><td>Application-owned runtime metadata</td></tr></tbody></table>
+<p>The agent runtime calls <code>RunContext.ensure_task_context()</code> before normal
+execution, streaming execution, and outbound agent calls. When work is delegated,
+<code>RunContext.child()</code> creates a child run identity while preserving the session,
+trace, workspace, permissions, budget, and metadata.</p>
+<p>This gives a distributed run continuity:</p>
+<div class="language-text codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-text codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">client run</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">  -&gt; coordinator run</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    -&gt; weather_agent child run</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    -&gt; hotel_agent child run</span><br></div></code></pre></div></div>
+<p>Every participant can remain independent while still contributing to a coherent
+trace.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="runtime-actions-policy-and-approvals">Runtime Actions, Policy, And Approvals<a href="#runtime-actions-policy-and-approvals" class="hash-link" aria-label="Direct link to Runtime Actions, Policy, And Approvals" title="Direct link to Runtime Actions, Policy, And Approvals" translate="no">​</a></h2>
+<p>ProtoLink separates model intent from runtime action. A model may propose a
+tool call. The runtime then prepares a <code>RunAction</code>: a concrete operation with
+validated arguments, a stable action ID, kind, name, payload, capabilities,
+metadata, and optional artifacts.</p>
+<p>Policy evaluates the <code>RunAction</code>, not raw model text.</p>
+<!-- -->
+<p><code>CapabilityPolicy</code> supports <code>allow</code>, <code>deny</code>, and <code>require_approval</code>, including
+namespace wildcards such as <code>workspace.*</code>. Runtime-owned policy and
+<code>RunContext.permissions</code> are combined using the most restrictive result. A task
+can narrow its permissions, but it cannot grant itself more authority than the
+receiving agent policy allows.</p>
+<p>Approval is application-owned. ProtoLink creates a typed <code>ApprovalRequest</code>,
+including the prepared action and preview artifacts. The application can render
+that request in a terminal, web UI, desktop app, editor, service, or test
+fixture. The runtime only proceeds after it receives a correlated
+<code>ApprovalDecision</code>.</p>
+<p>This enables patterns such as:</p>
+<ul>
+<li class="">preview a database mutation,</li>
+<li class="">show a unified diff before a file write,</li>
+<li class="">inspect an outbound message before sending,</li>
+<li class="">approve a workflow transition,</li>
+<li class="">deny destructive operations by default.</li>
+</ul>
+<p>The action contract stays domain-neutral.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="budgets-and-context-manifests">Budgets And Context Manifests<a href="#budgets-and-context-manifests" class="hash-link" aria-label="Direct link to Budgets And Context Manifests" title="Direct link to Budgets And Context Manifests" translate="no">​</a></h2>
+<p>LLM applications need to understand context pressure, token usage, cost
+estimates, and execution limits. ProtoLink models this with <code>ContextManifest</code>,
+<code>RunBudget</code>, <code>BudgetPolicy</code>, and <code>BudgetEnforcer</code>.</p>
+<p>Before a model call, ProtoLink can build a <code>ContextManifest</code> that estimates:</p>
+<ul>
+<li class="">system prompt tokens,</li>
+<li class="">tool/delegation prompt tokens,</li>
+<li class="">history tokens,</li>
+<li class="">user tokens,</li>
+<li class="">total estimated tokens,</li>
+<li class="">model context window,</li>
+<li class="">provider and model identity.</li>
+</ul>
+<p><code>RunBudget</code> can limit steps, LLM calls, tool calls, runtime seconds, input
+tokens, and output tokens. Warnings and hard denials are emitted as runtime
+events. Hard budget denials happen before protected execution proceeds.</p>
+<p>This is useful for user-facing CLIs, dashboards, hosted services, and tests. A
+UI can show context pressure while a run is active. A test can assert that a
+golden run stayed under a token budget. A service can fail closed before a
+runaway tool loop becomes expensive.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="cancellation-and-the-control-plane">Cancellation And The Control Plane<a href="#cancellation-and-the-control-plane" class="hash-link" aria-label="Direct link to Cancellation And The Control Plane" title="Direct link to Cancellation And The Control Plane" translate="no">​</a></h2>
+<p>ProtoLink distinguishes serialized task state from live cancellation control.</p>
+<ul>
+<li class=""><code>Task.cancel()</code> records the protocol-level state.</li>
+<li class=""><code>RunContext.cancel()</code> records a serializable canceled context.</li>
+<li class=""><code>CancellationToken</code> signals local active work.</li>
+<li class="">The agent&#x27;s active-task registry maps task IDs to live tokens and owning
+<code>asyncio.Task</code> objects while work is running.</li>
+</ul>
+<p>Cancellation can be requested locally or remotely by task ID. The same public
+client method works across HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport.
+WebSocket uses a separate control connection so cancellation does not wait
+behind the stream it is trying to interrupt.</p>
+<p>Cancellation is best-effort, matching the reality of async systems:</p>
+<ul>
+<li class="">async Python work normally stops at an <code>await</code>,</li>
+<li class="">custom CPU loops need explicit checkpoints,</li>
+<li class="">synchronous work cannot be forcibly killed safely,</li>
+<li class="">external APIs and databases need their own rollback or cancellation semantics.</li>
+</ul>
+<p>The runtime synchronizes the visible surfaces when cancellation succeeds:</p>
+<ul>
+<li class=""><code>Task.state</code> becomes <code>canceled</code>,</li>
+<li class=""><code>RunContext.canceled</code> becomes <code>True</code>,</li>
+<li class="">the final streaming status event is <code>canceled</code>,</li>
+<li class="">cancellation is not converted into a task failure,</li>
+<li class="">the active execution entry is cleaned up.</li>
+</ul>
+<p>The same control-plane pattern is used for history compaction and state
+operations. These are not model-visible tools. They are typed maintenance
+requests handled by the agent/server/client layer.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="transports-same-agent-different-mediums">Transports: Same Agent, Different Mediums<a href="#transports-same-agent-different-mediums" class="hash-link" aria-label="Direct link to Transports: Same Agent, Different Mediums" title="Direct link to Transports: Same Agent, Different Mediums" translate="no">​</a></h2>
+<p>ProtoLink transports are protocol adapters. They normalize wire formats into
+the same <code>Task</code>, <code>Message</code>, <code>Part</code>, and event objects.</p>
+<p>Supported runtime transports include:</p>
+<table><thead><tr><th>Transport</th><th>Use</th></tr></thead><tbody><tr><td><code>http</code></td><td>interoperable request/response APIs and registry communication</td></tr><tr><td><code>sse</code>, <code>json-rpc</code>, <code>sse-json-rpc</code></td><td>HTTP-compatible streaming over Server-Sent Events</td></tr><tr><td><code>websocket</code></td><td>bidirectional streaming and interactive sessions</td></tr><tr><td><code>runtime</code></td><td>in-process communication with zero network overhead</td></tr></tbody></table>
+<p>The <code>grpc</code> alias is reserved for future support, but it is not registered by
+the default transport factory today.</p>
+<p>The transport layer handles:</p>
+<ul>
+<li class="">route setup,</li>
+<li class="">serialization and recursive JSON normalization,</li>
+<li class="">client request dispatch,</li>
+<li class="">streaming event subscription,</li>
+<li class="">lifecycle start/stop,</li>
+<li class="">control-plane requests such as cancellation and compaction.</li>
+</ul>
+<p>Application code typically uses <code>AgentClient</code>, not transports directly:</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> protolink</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">client </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> AgentClient</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> protolink </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> Task</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">client </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> AgentClient</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">transport</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;sse&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> url</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;http://localhost:8000&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">task </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> Task</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">create_infer</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">prompt</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;Write a concise release summary&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token keyword" style="color:#00009f">async</span><span class="token plain"> </span><span class="token keyword" style="color:#00009f">for</span><span class="token plain"> event </span><span class="token keyword" style="color:#00009f">in</span><span class="token plain"> client</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">send_task_streaming</span><span class="token punctuation" style="color:#393A34">(</span><span class="token string" style="color:#e3116c">&quot;http://localhost:8010&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> task</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">.</span><span class="token punctuation" style="color:#393A34">.</span><span class="token punctuation" style="color:#393A34">.</span><br></div></code></pre></div></div>
+<p>The same agent can run over <code>RuntimeTransport</code> in tests and HTTP or SSE in a
+service. That is the point of keeping protocol details below the agent.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="registry-and-discovery">Registry And Discovery<a href="#registry-and-discovery" class="hash-link" aria-label="Direct link to Registry And Discovery" title="Direct link to Registry And Discovery" translate="no">​</a></h2>
+<p>The registry is ProtoLink&#x27;s discovery service. Agents register their
+<code>AgentCard</code>; other agents query by name, role, tags, capabilities, or metadata.</p>
+<p>The registry mirrors the agent architecture:</p>
+<div class="language-text codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-text codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">Registry</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">  -&gt; RegistryClient</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">      -&gt; Transport</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">  -&gt; RegistryServer</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">      -&gt; Transport</span><br></div></code></pre></div></div>
+<p>It keeps the mental model consistent. Agents interact with the registry through
+a client. The registry exposes itself through a transport. The public data is
+still agent cards.</p>
+<p>Discovery matters for autonomy. A coordinator agent should not need hardcoded
+URLs for every specialist. It can discover agents, inject their card
+descriptions into the LLM prompt, and delegate using <code>agent_call</code> actions. A
+structured flow can resolve named steps through the same registry. A dashboard
+can inspect live cards and status endpoints.</p>
+<p>The registry also maintains secondary indexes for common filters such as agent
+name, role, and tags, while preserving a full-scan fallback for correctness.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="structured-flows">Structured Flows<a href="#structured-flows" class="hash-link" aria-label="Direct link to Structured Flows" title="Direct link to Structured Flows" translate="no">​</a></h2>
+<p>Not every process should be routed by an LLM. Some work should follow a
+deterministic topology: pipeline, parallel review, conditional branch, or graph
+state machine. ProtoLink provides this through structured flows.</p>
+<p>The key design choice is that a flow is still:</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">Flow</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">execute</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">task</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> Task</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"> </span><span class="token operator" style="color:#393A34">-</span><span class="token operator" style="color:#393A34">&gt;</span><span class="token plain"> Task</span><br></div></code></pre></div></div>
+<p>It does not introduce a competing graph runtime with private state. It moves a
+normal A2A-style task through deterministic topology and returns the enriched
+task.</p>
+<p>Flow targets can be:</p>
+<ul>
+<li class="">local <code>Agent</code> instances,</li>
+<li class="">agent names resolved through a registry,</li>
+<li class="">explicit remote URLs,</li>
+<li class="">nested <code>Flow</code> instances.</li>
+</ul>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="pipeline">Pipeline<a href="#pipeline" class="hash-link" aria-label="Direct link to Pipeline" title="Direct link to Pipeline" translate="no">​</a></h3>
+<p><code>Pipeline</code> sends a task through ordered steps. Before each step, it looks at the
+next target and injects semantic instructions into <code>task.flow_state[&quot;prompt&quot;]</code>.
+The executing agent can then shape its output for the downstream receiver
+without being hardwired to the overall topology.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="parallel">Parallel<a href="#parallel" class="hash-link" aria-label="Direct link to Parallel" title="Direct link to Parallel" translate="no">​</a></h3>
+<p><code>Parallel</code> fans work out to multiple branches. It can inform the previous agent
+that its output is being broadcast to a committee. Results are merged back into
+the task using ID-based merging to avoid duplicate messages and artifacts.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="router">Router<a href="#router" class="hash-link" aria-label="Direct link to Router" title="Direct link to Router" translate="no">​</a></h3>
+<p><code>Router</code> lets a preceding agent choose a branch while keeping the branch
+transition explicit. The preferred contract is a structured part:</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> protolink </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> Message</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> Part</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">task</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">add_message</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    Message</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        role</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;agent&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        parts</span><span class="token operator" style="color:#393A34">=</span><span class="token punctuation" style="color:#393A34">[</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">            Part</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">text</span><span class="token punctuation" style="color:#393A34">(</span><span class="token string" style="color:#e3116c">&quot;This draft needs editing.&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">            Part</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">route</span><span class="token punctuation" style="color:#393A34">(</span><span class="token string" style="color:#e3116c">&quot;editor&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> reason</span><span class="token operator" style="color:#393A34">=</span><span class="token string" style="color:#e3116c">&quot;needs polish&quot;</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">        </span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token punctuation" style="color:#393A34">)</span><br></div></code></pre></div></div>
+<p>The router records route decisions into task metadata for tracing and replay.
+Legacy route tags and JSON-shaped route decisions are accepted for compatibility,
+but structured <code>Part.route(...)</code> is the inspectable path.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="graph">Graph<a href="#graph" class="hash-link" aria-label="Direct link to Graph" title="Direct link to Graph" translate="no">​</a></h3>
+<p><code>Graph</code> supports state-machine workflows with named nodes, edges, conditional
+edges, loops, and an entry point. It is useful for deterministic enterprise
+processes where the flow topology should be auditable in code.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="why-flows-stay-a2a-native">Why Flows Stay A2A-Native<a href="#why-flows-stay-a2a-native" class="hash-link" aria-label="Direct link to Why Flows Stay A2A-Native" title="Direct link to Why Flows Stay A2A-Native" translate="no">​</a></h3>
+<p>Structured flows solve a different problem than autonomous delegation. They
+remove LLMs from routing when the process is known. But every step still
+receives and returns a task. Every intermediate result remains a message or
+artifact. Route decisions are parts and metadata. The same transports, events,
+state, and replay surfaces apply.</p>
+<p>That keeps deterministic orchestration compatible with the rest of the agent
+mesh.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="telemetry-events-reports-and-replay">Telemetry, Events, Reports, And Replay<a href="#telemetry-events-reports-and-replay" class="hash-link" aria-label="Direct link to Telemetry, Events, Reports, And Replay" title="Direct link to Telemetry, Events, Reports, And Replay" translate="no">​</a></h2>
+<p>ProtoLink separates live application events from observability traces.</p>
+<p>Telemetry backends such as <code>LocalTraceTelemetry</code>, Langfuse, and LangSmith
+capture traces, spans, LLM metrics, tool calls, retries, redacted payloads, and
+provider metadata. They are useful for debugging and long-term analysis.</p>
+<p><code>RunEvent</code> is the stable application-facing event envelope. Existing transport
+events remain available for wire compatibility, but <code>RunEvent</code> gives UIs,
+CLIs, tests, and replay tools one normalized shape:</p>
+<ul>
+<li class="">version,</li>
+<li class="">type,</li>
+<li class="">run ID,</li>
+<li class="">task ID,</li>
+<li class="">agent name,</li>
+<li class="">sequence,</li>
+<li class="">step,</li>
+<li class="">span IDs,</li>
+<li class="">action IDs,</li>
+<li class="">delegation ID,</li>
+<li class="">severity,</li>
+<li class="">summary,</li>
+<li class="">structured payload,</li>
+<li class="">final marker.</li>
+</ul>
+<p>Promoted event types include:</p>
+<ul>
+<li class=""><code>task.status</code></li>
+<li class=""><code>task.artifact</code></li>
+<li class=""><code>task.progress</code></li>
+<li class=""><code>task.error</code></li>
+<li class=""><code>llm.stream</code></li>
+<li class=""><code>context.prepared</code></li>
+<li class=""><code>llm.call.started</code></li>
+<li class=""><code>llm.call.completed</code></li>
+<li class=""><code>budget.warning</code></li>
+<li class=""><code>budget.exceeded</code></li>
+<li class=""><code>action.requested</code></li>
+<li class=""><code>action.policy</code></li>
+<li class=""><code>approval.required</code></li>
+<li class=""><code>approval.decided</code></li>
+<li class=""><code>action.started</code></li>
+<li class=""><code>action.completed</code></li>
+<li class=""><code>action.denied</code></li>
+<li class=""><code>action.failed</code></li>
+</ul>
+<p><code>EventSink</code> is the protocol for consumers. <code>InMemoryEventSink</code> is the simple
+built-in sink for tests and local apps. <code>RunRecorder</code> records a stream and turns
+it into a <code>RunReport</code>. <code>RunReplay</code> provides a read-only view over that report.</p>
+<p>This makes golden-run testing practical:</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token keyword" style="color:#00009f">from</span><span class="token plain"> protolink </span><span class="token keyword" style="color:#00009f">import</span><span class="token plain"> RunRecorder</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> RunReplay</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> assert_run_events</span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">recorder </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> RunRecorder</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">context</span><span class="token operator" style="color:#393A34">=</span><span class="token plain">context</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token keyword" style="color:#00009f">async</span><span class="token plain"> </span><span class="token keyword" style="color:#00009f">for</span><span class="token plain"> task_event </span><span class="token keyword" style="color:#00009f">in</span><span class="token plain"> agent</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">handle_task_streaming</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">task</span><span class="token punctuation" style="color:#393A34">)</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token keyword" style="color:#00009f">await</span><span class="token plain"> recorder</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">record_task_event</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">task_event</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">report </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> recorder</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">to_report</span><span class="token punctuation" style="color:#393A34">(</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">replay </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> RunReplay</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">report</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">assert_run_events</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    replay</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">[</span><span class="token string" style="color:#e3116c">&quot;task.status&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;context.prepared&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;llm.call.started&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;llm.call.completed&quot;</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"> </span><span class="token string" style="color:#e3116c">&quot;task.status&quot;</span><span class="token punctuation" style="color:#393A34">]</span><span class="token punctuation" style="color:#393A34">,</span><span class="token plain"></span><br></div><div class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token punctuation" style="color:#393A34">)</span><br></div></code></pre></div></div>
+<p>Replay does not re-execute tools or model calls. It lets applications inspect
+what happened through a durable, redacted, structured summary.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="state-and-memory">State And Memory<a href="#state-and-memory" class="hash-link" aria-label="Direct link to State And Memory" title="Direct link to State And Memory" translate="no">​</a></h2>
+<p>ProtoLink&#x27;s state layer provides modular persistence for agent internals. A
+<code>State</code> object orchestrates state modules over a shared storage backend.</p>
+<p>Available module names are:</p>
+<ul>
+<li class=""><code>conversation</code></li>
+<li class=""><code>tools</code></li>
+<li class=""><code>task</code></li>
+<li class=""><code>flow</code></li>
+</ul>
+<p>Conversation state is the most integrated automatic path today. When enabled,
+the agent loads LLM history before inference and saves it after task completion,
+partitioned by <code>session_id</code>. If no session ID is supplied, the runtime falls
+back to task-local behavior.</p>
+<p>This lets a user or workflow continue across tasks without the application
+manually loading and saving history inside every handler.</p>
+<p>State is also exposed through typed control-plane operations:</p>
+<ul>
+<li class="">describe state,</li>
+<li class="">reset state,</li>
+<li class="">compact state.</li>
+</ul>
+<p>LLM history compaction is also explicit. It can keep recent messages, keep a
+token-bounded suffix, or summarize older turns through the LLM&#x27;s own compactor.
+Compaction is not exposed as a model-visible tool. Applications invoke it as a
+control-plane request when they decide it is appropriate.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="example-vacation-booking-mesh">Example: Vacation Booking Mesh<a href="#example-vacation-booking-mesh" class="hash-link" aria-label="Direct link to Example: Vacation Booking Mesh" title="Direct link to Example: Vacation Booking Mesh" translate="no">​</a></h2>
+<p>The ticket-booking example shows the agent-entity model in a domain that is easy
+to understand.</p>
+<!-- -->
+<p>The coordinator is user-facing. It has an LLM and can delegate. The weather
+agent exposes deterministic weather tools. The hotel agent exposes booking
+tools. The holiday advisor is reasoning-only. The registry lets them discover
+each other.</p>
+<p>This is not just a chain inside one process. Each participant can be a separate
+runtime entity with its own model, tools, state, transport, telemetry, and
+policy. The coordinator can use <code>agent_call</code> to request reasoning from the
+advisor or a tool execution from the hotel agent. Results return as structured
+task artifacts and parts.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="example-code-assistant-mesh">Example: Code Assistant Mesh<a href="#example-code-assistant-mesh" class="hash-link" aria-label="Direct link to Example: Code Assistant Mesh" title="Direct link to Example: Code Assistant Mesh" translate="no">​</a></h2>
+<p>The code-assistant example maps naturally onto specialized roles:</p>
+<ul>
+<li class="">Orchestrator: user-facing LLM coordinator.</li>
+<li class="">Planner: LLM-only reasoning agent.</li>
+<li class="">Coder: tool-only file operations agent.</li>
+<li class="">Registry: discovery.</li>
+</ul>
+<p>This separation is useful because the agent boundary can encode authority. The
+planner can reason about code without filesystem access. The coder can read and
+write files without being the model that decides broad strategy. A policy-gated
+variant can require approval before write tools execute, with diff artifacts as
+approval previews.</p>
+<p>That pattern generalizes:</p>
+<ul>
+<li class="">use one agent for reasoning,</li>
+<li class="">one for data retrieval,</li>
+<li class="">one for privileged writes,</li>
+<li class="">one for user-facing coordination,</li>
+<li class="">use policy and <code>RunContext.permissions</code> to constrain each run.</li>
+</ul>
+<p>ProtoLink makes these boundaries concrete runtime objects rather than comments
+in a prompt.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="development-and-deployment-modes">Development And Deployment Modes<a href="#development-and-deployment-modes" class="hash-link" aria-label="Direct link to Development And Deployment Modes" title="Direct link to Development And Deployment Modes" translate="no">​</a></h2>
+<p>ProtoLink is designed to scale across deployment shapes without changing the
+agent contract.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="local-single-process-mesh">Local Single-Process Mesh<a href="#local-single-process-mesh" class="hash-link" aria-label="Direct link to Local Single-Process Mesh" title="Direct link to Local Single-Process Mesh" translate="no">​</a></h3>
+<p>Use <code>RuntimeTransport</code> for tests, notebooks, local demos, and tightly-coupled
+agent systems. Agents communicate through an in-process runtime transport while
+preserving agent boundaries and task semantics.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="networked-agent-services">Networked Agent Services<a href="#networked-agent-services" class="hash-link" aria-label="Direct link to Networked Agent Services" title="Direct link to Networked Agent Services" translate="no">​</a></h3>
+<p>Use HTTP for straightforward request/response APIs. Use SSE JSON-RPC or
+WebSocket when a CLI, browser, dashboard, or external service needs streaming
+progress.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="mixed-systems">Mixed Systems<a href="#mixed-systems" class="hash-link" aria-label="Direct link to Mixed Systems" title="Direct link to Mixed Systems" translate="no">​</a></h3>
+<p>A single application can combine local agents, remote agents, tool-only workers,
+LLM-backed specialists, and registry discovery. Flow targets can be local
+objects, remote URLs, names resolved through the registry, or nested flows.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="ui-and-cli-integration">UI And CLI Integration<a href="#ui-and-cli-integration" class="hash-link" aria-label="Direct link to UI And CLI Integration" title="Direct link to UI And CLI Integration" translate="no">​</a></h3>
+<p>Use streaming task events for immediate transport compatibility. Normalize to
+<code>RunEvent</code> when a UI or CLI wants stable event types, sequence numbers,
+summaries, causal IDs, and replay compatibility.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="testing">Testing<a href="#testing" class="hash-link" aria-label="Direct link to Testing" title="Direct link to Testing" translate="no">​</a></h3>
+<p>Use <code>MockLLM</code>, <code>RuntimeTransport</code>, <code>InMemoryEventSink</code>, <code>RunRecorder</code>, and
+golden-run assertions to test agent behavior without live providers or network
+ports. This is especially valuable because the runtime records concrete action
+and policy events rather than relying on text snapshots alone.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="what-protolink-brings-to-the-table">What ProtoLink Brings To The Table<a href="#what-protolink-brings-to-the-table" class="hash-link" aria-label="Direct link to What ProtoLink Brings To The Table" title="Direct link to What ProtoLink Brings To The Table" translate="no">​</a></h2>
+<p>ProtoLink&#x27;s value is the combination of protocol alignment and runtime control.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="a2a-native-interoperability">A2A-Native Interoperability<a href="#a2a-native-interoperability" class="hash-link" aria-label="Direct link to A2A-Native Interoperability" title="Direct link to A2A-Native Interoperability" translate="no">​</a></h3>
+<p>Agents communicate through task, message, part, artifact, and card models rather
+than framework-private graph objects. The protocol boundary is always visible.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="autonomous-agent-entities">Autonomous Agent Entities<a href="#autonomous-agent-entities" class="hash-link" aria-label="Direct link to Autonomous Agent Entities" title="Direct link to Autonomous Agent Entities" translate="no">​</a></h3>
+<p>Each agent is a runtime object with identity, lifecycle, communication,
+execution, and modules. It can be local or remote, simple or complex, LLM-backed
+or deterministic.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="plug-and-play-runtime-modules">Plug-And-Play Runtime Modules<a href="#plug-and-play-runtime-modules" class="hash-link" aria-label="Direct link to Plug-And-Play Runtime Modules" title="Direct link to Plug-And-Play Runtime Modules" translate="no">​</a></h3>
+<p>LLMs, tools, MCP adapters, transport, storage, state, telemetry, authentication,
+logging, policy, and approval handlers plug into the agent.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="deterministic-execution-semantics">Deterministic Execution Semantics<a href="#deterministic-execution-semantics" class="hash-link" aria-label="Direct link to Deterministic Execution Semantics" title="Direct link to Deterministic Execution Semantics" translate="no">​</a></h3>
+<p>The default agent handler processes explicit parts from the latest task item.
+The LLM loop validates one action at a time. Tool calls and agent calls are
+runtime-executed, observable, and replayable.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="provider-independence">Provider Independence<a href="#provider-independence" class="hash-link" aria-label="Direct link to Provider Independence" title="Direct link to Provider Independence" translate="no">​</a></h3>
+<p>Provider-native tool calling and JSON fallback produce the same internal action
+contract. Smaller and local models can participate without forcing a different
+application architecture.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="structured-flows-without-protocol-escape">Structured Flows Without Protocol Escape<a href="#structured-flows-without-protocol-escape" class="hash-link" aria-label="Direct link to Structured Flows Without Protocol Escape" title="Direct link to Structured Flows Without Protocol Escape" translate="no">​</a></h3>
+<p>Pipelines, parallel fan-out, routers, and graphs remain <code>Task -&gt; Task</code>. Flow
+state and route decisions are serialized into the same task model used
+elsewhere.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="production-control-plane">Production Control Plane<a href="#production-control-plane" class="hash-link" aria-label="Direct link to Production Control Plane" title="Direct link to Production Control Plane" translate="no">​</a></h3>
+<p>Cancellation, state inspection/reset/compaction, history compaction, budgets,
+permissions, and approvals are typed runtime operations, not prompt hacks.</p>
+<h3 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="observability-and-replay">Observability And Replay<a href="#observability-and-replay" class="hash-link" aria-label="Direct link to Observability And Replay" title="Direct link to Observability And Replay" translate="no">​</a></h3>
+<p>Telemetry captures detailed traces. <code>RunEvent</code> and <code>RunReport</code> provide stable
+application-facing progress and replay surfaces. Redaction is shared across
+events, approvals, reports, and local telemetry.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="relationship-to-other-ecosystem-pieces">Relationship To Other Ecosystem Pieces<a href="#relationship-to-other-ecosystem-pieces" class="hash-link" aria-label="Direct link to Relationship To Other Ecosystem Pieces" title="Direct link to Relationship To Other Ecosystem Pieces" translate="no">​</a></h2>
+<p>ProtoLink is not trying to replace every agent ecosystem concept. It gives each
+piece a clean place.</p>
+<table><thead><tr><th>Ecosystem idea</th><th>ProtoLink stance</th></tr></thead><tbody><tr><td>A2A</td><td>The protocol foundation for identity, discovery, and task exchange</td></tr><tr><td>MCP</td><td>A tool integration layer that can be adapted into agent capabilities</td></tr><tr><td>Langfuse and LangSmith</td><td>Observability backends, not execution engines</td></tr><tr><td>LangChain-style model composition</td><td>Useful inspiration, but ProtoLink starts from autonomous agents rather than chains around model calls</td></tr><tr><td>Graph orchestration</td><td>Useful when topology is known; ProtoLink implements it as flows over A2A tasks</td></tr><tr><td>Local models</td><td>First-class participants through provider-agnostic LLM wrappers and JSON fallback</td></tr></tbody></table>
+<p>The point is not to force one abstraction to do everything. The point is to
+compose the right abstractions around a stable agent runtime.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="a-more-concrete-execution-flow">A More Concrete Execution Flow<a href="#a-more-concrete-execution-flow" class="hash-link" aria-label="Direct link to A More Concrete Execution Flow" title="Direct link to A More Concrete Execution Flow" translate="no">​</a></h2>
+<p>Consider a user asking a coordinator agent:</p>
+<div class="language-text codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-text codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><div class="token-line" style="color:#393A34"><span class="token plain">Plan a five-night trip to Santorini and book a hotel if the weather is good.</span><br></div></code></pre></div></div>
+<p>A ProtoLink run can proceed like this:</p>
+<ol>
+<li class="">The application creates a <code>Task</code> with <code>Part.infer(...)</code>.</li>
+<li class="">The application attaches a <code>RunContext</code> with session, trace, budget, and
+permissions.</li>
+<li class="">The coordinator starts handling the task and moves it to <code>working</code>.</li>
+<li class="">The coordinator discovers peer agents from the registry.</li>
+<li class="">The coordinator builds its LLM prompt with tool schemas, peer agent cards,
+and runtime action instructions.</li>
+<li class="">The LLM proposes an <code>agent_call</code> to the weather agent.</li>
+<li class="">ProtoLink validates the action, creates a child <code>RunContext</code>, and sends a
+child task.</li>
+<li class="">The weather agent executes a deterministic tool and returns <code>tool_output</code>.</li>
+<li class="">The coordinator injects that observation into its LLM history.</li>
+<li class="">The LLM proposes an <code>agent_call</code> to the hotel agent.</li>
+<li class="">ProtoLink prepares a <code>RunAction</code> for booking, checks policy, and may request
+approval with a preview artifact.</li>
+<li class="">If approved, the hotel tool executes.</li>
+<li class="">The LLM receives the booking result and returns a <code>final</code> action.</li>
+<li class="">The coordinator attaches an <code>infer_output</code> artifact and completes the task.</li>
+<li class="">Streaming clients receive final status and artifacts.</li>
+<li class="">Telemetry and run reports contain the trace, context manifest, tool events,
+approvals, artifacts, and final task.</li>
+</ol>
+<p>Every meaningful step has a typed representation. That is what makes the system
+debuggable.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="why-this-matters-for-smaller-models">Why This Matters For Smaller Models<a href="#why-this-matters-for-smaller-models" class="hash-link" aria-label="Direct link to Why This Matters For Smaller Models" title="Direct link to Why This Matters For Smaller Models" translate="no">​</a></h2>
+<p>Smaller local models often struggle when a framework relies on subtle hidden
+prompt conventions, implicit routing, or provider-specific features. ProtoLink&#x27;s
+runtime helps in several ways:</p>
+<ul>
+<li class="">The action contract is small and explicit.</li>
+<li class="">The model proposes one action at a time.</li>
+<li class="">Validation errors can be fed back with field-level diagnostics.</li>
+<li class="">JSON fallback does not require provider-native tool support.</li>
+<li class="">Structured flows can remove routing decisions from the model entirely.</li>
+<li class="">Context manifests make prompt growth visible.</li>
+<li class="">History compaction is explicit and testable.</li>
+</ul>
+<p>The runtime does not make every model equally capable, but it gives smaller
+models a more inspectable operating environment.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="why-this-matters-for-production-systems">Why This Matters For Production Systems<a href="#why-this-matters-for-production-systems" class="hash-link" aria-label="Direct link to Why This Matters For Production Systems" title="Direct link to Why This Matters For Production Systems" translate="no">​</a></h2>
+<p>Production agent systems need to answer questions that demos often ignore:</p>
+<ul>
+<li class="">Which run is this?</li>
+<li class="">Which session does it belong to?</li>
+<li class="">Which agent performed this action?</li>
+<li class="">Which tool executed?</li>
+<li class="">What arguments were validated?</li>
+<li class="">Was the action approved?</li>
+<li class="">Which capabilities were required?</li>
+<li class="">Which budget limit stopped the run?</li>
+<li class="">Did cancellation reach the active work?</li>
+<li class="">Which artifacts were produced?</li>
+<li class="">Can this stream be replayed?</li>
+<li class="">Are secrets redacted before persistence?</li>
+<li class="">Can this run be tested without a live provider?</li>
+</ul>
+<p>ProtoLink&#x27;s runtime contracts are designed around those questions. They do not
+turn the framework into an enterprise platform by themselves, but they give an
+application the hooks and data structures it needs to build one.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="philosophy-in-one-sentence">Philosophy In One Sentence<a href="#philosophy-in-one-sentence" class="hash-link" aria-label="Direct link to Philosophy In One Sentence" title="Direct link to Philosophy In One Sentence" translate="no">​</a></h2>
+<p>ProtoLink treats agents as autonomous, protocol-native runtime entities whose
+LLMs, tools, transports, state, telemetry, and policies are pluggable modules,
+while every meaningful action remains explicit, typed, observable, and
+replayable.</p>
+<h2 class="anchor anchorTargetHideOnScrollNavbar_vjPI" id="conclusion">Conclusion<a href="#conclusion" class="hash-link" aria-label="Direct link to Conclusion" title="Direct link to Conclusion" translate="no">​</a></h2>
+<p>The future of agent systems is not one giant prompt wrapped around one model. It
+is a mesh of specialized entities: some reason, some act, some coordinate, some
+observe, some guard side effects, and some execute deterministic workflows.</p>
+<p>ProtoLink provides the runtime substrate for that mesh. It uses A2A as the
+shared protocol language, then extends it with the practical machinery needed
+for real agent applications: LLM integration, tool execution, MCP adaptation,
+transport abstraction, registry discovery, structured flows, state, runtime
+context, budgets, cancellation, policy, approvals, telemetry, events, reports,
+and replay.</p>
+<p>In ProtoLink, you do not build agents by burying behavior inside orchestration
+glue. You build autonomous entities, plug in the modules they need, and let them
+communicate through explicit protocol-native tasks.</p>
+<p>That is the core architectural promise: minimal boilerplate, maximum clarity,
+and a runtime that keeps the agent system understandable as it grows.</p></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col noPrint_WFHX"><a href="https://github.com/nMaroulis/protolink/tree/main/docs/content/content/whitepaper.md" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Edit this page</a></div><div class="col lastUpdated_JAkA"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/protolink/docs/concept/"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Concept</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/protolink/docs/getting-started/"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">Getting Started</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#an-a2a-native-runtime-for-autonomous-pluggable-agent-systems" class="table-of-contents__link toc-highlight">An A2A-Native Runtime for Autonomous, Pluggable Agent Systems</a></li><li><a href="#abstract" class="table-of-contents__link toc-highlight">Abstract</a></li><li><a href="#the-problem" class="table-of-contents__link toc-highlight">The Problem</a></li><li><a href="#design-thesis" class="table-of-contents__link toc-highlight">Design Thesis</a><ul><li><a href="#1-the-agent-is-the-unit-of-autonomy" class="table-of-contents__link toc-highlight">1. The Agent Is The Unit Of Autonomy</a></li><li><a href="#2-protocol-objects-are-the-shared-language" class="table-of-contents__link toc-highlight">2. Protocol Objects Are The Shared Language</a></li><li><a href="#3-pluggability-is-a-runtime-property" class="table-of-contents__link toc-highlight">3. Pluggability Is A Runtime Property</a></li><li><a href="#4-the-model-declares-intent-the-runtime-executes" class="table-of-contents__link toc-highlight">4. The Model Declares Intent, The Runtime Executes</a></li><li><a href="#5-production-control-should-be-domain-neutral" class="table-of-contents__link toc-highlight">5. Production Control Should Be Domain-Neutral</a></li></ul></li><li><a href="#architecture-at-a-glance" class="table-of-contents__link toc-highlight">Architecture At A Glance</a></li><li><a href="#why-build-on-a2a" class="table-of-contents__link toc-highlight">Why Build On A2A?</a></li><li><a href="#the-protocol-core" class="table-of-contents__link toc-highlight">The Protocol Core</a><ul><li><a href="#task" class="table-of-contents__link toc-highlight">Task</a></li><li><a href="#message" class="table-of-contents__link toc-highlight">Message</a></li><li><a href="#part" class="table-of-contents__link toc-highlight">Part</a></li><li><a href="#artifact" class="table-of-contents__link toc-highlight">Artifact</a></li></ul></li><li><a href="#the-agent-as-autonomous-runtime-entity" class="table-of-contents__link toc-highlight">The Agent As Autonomous Runtime Entity</a><ul><li><a href="#agentcard-identity-and-capability" class="table-of-contents__link toc-highlight">AgentCard: Identity And Capability</a></li><li><a href="#agent-lifecycle" class="table-of-contents__link toc-highlight">Agent Lifecycle</a></li></ul></li><li><a href="#the-llm-runtime" class="table-of-contents__link toc-highlight">The LLM Runtime</a><ul><li><a href="#inference-as-controlled-action-loop" class="table-of-contents__link toc-highlight">Inference As Controlled Action Loop</a></li><li><a href="#native-tools-and-json-fallback" class="table-of-contents__link toc-highlight">Native Tools And JSON Fallback</a></li><li><a href="#semantic-context-injection" class="table-of-contents__link toc-highlight">Semantic Context Injection</a></li></ul></li><li><a href="#tools-as-capabilities" class="table-of-contents__link toc-highlight">Tools As Capabilities</a><ul><li><a href="#mcp-integration" class="table-of-contents__link toc-highlight">MCP Integration</a></li></ul></li><li><a href="#runcontext-the-execution-envelope" class="table-of-contents__link toc-highlight">RunContext: The Execution Envelope</a></li><li><a href="#runtime-actions-policy-and-approvals" class="table-of-contents__link toc-highlight">Runtime Actions, Policy, And Approvals</a></li><li><a href="#budgets-and-context-manifests" class="table-of-contents__link toc-highlight">Budgets And Context Manifests</a></li><li><a href="#cancellation-and-the-control-plane" class="table-of-contents__link toc-highlight">Cancellation And The Control Plane</a></li><li><a href="#transports-same-agent-different-mediums" class="table-of-contents__link toc-highlight">Transports: Same Agent, Different Mediums</a></li><li><a href="#registry-and-discovery" class="table-of-contents__link toc-highlight">Registry And Discovery</a></li><li><a href="#structured-flows" class="table-of-contents__link toc-highlight">Structured Flows</a><ul><li><a href="#pipeline" class="table-of-contents__link toc-highlight">Pipeline</a></li><li><a href="#parallel" class="table-of-contents__link toc-highlight">Parallel</a></li><li><a href="#router" class="table-of-contents__link toc-highlight">Router</a></li><li><a href="#graph" class="table-of-contents__link toc-highlight">Graph</a></li><li><a href="#why-flows-stay-a2a-native" class="table-of-contents__link toc-highlight">Why Flows Stay A2A-Native</a></li></ul></li><li><a href="#telemetry-events-reports-and-replay" class="table-of-contents__link toc-highlight">Telemetry, Events, Reports, And Replay</a></li><li><a href="#state-and-memory" class="table-of-contents__link toc-highlight">State And Memory</a></li><li><a href="#example-vacation-booking-mesh" class="table-of-contents__link toc-highlight">Example: Vacation Booking Mesh</a></li><li><a href="#example-code-assistant-mesh" class="table-of-contents__link toc-highlight">Example: Code Assistant Mesh</a></li><li><a href="#development-and-deployment-modes" class="table-of-contents__link toc-highlight">Development And Deployment Modes</a><ul><li><a href="#local-single-process-mesh" class="table-of-contents__link toc-highlight">Local Single-Process Mesh</a></li><li><a href="#networked-agent-services" class="table-of-contents__link toc-highlight">Networked Agent Services</a></li><li><a href="#mixed-systems" class="table-of-contents__link toc-highlight">Mixed Systems</a></li><li><a href="#ui-and-cli-integration" class="table-of-contents__link toc-highlight">UI And CLI Integration</a></li><li><a href="#testing" class="table-of-contents__link toc-highlight">Testing</a></li></ul></li><li><a href="#what-protolink-brings-to-the-table" class="table-of-contents__link toc-highlight">What ProtoLink Brings To The Table</a><ul><li><a href="#a2a-native-interoperability" class="table-of-contents__link toc-highlight">A2A-Native Interoperability</a></li><li><a href="#autonomous-agent-entities" class="table-of-contents__link toc-highlight">Autonomous Agent Entities</a></li><li><a href="#plug-and-play-runtime-modules" class="table-of-contents__link toc-highlight">Plug-And-Play Runtime Modules</a></li><li><a href="#deterministic-execution-semantics" class="table-of-contents__link toc-highlight">Deterministic Execution Semantics</a></li><li><a href="#provider-independence" class="table-of-contents__link toc-highlight">Provider Independence</a></li><li><a href="#structured-flows-without-protocol-escape" class="table-of-contents__link toc-highlight">Structured Flows Without Protocol Escape</a></li><li><a href="#production-control-plane" class="table-of-contents__link toc-highlight">Production Control Plane</a></li><li><a href="#observability-and-replay" class="table-of-contents__link toc-highlight">Observability And Replay</a></li></ul></li><li><a href="#relationship-to-other-ecosystem-pieces" class="table-of-contents__link toc-highlight">Relationship To Other Ecosystem Pieces</a></li><li><a href="#a-more-concrete-execution-flow" class="table-of-contents__link toc-highlight">A More Concrete Execution Flow</a></li><li><a href="#why-this-matters-for-smaller-models" class="table-of-contents__link toc-highlight">Why This Matters For Smaller Models</a></li><li><a href="#why-this-matters-for-production-systems" class="table-of-contents__link toc-highlight">Why This Matters For Production Systems</a></li><li><a href="#philosophy-in-one-sentence" class="table-of-contents__link toc-highlight">Philosophy In One Sentence</a></li><li><a href="#conclusion" class="table-of-contents__link toc-highlight">Conclusion</a></li></ul></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer"><div class="container container-fluid"><div class="row footer__links"><div class="theme-layout-footer-column col footer__col"><div class="footer__title">Start</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/getting-started/">Getting Started</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/cli/">CLI</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/devtools/">Developer Tools</a></li></ul></div><div class="theme-layout-footer-column col footer__col"><div class="footer__title">Build</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/agent/">Agents</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/runtime/">Runtime</a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/transport/">Transports</a></li></ul></div><div class="theme-layout-footer-column col footer__col"><div class="footer__title">Project</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://github.com/nMaroulis/protolink" target="_blank" rel="noopener noreferrer" class="footer__link-item">GitHub<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a></li><li class="footer__item"><a href="https://pypi.org/project/protolink/" target="_blank" rel="noopener noreferrer" class="footer__link-item">PyPI<svg width="13.5" height="13.5" aria-label="(opens in new tab)" class="iconExternalLink_nPIU"><use href="#theme-svg-external-link"></use></svg></a></li><li class="footer__item"><a class="footer__link-item" href="/protolink/docs/changelog/">Changelog</a></li></ul></div></div><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 Nikolaos Maroulis. MIT licensed. Built with Docusaurus.</div></div></div></footer></div>
+</body>
+</html>
