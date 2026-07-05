@@ -16,25 +16,25 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: docs-${{ github.ref }}
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Build and publish Docusaurus docs
+    name: Build Docusaurus docs
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: docs/package-lock.json
 
@@ -50,11 +50,26 @@ jobs:
           DOCSEARCH_API_KEY: ${{ secrets.DOCSEARCH_API_KEY }}
           DOCSEARCH_INDEX_NAME: ${{ vars.DOCSEARCH_INDEX_NAME }}
 
-      - name: Publish docs to gh-pages
+      - name: Upload Pages artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v4
+        uses: actions/upload-pages-artifact@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: docs/build
-          force_orphan: true
+          path: docs/build
+          include-hidden-files: true
+
+  deploy:
+    name: Deploy GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

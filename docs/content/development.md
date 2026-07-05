@@ -202,7 +202,7 @@ cd docs
 npm run build
 ```
 
-Pull requests run `npm run build` from `docs/`. Pushes to `main` that touch docs, the README, Docusaurus configuration, or docs dependencies publish `docs/build` to the `gh-pages` branch through GitHub Actions.
+Pull requests run `npm run build` from `docs/`. Pushes to `main` that touch docs, the README, Docusaurus configuration, or docs dependencies upload `docs/build` as a GitHub Pages artifact and deploy it through the `github-pages` environment.
 
 ---
 
