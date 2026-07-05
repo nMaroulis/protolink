@@ -45,6 +45,10 @@ jobs:
       - name: Build docs
         run: npm run build
         working-directory: docs
+        env:
+          DOCSEARCH_APP_ID: ${{ vars.DOCSEARCH_APP_ID }}
+          DOCSEARCH_API_KEY: ${{ secrets.DOCSEARCH_API_KEY }}
+          DOCSEARCH_INDEX_NAME: ${{ vars.DOCSEARCH_INDEX_NAME }}
 
       - name: Publish docs to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

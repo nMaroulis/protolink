@@ -1,6 +1,26 @@
 const lightCodeTheme = require("prism-react-renderer").themes.github;
 const darkCodeTheme = require("prism-react-renderer").themes.dracula;
 
+const algoliaConfig = (() => {
+  const appId = process.env.DOCSEARCH_APP_ID || process.env.ALGOLIA_APP_ID;
+  const apiKey =
+    process.env.DOCSEARCH_API_KEY || process.env.ALGOLIA_SEARCH_API_KEY;
+  const indexName =
+    process.env.DOCSEARCH_INDEX_NAME || process.env.ALGOLIA_INDEX_NAME;
+
+  if (!appId || !apiKey || !indexName) {
+    return undefined;
+  }
+
+  return {
+    appId,
+    apiKey,
+    indexName,
+    contextualSearch: true,
+    searchPagePath: "search",
+  };
+})();
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: "protolink",
@@ -11,6 +31,16 @@ const config = {
   baseUrl: "/protolink/",
   organizationName: "nMaroulis",
   projectName: "protolink",
+
+  headTags: [
+    {
+      tagName: "meta",
+      attributes: {
+        name: "algolia-site-verification",
+        content: "45AFD9E85485A956",
+      },
+    },
+  ],
 
   onBrokenLinks: "throw",
   trailingSlash: true,
@@ -73,6 +103,7 @@ const config = {
         disableSwitch: false,
         respectPrefersColorScheme: true,
       },
+      ...(algoliaConfig ? { algolia: algoliaConfig } : {}),
       navbar: {
         title: "protolink",
         logo: {
