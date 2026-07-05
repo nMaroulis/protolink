@@ -201,6 +201,10 @@ Write a static HTML snapshot instead:
 protolink dashboard --store runs.db --output dashboard.html
 ```
 
+<figure className="doc-media-frame">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif" alt="Protolink Dashboard UI" />
+</figure>
+
 The dashboard is deliberately small: no build step, no frontend dependencies, and no telemetry upload. It serves a local page with branded navigation, top-level cards for agents/tasks/reports/store state, registry agents, agent health probes, a chat panel for HTTP LLM agents, run replay, and a disabled Studio preview tab. The JSON endpoint at `/api/snapshot` uses the same collector as static rendering.
 
 Use the served dashboard when you want live refresh against a local registry or run store. Use `--output` when you want a portable snapshot for a demo, issue, notebook, or support handoff.

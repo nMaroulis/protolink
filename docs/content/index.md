@@ -1,4 +1,4 @@
-# ProtoLink Documentation
+# Documentation
 
 {/* SEO: Protolink - Agent-to-Agent Communication Framework | Lightweight Production-Ready A2A Protocol Extension | Python Library | AI Agents | LLMs | Tools | Multi-Agent Systems | Distributed Computing */}
 
