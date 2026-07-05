@@ -41,9 +41,9 @@ Rules:
 - The output MUST be valid, structured, and machine-parseable
 
 Allowed Response Types:
-1. tool_call   — Invoke an external tool
-2. agent_call  — Delegate to another agent
-3. final       — Return a user-facing response
+1. tool_call   - Invoke an external tool
+2. agent_call  - Delegate to another agent
+3. final       - Return a user-facing response
 
 Rules:
 - If no external action is required, return a final response.

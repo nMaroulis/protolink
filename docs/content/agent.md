@@ -162,7 +162,7 @@ Unlike the original A2A specification, Protolink's `Agent` combines client and s
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `card` | `AgentCard` | — | **Required.** The agent's metadata card containing name, description, and other identifying information. |
+| `card` | `AgentCard ⎪ dict` | - | **Required.** The agent's metadata card containing name, description, and other identifying information. |
 | `transport` | `Transport ⎪ str ⎪ None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via the `transport` property. |
 | `registry` | `Registry ⎪ RegistryClient ⎪ str ⎪ None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string. |
 | `registry_url` | `str ⎪ None` | `None` | URL of the registry when using string transport type for registry creation. |
@@ -222,7 +222,7 @@ These methods control the agent's server component lifecycle.
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `start()` | `register: bool = True`, `background: bool = False` | `None` | Starts the agent runtime. Can run in the main loop or as an isolated background thread. |
-| `stop()` | — | `None` | Stops the agent runtime and synchronously cleans up resources. |
+| `stop()` | - | `None` | Stops the agent runtime and synchronously cleans up resources. |
 
 ### Execution Models & Lifecycle
 
@@ -238,7 +238,7 @@ The `background` parameter controls the execution mode and event loop isolation:
 #### Seamless Synchronous Teardown
 
 Because `background=True` isolates the agent in its own thread, shutting down the agent is incredibly simple. You just call `agent.stop()`. 
-The `stop()` method operates synchronously—it tells the background thread to shut down and blocks for a fraction of a second to gracefully close Uvicorn and unregister from the registry. You **do not** need to `await` it, and it will never trigger messy `CancelledError` exceptions in your main event loop.
+The `stop()` method operates synchronously, it tells the background thread to shut down and blocks for a fraction of a second to gracefully close Uvicorn and unregister from the registry. You **do not** need to `await` it, and it will never trigger messy `CancelledError` exceptions in your main event loop.
 
 #### Common Usage Patterns
 
@@ -282,8 +282,8 @@ Always use `agent.stop()` to ensure that the agent unregisters from the registry
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `transport` (property) | `Transport ⎪ str ⎪ None` | `None` | Gets or sets the transport used by this agent. Setting this initializes the client/server components and updates the agent card's transport and streaming capability. |
-| `client` (property) | — | `AgentClient ⎪ None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
-| `server` (property) | — | `AgentServer ⎪ None` | Returns the server instance if one is available via the transport. |
+| `client` (property) | - | `AgentClient ⎪ None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
+| `server` (property) | - | `AgentServer ⎪ None` | Returns the server instance if one is available via the transport. |
 
 ## Task and Message Handling
 
@@ -302,7 +302,7 @@ Always use `agent.stop()` to ensure that the agent unregisters from the registry
 | `compact_state()` | `request/session_id` | `StateOperationResult` | Control-plane method behind `POST /state/compact`. Compacts persisted conversation state through the LLM-owned compactor. |
 | `cancel_task()` | `task_id | TaskCancellationRequest`, `reason=None` | `Task` | Marks an active task and its `RunContext` canceled, then interrupts its owning coroutine. |
 | `get_cancellation_token()` | `task_id: str` | `CancellationToken ⎪ None` | Returns the process-local token for checkpoints in custom long-running handlers. |
-| `active_task_ids` | — | `tuple[str, ...]` | Snapshot of task IDs currently registered on this Agent. |
+| `active_task_ids` | - | `tuple[str, ...]` | Snapshot of task IDs currently registered on this Agent. |
 | `invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. Accepts an optional `session_id` for memory. |
 | `sync.invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
 | `sync.discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Synchronous version of `discover_agents()`. |
@@ -433,7 +433,7 @@ writer = Agent(
 
 ## Synchronous API (`SyncAgent`)
 
-Protolink is built on an asynchronous foundation using `asyncio`, which is essential for handling concurrent agent interactions and streaming responses. However, many development workflows—such as data science notebooks, CLI tools, and simple automation scripts—benefit from a straightforward, blocking API.
+Protolink is built on an asynchronous foundation using `asyncio`, which is essential for handling concurrent agent interactions and streaming responses. However, many development workflows, such as data science notebooks, CLI tools, and simple automation scripts, benefit from a straightforward, blocking API.
 
 The `Agent` class provides a `.sync` property, which is an instance of `SyncAgent`. This class acts as a thin, synchronous wrapper around the agent's core async methods.
 
@@ -445,7 +445,7 @@ The `Agent` class provides a `.sync` property, which is an instance of `SyncAgen
 
 ### How it Works Internally
 
-The `SyncAgent` class does not re-implement any logic. Instead, it delegates calls to the agent's async methods using `asyncio.run()`. This ensures that all behavior—including tool execution, state management, and LLM orchestration—remains identical across both APIs.
+The `SyncAgent` class does not re-implement any logic. Instead, it delegates calls to the agent's async methods using `asyncio.run()`. This ensures that all behavior, including tool execution, state management, and LLM orchestration, remains identical across both APIs.
 
 :::warning[Event Loop Conflict]
 
@@ -574,8 +574,8 @@ agent.add_tool(WeatherTool())
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Discover agents in the registry matching the filter criteria. |
-| `register()` | — | `None` | Registers this agent in the global registry. |
-| `unregister()` | — | `None` | Unregisters this agent from the global registry. |
+| `register()` | - | `None` | Registers this agent in the global registry. |
+| `unregister()` | - | `None` | Unregisters this agent from the global registry. |
 
 ## Utility Methods
 
@@ -583,12 +583,12 @@ agent.add_tool(WeatherTool())
 |------|------------|---------|-------------|
 | `get_agent_card()` | `as_json: bool = True` | `AgentCard ⎪ dict` | Returns the agent's identity card. |
 | `get_status()` | `output_format: Literal["html", "json"] = "html"` | `str` | Returns the agent's status as HTML or JSON. HTML is a rich status page for the agent (displayed at `/status`). JSON is a machine-readable representation of the agent's status. |
-| `get_chat()` | — | `str` | Returns a self-contained chat UI as HTML. Only functional when the agent has an LLM configured (served at `/chat`). |
+| `get_chat()` | - | `str` | Returns a self-contained chat UI as HTML. Only functional when the agent has an LLM configured (served at `/chat`). |
 | `handle_chat_message()` | `data: dict` | `dict` | Processes an incoming chat message via the agent's `invoke()` method and returns the response. |
 | `llm` (property) | `LLM ⎪ None` | `None` | Gets or sets the agent's language model. Setting this validates the connection and updates `card.capabilities.has_llm` automatically. |
 | `storage` (property) | `Storage` | `None` | Gets or sets the agent's storage instance. Setting this automatically updates the internal `SessionManager`. |
 | `set_registry()` | `registry, registry_url=None` | `None` | Configures the agent's connection to a Protolink registry. |
-| `sync` (property) | — | `SyncAgent` | Returns a synchronous wrapper around the agent for blocking operations. |
+| `sync` (property) | - | `SyncAgent` | Returns a synchronous wrapper around the agent for blocking operations. |
 
 ## Storage and Persistence
 
@@ -668,18 +668,18 @@ If no `session_id` is provided in the task metadata (for non-invoke calls), the 
 :::
 ## Chat Gateway
 
-When an agent is configured with an **LLM**, Protolink automatically exposes a built-in **Chat UI** at the `/chat` endpoint. This provides a browser-based interface for interacting with the agent directly — ideal for development, demos, and quick testing.
+When an agent is configured with an **LLM**, Protolink automatically exposes a built-in **Chat UI** at the `/chat` endpoint. This provides a browser-based interface for interacting with the agent directly, ideal for development, demos, and quick testing.
 
 ### How It Works
 
-- **`GET /chat`** — Serves a self-contained HTML/CSS/JS chat interface. The page is always registered but displays a fallback message if no LLM is configured.
-- **`POST /chat`** — Accepts `{"message": "...", "session_id": "..."}` and returns `{"response": "..."}`. This endpoint is only registered when the agent has an LLM.
+- **`GET /chat`** - Serves a self-contained HTML/CSS/JS chat interface. The page is always registered but displays a fallback message if no LLM is configured.
+- **`POST /chat`** - Accepts `{"message": "...", "session_id": "..."}` and returns `{"response": "..."}`. This endpoint is only registered when the agent has an LLM.
 
 The chat page displays agent metadata (name, description, skills) and LLM configuration (provider, model, temperature) in a sidebar, alongside a modern conversational interface.
 
 ### Usage
 
-No extra setup is needed — just provide an LLM when creating your agent:
+No extra setup is needed, just provide an LLM when creating your agent:
 
 ```python
 from protolink.agents import Agent

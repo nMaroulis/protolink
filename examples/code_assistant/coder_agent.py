@@ -1,8 +1,8 @@
 """
-Coder Agent — The "Hands" of the Coding Assistant (Tools-Only)
+Coder Agent - The "Hands" of the Coding Assistant (Tools-Only)
 
 This agent is the file system interface. It exposes deterministic tools for
-reading, writing, listing, and searching files — no LLM needed.
+reading, writing, listing, and searching files - no LLM needed.
 
 ═══════════════════════════════════════════════════════════════════════════
 PROTOLINK CONCEPTS DEMONSTRATED:
@@ -41,7 +41,7 @@ WORKSPACE_DIR = os.getenv("WORKSPACE_DIR", os.path.join(os.path.dirname(__file__
 def _safe_path(path: str) -> str:
     """Resolve a path and ensure it's within the workspace sandbox.
 
-    This is critical for security — we never want an AI agent to
+    This is critical for security, we never want an AI agent to
     read or write arbitrary files on the host machine.
     """
     # Resolve relative paths against the workspace
@@ -62,7 +62,7 @@ def create_coder_agent(registry: Registry | None = None) -> Agent:
     """
     Create and configure the Coder Agent.
 
-    The Coder Agent is a TOOL-ONLY agent — it has no LLM attached.
+    The Coder Agent is a TOOL-ONLY agent, it has no LLM attached.
     It exposes four filesystem tools that other agents can invoke
     via Protolink's `agent_call` with action `tool_call`.
 
@@ -75,7 +75,7 @@ def create_coder_agent(registry: Registry | None = None) -> Agent:
 
     # ─── Create the Agent ─────────────────────────────────────────────
     # Notice: NO `llm` parameter! This is a pure tool agent.
-    # Protolink agents don't need an LLM to be useful — they can
+    # Protolink agents don't need an LLM to be useful, they can
     # serve as reliable, deterministic workers in the mesh.
     # ──────────────────────────────────────────────────────────────────
     agent = Agent(
@@ -99,7 +99,7 @@ def create_coder_agent(registry: Registry | None = None) -> Agent:
     # Tool. When another agent calls:
     #   agent_call → coder.read_file(path="utils.py")
     # Protolink routes the request over HTTP, executes this function,
-    # and returns the result — all automatically.
+    # and returns the result, all automatically.
     # ══════════════════════════════════════════════════════════════════
     @agent.tool(
         name="read_file",

@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Code Assistant Demo — Multi-Agent Coding System with Protolink
+Code Assistant Demo - Multi-Agent Coding System with Protolink
 
-This script demonstrates building a simplified "Claude Code" — a terminal
+This script demonstrates building a simplified "Claude Code", a terminal
 coding assistant powered by three autonomous agents:
 
-  1. ORCHESTRATOR (LLM) — receives user requests, coordinates the team
-  2. PLANNER (LLM)       — analyzes code, creates plans, generates edits
-  3. CODER (Tools)       — reads, writes, lists, and searches files
+  1. ORCHESTRATOR (LLM) - receives user requests, coordinates the team
+  2. PLANNER (LLM)       - analyzes code, creates plans, generates edits
+  3. CODER (Tools)       - reads, writes, lists, and searches files
 
 ═══════════════════════════════════════════════════════════════════════════
 WHAT THIS DEMO SHOWS:
 ─────────────────────
-• agent_call with "infer"    — LLM-to-LLM delegation (Orchestrator → Planner)
-• agent_call with "tool_call" — Tool delegation (Orchestrator → Coder)
-• Registry Discovery          — Agents find each other dynamically
-• LLM-Agnostic Design         — Works with OpenAI, Anthropic, Ollama, etc.
-• Separation of Concerns      — Brain (Planner) vs Hands (Coder)
+• agent_call with "infer"    - LLM-to-LLM delegation (Orchestrator → Planner)
+• agent_call with "tool_call" - Tool delegation (Orchestrator → Coder)
+• Registry Discovery          - Agents find each other dynamically
+• LLM-Agnostic Design         - Works with OpenAI, Anthropic, Ollama, etc.
+• Separation of Concerns      - Brain (Planner) vs Hands (Coder)
 ═══════════════════════════════════════════════════════════════════════════
 
 Run with:
@@ -144,7 +144,7 @@ async def main():
     """Run the Code Assistant demo."""
 
     print("=" * 70)
-    print("🤖 CODE ASSISTANT — Protolink Multi-Agent Coding System")
+    print("🤖 CODE ASSISTANT - Protolink Multi-Agent Coding System")
     print("=" * 70)
     print()
     print("Architecture: Orchestrator (LLM) → Planner (LLM) + Coder (Tools)")

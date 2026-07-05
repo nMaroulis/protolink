@@ -20,7 +20,7 @@ Protolink groups LLM backends into three broad categories:
   <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="55" className="hover-icon" />
 </div>
 
-- **API** — calls a remote API and requires an API key:
+- **API** - calls a remote API and requires an API key:
     - `OpenAILLM`: uses the **OpenAI API** for sync & async requests.
     - `AnthropicLLM`: uses the **Anthropic API** for sync & async requests.
     - `GeminiLLM`: uses the **Google Gemini API** for sync & async requests.
@@ -28,13 +28,13 @@ Protolink groups LLM backends into three broad categories:
     - `GrokLLM`: uses the **Grok API** for sync & async requests.
     - `HuggingFaceLLM`: uses the **HuggingFace Inference API** for sync & async requests.
 
-- **Server** — connects to an LLM server, locally or remotely:
+- **Server** - connects to an LLM server, locally or remotely:
     - `OllamaLLM`: connects to an **Ollama** server for sync & async requests.
     - `LlamaCPPServerLLM`: connects to a **llama-server** for sync & async requests.
     - `LMStudioLLM`: connects to an **LM Studio** OpenAI-compatible server.
     - `OpenAICompatibleLLM`: connects to any server exposing OpenAI-compatible `/v1/chat/completions` and `/v1/models` endpoints.
 
-- **Local** — runs the model directly in your runtime:
+- **Local** - runs the model directly in your runtime:
     - `LlamaCPPLocalLLM`: uses a local **llama-cpp-python** runtime for sync & async requests.
 
 You can also use other LLM clients directly without going through Protolink's `LLM` wrappers if you prefer.
@@ -415,7 +415,7 @@ Protolink's `ConversationHistory` uses a **`collections.deque`** internally. Thi
 | `configure_metrics()` | `profile=None, context_window=None, input_cost_per_million=None, output_cost_per_million=None` | `LLM` | Configure optional context/cost metadata used for emitted metrics. |
 | `build_system_prompt()` | `user_instructions, agent_cards, tools, action_mode=None, override_system_prompt=False, persist=False` | `str` | Build the final system prompt. `action_mode="json"` uses the portable JSON action contract; `action_mode="native"` uses provider-native tool instructions. If `persist=True`, preserves existing conversation history. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
-| `validate_connection()` | — | `bool` | **Abstract.** Validate that the LLM connection is working. |
+| `validate_connection()` | - | `bool` | **Abstract.** Validate that the LLM connection is working. |
 
 #### Properties
 
@@ -689,7 +689,7 @@ Protolink uses prompt families in `protolink/llms/prompts` to match the action a
 
 The `LLM.build_system_prompt()` method dynamically assembles the prompt used by `infer()`. In JSON mode it describes the portable action objects. In native mode it tells the model to use the provider tool interface and leaves the function-call syntax to the backend SDK/API.
 
-By default, this method calls `reset_to_system(self, new_system_prompt: str)` which clears the history. However, when using the **`persist=True`** flag, it calls `set_system()`, which updates the instructions while keeping the conversation history intact—essential for persistent sessions.
+By default, this method calls `reset_to_system(self, new_system_prompt: str)` which clears the history. However, when using the **`persist=True`** flag, it calls `set_system()`, which updates the instructions while keeping the conversation history intact, which is essential for persistent sessions.
 
 It is composed of several key components:
 
@@ -898,7 +898,7 @@ Base class for all server-based LLM implementations.
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `base_url` | `str` | — | **Required.** URL of the LLM server. |
+| `base_url` | `str` | - | **Required.** URL of the LLM server. |
 
 #### Methods
 
@@ -906,7 +906,7 @@ Base class for all server-based LLM implementations.
 |------|------------|---------|-------------|
 | `set_model_params()` | `model_params: dict[str, Any]` | `None` | Update existing model parameters, ignoring invalid keys. |
 | `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
-| `validate_connection()` | — | `bool` | Validate that the server is reachable. |
+| `validate_connection()` | - | `bool` | Validate that the server is reachable. |
 
 ### OllamaLLM
 
@@ -955,7 +955,7 @@ llm = OllamaLLM(model="mistral", base_url="http://localhost:11434")
 |------|------------|---------|-------------|
 | `call()` | `history: ConversationHistory` | `str` | Generate a single response using Ollama's API. |
 | `call_stream()` | `history: ConversationHistory` | `AsyncIterator[str]` | Generate a streaming response, yielding text chunks. |
-| `validate_connection()` | — | `bool` | Check if Ollama server is reachable and has models available. |
+| `validate_connection()` | - | `bool` | Check if Ollama server is reachable and has models available. |
 
 :::note[Ollama Server Required]
 
@@ -1046,7 +1046,7 @@ Local LLM integration using the `llama-cpp-python` distribution explicitly loadi
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `model` | `str` | — | **Required.** Absolute Path to your downloaded `.gguf` model file. |
+| `model` | `str` | - | **Required.** Absolute Path to your downloaded `.gguf` model file. |
 | `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters. |
 | `supports_tool_calling` | `bool` | `False` | Whether the loaded model/chat handler supports native tool calls. Defaults to JSON mode. |
 

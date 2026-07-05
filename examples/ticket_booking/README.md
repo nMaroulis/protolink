@@ -117,7 +117,7 @@ export OPENAI_API_KEY=sk-...
 
 **All-in-One Script (Recommended)**
 
-The fastest way to see everything in action—all agents defined in a single file:
+The fastest way to see everything in action, where all agents defined in a single file:
 
 ```bash
 cd examples/ticket_booking
@@ -278,7 +278,7 @@ print(result.get_last_part_content())
 
 4. **Separation of Concerns**: Each agent has a single responsibility. Only agents that need reasoning get an LLM; specialists are pure tools.
 
-5. **Dynamic Discovery**: Agents find each other through the Registry at runtime—no hard-coded references.
+5. **Dynamic Discovery**: Agents find each other through the Registry at runtime, no hard-coded references.
 
 6. **Automatic Orchestration**: The inference loop handles multi-step workflows automatically.
 

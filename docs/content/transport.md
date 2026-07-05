@@ -2,7 +2,7 @@ import ApiSurface from '@site/src/components/ApiSurface';
 
 # Transport
 
-Protolink implements a **pluggable transport layer** that decouples the agent's cognitive logic from the underlying communication protocol. This architectural pattern allows the same agent instance to effectively "exist" across multiple mediums—whether serving HTTP requests, holding a stateful WebSocket connection, or communicating over a fast in-memory channel—without changing a single line of business logic.
+Protolink implements a **pluggable transport layer** that decouples the agent's cognitive logic from the underlying communication protocol. This architectural pattern allows the same agent instance to effectively "exist" across multiple mediums, whether serving HTTP requests, holding a stateful WebSocket connection, or communicating over a fast in-memory channel, without changing a single line of business logic.
 
 At its core, the Transport abstraction behaves as a **protocol adapter pattern**, normalizing disparate wire formats into standard `Task` and `Message` domain objects.
 
@@ -125,9 +125,9 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 
 - **Server side**
   - Uses an ASGI app (Starlette or FastAPI) to expose endpoints like:
-    - `POST /tasks/` — submit a `Task` to the agent.
-    - `POST /tasks/cancel` — request best-effort cancellation of an active task ID.
-    - `GET /.well-known/agent.json` — agent metadata.
+    - `POST /tasks/` - submit a `Task` to the agent.
+    - `POST /tasks/cancel` - request best-effort cancellation of an active task ID.
+    - `GET /.well-known/agent.json` - agent metadata.
     - Registry endpoints (if acting as a registry).
   - Uses a backend implementation of `BackendInterface` to manage the ASGI app and `uvicorn` server.
 
@@ -375,11 +375,11 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 Unlike network transports (HTTP, WebSocket), RuntimeTransport avoids actual TCP I/O. However, it perfectly mirrors the behavioral boundaries of `HTTPTransport` ensuring seamless interchangeability:
 
-- **Strict URL Routing** — each agent transport is initialized explicitly with a unique URL (e.g., `runtime://agent-name`).
-- **Global In-Memory Registry** — transports discover each other seamlessly through an automatic shared class-level global registry.
-- **Serialization Isolation** — message models natively pass through Pydantic dict boundaries, maintaining process and state safety equivalently to HTTP wire framing.
-- **Supports streaming** — agents can use generic `EndpointSpec` routing for real-time task streams.
-- **Supports cancellation** — the same `/tasks/cancel` endpoint dispatches in-process without opening a local socket.
+- **Strict URL Routing** - each agent transport is initialized explicitly with a unique URL (e.g., `runtime://agent-name`).
+- **Global In-Memory Registry** - transports discover each other seamlessly through an automatic shared class-level global registry.
+- **Serialization Isolation** - message models natively pass through Pydantic dict boundaries, maintaining process and state safety equivalently to HTTP wire framing.
+- **Supports streaming** - agents can use generic `EndpointSpec` routing for real-time task streams.
+- **Supports cancellation** - the same `/tasks/cancel` endpoint dispatches in-process without opening a local socket.
 
 ### Usage
 

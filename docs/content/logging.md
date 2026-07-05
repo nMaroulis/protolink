@@ -139,7 +139,7 @@ Appends formatted logs to a given file. Can automatically output structured JSON
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `filepath` | `str ⎪ Path` | — | **Required.** The target file to write logs to. Directories will be created if they do not exist. |
+| `filepath` | `str ⎪ Path` | - | **Required.** The target file to write logs to. Directories will be created if they do not exist. |
 | `name` | `str` | `"protolink"` | The name of the logger instance. |
 | `level` | `int ⎪ str` | `logging.INFO` | The severity level. Can be a string like `"DEBUG"` or an integer. |
 | `extension` | `str ⎪ None` | `None` | Overrides the file extension. Passing `"json"` formats the output as structured JSON rows. |

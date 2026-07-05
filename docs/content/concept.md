@@ -19,11 +19,11 @@ This separation keeps agent logic **clean, testable, and future-proof**.
 
 Protolink is built from the following **core components**:
 
-- **Agent** — business logic and orchestration  
-- **Client** — outgoing communication  
-- **Server** — incoming communication  
-- **Transport** — protocol + runtime implementation  
-- **Registry** — discovery and coordination  
+- **Agent** - business logic and orchestration  
+- **Client** - outgoing communication  
+- **Server** - incoming communication  
+- **Transport** - protocol + runtime implementation  
+- **Registry** - discovery and coordination  
 
 Each layer has a **single responsibility** and a clear **dependency direction**.
 
@@ -132,13 +132,22 @@ It encapsulates:
 
 The dependency graph is strictly **one-way**:
 
-Agent
- ├── AgentClient
- │    └── Transport
- └── AgentServer
-      └── Transport
+```mermaid
+flowchart TB
+    Agent["Agent<br/>business logic + lifecycle"]
+    Client["AgentClient<br/>outgoing intent"]
+    Server["AgentServer<br/>incoming runtime"]
+    ClientTransport["Transport<br/>client-side protocol adapter"]
+    ServerTransport["Transport<br/>server-side protocol adapter"]
 
+    Agent --> Client
+    Agent --> Server
+    Client --> ClientTransport
+    Server --> ServerTransport
+```
 
+Both branches use the same transport abstraction, but the agent only talks to the
+client/server layer. Protocol details stay below that boundary.
 
 **Key points:**
 
@@ -161,20 +170,26 @@ Architecturally, it **mirrors the agent model**.
 
 ### Registry Components
 
-- **Registry** — logical registry service  
-- **RegistryClient** — outgoing discovery requests  
-- **RegistryServer** — incoming registry API  
-- **Transport** — protocol implementation  
+- **Registry** - logical registry service  
+- **RegistryClient** - outgoing discovery requests  
+- **RegistryServer** - incoming registry API  
+- **Transport** - protocol implementation  
 
 ### Registry Dependency Graph
 
-Registry
- ├── RegistryClient
- │    └── Transport
- └── RegistryServer
-      └── Transport
+```mermaid
+flowchart TB
+    Registry["Registry<br/>discovery state + coordination"]
+    RegistryClient["RegistryClient<br/>outgoing lookup/register calls"]
+    RegistryServer["RegistryServer<br/>incoming registry API"]
+    RegistryClientTransport["Transport<br/>client-side protocol adapter"]
+    RegistryServerTransport["Transport<br/>server-side protocol adapter"]
 
-
+    Registry --> RegistryClient
+    Registry --> RegistryServer
+    RegistryClient --> RegistryClientTransport
+    RegistryServer --> RegistryServerTransport
+```
 
 This symmetry is intentional and keeps the **mental model consistent** across the system.
 
@@ -233,7 +248,7 @@ Agents behave like **independent actors**, not manually invoked functions.
 
 > **Agents are entities, not functions.** They are autonomous, centralized objects that serve as the core unit of your system.
 
-This creates a **flexible mesh** where specialized agents leverage each other's native capabilities without rigid orchestration bottlenecks. The programmer can be as invasive or hands-off as they want in the agent flow—Protolink gives you the freedom to choose.
+This creates a **flexible mesh** where specialized agents leverage each other's native capabilities without rigid orchestration bottlenecks. The programmer can be as invasive or hands-off as they want in the agent flow, Protolink gives you the freedom to choose.
 
 ---
 
@@ -266,7 +281,7 @@ Traditional AI frameworks often trap you in a walled garden:
 
 | Lock-In Type | The Problem | Protolink Solution |
 |--------------|-------------|--------------------|
-| **LLM Lock-In** | Tied to one provider (OpenAI, Anthropic) | Plug in any LLM—API, local, or self-hosted |
+| **LLM Lock-In** | Tied to one provider (OpenAI, Anthropic) | Plug in any LLM, API, local, or self-hosted |
 | **Transport Lock-In** | Hardcoded HTTP or specific runtime | Swap transports with one line of code |
 | **Tooling Lock-In** | Proprietary tool schemas | Native tools + MCP adapter for universal tooling |
 | **Runtime Lock-In** | Only works in specific environments | Protocol-agnostic, runs anywhere Python runs |
@@ -292,7 +307,7 @@ By decoupling the **Brain** (LLM) from the **Body** (Agent), you are immune to p
 
 ### Developer Freedom
 
-The pluggable architecture means **you own your stack**. No vendor lock-in, no framework constraints—just clean, composable components.
+The pluggable architecture means **you own your stack**. No vendor lock-in, no framework constraints, just clean, composable components.
 
 ---
 

@@ -8,11 +8,11 @@ Unlike standard Agents that might rely on LLMs to dynamically map out interactio
 
 ## 🧠 The Logic Behind Flows
 
-In standard Protolink (or many other LLM-based frameworks), an Agent receives a task, analyzes it using an LLM, and decides what to do next—whether that's calling a tool, writing some text, or delegating work to another Agent via an `agent_call`. While powerful and flexible, this "implicit routing" can sometimes be unpredictable, expensive, or hard to debug for rigid enterprise processes.
+In standard Protolink (or many other LLM-based frameworks), an Agent receives a task, analyzes it using an LLM, and decides what to do next, whether that's calling a tool, writing some text, or delegating work to another Agent via an `agent_call`. While powerful and flexible, this "implicit routing" can sometimes be unpredictable, expensive, or hard to debug for rigid enterprise processes.
 
 :::tip[Why Structured Flows?]
 
-**Structured Flows** solve this by removing the LLM from the routing equation entirely. With a Flow, you—the developer—explicitly define the state machine. The task will move predictably from Agent A to Agent B, branching only on logical conditions you define in code.
+**Structured Flows** solve this by removing the LLM from the routing equation entirely. With a Flow, you, the developer, explicitly define the state machine. The task will move predictably from Agent A to Agent B, branching only on logical conditions you define in code.
 
 :::
 **Wait, what actually happens to the Task?**

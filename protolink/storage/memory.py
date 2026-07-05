@@ -11,16 +11,15 @@ class InMemoryStorage(Storage):
     """In-memory storage implementation.
 
     A lightweight, dictionary-backed storage that lives entirely in RAM.
-    Ideal for development, testing, and short-lived agents that don't need
-    disk persistence. Supports optional TTL-based expiration per entry.
+    Ideal for development, testing, and short-lived agents that don't need disk persistence.
+    Supports optional TTL-based expiration per entry.
 
     This implementation uses a min-heap to optimize proactive cleanup of expired entries.
 
     Attributes:
         namespace: Unique identifier for this storage instance's data.
-        ttl: Optional time-to-live in seconds. Entries older than this are
-            automatically evicted on access or during proactive cleanup.
-            ``None`` means no expiration.
+        ttl: Optional time-to-live in seconds. Entries older than this are automatically evicted on access or during
+            proactive cleanup. ``None`` means no expiration.
 
     Time Complexity:
         - save: O(log N) due to heap push
@@ -32,8 +31,7 @@ class InMemoryStorage(Storage):
         - O(N) where N is the number of entries in the store.
     """
 
-    # Class-level shared store — all InMemoryStorage instances see the same data
-    # unless a custom store is injected.
+    # Class-level shared store, all InMemoryStorage instances see the same data unless a custom store is injected.
     _global_store: ClassVar[dict[str, tuple[Any, float]]] = {}
     _global_ttl_heap: ClassVar[list[tuple[float, str]]] = []
 
@@ -50,8 +48,7 @@ class InMemoryStorage(Storage):
             namespace: Unique identifier for this storage instance's data.
             ttl: Optional time-to-live in seconds for stored entries.
                 If ``None``, entries never expire.
-            store: Optional custom backing dict. If not provided, the shared
-                class-level store is used.
+            store: Optional custom backing dict. If not provided, the shared class-level store is used.
             ttl_heap: Optional custom TTL heap.
         """
         self.namespace = namespace
@@ -122,9 +119,8 @@ class InMemoryStorage(Storage):
     def cleanup_expired(self) -> int:
         """Remove all expired entries from the backing store using a min-heap.
 
-        This method proactively evicts all entries whose TTL has passed by inspecting
-        the top of the min-heap. This is significantly more efficient than a linear
-        scan of the entire dictionary.
+        This method proactively evicts all entries whose TTL has passed by inspecting the top of the min-heap.
+        This is significantly more efficient than a linear scan of the entire dictionary.
 
         Returns:
             The number of entries removed.

@@ -169,7 +169,7 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
 - **Tools as modules**: native Python tools and MCP tools plugged directly into agents. Import tools from thousands of existing MCP servers instantly.
 - **Resilience by design**: by decoupling the Brain (LLM) from the Body (Agent), you are immune to provider outages or pricing changes.
 - **State Management**: Unified persistence for conversation history, tool state, task metadata, and flow context across multiple sessions.
-- **Developer freedom**: the pluggable architecture means you own your stack. No vendor lock-in, no framework constraints—just clean, composable components.
+- **Developer freedom**: the pluggable architecture means you own your stack. No vendor lock-in, no framework constraints, just clean, composable components.
 
 Use this documentation to:
 

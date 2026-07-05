@@ -1,5 +1,5 @@
 """
-Orchestrator Agent — The "Coordinator" of the Coding Assistant (LLM + Agent Calls)
+Orchestrator Agent - The "Coordinator" of the Coding Assistant (LLM + Agent Calls)
 
 This is the user-facing agent. It receives coding requests and coordinates
 the Planner (for reasoning) and Coder (for file operations) to fulfill them.
@@ -7,10 +7,10 @@ the Planner (for reasoning) and Coder (for file operations) to fulfill them.
 ═══════════════════════════════════════════════════════════════════════════
 PROTOLINK CONCEPTS DEMONSTRATED:
 ─────────────────────────────────
-1. AGENT CALL — BOTH MODES: This agent uses `agent_call` in two ways:
+1. AGENT CALL - BOTH MODES: This agent uses `agent_call` in two ways:
    • `infer`: Asks the Planner to reason about code (LLM-to-LLM)
    • `tool_call`: Tells the Coder to read/write files (tool delegation)
-   This is the CORE of Protolink's agent mesh — agents delegating
+   This is the CORE of Protolink's agent mesh, agents delegating
    to each other over the network using a standard protocol.
 
 2. DYNAMIC DISCOVERY: The Orchestrator doesn't hard-code agent URLs.
@@ -24,7 +24,7 @@ PROTOLINK CONCEPTS DEMONSTRATED:
 
 4. MULTI-STEP WORKFLOWS: The LLM can chain multiple agent_calls
    in sequence (read → plan → write), creating complex workflows
-   autonomously — just like a real coding assistant.
+   autonomously, just like a real coding assistant.
 
 HOW IT WORKS UNDER THE HOOD:
 ────────────────────────────
@@ -50,7 +50,7 @@ from protolink.discovery import Registry
 from protolink.llms.factory import create_llm
 
 # ─────────────────────────────────────────────────────────────────────────
-# SYSTEM PROMPT — The Orchestrator's "Playbook"
+# SYSTEM PROMPT - The Orchestrator's "Playbook"
 # ─────────────────────────────────────────────────────────────────────────
 # This prompt defines HOW the Orchestrator should coordinate the team.
 # It's appended to Protolink's built-in prompt (which explains agent_call
@@ -58,12 +58,12 @@ from protolink.llms.factory import create_llm
 #
 # KEY INSIGHT: The LLM reads this prompt + the discovered agent cards
 # and autonomously decides how to orchestrate the workflow. We don't
-# hard-code the steps — the LLM figures out the right sequence.
+# hard-code the steps, the LLM figures out the right sequence.
 # ─────────────────────────────────────────────────────────────────────────
 ORCHESTRATOR_SYSTEM_PROMPT = """You are an AI coding assistant coordinator, similar to Claude Code.
 
 Your job is to help users modify, understand, and improve their code by coordinating
-a team of specialist agents. You do NOT write code yourself — you delegate to specialists.
+a team of specialist agents. You do NOT write code yourself, you delegate to specialists.
 
 YOUR WORKFLOW:
 1. **Understand**: When a user asks for a code change, first understand what they want.
@@ -97,7 +97,7 @@ def create_orchestrator_agent(
     Parameters
     ----------
     registry : Registry
-        The agent registry for discovery (required — the Orchestrator
+        The agent registry for discovery (required - the Orchestrator
         MUST be able to discover other agents)
     llm_provider : str
         e.g. "ollama", "openai", "anthropic", "gemini"

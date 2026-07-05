@@ -8,7 +8,7 @@ Protolink provides a pluggable storage system to act as a persistent memory for 
 
 Protolink currently supports the following storage implementations:
 
-- **SQLiteStorage** — A local, file-based storage using SQLite. Ideal for persistence across restarts without requiring external database servers.
+- **SQLiteStorage** - A local, file-based storage using SQLite. Ideal for persistence across restarts without requiring external database servers.
 
 You can also implement your own storage backend by subclassing the `Storage` base class.
 
@@ -107,9 +107,9 @@ All methods are abstract and must be implemented by subclasses.
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `save()` | `data: Any` | `None` | Saves data to the storage. Structure depends on implementation. |
-| `load()` | — | `Any` | Loads data from the storage. Returns `None` if no data is found. |
+| `load()` | - | `Any` | Loads data from the storage. Returns `None` if no data is found. |
 | `update()` | `data: Any` | `None` | Updates existing data in the storage. |
-| `delete()` | — | `None` | Deletes the data from the storage. |
+| `delete()` | - | `None` | Deletes the data from the storage. |
 
 ### SQLiteStorage
 

@@ -7,7 +7,7 @@ The article on [Level Up Coding](https://levelup.gitconnected.com/build-easily-y
 :::
 The directory containing the example files can be found [here](https://github.com/nMaroulis/protolink/tree/main/examples/code_assistant).
 
-This example builds a simplified **"Claude Code"** — a terminal coding assistant powered by a mesh of three autonomous agents. It demonstrates how to compose specialized agents into a system where a **brain reasons**, **hands execute**, and a **coordinator orchestrates** — just like a real AI coding assistant.
+This example builds a simplified **"Claude Code"** - a terminal coding assistant powered by a mesh of three autonomous agents. It demonstrates how to compose specialized agents into a system where a **brain reasons**, **hands execute**, and a **coordinator orchestrates** - just like a real AI coding assistant.
 
 It highlights:
 
@@ -40,7 +40,7 @@ From this single input, the system:
 
 ## 🧩 Agent Overview
 
-### 1. Orchestrator Agent (Coordinator — LLM + Agent Calls)
+### 1. Orchestrator Agent (Coordinator | LLM + Agent Calls)
 
 **Role:** User-facing coordinator and workflow manager.  
 - Receives the user's coding request  
@@ -49,20 +49,20 @@ From this single input, the system:
 - Aggregates results and presents a summary to the user  
 > Uses an **LLM for decision-making**, but **never touches files or generates code** directly. It coordinates.
 
-### 2. Planner Agent (Brain — LLM-Only)
+### 2. Planner Agent (Brain | LLM-Only)
 **Role:** Code analysis, planning, and code generation.
 - Analyzes coding tasks and creates step-by-step implementation plans  
 - Reviews existing source code for issues and improvements  
 - Generates precise, complete file contents ready to be written  
 - Responds with structured output following PEP 8 / PEP 257 conventions
-> **No filesystem access.** The Planner is a pure reasoning engine — it thinks, but cannot act. This is the `infer` delegation in action.
+> **No filesystem access.** The Planner is a pure reasoning engine, it thinks, but cannot act. This is the `infer` delegation in action.
 
-### 3. Coder Agent (Hands — Tools-Only)
+### 3. Coder Agent (Hands | Tools-Only)
 **Role:** Deterministic filesystem operations.  
-- `read_file(path)` — Read file contents with line numbers  
-- `write_file(path, content)` — Create or overwrite files  
-- `list_directory(path)` — List directory contents  
-- `search_in_files(pattern, path, file_filter)` — Grep-like search  
+- `read_file(path)` - Read file contents with line numbers  
+- `write_file(path, content)` - Create or overwrite files  
+- `list_directory(path)` - List directory contents  
+- `search_in_files(pattern, path, file_filter)` - Grep-like search  
 > **No LLM.** The Coder executes file operations reliably and deterministically. All operations are **sandboxed** to a configurable workspace directory for safety.
 
 ### 🧠 Design Note: Why Three Agents?
@@ -144,7 +144,7 @@ This is the **core of Protolink's agent mesh**: agents delegating to each other 
 
 ---
 
-## 🧠 The Inference Loop — How the Orchestrator Works
+## 🧠 The Inference Loop - How the Orchestrator Works
 
 When the Orchestrator receives a user request, Protolink runs an **inference loop**:
 
@@ -180,7 +180,7 @@ This is how a single `Task.create_infer(prompt=...)` can trigger an autonomous, 
 
 ```
 examples/code_assistant/
-├── run.py                  # ⭐ Entry point — starts all agents & demo
+├── run.py                  # ⭐ Entry point, starts all agents & demo
 ├── orchestrator_agent.py   # LLM coordinator (delegates to Planner & Coder)
 ├── planner_agent.py        # LLM-only reasoning (code analysis & generation)
 ├── coder_agent.py          # Tools-only (read, write, list, search files)
@@ -258,7 +258,7 @@ examples/code_assistant/
 ## 📋 Expected Output
 
 ```
-🤖 CODE ASSISTANT — Protolink Multi-Agent Coding System
+🤖 CODE ASSISTANT - Protolink Multi-Agent Coding System
 ======================================================================
 
 📂 Setting up demo workspace...
@@ -299,12 +299,12 @@ examples/code_assistant/
 ✅ RESULT:
 ----------------------------------------------------------------------
 Added comprehensive docstrings to all 6 functions in utils.py:
-• add(a, b) — Addition operation
-• subtract(a, b) — Subtraction operation
-• multiply(a, b) — Multiplication operation
-• divide(a, b) — Division with zero-check
-• power(base, exponent) — Exponentiation
-• factorial(n) — Recursive factorial
+• add(a, b) - Addition operation
+• subtract(a, b) - Subtraction operation
+• multiply(a, b) - Multiplication operation
+• divide(a, b) - Division with zero-check
+• power(base, exponent) - Exponentiation
+• factorial(n) - Recursive factorial
 
 All docstrings follow PEP 257 conventions.
 ----------------------------------------------------------------------
@@ -321,8 +321,8 @@ All docstrings follow PEP 257 conventions.
 | 3 | **Registry Discovery** | Agents find each other dynamically at runtime |
 | 4 | **LLM-Agnostic** | One-line switch: `create_llm("openai")` → `create_llm("anthropic")` |
 | 5 | **Transport-Agnostic** | All agents use HTTP; switchable to SSE, WebSocket, or runtime transports |
-| 6 | **Tool-Only Agents** | Coder has tools but no LLM — pure determinism |
-| 7 | **LLM-Only Agents** | Planner has LLM but no tools — pure reasoning |
+| 6 | **Tool-Only Agents** | Coder has tools but no LLM - pure determinism |
+| 7 | **LLM-Only Agents** | Planner has LLM but no tools - pure reasoning |
 | 8 | **Custom `handle_task`** | Planner subclasses Agent for observability |
 | 9 | **Autonomous Orchestration** | Multi-step workflow without human intervention |
 | 10 | **Workspace Sandboxing** | File operations constrained to safe directory |
@@ -333,9 +333,9 @@ All docstrings follow PEP 257 conventions.
 
 - **Add a Reviewer agent** (LLM-only) that reviews code changes before they're written
 - **Add a Test Runner agent** (tool-only) that runs pytest after edits
-- **Switch transports** — use WebSocket for real-time streaming of edit progress
-- **Add MCP tools** — import tools from external MCP servers (e.g., GitHub, Jira)
-- **Use different LLMs per agent** — cheap model for Orchestrator, powerful model for Planner
+- **Switch transports** - use WebSocket for real-time streaming of edit progress
+- **Add MCP tools** - import tools from external MCP servers (e.g., GitHub, Jira)
+- **Use different LLMs per agent** - cheap model for Orchestrator, powerful model for Planner
 
 ---
 

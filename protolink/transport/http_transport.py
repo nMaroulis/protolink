@@ -254,7 +254,7 @@ class HTTPTransport(Transport):
         **Technical Note on Loop Isolation:**
         In Protolink's multi-threaded architecture, a single ``HTTPTransport`` instance is frequently shared across
         multiple ``asyncio`` event loops (e.g., a background server thread and the main execution thread).
-        Because ``asyncio`` primitives—including the sockets and selectors within ``httpx.AsyncClient``, are strictly
+        Because ``asyncio`` primitives, including the sockets and selectors within ``httpx.AsyncClient``, are strictly
         bound to the loop that instantiated them, attempting to close a client from a different loop triggers
         a ``RuntimeError`` ("Event loop is closed" or "Future attached to a different loop").
 

@@ -264,7 +264,7 @@ class Registry:
         event loop. To stop it from the main thread, we utilize ``call_soon_threadsafe`` to
         inject a cancellation request into the background loop. This triggers a
         ``CancelledError`` within the ``_lifecycle()`` coroutine, allowing it to execute its
-        ``finally`` blocks—which perform critical cleanup like closing the transport and
+        ``finally`` blocks, which perform critical cleanup like closing the transport and
         stopping the ASGI server.
 
         The subsequent ``join(timeout=10)`` synchronizes the main thread with the background

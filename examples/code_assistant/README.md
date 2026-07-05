@@ -1,6 +1,6 @@
-# 🤖 Code Assistant — Multi-Agent Coding System
+# 🤖 Code Assistant - Multi-Agent Coding System
 
-A simplified **"Claude Code"** built as a mesh of three autonomous agents using Protolink. This demo showcases how to build an AI coding assistant where specialized agents collaborate over the network — each with its own role, just like a real engineering team.
+A simplified **"Claude Code"** built as a mesh of three autonomous agents using Protolink. This demo showcases how to build an AI coding assistant where specialized agents collaborate over the network, each with its own role, just like a real engineering team.
 
 ![Protolink](https://img.shields.io/badge/Protolink-Multi--Agent-blue)
 ![Python 3.11+](https://img.shields.io/badge/Python-3.11+-green)
@@ -28,7 +28,7 @@ User Request: "Add docstrings to all functions in utils.py"
      ▼
 ┌───────────────────────────────────────────────────────────┐
 │                  ORCHESTRATOR AGENT                       │
-│                  (LLM — Coordinator)                      │
+│                  (LLM - Coordinator)                      │
 │                                                           │
 │  1. Receives user's coding request                        │
 │  2. agent_call → coder.list_directory(".")                │
@@ -41,7 +41,7 @@ User Request: "Add docstrings to all functions in utils.py"
          ▼                              ▼
 ┌─────────────────────┐      ┌─────────────────────────┐
 │   PLANNER AGENT     │      │     CODER AGENT         │
-│   (LLM — Brain)     │      │     (Tools — Hands)     │
+│   (LLM - Brain)     │      │     (Tools - Hands)     │
 │                     │      │                         │
 │   • Analyzes tasks  │      │  • read_file()          │
 │   • Creates plans   │      │  • write_file()         │
@@ -75,7 +75,7 @@ User Request: "Add docstrings to all functions in utils.py"
 This mirrors how real coding assistants work:
 
 - **Separation of Concerns**: The "brain" (Planner) doesn't touch files. The "hands" (Coder) don't reason. The Orchestrator coordinates.
-- **Both Delegation Modes**: Planner gets `infer` calls (LLM-to-LLM), Coder gets `tool_call` calls — showcasing both A2A delegation modes.
+- **Both Delegation Modes**: Planner gets `infer` calls (LLM-to-LLM), Coder gets `tool_call` calls, showcasing both A2A delegation modes.
 - **Scalability**: In production, you could run the Planner on a powerful GPU, the Coder on a secure file server, and the Orchestrator as a lightweight API gateway.
 
 ---
@@ -135,7 +135,7 @@ python run.py "Add type hints to all functions in utils.py"
 ## 📋 Expected Output
 
 ```
-🤖 CODE ASSISTANT — Protolink Multi-Agent Coding System
+🤖 CODE ASSISTANT - Protolink Multi-Agent Coding System
 ======================================================================
 
 Architecture: Orchestrator (LLM) → Planner (LLM) + Coder (Tools)
@@ -196,12 +196,12 @@ Architecture: Orchestrator (LLM) → Planner (LLM) + Coder (Tools)
 I've added comprehensive docstrings to all 6 functions in `utils.py`:
 
 📝 **Changes made:**
-- `add(a, b)` — Added docstring explaining addition operation
-- `subtract(a, b)` — Added docstring explaining subtraction
-- `multiply(a, b)` — Added docstring explaining multiplication
-- `divide(a, b)` — Added docstring with ValueError note for zero division
-- `power(base, exponent)` — Added docstring explaining exponentiation
-- `factorial(n)` — Added docstring with ValueError note for negatives
+- `add(a, b)` - Added docstring explaining addition operation
+- `subtract(a, b)` - Added docstring explaining subtraction
+- `multiply(a, b)` - Added docstring explaining multiplication
+- `divide(a, b)` - Added docstring with ValueError note for zero division
+- `power(base, exponent)` - Added docstring explaining exponentiation
+- `factorial(n)` - Added docstring with ValueError note for negatives
 
 All docstrings follow PEP 257 conventions with parameter descriptions
 and return value documentation.
@@ -230,7 +230,7 @@ and return value documentation.
 
 ```
 examples/code_assistant/
-├── run.py                  # ⭐ Entry point — starts all agents & demo
+├── run.py                  # ⭐ Entry point, starts all agents & demo
 ├── orchestrator_agent.py   # LLM coordinator (delegates to Planner & Coder)
 ├── planner_agent.py        # LLM-only reasoning (code analysis & generation)
 ├── coder_agent.py          # Tools-only (read, write, list, search files)
@@ -244,7 +244,7 @@ examples/code_assistant/
 
 ---
 
-## 🧠 How It Works — Step by Step
+## 🧠 How It Works - Step by Step
 
 
 <div align="center">
@@ -296,7 +296,7 @@ The Orchestrator's LLM enters an **inference loop**:
 9. **LLM outputs**: `agent_call → coder.write_file(path="utils.py", content="...")`
 10. **LLM outputs**: Final summary → loop ends
 
-All of this happens **autonomously** — Protolink handles the routing, serialization, and response parsing.
+All of this happens **autonomously** - Protolink handles the routing, serialization, and response parsing.
 
 ---
 
@@ -309,8 +309,8 @@ All of this happens **autonomously** — Protolink handles the routing, serializ
 | 3 | **Registry Discovery** | Agents find each other dynamically at runtime |
 | 4 | **LLM-Agnostic** | One-line switch between OpenAI, Anthropic, Ollama |
 | 5 | **Transport-Agnostic** | HTTP today, WebSocket/gRPC tomorrow |
-| 6 | **Tool-Only Agents** | Coder has tools but no LLM — pure determinism |
-| 7 | **LLM-Only Agents** | Planner has LLM but no tools — pure reasoning |
+| 6 | **Tool-Only Agents** | Coder has tools but no LLM - pure determinism |
+| 7 | **LLM-Only Agents** | Planner has LLM but no tools - pure reasoning |
 | 8 | **Custom handle_task** | Planner subclasses Agent for logging |
 | 9 | **Autonomous Orchestration** | Multi-step workflow runs without human intervention |
 
@@ -330,7 +330,7 @@ python run.py "Find all functions that don't have docstrings"
 
 ## 📄 License
 
-MIT License — See [LICENSE](../../LICENSE) for details.
+MIT License - See [LICENSE](../../LICENSE) for details.
 
 ---
 

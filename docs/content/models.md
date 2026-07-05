@@ -81,9 +81,9 @@ Agent identity and capability declaration. This is the main metadata card that d
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `name` | `str` | — | **Required.** Agent name |
-| `description` | `str` | — | **Required.** Agent purpose/description |
-| `url` | `str` | — | **Required.** Service endpoint URL |
+| `name` | `str` | - | **Required.** Agent name |
+| `description` | `str` | - | **Required.** Agent purpose/description |
+| `url` | `str` | - | **Required.** Service endpoint URL |
 | `transport` | `TransportType` | `"http"` | Transport protocol to use (e.g. `"http"`, `"sse"`, `"websocket"`, `"runtime"`) |
 | `version` | `str` | `"1.0.0"` | Agent version |
 | `protocol_version` | `str` | `protolink_version` | Protolink Protocol version |
@@ -260,7 +260,7 @@ Represents a task that an agent can perform. Skills are used to advertise specif
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `id` | `str` | — | **Required.** Unique Human-readable identifier for the task |
+| `id` | `str` | - | **Required.** Unique Human-readable identifier for the task |
 | `description` | `str` | `""` | Detailed description of what the task does |
 | `input_schema` | `dict[str, Any]` | `{}` | JSON Schema object for accepted inputs |
 | `output_schema` | `dict[str, Any]` | `{}` | JSON Schema object for the output payload |
@@ -1102,10 +1102,10 @@ Defines the contract for a server endpoint. This model lives in `protolink.serve
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `name` | `str` | — | **Required.** Unique internal name for the endpoint |
-| `path` | `str` | — | **Required.** URL path (e.g., `/tasks/`) |
-| `method` | `HttpMethod` | — | **Required.** HTTP method (GET, POST, etc.) |
-| `handler` | `Callable` | — | **Required.** Async function that handles the request |
+| `name` | `str` | - | **Required.** Unique internal name for the endpoint |
+| `path` | `str` | - | **Required.** URL path (e.g., `/tasks/`) |
+| `method` | `HttpMethod` | - | **Required.** HTTP method (GET, POST, etc.) |
+| `handler` | `Callable` | - | **Required.** Async function that handles the request |
 | `content_type` | `str` | `"json"` | Response content type (`json` or `html`) |
 | `streaming` | `bool` | `False` | Whether the endpoint handler returns a stream of events |
 | `mode` | `str` | `"request_response"` | Interaction mode (`request_response` or `stream`) |
