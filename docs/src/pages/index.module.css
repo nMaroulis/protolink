@@ -1049,28 +1049,36 @@
 }
 
 .kicker {
+  --kicker-text: var(--protolink-blue-700);
+  --kicker-border: rgba(10, 132, 255, 0.2);
+  --kicker-sheen: rgba(10, 132, 255, 0.16);
+  --kicker-sheen-soft: rgba(10, 132, 255, 0.06);
+  --kicker-fill: rgba(10, 132, 255, 0.08);
+  --kicker-base: rgba(255, 255, 255, 0.82);
+  --kicker-shadow-rest: 0 12px 34px rgba(15, 23, 42, 0.06);
+
   overflow: hidden;
   align-items: center;
   width: fit-content;
   max-width: 100%;
   margin: 0 auto;
   padding: 0.42rem 0.72rem;
-  border: 1px solid rgba(10, 132, 255, 0.2);
+  border: 1px solid var(--kicker-border);
   border-radius: 999px;
-  color: var(--protolink-blue-700);
+  color: var(--kicker-text);
   background:
-    linear-gradient(90deg, rgba(10, 132, 255, 0.2), rgba(10, 132, 255, 0.08) 42%, transparent 78%),
-    linear-gradient(90deg, rgba(10, 132, 255, 0.08), rgba(255, 255, 255, 0.82)),
-    rgba(255, 255, 255, 0.8);
-  background-position: left center, 0 0, 0 0;
+    linear-gradient(90deg, transparent, var(--kicker-sheen) 28%, var(--kicker-sheen-soft) 56%, transparent 82%),
+    linear-gradient(90deg, var(--kicker-fill), var(--kicker-base)),
+    var(--kicker-base);
+  background-position: -48% 0, 0 0, 0 0;
   background-repeat: no-repeat;
   background-size: 34% 100%, 100% 100%, auto;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--kicker-shadow-rest);
   font-family: Comfortaa, "Avenir Next Rounded", "Nunito Sans", ui-rounded, var(--ifm-font-family-base);
   font-size: clamp(0.98rem, 1.7vw, 1.18rem);
   line-height: 1.25;
   text-transform: none;
-  animation: kickerBreath 6.4s ease-in-out infinite;
+  animation: kickerBreath 18s ease-in-out infinite;
 }
 
 .heroCopy h1 {
@@ -1209,13 +1217,23 @@
 @keyframes kickerBreath {
   0%,
   100% {
+    background-position: -48% 0, 0 0, 0 0;
     background-size: 34% 100%, 100% 100%, auto;
-    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
   }
 
-  50% {
-    background-size: 118% 100%, 100% 100%, auto;
-    box-shadow: 0 15px 42px rgba(10, 132, 255, 0.13);
+  31% {
+    background-position: 22% 0, 0 0, 0 0;
+    background-size: 74% 100%, 100% 100%, auto;
+  }
+
+  63% {
+    background-position: 96% 0, 0 0, 0 0;
+    background-size: 116% 100%, 100% 100%, auto;
+  }
+
+  84% {
+    background-position: 44% 0, 0 0, 0 0;
+    background-size: 52% 100%, 100% 100%, auto;
   }
 }
 
@@ -1888,12 +1906,15 @@
 }
 
 :global([data-theme='dark']) .kicker {
-  border-color: rgba(64, 156, 255, 0.28);
-  background:
-    linear-gradient(90deg, rgba(64, 156, 255, 0.24), rgba(10, 132, 255, 0.1) 42%, transparent 78%),
-    linear-gradient(90deg, rgba(10, 132, 255, 0.16), rgba(16, 28, 42, 0.86)),
-    rgba(16, 28, 42, 0.86);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.24);
+  --kicker-text: #cfe9ff;
+  --kicker-border: rgba(125, 211, 252, 0.34);
+  --kicker-sheen: rgba(125, 211, 252, 0.18);
+  --kicker-sheen-soft: rgba(83, 173, 255, 0.08);
+  --kicker-fill: rgba(83, 173, 255, 0.14);
+  --kicker-base: rgba(13, 21, 32, 0.9);
+  --kicker-shadow-rest:
+    0 14px 40px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
 }
 
 :global([data-theme='dark']) .composerCue strong {

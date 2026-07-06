@@ -1,6 +1,6 @@
 import ApiSurface from '@site/src/components/ApiSurface';
 
-# Type Aliases API Reference
+# Type Aliases
 
 This section provides detailed documentation for the type aliases used throughout the Protolink framework. Type aliases improve code readability, provide type safety, and make the API more consistent across different modules.
 

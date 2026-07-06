@@ -1,32 +1,39 @@
 # Flows
 
-Structured Flows let you define complex, structured workflows for your agents. Building on the core Agent-to-Agent (A2A) architecture, flows enable deterministic execution paths such as sequential pipelines, parallel execution, conditional routing, and graph-shaped state machines.
+Structured Flows let you define explicit workflows for your agents while still using the same Agent-to-Agent (A2A) `Task`, `Message`, `Artifact`, and `AgentCard` primitives used everywhere else in Protolink. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
 
-Unlike standard Agents that might rely on LLMs to dynamically map out interactions and routing, flows mandate strict execution paths, ensuring consistent and predictable outcomes for multistep tasks.
+Use flows when the shape of the process is known ahead of time. Instead of asking an LLM to decide the whole plan at runtime, you define the path in code: a sequential pipeline, a fan-out/fan-in review step, a controlled router, or a graph-shaped state machine with loops. The agents inside the flow can still use LLMs, tools, storage, and remote transports. The difference is that the orchestration itself is inspectable Python.
 
 ---
 
 ## 🧠 The Logic Behind Flows
 
-In standard Protolink (or many other LLM-based frameworks), an Agent receives a task, analyzes it using an LLM, and decides what to do next, whether that's calling a tool, writing some text, or delegating work to another Agent via an `agent_call`. While powerful and flexible, this "implicit routing" can sometimes be unpredictable, expensive, or hard to debug for rigid enterprise processes.
+In standard Protolink agent execution, an Agent receives a task, analyzes it using an LLM, and decides what to do next. It might call a tool, write a response, or delegate work to another Agent through an `agent_call`. That flexible mode is useful when the problem is open ended, but it can be too loose for workflows that must be repeatable, reviewable, or tied to a business process.
+
+Flows move the topology out of the model and into code. A `Pipeline` always runs the same ordered steps. A `Parallel` flow always fans the same input out to the configured branches and merges the results. A `Graph` follows named edges and validates that destinations exist. A `Router` still lets a preceding agent choose a branch, but the available branch keys and destinations are fixed by the developer and recorded on the task for tracing.
 
 :::tip[Why Structured Flows?]
 
-**Structured Flows** solve this by removing the LLM from the routing equation entirely. With a Flow, you, the developer, explicitly define the state machine. The task will move predictably from Agent A to Agent B, branching only on logical conditions you define in code.
+**Structured Flows** are best for processes where the topology matters. They make the movement between agents explicit, while leaving each agent free to do its own specialized work.
+They remove the LLM from the routing equation entirely (Agent Delegation). With a Flow, you, the developer, explicitly define the state machine. The task will move predictably from Agent A to Agent B, branching only on logical conditions you define in code.
 
 :::
-**Wait, what actually happens to the Task?**
+
+## What Happens To The Task?
 
 In Protolink, a `Flow` expects a `Task` and returns a `Task`. A Task is essentially a container holding a history of interactions (Messages and Artifacts). When a Flow executes:
 
-1. **Semantic Context Injection**: The Flow orchestrator evaluates the *next step* in the topology. It pre-builds a context-aware system prompt (e.g., "Your output goes to the Editor") and attaches it to the `Task`'s `flow_state`.
-2. **Execution**: It sends the `Task` to the current Agent.
-3. **Context-Aware Inference**: The Agent automatically injects the `flow_state` prompt into its LLM, ensuring it formats its output perfectly for the downstream receiver. It then performs its logic and appends an `Artifact` to the `Task`.
-4. **Traversal**: The Flow retrieves the updated `Task` and passes it to the next Agent. This continues until the flow finishes, returning a highly-enriched `Task` full of intermediate artifacts.
+1. **Semantic Context Injection**: Before a deterministic next step, the flow builds a short prompt that describes the downstream target and stores it in `task.flow_state["prompt"]`.
+2. **Execution**: The flow dispatches the task to the current target. The target can be a local `Agent`, a remote agent string, or another nested `Flow`.
+3. **Agent Processing**: The executing agent can read the flow prompt automatically during inference. It appends messages, artifacts, metadata, or state transitions to the same logical task.
+4. **Transition Bridge**: If one agent's previous output is not already an executable instruction, Protolink wraps that output into a new `Message.infer(...)` instruction before sending it to the next agent. This keeps direct agent-to-agent steps from silently no-oping on a plain text or artifact result.
+5. **Traversal**: The flow moves to the next step and repeats until the topology reaches its terminal point.
+
+`flow_state` is intentionally transient. `Pipeline` and `Graph` clear and rewrite it before each step so agents receive only the relevant downstream context. If you need durable business state, put it in task metadata, messages, artifacts, or storage rather than relying on `flow_state` to survive the whole workflow.
 
 ### 🧱 Deep Composability & Nesting
 
-Protolink Flows are now **fully recursive**. This means a step in a `Pipeline` can be another entirely self-contained `Parallel` flow, or a `Graph` node can be a `Pipeline`.
+Protolink Flows are fully recursive. This means a step in a `Pipeline` can be another self-contained `Parallel` flow, or a `Graph` node can be a complete `Pipeline`. Nested flows receive the parent flow's client and registry when they have not been configured directly, so complex structures do not need repeated wiring at every level.
 
 
 <div className="centered-media">
@@ -34,29 +41,51 @@ Protolink Flows are now **fully recursive**. This means a step in a `Pipeline` c
 </div>
 
 
-This architectural shift allows you to build extremely complex, hierarchical decision trees using simple, reusable building blocks.
+This lets you build hierarchical workflows out of small, reusable pieces. For example, a parent `Pipeline` can draft a response, run a `Parallel` review committee, route the reviewed output, and then finish with a final formatter.
 
 :::info[Polymorphic Step Targets]
 
-Every flow step or branch now supports three target types interchangeably:
-*   **Local Agent Instance**: Executes directly within the same process.
-*   **URL / Registry Name (string)**: Dispatches a remote A2A task across the network.
-*   **Flow Instance**: Seamlessly propagates execution into a nested sub-flow.
+Every flow step, branch, route, or graph node supports three target types:
+
+- **Local Agent Instance**: Executes directly in the same process through `agent.handle_task(task)`.
+- **URL / Registry Name (string)**: Resolves an agent name through a registry, or dispatches directly to a URL such as `http://...`, `ws://...`, or `runtime://...`.
+- **Flow Instance**: Executes a nested sub-flow by calling its own `execute(task)` method.
 
 :::
+
+When a string target is not already a URL, the flow needs a `Registry` or `RegistryClient` so it can discover the agent by name. Remote dispatch also needs an `AgentClient`; if the registry client exposes a transport, Protolink can infer the client from that registry.
+
 ---
 
 ## ⚙️ Execution
 
-You can define a Flow and run it programmatically in your Python script using its `.execute(task)` method. In this mode, the flow runs exactly once to completion and then your script continues.
+You can run every flow asynchronously with `.execute(task)`. This is the normal API for servers, async scripts, and agents that are already inside an event loop:
 
-This is great for one-off tasks, background jobs, testing, or embedding a structured pipeline inside your own custom Agent classes.
+```python
+from protolink.flows import Pipeline
+from protolink.models import Message, Task
+
+task = Task.create(Message.user("Research this topic and summarize it."))
+
+pipeline = Pipeline(registry=registry)
+pipeline.add_step("researcher").add_step("summarizer")
+
+result = await pipeline.execute(task)
+```
+
+For scripts, CLI commands, and notebooks without async support, use the synchronous wrapper:
+
+```python
+result = pipeline.sync.execute(task)
+```
+
+The sync wrapper calls `asyncio.run()` internally, so do not use it from inside an already-running event loop. In async applications, always `await flow.execute(task)` directly.
 
 ---
 
 ## 🧩 Core Flow Patterns
 
-All flows can optionally be instantiated with a `Registry` or `RegistryClient` so they can discover agents dynamically by their registered name instead of explicitly hardcoded URLs.
+All flow primitives share the same contract: they accept a `Task`, execute one or more `FlowTarget` objects, and return the updated `Task`. They differ only in how they choose the next target.
 
 ### 1. Pipeline (Sequential)
 
@@ -69,11 +98,25 @@ pipeline.add_step("researcher").add_step("summarizer")
 await pipeline.execute(task)
 ```
 
+Use a `Pipeline` when each step depends on the previous step's result: research then summarize, draft then edit, extract then validate, plan then execute. The order is stable, and before each step Protolink looks at the next step to generate the right `flow_state["prompt"]`.
+
+If the next step is an agent, the prompt can include that agent's `AgentCard` so the current agent knows who will consume its output. If the next step is a `Router`, the prompt includes the available route keys and the routing instructions. If the next step is `Parallel`, the prompt describes all branch receivers so the current agent can produce an output useful to all of them.
+
 :::tip[Fluid API]
 
 Pipelines support a fluid API via the `.add_step()` method, allowing you to chain steps together dynamically during initialization.
 
 :::
+
+```python
+pipeline = (
+    Pipeline(registry=registry)
+    .add_step("researcher")
+    .add_step("fact_checker")
+    .add_step("summarizer")
+)
+```
+
 ### 2. Parallel Execution
 
 If multiple agents can act independently on the same task without needing each other's output, you can execute them concurrently. Their resulting parts are appended to the task outcome simultaneously.
@@ -88,6 +131,11 @@ When a preceding agent passes its output to a `Parallel` flow, Protolink's Seman
 Parallel execution uses **ID-based merging**. This ensures that the unified task only includes strictly new messages and artifacts from each branch, preventing duplicates even in complex nested structures.
 
 :::
+
+Under the hood, `Parallel` deep-copies the incoming task once per branch. Each branch gets an isolated task, so one branch cannot accidentally observe another branch's in-progress metadata or artifact changes. After all branches finish, Protolink merges newly created messages and artifacts back into the original task in branch order.
+
+Metadata from each branch is also merged into the final task. If two branches write the same metadata key, the later branch in the configured branch list wins. For data that must never collide, prefer branch-specific metadata keys or artifacts.
+
 ```python
 from protolink.flows import Parallel
 
@@ -103,6 +151,8 @@ result = await parallel.execute(task)
 for art in result.artifacts:
     print(f"- {art.parts[0].content}")
 ```
+
+Parallel is most useful for independent review, scoring, enrichment, extraction, or validation steps. It is less useful when branch B needs the exact output of branch A; use a `Pipeline` for that.
 
 ### 3. Conditional Routing
 
@@ -126,6 +176,10 @@ task.add_message(
 
 `Part.route(...)` round-trips through normal task serialization, appears in traces, and gives tests an exact branch key to assert. The Router also accepts JSON-shaped decisions such as `{"route_key": "editor"}` and the older `[ROUTE: editor]` text tag as compatibility fallbacks.
 
+The route key must match one of the keys in `routes`. If the preceding agent emits an unknown key, the router raises a `ValueError` instead of guessing. Every successful route decision is appended to `task.metadata["route_decisions"]`, which makes routing behavior easier to inspect in tests, traces, and replay tooling.
+
+Use `Router` when the content of the task should choose the next branch but the allowed branches should remain controlled by the developer. If the branch decision should be pure Python logic instead of a model-generated route decision, use a `Graph` conditional edge.
+
 ```python
 from protolink.flows import Router
 
@@ -146,6 +200,8 @@ pipeline.add_step("writer").add_step(router)
 task = Task.create(Message.user("Write a very short poem."))
 await pipeline.execute(task) 
 ```
+
+In this example, the `writer` agent receives the routing instructions before it runs. The `Router` itself does not ask the model again; it reads the route decision already present on the task and dispatches to the mapped target.
 
 ### 4. Graph Flows (State Machines)
 
@@ -179,3 +235,30 @@ graph.set_entry_point("entry")
 
 result = await graph.execute(task)
 ```
+
+Graphs are useful when the workflow has named stages, loops, or code-defined branch logic. Each node is a normal `FlowTarget`, so it can be a local agent, a remote string target, or an entire nested flow. Edges come in two forms:
+
+- `add_edge("a", "b")` creates a fixed transition from one node to the next.
+- `add_conditional_edge("a", condition_fn, path_map)` evaluates `condition_fn(task)` after node `a` finishes and uses the returned key to choose a destination.
+
+Graph validates that referenced nodes exist, requires an entry point, and uses the reserved `"__END__"` destination to terminate. A node can have either a fixed edge or a conditional edge, but not both. To protect against accidental infinite loops, graph execution stops with an error after 50 iterations.
+
+For deterministic edges, Graph can inject downstream context just like Pipeline. For conditional edges, the next node is not known until after the current node executes, so Protolink clears the transient flow prompt before running that node.
+
+## Choosing The Right Flow
+
+| Need | Use |
+| ---- | --- |
+| Strict ordered stages | `Pipeline` |
+| Independent work over the same input | `Parallel` |
+| Model-assisted branch choice with fixed destinations | `Router` |
+| Named state machine with loops or Python conditions | `Graph` |
+| A reusable sub-workflow inside another workflow | Any `Flow` as a nested target |
+
+## Practical Notes
+
+- Keep long-lived workflow state in `Task.metadata`, messages, artifacts, or storage. Treat `task.flow_state` as short-lived execution context.
+- Prefer structured `Part.route(...)` decisions for routers. Legacy `[ROUTE: key]` tags are supported, but structured parts are easier to test and replay.
+- Use registry names for portable flows and explicit URLs when you want the topology to point at a concrete service.
+- Keep branch metadata keys distinct in `Parallel` flows if multiple branches may write similar information.
+- Test flows by asserting the final `Task`: message count, artifact IDs, metadata, route decisions, and terminal state are usually better assertions than checking only the final text.

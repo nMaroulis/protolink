@@ -1,6 +1,6 @@
 import ApiSurface from '@site/src/components/ApiSurface';
 
-# Server API Reference
+# Server
 
 Servers in Protolink act as the **coordination layer** between business logic (Agents or Registries) and the underlying Transport mechanism. They are responsible for wiring endpoints, managing lifecycle, and ensuring that the core logic remains transport-agnostic.
 

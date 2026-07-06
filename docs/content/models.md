@@ -1,6 +1,6 @@
 import ApiSurface from '@site/src/components/ApiSurface';
 
-# Models API Reference
+# Models
 
 This section provides detailed API documentation for the core data models in Protolink. These models represent the fundamental data structures used throughout the framework for agent communication, task management, and data exchange.
 
