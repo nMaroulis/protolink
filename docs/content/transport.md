@@ -24,6 +24,7 @@ All transports inherit from the base `Transport` class.
 - **HTTPTransport**
     - Uses HTTP/HTTPS for synchronous request/response.
     - Used for both Agent-to-Agent and Agent-to-Registry communication.
+    - Serves browser-facing HTML pages such as `GET /status` and, for LLM-backed agents, `GET /chat`.
     - Backed by ASGI frameworks:
         - `Starlette` + `httpx` + `uvicorn` (lightweight default backend).
         - `FastAPI` + `pydantic` + `uvicorn` (with optional request validation).
@@ -32,17 +33,20 @@ All transports inherit from the base `Transport` class.
 - **WebSocketTransport**
     - Uses WebSocket for streaming requests and responses.
     - Built on top of libraries like `websockets` (and `httpx` for HTTP parts where applicable).
+    - Multiplexes endpoint specs over JSON frames instead of mounting browser-visible `GET /status` or `GET /chat` routes.
     - Uses a dedicated control connection for cancellation so the request cannot wait behind the active task or stream.
     - Useful for real‑time, bidirectional communication or token‑level streaming.
 
 - **SSEJSONRPCTransport**
     - Uses HTTP request/response for normal calls and Server-Sent Events for task streams.
     - Streams JSON-RPC-style envelopes from `POST /tasks/stream`.
+    - Inherits HTTP page exposure, so status and chat pages are available from the same base URL.
     - Useful for CLIs, browser clients, dashboards, and other consumers that want streaming without a WebSocket connection.
 
 - **RuntimeTransport**
     - Simple **in‑process, in‑memory transport**.
     - Allows multiple agents to communicate within the same Python process.
+    - Registers endpoint specs in memory only; there are no browser pages or bound network ports.
     - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
 
 ### Reserved Transports
@@ -57,8 +61,8 @@ Some rough guidelines:
 
 - Use **RuntimeTransport** for local experiments, tests, or when all agents live in the same process.
 - Use **HTTPTransport** when you want a simple, interoperable API surface (e.g. calling agents from other services or frontends) and for communicating with the Registry.
-- Use **SSEJSONRPCTransport** when you want HTTP-compatible streaming over `text/event-stream`.
-- Use **WebSocketTransport** when you need streaming and interactive sessions.
+- Use **SSEJSONRPCTransport** when you want HTTP-compatible streaming over `text/event-stream` while keeping normal HTTP status and chat pages.
+- Use **WebSocketTransport** when you need streaming and interactive sessions over a single WebSocket protocol surface.
 - Track gRPC support if you need a future strongly typed service boundary; it is not a default runtime transport yet.
 
 The rest of this page dives into the API of each transport in more detail.
@@ -113,6 +117,49 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 
 ---
 
+## Browser and Endpoint Exposure
+
+`AgentServer` and `RegistryServer` declare transport-neutral `EndpointSpec` objects. Each transport decides how those specs become reachable.
+
+### Agent endpoints
+
+| Endpoint | Purpose | Browser-visible with HTTP/SSE? |
+|----------|---------|---------------------------------|
+| `POST /tasks/` | Submit a task to the agent. | No, JSON API |
+| `POST /tasks/cancel` | Cancel an active task. | No, JSON API |
+| `POST /llm/history/compact` | Compact LLM history through the control plane. | No, JSON API |
+| `POST /state/describe` | Inspect enabled state stores. | No, JSON API |
+| `POST /state/reset` | Reset enabled state stores. | No, JSON API |
+| `POST /state/compact` | Compact persisted conversation state. | No, JSON API |
+| `GET /.well-known/agent.json` | Return the public `AgentCard`. | Yes, JSON document |
+| `GET /status` | Render the agent status page. | Yes, HTML page |
+| `GET /chat` | Render the self-contained chat UI or a fallback page. | Yes, HTML page |
+| `POST /chat` | Send a chat message to `Agent.invoke()`. Registered only when the agent has an LLM. | No, JSON API used by the page |
+| `POST /tasks/stream` | Stream task events. Registered only when the transport advertises streaming support. | SSE stream for `SSEJSONRPCTransport` |
+
+### Registry endpoints
+
+| Endpoint | Purpose | Browser-visible with HTTP/SSE? |
+|----------|---------|---------------------------------|
+| `POST /agents/` | Register an `AgentCard`. | No, JSON API |
+| `DELETE /agents/` | Unregister an agent URL. | No, JSON API |
+| `POST /agents/heartbeat` | Refresh agent liveness metadata. | No, JSON API |
+| `GET /agents/` | Discover registered agents. | Yes, JSON document |
+| `GET /status` | Render the registry status page. | Yes, HTML page |
+
+### Transport mapping
+
+| Transport | How endpoint specs are exposed |
+|-----------|--------------------------------|
+| `HTTPTransport` | Starlette/FastAPI mounts physical HTTP routes. Browser pages are available at `<base-url>/status` and `<base-url>/chat`. |
+| `SSEJSONRPCTransport` | Same HTTP routes as `HTTPTransport`, plus `POST /tasks/stream` as `text/event-stream`. The aliases `"sse"`, `"json-rpc"`, and `"sse-json-rpc"` all use this transport. |
+| `WebSocketTransport` | Endpoint specs are cached in memory and selected by JSON frames containing `id`, `method`, and `path`. A plain browser `GET /status` is not served. |
+| `RuntimeTransport` | Endpoint specs are cached in the process-local transport registry and called directly through `AgentClient`. No socket or browser surface is created. |
+
+The browser pages themselves are not separate servers. Agent status and registry status are rendered by `protolink.utils.renderers.status`; agent chat is rendered by `protolink.utils.renderers.chat`.
+
+---
+
 ## HTTPTransport
 
 `HTTPTransport` is the main network transport for communication in Protolink. It handles both Agent-to-Agent JSON HTTP APIs and Registry operations.
@@ -128,6 +175,8 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
     - `POST /tasks/` - submit a `Task` to the agent.
     - `POST /tasks/cancel` - request best-effort cancellation of an active task ID.
     - `GET /.well-known/agent.json` - agent metadata.
+    - `GET /status` - agent or registry status HTML.
+    - `GET /chat` - agent chat UI HTML when served by an agent.
     - Registry endpoints (if acting as a registry).
   - Uses a backend implementation of `BackendInterface` to manage the ASGI app and `uvicorn` server.
 
@@ -340,7 +389,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, backend, validation, and Uvicorn logging behavior. |
-| `start` | `self` | `Awaitable[None]` | Start the selected backend, register the `/tasks/` route and create the internal `httpx.AsyncClient`. Must be awaited before serving HTTP traffic. |
+| `start` | `self` | `Awaitable[None]` | Start the selected backend and create the internal `httpx.AsyncClient`. `AgentServer` or `RegistryServer` registers endpoint specs before transport startup. |
 | `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
 
 #### Properties
@@ -354,7 +403,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `on_task_received` | `handler: Callable[[Task], Awaitable[Task]]` | `None` | Register the callback that will handle incoming tasks on `POST /tasks/`. This must be set before `start()` when running as a server. |
+| `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Mount transport-neutral server endpoint specs onto the selected Starlette or FastAPI backend. Called by `AgentServer` and `RegistryServer`. |
 | `send` | `request_spec: ClientRequestSpec`, `base_url: str`, `data: Any = None`, `params: dict ⎪ None = None` | `Awaitable[Any]` | Send a generic request to the agent. This is the low-level primitive used by `AgentClient`. |
 
 #### Auth & utilities

@@ -276,7 +276,7 @@ for mcp_tool in mcp_tools:
 agent.start()
 ```
 
-Once the **Agent** and **Registry** objects have been initiated, they will automatically expose a web interface at `/status` where they display the registry and agent's information.
+When using an HTTP-compatible transport (`http`, `sse`, `json-rpc`, or `sse-json-rpc`), the **Agent** and **Registry** expose lightweight browser pages: registry status at `/status`, agent status at `/status`, and agent chat at `/chat` for LLM-backed agents. WebSocket and runtime transports keep the same logical endpoints for clients, but they do not serve browser HTML directly.
 
 <table>
   <tr style="border: none;">
@@ -285,6 +285,9 @@ Once the **Agent** and **Registry** objects have been initiated, they will autom
     </td>
     <td style="text-align: center; border: none;">
       <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="100%">
+    </td>
+    <td style="text-align: center; border: none;">
+      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_chat_card.png" alt="Agent Chat Card" width="100%">
     </td>
   </tr>
 </table>
@@ -301,9 +304,10 @@ For Agent-to-Agent & Agent-to-Registry communication:
 - `http` · [HTTPTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py): Uses HTTP/HTTPS for synchronous requests. Two ASGI implementations are available.
   - Lightweight: `starlette`, `httpx` & `uvicorn`
   - Advanced | Schema Validation: `fastapi`, `pydantic` & `uvicorn`
+- `sse`, `json-rpc`, `sse-json-rpc` · [SSEJSONRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/sse_jsonrpc_transport.py): Uses normal HTTP routes plus Server-Sent Events for streamed task updates.
 - `websocket` · [WebSocketTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py): Uses WebSocket for streaming requests. [`websockets`]
-- `grpc` · [GRPCTransport](): TBD
 - `runtime` · [RuntimeTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py): Simple **in-process, in-memory transport**.
+- `grpc` is reserved for future support and is not registered by the default transport factory today.
 
 #### LLMs:
 
