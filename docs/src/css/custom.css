@@ -49,8 +49,13 @@ html {
   scroll-padding-top: 5rem;
 }
 
-.navbar {
-  backdrop-filter: blur(18px);
+.navbar__inner,
+.navbar__items {
+  min-width: 0;
+}
+
+.navbar__items--right {
+  flex: 0 1 auto;
 }
 
 .navbar__brand {
@@ -61,6 +66,7 @@ html {
   text-transform: lowercase;
   padding: 0.16rem 0.42rem 0.16rem 0.18rem;
   border-radius: 999px;
+  min-width: 0;
   transition:
     color 160ms ease,
     background-color 160ms ease,
@@ -81,6 +87,9 @@ html {
 
 .navbar__title {
   color: var(--protolink-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: color 160ms ease, text-shadow 160ms ease;
 }
 
@@ -99,6 +108,23 @@ html {
 .navbar__brand:focus-visible .navbar__logo img {
   filter: drop-shadow(0 0 9px rgba(10, 132, 255, 0.38));
   transform: scale(1.035);
+}
+
+.navbar-github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.navbar-github-link::before {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 1.05rem;
+  height: 1.05rem;
+  content: "";
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20viewBox%3D%270%200%2024%2024%27%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%3E%3Cpath%20d%3D%27M12%20.5C5.65.5.5%205.65.5%2012c0%205.1%203.29%209.42%207.86%2010.95.58.1.79-.25.79-.56%200-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7%201.16.08%201.77%201.19%201.77%201.19%201.03%201.76%202.7%201.25%203.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.23-1.28-5.23-5.68%200-1.25.45-2.28%201.19-3.08-.12-.29-.52-1.46.11-3.04%200%200%20.97-.31%203.18%201.18A11.1%2011.1%200%200%201%2012%206.8c.99%200%201.99.13%202.92.4%202.2-1.49%203.17-1.18%203.17-1.18.63%201.58.23%202.75.11%203.04.74.8%201.18%201.83%201.18%203.08%200%204.41-2.69%205.38-5.25%205.67.41.35.78%201.05.78%202.12%200%201.53-.01%202.76-.01%203.14%200%20.31.21.67.79.56A10.99%2010.99%200%200%200%2023.5%2012C23.5%205.65%2018.35.5%2012%20.5Z%27/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20viewBox%3D%270%200%2024%2024%27%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%3E%3Cpath%20d%3D%27M12%20.5C5.65.5.5%205.65.5%2012c0%205.1%203.29%209.42%207.86%2010.95.58.1.79-.25.79-.56%200-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.05-.72.08-.7.08-.7%201.16.08%201.77%201.19%201.77%201.19%201.03%201.76%202.7%201.25%203.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.23-1.28-5.23-5.68%200-1.25.45-2.28%201.19-3.08-.12-.29-.52-1.46.11-3.04%200%200%20.97-.31%203.18%201.18A11.1%2011.1%200%200%201%2012%206.8c.99%200%201.99.13%202.92.4%202.2-1.49%203.17-1.18%203.17-1.18.63%201.58.23%202.75.11%203.04.74.8%201.18%201.83%201.18%203.08%200%204.41-2.69%205.38-5.25%205.67.41.35.78%201.05.78%202.12%200%201.53-.01%202.76-.01%203.14%200%20.31.21.67.79.56A10.99%2010.99%200%200%200%2023.5%2012C23.5%205.65%2018.35.5%2012%20.5Z%27/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .main-wrapper {
@@ -609,7 +635,59 @@ html {
   border-color: rgba(10, 132, 255, 0.42);
 }
 
+@media (max-width: 1180px) {
+  .navbar__item {
+    padding-right: 0.45rem;
+    padding-left: 0.45rem;
+  }
+
+  .navbar__link {
+    font-size: 0.88rem;
+  }
+
+  .navbar__brand {
+    margin-right: 0.35rem;
+  }
+}
+
+@media (max-width: 1060px) {
+  .navbar__title {
+    max-width: 122px;
+  }
+
+  .DocSearch-Button {
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .DocSearch-Button-Container {
+    width: auto;
+  }
+
+  .DocSearch-Button-Placeholder,
+  .DocSearch-Button-Keys {
+    display: none;
+  }
+}
+
 @media (max-width: 996px) {
+  .navbar {
+    min-height: 58px;
+  }
+
+  .navbar__brand {
+    max-width: calc(100vw - 126px);
+  }
+
+  .navbar__title {
+    max-width: 168px;
+  }
+
+  .DocSearch-Button {
+    margin-left: 0;
+  }
+
   .theme-doc-markdown h1 {
     font-size: 2.45rem;
   }
@@ -633,5 +711,32 @@ html {
   .docs-compass-feature {
     grid-row: auto;
     min-height: 220px;
+  }
+}
+
+@media (max-width: 420px) {
+  .navbar__brand {
+    padding-right: 0.22rem;
+  }
+
+  .navbar__title {
+    display: none;
+  }
+
+  .analytics-consent {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-consent__icon {
+    display: none;
+  }
+
+  .analytics-consent__actions {
+    grid-column: auto;
+    justify-content: stretch;
+  }
+
+  .analytics-consent__button {
+    flex: 1 1 0;
   }
 }

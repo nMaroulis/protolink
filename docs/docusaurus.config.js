@@ -110,7 +110,6 @@ const config = {
           alt: "ProtoLink logo",
           src: "img/logo_sm.png",
         },
-        hideOnScroll: true,
         items: [
           {
             type: "docSidebar",
@@ -142,6 +141,7 @@ const config = {
             href: "https://github.com/nMaroulis/protolink",
             label: "GitHub",
             position: "right",
+            className: "navbar-github-link",
           },
           {
             href: "https://pypi.org/project/protolink/",

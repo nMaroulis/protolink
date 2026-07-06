@@ -1,3 +1,5 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Changelog
 
@@ -9,11 +11,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 :::
+
+:::tip[Update Protolink]
+
+Upgrade to the latest published release before following the notes below.
+<Tabs groupId="package-manager">
+<TabItem value="pip" label="pip" default>
+```bash title="Terminal"
+pip install --upgrade protolink
+```
+</TabItem>
+<TabItem value="uv" label="uv">
+```bash title="Terminal"
+uv add --upgrade protolink
+```
+
+</TabItem>
+</Tabs>
+
+:::
 ---
 
 # Release Notes
 
-## [v0.6.4] - 2026-07-03
+## [0.6.4] - 2026-07-03
+
+:::note Latest release
+:::
 
 ### Added
 
