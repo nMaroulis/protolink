@@ -899,6 +899,9 @@ Base class for all server-based LLM implementations.
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `base_url` | `str` | - | **Required.** URL of the LLM server. |
+| `model` | `str` | - | **Required.** Model identifier understood by the server. |
+| `model_params` | `dict[str, Any] ⎪ None` | `None` | Optional model parameters. |
+| `supports_tool_calling` | `bool` | `False` | Whether this server/model combination supports tool calling. |
 
 #### Methods
 

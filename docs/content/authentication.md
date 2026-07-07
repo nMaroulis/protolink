@@ -396,7 +396,7 @@ class LDAPAuthenticator(Authenticator):
 | :--- | :--- | :--- |
 | `principal_id` | `str` | The verified identity identifier of the client. |
 | `token` | `str` | The session or signature token. |
-| `expires_at` | `str \| None` | Optional ISO timestamp for token expiration. |
+| `expires_at` | `str ⎪ None` | Optional ISO timestamp for token expiration. |
 | `issued_at` | `str` | ISO timestamp for token creation. |
 | `metadata` | `dict` | Key-value pairs containing provider-specific information. |
 
@@ -404,8 +404,8 @@ class LDAPAuthenticator(Authenticator):
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `auth_type` | `str` | General classification: `"apiKey"`, `"http"`, `"oauth2"`, `"openIdConnect"`. |
-| `auth_scheme` | `str \| None` | Required if type is `"http"`. Example: `"bearer"`, `"basic"`. |
+| `auth_type` | `SecuritySchemeType` | General classification: `"apiKey"`, `"http"`, `"oauth2"`, `"openIdConnect"`. |
+| `auth_scheme` | `HttpAuthScheme ⎪ None` | Required if type is `"http"`. Example: `"bearer"`, `"basic"`. |
 | `description` | `str` | Human-readable explanation of the scheme. |
 | `metadata` | `dict` | Scheme extensions or provider settings. |
 
@@ -416,10 +416,10 @@ class LDAPAuthenticator(Authenticator):
 
 ### BearerTokenAuth Options
 
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| `secret` | `str` | Required HMAC signing secret. Empty secrets are rejected. |
-| `algorithm` | `str` | JWT signing algorithm. Supported values: `HS256`, `HS384`, `HS512`. |
-| `issuer` | `str \| None` | Optional required `iss` claim. |
-| `audience` | `str \| None` | Optional required `aud` claim. Token audiences may be a string or list. |
-| `leeway_seconds` | `int` | Optional clock-skew allowance for registered time claims. |
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `secret` | `str` | - | Required HMAC signing secret. Empty secrets are rejected. |
+| `algorithm` | `str` | `"HS256"` | JWT signing algorithm. Supported values: `HS256`, `HS384`, `HS512`. |
+| `issuer` | `str ⎪ None` | `None` | Optional required `iss` claim. |
+| `audience` | `str ⎪ None` | `None` | Optional required `aud` claim. Token audiences may be a string or list. |
+| `leeway_seconds` | `int` | `0` | Optional clock-skew allowance for registered time claims. |

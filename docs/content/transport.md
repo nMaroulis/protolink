@@ -316,11 +316,16 @@ The tables below document each object type.
 ```
 
 | Field         | Type             | Description                 |
-|-------------- |------------------|-----------------------------|
+|-------------- |------------------|-----------------------------| 
 | `id` | `str`            | Unique artifact identifier. |
 | `parts`       | `list[Part]`     | Artifact content.           |
 | `metadata`    | `dict[str, Any]` | Artifact metadata.          |
 | `timestamp`   | `str`            | ISO‑8601 timestamp.         |
+| `kind`        | `str`            | Application-defined category (e.g. `"result"`, `"preview"`, `"diagnostic"`). |
+| `name`        | `str ⎪ null`    | Optional display or resource name. |
+| `uri`         | `str ⎪ null`    | Optional URI identifying the represented resource. |
+| `media_type`  | `str ⎪ null`    | Optional MIME type describing the artifact as a whole. |
+| `action_id`   | `str ⎪ null`    | Optional ID of the `RunAction` that produced this artifact. |
 
 ### Typical Usage
 
@@ -526,7 +531,7 @@ Use it when:
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `...` | `None` | Configure host/port and WebSocket settings for streaming connections. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None` | `None` | Configure URL, timeout, authentication, and credentials for WebSocket connections. |
 | `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a `Task` to `/tasks/stream` and receive task event payloads over a single WebSocket connection. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
 
