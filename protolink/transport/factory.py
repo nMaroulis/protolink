@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 # Registry stores callables that return the class, or the class itself.
 # We store strings or callables to allow lazy loading.
 _TRANSPORT_REGISTRY: dict[str, type[Transport] | str] = {
+    "grpc": "protolink.transport.grpc_transport.GRPCTransport",
     "http": "protolink.transport.http_transport.HTTPTransport",
     "json-rpc": "protolink.transport.sse_jsonrpc_transport.SSEJSONRPCTransport",
     "sse": "protolink.transport.sse_jsonrpc_transport.SSEJSONRPCTransport",

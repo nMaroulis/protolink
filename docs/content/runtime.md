@@ -278,7 +278,7 @@ canceled = await client.cancel_task(
 result = await running
 ```
 
-`AgentClient.cancel_task()` uses the A2A-style `POST /tasks/cancel` operation and returns the updated task. The same call works over HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport. WebSocket uses a separate control connection so cancellation cannot wait behind the request or stream it needs to stop.
+`AgentClient.cancel_task()` uses the A2A-style `POST /tasks/cancel` operation and returns the updated task. The same call works over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. WebSocket uses a separate control connection so cancellation cannot wait behind the request or stream it needs to stop.
 
 The synchronous client exposes the same operation as `client.sync.cancel_task(...)`. A synchronous call can only cancel work running on another thread, process, or event loop; it cannot interrupt itself while blocked in the same call stack.
 

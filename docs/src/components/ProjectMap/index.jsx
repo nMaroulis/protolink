@@ -67,7 +67,7 @@ const surfaces = [
     responsibilities: [
       'Turns operations into ClientRequestSpec definitions',
       'Mounts handlers as EndpointSpec routes',
-      'Supports HTTP, WebSocket, SSE JSON-RPC, and in-process runtime paths',
+      'Supports HTTP, WebSocket, SSE JSON-RPC, gRPC, and in-process runtime paths',
       'Separates protocol concerns from agent logic',
     ],
     boundaries: [

@@ -43,17 +43,18 @@ All transports inherit from the base `Transport` class.
     - Inherits HTTP page exposure, so status and chat pages are available from the same base URL.
     - Useful for CLIs, browser clients, dashboards, and other consumers that want streaming without a WebSocket connection.
 
+- **GRPCTransport**
+    - Uses `grpc.aio` for unary request/response calls and unary-stream task events.
+    - Registers one generic Protolink gRPC service and routes requests by `ClientRequestSpec` method/path.
+    - Carries compact JSON envelopes over gRPC byte messages, so no generated protobuf files are required.
+    - Supports gRPC metadata for the same bearer/API-key authentication headers used by HTTP and WebSocket transports.
+    - Useful for service meshes, polyglot infrastructure, and teams that want gRPC deadlines and connection pooling while keeping Protolink's transport-neutral agent API.
+
 - **RuntimeTransport**
     - Simple **in‑process, in‑memory transport**.
     - Allows multiple agents to communicate within the same Python process.
     - Registers endpoint specs in memory only; there are no browser pages or bound network ports.
     - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
-
-### Reserved Transports
-
-- **gRPC** (`"grpc"`)
-  - The `TransportType` alias reserves `"grpc"` for future support.
-  - The default transport factory does not currently register a gRPC transport class, so use HTTP, SSE JSON-RPC, WebSocket, or Runtime transports in application code today.
 
 ## Choosing a Transport
 
@@ -63,7 +64,7 @@ Some rough guidelines:
 - Use **HTTPTransport** when you want a simple, interoperable API surface (e.g. calling agents from other services or frontends) and for communicating with the Registry.
 - Use **SSEJSONRPCTransport** when you want HTTP-compatible streaming over `text/event-stream` while keeping normal HTTP status and chat pages.
 - Use **WebSocketTransport** when you need streaming and interactive sessions over a single WebSocket protocol surface.
-- Track gRPC support if you need a future strongly typed service boundary; it is not a default runtime transport yet.
+- Use **GRPCTransport** when your deployment already standardizes on gRPC deadlines, metadata, and connection management.
 
 The rest of this page dives into the API of each transport in more detail.
 
@@ -71,11 +72,12 @@ The rest of this page dives into the API of each transport in more detail.
   eyebrow="Transport module"
   title="Transport Layer"
   path="protolink.transport"
-  description="The protocol adapter layer that lets the same agent runtime communicate over HTTP, SSE JSON-RPC, WebSocket, or an in-process runtime channel."
+  description="The protocol adapter layer that lets the same agent runtime communicate over HTTP, SSE JSON-RPC, WebSocket, gRPC, or an in-process runtime channel."
   pills={[
     "HTTP",
     "SSE JSON-RPC",
     "WebSocket",
+    "gRPC",
     "RuntimeTransport",
     "Control-plane routes",
   ]}
@@ -87,7 +89,7 @@ The rest of this page dives into the API of each transport in more detail.
     },
     {
       title: "Streaming",
-      text: "Emit task status, LLM chunks, tool events, artifacts, and final completion updates.",
+      text: "Emit task status, LLM chunks, tool events, artifacts, and final completion updates over SSE, WebSocket, gRPC, or runtime streams.",
       code: "subscribe()",
     },
     {
@@ -97,8 +99,8 @@ The rest of this page dives into the API of each transport in more detail.
     },
     {
       title: "Backends",
-      text: "Bind endpoint specs through Starlette or FastAPI without changing agent behavior.",
-      code: "BackendInterface",
+      text: "Bind endpoint specs through ASGI backends or the generic gRPC service without changing agent behavior.",
+      code: "EndpointSpec",
     },
   ]}
 />
@@ -113,7 +115,7 @@ Agent-facing transports should preserve the same logical contract even when thei
 - Control-plane routes such as `POST /tasks/cancel` and registry heartbeats must not depend on the active request/stream connection.
 - Request parsers may be synchronous or asynchronous; transports must normalize both.
 
-The repository includes `tests/test_transport_conformance.py` to keep Runtime, HTTP, and WebSocket behavior aligned. Add new transports to that suite before treating them as production-ready.
+The repository includes `tests/test_transport_conformance.py` to keep Runtime, HTTP, WebSocket, and gRPC behavior aligned. Add new transports to that suite before treating them as production-ready.
 
 ---
 
@@ -123,7 +125,7 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 
 ### Agent endpoints
 
-| Endpoint | Purpose | Browser-visible with HTTP/SSE? |
+| Endpoint | Purpose | Transport exposure |
 |----------|---------|---------------------------------|
 | `POST /tasks/` | Submit a task to the agent. | No, JSON API |
 | `POST /tasks/cancel` | Cancel an active task. | No, JSON API |
@@ -135,11 +137,11 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | `GET /status` | Render the agent status page. | Yes, HTML page |
 | `GET /chat` | Render the self-contained chat UI or a fallback page. | Yes, HTML page |
 | `POST /chat` | Send a chat message to `Agent.invoke()`. Registered only when the agent has an LLM. | No, JSON API used by the page |
-| `POST /tasks/stream` | Stream task events. Registered only when the transport advertises streaming support. | SSE stream for `SSEJSONRPCTransport` |
+| `POST /tasks/stream` | Stream task events. Registered only when the transport advertises streaming support. | SSE, WebSocket, gRPC, or runtime stream depending on transport |
 
 ### Registry endpoints
 
-| Endpoint | Purpose | Browser-visible with HTTP/SSE? |
+| Endpoint | Purpose | Transport exposure |
 |----------|---------|---------------------------------|
 | `POST /agents/` | Register an `AgentCard`. | No, JSON API |
 | `DELETE /agents/` | Unregister an agent URL. | No, JSON API |
@@ -154,6 +156,7 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | `HTTPTransport` | Starlette/FastAPI mounts physical HTTP routes. Browser pages are available at `<base-url>/status` and `<base-url>/chat`. |
 | `SSEJSONRPCTransport` | Same HTTP routes as `HTTPTransport`, plus `POST /tasks/stream` as `text/event-stream`. The aliases `"sse"`, `"json-rpc"`, and `"sse-json-rpc"` all use this transport. |
 | `WebSocketTransport` | Endpoint specs are cached in memory and selected by JSON frames containing `id`, `method`, and `path`. A plain browser `GET /status` is not served. |
+| `GRPCTransport` | Endpoint specs are cached in memory and selected by JSON envelopes sent to the generic `Invoke` or `Stream` gRPC methods. A plain browser `GET /status` is not served. |
 | `RuntimeTransport` | Endpoint specs are cached in the process-local transport registry and called directly through `AgentClient`. No socket or browser surface is created. |
 
 The browser pages themselves are not separate servers. Agent status and registry status are rendered by `protolink.utils.renderers.status`; agent chat is rendered by `protolink.utils.renderers.chat`.
@@ -541,6 +544,84 @@ Use it when:
 | ---- | ---- | ------ | ----------- |
 | `url` | `str` | Read-only | The base URL configured for this transport. |
 | `timeout` | `float` | Read/Write | The timeout (in seconds) for WebSocket receive operations. This can be changed at runtime to adjust response wait times for subsequent requests. |
+
+---
+
+## GRPCTransport
+
+`GRPCTransport` exposes Protolink agents through a generic `grpc.aio` service. It supports the same high-level `AgentClient` calls as the other transports:
+
+- `send_task()` and `get_agent_card()` use the unary `Invoke` method.
+- `send_task_streaming()` uses the unary-stream `Stream` method.
+- Control-plane calls such as cancellation, state operations, and history compaction use the same request-spec envelopes as other transports.
+
+Install the optional dependency with:
+
+```bash
+pip install "protolink[grpc]"
+```
+
+### Client Usage
+
+```python
+from protolink import Agent, AgentCard, Task, create_llm
+from protolink.client import AgentClient
+
+agent_url = "grpc://127.0.0.1:8010"
+agent = Agent(
+    AgentCard(name="grpc-agent", description="Served over gRPC", url=agent_url),
+    transport="grpc",
+    llm=create_llm("mock", default_response="hello from grpc"),
+)
+agent.start(register=False, background=True)
+
+client = AgentClient(transport="grpc", url="grpc://127.0.0.1:0")
+result = client.sync.send_task(agent_url, Task.create_infer(prompt="Say hello"))
+print(result.get_last_part_content())
+
+agent.stop()
+```
+
+See [`examples/grpc_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/grpc_agent.py) for a complete request/response and streaming round trip.
+
+### Wire Format
+
+The gRPC service name is `protolink.transport.v1.ProtolinkTransport`. It exposes two methods:
+
+| Method | Shape | Purpose |
+|--------|-------|---------|
+| `Invoke` | unary -> unary | Agent cards, task submission, registry calls, and control-plane operations. |
+| `Stream` | unary -> stream | Task event streams for `POST /tasks/stream`. |
+
+Each gRPC message is a JSON envelope carried as UTF-8 bytes:
+
+```json
+{
+  "id": "request-id",
+  "method": "POST",
+  "path": "/tasks/",
+  "data": {"id": "task-id", "messages": []},
+  "params": {}
+}
+```
+
+Responses follow the same envelope family used by WebSocket and SSE JSON-RPC:
+
+```json
+{"id":"request-id","ok":true,"result":{"state":"completed"},"final":true}
+```
+
+Authentication uses gRPC metadata keys compatible with the HTTP headers Protolink already builds: `authorization` and `x-api-key`.
+
+### API
+
+| Name | Parameters | Returns | Description |
+| ---- | ---------- | ------- | ----------- |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `channel_options = None`, `server_options = None`, `compression = None`, `maximum_concurrent_rpcs: int ⎪ None = None`, `graceful_shutdown_timeout: float = 3.0` | `None` | Configure the gRPC endpoint, deadlines, optional auth, grpcio options, compression, and server shutdown grace. |
+| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Send a unary request to the peer's `Invoke` method and parse the response through the request spec. |
+| `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a task to `Stream` and yield each task event result until the stream is final. |
+| `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Cache transport-neutral endpoint specs for the generic gRPC router. |
+| `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the `grpc.aio` server and loop-local client channels. |
 
 ---
 

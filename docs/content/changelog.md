@@ -34,6 +34,12 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [Unreleased]
+
+### Added
+
+- Added `GRPCTransport`, the `"grpc"` factory registration, gRPC transport conformance coverage, and `examples/grpc_agent.py` for provider-free request/response and streaming usage.
+
 ## [0.6.4] - 2026-07-03
 
 :::note Latest release
@@ -470,6 +476,6 @@ The near-term roadmap focuses on hardening the runtime paths that production age
 - [x] **Storage**: In-memory and SQLite storage implementations.
 - [x] **Observability**: Local trace replay plus Langfuse and LangSmith integrations.
 - [x] **Integrations**: MCP adapter for external tool servers.
-- [ ] **Transport Layer**: Add a production-ready **gRPC** transport implementation and factory registration.
+- [x] **Transport Layer**: Add a production-ready **gRPC** transport implementation and factory registration.
 - [ ] **State Modules**: Expand tool, task, and flow state modules beyond their current storage-backed extension points.
 - [ ] **OpenTelemetry**: Add first-class OpenTelemetry export alongside the existing telemetry integrations.

@@ -10,7 +10,8 @@ import pytest
 from protolink import Agent, AgentCard, Task, create_llm
 from protolink.client import AgentClient
 from protolink.core.agent_card import AgentCapabilities
-from protolink.transport import HTTPTransport, RuntimeTransport, WebSocketTransport
+from protolink.transport import GRPCTransport, HTTPTransport, RuntimeTransport, WebSocketTransport
+from protolink.transport.factory import get_transport
 
 
 def _card(name: str, url: str, *, streaming: bool = False) -> AgentCard:
@@ -88,6 +89,37 @@ async def test_http_transport_conforms_to_agent_request_response_contract(unused
     client = AgentClient(HTTPTransport(url="http://127.0.0.1:0", log_level="critical", access_log=False))
 
     await _assert_request_response_contract(agent, client)
+
+
+def test_grpc_transport_factory_registration() -> None:
+    """The default factory should expose the registered gRPC transport."""
+    pytest.importorskip("grpc")
+
+    transport = get_transport("grpc", url="grpc://127.0.0.1:0")
+
+    assert isinstance(transport, GRPCTransport)
+    assert transport.transport_type == "grpc"
+    assert transport.supports_streaming is True
+    assert transport.validate_url() is True
+
+
+@pytest.mark.asyncio
+async def test_grpc_transport_conforms_to_agent_contract(unused_tcp_port) -> None:
+    """gRPC transport should honor request/response and streaming contracts."""
+    pytest.importorskip("grpc")
+
+    url = f"grpc://127.0.0.1:{unused_tcp_port}"
+    agent = Agent(
+        _card("grpc-conformance", url, streaming=True),
+        transport=GRPCTransport(url=url),
+        llm=create_llm("mock", default_response="transport ok"),
+        verbosity=0,
+    )
+    client = AgentClient(GRPCTransport(url="grpc://127.0.0.1:0"))
+
+    await _assert_request_response_contract(agent, client)
+    await asyncio.sleep(0.01)
+    await _assert_streaming_contract(agent, client)
 
 
 @pytest.mark.asyncio

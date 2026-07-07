@@ -31,7 +31,7 @@ High‑level ideas:
   - **Storage** (e.g. `InMemoryStorage`, `SQLiteStorage`).
   - **Telemetry** (e.g. `LocalTraceTelemetry`, `LangfuseTelemetry`, `LangSmithTelemetry`).
   - **Logger** (e.g. `ConsoleLogger`, `FileLogger`, `QuietLogger`).
-- **Transport abstraction**: agents communicate over transports such as HTTP, SSE JSON-RPC, WebSocket, or the in-process runtime transport. The `grpc` alias is reserved for future support.
+- **Transport abstraction**: agents communicate over transports such as HTTP, SSE JSON-RPC, WebSocket, gRPC, or the in-process runtime transport.
 
 <div className="centered-media">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%" />

@@ -215,6 +215,9 @@ uv add "protolink[all]"
 # Install with HTTP support (for web-based agents)
 uv add "protolink[http]"
 
+# Install with gRPC support (for service-to-service agents)
+uv add "protolink[grpc]"
+
 # Install all the supported LLM libraries
 uv add "protolink[llms]"
 
@@ -276,7 +279,7 @@ for mcp_tool in mcp_tools:
 agent.start()
 ```
 
-When using an HTTP-compatible transport (`http`, `sse`, `json-rpc`, or `sse-json-rpc`), the **Agent** and **Registry** expose lightweight browser pages: registry status at `/status`, agent status at `/status`, and agent chat at `/chat` for LLM-backed agents. WebSocket and runtime transports keep the same logical endpoints for clients, but they do not serve browser HTML directly.
+When using an HTTP-compatible transport (`http`, `sse`, `json-rpc`, or `sse-json-rpc`), the **Agent** and **Registry** expose lightweight browser pages: registry status at `/status`, agent status at `/status`, and agent chat at `/chat` for LLM-backed agents. WebSocket, gRPC, and runtime transports keep the same logical endpoints for clients, but they do not serve browser HTML directly.
 
 <table>
   <tr style="border: none;">
@@ -306,8 +309,8 @@ For Agent-to-Agent & Agent-to-Registry communication:
   - Advanced | Schema Validation: `fastapi`, `pydantic` & `uvicorn`
 - `sse`, `json-rpc`, `sse-json-rpc` · [SSEJSONRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/sse_jsonrpc_transport.py): Uses normal HTTP routes plus Server-Sent Events for streamed task updates.
 - `websocket` · [WebSocketTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py): Uses WebSocket for streaming requests. [`websockets`]
+- `grpc` · [GRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py): Uses gRPC unary calls and unary-stream task events over compact JSON envelopes. [`grpcio`]
 - `runtime` · [RuntimeTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py): Simple **in-process, in-memory transport**.
-- `grpc` is reserved for future support and is not registered by the default transport factory today.
 
 #### LLMs:
 

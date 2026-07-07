@@ -54,7 +54,7 @@ const foundations = [
   ],
   [
     "Deployment path",
-    "Start in-process with RuntimeTransport, then move the same agent to HTTP, SSE JSON-RPC, or WebSocket.",
+    "Start in-process with RuntimeTransport, then move the same agent to HTTP, SSE JSON-RPC, WebSocket, or gRPC.",
   ],
 ];
 
@@ -385,6 +385,13 @@ const moduleDefinitions = [
         agentArg: 'transport="websocket"',
       },
       {
+        id: "grpc",
+        label: "gRPC",
+        kind: "rpc",
+        cardUrl: "grpc://127.0.0.1:8000",
+        agentArg: 'transport="grpc"',
+      },
+      {
         id: "jsonrpc",
         label: "JSON-RPC",
         kind: "sse",
@@ -619,6 +626,8 @@ function buildAgentCode(activeModules, selectedOptions) {
     ...constructorArgs.map((arg) => `    ${arg},`),
     ")",
     ...(afterLines.length ? ["", ...afterLines] : []),
+    "",
+    "agent.start()",
   ].join("\n");
 }
 

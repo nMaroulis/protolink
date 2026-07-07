@@ -43,3 +43,21 @@ def _require_starlette():
         ) from exc
 
     return Starlette, Request, JSONResponse, HTMLResponse, StreamingResponse
+
+
+def _require_grpc():
+    """Import gRPC lazily and return the ``grpc`` module.
+
+    Raises
+    ------
+    ImportError
+        If grpcio is not installed.
+    """
+    try:
+        import grpc
+    except ImportError as exc:
+        raise ImportError(
+            "GRPCTransport requires the 'grpcio' package. Install it with: pip install protolink[grpc]"
+        ) from exc
+
+    return grpc

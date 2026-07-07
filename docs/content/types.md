@@ -615,8 +615,8 @@ Type alias for supported transport protocols.
 | **sse** | Registered | Server-Sent Events transport using JSON-RPC-style envelopes |
 | **json-rpc** | Registered | Alias for SSE JSON-RPC streaming over HTTP |
 | **sse-json-rpc** | Registered | Explicit alias for SSE JSON-RPC streaming over HTTP |
+| **grpc** | Registered | gRPC transport using unary and unary-stream JSON envelopes over `grpc.aio` |
 | **runtime** | Registered | In-memory transport for local agent composition |
-| **grpc** | Reserved | Type alias placeholder for future gRPC transport support; not registered by the default factory yet |
 
 ---
 
