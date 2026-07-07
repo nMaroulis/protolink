@@ -2,7 +2,11 @@ import ApiSurface from '@site/src/components/ApiSurface';
 
 # Registry
 
-The Registry is Protolink's discovery service. Agents register their `AgentCard` with it, and other agents query it to find peers by name, role, tags, capabilities, or other card metadata.
+The Registry is Protolink's implementation of the A2A discovery primitive. It gives a multi-agent system a shared address book where each running agent can publish its `AgentCard`, and where other agents can look up peers by name, role, tags, capabilities, or other card metadata.
+
+Its role is coordination, not orchestration. The registry does not decide which agent should handle a task, route messages between agents, or own workflow state. It answers a narrower A2A question: which agents are currently available, where can they be reached, and what do they say they can do?
+
+That separation keeps agent-to-agent communication explicit. Agents still call each other through their own transports and clients, but they no longer need every peer URL hard-coded at startup. ProtoLink extends the basic A2A registry shape with indexed discovery, liveness heartbeats, optional TTL pruning, persistence hooks, and a browser status view while keeping the core contract centered on `AgentCard` discovery.
 
 Use a registry when agents should discover each other dynamically instead of hard-coding every peer URL.
 
@@ -18,6 +22,17 @@ registry.start(background=True)
 
 registry.stop()
 ```
+
+## How It Works
+
+The Registry is both a local runtime object and a transport-backed service. Locally, it stores registered agents by their stable `AgentCard.url`, keeps liveness metadata in `RegistryEntry`, and maintains secondary indexes for common discovery filters. Over the transport, `RegistryClient` sends the same registration, heartbeat, unregistration, and discovery requests that agents use when they connect to a registry URL.
+
+This means there are two useful ways to think about the API:
+
+- Use `register()`, `heartbeat()`, `unregister()`, and `discover()` when code should talk to a running registry through its configured transport.
+- Use `count()`, `list_urls()`, `get_entry()`, and `clear()` when code owns the in-process `Registry` object and needs diagnostics, tests, or local administration.
+
+Incoming transport requests are handled by `handle_register()`, `handle_heartbeat()`, `handle_unregister()`, and `handle_discover()`. Those handler methods update the local store, rebuild indexes as needed, prune expired entries when TTL is enabled, and persist entries when storage is configured. Most application code should use the higher-level client methods or `Agent` registry integration instead of calling handlers directly.
 
 ## Browser Status
 
@@ -81,6 +96,27 @@ Discovery returns `AgentCard` objects. The same filter shape is available throug
 ## Transport Integration
 
 The Registry is transport-agnostic. It relies on a Transport implementation to expose its API.
+
+Internally, `Registry` composes the transport in two directions:
+
+- `RegistryClient(transport)` is the outbound side. Public methods such as `register()`, `heartbeat()`, `unregister()`, and `discover()` delegate to this client, which turns each operation into a `ClientRequestSpec` and calls `transport.send(...)`.
+- `RegistryServer(self, transport)` is the inbound side. `start()` calls the server, the server builds an `EndpointSpec` table, and the transport mounts those endpoint specs as real routes.
+
+When you construct a registry with `Registry(transport="http", url="http://localhost:9000")`, the string transport is resolved through `get_transport(...)`. The resulting transport instance is passed to both the client and the server, so one configured URL defines both where the registry listens and where registry client requests are sent.
+
+The registry endpoint table is:
+
+| Operation | Client request | Server handler |
+|------|------|------|
+| Register | `POST /agents/` with an `AgentCard` body | `handle_register(card)` |
+| Unregister | `DELETE /agents/` with `{"agent_url": ...}` | `handle_unregister(agent_url)` |
+| Heartbeat | `POST /agents/heartbeat` with `{"agent_url": ...}` | `handle_heartbeat(agent_url)` |
+| Discover | `GET /agents/` with query filters | `handle_discover(filter_by)` |
+| Status page | - | `GET /status` calls `handle_status_html()` |
+
+For HTTP, `HTTPTransport.send()` serializes request bodies or query parameters and dispatches them with `httpx.AsyncClient`. On the server side, `HTTPTransport.setup_routes()` delegates to the selected ASGI backend, currently Starlette or FastAPI, which turns each `EndpointSpec` into a concrete route. `HTTPTransport.start()` then starts the ASGI server at the transport URL.
+
+Agents use the same path. If an `Agent` receives a live `Registry` object, it extracts `registry.client`. If it receives a transport string plus `registry_url`, it creates a separate transport and wraps it in `RegistryClient`. During agent startup, the agent registers its card through that client; if `registry_heartbeat_interval` is configured, it keeps sending heartbeats through the same client; and `Agent.discover_agents()` calls `RegistryClient.discover()`.
 
 Currently supported by the default runtime path:
 
@@ -218,14 +254,20 @@ agent = Agent(
 )
 ```
 
-The public registry API now includes:
+The user-facing Registry surface in `protolink.discovery.registry.Registry` includes:
 
 | Method | Purpose |
 |------|-------------|
-| `register(card)` | Add or replace an agent card and update secondary indexes. |
-| `heartbeat(agent_url)` | Refresh `last_seen` for a registered agent. |
-| `unregister(agent_url)` | Remove an agent and its indexes. |
-| `discover(filter_by=None)` | Return live agent cards, pruning expired entries first. |
+| `register(card)` | Send an agent card to the registry transport for registration. |
+| `heartbeat(agent_url)` | Refresh `last_seen` for a registered agent through the registry transport. |
+| `unregister(agent_url)` | Remove an agent through the registry transport. |
+| `discover(filter_by=None)` | Return matching live `AgentCard` objects through the registry transport. |
+| `list_urls()` | Return registered agent URLs from the local in-process registry store. |
+| `count()` | Return the number of live local entries after TTL pruning. |
+| `clear()` | Clear local entries, secondary indexes, and persisted registry state if storage is configured. |
+| `get_entry(agent_url)` | Return local `RegistryEntry` liveness metadata for diagnostics and tests. |
+
+The `handle_*` methods are the server-side endpoint hooks used by `RegistryServer`. They are part of the served registry implementation, but most callers should not need them unless they are writing tests, custom transports, or an alternate registry server.
 
 ## Constructor
 
