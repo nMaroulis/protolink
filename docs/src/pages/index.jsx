@@ -529,7 +529,7 @@ function tokenClassName(token, segment, endIndex) {
   return styles.syntaxPlain;
 }
 
-function renderHighlightedLine(line, lineIndex) {
+function tokenizeHighlightedLine(line, lineIndex) {
   const commentIndex = line.indexOf("#");
   const source = commentIndex >= 0 ? line.slice(0, commentIndex) : line;
   const comment = commentIndex >= 0 ? line.slice(commentIndex) : "";
@@ -545,42 +545,189 @@ function renderHighlightedLine(line, lineIndex) {
     const end = start + token.length;
 
     if (start > cursor) {
-      tokens.push(source.slice(cursor, start));
+      tokens.push({
+        className: null,
+        key: `${lineIndex}-${cursor}`,
+        text: source.slice(cursor, start),
+      });
     }
 
-    tokens.push(
-      <span
-        className={tokenClassName(token, source, end)}
-        key={`${lineIndex}-${start}`}
-      >
-        {token}
-      </span>,
-    );
+    tokens.push({
+      className: tokenClassName(token, source, end),
+      key: `${lineIndex}-${start}`,
+      text: token,
+    });
     cursor = end;
   }
 
   if (cursor < source.length) {
-    tokens.push(source.slice(cursor));
+    tokens.push({
+      className: null,
+      key: `${lineIndex}-${cursor}`,
+      text: source.slice(cursor),
+    });
   }
 
   if (comment) {
-    tokens.push(
-      <span className={styles.syntaxComment} key={`${lineIndex}-comment`}>
-        {comment}
-      </span>,
-    );
+    tokens.push({
+      className: styles.syntaxComment,
+      key: `${lineIndex}-comment`,
+      text: comment,
+    });
   }
 
   return tokens;
 }
 
-function renderHighlightedCode(code) {
+function renderTokenText(token, key, text) {
+  if (!text) {
+    return null;
+  }
+
+  return token.className ? (
+    <span className={token.className} key={key}>
+      {text}
+    </span>
+  ) : (
+    <span key={key}>{text}</span>
+  );
+}
+
+function renderHighlightedLine(line, lineIndex, caretColumn) {
+  const tokens = tokenizeHighlightedLine(line, lineIndex);
+  const output = [];
+  let column = 0;
+  let caretRendered = false;
+  const renderCaret = (key) => (
+    <span className={styles.editorCaret} key={key} />
+  );
+
+  tokens.forEach((token) => {
+    const tokenStart = column;
+    const tokenEnd = tokenStart + token.text.length;
+
+    if (
+      caretColumn !== null &&
+      !caretRendered &&
+      caretColumn >= tokenStart &&
+      caretColumn <= tokenEnd
+    ) {
+      const splitAt = caretColumn - tokenStart;
+      output.push(
+        renderTokenText(token, `${token.key}-before`, token.text.slice(0, splitAt)),
+      );
+      output.push(renderCaret(`${lineIndex}-caret`));
+      output.push(
+        renderTokenText(token, `${token.key}-after`, token.text.slice(splitAt)),
+      );
+      caretRendered = true;
+    } else {
+      output.push(renderTokenText(token, token.key, token.text));
+    }
+
+    column = tokenEnd;
+  });
+
+  if (caretColumn !== null && !caretRendered) {
+    output.push(renderCaret(`${lineIndex}-caret`));
+  }
+
+  return output;
+}
+
+function caretPositionForCode(code, caretOffset) {
+  const safeOffset = Math.max(0, Math.min(caretOffset, code.length));
+  const prefix = code.slice(0, safeOffset);
+  const lines = prefix.split("\n");
+
+  return {
+    column: lines[lines.length - 1].length,
+    line: lines.length - 1,
+  };
+}
+
+function renderHighlightedCode(code, caretOffset) {
+  const caretPosition = caretPositionForCode(code, caretOffset);
+
   return code
     .split("\n")
     .flatMap((line, lineIndex, lines) => [
-      ...renderHighlightedLine(line, lineIndex),
+      ...renderHighlightedLine(
+        line,
+        lineIndex,
+        lineIndex === caretPosition.line ? caretPosition.column : null,
+      ),
       lineIndex < lines.length - 1 ? "\n" : "",
     ]);
+}
+
+function diffCodeLines(fromCode, toCode) {
+  const fromLines = fromCode ? fromCode.split("\n") : [];
+  const toLines = toCode ? toCode.split("\n") : [];
+  const table = Array.from({ length: fromLines.length + 1 }, () =>
+    Array(toLines.length + 1).fill(0),
+  );
+
+  for (let fromIndex = fromLines.length - 1; fromIndex >= 0; fromIndex -= 1) {
+    for (let toIndex = toLines.length - 1; toIndex >= 0; toIndex -= 1) {
+      table[fromIndex][toIndex] =
+        fromLines[fromIndex] === toLines[toIndex]
+          ? table[fromIndex + 1][toIndex + 1] + 1
+          : Math.max(
+              table[fromIndex + 1][toIndex],
+              table[fromIndex][toIndex + 1],
+            );
+    }
+  }
+
+  const edits = [];
+  let fromIndex = 0;
+  let toIndex = 0;
+
+  while (fromIndex < fromLines.length && toIndex < toLines.length) {
+    if (fromLines[fromIndex] === toLines[toIndex]) {
+      edits.push({ type: "equal", line: fromLines[fromIndex] });
+      fromIndex += 1;
+      toIndex += 1;
+    } else if (table[fromIndex + 1][toIndex] >= table[fromIndex][toIndex + 1]) {
+      edits.push({ type: "delete", line: fromLines[fromIndex] });
+      fromIndex += 1;
+    } else {
+      edits.push({ type: "insert", line: toLines[toIndex] });
+      toIndex += 1;
+    }
+  }
+
+  while (fromIndex < fromLines.length) {
+    edits.push({ type: "delete", line: fromLines[fromIndex] });
+    fromIndex += 1;
+  }
+
+  while (toIndex < toLines.length) {
+    edits.push({ type: "insert", line: toLines[toIndex] });
+    toIndex += 1;
+  }
+
+  return edits;
+}
+
+function codeOffsetFromLinePosition(lines, lineIndex, column) {
+  if (!lines.length) {
+    return 0;
+  }
+
+  const safeLineIndex = Math.max(0, Math.min(lineIndex, lines.length - 1));
+  const safeColumn = Math.max(
+    0,
+    Math.min(column, lines[safeLineIndex]?.length ?? 0),
+  );
+  let offset = 0;
+
+  for (let index = 0; index < safeLineIndex; index += 1) {
+    offset += lines[index].length + 1;
+  }
+
+  return offset + safeColumn;
 }
 
 function PathwayCard({ pathway }) {
@@ -635,13 +782,10 @@ function PluggableAgent({ logo }) {
   const [activeIds, setActiveIds] = useState(initialActiveIds);
   const [focusedModuleId, setFocusedModuleId] = useState("transport");
   const [selectedOptions, setSelectedOptions] = useState(defaultModuleOptions);
-  const [streamedCode, setStreamedCode] = useState(() =>
-    buildAgentCode(
-      plugModules.filter((module) => initialActiveIds.includes(module.id)),
-      defaultModuleOptions,
-    ),
-  );
-  const streamTimer = useRef();
+  const [streamedCode, setStreamedCode] = useState("");
+  const [caretOffset, setCaretOffset] = useState(0);
+  const displayedCodeRef = useRef("");
+  const animationRunRef = useRef(0);
   const focusedModule =
     plugModules.find((module) => module.id === focusedModuleId) ??
     plugModules[0];
@@ -656,27 +800,110 @@ function PluggableAgent({ logo }) {
   );
 
   useEffect(() => {
-    if (streamTimer.current) {
-      window.clearInterval(streamTimer.current);
+    let cancelled = false;
+    const runId = animationRunRef.current + 1;
+    animationRunRef.current = runId;
+    const isCurrentRun = () => !cancelled && animationRunRef.current === runId;
+    const commit = (lines, lineIndex, column) => {
+      const nextCode = lines.join("\n");
+      const nextCaretOffset = codeOffsetFromLinePosition(
+        lines,
+        lineIndex,
+        column,
+      );
+      displayedCodeRef.current = nextCode;
+      setStreamedCode(nextCode);
+      setCaretOffset(nextCaretOffset);
+    };
+    const pause = (duration = 18) =>
+      new Promise((resolve) => {
+        window.setTimeout(resolve, duration);
+      });
+
+    async function animateLineEdit() {
+      if (displayedCodeRef.current === code) {
+        return;
+      }
+
+      const edits = diffCodeLines(displayedCodeRef.current, code);
+      const lines = displayedCodeRef.current
+        ? displayedCodeRef.current.split("\n")
+        : [];
+      let cursor = 0;
+
+      for (const edit of edits) {
+        if (!isCurrentRun()) {
+          return;
+        }
+
+        if (edit.type === "equal") {
+          cursor += 1;
+          continue;
+        }
+
+        if (edit.type === "delete") {
+          const originalLine = lines[cursor] ?? "";
+          const chunkSize = Math.max(1, Math.ceil(originalLine.length / 28));
+
+          for (
+            let length = originalLine.length - chunkSize;
+            length >= 0;
+            length -= chunkSize
+          ) {
+            if (!isCurrentRun()) {
+              return;
+            }
+            lines[cursor] = originalLine.slice(0, Math.max(0, length));
+            commit(lines, cursor, lines[cursor].length);
+            await pause(14);
+          }
+
+          lines.splice(cursor, 1);
+          commit(lines, Math.min(cursor, lines.length - 1), 0);
+          await pause(34);
+          continue;
+        }
+
+        lines.splice(cursor, 0, "");
+        commit(lines, cursor, 0);
+        await pause(edit.line ? 18 : 34);
+
+        if (edit.line) {
+          const chunkSize = Math.max(1, Math.ceil(edit.line.length / 30));
+          for (
+            let length = chunkSize;
+            length <= edit.line.length;
+            length += chunkSize
+          ) {
+            if (!isCurrentRun()) {
+              return;
+            }
+            lines[cursor] = edit.line.slice(
+              0,
+              Math.min(edit.line.length, length),
+            );
+            commit(lines, cursor, lines[cursor].length);
+            await pause();
+          }
+        }
+
+        lines[cursor] = edit.line;
+        commit(lines, cursor, edit.line.length);
+        cursor += 1;
+        await pause(28);
+      }
+
+      if (isCurrentRun() && displayedCodeRef.current !== code) {
+        displayedCodeRef.current = code;
+        setStreamedCode(code);
+        setCaretOffset(code.length);
+      }
     }
 
-    let index = 0;
-    const step = Math.max(3, Math.ceil(code.length / 120));
-    setStreamedCode("");
-
-    streamTimer.current = window.setInterval(() => {
-      index = Math.min(code.length, index + step);
-      setStreamedCode(code.slice(0, index));
-
-      if (index >= code.length) {
-        window.clearInterval(streamTimer.current);
-      }
-    }, 16);
+    animateLineEdit();
 
     return () => {
-      if (streamTimer.current) {
-        window.clearInterval(streamTimer.current);
-      }
+      cancelled = true;
     };
   }, [code]);
 
@@ -826,10 +1053,7 @@ function PluggableAgent({ logo }) {
             </strong>
           </div>
           <pre>
-            <code>
-              {renderHighlightedCode(streamedCode)}
-              <span className={styles.editorCaret} />
-            </code>
+            <code>{renderHighlightedCode(streamedCode, caretOffset)}</code>
           </pre>
         </section>
       </div>
