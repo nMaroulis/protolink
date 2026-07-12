@@ -25,6 +25,7 @@ from protolink.security.auth import Authenticator, extract_credentials
 from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport._deps import _require_grpc
+from protolink.transport._streaming import is_stream_terminal_event
 from protolink.transport.base import Transport
 from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
@@ -179,7 +180,7 @@ class GRPCTransport(Transport):
             self._is_running = False
 
         loop_id = id(asyncio.get_running_loop())
-        channels = [(key, channel) for key, channel in self._channels.items() if key[1] == loop_id]
+        channels = [(key, channel) for key, channel in self._channels.items() if key[2] == loop_id]
         for key, channel in channels:
             await channel.close(grace=1.0)
             self._channels.pop(key, None)
@@ -329,7 +330,7 @@ class GRPCTransport(Transport):
             async for event in stream_obj:
                 event_payload = self._serialize_result(event)
                 event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
-                stream_final = self._is_stream_terminal_event(event_payload, event_final=event_final)
+                stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
                 yield {
                     "id": request_id,
                     "ok": True,
@@ -648,15 +649,3 @@ class GRPCTransport(Transport):
     def _is_secure_url(url: str) -> bool:
         """Return whether a gRPC URL requests TLS."""
         return urlparse(url.rstrip("/")).scheme.lower() == "grpcs"
-
-    @staticmethod
-    def _is_stream_terminal_event(event_payload: Any, *, event_final: bool) -> bool:
-        """Return whether a streamed payload should close the transport stream."""
-        if not event_final:
-            return False
-        if not isinstance(event_payload, dict):
-            return True
-        event_type = event_payload.get("type")
-        if event_type is None:
-            return True
-        return event_type == "task_status_update"

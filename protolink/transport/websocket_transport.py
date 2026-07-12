@@ -12,6 +12,7 @@ from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator
 from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
+from protolink.transport._streaming import is_stream_terminal_event
 from protolink.transport.base import Transport
 from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
@@ -482,7 +483,7 @@ class WebSocketTransport(Transport):
                             event_final = False
                             if isinstance(event_payload, dict):
                                 event_final = bool(event_payload.get("final", False))
-                            stream_final = self._is_stream_terminal_event(event_payload, event_final=event_final)
+                            stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
                             await websocket.send(
                                 json.dumps(
                                     {
@@ -539,18 +540,6 @@ class WebSocketTransport(Transport):
         """Parse a ``ws://`` or ``wss://`` URL and return (host, port)."""
         parsed = urlparse(url.rstrip("/"))
         return parsed.hostname, parsed.port
-
-    @staticmethod
-    def _is_stream_terminal_event(event_payload: Any, *, event_final: bool) -> bool:
-        """Return whether a streamed payload should close the transport stream."""
-        if not event_final:
-            return False
-        if not isinstance(event_payload, dict):
-            return True
-        event_type = event_payload.get("type")
-        if event_type is None:
-            return True
-        return event_type == "task_status_update"
 
     # ------------------------------------------------------------------
     # Utility

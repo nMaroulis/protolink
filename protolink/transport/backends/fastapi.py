@@ -13,6 +13,7 @@ from typing import Any
 from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport._deps import _require_fastapi
+from protolink.transport._streaming import is_stream_terminal_event
 from protolink.transport.backends.base import BackendInterface
 from protolink.utils.inspect import is_async_callable
 
@@ -133,17 +134,18 @@ class FastAPIBackend(BackendInterface):
             sent_final = False
             async for event in stream_obj:
                 event_payload = self._serialize_result(event)
-                final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
+                event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
+                stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
                 yield self._sse_frame(
                     {
                         "jsonrpc": "2.0",
                         "id": request_id,
                         "ok": True,
                         "result": event_payload,
-                        "final": final,
+                        "final": stream_final,
                     }
                 )
-                if final:
+                if stream_final:
                     sent_final = True
                     break
 
