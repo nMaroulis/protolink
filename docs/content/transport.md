@@ -43,17 +43,18 @@ All transports inherit from the base `Transport` class.
     - Inherits HTTP page exposure, so status and chat pages are available from the same base URL.
     - Useful for CLIs, browser clients, dashboards, and other consumers that want streaming without a WebSocket connection.
 
+- **GRPCTransport**
+    - Uses `grpc.aio` for unary request/response calls and unary-stream task events.
+    - Registers one generic Protolink gRPC service and routes requests by `ClientRequestSpec` method/path.
+    - Carries compact JSON envelopes over gRPC byte messages, so no generated protobuf files are required.
+    - Supports gRPC metadata for the same bearer/API-key authentication headers used by HTTP and WebSocket transports.
+    - Useful for service meshes, polyglot infrastructure, and teams that want gRPC deadlines and connection pooling while keeping Protolink's transport-neutral agent API.
+
 - **RuntimeTransport**
     - Simple **in‑process, in‑memory transport**.
     - Allows multiple agents to communicate within the same Python process.
     - Registers endpoint specs in memory only; there are no browser pages or bound network ports.
     - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
-
-### Reserved Transports
-
-- **gRPC** (`"grpc"`)
-  - The `TransportType` alias reserves `"grpc"` for future support.
-  - The default transport factory does not currently register a gRPC transport class, so use HTTP, SSE JSON-RPC, WebSocket, or Runtime transports in application code today.
 
 ## Choosing a Transport
 
@@ -63,19 +64,105 @@ Some rough guidelines:
 - Use **HTTPTransport** when you want a simple, interoperable API surface (e.g. calling agents from other services or frontends) and for communicating with the Registry.
 - Use **SSEJSONRPCTransport** when you want HTTP-compatible streaming over `text/event-stream` while keeping normal HTTP status and chat pages.
 - Use **WebSocketTransport** when you need streaming and interactive sessions over a single WebSocket protocol surface.
-- Track gRPC support if you need a future strongly typed service boundary; it is not a default runtime transport yet.
+- Use **GRPCTransport** when your deployment already standardizes on gRPC deadlines, metadata, and connection management.
 
 The rest of this page dives into the API of each transport in more detail.
+
+## TLS and mutual TLS
+
+TLS is transport security: it encrypts traffic and verifies certificates before ProtoLink sends any task data. It is separate from application authentication. Use `TLSConfig` for HTTPS, secure WebSockets, and secure gRPC; use an `Authenticator` for bearer tokens, API keys, Basic auth, or OAuth. Production services commonly use both.
+
+The high-level API accepts the same configuration everywhere:
+
+```python
+from protolink import Agent, AgentCard, TLSConfig
+
+tls = TLSConfig(
+    certfile="certs/agent.pem",
+    keyfile="certs/agent-key.pem",
+    cafile="certs/ca.pem",
+)
+
+agent = Agent(
+    card=AgentCard(
+        name="secure-agent",
+        description="Agent served over HTTPS",
+        url="https://agent.internal:8443",
+    ),
+    transport="http",
+    tls=tls,
+)
+```
+
+The URL scheme activates encryption. The transport name does not change:
+
+| Transport | Plain URL | TLS URL |
+|-----------|-----------|---------|
+| HTTP and SSE JSON-RPC | `http://` | `https://` |
+| WebSocket | `ws://` | `wss://` |
+| gRPC | `grpc://` | `grpcs://` |
+| Runtime | `runtime://` | Not applicable; no network socket |
+
+`certfile` and `keyfile` form the local certificate identity. A secure server URL requires both. `cafile` supplies trusted certificate authorities; outbound clients use the operating system trust store when it is omitted. Hostname verification is enabled by default and should remain enabled in production.
+
+| `TLSConfig` field | Default | Purpose |
+|-------------------|---------|---------|
+| `certfile` | `None` | PEM certificate chain presented by this server or mTLS client. |
+| `keyfile` | `None` | PEM private key matching `certfile`; the two fields must be supplied together. |
+| `cafile` | System roots for clients | PEM CA bundle used to verify remote servers and inbound mTLS clients. |
+| `require_client_cert` | `False` | Require a trusted certificate from every inbound client. Requires `cafile`. |
+| `check_hostname` | `True` | Verify outbound certificate hostnames. Disabling this does not disable CA verification. |
+
+For a client that only calls a secure service, certificate trust is enough:
+
+```python
+from protolink import TLSConfig
+from protolink.client import AgentClient
+
+client = AgentClient(
+    transport="grpc",
+    url="grpc://127.0.0.1:0",
+    tls=TLSConfig(cafile="certs/ca.pem"),
+)
+result = client.sync.send_task("grpcs://worker.internal:9443", task)
+```
+
+Enable mutual TLS by requiring a trusted client certificate on the server. The calling workload must then provide its own certificate and key:
+
+```python
+server_tls = TLSConfig(
+    certfile="certs/server.pem",
+    keyfile="certs/server-key.pem",
+    cafile="certs/ca.pem",
+    require_client_cert=True,
+)
+
+client_tls = TLSConfig(
+    certfile="certs/client.pem",
+    keyfile="certs/client-key.pem",
+    cafile="certs/ca.pem",
+)
+```
+
+`Agent`, `AgentClient`, and `Registry` accept `tls=` when they create a transport by name. Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport`, and `GRPCTransport` instances accept the same argument. Certificate paths are serialized by `Agent.to_dict()` and `to_yaml()`; private-key contents are never embedded.
+
+:::note[TLS termination]
+
+Native TLS is useful for direct service exposure and end-to-end mTLS. It is also valid to terminate TLS at a trusted ingress, reverse proxy, load balancer, or service mesh and use an insecure ProtoLink URL only on the protected internal hop. Do not advertise an insecure URL outside that boundary. Restart the transport and recreate client connections after rotating certificate files so new SSL contexts and gRPC credentials are loaded.
+
+:::
 
 <ApiSurface
   eyebrow="Transport module"
   title="Transport Layer"
   path="protolink.transport"
-  description="The protocol adapter layer that lets the same agent runtime communicate over HTTP, SSE JSON-RPC, WebSocket, or an in-process runtime channel."
+  description="The protocol adapter layer that lets the same agent runtime communicate over HTTP, SSE JSON-RPC, WebSocket, gRPC, or an in-process runtime channel."
   pills={[
     "HTTP",
     "SSE JSON-RPC",
     "WebSocket",
+    "gRPC",
+    "TLS / mTLS",
     "RuntimeTransport",
     "Control-plane routes",
   ]}
@@ -87,7 +174,7 @@ The rest of this page dives into the API of each transport in more detail.
     },
     {
       title: "Streaming",
-      text: "Emit task status, LLM chunks, tool events, artifacts, and final completion updates.",
+      text: "Emit task status, LLM chunks, tool events, artifacts, and final completion updates over SSE, WebSocket, gRPC, or runtime streams.",
       code: "subscribe()",
     },
     {
@@ -97,8 +184,8 @@ The rest of this page dives into the API of each transport in more detail.
     },
     {
       title: "Backends",
-      text: "Bind endpoint specs through Starlette or FastAPI without changing agent behavior.",
-      code: "BackendInterface",
+      text: "Bind endpoint specs through ASGI backends or the generic gRPC service without changing agent behavior.",
+      code: "EndpointSpec",
     },
   ]}
 />
@@ -113,7 +200,7 @@ Agent-facing transports should preserve the same logical contract even when thei
 - Control-plane routes such as `POST /tasks/cancel` and registry heartbeats must not depend on the active request/stream connection.
 - Request parsers may be synchronous or asynchronous; transports must normalize both.
 
-The repository includes `tests/test_transport_conformance.py` to keep Runtime, HTTP, and WebSocket behavior aligned. Add new transports to that suite before treating them as production-ready.
+The repository includes `tests/test_transport_conformance.py` to keep Runtime, HTTP, WebSocket, and gRPC behavior aligned. Add new transports to that suite before treating them as production-ready.
 
 ---
 
@@ -123,7 +210,7 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 
 ### Agent endpoints
 
-| Endpoint | Purpose | Browser-visible with HTTP/SSE? |
+| Endpoint | Purpose | Transport exposure |
 |----------|---------|---------------------------------|
 | `POST /tasks/` | Submit a task to the agent. | No, JSON API |
 | `POST /tasks/cancel` | Cancel an active task. | No, JSON API |
@@ -135,11 +222,11 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | `GET /status` | Render the agent status page. | Yes, HTML page |
 | `GET /chat` | Render the self-contained chat UI or a fallback page. | Yes, HTML page |
 | `POST /chat` | Send a chat message to `Agent.invoke()`. Registered only when the agent has an LLM. | No, JSON API used by the page |
-| `POST /tasks/stream` | Stream task events. Registered only when the transport advertises streaming support. | SSE stream for `SSEJSONRPCTransport` |
+| `POST /tasks/stream` | Stream task events. Registered only when the transport advertises streaming support. | SSE, WebSocket, gRPC, or runtime stream depending on transport |
 
 ### Registry endpoints
 
-| Endpoint | Purpose | Browser-visible with HTTP/SSE? |
+| Endpoint | Purpose | Transport exposure |
 |----------|---------|---------------------------------|
 | `POST /agents/` | Register an `AgentCard`. | No, JSON API |
 | `DELETE /agents/` | Unregister an agent URL. | No, JSON API |
@@ -154,6 +241,7 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | `HTTPTransport` | Starlette/FastAPI mounts physical HTTP routes. Browser pages are available at `<base-url>/status` and `<base-url>/chat`. |
 | `SSEJSONRPCTransport` | Same HTTP routes as `HTTPTransport`, plus `POST /tasks/stream` as `text/event-stream`. The aliases `"sse"`, `"json-rpc"`, and `"sse-json-rpc"` all use this transport. |
 | `WebSocketTransport` | Endpoint specs are cached in memory and selected by JSON frames containing `id`, `method`, and `path`. A plain browser `GET /status` is not served. |
+| `GRPCTransport` | Endpoint specs are cached in memory and selected by JSON envelopes sent to the generic `Invoke` or `Stream` gRPC methods. A plain browser `GET /status` is not served. |
 | `RuntimeTransport` | Endpoint specs are cached in the process-local transport registry and called directly through `AgentClient`. No socket or browser surface is created. |
 
 The browser pages themselves are not separate servers. Agent status and registry status are rendered by `protolink.utils.renderers.status`; agent chat is rendered by `protolink.utils.renderers.chat`.
@@ -189,7 +277,7 @@ class BackendInterface(ABC):
     @abstractmethod
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None: ...
     @abstractmethod
-    async def start(self, host: str, port: int) -> None: ...
+    async def start(self, url: str, tls: TLSConfig | None = None) -> None: ...
     @abstractmethod
     async def stop(self) -> None: ...
 ```
@@ -393,7 +481,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, backend, validation, and Uvicorn logging behavior. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, TLS, backend, validation, and Uvicorn logging behavior. |
 | `start` | `self` | `Awaitable[None]` | Start the selected backend and create the internal `httpx.AsyncClient`. `AgentServer` or `RegistryServer` registers endpoint specs before transport startup. |
 | `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
 
@@ -417,7 +505,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 | ---- | ---------- | ------- | ----------- |
 | `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `Authenticator` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
 | `_build_headers` | `skill: str ⎪ None = None` | `dict[str, str]` | Internal helper that constructs HTTP headers (including `Authorization` when an auth context is present). Exposed here for completeness; you normally do not need to call it directly. |
-| `validate_url` | `-` | `-` | Return `True` if the URL is considered local to this transport's host/port (e.g. for allow‑listing), `False` otherwise. |
+| `validate_url` | `-` | `bool` | Return `True` when the configured URL uses `http://` or `https://`. |
 
 ---
 
@@ -531,7 +619,7 @@ Use it when:
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None` | `None` | Configure URL, timeout, authentication, and credentials for WebSocket connections. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None` | `None` | Configure URL, timeout, authentication, credentials, and TLS for `wss://` connections. |
 | `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a `Task` to `/tasks/stream` and receive task event payloads over a single WebSocket connection. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
 
@@ -541,6 +629,84 @@ Use it when:
 | ---- | ---- | ------ | ----------- |
 | `url` | `str` | Read-only | The base URL configured for this transport. |
 | `timeout` | `float` | Read/Write | The timeout (in seconds) for WebSocket receive operations. This can be changed at runtime to adjust response wait times for subsequent requests. |
+
+---
+
+## GRPCTransport
+
+`GRPCTransport` exposes Protolink agents through a generic `grpc.aio` service. It supports the same high-level `AgentClient` calls as the other transports:
+
+- `send_task()` and `get_agent_card()` use the unary `Invoke` method.
+- `send_task_streaming()` uses the unary-stream `Stream` method.
+- Control-plane calls such as cancellation, state operations, and history compaction use the same request-spec envelopes as other transports.
+
+Install the optional dependency with:
+
+```bash
+pip install "protolink[grpc]"
+```
+
+### Client Usage
+
+```python
+from protolink import Agent, AgentCard, Task, create_llm
+from protolink.client import AgentClient
+
+agent_url = "grpc://127.0.0.1:8010"
+agent = Agent(
+    AgentCard(name="grpc-agent", description="Served over gRPC", url=agent_url),
+    transport="grpc",
+    llm=create_llm("mock", default_response="hello from grpc"),
+)
+agent.start(register=False, background=True)
+
+client = AgentClient(transport="grpc", url="grpc://127.0.0.1:0")
+result = client.sync.send_task(agent_url, Task.create_infer(prompt="Say hello"))
+print(result.get_last_part_content())
+
+agent.stop()
+```
+
+See [`examples/grpc_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/grpc_agent.py) for a complete request/response and streaming round trip.
+
+### Wire Format
+
+The gRPC service name is `protolink.transport.v1.ProtolinkTransport`. It exposes two methods:
+
+| Method | Shape | Purpose |
+|--------|-------|---------|
+| `Invoke` | unary -> unary | Agent cards, task submission, registry calls, and control-plane operations. |
+| `Stream` | unary -> stream | Task event streams for `POST /tasks/stream`. |
+
+Each gRPC message is a JSON envelope carried as UTF-8 bytes:
+
+```json
+{
+  "id": "request-id",
+  "method": "POST",
+  "path": "/tasks/",
+  "data": {"id": "task-id", "messages": []},
+  "params": {}
+}
+```
+
+Responses follow the same envelope family used by WebSocket and SSE JSON-RPC:
+
+```json
+{"id":"request-id","ok":true,"result":{"state":"completed"},"final":true}
+```
+
+Authentication uses gRPC metadata keys compatible with the HTTP headers Protolink already builds: `authorization` and `x-api-key`.
+
+### API
+
+| Name | Parameters | Returns | Description |
+| ---- | ---------- | ------- | ----------- |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `channel_options = None`, `server_options = None`, `compression = None`, `maximum_concurrent_rpcs: int ⎪ None = None`, `graceful_shutdown_timeout: float = 3.0`, `tls: TLSConfig ⎪ None = None` | `None` | Configure the gRPC endpoint, deadlines, auth, TLS/mTLS, grpcio options, compression, and server shutdown grace. |
+| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Send a unary request to the peer's `Invoke` method and parse the response through the request spec. |
+| `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a task to `Stream` and yield each task event result until the stream is final. |
+| `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Cache transport-neutral endpoint specs for the generic gRPC router. |
+| `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the `grpc.aio` server and loop-local client channels. |
 
 ---
 

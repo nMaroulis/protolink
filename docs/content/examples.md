@@ -179,6 +179,22 @@ ProtoAgent is a full local-first coding assistant built on ProtoLink. Read the c
 - Shows registry discovery over WebSockets
 - Real-time progress updates via WebSocket events
 
+### [`grpc_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/grpc_agent.py)
+**Purpose**: gRPC transport request/response and streaming smoke test
+
+- Starts a provider-free mock-LLM agent on a local `grpc://` port
+- Fetches the agent card and sends a normal task through `AgentClient`
+- Consumes task events through the gRPC streaming API
+- Demonstrates the `transport="grpc"` factory path without generated protobuf files
+
+### [`tls_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/tls_agent.py)
+**Purpose**: Native TLS and mutual TLS through the high-level agent API
+
+- Starts a provider-free mock agent on an `https://` endpoint using `TLSConfig`
+- Configures verified client trust without disabling hostname or certificate checks
+- Supports `--require-client-cert` to demonstrate mutual TLS
+- Keeps certificate transport security separate from bearer/API-key authentication
+
 ### 🔄 [`structured_flows/`](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows)
 **Purpose**: Advanced flow orchestration patterns
 

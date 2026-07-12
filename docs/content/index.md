@@ -90,7 +90,7 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
   See [Getting Started](getting-started.md) and [Agents](agent.md) for the core concepts and basic setup.
 
 - **Choose your transport**  
-  Explore [Transports](transport.md) to switch between HTTP, SSE JSON-RPC streaming, WebSocket, and in-process runtime transports with minimal code changes.
+  Explore [Transports](transport.md) to switch between HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports with minimal code changes.
 
 - **Plug in LLMs & tools**  
   Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and both native & MCP tools as agent modules.
@@ -99,7 +99,7 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
 ## Key ideas
 
 - **Unified Agent model**: a single autonomous `AI Agent` instance handles both client and server responsibilities, incorporating LLMs and tools.
-- **Flexible transports**: HTTP, SSE JSON-RPC streaming, WebSocket, and in-process runtime transports. The `grpc` type is reserved for future support, but it is not registered in the default transport factory yet.
+- **Flexible transports**: HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports.
 - **LLM‑ready architecture**: first‑class integration with API, local, and server‑hosted LLMs.
 - **Tools as modules**: native Python tools and MCP tools plugged directly into agents. Import tools from thousands of existing MCP servers instantly.
 - **Resilience by design**: by decoupling the Brain (LLM) from the Body (Agent), you are immune to provider outages or pricing changes.

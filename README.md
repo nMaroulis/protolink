@@ -118,7 +118,7 @@ Running tasks can be canceled by task ID across local and remote transports, wit
   - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
   - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
   - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
-  - **Enhanced Security**: **OAuth 2.0** and **API key support**.
+  - **Enhanced Security**: Native **TLS/mTLS**, **OAuth 2.0**, bearer tokens, Basic auth, and **API key support**.
   - **Comprehensive Logging**: Built-in support for **console** (colored), **file-based** logging (including structured **JSON** output), and a no-op quiet logger.
   - Built-in support for streaming and async operations.
 - **Planned Integrations**:
@@ -215,6 +215,9 @@ uv add "protolink[all]"
 # Install with HTTP support (for web-based agents)
 uv add "protolink[http]"
 
+# Install with gRPC support (for service-to-service agents)
+uv add "protolink[grpc]"
+
 # Install all the supported LLM libraries
 uv add "protolink[llms]"
 
@@ -276,7 +279,7 @@ for mcp_tool in mcp_tools:
 agent.start()
 ```
 
-When using an HTTP-compatible transport (`http`, `sse`, `json-rpc`, or `sse-json-rpc`), the **Agent** and **Registry** expose lightweight browser pages: registry status at `/status`, agent status at `/status`, and agent chat at `/chat` for LLM-backed agents. WebSocket and runtime transports keep the same logical endpoints for clients, but they do not serve browser HTML directly.
+When using an HTTP-compatible transport (`http`, `sse`, `json-rpc`, or `sse-json-rpc`), the **Agent** and **Registry** expose lightweight browser pages: registry status at `/status`, agent status at `/status`, and agent chat at `/chat` for LLM-backed agents. WebSocket, gRPC, and runtime transports keep the same logical endpoints for clients, but they do not serve browser HTML directly.
 
 <table>
   <tr style="border: none;">
@@ -306,8 +309,33 @@ For Agent-to-Agent & Agent-to-Registry communication:
   - Advanced | Schema Validation: `fastapi`, `pydantic` & `uvicorn`
 - `sse`, `json-rpc`, `sse-json-rpc` · [SSEJSONRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/sse_jsonrpc_transport.py): Uses normal HTTP routes plus Server-Sent Events for streamed task updates.
 - `websocket` · [WebSocketTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py): Uses WebSocket for streaming requests. [`websockets`]
+- `grpc` · [GRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py): Uses gRPC unary calls and unary-stream task events over compact JSON envelopes. [`grpcio`]
 - `runtime` · [RuntimeTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py): Simple **in-process, in-memory transport**.
-- `grpc` is reserved for future support and is not registered by the default transport factory today.
+
+All network transports share one native TLS API. Use `https://`, `wss://`, or `grpcs://` and pass `TLSConfig` at the top level:
+
+```python
+from protolink import Agent, AgentCard, TLSConfig
+
+tls = TLSConfig(
+    certfile="certs/agent.pem",
+    keyfile="certs/agent-key.pem",
+    cafile="certs/ca.pem",
+    # require_client_cert=True,  # enable mutual TLS
+)
+
+agent = Agent(
+    card=AgentCard(
+        name="secure-agent",
+        description="Agent served over HTTPS",
+        url="https://agent.internal:8443",
+    ),
+    transport="http",
+    tls=tls,
+)
+```
+
+`TLSConfig` encrypts the connection and verifies certificates; `Authenticator` implementations handle application credentials and authorization. They are independent and can be combined. See the [TLS and mutual TLS guide](https://nmaroulis.github.io/protolink/docs/transport/#tls-and-mutual-tls) and [`examples/tls_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/tls_agent.py).
 
 #### LLMs:
 

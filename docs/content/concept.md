@@ -288,14 +288,14 @@ Traditional AI frameworks often trap you in a walled garden:
 
 ### Transport Independence
 
-Protolink agents can communicate over HTTP, SSE JSON-RPC, WebSocket, or in-process runtime transports without changing agent logic. Change the transport at construction time:
+Protolink agents can communicate over HTTP, SSE JSON-RPC, WebSocket, gRPC, or in-process runtime transports without changing agent logic. Change the transport at construction time:
 
 ```python
 # Switch from HTTP to WebSocket with one line
 agent = Agent(card, transport="websocket")  # That's it!
 ```
 
-The `grpc` transport alias is reserved for future support, but it is not registered by the default transport factory yet.
+The `grpc` transport uses the same `AgentClient` and `AgentServer` contracts as the other transports while carrying request/response and streaming envelopes over `grpc.aio`.
 
 ### Universal Tooling
 

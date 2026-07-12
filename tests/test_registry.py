@@ -7,10 +7,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from protolink.client import RegistryClient
 from protolink.discovery.registry import Registry
 from protolink.models import AgentCard
 from protolink.storage import SQLiteStorage
-from protolink.transport import HTTPTransport, Transport
+from protolink.transport import GRPCTransport, HTTPTransport, Transport
 
 
 class DummyTransport(Transport):
@@ -129,6 +130,34 @@ class TestRegistry:
 
         registry.stop()
         assert dummy_transport._started is False
+
+    @pytest.mark.asyncio
+    async def test_grpc_registry_register_discover_round_trip(self, unused_tcp_port):
+        """A gRPC registry should accept registration and discovery over gRPC."""
+        pytest.importorskip("grpc")
+
+        registry_url = f"grpc://127.0.0.1:{unused_tcp_port}"
+        registry = Registry(url=registry_url, transport="grpc", verbosity=0)
+        client_transport = GRPCTransport(url=registry_url)
+        client = RegistryClient(client_transport)
+        agent_card = AgentCard(
+            name="grpc-test-agent",
+            description="Registered over the gRPC registry transport",
+            url="grpc://127.0.0.1:9911",
+            version="1.0.0",
+        )
+
+        registry.start(background=True)
+        try:
+            response = await client.register(agent_card)
+            discovered = await client.discover()
+
+            assert response == {"status": "agent registered successfully"}
+            assert [card.url for card in discovered] == [agent_card.url]
+            assert discovered[0].name == agent_card.name
+        finally:
+            await client_transport.stop()
+            registry.stop()
 
     @pytest.mark.asyncio
     async def test_register_agent(self, dummy_transport, agent_card):

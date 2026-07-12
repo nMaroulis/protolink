@@ -279,6 +279,7 @@ Registry(
     *,
     entry_ttl_seconds: float | None = None,
     storage: Storage | None = None,
+    tls: TLSConfig | None = None,
 )
 ```
 
@@ -289,6 +290,7 @@ Registry(
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity: `0` = warning, `1` = info, `2` = debug. |
 | `entry_ttl_seconds` | `float | None` | `None` | Optional liveness TTL. Expired entries are pruned before discovery, status, and count/list operations. |
 | `storage` | `Storage | None` | `None` | Optional persistence for serialized registry entries. |
+| `tls` | `TLSConfig | None` | `None` | Optional certificate identity and trust configuration for a secure registry URL. |
 
 :::info[Single source of truth]
 

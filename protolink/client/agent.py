@@ -33,6 +33,7 @@ from protolink.models import (
     Task,
     TaskCancellationRequest,
 )
+from protolink.security.tls import TLSConfig
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
 
@@ -144,11 +145,31 @@ class AgentClient:
         channel="control",
     )
 
-    def __init__(self, transport: Transport | TransportType, url: str | None = None, timeout: int = 300) -> None:
+    def __init__(
+        self,
+        transport: Transport | TransportType,
+        url: str | None = None,
+        timeout: int = 300,
+        *,
+        tls: TLSConfig | None = None,
+    ) -> None:
+        """Initialize a client from a transport instance or registered name.
+
+        Args:
+            transport: Existing transport or registered transport name.
+            url: Local transport URL required when constructing by name.
+            timeout: Outbound request timeout in seconds.
+            tls: Optional TLS trust and client-certificate configuration.
+        """
         if isinstance(transport, Transport):
+            if tls is not None and getattr(transport, "tls", None) is None and hasattr(transport, "tls"):
+                setattr(transport, "tls", tls)  # noqa: B010
             self._transport = transport
         else:
-            self._transport = get_transport(transport=transport, url=url, timeout=timeout)
+            transport_kwargs: dict[str, Any] = {"url": url, "timeout": timeout}
+            if tls is not None:
+                transport_kwargs["tls"] = tls
+            self._transport = get_transport(transport=transport, **transport_kwargs)
 
         self.sync = SyncAgentClient(self)
 

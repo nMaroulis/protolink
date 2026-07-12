@@ -10,7 +10,9 @@ from urllib.parse import urlparse
 
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator
+from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
+from protolink.transport._streaming import is_stream_terminal_event
 from protolink.transport.base import Transport
 from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
@@ -45,6 +47,14 @@ class WebSocketTransport(Transport):
     management. Persistent WebSocket connections and their synchronization primitives (like
     ``asyncio.Lock``) are dynamically cached using composite keys incorporating the caller's
     event loop ID. This guarantees strict isolation of connections per thread.
+
+    Args:
+        url: Server URL using ``ws://`` or secure ``wss://``.
+        timeout: Timeout in seconds for outbound operations.
+        authenticator: Optional application-level request authenticator.
+        credentials: Optional credentials for outbound authentication.
+        tls: Optional certificate and trust configuration used by ``wss://``
+            servers and clients.
     """
 
     transport_type: ClassVar[TransportType] = "websocket"
@@ -56,11 +66,15 @@ class WebSocketTransport(Transport):
         timeout: float = 360.0,
         authenticator: Authenticator | None = None,
         credentials: str | None = None,
+        *,
+        tls: TLSConfig | None = None,
     ) -> None:
+        """Initialize a loop-safe WebSocket transport."""
         self._url: str = url
         self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
         self.credentials: str | None = credentials
+        self.tls = tls
         self.security_context: Any | None = None
 
         self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
@@ -112,6 +126,11 @@ class WebSocketTransport(Transport):
         }
         if self.authenticator:
             kwargs["process_request"] = self._process_request
+        if urlparse(self._url).scheme.lower() == "wss":
+            if self.tls is None:
+                raise ValueError(f"WSS server at {self._url} requires TLSConfig with certfile and keyfile")
+            self.tls.require_server_identity(self._url)
+            kwargs["ssl"] = self.tls.create_server_context()
 
         self._server = await websockets.serve(
             self._handle_connection,
@@ -323,10 +342,13 @@ class WebSocketTransport(Transport):
             return existing
 
         headers = self._build_headers()
+        connect_kwargs: dict[str, Any] = {}
+        if urlparse(base_url).scheme.lower() == "wss" and self.tls is not None:
+            connect_kwargs["ssl"] = self.tls.create_client_context()
         try:
-            conn = await websockets.connect(base_url, additional_headers=headers)
+            conn = await websockets.connect(base_url, additional_headers=headers, **connect_kwargs)
         except TypeError:
-            conn = await websockets.connect(base_url, extra_headers=headers)
+            conn = await websockets.connect(base_url, extra_headers=headers, **connect_kwargs)
         self._client_conns[loop_key] = conn
         return conn
 
@@ -461,7 +483,7 @@ class WebSocketTransport(Transport):
                             event_final = False
                             if isinstance(event_payload, dict):
                                 event_final = bool(event_payload.get("final", False))
-                            stream_final = self._is_stream_terminal_event(event_payload, event_final=event_final)
+                            stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
                             await websocket.send(
                                 json.dumps(
                                     {
@@ -518,18 +540,6 @@ class WebSocketTransport(Transport):
         """Parse a ``ws://`` or ``wss://`` URL and return (host, port)."""
         parsed = urlparse(url.rstrip("/"))
         return parsed.hostname, parsed.port
-
-    @staticmethod
-    def _is_stream_terminal_event(event_payload: Any, *, event_final: bool) -> bool:
-        """Return whether a streamed payload should close the transport stream."""
-        if not event_final:
-            return False
-        if not isinstance(event_payload, dict):
-            return True
-        event_type = event_payload.get("type")
-        if event_type is None:
-            return True
-        return event_type == "task_status_update"
 
     # ------------------------------------------------------------------
     # Utility

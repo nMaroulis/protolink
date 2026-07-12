@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator
+from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
 from protolink.transport.base import Transport
@@ -52,6 +53,9 @@ class HTTPTransport(Transport):
         Backend implementation to use (``"starlette"`` or ``"fastapi"``).
     validate_schema:
         Whether to validate request/response schemas.
+    tls:
+        Optional TLS certificate and trust configuration. Use an ``https://``
+        server URL to enable TLS.
     """
 
     transport_type: ClassVar[TransportType] = "http"
@@ -66,6 +70,7 @@ class HTTPTransport(Transport):
         *,
         validate_schema: bool = False,
         credentials: str | None = None,
+        tls: TLSConfig | None = None,
         log_level: str = "info",
         access_log: bool = True,
     ) -> None:
@@ -82,11 +87,13 @@ class HTTPTransport(Transport):
                      used to construct the physical server routing table.
             validate_schema: If true, instructs the selected backend (such as FastAPI)
                              to enforce strict Pydantic model validation on inbound payloads.
+            tls: Optional transport-security configuration for HTTPS and mutual TLS.
         """
         self._url: str = url
         self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
         self.credentials: str | None = credentials
+        self.tls = tls
         self.security_context: object | None = None
         # Handlers that are called for different Server Requests
 
@@ -200,9 +207,15 @@ class HTTPTransport(Transport):
         loop_id = id(asyncio.get_running_loop())
         client = self._clients.get(loop_id)
         if not client or client.is_closed:
-            client = httpx.AsyncClient(timeout=self._timeout)
+            client = self._create_client()
             self._clients[loop_id] = client
         return client
+
+    def _create_client(self) -> httpx.AsyncClient:
+        """Create an HTTP client using configured TLS trust and identity."""
+        if self.tls is None:
+            return httpx.AsyncClient(timeout=self._timeout)
+        return httpx.AsyncClient(timeout=self._timeout, verify=self.tls.create_client_context())
 
     # ------------------------------------------------------------------
     # Server Routing
@@ -238,12 +251,12 @@ class HTTPTransport(Transport):
         the current thread's loop selector, preventing cross-loop boundary violations.
         """
 
-        await self.backend.start(self._url)
+        await self.backend.start(self._url, tls=self.tls)
 
         import asyncio
 
         loop_id = id(asyncio.get_running_loop())
-        self._clients[loop_id] = httpx.AsyncClient(timeout=self._timeout)
+        self._clients[loop_id] = self._create_client()
 
     async def stop(self) -> None:
         """Stop the HTTP server and gracefully close the loop-isolated HTTP client pool.

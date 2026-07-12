@@ -648,7 +648,7 @@ ProtoLink distinguishes serialized task state from live cancellation control.
   `asyncio.Task` objects while work is running.
 
 Cancellation can be requested locally or remotely by task ID. The same public
-client method works across HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport.
+client method works across HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport.
 WebSocket uses a separate control connection so cancellation does not wait
 behind the stream it is trying to interrupt.
 
@@ -683,10 +683,8 @@ Supported runtime transports include:
 | `http` | interoperable request/response APIs and registry communication |
 | `sse`, `json-rpc`, `sse-json-rpc` | HTTP-compatible streaming over Server-Sent Events |
 | `websocket` | bidirectional streaming and interactive sessions |
+| `grpc` | gRPC unary calls and unary-stream task events |
 | `runtime` | in-process communication with zero network overhead |
-
-The `grpc` alias is reserved for future support, but it is not registered by
-the default transport factory today.
 
 The transport layer handles:
 

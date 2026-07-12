@@ -194,6 +194,12 @@ auth = OAuth2DelegationAuth(
 
 When hosting an agent server, endpoints can be protected by configuring an `authenticator` on the transport. The transport backend (FastAPI or Starlette) will intercept incoming HTTP requests, extract headers, and invoke the validator.
 
+:::note[Authentication and TLS are different layers]
+
+An `Authenticator` decides whether an application request may access the agent. `TLSConfig` encrypts the network connection and verifies certificate identities before that request arrives. Use secure URL schemes with `tls=` for HTTPS, WSS, or secure gRPC, and combine TLS with an authenticator when you need both protected traffic and application authorization. See [TLS and mutual TLS](transport.md#tls-and-mutual-tls).
+
+:::
+
 ### Request Interception Flow
 
 1. **Extraction**: The server calls the `extract_credentials()` utility, searching the request in order:

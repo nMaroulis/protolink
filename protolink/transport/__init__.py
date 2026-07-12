@@ -7,6 +7,7 @@ from .base import Transport
 from .factory import get_transport
 
 __all__ = [
+    "GRPCTransport",
     "HTTPTransport",
     "RuntimeTransport",
     "SSEJSONRPCTransport",
@@ -16,6 +17,7 @@ __all__ = [
 ]
 
 _EXPORTS = {
+    "GRPCTransport": "protolink.transport.grpc_transport.GRPCTransport",
     "HTTPTransport": "protolink.transport.http_transport.HTTPTransport",
     "RuntimeTransport": "protolink.transport.runtime_transport.RuntimeTransport",
     "SSEJSONRPCTransport": "protolink.transport.sse_jsonrpc_transport.SSEJSONRPCTransport",

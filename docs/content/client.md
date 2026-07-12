@@ -78,7 +78,13 @@ print(result.get_last_part_content())
 ### Constructor
 
 ```python
-AgentClient(transport: Transport | TransportType, url: str | None = None)
+AgentClient(
+    transport: Transport | TransportType,
+    url: str | None = None,
+    timeout: int = 300,
+    *,
+    tls: TLSConfig | None = None,
+)
 ```
 
 | Parameter | Type | Description |
@@ -86,6 +92,7 @@ AgentClient(transport: Transport | TransportType, url: str | None = None)
 | `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
 | `url` | `str ⎪ None` | Base URL when using a transport type string |
 | `timeout` | `int` | Timeout in seconds for the request (default: 300) |
+| `tls` | `TLSConfig ⎪ None` | Optional CA trust and client certificate identity for HTTPS, WSS, or secure gRPC calls. |
 
 **Examples:**
 
@@ -141,7 +148,7 @@ async def send_task_streaming(agent_url: str, task: Task) -> AsyncIterator[Any]
 
 :::warning[Transport Support]
 
-Requires a transport that advertises streaming support and implements `subscribe()`. Supported choices include `"sse"`, `"json-rpc"`, `"websocket"`, and `"runtime"`. Plain `"http"` remains request/response only and raises `NotImplementedError`.
+Requires a transport that advertises streaming support and implements `subscribe()`. Supported choices include `"sse"`, `"json-rpc"`, `"grpc"`, `"websocket"`, and `"runtime"`. Plain `"http"` remains request/response only and raises `NotImplementedError`.
 
 :::
 **Example with SSE JSON-RPC:**
@@ -162,7 +169,7 @@ async for event in client.send_task_streaming("http://localhost:8010", task):
 
 Applications that need a stable UI or replay contract can normalize these transport events with `RunEvent.from_task_event(...)` or record them through `InMemoryEventSink`. See [Runtime](runtime.md) for the versioned run-event envelope.
 
-SSE and WebSocket transports recursively convert nested Protolink models and dataclasses into JSON-compatible values. Tool and delegated-agent events therefore preserve structured results such as `ToolOutput` inside `content` or `metadata`; clients do not need a custom encoder for these framework event payloads.
+SSE, WebSocket, and gRPC transports recursively convert nested Protolink models and dataclasses into JSON-compatible values. Tool and delegated-agent events therefore preserve structured results such as `ToolOutput` inside `content` or `metadata`; clients do not need a custom encoder for these framework event payloads.
 
 ---
 
@@ -202,7 +209,7 @@ assert canceled.state.value == "canceled"
 assert result.state.value == "canceled"
 ```
 
-`cancel_task()` uses the A2A-style `POST /tasks/cancel` operation over HTTP, SSE JSON-RPC, WebSocket, and RuntimeTransport. Cancellation is a control-plane request: WebSocket sends it over a separate connection so it does not queue behind the active task stream.
+`cancel_task()` uses the A2A-style `POST /tasks/cancel` operation over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. Cancellation is a control-plane request: WebSocket sends it over a separate connection so it does not queue behind the active task stream.
 
 Cancellation is intentionally best-effort. Async work normally stops at an `await` boundary; synchronous work and external systems may need their own cooperative cancellation or rollback mechanism. See [Runtime cancellation](runtime.md#canceling-running-tasks) for lifecycle, custom-handler, and side-effect guidance.
 

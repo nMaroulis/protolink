@@ -23,6 +23,7 @@ from protolink.llms.base import LLM
 from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult, HistoryCompactionStrategy
 from protolink.logging import get_agent_farewell, get_agent_greeting
 from protolink.models import AgentCard, AgentSkill, Message, Task
+from protolink.security.tls import TLSConfig
 from protolink.server import AgentServer
 from protolink.state.operations import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import Storage
@@ -1041,6 +1042,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
 
         authenticator = getattr(self, "authenticator", None)
         credentials = getattr(self, "credentials", None)
+        tls = self.tls
 
         if isinstance(transport, str):
             transport_kwargs: dict[str, Any] = {
@@ -1048,6 +1050,8 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 "authenticator": authenticator,
                 "credentials": credentials,
             }
+            if tls is not None:
+                transport_kwargs["tls"] = tls
             if getattr(self, "_verbosity", 1) == 0:
                 transport_kwargs["log_level"] = "critical"
                 transport_kwargs["access_log"] = False
@@ -1061,6 +1065,8 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 setattr(transport, "authenticator", authenticator)  # noqa: B010
             if credentials is not None and getattr(transport, "credentials", None) is None:
                 setattr(transport, "credentials", credentials)  # noqa: B010
+            if tls is not None and getattr(transport, "tls", None) is None and hasattr(transport, "tls"):
+                setattr(transport, "tls", tls)  # noqa: B010
         else:
             raise ValueError("Invalid transport type")
 
@@ -1244,7 +1250,10 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 if registry_url is None:
                     self._logger.error("registry_url cannot be None")
                     return
-                transport = get_transport(registry, url=registry_url)
+                transport_kwargs: dict[str, Any] = {"url": registry_url}
+                if self.tls is not None:
+                    transport_kwargs["tls"] = self.tls
+                transport = get_transport(registry, **transport_kwargs)
                 self.registry_client = RegistryClient(transport=transport)
             elif isinstance(registry, RegistryClient):
                 self.registry_client = registry
@@ -1402,6 +1411,9 @@ class AgentSerializationMixin(_AgentMixinBase):
             "credentials": self.credentials,
         }
 
+        if self.tls is not None:
+            data["tls"] = self.tls.to_dict()
+
         # Transport
         if self._transport:
             transport_config = {
@@ -1522,6 +1534,13 @@ class AgentSerializationMixin(_AgentMixinBase):
         # Credentials
         credentials = overrides.get("credentials", data.get("credentials"))
 
+        # Transport security
+        tls = overrides.get("tls")
+        if tls is None:
+            tls_config = data.get("tls")
+            if isinstance(tls_config, dict):
+                tls = TLSConfig.from_dict(tls_config)
+
         # Transport
         transport = overrides.get("transport")
         if transport is None:
@@ -1542,6 +1561,7 @@ class AgentSerializationMixin(_AgentMixinBase):
 
                     t_kwargs["authenticator"] = authenticator
                     t_kwargs["credentials"] = credentials
+                    t_kwargs["tls"] = tls
 
                     transport = get_transport(transport_type, **t_kwargs)
                 except Exception:
@@ -1616,6 +1636,7 @@ class AgentSerializationMixin(_AgentMixinBase):
             expose_chat=expose_chat,
             authenticator=authenticator,
             credentials=credentials,
+            tls=tls,
         )
 
         tools_data = data.get("tools", [])

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
     from protolink.logging import BaseLogger
     from protolink.models import AgentCard, AgentSkill, Part, Task
+    from protolink.security.tls import TLSConfig
     from protolink.server import AgentServer
     from protolink.state import State
     from protolink.state.operations import StateOperationRequest, StateOperationResult
@@ -35,6 +36,7 @@ class _AgentMixinBase(Protocol):
     registry_client: RegistryClient | None
     authenticator: Any
     credentials: str | None
+    tls: TLSConfig | None
     override_system_prompt: bool
     start_time: float | None
 
