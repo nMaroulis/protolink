@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import threading
 from typing import Any
 
@@ -16,7 +17,7 @@ from protolink import (
     TransportLimitError,
     TransportLimits,
 )
-from protolink.client import AgentClient
+from protolink.client import AgentClient, RegistryClient
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.discovery import Registry
 from protolink.server.endpoint_handler import EndpointSpec
@@ -71,9 +72,7 @@ def test_transport_request_context_is_public() -> None:
 
 
 def test_transport_rejects_oversized_payloads() -> None:
-    transport = HarnessTransport(
-        TransportConfig(limits=TransportLimits(max_request_bytes=4))
-    )
+    transport = HarnessTransport(TransportConfig(limits=TransportLimits(max_request_bytes=4)))
 
     with pytest.raises(TransportLimitError, match="configured maximum"):
         transport.check_payload_limit("too large", kind="request")
@@ -182,30 +181,60 @@ def test_high_level_client_propagates_transport_config() -> None:
     assert client.transport.config is config
 
 
-def test_agent_and_registry_factories_propagate_transport_config() -> None:
-    config = TransportConfig(retry=RetryPolicy(max_attempts=2))
+def test_agent_and_registry_transports_own_independent_config() -> None:
+    agent_config = TransportConfig(retry=RetryPolicy(max_attempts=2))
+    registry_config = TransportConfig(
+        limits=TransportLimits(max_concurrent_requests=25),
+    )
+    agent_transport = RuntimeTransport("runtime://configured-agent", config=agent_config)
+    registry_transport = RuntimeTransport("runtime://configured-registry", config=registry_config)
     agent = Agent(
         card=AgentCard(
             name="configured-agent",
             description="Exercises transport configuration propagation",
             url="runtime://configured-agent",
         ),
-        transport="runtime",
-        registry="runtime",
-        registry_url="runtime://configured-registry",
-        transport_config=config,
+        transport=agent_transport,
+        registry=RegistryClient(registry_transport),
     )
     registry = Registry(
         transport="runtime",
         url="runtime://configured-registry",
-        transport_config=config,
+        transport_config=registry_config,
+    )
+    restored = Agent.from_dict(agent.to_dict())
+
+    assert agent.transport is agent_transport
+    assert agent.transport.config is agent_config
+    assert agent.registry_client is not None
+    assert agent.registry_client.transport is registry_transport
+    assert agent.registry_client.transport.config is registry_config
+    assert registry.client.transport.config is registry_config
+    assert restored.transport is not None
+    assert restored.transport.config == agent_config
+    assert restored.registry_client is not None
+    assert restored.registry_client.transport.config == registry_config
+
+
+def test_agent_string_transport_uses_simple_defaults() -> None:
+    agent = Agent(
+        card=AgentCard(
+            name="simple-agent",
+            description="Exercises the zero-configuration path",
+            url="runtime://simple-agent",
+        ),
+        transport="runtime",
     )
 
     assert agent.transport is not None
-    assert agent.transport.config is config
-    assert agent.registry_client is not None
-    assert agent.registry_client.transport.config is config
-    assert registry.client.transport.config is config
+    assert agent.transport.config == TransportConfig()
+
+
+def test_agent_constructor_keeps_advanced_settings_on_transport() -> None:
+    parameters = inspect.signature(Agent).parameters
+
+    assert "tls" not in parameters
+    assert "transport_config" not in parameters
 
 
 @pytest.mark.asyncio

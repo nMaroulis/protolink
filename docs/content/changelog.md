@@ -44,7 +44,7 @@ uv add --upgrade protolink
   - Added gRPC transport conformance and integration coverage plus the provider-free `examples/grpc_agent.py` example.
 - **TLS and mutual TLS**
   - Added the top-level `TLSConfig` API for shared certificate trust, server identity, and optional client-certificate verification across HTTP, SSE JSON-RPC, WebSocket, and gRPC.
-  - Added secure `https://`, `wss://`, and `grpcs://` URL handling and automatic propagation through `Agent`, `AgentClient`, and `Registry` factory-created transports.
+  - Added secure `https://`, `wss://`, and `grpcs://` URL handling. TLS is owned by concrete Agent transports, while `AgentClient` and `Registry` retain factory convenience arguments.
   - Added certificate-backed integration coverage and `examples/tls_agent.py`, while keeping transport encryption independent from application authentication and authorization.
 - **Shared production transport contract**
   - Added `TransportConfig`, `TransportLimits`, and `RetryPolicy` for consistent payload bounds, request/stream concurrency, explicit idempotent retries, keepalive, graceful shutdown, response deduplication, and dependency-free metrics across every built-in transport.
@@ -58,7 +58,8 @@ uv add --upgrade protolink
 
 ### Changed
 
-- `Agent`, `AgentClient`, and `Registry` now accept `transport_config=` when constructing transports by name; directly supplied transport objects retain ownership of their existing configuration.
+- Simplified the Agent API boundary: string transport aliases remain the zero-configuration prototyping path, while TLS, limits, retries, keepalive, and protocol-specific settings are configured on a concrete transport object passed to Agent.
+- `AgentClient` and `Registry` retain `tls=` and `transport_config=` factory conveniences because they directly own the transports they create. Agent serialization now restores its primary and Registry transports with independent TLS identities and production configurations.
 - `ClientRequestSpec` now declares operation idempotency explicitly. Retries remain disabled by default and run only when the request specification, method, and typed failure all permit a safe retry.
 - HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport now enforce the same serialized payload and concurrency contract, so in-process tests exercise the same resource boundaries as network deployments.
 - Correlation IDs remain stable across retry attempts, while idempotency keys suppress concurrent duplicate execution and replay completed responses within the configured process-local cache window.
@@ -71,6 +72,7 @@ uv add --upgrade protolink
 - Fixed HTTP health probes so `/healthz` and `/readyz` remain available when application authentication is enabled.
 - Fixed transport shutdown across background-thread and caller event loops by closing pooled clients and channels on the event loop that owns them.
 - Fixed gRPC shutdown so loop-local cached channels are closed and removed correctly, including repeated `start()` and `stop()` calls.
+- Fixed source-distribution contents so generated Docusaurus output and `docs/node_modules` are excluded from PyPI packages.
 
 ## [0.6.4] - 2026-07-03
 

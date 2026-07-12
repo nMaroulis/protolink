@@ -1,4 +1,4 @@
-"""Configure production transport behavior through the high-level Agent API.
+"""Configure production transport behavior on a concrete transport.
 
 This provider-free example uses RuntimeTransport so it can run without opening
 a network port. The same ``TransportConfig`` works unchanged with HTTP, SSE
@@ -13,6 +13,7 @@ from protolink import (
     TransportConfig,
     TransportLimits,
 )
+from protolink.transport import RuntimeTransport
 
 
 def main() -> None:
@@ -41,10 +42,10 @@ def main() -> None:
             )
         ],
     )
+    transport = RuntimeTransport(card.url, config=transport_config)
     agent = Agent(
         card=card,
-        transport="runtime",
-        transport_config=transport_config,
+        transport=transport,
         verbosity=0,
     )
 

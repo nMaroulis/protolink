@@ -44,6 +44,14 @@ ProtoLink implements and extends [Google's Agent-to-Agent (A2A)](https://a2a-pro
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
+:::tip[Simple API, progressive control]
+
+ProtoLink keeps the common path intentionally small: `Agent(card=card, transport="http")` is enough to start prototyping with safe transport defaults. When a deployment needs TLS, limits, retries, or protocol-specific behavior, construct the transport explicitly and pass the completed object to the same Agent API. This preserves fast iteration without hiding or flattening advanced infrastructure control.
+
+Read the [API design philosophy](concept.md#api-design-progressive-control) or jump to the [transport configuration guide](transport.md#production-configuration).
+
+:::
+
 ## Find Your Path
 
 <ProjectMap />

@@ -97,12 +97,13 @@ The shared APIs exist to solve four practical production problems:
 
 ## Production configuration
 
-Every transport accepts the same `TransportConfig`. Pass it at the high-level `Agent`, `AgentClient`, or `Registry` boundary; ProtoLink forwards it to the selected transport. This keeps operational behavior consistent when an application changes protocols: an 8 MiB request limit means the same thing over HTTP, gRPC, WebSocket, or the in-process runtime.
+Every transport accepts the same `TransportConfig`. Configure it on the concrete transport passed to an Agent, or pass `transport_config=` to `AgentClient` and `Registry` when those APIs create a transport by name. This keeps operational behavior consistent when an application changes protocols: an 8 MiB request limit means the same thing over HTTP, gRPC, WebSocket, or the in-process runtime.
 
 Most applications can start without creating this object. The defaults bound resources, collect local metrics, and keep retries disabled. Add an explicit configuration when deployment requirements differ from those defaults, such as a known maximum task size, a service concurrency budget, or a retry policy approved for your workload.
 
 ```python
 from protolink import Agent, AgentCard, RetryPolicy, TransportConfig, TransportLimits
+from protolink.transport import GRPCTransport
 
 transport_config = TransportConfig(
     limits=TransportLimits(
@@ -118,24 +119,22 @@ transport_config = TransportConfig(
     shutdown_timeout=10,
 )
 
-agent = Agent(
-    card=AgentCard(
-        name="worker",
-        description="Production task worker",
-        url="grpcs://worker.internal:9443",
-    ),
-    transport="grpc",
-    transport_config=transport_config,
+card = AgentCard(
+    name="worker",
+    description="Production task worker",
+    url="grpcs://worker.internal:9443",
 )
+transport = GRPCTransport(url=card.url, config=transport_config)
+agent = Agent(card=card, transport=transport)
 ```
 
 `max_attempts=1` is the default, so upgrading never enables retries implicitly. ProtoLink retries only request specifications explicitly marked idempotent, preserves one correlation ID across attempts, and sends an idempotency key so completed operations can be replayed without executing the handler again. Streams are not automatically retried because resuming a partial event sequence requires application-level checkpoints.
 
 The same limits apply to RuntimeTransport, making local tests representative of deployed serialization boundaries. HTTP uses bounded client/server concurrency, WebSocket uses bounded frame queues and ping/pong keepalive, and gRPC applies message-size, keepalive, and concurrent-RPC options.
 
-:::tip[Configure at the highest boundary]
+:::tip[Start simple, configure explicitly]
 
-If you construct an `Agent`, `AgentClient`, or `Registry` with a transport name such as `"grpc"`, pass `transport_config=` there. If you construct `GRPCTransport`, `HTTPTransport`, or another transport object yourself, pass `config=` to that object instead. An existing transport object keeps ownership of its configuration.
+Use `Agent(card=card, transport="grpc")` while prototyping. When deployment needs advanced settings, construct `GRPCTransport(url=card.url, config=transport_config)` and pass that object to Agent. `AgentClient` and `Registry` retain `transport_config=` as factory conveniences because they directly own the transport they create.
 
 :::
 
@@ -536,10 +535,11 @@ See [`examples/transport_production.py`](https://github.com/nMaroulis/protolink/
 
 TLS is transport security: it encrypts traffic and verifies certificates before ProtoLink sends any task data. It is separate from application authentication. Use `TLSConfig` for HTTPS, secure WebSockets, and secure gRPC; use an `Authenticator` for bearer tokens, API keys, Basic auth, or OAuth. Production services commonly use both.
 
-The high-level API accepts the same configuration everywhere:
+Configure TLS on the network transport that owns the socket and certificate identity:
 
 ```python
 from protolink import Agent, AgentCard, TLSConfig
+from protolink.transport import HTTPTransport
 
 tls = TLSConfig(
     certfile="certs/agent.pem",
@@ -547,15 +547,16 @@ tls = TLSConfig(
     cafile="certs/ca.pem",
 )
 
-agent = Agent(
-    card=AgentCard(
-        name="secure-agent",
-        description="Agent served over HTTPS",
-        url="https://agent.internal:8443",
-    ),
-    transport="http",
+card = AgentCard(
+    name="secure-agent",
+    description="Agent served over HTTPS",
+    url="https://agent.internal:8443",
+)
+transport = HTTPTransport(
+    url=card.url,
     tls=tls,
 )
+agent = Agent(card=card, transport=transport)
 ```
 
 The URL scheme activates encryption. The transport name does not change:
@@ -608,7 +609,7 @@ client_tls = TLSConfig(
 )
 ```
 
-`Agent`, `AgentClient`, and `Registry` accept `tls=` when they create a transport by name. Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport`, and `GRPCTransport` instances accept the same argument. Certificate paths are serialized by `Agent.to_dict()` and `to_yaml()`; private-key contents are never embedded.
+Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport`, and `GRPCTransport` instances accept `tls=`. `AgentClient` and `Registry` also accept it as a convenience when they create a transport by name. `Agent` keeps transport security out of its constructor: pass a configured transport object instead. `Agent.to_dict()` and `to_yaml()` serialize certificate paths inside the transport block; private-key contents are never embedded.
 
 :::note[TLS termination]
 

@@ -127,7 +127,6 @@ const moduleDefinitions = [
           '    cafile="certs/ca.pem",',
           ")",
         ],
-        agentArg: "tls=tls",
       },
       {
         id: "mutual-tls",
@@ -142,7 +141,6 @@ const moduleDefinitions = [
           "    require_client_cert=True,",
           ")",
         ],
-        agentArg: "tls=tls",
       },
     ],
   },
@@ -407,6 +405,7 @@ const moduleDefinitions = [
         kind: "network",
         cardUrl: "http://127.0.0.1:8000",
         secureCardUrl: "https://127.0.0.1:8000",
+        transportClass: "HTTPTransport",
         agentArg: 'transport="http"',
       },
       {
@@ -414,6 +413,7 @@ const moduleDefinitions = [
         label: "Runtime",
         kind: "in-process",
         cardUrl: "runtime://assistant",
+        transportClass: "RuntimeTransport",
         agentArg: 'transport="runtime"',
       },
       {
@@ -422,6 +422,7 @@ const moduleDefinitions = [
         kind: "duplex",
         cardUrl: "ws://127.0.0.1:8000",
         secureCardUrl: "wss://127.0.0.1:8000",
+        transportClass: "WebSocketTransport",
         agentArg: 'transport="websocket"',
       },
       {
@@ -430,6 +431,7 @@ const moduleDefinitions = [
         kind: "rpc",
         cardUrl: "grpc://127.0.0.1:8000",
         secureCardUrl: "grpcs://127.0.0.1:8000",
+        transportClass: "GRPCTransport",
         agentArg: 'transport="grpc"',
       },
       {
@@ -438,6 +440,7 @@ const moduleDefinitions = [
         kind: "sse",
         cardUrl: "http://127.0.0.1:8000",
         secureCardUrl: "https://127.0.0.1:8000",
+        transportClass: "SSEJSONRPCTransport",
         agentArg: 'transport="json-rpc"',
       },
     ],
@@ -495,7 +498,6 @@ const moduleDefinitions = [
           "    retry=RetryPolicy(max_attempts=3),",
           ")",
         ],
-        agentArg: "transport_config=transport_config",
       },
       {
         id: "limits-only",
@@ -510,7 +512,6 @@ const moduleDefinitions = [
           "    ),",
           ")",
         ],
-        agentArg: "transport_config=transport_config",
       },
     ],
   },
@@ -564,6 +565,7 @@ function selectedTransportOption(activeModules, selectedOptions) {
   ) {
     return {
       cardUrl: "runtime://assistant",
+      transportClass: "RuntimeTransport",
     };
   }
 
@@ -834,6 +836,10 @@ function buildAgentCode(activeModules, selectedOptions) {
   const tlsEnabled =
     activeModules.some((module) => module.id === "tls") &&
     Boolean(transportOption.secureCardUrl);
+  const resilienceEnabled = activeModules.some(
+    (module) => module.id === "resilience",
+  );
+  const advancedTransport = tlsEnabled || resilienceEnabled;
   const cardUrl = tlsEnabled
     ? transportOption.secureCardUrl
     : transportOption.cardUrl;
@@ -851,12 +857,29 @@ function buildAgentCode(activeModules, selectedOptions) {
     resolvedModule.imports?.forEach((line) => imports.add(line));
     resolvedModule.setup?.forEach((line) => setupLines.push(line));
 
-    if (resolvedModule.agentArg) {
+    if (
+      resolvedModule.agentArg &&
+      !(advancedTransport && module.id === "transport")
+    ) {
       constructorArgs.push(resolvedModule.agentArg);
     }
 
     resolvedModule.after?.forEach((line) => afterLines.push(line));
   });
+
+  if (advancedTransport) {
+    imports.add(
+      `from protolink.transport import ${transportOption.transportClass}`,
+    );
+    setupLines.push(
+      `transport = ${transportOption.transportClass}(`,
+      `    url="${cardUrl}",`,
+      ...(tlsEnabled ? ["    tls=tls,"] : []),
+      ...(resilienceEnabled ? ["    config=transport_config,"] : []),
+      ")",
+    );
+    constructorArgs.push("transport=transport");
+  }
 
   return [
     ...Array.from(imports),

@@ -97,17 +97,25 @@ def test_tls_config_serializes_paths_without_certificate_material() -> None:
     assert restored == config
 
 
-def test_top_level_tls_propagates_to_agent_client_and_registry() -> None:
-    """High-level constructors should forward TLS to factory-created transports."""
-    tls = _client_tls()
-    agent = Agent(_card("factory-agent", "https://127.0.0.1:8443"), transport="http", tls=tls, verbosity=0)
-    client = AgentClient("http", url="https://127.0.0.1:8444", tls=tls)
-    registry = Registry("http", url="https://127.0.0.1:8445", tls=tls, verbosity=0)
+def test_tls_is_owned_and_serialized_by_the_transport() -> None:
+    """Agent should preserve advanced TLS without promoting it to Agent state."""
+    server_tls = _server_tls()
+    transport = HTTPTransport("https://127.0.0.1:8443", tls=server_tls)
+    agent = Agent(_card("factory-agent", transport.url), transport=transport, verbosity=0)
+    client_tls = _client_tls()
+    client = AgentClient("http", url="https://127.0.0.1:8444", tls=client_tls)
+    registry = Registry("http", url="https://127.0.0.1:8445", tls=client_tls, verbosity=0)
 
-    assert agent.transport is not None and getattr(agent.transport, "tls", None) is tls
-    assert getattr(client._transport, "tls", None) is tls
-    assert getattr(registry.client.transport, "tls", None) is tls
-    assert Agent.from_dict(agent.to_dict()).tls == tls
+    serialized = agent.to_dict()
+    restored = Agent.from_dict(serialized)
+
+    assert "tls" not in serialized
+    assert serialized["transport"]["tls"] == server_tls.to_dict()
+    assert agent.transport is transport
+    assert getattr(client.transport, "tls", None) is client_tls
+    assert getattr(registry.client.transport, "tls", None) is client_tls
+    assert restored.transport is not None
+    assert getattr(restored.transport, "tls", None) == server_tls
 
 
 @pytest.mark.asyncio

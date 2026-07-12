@@ -10,7 +10,7 @@ The `AgentClient` is the primary entry point for programmatic agent interactions
 
 The distinction is useful because application code should think in Agent operations such as “send this task” or “cancel that task,” not in HTTP headers, WebSocket frames, or gRPC metadata. `AgentClient` chooses the operation contract and parses the result; the selected transport only maps that contract onto its wire protocol. Changing from HTTP to gRPC therefore does not require rewriting task-level client code.
 
-Pass `transport_config=` when constructing by transport name to share the same production limits, retry policy, keepalive, shutdown, idempotency, and metrics behavior used by `Agent` and `Registry`. The read-only `client.transport` property exposes health and metric snapshots when an application needs them.
+Pass `transport_config=` when the client constructs a transport by name. It uses the same production configuration object accepted by concrete Agent transports and `Registry`. The read-only `client.transport` property exposes health and metric snapshots when an application needs them.
 
 ```python
 from protolink import RetryPolicy, TransportConfig

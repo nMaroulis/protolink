@@ -1,4 +1,4 @@
 include LICENSE
 include README.md
-include requirements/*.txt
-recursive-include docs *.rst *.txt
+prune docs/build
+prune docs/node_modules

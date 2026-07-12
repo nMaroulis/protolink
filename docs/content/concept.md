@@ -29,6 +29,89 @@ Each layer has a **single responsibility** and a clear **dependency direction**.
 
 ---
 
+## API Design: Progressive Control
+
+ProtoLink's API is designed to be **simple at the beginning without becoming restrictive later**. A user should be able to prototype an Agent without first learning transport internals, but production users should still be able to configure every network and runtime boundary explicitly.
+
+This creates two levels of control through one API.
+
+### Simple path: choose a transport
+
+Pass a registered transport name when the defaults are sufficient:
+
+```python
+from protolink import Agent, AgentCard
+
+card = AgentCard(
+    name="assistant",
+    description="General-purpose assistant",
+    url="http://127.0.0.1:8000",
+)
+
+agent = Agent(card=card, transport="http")
+```
+
+ProtoLink resolves the string through its transport factory, creates an `HTTPTransport` from `card.url`, applies bounded default limits, enables local metrics, and leaves retries disabled. The shortcut removes setup code; it does not select a reduced or separate runtime.
+
+This path is intended for prototypes, examples, tests, and deployments that accept the built-in operational defaults.
+
+### Advanced path: configure the boundary
+
+When the transport needs TLS, mutual TLS, custom resource limits, retries, keepalive settings, or protocol-specific options, construct it directly:
+
+```python
+from protolink import Agent, AgentCard, RetryPolicy, TLSConfig, TransportConfig, TransportLimits
+from protolink.transport import HTTPTransport
+
+card = AgentCard(
+    name="assistant",
+    description="Production assistant",
+    url="https://agent.internal:8443",
+)
+transport = HTTPTransport(
+    url=card.url,
+    tls=TLSConfig(
+        certfile="certs/agent.pem",
+        keyfile="certs/agent-key.pem",
+        cafile="certs/ca.pem",
+    ),
+    config=TransportConfig(
+        limits=TransportLimits(max_concurrent_requests=200),
+        retry=RetryPolicy(max_attempts=3),
+    ),
+)
+
+agent = Agent(card=card, transport=transport)
+```
+
+The Agent receives the same `Transport` abstraction in both examples. The only difference is who constructs it: ProtoLink owns construction in the simple path; the application owns construction in the advanced path.
+
+### Why advanced settings live on Transport
+
+Putting every infrastructure option on `Agent` would make the common constructor grow whenever HTTP, WebSocket, gRPC, TLS, or resilience gained a feature. It would also blur ownership: TLS certificates, connection pools, message limits, retry timing, and keepalive behavior are properties of the communication boundary, not of Agent reasoning or task execution.
+
+Keeping these settings on Transport provides several concrete benefits:
+
+- **Clear ownership**: the object opening sockets also owns certificates, pools, limits, retries, and shutdown behavior.
+- **Independent boundaries**: an Agent transport and its Registry transport can use different trust roots, identities, capacities, and retry policies.
+- **Stable Agent API**: adding a gRPC channel option or HTTP backend option does not expand the Agent constructor.
+- **Protocol substitution**: application logic continues to depend on `Transport`, not on protocol-specific settings promoted into Agent.
+- **Reliable serialization**: `Agent.to_dict()` and YAML preserve advanced settings inside each serialized transport block.
+
+| Concern | Owning API | Reason |
+|---------|------------|--------|
+| Identity, tools, LLM, state, policy, task lifecycle | `Agent` | Describes what the autonomous runtime is and does. |
+| Application authentication and authorization | `Agent` / `Authenticator` | Describes who may invoke Agent capabilities. |
+| TLS certificates and trust | Concrete `Transport` | Protects and identifies the network connection. |
+| Payload limits, retries, keepalive, connection pools | `TransportConfig` on a concrete `Transport` | Controls communication resources and failure behavior. |
+| Registry TLS and capacity policy | Registry transport / `RegistryClient` | The Registry is a separate service boundary with independent deployment requirements. |
+
+This is **progressive control**, not a beginner API and an unrelated expert API. Users can begin with a string, move to a configured object when requirements grow, and keep the surrounding Agent code unchanged.
+
+See [Agents](agent.md#simple-and-advanced-transports) for the constructor-level API and [Transport](transport.md#production-configuration) for every production setting.
+
+---
+
 ## Agent
 
 The **Agent** is the central abstraction in Protolink.  
@@ -55,7 +138,7 @@ The agent **does not perform networking** and **does not implement protocols**.
 - Open sockets  
 - Handle HTTP requests  
 - Serialize messages  
-- Know about protocols (HTTP, WS, local, etc.)  
+- Implement protocol behavior or own protocol-specific configuration
 
 This is **intentional and enforced by design**.
 
@@ -124,7 +207,7 @@ It encapsulates:
 - Reusable across agents  
 - Shared by client and server  
 
-> The transport is **never accessed directly by the agent**.
+> Agent business logic never calls protocol primitives directly. The Agent facade composes its client and server around the selected transport.
 
 ---
 
@@ -151,9 +234,9 @@ client/server layer. Protocol details stay below that boundary.
 
 **Key points:**
 
-- The agent owns the client and server  
-- The client and server own the transport  
-- The agent never calls transport methods directly  
+- The Agent composes its client and server
+- The client and server use the same configured transport abstraction
+- Agent business logic never calls protocol methods directly
 
 This guarantees:
 

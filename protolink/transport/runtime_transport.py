@@ -307,10 +307,10 @@ class RuntimeTransport(Transport):
                     retryable=True,
                 )
 
-        # Resolve an endpoint explicitly designed for streaming
+            # Resolve an endpoint explicitly designed for streaming
             stream_endpoints: list[EndpointSpec] = [ep for ep in target._endpoints.values() if ep.streaming]
             if not stream_endpoints:
-            # Fallback wrapper enabling non-streaming endpoints to mock a final stream response
+                # Fallback wrapper enabling non-streaming endpoints to mock a final stream response
                 fallback_spec = ClientRequestSpec(
                     name="task",
                     path="/tasks/",
@@ -329,14 +329,14 @@ class RuntimeTransport(Transport):
 
             endpoint: EndpointSpec = stream_endpoints[0]
 
-        # Emulate boundary validation across streaming task delivery
+            # Emulate boundary validation across streaming task delivery
             payload: Any = task
             if endpoint.request_parser:
                 payload = endpoint.request_parser(task.to_dict())
                 if inspect.isawaitable(payload):
                     payload = await payload
 
-        # Begin generator sequence
+            # Begin generator sequence
             result = endpoint.handler(payload)
 
             if inspect.isawaitable(result):

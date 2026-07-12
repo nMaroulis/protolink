@@ -21,6 +21,7 @@ from pathlib import Path
 
 from protolink import Agent, AgentCard, Task, TLSConfig, create_llm
 from protolink.client import AgentClient
+from protolink.transport import HTTPTransport
 
 
 def find_free_port() -> int:
@@ -63,10 +64,15 @@ def main() -> None:
         cafile=args.cafile,
     )
 
+    transport = HTTPTransport(
+        agent_url,
+        tls=server_tls,
+        log_level="critical",
+        access_log=False,
+    )
     agent = Agent(
         AgentCard(name="secure-agent", description="Agent served over HTTPS", url=agent_url),
-        transport="http",
-        tls=server_tls,
+        transport=transport,
         llm=create_llm("mock", default_response="hello over TLS"),
         verbosity=0,
     )

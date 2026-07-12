@@ -1042,7 +1042,6 @@ class AgentConfigurationMixin(_AgentMixinBase):
 
         authenticator = getattr(self, "authenticator", None)
         credentials = getattr(self, "credentials", None)
-        tls = self.tls
 
         if isinstance(transport, str):
             transport_kwargs: dict[str, Any] = {
@@ -1050,11 +1049,6 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 "authenticator": authenticator,
                 "credentials": credentials,
             }
-            if tls is not None:
-                transport_kwargs["tls"] = tls
-            transport_config = getattr(self, "transport_config", None)
-            if transport_config is not None:
-                transport_kwargs["config"] = transport_config
             if getattr(self, "_verbosity", 1) == 0:
                 transport_kwargs["log_level"] = "critical"
                 transport_kwargs["access_log"] = False
@@ -1068,8 +1062,6 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 setattr(transport, "authenticator", authenticator)  # noqa: B010
             if credentials is not None and getattr(transport, "credentials", None) is None:
                 setattr(transport, "credentials", credentials)  # noqa: B010
-            if tls is not None and getattr(transport, "tls", None) is None and hasattr(transport, "tls"):
-                setattr(transport, "tls", tls)  # noqa: B010
         else:
             raise ValueError("Invalid transport type")
 
@@ -1253,13 +1245,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 if registry_url is None:
                     self._logger.error("registry_url cannot be None")
                     return
-                transport_kwargs: dict[str, Any] = {"url": registry_url}
-                if self.tls is not None:
-                    transport_kwargs["tls"] = self.tls
-                transport_config = getattr(self, "transport_config", None)
-                if transport_config is not None:
-                    transport_kwargs["config"] = transport_config
-                transport = get_transport(registry, **transport_kwargs)
+                transport = get_transport(registry, url=registry_url)
                 self.registry_client = RegistryClient(transport=transport)
             elif isinstance(registry, RegistryClient):
                 self.registry_client = registry
@@ -1397,6 +1383,54 @@ class AgentSerializationMixin(_AgentMixinBase):
                 func=func,
             )
 
+    @staticmethod
+    def _serialize_transport(transport: Transport) -> dict[str, Any]:
+        """Serialize one transport with its independently owned settings."""
+        data: dict[str, Any] = {
+            "type": getattr(transport, "transport_type", "http"),
+            "url": transport.url,
+            "timeout": getattr(transport, "timeout", 360.0),
+            "config": transport.config.to_dict(),
+        }
+        tls = getattr(transport, "tls", None)
+        if tls is not None:
+            data["tls"] = tls.to_dict()
+        if hasattr(transport, "backend"):
+            data["backend"] = (
+                "fastapi" if "FastAPIBackend" in transport.backend.__class__.__name__ else "starlette"
+            )
+            if hasattr(transport.backend, "validate_schema"):
+                data["validate_schema"] = getattr(transport.backend, "validate_schema", False)
+        return data
+
+    @classmethod
+    def _deserialize_transport(
+        cls,
+        data: dict[str, Any],
+        *,
+        fallback_url: str,
+        authenticator: Any = None,
+        credentials: str | None = None,
+    ) -> Transport:
+        """Rebuild one transport without promoting its settings onto Agent."""
+        kwargs: dict[str, Any] = {
+            "url": data.get("url", fallback_url),
+            "timeout": data.get("timeout", 360.0),
+        }
+        if "backend" in data:
+            kwargs["backend"] = data["backend"]
+        if "validate_schema" in data:
+            kwargs["validate_schema"] = data["validate_schema"]
+        if isinstance(data.get("config"), dict):
+            kwargs["config"] = TransportConfig.from_dict(data["config"])
+        if isinstance(data.get("tls"), dict):
+            kwargs["tls"] = TLSConfig.from_dict(data["tls"])
+        if authenticator is not None:
+            kwargs["authenticator"] = authenticator
+        if credentials is not None:
+            kwargs["credentials"] = credentials
+        return get_transport(data.get("type", "http"), **kwargs)
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize the agent configuration to a dictionary representation."""
         level = getattr(self._logger, "level", 20)
@@ -1417,32 +1451,13 @@ class AgentSerializationMixin(_AgentMixinBase):
             "credentials": self.credentials,
         }
 
-        if self.tls is not None:
-            data["tls"] = self.tls.to_dict()
-
         # Transport
         if self._transport:
-            transport_config = {
-                "type": getattr(self._transport, "transport_type", "http"),
-                "url": self._transport.url,
-                "timeout": getattr(self._transport, "timeout", 360.0),
-            }
-            transport_config["config"] = self._transport.config.to_dict()
-            if hasattr(self._transport, "backend"):
-                backend_name = "starlette"
-                if "FastAPIBackend" in self._transport.backend.__class__.__name__:
-                    backend_name = "fastapi"
-                transport_config["backend"] = backend_name
-            if hasattr(self._transport, "backend") and hasattr(self._transport.backend, "validate_schema"):
-                transport_config["validate_schema"] = getattr(self._transport.backend, "validate_schema", False)
-            data["transport"] = transport_config
+            data["transport"] = self._serialize_transport(self._transport)
 
         # Registry
         if self.registry_client:
-            data["registry"] = {
-                "type": getattr(self.registry_client.transport, "transport_type", "http"),
-                "url": self.registry_client.url,
-            }
+            data["registry"] = self._serialize_transport(self.registry_client.transport)
 
         # LLM
         if self.llm:
@@ -1541,43 +1556,20 @@ class AgentSerializationMixin(_AgentMixinBase):
         # Credentials
         credentials = overrides.get("credentials", data.get("credentials"))
 
-        # Transport security
-        tls = overrides.get("tls")
-        if tls is None:
-            tls_config = data.get("tls")
-            if isinstance(tls_config, dict):
-                tls = TLSConfig.from_dict(tls_config)
-
         # Transport
         transport = overrides.get("transport")
-        shared_transport_config = overrides.get("transport_config")
         if transport is None:
             transport_config = data.get("transport")
             if transport_config:
-                transport_type = transport_config.get("type", "http")
-                if shared_transport_config is None and isinstance(transport_config.get("config"), dict):
-                    shared_transport_config = TransportConfig.from_dict(transport_config["config"])
                 try:
-                    from protolink.transport import get_transport
-
-                    t_kwargs = {
-                        "url": transport_config.get("url", card_data.get("url")),
-                        "timeout": transport_config.get("timeout", 360.0),
-                    }
-                    if "backend" in transport_config:
-                        t_kwargs["backend"] = transport_config["backend"]
-                    if "validate_schema" in transport_config:
-                        t_kwargs["validate_schema"] = transport_config["validate_schema"]
-
-                    t_kwargs["authenticator"] = authenticator
-                    t_kwargs["credentials"] = credentials
-                    t_kwargs["tls"] = tls
-                    if shared_transport_config is not None:
-                        t_kwargs["config"] = shared_transport_config
-
-                    transport = get_transport(transport_type, **t_kwargs)
+                    transport = cls._deserialize_transport(
+                        transport_config,
+                        fallback_url=card_data.get("url", ""),
+                        authenticator=authenticator,
+                        credentials=credentials,
+                    )
                 except Exception:
-                    transport = transport_type
+                    transport = transport_config.get("type", "http")
 
         # Registry
         registry = overrides.get("registry")
@@ -1585,8 +1577,17 @@ class AgentSerializationMixin(_AgentMixinBase):
         if registry is None:
             registry_config = data.get("registry")
             if registry_config:
-                registry = registry_config.get("type")
                 registry_url = registry_config.get("url")
+                try:
+                    registry = RegistryClient(
+                        cls._deserialize_transport(
+                            registry_config,
+                            fallback_url=registry_url or "",
+                            credentials=credentials,
+                        )
+                    )
+                except Exception:
+                    registry = registry_config.get("type")
 
         # LLM
         llm = overrides.get("llm")
@@ -1648,8 +1649,6 @@ class AgentSerializationMixin(_AgentMixinBase):
             expose_chat=expose_chat,
             authenticator=authenticator,
             credentials=credentials,
-            tls=tls,
-            transport_config=shared_transport_config,
         )
 
         tools_data = data.get("tools", [])
