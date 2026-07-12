@@ -8,6 +8,8 @@ The **Client** layer in Protolink provides a high-level interface for agent-to-a
 
 The `AgentClient` is the primary entry point for programmatic agent interactions. It wraps a transport and provides a unified interface for communicating with Protolink agents.
 
+The distinction is useful because application code should think in Agent operations such as “send this task” or “cancel that task,” not in HTTP headers, WebSocket frames, or gRPC metadata. `AgentClient` chooses the operation contract and parses the result; the selected transport only maps that contract onto its wire protocol. Changing from HTTP to gRPC therefore does not require rewriting task-level client code.
+
 Pass `transport_config=` when constructing by transport name to share the same production limits, retry policy, keepalive, shutdown, idempotency, and metrics behavior used by `Agent` and `Registry`. The read-only `client.transport` property exposes health and metric snapshots when an application needs them.
 
 ```python
@@ -111,6 +113,10 @@ AgentClient(
 | `transport_config` | `TransportConfig ⎪ None` | Limits, retry policy, keepalive, shutdown, idempotency cache, and local metrics configuration for a factory-created transport. |
 
 `tls` and `transport_config` are applied when `transport` is a string alias. When you pass an existing `Transport` instance, configure that instance directly; its existing `config` remains authoritative.
+
+Use a string alias when ProtoLink should create and own the transport for you. Use an existing transport object when the application needs protocol-specific constructor options or wants to share that exact instance. In both cases, `AgentClient` exposes the resolved object through `client.transport`; there is no second hidden transport.
+
+You can omit `transport_config` for local use and simple deployments. The default already bounds payloads and concurrency, records metrics, and performs no automatic retries. Supply it when your service has explicit capacity or failure-recovery requirements.
 
 **Examples:**
 
@@ -406,6 +412,10 @@ for event in client.sync.send_task_streaming("http://localhost:8010", task):
 
 `ClientRequestSpec` defines the contract for an API endpoint in a transport-agnostic way.
 
+It is the small description that sits between the high-level client and the wire transport. For example, “send a task” is a `POST` operation with a body and a `Task` response parser. HTTP turns that description into a route request, while WebSocket and gRPC place the same method and path in their envelopes. The client behavior stays identical because the specification describes the operation rather than the protocol.
+
+Normal users rarely need to create request specs; the built-in Agent and Registry clients provide them. They become relevant when adding a new endpoint or implementing a custom client operation. At that point, `idempotent` deserves particular care because it authorizes the retry and duplicate-replay machinery.
+
 ```python
 @dataclass(frozen=True)
 class ClientRequestSpec:
@@ -434,6 +444,8 @@ class ClientRequestSpec:
 
 `idempotent=True` is an application-level safety promise, not an inference made from `POST` or a URL. Custom request specs should enable it only when repeating the operation with the same payload and idempotency key cannot apply the effect twice.
 
+The `channel` field matters only to transports that multiplex several logical operations. Control requests such as cancellation use a separate channel so they are not forced to wait behind the long-running task they are intended to stop. Request/response transports may ignore the distinction while preserving the same client contract.
+
 ### Built-in Request Specs
 
 | Spec | Path | Method | Channel | Idempotent | Description |
@@ -451,8 +463,9 @@ class ClientRequestSpec:
 
 When you call a method like `send_task()`:
 
-1. The client selects the appropriate `ClientRequestSpec` (e.g., `TASK_REQUEST`)
-2. Passes the spec and data to `transport.send()`
-3. The transport uses the spec to construct the wire request
+1. The client selects the appropriate `ClientRequestSpec` (for example, `TASK_REQUEST`).
+2. It passes the specification and task data to `transport.send()`.
+3. The transport creates correlation and idempotency metadata, applies limits, and constructs the protocol-specific request.
+4. The decoded response passes through `response_parser`, so the caller receives a `Task`, `AgentCard`, or another domain model rather than a raw wire dictionary.
 
 If the spec is idempotent and the configured retry policy permits its method, the transport preserves one request ID and idempotency key across attempts. This pattern allows new endpoints without modifying transport implementations while keeping retry safety explicit at the operation boundary.

@@ -356,6 +356,8 @@ agent = Agent(
 
 Retries remain off by default and run only for explicitly idempotent request specifications. Correlation IDs, server-side idempotency replay, bounded payloads/concurrency, loop-safe pooled-resource shutdown, WebSocket keepalive, typed transport errors, local metric snapshots, and `/healthz` and `/readyz` probes use the same contract across HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. The `grpc` extra also installs standard gRPC health checking and reflection. See the [production transport guide](https://nmaroulis.github.io/protolink/docs/transport/#production-configuration) and [`examples/transport_production.py`](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py).
 
+These controls exist so changing protocols does not change the Agent's production safety model. Limits prevent one payload or traffic burst from exhausting the process; retries recover explicitly safe operations from temporary connection failures; idempotency prevents those retries from executing the same operation twice; and metrics and health probes make the behavior visible. The defaults are suitable for getting started and do not enable retries automatically.
+
 The application-facing transport types are exported directly from `protolink`:
 
 | API | Purpose |

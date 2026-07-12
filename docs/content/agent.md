@@ -245,6 +245,8 @@ agent = Agent(card=card, transport=transport, llm=llm)
 
 Pass one `TransportConfig` at the Agent boundary when the Agent creates transports from string aliases. The same object configures the Agent's server/client transport and any registry transport created from `registry="..."`:
 
+An Agent uses its transport in both directions: its server receives tasks from peers, and its client sends tasks to peers. Using one configuration means both directions agree on payload bounds, retry safety, connection lifecycle, and metrics. The registry connection receives the same policy so discovery traffic does not quietly behave differently from Agent traffic.
+
 ```python
 from protolink import Agent, RetryPolicy, TransportConfig, TransportLimits
 
@@ -269,6 +271,10 @@ agent = Agent(
 ```
 
 When `transport` or `registry` is already an object, its own `config` remains authoritative. Inspect the active instance through `agent.transport`; its `config`, `capabilities`, `metrics`, and `health()` surfaces are documented in the [transport reference](./transport.md#shared-transport-api-reference).
+
+The configuration object may be shared, but each concrete transport still owns separate runtime state. Agent and Registry connections have their own pools, concurrency slots, idempotency caches, and metric counters. This prevents unrelated endpoints from sharing active-request gauges or cached responses merely because they use the same settings.
+
+For a first deployment, leaving `transport_config=None` is reasonable. Add explicit limits after measuring normal task sizes and concurrency, then enable retries only when the operations and downstream side effects are known to be idempotent.
 
 ### Durable Task Snapshots
 

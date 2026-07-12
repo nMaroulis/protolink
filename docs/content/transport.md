@@ -69,9 +69,37 @@ Some rough guidelines:
 
 The rest of this page dives into the API of each transport in more detail.
 
+## How a request moves through a transport
+
+For everyday use, a transport is simply the part of ProtoLink that moves a task from one process to another. The Agent decides **what** work should happen; the transport decides **how** the request and response cross the boundary safely.
+
+One normal unary request follows this path:
+
+1. `AgentClient` selects a `ClientRequestSpec`, which describes the operation without depending on HTTP, WebSocket, gRPC, or another protocol.
+2. The transport creates a request context containing a correlation ID and, for safe repeatable operations, an idempotency key.
+3. ProtoLink serializes the payload and checks its configured byte limit.
+4. The request waits for a concurrency slot. This applies backpressure when the process is already busy instead of starting unlimited work.
+5. The concrete transport sends the request using headers, metadata, or an envelope appropriate for its protocol.
+6. If the connection fails, ProtoLink retries only when the operation, method, and error all say that retrying is safe.
+7. The receiving transport deduplicates idempotent requests, executes the endpoint handler, checks the response size, and returns the result.
+8. Metrics and health state are updated around the operation so applications can inspect what happened.
+
+Streaming requests use the same ideas, but hold a stream slot and check every event independently. ProtoLink does not automatically restart a failed stream because it cannot know which events the consumer already processed.
+
+The shared APIs exist to solve four practical production problems:
+
+| Problem | ProtoLink feature | Why it matters |
+|---------|-------------------|----------------|
+| A large payload or traffic spike exhausts memory | `TransportLimits` and request/stream slots | Work is bounded before one busy peer destabilizes the whole process. |
+| A temporary network failure interrupts a safe operation | `RetryPolicy` plus `ClientRequestSpec.idempotent` | Safe operations can recover without blindly repeating state changes. |
+| A retry arrives after the server already completed the first attempt | Correlation IDs and idempotency keys | The duplicate receives the original result instead of executing the handler twice. |
+| Operators cannot tell whether a service is ready or failing | Typed errors, metrics, and health endpoints | Failures become inspectable and automation can make informed decisions. |
+
 ## Production configuration
 
-Every transport accepts the same `TransportConfig`. Pass it at the high-level `Agent`, `AgentClient`, or `Registry` boundary; ProtoLink forwards it to the selected transport.
+Every transport accepts the same `TransportConfig`. Pass it at the high-level `Agent`, `AgentClient`, or `Registry` boundary; ProtoLink forwards it to the selected transport. This keeps operational behavior consistent when an application changes protocols: an 8 MiB request limit means the same thing over HTTP, gRPC, WebSocket, or the in-process runtime.
+
+Most applications can start without creating this object. The defaults bound resources, collect local metrics, and keep retries disabled. Add an explicit configuration when deployment requirements differ from those defaults, such as a known maximum task size, a service concurrency budget, or a retry policy approved for your workload.
 
 ```python
 from protolink import Agent, AgentCard, RetryPolicy, TransportConfig, TransportLimits
@@ -104,6 +132,12 @@ agent = Agent(
 `max_attempts=1` is the default, so upgrading never enables retries implicitly. ProtoLink retries only request specifications explicitly marked idempotent, preserves one correlation ID across attempts, and sends an idempotency key so completed operations can be replayed without executing the handler again. Streams are not automatically retried because resuming a partial event sequence requires application-level checkpoints.
 
 The same limits apply to RuntimeTransport, making local tests representative of deployed serialization boundaries. HTTP uses bounded client/server concurrency, WebSocket uses bounded frame queues and ping/pong keepalive, and gRPC applies message-size, keepalive, and concurrent-RPC options.
+
+:::tip[Configure at the highest boundary]
+
+If you construct an `Agent`, `AgentClient`, or `Registry` with a transport name such as `"grpc"`, pass `transport_config=` there. If you construct `GRPCTransport`, `HTTPTransport`, or another transport object yourself, pass `config=` to that object instead. An existing transport object keeps ownership of its configuration.
+
+:::
 
 ## Shared Transport API Reference
 
@@ -138,6 +172,15 @@ from protolink.transport import (
 
 `TransportConfig` is the single configuration object accepted by every built-in transport. It is immutable and safe to share between an `Agent`, its client, and a `Registry`.
 
+It is a container for four kinds of operational policy:
+
+- `limits` controls how much work and data one transport instance may accept at once.
+- `retry` controls recovery from temporary failures, but only for explicitly safe operations.
+- Keepalive and shutdown values control the lifecycle of pooled or persistent connections.
+- Idempotency and metrics values control duplicate-response retention and local observability.
+
+Keeping these values together avoids protocol-specific production settings scattered across application code. The object is immutable because changing limits or retry behavior halfway through active requests would make behavior timing-dependent. Create a new transport configuration when settings need to change.
+
 ```python
 TransportConfig(
     limits: TransportLimits = TransportLimits(),
@@ -166,7 +209,16 @@ All timing and cache values must be positive, except `keepalive_interval`, which
 
 `TransportConfig.to_dict()` returns JSON-safe nested dictionaries. `TransportConfig.from_dict(data)` restores `TransportLimits`, `RetryPolicy`, and the retryable-method `frozenset`. `Agent.to_dict()`, YAML serialization, and `Agent.from_dict()` preserve this configuration under the serialized transport block.
 
+The keepalive settings do not change how long an Agent task may run. They only determine how idle or persistent network connections are checked and retained. Similarly, `shutdown_timeout` is a cleanup grace period, not a request deadline.
+
 ### `TransportLimits`
+
+Limits protect the process from accidental overload. They are not authentication or authorization rules: they do not decide who may call an Agent, only how much data and concurrent work the transport will accept.
+
+There are two independent kinds of limit:
+
+- **Byte limits** reject one request, response, or stream event that is too large. This prevents a single payload from consuming an unexpected amount of memory.
+- **Concurrency limits** bound how many operations execute at once. Extra operations wait asynchronously for a slot, which slows producers naturally without blocking the event loop or immediately rejecting ordinary bursts.
 
 ```python
 TransportLimits(
@@ -188,6 +240,8 @@ TransportLimits(
 
 Payload sizes are calculated after ProtoLink recursively normalizes domain objects through its normal serializer. A payload over its byte bound raises `TransportLimitError` before it is sent or yielded. Every limit must be greater than zero. `to_dict()` returns all five integer fields.
 
+Choose byte limits from the largest valid serialized task your application expects, with some headroom for envelope metadata. Choose concurrency limits from measured CPU, memory, downstream-service, and model-provider capacity. Higher values increase parallelism but also increase peak resource use; they do not make an individual request faster.
+
 Protocol-specific mapping:
 
 | Transport | Request/response limits | Concurrency/backpressure |
@@ -199,6 +253,10 @@ Protocol-specific mapping:
 | Runtime | Applies the same serialized-size checks despite not opening a socket. | Both caller and target transports enforce per-loop request and stream slots. |
 
 ### `RetryPolicy`
+
+A retry is useful when the operation is safe but the connection is temporarily unhealthy: for example, a connection reset before the client receives the response. A retry is dangerous when repeating the operation could apply a mutation twice. For that reason, ProtoLink separates **how often retrying is allowed** (`RetryPolicy`) from **whether this operation is safe to repeat** (`ClientRequestSpec.idempotent`).
+
+Retries are disabled by default. Setting `max_attempts=3` means one initial attempt and at most two retries; it does not mean three additional retries. Exponential backoff spaces attempts farther apart so a recovering service is not immediately flooded again. Jitter adds a small random offset so many clients do not retry at exactly the same moment.
 
 ```python
 RetryPolicy(
@@ -228,7 +286,16 @@ The delay before retry number `n` is `min(initial_backoff * 2**(n - 1), max_back
 
 Built-in task submission, agent-card retrieval, cancellation, state description, registry discovery, registry heartbeat, and registry unregister requests declare idempotency. Mutating state compaction/reset operations and streaming requests do not.
 
+The transport retries only typed `TransportError` failures marked `retryable=True`. Application exceptions and protocol errors that indicate invalid data are returned immediately because waiting and trying the same invalid operation again cannot repair them.
+
 ### Correlation and idempotency
+
+Correlation and idempotency solve related but different problems:
+
+- A **request ID** answers “which logical request produced this log, metric, or error?” It stays the same across retry attempts so operators can follow the whole operation.
+- An **idempotency key** answers “has this logical operation already executed?” The server uses it to suppress duplicate execution and replay the completed result.
+
+Consider a task that completes on the server, but the response connection breaks before the client receives it. The client cannot tell whether execution happened, so it retries. The repeated request keeps the same idempotency key; the server returns the stored result rather than running the task a second time. The request ID keeps both attempts connected in diagnostics.
 
 `TransportRequestContext` is an immutable request-scoped value:
 
@@ -251,9 +318,13 @@ TransportRequestContext(
 
 Server-side keys are namespaced by method and path. The first request owns the operation; concurrent duplicates await its result, and later duplicates replay the completed result until the TTL expires. This cache is process-local. Use a durable application-level idempotency store as well when operations must remain deduplicated across restarts or multiple server replicas.
 
+The TTL and cache size are memory bounds, not correctness guarantees. Once an entry expires or is evicted, the transport no longer remembers the operation. Deployments requiring long-lived exactly-once business effects should enforce a durable unique operation key in their storage layer as well.
+
 ### `TransportCapabilities`
 
 Every transport declares immutable class-level capabilities. Applications normally inspect `transport.capabilities`; custom transports set the class attribute.
+
+Capabilities let generic code ask what a transport can do without checking concrete class names. For example, a dashboard can show whether TLS is native, and a client can decide whether live streaming is available. They describe supported behavior, not current health: `streaming=True` means the implementation supports streams even when its server is currently stopped.
 
 ```python
 TransportCapabilities(
@@ -279,6 +350,10 @@ TransportCapabilities(
 
 Application code usually receives a transport from `Agent.transport` or `AgentClient.transport`. The stable inspection surface is:
 
+The base class exists so reliability behavior is not reimplemented differently in every protocol. HTTP still owns HTTP requests, gRPC still owns channels and metadata, and WebSocket still owns frames and connections; the base class supplies the protocol-neutral limits, retry decisions, metrics, correlation, deduplication, and lifecycle bookkeeping around them.
+
+Most users should not call `send()` or the extension hooks directly. Use `AgentClient` for task-level operations and inspect `config`, `capabilities`, `metrics`, and `health()` when operational state is needed.
+
 | Member | Type | Purpose |
 |--------|------|---------|
 | `transport_type` | `ClassVar[str]` | Factory/card identifier such as `"http"`, `"grpc"`, or `"runtime"`. |
@@ -297,6 +372,8 @@ Application code usually receives a transport from `Agent.transport` or `AgentCl
 #### Custom transport contract
 
 A custom transport subclasses `Transport`, calls `super().__init__(config=config)`, declares its class capabilities, and implements `send`, `setup_routes`, `start`, `stop`, `validate_url`, and `url`. Streaming transports also override `subscribe`.
+
+The split is intentional: the custom class implements the wire protocol, while the inherited helpers preserve the same safety contract as built-in transports. A typical outbound implementation creates a request context, checks the request size, enters `request_slot()`, and calls `run_with_retries()` around the actual protocol operation. An inbound implementation enters `inbound_request_slot()`, claims any idempotency key, invokes the endpoint, checks the response, and then completes or aborts the idempotent result.
 
 The base class exposes reusable extension hooks so custom transports can preserve the built-in operational contract:
 
@@ -322,6 +399,8 @@ These hooks are an extension API for transport authors. Normal agent application
 
 The base constructor creates the following private variables. They explain lifecycle behavior but are not a public mutation surface:
 
+These variables are documented so transport authors can understand ownership and debugging output, not so applications can modify them. In particular, asyncio semaphores and client connections belong to the event loop that created them. The per-loop maps prevent an Agent started in a background thread from accidentally reusing an asyncio resource on the caller's loop.
+
 | Variable | Role |
 |----------|------|
 | `_metrics` | Thread-safe mutable recorder behind the immutable `metrics` property. |
@@ -340,6 +419,8 @@ Do not replace or mutate these collections from application code. A custom trans
 
 `transport.metrics` returns a new immutable snapshot. Reading it does not reset counters.
 
+The built-in metrics are deliberately small and dependency-free. They answer immediate questions such as “are requests failing?”, “is the concurrency limit saturated?”, and “are retries hiding an unstable connection?” without requiring Prometheus, OpenTelemetry, or another backend. Because snapshots are local to one transport instance and reset on process restart, production monitoring should periodically export them or use ProtoLink telemetry for durable analysis.
+
 | Field | Type | Meaning |
 |-------|------|---------|
 | `requests_started` | `int` | Unary request executions admitted by this instance. |
@@ -357,9 +438,13 @@ Do not replace or mutate these collections from application code. A custom trans
 
 `snapshot.to_dict()` produces the exact JSON-compatible mapping embedded in health responses. Metrics are process-local operational counters, not a replacement for durable telemetry. Set `collect_metrics=False` when another layer owns all measurement.
 
+For a rough average unary latency, divide `total_latency_ms` by the number of completed requests (`requests_succeeded + requests_failed`). Do not use this value as a percentile: a cumulative total cannot show whether a small number of requests were unusually slow.
+
 ### Transport errors
 
 All transport exceptions inherit from `TransportError` and expose the same diagnostic attributes:
+
+Typed errors let application code react to failure categories without parsing human-readable messages or knowing which protocol was used. A caller can handle `TransportTimeoutError` the same way for HTTP and gRPC, while still reading the native `status_code` when protocol-specific diagnostics are useful.
 
 ```python
 TransportError(
@@ -382,6 +467,8 @@ TransportError(
 
 `retryable` describes the failure category only; the request spec and method must still permit retries. `status_code` is an HTTP integer or protocol-native string such as a gRPC status name. `request_id` lets logs and traces correlate the exception with request headers or envelopes.
 
+The subclasses also inherit familiar Python exception types where useful. For example, `TransportConnectionError` is both a `TransportError` and a `ConnectionError`. Existing code that catches the standard exception remains compatible, while new code can use the richer transport metadata.
+
 ```python
 try:
     result = await client.send_task(agent_url, task)
@@ -398,6 +485,14 @@ except TransportError as exc:
 ```
 
 ### Health and readiness
+
+Health endpoints exist for process managers, container orchestrators, load balancers, and human diagnostics. They provide a cheap answer without submitting a real task or requiring model-provider access.
+
+- `transport.health()` is useful from Python code and always returns JSON-safe data.
+- `GET /healthz` and `GET /readyz` expose the same conservative payload over HTTP-compatible Agent and Registry servers.
+- The `ready` field is `True` only after the transport starts serving and becomes `False` after shutdown.
+
+ProtoLink currently gives both HTTP probe paths the same payload. Deployments can use `/healthz` for general monitoring and `/readyz` for traffic admission; the shared `ready` flag ensures a stopped transport is not treated as ready for requests.
 
 `transport.health()` returns this transport-neutral shape:
 

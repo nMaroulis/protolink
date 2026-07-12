@@ -296,7 +296,11 @@ Registry(
 
 `transport_config` is applied when `transport` is a string alias. If an existing `Transport` object is supplied, configure that object directly. The Registry passes the resolved transport to both `RegistryClient` and `RegistryServer`, so inbound serving and outbound registry calls share one capability, health, and metrics surface.
 
+The Registry needs the same protections as an Agent even though its requests are smaller. In a large deployment, many Agents may start or heartbeat at once. Concurrency limits keep that burst bounded, payload limits prevent malformed cards from consuming excessive memory, and health metrics reveal whether discovery traffic is failing or saturating the service.
+
 The built-in registry request specs mark `unregister`, `heartbeat`, and `discover` as idempotent. `register` is intentionally not retried automatically because registration may have application-specific replacement semantics. See [ClientRequestSpec](./client.md#clientrequestspec) and the [retry contract](./transport.md#retrypolicy).
+
+In simple terms, reading discovery results, refreshing the same heartbeat, or removing an already removed URL has a repeatable outcome. Registration can mean “create,” “replace,” or trigger custom persistence behavior, so ProtoLink does not assume that repeating it is harmless. Applications that provide durable idempotent registration semantics can define an explicit custom request contract.
 
 :::info[Single source of truth]
 
