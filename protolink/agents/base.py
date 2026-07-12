@@ -24,7 +24,7 @@ from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
 from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool
-from protolink.transport import Transport
+from protolink.transport import Transport, TransportConfig
 from protolink.types import StateMode, TransportType
 
 from .engine import AgentExecutionMixin
@@ -80,6 +80,7 @@ class Agent(
         authenticator: Authenticator | None = None,
         credentials: str | None = None,
         tls: TLSConfig | None = None,
+        transport_config: TransportConfig | None = None,
         policy: Policy | None = None,
         approval_handler: ApprovalHandlerLike | None = None,
         run_store: Any | None = None,
@@ -118,6 +119,8 @@ class Agent(
             credentials: Optional credentials string used for authenticating outgoing requests.
             tls: Optional transport-security configuration. Secure agent and registry
                 URLs use it for certificate trust, server identity, and mutual TLS.
+            transport_config: Shared transport limits, retry, keepalive, shutdown,
+                idempotency, and metrics configuration.
             policy: Optional runtime policy evaluated before concrete actions execute.
                 Defaults to a backward-compatible ``CapabilityPolicy`` that
                 allows actions unless a tool or ``RunContext`` rule restricts
@@ -184,6 +187,7 @@ class Agent(
         self.authenticator: Authenticator | None = authenticator
         self.credentials: str | None = credentials
         self.tls = tls
+        self.transport_config = transport_config
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None

@@ -19,7 +19,9 @@ from pydantic import BaseModel
 
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.models import Task
-from protolink.transport.base import Transport
+from protolink.transport.base import Transport, TransportRequestContext
+from protolink.transport.config import TransportCapabilities, TransportConfig
+from protolink.transport.errors import TransportConnectionError, TransportError, TransportRemoteError
 from protolink.types import TransportType
 
 if TYPE_CHECKING:
@@ -51,6 +53,8 @@ class RuntimeTransport(Transport):
     url : str
         URL identifying this transport endpoint. Must use the ``runtime://`` scheme
         (e.g., ``"runtime://alice"``).
+    config : TransportConfig, optional
+        Shared limits, retry, shutdown, idempotency, and metrics settings.
     """
 
     transport_type: ClassVar[TransportType] = "runtime"
@@ -59,15 +63,22 @@ class RuntimeTransport(Transport):
     supports_streaming: ClassVar[bool] = True
     """Indicates whether this transport supports asynchronous streaming."""
 
+    capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
+        networked=False,
+        streaming=True,
+    )
+
     # Global registry for cross-transport routing
     _registry: ClassVar[dict[str, RuntimeTransport]] = {}
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, *, config: TransportConfig | None = None) -> None:
         """Initialize the in-memory transport.
 
         Args:
             url: The unique runtime URL for this agent transport endpoint.
+            config: Shared production transport behavior.
         """
+        super().__init__(config=config)
         self._url: str = url
         self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
         self._is_running: bool = False
@@ -127,9 +138,52 @@ class RuntimeTransport(Transport):
             ConnectionError: If the target URI is not registered in the global memory bus.
             RuntimeError: If the target endpoint (method/path) cannot be resolved.
         """
+        context = self.new_request_context(request_spec, data)
+        request_size = self.check_payload_limit({"data": data, "params": params}, kind="request", url=base_url)
+
+        async def operation(attempt: TransportRequestContext) -> Any:
+            try:
+                self._metrics.add(bytes_sent=request_size)
+                result = await self._send_once(
+                    request_spec,
+                    base_url,
+                    data,
+                    params,
+                    idempotency_key=attempt.idempotency_key,
+                )
+            except TransportError:
+                raise
+            except Exception as exc:
+                raise TransportRemoteError(
+                    f"Runtime request failed at {base_url}: {exc}",
+                    url=base_url,
+                    request_id=attempt.request_id,
+                ) from exc
+            response_size = self.check_payload_limit(result, kind="response", url=base_url)
+            self._metrics.add(bytes_received=response_size)
+            return result
+
+        async with self.request_slot():
+            return await self.run_with_retries(request_spec, context, operation)
+
+    async def _send_once(
+        self,
+        request_spec: ClientRequestSpec,
+        base_url: str,
+        data: Any = None,
+        params: dict[str, Any] | None = None,
+        *,
+        idempotency_key: str | None = None,
+    ) -> Any:
+        """Execute one in-process request without retry orchestration."""
+        del params
         target: RuntimeTransport | None = self.get_transport(base_url)
         if not target:
-            raise ConnectionError(f"Failed to connect to agent at {base_url}. Agent transport not found in registry.")
+            raise TransportConnectionError(
+                f"Failed to connect to agent at {base_url}. Agent transport not found in registry.",
+                url=base_url,
+                retryable=True,
+            )
 
         # Resolve the applicable endpoint configuration on the target node
         endpoint_key: tuple[str, str] = (request_spec.method.upper(), request_spec.path)
@@ -141,10 +195,35 @@ class RuntimeTransport(Transport):
             endpoint = target._endpoints.get((request_spec.method.upper(), alt_path))
 
         if not endpoint:
-            raise RuntimeError(
-                f"Agent at {base_url} returned HTTP 404: Endpoint {request_spec.method} {request_spec.path} not found"
+            raise TransportRemoteError(
+                f"Agent at {base_url} returned HTTP 404: Endpoint {request_spec.method} {request_spec.path} not found",
+                url=base_url,
+                status_code=404,
             )
 
+        cache_key = (
+            f"{request_spec.method}:{request_spec.path}:{idempotency_key}" if idempotency_key is not None else None
+        )
+        owns_operation, cached = await target.acquire_idempotent_response(cache_key)
+        if not owns_operation:
+            return cached
+
+        try:
+            async with target.inbound_request_slot():
+                parsed_result = await self._invoke_endpoint(endpoint, data, request_spec)
+        except BaseException as exc:
+            target.abort_idempotent_response(cache_key, exc)
+            raise
+        target.complete_idempotent_response(cache_key, parsed_result)
+        return parsed_result
+
+    async def _invoke_endpoint(
+        self,
+        endpoint: EndpointSpec,
+        data: Any,
+        request_spec: ClientRequestSpec,
+    ) -> Any:
+        """Apply the runtime serialization boundary and invoke one endpoint."""
         # Simulate robust network serialization/deserialization mimicking HTTP transport boundaries
         payload: Any = data
         if payload is not None:
@@ -181,21 +260,22 @@ class RuntimeTransport(Transport):
             result = await result
 
         # Emulate outgoing response serialization using specified JSON parsers
+        parsed_result = result
         if request_spec.response_parser:
             if hasattr(result, "to_dict"):
-                return request_spec.response_parser(result.to_dict())
+                parsed_result = request_spec.response_parser(result.to_dict())
             elif isinstance(result, BaseModel):
-                return request_spec.response_parser(result.model_dump())
+                parsed_result = request_spec.response_parser(result.model_dump())
             elif isinstance(result, dict):
-                return request_spec.response_parser(result)
+                parsed_result = request_spec.response_parser(result)
 
-        return result
+        return parsed_result
 
     # ------------------------------------------------------------------
     # Streaming Support
     # ------------------------------------------------------------------
 
-    async def subscribe(self, base_url: str, task: Task) -> AsyncIterator[dict[str, Any]]:
+    async def subscribe(self, agent_url: str, task: Task) -> AsyncIterator[dict[str, Any]]:
         """Establish a local asynchronous streaming pipeline to a peer agent.
 
         Designed for streaming workloads like real-time agent thought processing, this method
@@ -216,46 +296,64 @@ class RuntimeTransport(Transport):
             ConnectionError: If the target agent is not actively registered.
             RuntimeError: If the resolved endpoint fails to return an `AsyncIterator`.
         """
-        target: RuntimeTransport | None = self.get_transport(base_url)
-        if not target:
-            raise ConnectionError(f"Failed to connect to agent at {base_url}. Agent transport not found in registry.")
+        base_url = agent_url
+        request_size = self.check_payload_limit(task, kind="request", url=base_url)
+        async with self.stream_slot():
+            target: RuntimeTransport | None = self.get_transport(base_url)
+            if not target:
+                raise TransportConnectionError(
+                    f"Failed to connect to agent at {base_url}. Agent transport not found in registry.",
+                    url=base_url,
+                    retryable=True,
+                )
 
         # Resolve an endpoint explicitly designed for streaming
-        stream_endpoints: list[EndpointSpec] = [ep for ep in target._endpoints.values() if ep.streaming]
-        if not stream_endpoints:
+            stream_endpoints: list[EndpointSpec] = [ep for ep in target._endpoints.values() if ep.streaming]
+            if not stream_endpoints:
             # Fallback wrapper enabling non-streaming endpoints to mock a final stream response
-            fallback_spec = ClientRequestSpec(
-                name="task",
-                path="/tasks/",
-                method="POST",
-                request_source="body",
-            )
-            result: Any = await self.send(fallback_spec, base_url, data=task)
-            from protolink.core.events import TaskStatusUpdateEvent
+                fallback_spec = ClientRequestSpec(
+                    name="task",
+                    path="/tasks/",
+                    method="POST",
+                    request_source="body",
+                    idempotent=True,
+                )
+                result: Any = await self.send(fallback_spec, base_url, data=task)
+                from protolink.core.events import TaskStatusUpdateEvent
 
-            yield TaskStatusUpdateEvent(task_id=result.id, new_state="completed", final=True).to_dict()
-            return
+                event = TaskStatusUpdateEvent(task_id=result.id, new_state="completed", final=True).to_dict()
+                event_size = self.check_payload_limit(event, kind="event", url=base_url)
+                self._metrics.add(bytes_sent=request_size, bytes_received=event_size)
+                yield event
+                return
 
-        endpoint: EndpointSpec = stream_endpoints[0]
+            endpoint: EndpointSpec = stream_endpoints[0]
 
         # Emulate boundary validation across streaming task delivery
-        payload: Any = task
-        if endpoint.request_parser:
-            payload = endpoint.request_parser(task.to_dict())
-            if inspect.isawaitable(payload):
-                payload = await payload
+            payload: Any = task
+            if endpoint.request_parser:
+                payload = endpoint.request_parser(task.to_dict())
+                if inspect.isawaitable(payload):
+                    payload = await payload
 
         # Begin generator sequence
-        result = endpoint.handler(payload)
+            result = endpoint.handler(payload)
 
-        if inspect.isawaitable(result):
-            result = await result
+            if inspect.isawaitable(result):
+                result = await result
 
-        if hasattr(result, "__aiter__"):
-            async for event in result:
-                yield event.to_dict() if hasattr(event, "to_dict") else event
-        else:
-            raise RuntimeError("Streaming endpoint handler must return an AsyncIterator")
+            if hasattr(result, "__aiter__"):
+                self._metrics.add(bytes_sent=request_size)
+                async for event in result:
+                    serialized = event.to_dict() if hasattr(event, "to_dict") else event
+                    event_size = self.check_payload_limit(serialized, kind="event", url=base_url)
+                    self._metrics.add(bytes_received=event_size)
+                    yield serialized
+            else:
+                raise TransportRemoteError(
+                    "Streaming endpoint handler must return an AsyncIterator",
+                    url=base_url,
+                )
 
     # ------------------------------------------------------------------
     # Transport Lifecycle
@@ -281,8 +379,11 @@ class RuntimeTransport(Transport):
         singleton dictionary. Once registered, any other agent running in the same Python
         process can instantly route messages to this transport using its `runtime://` URI.
         """
+        if self._is_running:
+            return
         RuntimeTransport._registry[self._url] = self
         self._is_running = True
+        self._transport_running = True
 
     async def stop(self) -> None:
         """Gracefully terminate transport operations and drop from the global registry.
@@ -294,6 +395,7 @@ class RuntimeTransport(Transport):
         RuntimeTransport._registry.pop(self._url, None)
         self._endpoints.clear()
         self._is_running = False
+        self._transport_running = False
 
     # ------------------------------------------------------------------
     # Properties

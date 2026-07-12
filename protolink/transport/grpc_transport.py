@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
-import uuid
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar, NoReturn
 from urllib.parse import urlparse
@@ -26,7 +25,14 @@ from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport._deps import _require_grpc
 from protolink.transport._streaming import is_stream_terminal_event
-from protolink.transport.base import Transport
+from protolink.transport.base import Transport, TransportRequestContext
+from protolink.transport.config import TransportCapabilities, TransportConfig
+from protolink.transport.errors import (
+    TransportConnectionError,
+    TransportProtocolError,
+    TransportRemoteError,
+    TransportTimeoutError,
+)
 from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
 from protolink.utils.serialization import Serializer
@@ -69,10 +75,21 @@ class GRPCTransport(Transport):
     tls:
         Optional certificate and trust configuration used by ``grpcs://``
         servers and channels.
+    config:
+        Shared limits, retry, keepalive, shutdown, idempotency, and metrics settings.
+    enable_health:
+        Register the standard gRPC health service when its optional package is installed.
+    enable_reflection:
+        Register gRPC server reflection when its optional package is installed.
     """
 
     transport_type: ClassVar[TransportType] = "grpc"
     supports_streaming: ClassVar[bool] = True
+    capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
+        streaming=True,
+        tls=True,
+        persistent_connections=True,
+    )
 
     _SERVICE_NAME: ClassVar[str] = "protolink.transport.v1.ProtolinkTransport"
     _INVOKE_METHOD: ClassVar[str] = f"/{_SERVICE_NAME}/Invoke"
@@ -91,7 +108,12 @@ class GRPCTransport(Transport):
         maximum_concurrent_rpcs: int | None = None,
         graceful_shutdown_timeout: float = 3.0,
         tls: TLSConfig | None = None,
+        config: TransportConfig | None = None,
+        enable_health: bool = True,
+        enable_reflection: bool = True,
     ) -> None:
+        """Initialize a loop-safe generic gRPC client/server transport."""
+        super().__init__(config=config)
         self._grpc = _require_grpc()
         self._url = url
         self._timeout = timeout
@@ -104,11 +126,31 @@ class GRPCTransport(Transport):
         self._server: Any | None = None
         self._is_running = False
         self._channels: dict[tuple[str, bool, int], Any] = {}
-        self._channel_options = tuple(channel_options or ())
-        self._server_options = tuple(server_options or ())
+        self._channel_options = self._merge_options(
+            (
+                ("grpc.keepalive_time_ms", int((self.config.keepalive_interval or 0) * 1000)),
+                ("grpc.keepalive_timeout_ms", int(self.config.keepalive_timeout * 1000)),
+                ("grpc.max_send_message_length", self.config.limits.max_request_bytes),
+                ("grpc.max_receive_message_length", self.config.limits.max_response_bytes),
+            ),
+            channel_options,
+        )
+        self._server_options = self._merge_options(
+            (
+                ("grpc.max_receive_message_length", self.config.limits.max_request_bytes),
+                (
+                    "grpc.max_send_message_length",
+                    max(self.config.limits.max_response_bytes, self.config.limits.max_event_bytes),
+                ),
+            ),
+            server_options,
+        )
         self._compression = compression
-        self._maximum_concurrent_rpcs = maximum_concurrent_rpcs
+        self._maximum_concurrent_rpcs = maximum_concurrent_rpcs or self.config.limits.max_concurrent_requests
         self._graceful_shutdown_timeout = graceful_shutdown_timeout
+        self._enable_health = enable_health
+        self._enable_reflection = enable_reflection
+        self._health_servicer: Any | None = None
 
     # ------------------------------------------------------------------
     # Server routing and lifecycle
@@ -126,6 +168,8 @@ class GRPCTransport(Transport):
 
     async def start(self) -> None:
         """Start the ``grpc.aio`` server and register generic RPC handlers."""
+        if self._is_running:
+            return
         host, port = self._get_host_port(self._url)
         if not host or port is None:
             raise ValueError(f"Invalid URL: {self._url}. Expected grpc://host:port or grpcs://host:port.")
@@ -151,6 +195,7 @@ class GRPCTransport(Transport):
             },
         )
         self._server.add_generic_rpc_handlers((generic_handler,))
+        await self._setup_operational_services()
 
         if self._is_secure_url(self._url):
             if self.tls is None:
@@ -171,19 +216,23 @@ class GRPCTransport(Transport):
 
         await self._server.start()
         self._is_running = True
+        self._transport_running = True
 
     async def stop(self) -> None:
         """Stop the gRPC server and close caller-loop client channels."""
+        await self._set_health_status(serving=False)
         if self._server is not None:
             await self._server.stop(self._graceful_shutdown_timeout)
             self._server = None
             self._is_running = False
 
+        await self.close_loop_resources()
         loop_id = id(asyncio.get_running_loop())
-        channels = [(key, channel) for key, channel in self._channels.items() if key[2] == loop_id]
-        for key, channel in channels:
-            await channel.close(grace=1.0)
-            self._channels.pop(key, None)
+        for key, channel in list(self._channels.items()):
+            if key[2] == loop_id:
+                await channel.close(grace=1.0)
+                self._channels.pop(key, None)
+        self._transport_running = False
 
     # ------------------------------------------------------------------
     # Client
@@ -206,31 +255,46 @@ class GRPCTransport(Transport):
         if self.authenticator and self.credentials and not self.security_context:
             await self.authenticate(self.credentials)
 
-        request_id = uuid.uuid4().hex
-        payload = self._build_request_payload(
-            request_id=request_id,
-            method=request_spec.method,
-            path=request_spec.path,
-            request_source=request_spec.request_source,
-            data=data,
-            params=params,
-        )
+        context = self.new_request_context(request_spec, data)
 
-        channel = await self._ensure_channel(base_url)
-        invoke = channel.unary_unary(
-            self._INVOKE_METHOD,
-            request_serializer=self._encode_message,
-            response_deserializer=self._decode_message,
-        )
-        try:
-            response = await invoke(payload, timeout=self._timeout, metadata=self._build_metadata())
-        except self._grpc.aio.AioRpcError as exc:
-            self._raise_rpc_error(exc, base_url, operation="request")
+        async def operation(attempt: TransportRequestContext) -> Any:
+            payload = self._build_request_payload(
+                request_id=attempt.request_id,
+                idempotency_key=attempt.idempotency_key,
+                method=request_spec.method,
+                path=request_spec.path,
+                request_source=request_spec.request_source,
+                data=data,
+                params=params,
+            )
+            request_size = self.check_payload_limit(payload, kind="request", url=base_url)
+            channel = await self._ensure_channel(base_url)
+            invoke = channel.unary_unary(
+                self._INVOKE_METHOD,
+                request_serializer=self._encode_message,
+                response_deserializer=self._decode_message,
+            )
+            try:
+                self._metrics.add(bytes_sent=request_size)
+                response = await invoke(
+                    payload,
+                    timeout=self._timeout,
+                    metadata=self._build_metadata(attempt),
+                )
+            except self._grpc.aio.AioRpcError as exc:
+                self._raise_rpc_error(exc, base_url, operation="request", request_id=attempt.request_id)
+            result = self._unwrap_response(
+                response,
+                request_id=attempt.request_id,
+                base_url=base_url,
+                operation="request",
+            )
+            response_size = self.check_payload_limit(result, kind="response", url=base_url)
+            self._metrics.add(bytes_received=response_size)
+            return request_spec.response_parser(result) if request_spec.response_parser else result
 
-        result = self._unwrap_response(response, request_id=request_id, base_url=base_url, operation="request")
-        if request_spec.response_parser:
-            return request_spec.response_parser(result)
-        return result
+        async with self.request_slot():
+            return await self.run_with_retries(request_spec, context, operation)
 
     async def subscribe(self, agent_url: str, task: Any) -> AsyncIterator[Any]:
         """Stream task events from a remote agent over gRPC unary-stream RPCs.
@@ -243,9 +307,17 @@ class GRPCTransport(Transport):
         if self.authenticator and self.credentials and not self.security_context:
             await self.authenticate(self.credentials)
 
-        request_id = uuid.uuid4().hex
+        request_spec = ClientRequestSpec(
+            name="task_stream",
+            path="/tasks/stream",
+            method="POST",
+            request_source="body",
+        )
+        request_context = self.new_request_context(request_spec, task)
+        request_id = request_context.request_id
         payload = self._build_request_payload(
             request_id=request_id,
+            idempotency_key=None,
             method="POST",
             path="/tasks/stream",
             request_source="body",
@@ -253,27 +325,32 @@ class GRPCTransport(Transport):
             params=None,
         )
 
-        channel = await self._ensure_channel(agent_url)
-        stream = channel.unary_stream(
-            self._STREAM_METHOD,
-            request_serializer=self._encode_message,
-            response_deserializer=self._decode_message,
-        )
-        try:
-            call = stream(payload, timeout=self._timeout, metadata=self._build_metadata())
-            async for response in call:
-                result = self._unwrap_response(
-                    response,
-                    request_id=request_id,
-                    base_url=agent_url,
-                    operation="stream",
-                )
-                if result is not None:
-                    yield result
-                if response.get("final", False):
-                    break
-        except self._grpc.aio.AioRpcError as exc:
-            self._raise_rpc_error(exc, agent_url, operation="stream")
+        request_size = self.check_payload_limit(payload, kind="request", url=agent_url)
+        async with self.stream_slot():
+            channel = await self._ensure_channel(agent_url)
+            stream = channel.unary_stream(
+                self._STREAM_METHOD,
+                request_serializer=self._encode_message,
+                response_deserializer=self._decode_message,
+            )
+            try:
+                self._metrics.add(bytes_sent=request_size)
+                call = stream(payload, timeout=self._timeout, metadata=self._build_metadata(request_context))
+                async for response in call:
+                    result = self._unwrap_response(
+                        response,
+                        request_id=request_id,
+                        base_url=agent_url,
+                        operation="stream",
+                    )
+                    if result is not None:
+                        event_size = self.check_payload_limit(result, kind="event", url=agent_url)
+                        self._metrics.add(bytes_received=event_size)
+                        yield result
+                    if response.get("final", False):
+                        break
+            except self._grpc.aio.AioRpcError as exc:
+                self._raise_rpc_error(exc, agent_url, operation="stream", request_id=request_id)
 
     async def authenticate(self, credentials: str) -> None:
         """Authenticate outbound credentials and store the resulting context."""
@@ -289,20 +366,38 @@ class GRPCTransport(Transport):
         """Handle one ``Invoke`` RPC by routing the request envelope."""
         await self._authenticate_context(context)
         request_id = request.get("id") if isinstance(request, dict) else None
+        idempotency_key: str | None = None
 
         try:
             endpoint, payload = await self._prepare_endpoint_request(request)
             if endpoint.mode == "stream" or endpoint.streaming:
                 raise ValueError(f"Endpoint {endpoint.method} {endpoint.path} requires the gRPC Stream method")
 
-            result = await self._call_endpoint(endpoint, payload)
-            return {
+            raw_idempotency_key = request.get("idempotency_key")
+            idempotency_key = (
+                f"{endpoint.method}:{endpoint.path}:{raw_idempotency_key}" if raw_idempotency_key else None
+            )
+            owns_operation, cached = await self.acquire_idempotent_response(idempotency_key)
+            if not owns_operation:
+                if not isinstance(cached, dict):
+                    raise TypeError("Cached gRPC response must be a mapping")
+                cached_response = cached.copy()
+                cached_response["id"] = request_id
+                return cached_response
+            async with self.inbound_request_slot():
+                result = await self._call_endpoint(endpoint, payload)
+            response = {
                 "id": request_id,
                 "ok": True,
                 "result": self._serialize_result(result),
             }
+            self.check_payload_limit(response, kind="response", url=self._url)
+            self.complete_idempotent_response(idempotency_key, response)
+            return response
         except Exception as exc:
-            return self._error_response(request_id, exc)
+            response = self._error_response(request_id, exc)
+            self.complete_idempotent_response(idempotency_key, response)
+            return response
 
     async def _handle_stream(self, request: dict[str, Any], context: Any) -> AsyncIterator[dict[str, Any]]:
         """Handle one ``Stream`` RPC by yielding response envelopes."""
@@ -314,36 +409,24 @@ class GRPCTransport(Transport):
             if endpoint.mode != "stream" and not endpoint.streaming:
                 raise ValueError(f"Endpoint {endpoint.method} {endpoint.path} is not a streaming endpoint")
 
-            handler_input = await self._parse_payload(endpoint, payload)
-            if endpoint.request_source != "none" and payload is not None:
-                stream_obj = endpoint.handler(handler_input)
-            else:
-                stream_obj = endpoint.handler()
+            async with self.stream_slot():
+                sent_final = False
+                async for event_payload in self._iterate_endpoint_stream(endpoint, payload):
+                    event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
+                    stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
+                    yield {
+                        "id": request_id,
+                        "ok": True,
+                        "result": event_payload,
+                        "final": stream_final,
+                        "stream": True,
+                    }
+                    if stream_final:
+                        sent_final = True
+                        break
 
-            if inspect.isawaitable(stream_obj):
-                stream_obj = await stream_obj
-
-            if not hasattr(stream_obj, "__aiter__"):
-                raise TypeError("Streaming endpoint handler must return an async iterator")
-
-            sent_final = False
-            async for event in stream_obj:
-                event_payload = self._serialize_result(event)
-                event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
-                stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
-                yield {
-                    "id": request_id,
-                    "ok": True,
-                    "result": event_payload,
-                    "final": stream_final,
-                    "stream": True,
-                }
-                if stream_final:
-                    sent_final = True
-                    break
-
-            if not sent_final:
-                yield {"id": request_id, "ok": True, "result": None, "final": True, "stream": True}
+                if not sent_final:
+                    yield {"id": request_id, "ok": True, "result": None, "final": True, "stream": True}
         except Exception as exc:
             yield self._error_response(request_id, exc, final=True, stream=True)
 
@@ -402,6 +485,22 @@ class GRPCTransport(Transport):
             return await endpoint.handler(handler_input) if handler_is_async else endpoint.handler(handler_input)
         return await endpoint.handler() if handler_is_async else endpoint.handler()
 
+    async def _iterate_endpoint_stream(self, endpoint: EndpointSpec, payload: Any) -> AsyncIterator[Any]:
+        """Parse and iterate one bounded server-side streaming handler."""
+        handler_input = await self._parse_payload(endpoint, payload)
+        if endpoint.request_source != "none" and payload is not None:
+            stream_obj = endpoint.handler(handler_input)
+        else:
+            stream_obj = endpoint.handler()
+        if inspect.isawaitable(stream_obj):
+            stream_obj = await stream_obj
+        if not hasattr(stream_obj, "__aiter__"):
+            raise TypeError("Streaming endpoint handler must return an async iterator")
+        async for event in stream_obj:
+            event_payload = self._serialize_result(event)
+            self.check_payload_limit(event_payload, kind="event", url=self._url)
+            yield event_payload
+
     # ------------------------------------------------------------------
     # Serialization and envelope helpers
     # ------------------------------------------------------------------
@@ -410,6 +509,7 @@ class GRPCTransport(Transport):
         self,
         *,
         request_id: str,
+        idempotency_key: str | None,
         method: str,
         path: str,
         request_source: str,
@@ -422,6 +522,8 @@ class GRPCTransport(Transport):
             "method": method,
             "path": path,
         }
+        if idempotency_key:
+            payload["idempotency_key"] = idempotency_key
 
         if request_source == "body" and data is not None:
             payload["data"] = self._serialize_result(data)
@@ -463,11 +565,19 @@ class GRPCTransport(Transport):
         """Validate and unwrap a response envelope from a remote peer."""
         message_id = response.get("id")
         if message_id not in {None, request_id}:
-            raise RuntimeError(f"Mismatched gRPC {operation} id from {base_url}: {message_id}")
+            raise TransportProtocolError(
+                f"Mismatched gRPC {operation} id from {base_url}: {message_id}",
+                url=base_url,
+                request_id=request_id,
+            )
 
         if not response.get("ok", False):
             error = response.get("error") or {}
-            raise RuntimeError(f"gRPC {operation} failed at {base_url}: {error}")
+            raise TransportRemoteError(
+                f"gRPC {operation} failed at {base_url}: {error}",
+                url=base_url,
+                request_id=request_id,
+            )
 
         return response.get("result")
 
@@ -491,6 +601,51 @@ class GRPCTransport(Transport):
             response["stream"] = True
         return response
 
+    async def _setup_operational_services(self) -> None:
+        """Register standard gRPC health and reflection services when installed."""
+        if self._server is None or (not self._enable_health and not self._enable_reflection):
+            return
+        try:
+            from grpc_health.v1 import health, health_pb2_grpc
+            from grpc_reflection.v1alpha import reflection
+        except ImportError:
+            return
+
+        service_names = [self._SERVICE_NAME]
+        if self._enable_health:
+            health_api = getattr(health, "aio", health)
+            self._health_servicer = health_api.HealthServicer()
+            health_pb2_grpc.add_HealthServicer_to_server(self._health_servicer, self._server)
+            service_names.append("grpc.health.v1.Health")
+            await self._set_health_status(serving=True)
+        if self._enable_reflection:
+            service_names.append(reflection.SERVICE_NAME)
+            reflection.enable_server_reflection(tuple(service_names), self._server)
+
+    async def _set_health_status(self, *, serving: bool) -> None:
+        """Update standard gRPC health status for all exposed service names."""
+        if self._health_servicer is None:
+            return
+        try:
+            from grpc_health.v1 import health_pb2
+        except ImportError:
+            return
+        status = health_pb2.HealthCheckResponse.SERVING if serving else health_pb2.HealthCheckResponse.NOT_SERVING
+        for service_name in ("", self._SERVICE_NAME):
+            result = self._health_servicer.set(service_name, status)
+            if inspect.isawaitable(result):
+                await result
+
+    @staticmethod
+    def _merge_options(
+        defaults: tuple[tuple[str, Any], ...],
+        overrides: list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None,
+    ) -> tuple[tuple[str, Any], ...]:
+        """Merge gRPC options while giving explicit caller values precedence."""
+        merged = dict(defaults)
+        merged.update(dict(overrides or ()))
+        return tuple(merged.items())
+
     # ------------------------------------------------------------------
     # Authentication and channels
     # ------------------------------------------------------------------
@@ -511,9 +666,13 @@ class GRPCTransport(Transport):
         except Exception as exc:
             await context.abort(self._grpc.StatusCode.UNAUTHENTICATED, f"Authentication failed: {exc}")
 
-    def _build_metadata(self) -> tuple[tuple[str, str], ...]:
+    def _build_metadata(self, context: TransportRequestContext) -> tuple[tuple[str, str], ...]:
         """Build lowercase gRPC metadata from the active security context."""
-        return tuple((key.lower(), value) for key, value in self._build_headers().items())
+        metadata = [(key.lower(), value) for key, value in self._build_headers().items()]
+        metadata.append(("x-protolink-request-id", context.request_id))
+        if context.idempotency_key:
+            metadata.append(("idempotency-key", context.idempotency_key))
+        return tuple(metadata)
 
     def _build_headers(self) -> dict[str, str]:
         """Construct authentication headers shared with other network transports."""
@@ -568,6 +727,12 @@ class GRPCTransport(Transport):
                     compression=self._compression,
                 )
             self._channels[key] = channel
+
+            async def close_channel() -> None:
+                await channel.close(grace=1.0)
+                self._channels.pop(key, None)
+
+            self.register_loop_resource(("grpc", key), close_channel)
         return channel
 
     @staticmethod
@@ -587,17 +752,31 @@ class GRPCTransport(Transport):
             pairs.append((str(key), str(value)))
         return pairs
 
-    def _raise_rpc_error(self, exc: Any, base_url: str, *, operation: str) -> NoReturn:
+    def _raise_rpc_error(self, exc: Any, base_url: str, *, operation: str, request_id: str) -> NoReturn:
         """Translate grpcio exceptions into Protolink-style client errors."""
         code = exc.code()
         details = exc.details()
         if code == self._grpc.StatusCode.UNAVAILABLE:
-            raise ConnectionError(
-                f"Failed to connect to agent at {base_url}. Make sure the gRPC agent is running and accessible."
+            raise TransportConnectionError(
+                f"Failed to connect to agent at {base_url}. Make sure the gRPC agent is running and accessible.",
+                url=base_url,
+                request_id=request_id,
+                retryable=True,
             ) from exc
         if code == self._grpc.StatusCode.DEADLINE_EXCEEDED:
-            raise TimeoutError(f"gRPC {operation} to {base_url} exceeded {self._timeout} seconds") from exc
-        raise RuntimeError(f"gRPC {operation} failed at {base_url}: {code.name}: {details}") from exc
+            raise TransportTimeoutError(
+                f"gRPC {operation} to {base_url} exceeded {self._timeout} seconds",
+                url=base_url,
+                request_id=request_id,
+                retryable=True,
+            ) from exc
+        raise TransportRemoteError(
+            f"gRPC {operation} failed at {base_url}: {code.name}: {details}",
+            url=base_url,
+            request_id=request_id,
+            retryable=code in {self._grpc.StatusCode.RESOURCE_EXHAUSTED, self._grpc.StatusCode.INTERNAL},
+            status_code=code.name,
+        ) from exc
 
     # ------------------------------------------------------------------
     # Utilities

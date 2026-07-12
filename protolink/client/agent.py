@@ -34,7 +34,7 @@ from protolink.models import (
     TaskCancellationRequest,
 )
 from protolink.security.tls import TLSConfig
-from protolink.transport import Transport, get_transport
+from protolink.transport import Transport, TransportConfig, get_transport
 from protolink.types import TransportType
 
 
@@ -83,6 +83,7 @@ class AgentClient:
         method="POST",
         response_parser=Task.from_dict,
         request_source="body",
+        idempotent=True,
     )
 
     AGENT_CARD_REQUEST = ClientRequestSpec(
@@ -91,6 +92,7 @@ class AgentClient:
         method="GET",
         response_parser=AgentCard.from_dict,
         request_source="none",
+        idempotent=True,
     )
 
     TASK_STREAM_REQUEST = ClientRequestSpec(
@@ -107,6 +109,7 @@ class AgentClient:
         response_parser=Task.from_dict,
         request_source="body",
         channel="control",
+        idempotent=True,
     )
 
     COMPACT_HISTORY_REQUEST = ClientRequestSpec(
@@ -125,6 +128,7 @@ class AgentClient:
         response_parser=StateOperationResult.from_dict,
         request_source="body",
         channel="control",
+        idempotent=True,
     )
 
     RESET_STATE_REQUEST = ClientRequestSpec(
@@ -152,6 +156,7 @@ class AgentClient:
         timeout: int = 300,
         *,
         tls: TLSConfig | None = None,
+        transport_config: TransportConfig | None = None,
     ) -> None:
         """Initialize a client from a transport instance or registered name.
 
@@ -160,6 +165,7 @@ class AgentClient:
             url: Local transport URL required when constructing by name.
             timeout: Outbound request timeout in seconds.
             tls: Optional TLS trust and client-certificate configuration.
+            transport_config: Shared limits, retry, keepalive, and metrics configuration.
         """
         if isinstance(transport, Transport):
             if tls is not None and getattr(transport, "tls", None) is None and hasattr(transport, "tls"):
@@ -169,9 +175,16 @@ class AgentClient:
             transport_kwargs: dict[str, Any] = {"url": url, "timeout": timeout}
             if tls is not None:
                 transport_kwargs["tls"] = tls
+            if transport_config is not None:
+                transport_kwargs["config"] = transport_config
             self._transport = get_transport(transport=transport, **transport_kwargs)
 
         self.sync = SyncAgentClient(self)
+
+    @property
+    def transport(self) -> Transport:
+        """Return the transport used for all client requests."""
+        return self._transport
 
     # ----------------------------------------------------------------------
     # Agent-to-Agent Communication

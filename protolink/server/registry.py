@@ -116,6 +116,20 @@ class RegistryServer:
                     request_source="none",
                     content_type="html",
                 ),
+                EndpointSpec(
+                    name="health",
+                    path="/healthz",
+                    method="GET",
+                    handler=self._transport.health,
+                    request_source="none",
+                ),
+                EndpointSpec(
+                    name="readiness",
+                    path="/readyz",
+                    method="GET",
+                    handler=self._transport.health,
+                    request_source="none",
+                ),
             ]
         )
 

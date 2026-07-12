@@ -16,7 +16,7 @@ from protolink.models import AgentCard
 from protolink.security.tls import TLSConfig
 from protolink.server import RegistryServer
 from protolink.storage import Storage
-from protolink.transport import Transport, get_transport
+from protolink.transport import Transport, TransportConfig, get_transport
 from protolink.types import TransportType
 from protolink.utils.logging import get_logger
 from protolink.utils.renderers.status import to_registry_status_html
@@ -52,6 +52,7 @@ class Registry:
         entry_ttl_seconds: float | None = None,
         storage: Storage | None = None,
         tls: TLSConfig | None = None,
+        transport_config: TransportConfig | None = None,
     ):
         """Initialize the registry.
 
@@ -64,6 +65,7 @@ class Registry:
             storage: Optional generic storage used to persist registry entries
                 across process restarts.
             tls: Optional transport-security configuration for secure registry URLs.
+            transport_config: Shared limits, retry, keepalive, and metrics configuration.
         """
         self.logger = get_logger(__name__, verbosity)
 
@@ -74,6 +76,8 @@ class Registry:
             transport_kwargs: dict[str, Any] = {"url": url}
             if tls is not None:
                 transport_kwargs["tls"] = tls
+            if transport_config is not None:
+                transport_kwargs["config"] = transport_config
             transport = get_transport(transport, **transport_kwargs)
         elif not isinstance(transport, Transport):
             raise ValueError("transport must be a TransportType or Transport instance")

@@ -280,6 +280,7 @@ Registry(
     entry_ttl_seconds: float | None = None,
     storage: Storage | None = None,
     tls: TLSConfig | None = None,
+    transport_config: TransportConfig | None = None,
 )
 ```
 
@@ -291,6 +292,11 @@ Registry(
 | `entry_ttl_seconds` | `float | None` | `None` | Optional liveness TTL. Expired entries are pruned before discovery, status, and count/list operations. |
 | `storage` | `Storage | None` | `None` | Optional persistence for serialized registry entries. |
 | `tls` | `TLSConfig | None` | `None` | Optional certificate identity and trust configuration for a secure registry URL. |
+| `transport_config` | `TransportConfig | None` | `None` | Limits, retry policy, keepalive, shutdown, idempotency cache, and metrics configuration for a factory-created registry transport. |
+
+`transport_config` is applied when `transport` is a string alias. If an existing `Transport` object is supplied, configure that object directly. The Registry passes the resolved transport to both `RegistryClient` and `RegistryServer`, so inbound serving and outbound registry calls share one capability, health, and metrics surface.
+
+The built-in registry request specs mark `unregister`, `heartbeat`, and `discover` as idempotent. `register` is intentionally not retried automatically because registration may have application-specific replacement semantics. See [ClientRequestSpec](./client.md#clientrequestspec) and the [retry contract](./transport.md#retrypolicy).
 
 :::info[Single source of truth]
 

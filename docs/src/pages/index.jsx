@@ -472,6 +472,48 @@ const moduleDefinitions = [
       },
     ],
   },
+  {
+    id: "resilience",
+    label: "Resilience",
+    detail: "limits and retries",
+    badge: "RS",
+    tone: "blue",
+    options: [
+      {
+        id: "production",
+        label: "Production",
+        kind: "bounded",
+        imports: [
+          "from protolink import RetryPolicy, TransportConfig, TransportLimits",
+        ],
+        setup: [
+          "transport_config = TransportConfig(",
+          "    limits=TransportLimits(",
+          "        max_concurrent_requests=200,",
+          "        max_concurrent_streams=50,",
+          "    ),",
+          "    retry=RetryPolicy(max_attempts=3),",
+          ")",
+        ],
+        agentArg: "transport_config=transport_config",
+      },
+      {
+        id: "limits-only",
+        label: "Limits only",
+        kind: "no retries",
+        imports: ["from protolink import TransportConfig, TransportLimits"],
+        setup: [
+          "transport_config = TransportConfig(",
+          "    limits=TransportLimits(",
+          "        max_request_bytes=8 * 1024 * 1024,",
+          "        max_concurrent_requests=100,",
+          "    ),",
+          ")",
+        ],
+        agentArg: "transport_config=transport_config",
+      },
+    ],
+  },
 ];
 
 const plugModules = [...moduleDefinitions].sort((left, right) => {

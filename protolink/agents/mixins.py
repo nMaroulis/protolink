@@ -30,7 +30,7 @@ from protolink.storage import Storage
 from protolink.telemetry.base import Telemetry
 from protolink.tools import ActionBuilder, BaseTool, Tool
 from protolink.tools.schema import validate_tool_args
-from protolink.transport import Transport, get_transport
+from protolink.transport import Transport, TransportConfig, get_transport
 from protolink.types import TransportType
 from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
@@ -1052,6 +1052,9 @@ class AgentConfigurationMixin(_AgentMixinBase):
             }
             if tls is not None:
                 transport_kwargs["tls"] = tls
+            transport_config = getattr(self, "transport_config", None)
+            if transport_config is not None:
+                transport_kwargs["config"] = transport_config
             if getattr(self, "_verbosity", 1) == 0:
                 transport_kwargs["log_level"] = "critical"
                 transport_kwargs["access_log"] = False
@@ -1253,6 +1256,9 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 transport_kwargs: dict[str, Any] = {"url": registry_url}
                 if self.tls is not None:
                     transport_kwargs["tls"] = self.tls
+                transport_config = getattr(self, "transport_config", None)
+                if transport_config is not None:
+                    transport_kwargs["config"] = transport_config
                 transport = get_transport(registry, **transport_kwargs)
                 self.registry_client = RegistryClient(transport=transport)
             elif isinstance(registry, RegistryClient):
@@ -1421,6 +1427,7 @@ class AgentSerializationMixin(_AgentMixinBase):
                 "url": self._transport.url,
                 "timeout": getattr(self._transport, "timeout", 360.0),
             }
+            transport_config["config"] = self._transport.config.to_dict()
             if hasattr(self._transport, "backend"):
                 backend_name = "starlette"
                 if "FastAPIBackend" in self._transport.backend.__class__.__name__:
@@ -1543,10 +1550,13 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         # Transport
         transport = overrides.get("transport")
+        shared_transport_config = overrides.get("transport_config")
         if transport is None:
             transport_config = data.get("transport")
             if transport_config:
                 transport_type = transport_config.get("type", "http")
+                if shared_transport_config is None and isinstance(transport_config.get("config"), dict):
+                    shared_transport_config = TransportConfig.from_dict(transport_config["config"])
                 try:
                     from protolink.transport import get_transport
 
@@ -1562,6 +1572,8 @@ class AgentSerializationMixin(_AgentMixinBase):
                     t_kwargs["authenticator"] = authenticator
                     t_kwargs["credentials"] = credentials
                     t_kwargs["tls"] = tls
+                    if shared_transport_config is not None:
+                        t_kwargs["config"] = shared_transport_config
 
                     transport = get_transport(transport_type, **t_kwargs)
                 except Exception:
@@ -1637,6 +1649,7 @@ class AgentSerializationMixin(_AgentMixinBase):
             authenticator=authenticator,
             credentials=credentials,
             tls=tls,
+            transport_config=shared_transport_config,
         )
 
         tools_data = data.get("tools", [])

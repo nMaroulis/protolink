@@ -3,15 +3,37 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-from .base import Transport
+from .base import Transport, TransportRequestContext
+from .config import RetryPolicy, TransportCapabilities, TransportConfig, TransportLimits
+from .errors import (
+    TransportConnectionError,
+    TransportError,
+    TransportLimitError,
+    TransportProtocolError,
+    TransportRemoteError,
+    TransportTimeoutError,
+)
 from .factory import get_transport
+from .metrics import TransportMetricsSnapshot
 
 __all__ = [
     "GRPCTransport",
     "HTTPTransport",
+    "RetryPolicy",
     "RuntimeTransport",
     "SSEJSONRPCTransport",
     "Transport",
+    "TransportCapabilities",
+    "TransportConfig",
+    "TransportConnectionError",
+    "TransportError",
+    "TransportLimitError",
+    "TransportLimits",
+    "TransportMetricsSnapshot",
+    "TransportProtocolError",
+    "TransportRemoteError",
+    "TransportRequestContext",
+    "TransportTimeoutError",
     "WebSocketTransport",
     "get_transport",
 ]

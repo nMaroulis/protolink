@@ -11,7 +11,8 @@ class ClientRequestSpec:
 
     ``channel`` lets multiplexed transports isolate control-plane requests such
     as cancellation from a long-lived streaming data channel. Request/response
-    transports may ignore it.
+    transports may ignore it. ``idempotent`` is an explicit safety declaration:
+    configured retry policies never retry a request unless it is true.
     """
 
     name: str
@@ -22,3 +23,4 @@ class ClientRequestSpec:
     content_type: ContentType | None = None
     accept: ContentType | None = None
     channel: str = "default"
+    idempotent: bool = False

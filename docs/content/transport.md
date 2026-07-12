@@ -48,6 +48,7 @@ All transports inherit from the base `Transport` class.
     - Registers one generic Protolink gRPC service and routes requests by `ClientRequestSpec` method/path.
     - Carries compact JSON envelopes over gRPC byte messages, so no generated protobuf files are required.
     - Supports gRPC metadata for the same bearer/API-key authentication headers used by HTTP and WebSocket transports.
+    - Registers standard gRPC health checking and server reflection when installed through `protolink[grpc]`.
     - Useful for service meshes, polyglot infrastructure, and teams that want gRPC deadlines and connection pooling while keeping Protolink's transport-neutral agent API.
 
 - **RuntimeTransport**
@@ -67,6 +68,374 @@ Some rough guidelines:
 - Use **GRPCTransport** when your deployment already standardizes on gRPC deadlines, metadata, and connection management.
 
 The rest of this page dives into the API of each transport in more detail.
+
+## Production configuration
+
+Every transport accepts the same `TransportConfig`. Pass it at the high-level `Agent`, `AgentClient`, or `Registry` boundary; ProtoLink forwards it to the selected transport.
+
+```python
+from protolink import Agent, AgentCard, RetryPolicy, TransportConfig, TransportLimits
+
+transport_config = TransportConfig(
+    limits=TransportLimits(
+        max_request_bytes=8 * 1024 * 1024,
+        max_response_bytes=8 * 1024 * 1024,
+        max_event_bytes=1024 * 1024,
+        max_concurrent_requests=200,
+        max_concurrent_streams=50,
+    ),
+    retry=RetryPolicy(max_attempts=3),
+    keepalive_interval=20,
+    keepalive_timeout=10,
+    shutdown_timeout=10,
+)
+
+agent = Agent(
+    card=AgentCard(
+        name="worker",
+        description="Production task worker",
+        url="grpcs://worker.internal:9443",
+    ),
+    transport="grpc",
+    transport_config=transport_config,
+)
+```
+
+`max_attempts=1` is the default, so upgrading never enables retries implicitly. ProtoLink retries only request specifications explicitly marked idempotent, preserves one correlation ID across attempts, and sends an idempotency key so completed operations can be replayed without executing the handler again. Streams are not automatically retried because resuming a partial event sequence requires application-level checkpoints.
+
+The same limits apply to RuntimeTransport, making local tests representative of deployed serialization boundaries. HTTP uses bounded client/server concurrency, WebSocket uses bounded frame queues and ping/pong keepalive, and gRPC applies message-size, keepalive, and concurrent-RPC options.
+
+## Shared Transport API Reference
+
+The shared production API is available from the top-level package for normal application code:
+
+```python
+from protolink import (
+    RetryPolicy,
+    TransportConfig,
+    TransportConnectionError,
+    TransportError,
+    TransportLimitError,
+    TransportLimits,
+    TransportMetricsSnapshot,
+    TransportProtocolError,
+    TransportRemoteError,
+    TransportTimeoutError,
+)
+```
+
+Custom transport implementations can import the base contract and extension types from the transport package:
+
+```python
+from protolink.transport import (
+    Transport,
+    TransportCapabilities,
+    TransportRequestContext,
+)
+```
+
+### `TransportConfig`
+
+`TransportConfig` is the single configuration object accepted by every built-in transport. It is immutable and safe to share between an `Agent`, its client, and a `Registry`.
+
+```python
+TransportConfig(
+    limits: TransportLimits = TransportLimits(),
+    retry: RetryPolicy = RetryPolicy(),
+    keepalive_interval: float | None = 20.0,
+    keepalive_timeout: float = 20.0,
+    shutdown_timeout: float = 5.0,
+    idempotency_ttl: float = 300.0,
+    idempotency_cache_size: int = 1024,
+    collect_metrics: bool = True,
+)
+```
+
+| Field | Default | Applied behavior |
+|-------|---------|------------------|
+| `limits` | `TransportLimits()` | Payload and per-event-loop concurrency bounds. |
+| `retry` | `RetryPolicy()` | Bounded retry policy. The default performs one attempt only. |
+| `keepalive_interval` | `20.0` seconds | WebSocket ping interval, HTTP keep-alive expiry, and gRPC keepalive interval. Set `None` to disable periodic WebSocket/HTTP keepalive; gRPC receives a zero interval. |
+| `keepalive_timeout` | `20.0` seconds | WebSocket pong timeout, Uvicorn keep-alive timeout, and gRPC keepalive timeout. |
+| `shutdown_timeout` | `5.0` seconds | Maximum wait for each loop-owned client connection or channel to close. Also used as WebSocket close timeout. |
+| `idempotency_ttl` | `300.0` seconds | How long a completed idempotent result remains replayable. |
+| `idempotency_cache_size` | `1024` | Maximum completed results retained by each transport instance. Oldest results are evicted first. |
+| `collect_metrics` | `True` | Enables the dependency-free in-process metric recorder. When false, snapshots remain available but stay at zero. |
+
+All timing and cache values must be positive, except `keepalive_interval`, which may be `None`. Invalid configurations raise `ValueError` during construction.
+
+`TransportConfig.to_dict()` returns JSON-safe nested dictionaries. `TransportConfig.from_dict(data)` restores `TransportLimits`, `RetryPolicy`, and the retryable-method `frozenset`. `Agent.to_dict()`, YAML serialization, and `Agent.from_dict()` preserve this configuration under the serialized transport block.
+
+### `TransportLimits`
+
+```python
+TransportLimits(
+    max_request_bytes: int = 16 * 1024 * 1024,
+    max_response_bytes: int = 16 * 1024 * 1024,
+    max_event_bytes: int = 4 * 1024 * 1024,
+    max_concurrent_requests: int = 100,
+    max_concurrent_streams: int = 100,
+)
+```
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `max_request_bytes` | `16 MiB` | Maximum serialized request envelope or body. |
+| `max_response_bytes` | `16 MiB` | Maximum serialized unary response. |
+| `max_event_bytes` | `4 MiB` | Maximum serialized event yielded by a stream. |
+| `max_concurrent_requests` | `100` | Per-event-loop unary request capacity. Additional work waits for a slot instead of spawning without a bound. |
+| `max_concurrent_streams` | `100` | Per-event-loop active stream capacity. Additional streams wait for a slot. |
+
+Payload sizes are calculated after ProtoLink recursively normalizes domain objects through its normal serializer. A payload over its byte bound raises `TransportLimitError` before it is sent or yielded. Every limit must be greater than zero. `to_dict()` returns all five integer fields.
+
+Protocol-specific mapping:
+
+| Transport | Request/response limits | Concurrency/backpressure |
+|-----------|-------------------------|--------------------------|
+| HTTP | Checked before outbound send and before server response; `httpx` pools use the request limit. | Uvicorn `limit_concurrency` plus per-loop client request slots. |
+| SSE JSON-RPC | HTTP request limits plus `max_event_bytes` for every SSE result. | HTTP concurrency plus a bounded active-stream semaphore. |
+| WebSocket | `websockets` frame size plus explicit request, response, and event checks. | Bounded frame queues, unary handler slots, and active-stream slots. |
+| gRPC | Mapped to `grpc.max_send_message_length` and `grpc.max_receive_message_length`, with explicit envelope checks. | `maximum_concurrent_rpcs` defaults to `max_concurrent_requests`; streams also use active-stream slots. |
+| Runtime | Applies the same serialized-size checks despite not opening a socket. | Both caller and target transports enforce per-loop request and stream slots. |
+
+### `RetryPolicy`
+
+```python
+RetryPolicy(
+    max_attempts: int = 1,
+    initial_backoff: float = 0.1,
+    max_backoff: float = 2.0,
+    jitter: float = 0.1,
+    retryable_methods: frozenset[str] = frozenset({"DELETE", "GET", "POST", "PUT"}),
+)
+```
+
+| Field | Meaning |
+|-------|---------|
+| `max_attempts` | Total attempts, including the initial request. `1` disables retries. |
+| `initial_backoff` | Base delay before the first retry. |
+| `max_backoff` | Upper bound for exponential backoff. Must be at least `initial_backoff`. |
+| `jitter` | Maximum random delay added to each retry. Set `0` for deterministic tests. |
+| `retryable_methods` | HTTP-style methods eligible for retry after the request spec also declares idempotency. |
+
+A request is retried only when all three conditions are true:
+
+1. `ClientRequestSpec.idempotent` is `True`.
+2. The request method appears in `retryable_methods`.
+3. The raised `TransportError` has `retryable=True`.
+
+The delay before retry number `n` is `min(initial_backoff * 2**(n - 1), max_backoff) + uniform(0, jitter)`. The same request ID and idempotency key are retained across every attempt; only `TransportRequestContext.attempt` increases. Streams are never automatically retried because replaying a partial event sequence requires an application checkpoint.
+
+Built-in task submission, agent-card retrieval, cancellation, state description, registry discovery, registry heartbeat, and registry unregister requests declare idempotency. Mutating state compaction/reset operations and streaming requests do not.
+
+### Correlation and idempotency
+
+`TransportRequestContext` is an immutable request-scoped value:
+
+```python
+TransportRequestContext(
+    request_id: str,
+    idempotency_key: str | None = None,
+    attempt: int = 1,
+)
+```
+
+`next_attempt()` returns a new context with the same IDs and `attempt + 1`. `Transport.new_request_context()` generates the initial context. For idempotent payloads it derives the operation key from `id`, `task_id`, or `agent_url` when available; otherwise it uses the generated request ID.
+
+| Transport | Correlation ID | Idempotency key |
+|-----------|----------------|-----------------|
+| HTTP / SSE | `X-Protolink-Request-ID` header | `Idempotency-Key` header |
+| WebSocket | Envelope `id` | Envelope `idempotency_key` |
+| gRPC | Envelope `id` and `x-protolink-request-id` metadata | Envelope `idempotency_key` and `idempotency-key` metadata |
+| Runtime | In-process `TransportRequestContext` | In-process namespaced operation key |
+
+Server-side keys are namespaced by method and path. The first request owns the operation; concurrent duplicates await its result, and later duplicates replay the completed result until the TTL expires. This cache is process-local. Use a durable application-level idempotency store as well when operations must remain deduplicated across restarts or multiple server replicas.
+
+### `TransportCapabilities`
+
+Every transport declares immutable class-level capabilities. Applications normally inspect `transport.capabilities`; custom transports set the class attribute.
+
+```python
+TransportCapabilities(
+    networked: bool = True,
+    streaming: bool = False,
+    tls: bool = False,
+    bidirectional: bool = False,
+    persistent_connections: bool = False,
+)
+```
+
+| Transport | Networked | Streaming | TLS | Bidirectional | Persistent connections |
+|-----------|-----------|-----------|-----|---------------|------------------------|
+| `HTTPTransport` | Yes | No | Yes | No | Yes |
+| `SSEJSONRPCTransport` | Yes | Yes | Yes | No | Yes |
+| `WebSocketTransport` | Yes | Yes | Yes | Yes | Yes |
+| `GRPCTransport` | Yes | Yes | Yes | No | Yes |
+| `RuntimeTransport` | No | Yes | No | No | No |
+
+`supports_streaming` remains available as the compatibility flag used by `AgentClient` and `AgentServer`; it matches `capabilities.streaming` on all built-in transports.
+
+### `Transport` base class
+
+Application code usually receives a transport from `Agent.transport` or `AgentClient.transport`. The stable inspection surface is:
+
+| Member | Type | Purpose |
+|--------|------|---------|
+| `transport_type` | `ClassVar[str]` | Factory/card identifier such as `"http"`, `"grpc"`, or `"runtime"`. |
+| `supports_streaming` | `ClassVar[bool]` | Compatibility flag used to decide whether `/tasks/stream` is registered. |
+| `capabilities` | `ClassVar[TransportCapabilities]` | Declarative transport behavior. |
+| `config` | `TransportConfig` | Effective shared configuration for this instance. |
+| `url` | `str` | Canonical bind/identity URL. |
+| `metrics` | `TransportMetricsSnapshot` | Immutable snapshot taken at property access time. |
+| `is_running` | `bool` | Whether this instance currently owns a running server endpoint. |
+| `health()` | `dict[str, Any]` | JSON-compatible readiness, capability, and metric payload. |
+| `validate_url()` | `bool` | Whether the configured URL uses a scheme accepted by the transport. |
+| `start()` / `stop()` | `Awaitable[None]` | Idempotent server and pooled-resource lifecycle. |
+| `send(...)` | `Awaitable[Any]` | Low-level unary request primitive used by clients. |
+| `subscribe(agent_url, task)` | `AsyncIterator[Any]` | Low-level streaming primitive; unsupported transports raise `NotImplementedError`. |
+
+#### Custom transport contract
+
+A custom transport subclasses `Transport`, calls `super().__init__(config=config)`, declares its class capabilities, and implements `send`, `setup_routes`, `start`, `stop`, `validate_url`, and `url`. Streaming transports also override `subscribe`.
+
+The base class exposes reusable extension hooks so custom transports can preserve the built-in operational contract:
+
+| Method | Intended use |
+|--------|--------------|
+| `new_request_context(request_spec, data=None)` | Generate stable correlation and optional idempotency metadata. |
+| `payload_size(payload)` | Return the normalized UTF-8 JSON size estimate. |
+| `check_payload_limit(payload, kind, url=None)` | Enforce `kind="request"`, `"response"`, or `"event"`; returns measured bytes. |
+| `request_slot()` | Async context manager for bounded outbound unary work. Pair it with `run_with_retries()`. |
+| `inbound_request_slot()` | Async context manager for bounded inbound unary work and full outcome metrics. |
+| `stream_slot()` | Async context manager for bounded streams and stream outcome metrics. |
+| `run_with_retries(request_spec, context, operation)` | Execute an async operation under retry eligibility, backoff, and request metrics. |
+| `register_loop_resource(key, closer)` | Record an async client/channel closer with the event loop that owns it. |
+| `discard_loop_resource(key)` | Remove a resource that was already invalidated or closed. |
+| `close_loop_resources()` | Close all registered resources on their owning loops under `shutdown_timeout`. |
+| `acquire_idempotent_response(key)` | Claim an operation or await/replay an existing result. Returns `(owns_operation, result)`. |
+| `complete_idempotent_response(key, response)` | Publish and cache a successful or protocol-level response. |
+| `abort_idempotent_response(key, error)` | Release waiting duplicates when execution fails before a response exists. |
+
+These hooks are an extension API for transport authors. Normal agent applications should configure the transport and call `AgentClient`, not manually coordinate slots or idempotency ownership.
+
+#### Internal instance state
+
+The base constructor creates the following private variables. They explain lifecycle behavior but are not a public mutation surface:
+
+| Variable | Role |
+|----------|------|
+| `_metrics` | Thread-safe mutable recorder behind the immutable `metrics` property. |
+| `_request_semaphores` | Per-event-loop unary request semaphores. Separate loops never share asyncio primitives. |
+| `_stream_semaphores` | Per-event-loop active-stream semaphores. |
+| `_resource_lock` | Thread lock protecting loop-owned resource registration. |
+| `_loop_resources` | Resource key to `(owner_loop, async_closer)` mapping used during cross-loop shutdown. |
+| `_idempotency_lock` | Thread lock protecting completed and in-flight operation state. |
+| `_idempotency_cache` | TTL-bound, oldest-first completed response cache. |
+| `_idempotency_inflight` | Shared futures used so concurrent duplicate requests await one owner. |
+| `_transport_running` | Base lifecycle flag used by `is_running` and health reporting. |
+
+Do not replace or mutate these collections from application code. A custom transport should use the public helper methods above.
+
+### `TransportMetricsSnapshot`
+
+`transport.metrics` returns a new immutable snapshot. Reading it does not reset counters.
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `requests_started` | `int` | Unary request executions admitted by this instance. |
+| `requests_succeeded` | `int` | Unary executions completed successfully. |
+| `requests_failed` | `int` | Unary executions ending with an exception or terminal transport failure. |
+| `retries` | `int` | Additional attempts started by `RetryPolicy`. |
+| `streams_started` | `int` | Streams admitted by this instance. |
+| `streams_completed` | `int` | Streams that exited normally. |
+| `streams_failed` | `int` | Streams that exited with an exception or cancellation. |
+| `active_requests` | `int` | Current unary request gauge. |
+| `active_streams` | `int` | Current stream gauge. |
+| `bytes_sent` | `int` | Estimated normalized payload bytes attempted by outbound operations. Retries add bytes again. |
+| `bytes_received` | `int` | Estimated normalized result bytes accepted by outbound operations. |
+| `total_latency_ms` | `float` | Cumulative unary latency, not an average or histogram. |
+
+`snapshot.to_dict()` produces the exact JSON-compatible mapping embedded in health responses. Metrics are process-local operational counters, not a replacement for durable telemetry. Set `collect_metrics=False` when another layer owns all measurement.
+
+### Transport errors
+
+All transport exceptions inherit from `TransportError` and expose the same diagnostic attributes:
+
+```python
+TransportError(
+    message: str,
+    *,
+    url: str | None = None,
+    request_id: str | None = None,
+    retryable: bool = False,
+    status_code: int | str | None = None,
+)
+```
+
+| Error | Compatibility base | Raised for |
+|-------|--------------------|------------|
+| `TransportConnectionError` | `ConnectionError` | Connection establishment, retention, or peer availability failure. |
+| `TransportTimeoutError` | `TimeoutError` | Request or stream deadline expiry. |
+| `TransportProtocolError` | `RuntimeError` | Invalid JSON/envelope shape, mismatched request ID, or incompatible wire response. |
+| `TransportRemoteError` | `RuntimeError` | A reachable peer returns an HTTP/gRPC status or protocol error result. |
+| `TransportLimitError` | `ValueError` | Serialized request, response, or event exceeds its configured byte limit. |
+
+`retryable` describes the failure category only; the request spec and method must still permit retries. `status_code` is an HTTP integer or protocol-native string such as a gRPC status name. `request_id` lets logs and traces correlate the exception with request headers or envelopes.
+
+```python
+try:
+    result = await client.send_task(agent_url, task)
+except TransportError as exc:
+    logger.error(
+        "transport failed",
+        extra={
+            "url": exc.url,
+            "request_id": exc.request_id,
+            "retryable": exc.retryable,
+            "status_code": exc.status_code,
+        },
+    )
+```
+
+### Health and readiness
+
+`transport.health()` returns this transport-neutral shape:
+
+```json
+{
+  "status": "ready",
+  "ready": true,
+  "transport": "grpc",
+  "url": "grpc://127.0.0.1:9001",
+  "capabilities": {
+    "networked": true,
+    "streaming": true,
+    "tls": true,
+    "bidirectional": false,
+    "persistent_connections": true
+  },
+  "metrics": {
+    "requests_started": 12,
+    "requests_succeeded": 12,
+    "requests_failed": 0,
+    "retries": 1,
+    "streams_started": 2,
+    "streams_completed": 2,
+    "streams_failed": 0,
+    "active_requests": 0,
+    "active_streams": 0,
+    "bytes_sent": 4096,
+    "bytes_received": 8192,
+    "total_latency_ms": 184.5
+  }
+}
+```
+
+Agents and registries expose the same payload at `GET /healthz` and `GET /readyz`. These probe endpoints do not require application authentication. `ready` becomes true after the transport server starts and false after it stops.
+
+gRPC additionally exposes `grpc.health.v1.Health` and service discovery through reflection when the packages installed by `protolink[grpc]` are present. Direct `GRPCTransport` construction accepts `enable_health=False` and `enable_reflection=False` to disable either service.
+
+See [`examples/transport_production.py`](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py) for a provider-free configuration example.
 
 ## TLS and mutual TLS
 
@@ -220,6 +589,8 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | `POST /state/compact` | Compact persisted conversation state. | No, JSON API |
 | `GET /.well-known/agent.json` | Return the public `AgentCard`. | Yes, JSON document |
 | `GET /status` | Render the agent status page. | Yes, HTML page |
+| `GET /healthz` | Return transport liveness and metrics. | Yes, JSON document |
+| `GET /readyz` | Return transport readiness and metrics. | Yes, JSON document |
 | `GET /chat` | Render the self-contained chat UI or a fallback page. | Yes, HTML page |
 | `POST /chat` | Send a chat message to `Agent.invoke()`. Registered only when the agent has an LLM. | No, JSON API used by the page |
 | `POST /tasks/stream` | Stream task events. Registered only when the transport advertises streaming support. | SSE, WebSocket, gRPC, or runtime stream depending on transport |
@@ -233,6 +604,8 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | `POST /agents/heartbeat` | Refresh agent liveness metadata. | No, JSON API |
 | `GET /agents/` | Discover registered agents. | Yes, JSON document |
 | `GET /status` | Render the registry status page. | Yes, HTML page |
+| `GET /healthz` | Return transport liveness and metrics. | Yes, JSON document |
+| `GET /readyz` | Return transport readiness and metrics. | Yes, JSON document |
 
 ### Transport mapping
 
@@ -481,7 +854,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, TLS, backend, validation, and Uvicorn logging behavior. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None`, `config: TransportConfig ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, TLS, shared production behavior, backend, validation, and Uvicorn logging. |
 | `start` | `self` | `Awaitable[None]` | Start the selected backend and create the internal `httpx.AsyncClient`. `AgentServer` or `RegistryServer` registers endpoint specs before transport startup. |
 | `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
 
@@ -491,6 +864,10 @@ The most important public methods on `HTTPTransport` are summarized below.
 | ---- | ---- | ------ | ----------- |
 | `url` | `str` | Read-only | The base URL configured for this transport. |
 | `timeout` | `float` | Read/Write | The request timeout (in seconds) for outgoing requests. This can be changed at runtime to easily adjust timeouts for subsequent requests without restarting the transport. |
+| `config` | `TransportConfig` | Read-only reference | Effective limits, retry, keepalive, shutdown, idempotency, and metric settings. |
+| `capabilities` | `TransportCapabilities` | Class-level | Networked, TLS-capable, persistent, unary-only capability declaration. |
+| `metrics` | `TransportMetricsSnapshot` | Read-only snapshot | Current request, retry, byte, stream, and latency counters. |
+| `is_running` | `bool` | Read-only | Whether the ASGI server is running. |
 
 #### Sending & receiving
 
@@ -504,8 +881,8 @@ The most important public methods on `HTTPTransport` are summarized below.
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
 | `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `Authenticator` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
-| `_build_headers` | `skill: str ⎪ None = None` | `dict[str, str]` | Internal helper that constructs HTTP headers (including `Authorization` when an auth context is present). Exposed here for completeness; you normally do not need to call it directly. |
 | `validate_url` | `-` | `bool` | Return `True` when the configured URL uses `http://` or `https://`. |
+| `health` | `-` | `dict[str, Any]` | Return readiness, capabilities, URL, and metric snapshot. |
 
 ---
 
@@ -576,7 +953,7 @@ async def main() -> None:
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `__init__` | `url: str` | `None` | Create an isolated in-memory transport. Bound to a specified runtime URL. |
+| `__init__` | `url: str`, `config: TransportConfig ⎪ None = None` | `None` | Create an isolated in-memory transport with the same limits, retries, idempotency, and metrics contract as network transports. |
 | `start` | `self` | `Awaitable[None]` | Register the allocated `url` actively directly on the class-level registry cache. |
 | `stop` | `self` | `Awaitable[None]` | Detach registry allocations cleaning up in-memory routing bindings. |
 
@@ -586,6 +963,9 @@ async def main() -> None:
 | ---- | ---- | ------ | ----------- |
 | `url` | `str` | Read-only | The unique runtime URL allocated to this transport. |
 | `is_running` | `bool` | Read-only | Whether the transport is currently registered in the global in-memory registry. |
+| `config` | `TransportConfig` | Read-only reference | Effective shared production configuration. |
+| `capabilities` | `TransportCapabilities` | Class-level | In-process, streaming, non-networked capability declaration. |
+| `metrics` | `TransportMetricsSnapshot` | Read-only snapshot | Current request, stream, retry, byte, and latency counters. |
 
 #### Sending
 
@@ -619,9 +999,13 @@ Use it when:
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None` | `None` | Configure URL, timeout, authentication, credentials, and TLS for `wss://` connections. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None`, `config: TransportConfig ⎪ None = None` | `None` | Configure URL, timeout, authentication, credentials, TLS, frame/concurrency limits, ping/pong keepalive, retry, shutdown, idempotency, and metrics. |
+| `send` | `request_spec`, `base_url`, `data=None`, `params=None` | `Awaitable[Any]` | Send one correlated JSON envelope over a loop-local persistent connection. Control-channel specs use a separate cached connection. |
 | `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a `Task` to `/tasks/stream` and receive task event payloads over a single WebSocket connection. |
+| `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Cache endpoint specs for the server-side frame router. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
+| `validate_url` | `-` | `bool` | Accept `ws://` and `wss://` URLs. |
+| `health` | `-` | `dict[str, Any]` | Return shared readiness, capability, and metric data. |
 
 #### Properties
 
@@ -629,6 +1013,9 @@ Use it when:
 | ---- | ---- | ------ | ----------- |
 | `url` | `str` | Read-only | The base URL configured for this transport. |
 | `timeout` | `float` | Read/Write | The timeout (in seconds) for WebSocket receive operations. This can be changed at runtime to adjust response wait times for subsequent requests. |
+| `config` | `TransportConfig` | Read-only reference | Effective limits, retry, ping/pong, shutdown, idempotency, and metric settings. |
+| `capabilities` | `TransportCapabilities` | Class-level | Networked, streaming, TLS-capable, bidirectional, persistent capability declaration. |
+| `metrics` | `TransportMetricsSnapshot` | Read-only snapshot | Current unary and stream counters, bytes, retries, and latency. |
 
 ---
 
@@ -702,11 +1089,15 @@ Authentication uses gRPC metadata keys compatible with the HTTP headers Protolin
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `channel_options = None`, `server_options = None`, `compression = None`, `maximum_concurrent_rpcs: int ⎪ None = None`, `graceful_shutdown_timeout: float = 3.0`, `tls: TLSConfig ⎪ None = None` | `None` | Configure the gRPC endpoint, deadlines, auth, TLS/mTLS, grpcio options, compression, and server shutdown grace. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `channel_options = None`, `server_options = None`, `compression = None`, `maximum_concurrent_rpcs: int ⎪ None = None`, `graceful_shutdown_timeout: float = 3.0`, `tls: TLSConfig ⎪ None = None`, `config: TransportConfig ⎪ None = None`, `enable_health: bool = True`, `enable_reflection: bool = True` | `None` | Configure deadlines, auth, TLS/mTLS, shared limits/retries/keepalive, grpcio overrides, compression, shutdown grace, standard health, and reflection. Explicit gRPC options override values derived from `config`. |
 | `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Send a unary request to the peer's `Invoke` method and parse the response through the request spec. |
 | `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a task to `Stream` and yield each task event result until the stream is final. |
 | `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Cache transport-neutral endpoint specs for the generic gRPC router. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the `grpc.aio` server and loop-local client channels. |
+| `validate_url` | `-` | `bool` | Accept `grpc://` and `grpcs://` URLs. |
+| `url` / `timeout` | `str` / `float` | URL read-only; timeout read/write | Inspect the server identity URL or adjust future call deadlines. |
+| `config` / `capabilities` / `metrics` | Shared types | Read-only | Inspect effective production settings, declared behavior, and operational counters. |
+| `health` | `-` | `dict[str, Any]` | Return ProtoLink health data; standard gRPC health is exposed separately when enabled. |
 
 ---
 
@@ -751,5 +1142,7 @@ Event results are normalized recursively before the SSE frame is encoded. For ex
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
+| `__init__` | Same as `HTTPTransport`, including `config: TransportConfig ⎪ None = None` | `None` | Configure the inherited HTTP unary path and SSE streaming production behavior. |
 | `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | POST a task to `/tasks/stream`, parse SSE JSON-RPC envelopes, and yield each `result` payload. |
 | `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Inherited from `HTTPTransport` for normal request/response calls. |
+| `config` / `capabilities` / `metrics` | Shared types | Read-only | Inspect effective settings, streaming/TLS capabilities, and unary/stream counters. |

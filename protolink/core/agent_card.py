@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any, final
@@ -89,6 +91,42 @@ class AgentSkill:
             self.output_schema = {}
 
 
+@dataclass(frozen=True, slots=True)
+class AgentInterface:
+    """Describe an additional endpoint exposed by an agent.
+
+    ``AgentCard.url`` and ``AgentCard.transport`` remain the primary interface.
+    Use this type only when the same agent is reachable through more than one
+    transport, such as HTTP for broad compatibility and gRPC for internal calls.
+
+    Args:
+        url: Absolute endpoint URL.
+        transport: Registered ProtoLink transport name.
+        protocol_version: Protocol version served by this endpoint.
+    """
+
+    url: str
+    transport: TransportType
+    protocol_version: str = protolink_version
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> AgentInterface:
+        """Create an interface from serialized card data."""
+        return cls(
+            url=str(data["url"]),
+            transport=data.get("transport", "http"),
+            protocol_version=str(data.get("protocolVersion", protolink_version)),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the interface in AgentCard wire format."""
+        return {
+            "url": self.url,
+            "transport": self.transport,
+            "protocolVersion": self.protocol_version,
+        }
+
+
 @final
 @dataclass
 class AgentCard:
@@ -109,6 +147,7 @@ class AgentCard:
         tags: List of tags for categorization. These tags can be used for filtering
             during discovery (Protolink extension to A2A spec) [Optional]
             E.g. "finance", "travel", "math" etc.
+        interfaces: Optional additional endpoints for this same agent identity.
     """
 
     name: str
@@ -124,6 +163,7 @@ class AgentCard:
     security_schemes: dict[SecuritySchemeType, dict[str, Any]] | None = field(default_factory=dict)
     role: AgentRoleType = "worker"
     tags: list[str] = field(default_factory=list)
+    interfaces: list[AgentInterface] = field(default_factory=list)
 
     def __post_init__(self):
         """Normalize fields after initialization."""
@@ -131,13 +171,19 @@ class AgentCard:
         capabilities: Any = self.capabilities
         if isinstance(capabilities, Mapping):
             self.capabilities = AgentCapabilities(**dict(capabilities))
-            return
-        if not isinstance(capabilities, AgentCapabilities):
+        elif not isinstance(capabilities, AgentCapabilities):
             raise TypeError(f"capabilities must be AgentCapabilities or mapping, got {type(capabilities).__name__}")
+        raw_interfaces: list[Any] = list(self.interfaces)
+        self.interfaces = [
+            AgentInterface.from_dict(interface) if isinstance(interface, Mapping) else interface
+            for interface in raw_interfaces
+        ]
+        if not all(isinstance(interface, AgentInterface) for interface in self.interfaces):
+            raise TypeError("interfaces must contain AgentInterface instances or mappings")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to JSON format (A2A agent card spec)."""
-        return {
+        data = {
             "name": self.name,
             "description": self.description,
             "url": self.url,
@@ -151,9 +197,12 @@ class AgentCard:
             "securitySchemes": self.security_schemes,
             "tags": self.tags,
         }
+        if self.interfaces:
+            data["additionalInterfaces"] = [interface.to_dict() for interface in self.interfaces]
+        return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentCard":
+    def from_dict(cls, data: dict[str, Any]) -> AgentCard:
         """Create from Python dict/JSON data."""
 
         cls._validate_fields(data)
@@ -175,6 +224,7 @@ class AgentCard:
             output_formats=data.get("outputFormats", ["text/plain"]),
             security_schemes=data.get("securitySchemes", {}),
             tags=data.get("tags", []),
+            interfaces=data.get("interfaces", data.get("additionalInterfaces", [])),
         )
 
     @staticmethod

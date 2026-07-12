@@ -22,6 +22,7 @@ class RegistryClient:
         path="/agents/",
         method="DELETE",
         request_source="body",
+        idempotent=True,
     )
 
     HEARTBEAT_REQUEST = ClientRequestSpec(
@@ -29,6 +30,7 @@ class RegistryClient:
         path="/agents/heartbeat",
         method="POST",
         request_source="body",
+        idempotent=True,
     )
 
     DISCOVER_REQUEST = ClientRequestSpec(
@@ -36,6 +38,7 @@ class RegistryClient:
         path="/agents/",
         method="GET",
         request_source="query_params",
+        idempotent=True,
     )
 
     def __init__(self, transport: Transport):

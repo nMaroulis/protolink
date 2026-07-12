@@ -52,12 +52,24 @@ from protolink.llms import (
     build_context_manifest,
     create_llm,
 )
-from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task, TaskState
+from protolink.models import AgentCard, AgentInterface, AgentSkill, Artifact, Message, Part, Task, TaskState
 from protolink.security import TLSConfig
 from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import RunReportRecord, RunStore, SQLiteRunStore, TaskRecord
 from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
 from protolink.tools import BaseTool, Tool
+from protolink.transport import (
+    RetryPolicy,
+    TransportConfig,
+    TransportConnectionError,
+    TransportError,
+    TransportLimitError,
+    TransportLimits,
+    TransportMetricsSnapshot,
+    TransportProtocolError,
+    TransportRemoteError,
+    TransportTimeoutError,
+)
 
 __all__ = [
     "DEFAULT_REDACTION_POLICY",
@@ -67,6 +79,7 @@ __all__ = [
     "ActionPolicyError",
     "Agent",
     "AgentCard",
+    "AgentInterface",
     "AgentSkill",
     "ApprovalDecision",
     "ApprovalHandler",
@@ -103,6 +116,7 @@ __all__ = [
     "PolicyDecision",
     "PolicyEffect",
     "RedactionPolicy",
+    "RetryPolicy",
     "Router",
     "RunAction",
     "RunBudget",
@@ -127,6 +141,15 @@ __all__ = [
     "TaskRecord",
     "TaskState",
     "Tool",
+    "TransportConfig",
+    "TransportConnectionError",
+    "TransportError",
+    "TransportLimitError",
+    "TransportLimits",
+    "TransportMetricsSnapshot",
+    "TransportProtocolError",
+    "TransportRemoteError",
+    "TransportTimeoutError",
     "__version__",
     "assert_budget_under",
     "assert_no_denied_actions",

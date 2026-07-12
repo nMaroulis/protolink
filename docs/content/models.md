@@ -73,6 +73,7 @@ class AgentCard:
     security_schemes: dict[str, dict[str, Any]] | None = field(default_factory=dict)
     role: AgentRoleType = "worker"
     tags: list[str] = field(default_factory=list)
+    interfaces: list[AgentInterface] = field(default_factory=list)
 ```
 
 Agent identity and capability declaration. This is the main metadata card that describes an agent's identity, capabilities, and security requirements.
@@ -94,6 +95,22 @@ Agent identity and capability declaration. This is the main metadata card that d
 | `security_schemes` | `dict[SecuritySchemeType, dict[str, Any]] | None` | `{}` | Authentication schemes |
 | `role` | `AgentRoleType` | `"worker"` | Agent role is a protocol-level contract that defines the agent's responsibility in the system topology (Extends A2A spec) |
 | `tags` | `list[str]` | `[]` | List of tags for categorization. These tags can be used for filtering during discovery (Protolink extension to A2A spec) E.g. "finance", "travel", "math" etc. (Extends A2A spec) |
+| `interfaces` | `list[AgentInterface]` | `[]` | Additional URLs and transports for the same agent identity. Serialized as `additionalInterfaces`; the card's `url` and `transport` remain primary. |
+
+Use additional interfaces only when one agent is genuinely reachable through multiple transports:
+
+```python
+from protolink import AgentCard, AgentInterface
+
+card = AgentCard(
+    name="worker",
+    description="Task worker",
+    url="https://worker.example",
+    interfaces=[
+        AgentInterface(url="grpcs://worker.example:9443", transport="grpc"),
+    ],
+)
+```
 
 ### Methods
 

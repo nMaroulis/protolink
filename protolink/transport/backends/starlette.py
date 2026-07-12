@@ -8,7 +8,7 @@ zero-overhead footprint and robust async routing capabilities.
 import asyncio
 import inspect
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
@@ -17,9 +17,19 @@ from protolink.transport._streaming import is_stream_terminal_event
 from protolink.transport.backends.base import BackendInterface
 from protolink.utils.inspect import is_async_callable
 
+if TYPE_CHECKING:
+    from protolink.transport.base import Transport
+
 
 class StarletteBackend(BackendInterface):
-    def __init__(self, *, log_level: str = "info", access_log: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        log_level: str = "info",
+        access_log: bool = True,
+        keepalive_timeout: float = 20.0,
+        limit_concurrency: int = 100,
+    ) -> None:
         Starlette, _, _, _, _ = _require_starlette()  # noqa: N806
 
         self.app = Starlette()
@@ -27,19 +37,26 @@ class StarletteBackend(BackendInterface):
         self._server_instance: Any = None
         self._log_level = log_level
         self._access_log = access_log
+        self._keepalive_timeout = keepalive_timeout
+        self._limit_concurrency = limit_concurrency
 
     # ----------------------------------------------------------------------
     # Setup Routes - Define Server URIs
     # ----------------------------------------------------------------------
 
-    def _register_endpoint(self, ep: EndpointSpec, authenticator: Any = None) -> None:
+    def _register_endpoint(
+        self,
+        ep: EndpointSpec,
+        authenticator: Any = None,
+        transport: "Transport | None" = None,
+    ) -> None:
         _, Request, JSONResponse, HTMLResponse, StreamingResponse = _require_starlette()  # noqa: N806
 
         async def route(request: Request):
             # -------------------------
             # Authenticate request
             # -------------------------
-            if authenticator:
+            if authenticator and ep.path not in {"/healthz", "/readyz"}:
                 from protolink.security.auth import extract_credentials
 
                 credentials = extract_credentials(request.headers, dict(request.query_params))
@@ -63,6 +80,9 @@ class StarletteBackend(BackendInterface):
             else:
                 payload = None
 
+            if transport is not None:
+                transport.check_payload_limit(payload, kind="request", url=str(request.url))
+
             # -------------------------
             # Parse payload
             # -------------------------
@@ -83,19 +103,36 @@ class StarletteBackend(BackendInterface):
                         handler_input=handler_input,
                         payload=payload,
                         request_id=request_id,
+                        transport=transport,
                     ),
                     media_type="text/event-stream",
+                    headers={"X-Protolink-Request-ID": request_id or ""},
                 )
+
+            raw_idempotency_key = request.headers.get("idempotency-key")
+            idempotency_key = f"{ep.method}:{ep.path}:{raw_idempotency_key}" if raw_idempotency_key else None
+            if transport is not None:
+                owns_operation, cached = await transport.acquire_idempotent_response(idempotency_key)
+                if not owns_operation:
+                    return JSONResponse(
+                        cached,
+                        headers={"X-Protolink-Request-ID": request.headers.get("x-protolink-request-id", "")},
+                    )
 
             # -------------------------
             # Call handler
             # -------------------------
             handler_is_async = is_async_callable(ep.handler)
 
-            if ep.request_source != "none" and payload is not None:
-                result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
-            else:
-                result = await ep.handler() if handler_is_async else ep.handler()
+            try:
+                if ep.request_source != "none" and payload is not None:
+                    result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
+                else:
+                    result = await ep.handler() if handler_is_async else ep.handler()
+            except BaseException as exc:
+                if transport is not None:
+                    transport.abort_idempotent_response(idempotency_key, exc)
+                raise
 
             # -------------------------
             # Response
@@ -104,11 +141,25 @@ class StarletteBackend(BackendInterface):
                 return HTMLResponse(result)
 
             serialized_result = self._serialize_result(result)
-            return JSONResponse(serialized_result)
+            if transport is not None:
+                transport.check_payload_limit(serialized_result, kind="response", url=str(request.url))
+                transport.complete_idempotent_response(idempotency_key, serialized_result)
+            return JSONResponse(
+                serialized_result,
+                headers={"X-Protolink-Request-ID": request.headers.get("x-protolink-request-id", "")},
+            )
 
         self.app.add_route(ep.path, route, methods=[ep.method])
 
-    async def _stream_sse(self, *, ep: EndpointSpec, handler_input: Any, payload: Any, request_id: str | None):
+    async def _stream_sse(
+        self,
+        *,
+        ep: EndpointSpec,
+        handler_input: Any,
+        payload: Any,
+        request_id: str | None,
+        transport: "Transport | None" = None,
+    ):
         """Yield JSON-RPC envelopes as Server-Sent Events.
 
         Streaming endpoint handlers return async iterators of Protolink events.
@@ -130,6 +181,8 @@ class StarletteBackend(BackendInterface):
             sent_final = False
             async for event in stream_obj:
                 event_payload = self._serialize_result(event)
+                if transport is not None:
+                    transport.check_payload_limit(event_payload, kind="event")
                 event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
                 stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
                 yield self._sse_frame(
@@ -162,7 +215,12 @@ class StarletteBackend(BackendInterface):
         """Serialize a JSON payload as a single Server-Sent Event frame."""
         return f"data: {json.dumps(payload)}\n\n"
 
-    def setup_routes(self, endpoints: list[EndpointSpec], authenticator: Any = None) -> None:
+    def setup_routes(
+        self,
+        endpoints: list[EndpointSpec],
+        authenticator: Any = None,
+        transport: "Transport | None" = None,
+    ) -> None:
         """Mount abstract Protolink endpoints as physical Starlette routes.
 
         This method serves as the architectural bridge between Protolink's `EndpointSpec` definitions
@@ -171,7 +229,7 @@ class StarletteBackend(BackendInterface):
         `JSONResponse` objects back over the wire.
         """
         for ep in endpoints:
-            self._register_endpoint(ep, authenticator=authenticator)
+            self._register_endpoint(ep, authenticator=authenticator, transport=transport)
 
     # ----------------------------------------------------------------------
     # ASGI Server Lifecycle
@@ -196,6 +254,8 @@ class StarletteBackend(BackendInterface):
             port=port,
             log_level=self._log_level,
             access_log=self._access_log,
+            limit_concurrency=self._limit_concurrency,
+            timeout_keep_alive=int(self._keepalive_timeout),
             **self._uvicorn_tls_kwargs(url, tls),
         )
         server = uvicorn.Server(config)

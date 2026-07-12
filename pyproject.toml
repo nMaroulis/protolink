@@ -39,6 +39,8 @@ possibly-unresolved-reference = "warn"
 allowed-unresolved-imports = [
     "anthropic.**",
     "google.genai.**",
+    "grpc_health.**",
+    "grpc_reflection.**",
     "huggingface_hub.**",
     "llama_cpp.**",
     "mcp.**",
@@ -63,6 +65,8 @@ http = [
 
 grpc = [
     "grpcio>=1.76.0",
+    "grpcio-health-checking>=1.76.0",
+    "grpcio-reflection>=1.76.0",
 ]
 
 llms = [

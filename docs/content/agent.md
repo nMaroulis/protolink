@@ -221,6 +221,7 @@ Unlike the original A2A specification, Protolink's `Agent` combines client and s
 | `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
 | `tls` | `TLSConfig ⎪ None` | `None` | Optional transport-security configuration propagated to factory-created agent and registry transports. Use with `https://`, `wss://`, or `grpcs://` URLs. |
+| `transport_config` | `TransportConfig ⎪ None` | `None` | Shared limits, retry, keepalive, graceful shutdown, idempotency cache, and local metrics configuration propagated to factory-created agent and registry transports. |
 | `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
 | `approval_handler` | `Callable ⎪ None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
 | `run_store` | `RunStore ⎪ None` | `None` | Optional durable task/run store. When provided, the default runtime records task snapshots after direct, server, and streaming execution paths. |
@@ -239,6 +240,35 @@ transport = HTTPTransport(url=url)
 
 agent = Agent(card=card, transport=transport, llm=llm)
 ```
+
+### Production Transport Configuration
+
+Pass one `TransportConfig` at the Agent boundary when the Agent creates transports from string aliases. The same object configures the Agent's server/client transport and any registry transport created from `registry="..."`:
+
+```python
+from protolink import Agent, RetryPolicy, TransportConfig, TransportLimits
+
+transport_config = TransportConfig(
+    limits=TransportLimits(
+        max_request_bytes=8 * 1024 * 1024,
+        max_response_bytes=8 * 1024 * 1024,
+        max_concurrent_requests=200,
+        max_concurrent_streams=50,
+    ),
+    retry=RetryPolicy(max_attempts=3),
+    shutdown_timeout=10.0,
+)
+
+agent = Agent(
+    card=card,
+    transport="grpc",
+    registry="http",
+    registry_url="http://registry.internal:9000",
+    transport_config=transport_config,
+)
+```
+
+When `transport` or `registry` is already an object, its own `config` remains authoritative. Inspect the active instance through `agent.transport`; its `config`, `capabilities`, `metrics`, and `health()` surfaces are documented in the [transport reference](./transport.md#shared-transport-api-reference).
 
 ### Durable Task Snapshots
 

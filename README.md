@@ -337,6 +337,37 @@ agent = Agent(
 
 `TLSConfig` encrypts the connection and verifies certificates; `Authenticator` implementations handle application credentials and authorization. They are independent and can be combined. See the [TLS and mutual TLS guide](https://nmaroulis.github.io/protolink/docs/transport/#tls-and-mutual-tls) and [`examples/tls_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/tls_agent.py).
 
+All transports also share one production configuration surface:
+
+```python
+from protolink import RetryPolicy, TransportConfig, TransportLimits
+
+transport_config = TransportConfig(
+    limits=TransportLimits(max_concurrent_requests=200, max_concurrent_streams=50),
+    retry=RetryPolicy(max_attempts=3),
+)
+
+agent = Agent(
+    card=agent_card,
+    transport="grpc",
+    transport_config=transport_config,
+)
+```
+
+Retries remain off by default and run only for explicitly idempotent request specifications. Correlation IDs, server-side idempotency replay, bounded payloads/concurrency, loop-safe pooled-resource shutdown, WebSocket keepalive, typed transport errors, local metric snapshots, and `/healthz` and `/readyz` probes use the same contract across HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. The `grpc` extra also installs standard gRPC health checking and reflection. See the [production transport guide](https://nmaroulis.github.io/protolink/docs/transport/#production-configuration) and [`examples/transport_production.py`](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py).
+
+The application-facing transport types are exported directly from `protolink`:
+
+| API | Purpose |
+|-----|---------|
+| `TransportConfig` | One immutable configuration for limits, retries, keepalive, shutdown, idempotency replay, and metrics. |
+| `TransportLimits` | Request, response, stream-event, request-concurrency, and stream-concurrency bounds. |
+| `RetryPolicy` | Explicit attempt count, exponential backoff, jitter, and retryable method set. |
+| `TransportMetricsSnapshot` | Dependency-free per-instance counters, byte totals, active work, retries, and cumulative latency. |
+| `TransportError` and typed subclasses | Stable connection, timeout, protocol, remote, and payload-limit failures with request metadata. |
+
+Transport authors can additionally import `Transport`, `TransportCapabilities`, and `TransportRequestContext` from `protolink.transport`. The [shared API reference](https://nmaroulis.github.io/protolink/docs/transport/#shared-transport-api-reference) lists every field, default, base-class hook, health payload, and protocol mapping.
+
 #### LLMs:
 
 Protolink separates LLMs into three types: `api`, `local`, and `server`.
