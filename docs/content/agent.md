@@ -220,6 +220,7 @@ Unlike the original A2A specification, Protolink's `Agent` combines client and s
 | `expose_chat` | `bool` | `True` | Whether an LLM-backed Agent will serve the interactive chat UI and accept chat messages. HTTP-compatible transports make this visible at `/chat`. |
 | `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
+| `tls` | `TLSConfig ⎪ None` | `None` | Optional transport-security configuration propagated to factory-created agent and registry transports. Use with `https://`, `wss://`, or `grpcs://` URLs. |
 | `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
 | `approval_handler` | `Callable ⎪ None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
 | `run_store` | `RunStore ⎪ None` | `None` | Optional durable task/run store. When provided, the default runtime records task snapshots after direct, server, and streaming execution paths. |
@@ -743,7 +744,7 @@ The `/status` page shows the agent's operational health and metadata. The `/chat
 :::
 ## YAML Import and Export
 
-Protolink supports exporting an agent's configuration (identity card, capabilities, transport, LLM, security/authenticator, and registered tools) to a YAML file, and importing it back to reconstruct a functional `Agent` instance.
+Protolink supports exporting an agent's configuration (identity card, capabilities, transport, TLS file references, LLM, security/authenticator, and registered tools) to a YAML file, and importing it back to reconstruct a functional `Agent` instance. TLS serialization stores certificate paths and settings, never certificate or private-key contents.
 
 ### Exporting an Agent
 

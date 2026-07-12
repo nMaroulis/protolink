@@ -53,6 +53,7 @@ from protolink.llms import (
     create_llm,
 )
 from protolink.models import AgentCard, AgentSkill, Artifact, Message, Part, Task, TaskState
+from protolink.security import TLSConfig
 from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import RunReportRecord, RunStore, SQLiteRunStore, TaskRecord
 from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
@@ -116,6 +117,7 @@ __all__ = [
     "StateOperationRequest",
     "StateOperationResult",
     "StateStoreReport",
+    "TLSConfig",
     "Task",
     "TaskAlreadyRunningError",
     "TaskCancellationError",

@@ -1,6 +1,16 @@
 from pathlib import Path
 
-from protolink import Agent, AgentCard, LocalTraceRecorder, LocalTraceTelemetry, Pipeline, Task, Tool, create_llm
+from protolink import (
+    Agent,
+    AgentCard,
+    LocalTraceRecorder,
+    LocalTraceTelemetry,
+    Pipeline,
+    Task,
+    TLSConfig,
+    Tool,
+    create_llm,
+)
 from protolink.cli import main as cli_main
 
 
@@ -11,6 +21,7 @@ def test_top_level_happy_path_exports():
     assert LocalTraceTelemetry is not None
     assert Pipeline is not None
     assert Task is not None
+    assert TLSConfig is not None
     assert Tool is not None
     assert create_llm("mock", default_response="ok").provider == "mock"
 

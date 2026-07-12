@@ -10,6 +10,7 @@ import inspect
 import json
 from typing import Any
 
+from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport._deps import _require_starlette
 from protolink.transport.backends.base import BackendInterface
@@ -174,7 +175,7 @@ class StarletteBackend(BackendInterface):
     # ASGI Server Lifecycle
     # ----------------------------------------------------------------------
 
-    async def start(self, url: str) -> None:
+    async def start(self, url: str, tls: TLSConfig | None = None) -> None:
         """Boot the Uvicorn ASGI server as an isolated background task.
 
         Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn
@@ -193,6 +194,7 @@ class StarletteBackend(BackendInterface):
             port=port,
             log_level=self._log_level,
             access_log=self._access_log,
+            **self._uvicorn_tls_kwargs(url, tls),
         )
         server = uvicorn.Server(config)
 

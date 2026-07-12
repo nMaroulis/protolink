@@ -618,6 +618,8 @@ Type alias for supported transport protocols.
 | **grpc** | Registered | gRPC transport using unary and unary-stream JSON envelopes over `grpc.aio` |
 | **runtime** | Registered | In-memory transport for local agent composition |
 
+The transport name remains protocol-oriented when TLS is enabled. Use secure URL schemes with `TLSConfig`: `https://` for `http`, `sse`, and JSON-RPC aliases; `wss://` for `websocket`; and `grpcs://` for `grpc`.
+
 ---
 
 ## FlowTarget

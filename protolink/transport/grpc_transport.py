@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator, extract_credentials
+from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport._deps import _require_grpc
 from protolink.transport.base import Transport
@@ -44,8 +45,8 @@ class GRPCTransport(Transport):
     Parameters
     ----------
     url:
-        Server URL using the ``grpc://`` scheme, for example
-        ``"grpc://127.0.0.1:9001"``.
+        Server URL using ``grpc://`` or secure ``grpcs://``, for example
+        ``"grpcs://127.0.0.1:9001"``.
     timeout:
         Deadline in seconds for outbound gRPC calls.
     authenticator:
@@ -64,6 +65,9 @@ class GRPCTransport(Transport):
         Optional concurrency limit for the gRPC server.
     graceful_shutdown_timeout:
         Seconds to allow in-flight RPCs to finish during ``stop()``.
+    tls:
+        Optional certificate and trust configuration used by ``grpcs://``
+        servers and channels.
     """
 
     transport_type: ClassVar[TransportType] = "grpc"
@@ -85,18 +89,20 @@ class GRPCTransport(Transport):
         compression: Any | None = None,
         maximum_concurrent_rpcs: int | None = None,
         graceful_shutdown_timeout: float = 3.0,
+        tls: TLSConfig | None = None,
     ) -> None:
         self._grpc = _require_grpc()
         self._url = url
         self._timeout = timeout
         self.authenticator = authenticator
         self.credentials = credentials
+        self.tls = tls
         self.security_context: Any | None = None
 
         self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
         self._server: Any | None = None
         self._is_running = False
-        self._channels: dict[tuple[str, int], Any] = {}
+        self._channels: dict[tuple[str, bool, int], Any] = {}
         self._channel_options = tuple(channel_options or ())
         self._server_options = tuple(server_options or ())
         self._compression = compression
@@ -121,7 +127,7 @@ class GRPCTransport(Transport):
         """Start the ``grpc.aio`` server and register generic RPC handlers."""
         host, port = self._get_host_port(self._url)
         if not host or port is None:
-            raise ValueError(f"Invalid URL: {self._url}. Expected grpc://host:port.")
+            raise ValueError(f"Invalid URL: {self._url}. Expected grpc://host:port or grpcs://host:port.")
 
         self._server = self._grpc.aio.server(
             options=self._server_options,
@@ -145,7 +151,20 @@ class GRPCTransport(Transport):
         )
         self._server.add_generic_rpc_handlers((generic_handler,))
 
-        bound_port = self._server.add_insecure_port(f"{host}:{port}")
+        if self._is_secure_url(self._url):
+            if self.tls is None:
+                raise ValueError(f"gRPC TLS server at {self._url} requires TLSConfig with certfile and keyfile")
+            self.tls.require_server_identity(self._url)
+            private_key = self.tls.private_key_bytes()
+            certificate_chain = self.tls.certificate_chain_bytes()
+            credentials = self._grpc.ssl_server_credentials(
+                private_key_certificate_chain_pairs=((private_key, certificate_chain),),
+                root_certificates=self.tls.ca_bytes() if self.tls.require_client_cert else None,
+                require_client_auth=self.tls.require_client_cert,
+            )
+            bound_port = self._server.add_secure_port(f"{host}:{port}", credentials)
+        else:
+            bound_port = self._server.add_insecure_port(f"{host}:{port}")
         if bound_port == 0:
             raise RuntimeError(f"Failed to bind gRPC transport at {self._url}")
 
@@ -522,14 +541,31 @@ class GRPCTransport(Transport):
     async def _ensure_channel(self, base_url: str) -> Any:
         """Return a loop-local gRPC channel for the target URL."""
         target = self._target_from_url(base_url)
-        key = (target, id(asyncio.get_running_loop()))
+        secure = self._is_secure_url(base_url)
+        key = (target, secure, id(asyncio.get_running_loop()))
         channel = self._channels.get(key)
         if channel is None:
-            channel = self._grpc.aio.insecure_channel(
-                target,
-                options=self._channel_options,
-                compression=self._compression,
-            )
+            if secure:
+                root_certificates = self.tls.ca_bytes() if self.tls is not None else None
+                private_key = self.tls.private_key_bytes() if self.tls is not None else None
+                certificate_chain = self.tls.certificate_chain_bytes() if self.tls is not None else None
+                credentials = self._grpc.ssl_channel_credentials(
+                    root_certificates=root_certificates,
+                    private_key=private_key,
+                    certificate_chain=certificate_chain,
+                )
+                channel = self._grpc.aio.secure_channel(
+                    target,
+                    credentials,
+                    options=self._channel_options,
+                    compression=self._compression,
+                )
+            else:
+                channel = self._grpc.aio.insecure_channel(
+                    target,
+                    options=self._channel_options,
+                    compression=self._compression,
+                )
             self._channels[key] = channel
         return channel
 
@@ -567,8 +603,8 @@ class GRPCTransport(Transport):
     # ------------------------------------------------------------------
 
     def validate_url(self) -> bool:
-        """Return ``True`` when the configured URL uses the ``grpc://`` scheme."""
-        return self._url.startswith("grpc://")
+        """Return whether the URL uses ``grpc://`` or secure ``grpcs://``."""
+        return self._url.startswith("grpc://") or self._url.startswith("grpcs://")
 
     @property
     def url(self) -> str:
@@ -592,21 +628,26 @@ class GRPCTransport(Transport):
 
     @staticmethod
     def _get_host_port(url: str) -> tuple[str | None, int | None]:
-        """Parse a ``grpc://`` URL and return ``(host, port)``."""
+        """Parse a ``grpc://`` or ``grpcs://`` URL into ``(host, port)``."""
         parsed = urlparse(url.rstrip("/"))
         return parsed.hostname, parsed.port
 
     @staticmethod
     def _target_from_url(url: str) -> str:
-        """Convert ``grpc://host:port`` into the grpcio target ``host:port``."""
+        """Convert a ProtoLink gRPC URL into the grpcio ``host:port`` target."""
         parsed = urlparse(url.rstrip("/"))
         if parsed.scheme:
-            if parsed.scheme != "grpc":
+            if parsed.scheme not in {"grpc", "grpcs"}:
                 raise ValueError(f"Unsupported gRPC URL scheme: {parsed.scheme}")
             if not parsed.hostname or parsed.port is None:
-                raise ValueError(f"Invalid gRPC URL: {url}. Expected grpc://host:port.")
+                raise ValueError(f"Invalid gRPC URL: {url}. Expected grpc://host:port or grpcs://host:port.")
             return f"{parsed.hostname}:{parsed.port}"
         return url
+
+    @staticmethod
+    def _is_secure_url(url: str) -> bool:
+        """Return whether a gRPC URL requests TLS."""
+        return urlparse(url.rstrip("/")).scheme.lower() == "grpcs"
 
     @staticmethod
     def _is_stream_terminal_event(event_payload: Any, *, event_final: bool) -> bool:

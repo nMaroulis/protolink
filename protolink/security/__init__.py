@@ -7,6 +7,7 @@ from .auth import (
     SecurityContext,
     extract_credentials,
 )
+from .tls import TLSConfig
 
 __all__ = [
     "APIKeyAuth",
@@ -15,5 +16,6 @@ __all__ = [
     "BearerTokenAuth",
     "OAuth2DelegationAuth",
     "SecurityContext",
+    "TLSConfig",
     "extract_credentials",
 ]

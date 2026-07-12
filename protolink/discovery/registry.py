@@ -13,6 +13,7 @@ from typing import Any, Literal
 from protolink.client import RegistryClient
 from protolink.core.registry import RegistryEntry
 from protolink.models import AgentCard
+from protolink.security.tls import TLSConfig
 from protolink.server import RegistryServer
 from protolink.storage import Storage
 from protolink.transport import Transport, get_transport
@@ -50,6 +51,7 @@ class Registry:
         *,
         entry_ttl_seconds: float | None = None,
         storage: Storage | None = None,
+        tls: TLSConfig | None = None,
     ):
         """Initialize the registry.
 
@@ -61,6 +63,7 @@ class Registry:
                 is older than this value are pruned before discovery/status.
             storage: Optional generic storage used to persist registry entries
                 across process restarts.
+            tls: Optional transport-security configuration for secure registry URLs.
         """
         self.logger = get_logger(__name__, verbosity)
 
@@ -68,9 +71,14 @@ class Registry:
         if isinstance(transport, str):
             if url is None:
                 raise ValueError("url must be provided if transport is a TransportType")
-            transport = get_transport(transport, url=url)
+            transport_kwargs: dict[str, Any] = {"url": url}
+            if tls is not None:
+                transport_kwargs["tls"] = tls
+            transport = get_transport(transport, **transport_kwargs)
         elif not isinstance(transport, Transport):
             raise ValueError("transport must be a TransportType or Transport instance")
+        elif tls is not None and getattr(transport, "tls", None) is None and hasattr(transport, "tls"):
+            setattr(transport, "tls", tls)  # noqa: B010
 
         # Local store for agent cards. ``_agents`` remains public-ish for
         # compatibility with tests and examples; ``_entries`` carries liveness

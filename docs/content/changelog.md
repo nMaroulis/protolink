@@ -39,6 +39,7 @@ uv add --upgrade protolink
 ### Added
 
 - Added `GRPCTransport`, the `"grpc"` factory registration, gRPC transport conformance coverage, and `examples/grpc_agent.py` for provider-free request/response and streaming usage.
+- Added the top-level `TLSConfig` API with native TLS and optional mutual TLS for HTTP, SSE JSON-RPC, WebSocket, and gRPC transports; secure URL schemes; high-level `Agent`, `AgentClient`, and `Registry` propagation; certificate-backed integration coverage; and `examples/tls_agent.py`.
 
 ## [0.6.4] - 2026-07-03
 

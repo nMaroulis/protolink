@@ -78,7 +78,13 @@ print(result.get_last_part_content())
 ### Constructor
 
 ```python
-AgentClient(transport: Transport | TransportType, url: str | None = None)
+AgentClient(
+    transport: Transport | TransportType,
+    url: str | None = None,
+    timeout: int = 300,
+    *,
+    tls: TLSConfig | None = None,
+)
 ```
 
 | Parameter | Type | Description |
@@ -86,6 +92,7 @@ AgentClient(transport: Transport | TransportType, url: str | None = None)
 | `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
 | `url` | `str ⎪ None` | Base URL when using a transport type string |
 | `timeout` | `int` | Timeout in seconds for the request (default: 300) |
+| `tls` | `TLSConfig ⎪ None` | Optional CA trust and client certificate identity for HTTPS, WSS, or secure gRPC calls. |
 
 **Examples:**
 

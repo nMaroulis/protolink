@@ -118,7 +118,7 @@ Running tasks can be canceled by task ID across local and remote transports, wit
   - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
   - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
   - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
-  - **Enhanced Security**: **OAuth 2.0** and **API key support**.
+  - **Enhanced Security**: Native **TLS/mTLS**, **OAuth 2.0**, bearer tokens, Basic auth, and **API key support**.
   - **Comprehensive Logging**: Built-in support for **console** (colored), **file-based** logging (including structured **JSON** output), and a no-op quiet logger.
   - Built-in support for streaming and async operations.
 - **Planned Integrations**:
@@ -311,6 +311,31 @@ For Agent-to-Agent & Agent-to-Registry communication:
 - `websocket` · [WebSocketTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py): Uses WebSocket for streaming requests. [`websockets`]
 - `grpc` · [GRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py): Uses gRPC unary calls and unary-stream task events over compact JSON envelopes. [`grpcio`]
 - `runtime` · [RuntimeTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py): Simple **in-process, in-memory transport**.
+
+All network transports share one native TLS API. Use `https://`, `wss://`, or `grpcs://` and pass `TLSConfig` at the top level:
+
+```python
+from protolink import Agent, AgentCard, TLSConfig
+
+tls = TLSConfig(
+    certfile="certs/agent.pem",
+    keyfile="certs/agent-key.pem",
+    cafile="certs/ca.pem",
+    # require_client_cert=True,  # enable mutual TLS
+)
+
+agent = Agent(
+    card=AgentCard(
+        name="secure-agent",
+        description="Agent served over HTTPS",
+        url="https://agent.internal:8443",
+    ),
+    transport="http",
+    tls=tls,
+)
+```
+
+`TLSConfig` encrypts the connection and verifies certificates; `Authenticator` implementations handle application credentials and authorization. They are independent and can be combined. See the [TLS and mutual TLS guide](https://nmaroulis.github.io/protolink/docs/transport/#tls-and-mutual-tls) and [`examples/tls_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/tls_agent.py).
 
 #### LLMs:
 

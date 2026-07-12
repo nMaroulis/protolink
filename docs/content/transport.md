@@ -68,6 +68,90 @@ Some rough guidelines:
 
 The rest of this page dives into the API of each transport in more detail.
 
+## TLS and mutual TLS
+
+TLS is transport security: it encrypts traffic and verifies certificates before ProtoLink sends any task data. It is separate from application authentication. Use `TLSConfig` for HTTPS, secure WebSockets, and secure gRPC; use an `Authenticator` for bearer tokens, API keys, Basic auth, or OAuth. Production services commonly use both.
+
+The high-level API accepts the same configuration everywhere:
+
+```python
+from protolink import Agent, AgentCard, TLSConfig
+
+tls = TLSConfig(
+    certfile="certs/agent.pem",
+    keyfile="certs/agent-key.pem",
+    cafile="certs/ca.pem",
+)
+
+agent = Agent(
+    card=AgentCard(
+        name="secure-agent",
+        description="Agent served over HTTPS",
+        url="https://agent.internal:8443",
+    ),
+    transport="http",
+    tls=tls,
+)
+```
+
+The URL scheme activates encryption. The transport name does not change:
+
+| Transport | Plain URL | TLS URL |
+|-----------|-----------|---------|
+| HTTP and SSE JSON-RPC | `http://` | `https://` |
+| WebSocket | `ws://` | `wss://` |
+| gRPC | `grpc://` | `grpcs://` |
+| Runtime | `runtime://` | Not applicable; no network socket |
+
+`certfile` and `keyfile` form the local certificate identity. A secure server URL requires both. `cafile` supplies trusted certificate authorities; outbound clients use the operating system trust store when it is omitted. Hostname verification is enabled by default and should remain enabled in production.
+
+| `TLSConfig` field | Default | Purpose |
+|-------------------|---------|---------|
+| `certfile` | `None` | PEM certificate chain presented by this server or mTLS client. |
+| `keyfile` | `None` | PEM private key matching `certfile`; the two fields must be supplied together. |
+| `cafile` | System roots for clients | PEM CA bundle used to verify remote servers and inbound mTLS clients. |
+| `require_client_cert` | `False` | Require a trusted certificate from every inbound client. Requires `cafile`. |
+| `check_hostname` | `True` | Verify outbound certificate hostnames. Disabling this does not disable CA verification. |
+
+For a client that only calls a secure service, certificate trust is enough:
+
+```python
+from protolink import TLSConfig
+from protolink.client import AgentClient
+
+client = AgentClient(
+    transport="grpc",
+    url="grpc://127.0.0.1:0",
+    tls=TLSConfig(cafile="certs/ca.pem"),
+)
+result = client.sync.send_task("grpcs://worker.internal:9443", task)
+```
+
+Enable mutual TLS by requiring a trusted client certificate on the server. The calling workload must then provide its own certificate and key:
+
+```python
+server_tls = TLSConfig(
+    certfile="certs/server.pem",
+    keyfile="certs/server-key.pem",
+    cafile="certs/ca.pem",
+    require_client_cert=True,
+)
+
+client_tls = TLSConfig(
+    certfile="certs/client.pem",
+    keyfile="certs/client-key.pem",
+    cafile="certs/ca.pem",
+)
+```
+
+`Agent`, `AgentClient`, and `Registry` accept `tls=` when they create a transport by name. Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport`, and `GRPCTransport` instances accept the same argument. Certificate paths are serialized by `Agent.to_dict()` and `to_yaml()`; private-key contents are never embedded.
+
+:::note[TLS termination]
+
+Native TLS is useful for direct service exposure and end-to-end mTLS. It is also valid to terminate TLS at a trusted ingress, reverse proxy, load balancer, or service mesh and use an insecure ProtoLink URL only on the protected internal hop. Do not advertise an insecure URL outside that boundary. Restart the transport and recreate client connections after rotating certificate files so new SSL contexts and gRPC credentials are loaded.
+
+:::
+
 <ApiSurface
   eyebrow="Transport module"
   title="Transport Layer"
@@ -78,6 +162,7 @@ The rest of this page dives into the API of each transport in more detail.
     "SSE JSON-RPC",
     "WebSocket",
     "gRPC",
+    "TLS / mTLS",
     "RuntimeTransport",
     "Control-plane routes",
   ]}
@@ -192,7 +277,7 @@ class BackendInterface(ABC):
     @abstractmethod
     def setup_routes(self, endpoints: list[EndpointSpec]) -> None: ...
     @abstractmethod
-    async def start(self, host: str, port: int) -> None: ...
+    async def start(self, url: str, tls: TLSConfig | None = None) -> None: ...
     @abstractmethod
     async def stop(self) -> None: ...
 ```
@@ -396,7 +481,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, backend, validation, and Uvicorn logging behavior. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, TLS, backend, validation, and Uvicorn logging behavior. |
 | `start` | `self` | `Awaitable[None]` | Start the selected backend and create the internal `httpx.AsyncClient`. `AgentServer` or `RegistryServer` registers endpoint specs before transport startup. |
 | `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
 
@@ -420,7 +505,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 | ---- | ---------- | ------- | ----------- |
 | `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `Authenticator` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
 | `_build_headers` | `skill: str ⎪ None = None` | `dict[str, str]` | Internal helper that constructs HTTP headers (including `Authorization` when an auth context is present). Exposed here for completeness; you normally do not need to call it directly. |
-| `validate_url` | `-` | `-` | Return `True` if the URL is considered local to this transport's host/port (e.g. for allow‑listing), `False` otherwise. |
+| `validate_url` | `-` | `bool` | Return `True` when the configured URL uses `http://` or `https://`. |
 
 ---
 
@@ -534,7 +619,7 @@ Use it when:
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None` | `None` | Configure URL, timeout, authentication, and credentials for WebSocket connections. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None` | `None` | Configure URL, timeout, authentication, credentials, and TLS for `wss://` connections. |
 | `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a `Task` to `/tasks/stream` and receive task event payloads over a single WebSocket connection. |
 | `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
 
@@ -617,7 +702,7 @@ Authentication uses gRPC metadata keys compatible with the HTTP headers Protolin
 
 | Name | Parameters | Returns | Description |
 | ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `channel_options = None`, `server_options = None`, `compression = None`, `maximum_concurrent_rpcs: int ⎪ None = None`, `graceful_shutdown_timeout: float = 3.0` | `None` | Configure the gRPC endpoint, deadlines, optional auth, grpcio options, compression, and server shutdown grace. |
+| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `channel_options = None`, `server_options = None`, `compression = None`, `maximum_concurrent_rpcs: int ⎪ None = None`, `graceful_shutdown_timeout: float = 3.0`, `tls: TLSConfig ⎪ None = None` | `None` | Configure the gRPC endpoint, deadlines, auth, TLS/mTLS, grpcio options, compression, and server shutdown grace. |
 | `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Send a unary request to the peer's `Invoke` method and parse the response through the request spec. |
 | `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a task to `Stream` and yield each task event result until the stream is final. |
 | `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Cache transport-neutral endpoint specs for the generic gRPC router. |

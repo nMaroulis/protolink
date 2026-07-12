@@ -109,6 +109,44 @@ const moduleDefinitions = [
     ],
   },
   {
+    id: "tls",
+    label: "TLS",
+    detail: "transport security",
+    badge: "TS",
+    tone: "blue",
+    options: [
+      {
+        id: "server-tls",
+        label: "TLS",
+        kind: "encrypted",
+        imports: ["from protolink import TLSConfig"],
+        setup: [
+          "tls = TLSConfig(",
+          '    certfile="certs/agent.pem",',
+          '    keyfile="certs/agent-key.pem",',
+          '    cafile="certs/ca.pem",',
+          ")",
+        ],
+        agentArg: "tls=tls",
+      },
+      {
+        id: "mutual-tls",
+        label: "Mutual TLS",
+        kind: "peer identity",
+        imports: ["from protolink import TLSConfig"],
+        setup: [
+          "tls = TLSConfig(",
+          '    certfile="certs/agent.pem",',
+          '    keyfile="certs/agent-key.pem",',
+          '    cafile="certs/ca.pem",',
+          "    require_client_cert=True,",
+          ")",
+        ],
+        agentArg: "tls=tls",
+      },
+    ],
+  },
+  {
     id: "llm",
     label: "LLM",
     detail: "model provider",
@@ -368,6 +406,7 @@ const moduleDefinitions = [
         label: "HTTP",
         kind: "network",
         cardUrl: "http://127.0.0.1:8000",
+        secureCardUrl: "https://127.0.0.1:8000",
         agentArg: 'transport="http"',
       },
       {
@@ -382,6 +421,7 @@ const moduleDefinitions = [
         label: "WebSockets",
         kind: "duplex",
         cardUrl: "ws://127.0.0.1:8000",
+        secureCardUrl: "wss://127.0.0.1:8000",
         agentArg: 'transport="websocket"',
       },
       {
@@ -389,6 +429,7 @@ const moduleDefinitions = [
         label: "gRPC",
         kind: "rpc",
         cardUrl: "grpc://127.0.0.1:8000",
+        secureCardUrl: "grpcs://127.0.0.1:8000",
         agentArg: 'transport="grpc"',
       },
       {
@@ -396,6 +437,7 @@ const moduleDefinitions = [
         label: "JSON-RPC",
         kind: "sse",
         cardUrl: "http://127.0.0.1:8000",
+        secureCardUrl: "https://127.0.0.1:8000",
         agentArg: 'transport="json-rpc"',
       },
     ],
@@ -747,12 +789,21 @@ function buildAgentCode(activeModules, selectedOptions) {
     activeModules,
     selectedOptions,
   );
+  const tlsEnabled =
+    activeModules.some((module) => module.id === "tls") &&
+    Boolean(transportOption.secureCardUrl);
+  const cardUrl = tlsEnabled
+    ? transportOption.secureCardUrl
+    : transportOption.cardUrl;
   const constructorArgs = [
-    `card=AgentCard(name="assistant", description="Composable protocol task agent", url="${transportOption.cardUrl}")`,
+    `card=AgentCard(name="assistant", description="Composable protocol task agent", url="${cardUrl}")`,
   ];
   const afterLines = [];
 
   activeModules.forEach((module) => {
+    if (module.id === "tls" && !tlsEnabled) {
+      return;
+    }
     const resolvedModule = selectedModuleOption(module, selectedOptions);
 
     resolvedModule.imports?.forEach((line) => imports.add(line));

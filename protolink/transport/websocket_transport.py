@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.security.auth import Authenticator
+from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport.base import Transport
 from protolink.types import TransportType
@@ -45,6 +46,14 @@ class WebSocketTransport(Transport):
     management. Persistent WebSocket connections and their synchronization primitives (like
     ``asyncio.Lock``) are dynamically cached using composite keys incorporating the caller's
     event loop ID. This guarantees strict isolation of connections per thread.
+
+    Args:
+        url: Server URL using ``ws://`` or secure ``wss://``.
+        timeout: Timeout in seconds for outbound operations.
+        authenticator: Optional application-level request authenticator.
+        credentials: Optional credentials for outbound authentication.
+        tls: Optional certificate and trust configuration used by ``wss://``
+            servers and clients.
     """
 
     transport_type: ClassVar[TransportType] = "websocket"
@@ -56,11 +65,15 @@ class WebSocketTransport(Transport):
         timeout: float = 360.0,
         authenticator: Authenticator | None = None,
         credentials: str | None = None,
+        *,
+        tls: TLSConfig | None = None,
     ) -> None:
+        """Initialize a loop-safe WebSocket transport."""
         self._url: str = url
         self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
         self.credentials: str | None = credentials
+        self.tls = tls
         self.security_context: Any | None = None
 
         self._endpoints: dict[tuple[str, str], EndpointSpec] = {}
@@ -112,6 +125,11 @@ class WebSocketTransport(Transport):
         }
         if self.authenticator:
             kwargs["process_request"] = self._process_request
+        if urlparse(self._url).scheme.lower() == "wss":
+            if self.tls is None:
+                raise ValueError(f"WSS server at {self._url} requires TLSConfig with certfile and keyfile")
+            self.tls.require_server_identity(self._url)
+            kwargs["ssl"] = self.tls.create_server_context()
 
         self._server = await websockets.serve(
             self._handle_connection,
@@ -323,10 +341,13 @@ class WebSocketTransport(Transport):
             return existing
 
         headers = self._build_headers()
+        connect_kwargs: dict[str, Any] = {}
+        if urlparse(base_url).scheme.lower() == "wss" and self.tls is not None:
+            connect_kwargs["ssl"] = self.tls.create_client_context()
         try:
-            conn = await websockets.connect(base_url, additional_headers=headers)
+            conn = await websockets.connect(base_url, additional_headers=headers, **connect_kwargs)
         except TypeError:
-            conn = await websockets.connect(base_url, extra_headers=headers)
+            conn = await websockets.connect(base_url, extra_headers=headers, **connect_kwargs)
         self._client_conns[loop_key] = conn
         return conn
 
