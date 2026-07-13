@@ -97,7 +97,7 @@ The shared APIs exist to solve four practical production problems:
 
 ## Production configuration
 
-Every transport accepts the same `TransportConfig`. Configure it on the concrete transport passed to an Agent, or pass `transport_config=` to `AgentClient` and `Registry` when those APIs create a transport by name. This keeps operational behavior consistent when an application changes protocols: an 8 MiB request limit means the same thing over HTTP, gRPC, WebSocket, or the in-process runtime.
+Every transport accepts the same `TransportConfig`. Configure it on the concrete transport passed to `Agent`, `AgentClient`, or `Registry`. This keeps operational behavior consistent when an application changes protocols: an 8 MiB request limit means the same thing over HTTP, gRPC, WebSocket, or the in-process runtime.
 
 Most applications can start without creating this object. The defaults bound resources, collect local metrics, and keep retries disabled. Add an explicit configuration when deployment requirements differ from those defaults, such as a known maximum task size, a service concurrency budget, or a retry policy approved for your workload.
 
@@ -134,7 +134,7 @@ The same limits apply to RuntimeTransport, making local tests representative of 
 
 :::tip[Start simple, configure explicitly]
 
-Use `Agent(card=card, transport="grpc")` while prototyping. When deployment needs advanced settings, construct `GRPCTransport(url=card.url, config=transport_config)` and pass that object to Agent. `AgentClient` and `Registry` retain `transport_config=` as factory conveniences because they directly own the transport they create.
+Use string aliases while prototyping: `Agent(card=card, transport="grpc")`, `AgentClient("grpc", url=...)`, or `Registry("grpc", url=...)`. When deployment needs advanced settings, construct `GRPCTransport(url=..., config=transport_config)` and pass that object to the facade. The same rule applies everywhere.
 
 :::
 
@@ -583,12 +583,13 @@ For a client that only calls a secure service, certificate trust is enough:
 ```python
 from protolink import TLSConfig
 from protolink.client import AgentClient
+from protolink.transport import GRPCTransport
 
-client = AgentClient(
-    transport="grpc",
+transport = GRPCTransport(
     url="grpc://127.0.0.1:0",
     tls=TLSConfig(cafile="certs/ca.pem"),
 )
+client = AgentClient(transport)
 result = client.sync.send_task("grpcs://worker.internal:9443", task)
 ```
 
@@ -609,7 +610,7 @@ client_tls = TLSConfig(
 )
 ```
 
-Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport`, and `GRPCTransport` instances accept `tls=`. `AgentClient` and `Registry` also accept it as a convenience when they create a transport by name. `Agent` keeps transport security out of its constructor: pass a configured transport object instead. `Agent.to_dict()` and `to_yaml()` serialize certificate paths inside the transport block; private-key contents are never embedded.
+Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport`, and `GRPCTransport` instances accept `tls=`. `Agent`, `AgentClient`, and `Registry` keep transport security out of their constructors: pass a configured transport object instead. `Agent.to_dict()` and `to_yaml()` serialize certificate paths inside the transport block; private-key contents are never embedded.
 
 :::note[TLS termination]
 

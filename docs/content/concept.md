@@ -33,7 +33,7 @@ Each layer has a **single responsibility** and a clear **dependency direction**.
 
 ProtoLink's API is designed to be **simple at the beginning without becoming restrictive later**. A user should be able to prototype an Agent without first learning transport internals, but production users should still be able to configure every network and runtime boundary explicitly.
 
-This creates two levels of control through one API.
+This creates two levels of control through one consistent rule. `Agent`, `AgentClient`, and `Registry` all accept either a registered transport name or a concrete `Transport` instance.
 
 ### Simple path: choose a transport
 
@@ -86,6 +86,31 @@ agent = Agent(card=card, transport=transport)
 
 The Agent receives the same `Transport` abstraction in both examples. The only difference is who constructs it: ProtoLink owns construction in the simple path; the application owns construction in the advanced path.
 
+AgentClient and Registry follow the same progression:
+
+```python
+from protolink import TLSConfig
+from protolink.client import AgentClient
+from protolink.discovery import Registry
+from protolink.transport import HTTPTransport
+
+# Simple facades create default transports.
+client = AgentClient("http", url="http://127.0.0.1:8001")
+registry = Registry("http", url="http://127.0.0.1:9000")
+
+# Advanced facades receive independently configured transport objects.
+client_tls = TLSConfig(cafile="certs/ca.pem")
+registry_tls = TLSConfig(
+    certfile="certs/registry.pem",
+    keyfile="certs/registry-key.pem",
+    cafile="certs/ca.pem",
+)
+client = AgentClient(HTTPTransport("https://agent.internal:8443", tls=client_tls))
+registry = Registry(HTTPTransport("https://registry.internal:9000", tls=registry_tls))
+```
+
+Each service boundary should receive its own transport instance. Sharing configuration values is safe, but sharing a live transport object between unrelated Agent, client, and Registry lifecycles would also share pools, metrics, idempotency caches, and shutdown ownership.
+
 ### Why advanced settings live on Transport
 
 Putting every infrastructure option on `Agent` would make the common constructor grow whenever HTTP, WebSocket, gRPC, TLS, or resilience gained a feature. It would also blur ownership: TLS certificates, connection pools, message limits, retry timing, and keepalive behavior are properties of the communication boundary, not of Agent reasoning or task execution.
@@ -94,7 +119,7 @@ Keeping these settings on Transport provides several concrete benefits:
 
 - **Clear ownership**: the object opening sockets also owns certificates, pools, limits, retries, and shutdown behavior.
 - **Independent boundaries**: an Agent transport and its Registry transport can use different trust roots, identities, capacities, and retry policies.
-- **Stable Agent API**: adding a gRPC channel option or HTTP backend option does not expand the Agent constructor.
+- **Stable facade APIs**: adding a gRPC channel option or HTTP backend option does not expand Agent, AgentClient, or Registry constructors.
 - **Protocol substitution**: application logic continues to depend on `Transport`, not on protocol-specific settings promoted into Agent.
 - **Reliable serialization**: `Agent.to_dict()` and YAML preserve advanced settings inside each serialized transport block.
 
@@ -106,7 +131,7 @@ Keeping these settings on Transport provides several concrete benefits:
 | Payload limits, retries, keepalive, connection pools | `TransportConfig` on a concrete `Transport` | Controls communication resources and failure behavior. |
 | Registry TLS and capacity policy | Registry transport / `RegistryClient` | The Registry is a separate service boundary with independent deployment requirements. |
 
-This is **progressive control**, not a beginner API and an unrelated expert API. Users can begin with a string, move to a configured object when requirements grow, and keep the surrounding Agent code unchanged.
+This is **progressive control**, not a beginner API and an unrelated expert API. Users can begin with a string, move to a configured object when requirements grow, and keep the surrounding Agent, client, and Registry code unchanged.
 
 See [Agents](agent.md#simple-and-advanced-transports) for the constructor-level API and [Transport](transport.md#production-configuration) for every production setting.
 

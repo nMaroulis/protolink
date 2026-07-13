@@ -103,8 +103,10 @@ def test_tls_is_owned_and_serialized_by_the_transport() -> None:
     transport = HTTPTransport("https://127.0.0.1:8443", tls=server_tls)
     agent = Agent(_card("factory-agent", transport.url), transport=transport, verbosity=0)
     client_tls = _client_tls()
-    client = AgentClient("http", url="https://127.0.0.1:8444", tls=client_tls)
-    registry = Registry("http", url="https://127.0.0.1:8445", tls=client_tls, verbosity=0)
+    client_transport = HTTPTransport("https://127.0.0.1:8444", tls=client_tls)
+    client = AgentClient(client_transport)
+    registry_transport = HTTPTransport("https://127.0.0.1:8445", tls=_server_tls())
+    registry = Registry(registry_transport, verbosity=0)
 
     serialized = agent.to_dict()
     restored = Agent.from_dict(serialized)
@@ -112,8 +114,10 @@ def test_tls_is_owned_and_serialized_by_the_transport() -> None:
     assert "tls" not in serialized
     assert serialized["transport"]["tls"] == server_tls.to_dict()
     assert agent.transport is transport
+    assert client.transport is client_transport
     assert getattr(client.transport, "tls", None) is client_tls
-    assert getattr(registry.client.transport, "tls", None) is client_tls
+    assert registry.client.transport is registry_transport
+    assert getattr(registry.client.transport, "tls", None) == _server_tls()
     assert restored.transport is not None
     assert getattr(restored.transport, "tls", None) == server_tls
 

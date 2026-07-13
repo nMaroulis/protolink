@@ -44,7 +44,7 @@ uv add --upgrade protolink
   - Added gRPC transport conformance and integration coverage plus the provider-free `examples/grpc_agent.py` example.
 - **TLS and mutual TLS**
   - Added the top-level `TLSConfig` API for shared certificate trust, server identity, and optional client-certificate verification across HTTP, SSE JSON-RPC, WebSocket, and gRPC.
-  - Added secure `https://`, `wss://`, and `grpcs://` URL handling. TLS is owned by concrete Agent transports, while `AgentClient` and `Registry` retain factory convenience arguments.
+  - Added secure `https://`, `wss://`, and `grpcs://` URL handling, with TLS owned consistently by concrete transport instances.
   - Added certificate-backed integration coverage and `examples/tls_agent.py`, while keeping transport encryption independent from application authentication and authorization.
 - **Shared production transport contract**
   - Added `TransportConfig`, `TransportLimits`, and `RetryPolicy` for consistent payload bounds, request/stream concurrency, explicit idempotent retries, keepalive, graceful shutdown, response deduplication, and dependency-free metrics across every built-in transport.
@@ -58,12 +58,16 @@ uv add --upgrade protolink
 
 ### Changed
 
-- Simplified the Agent API boundary: string transport aliases remain the zero-configuration prototyping path, while TLS, limits, retries, keepalive, and protocol-specific settings are configured on a concrete transport object passed to Agent.
-- `AgentClient` and `Registry` retain `tls=` and `transport_config=` factory conveniences because they directly own the transports they create. Agent serialization now restores its primary and Registry transports with independent TLS identities and production configurations.
+- Unified transport construction across `Agent`, `AgentClient`, and `Registry`: string aliases remain the zero-configuration prototyping path, while TLS, limits, retries, keepalive, and protocol-specific settings are configured on a concrete transport object passed to the facade.
+- Agent serialization now restores its primary and Registry transports with independent TLS identities and production configurations.
 - `ClientRequestSpec` now declares operation idempotency explicitly. Retries remain disabled by default and run only when the request specification, method, and typed failure all permit a safe retry.
 - HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport now enforce the same serialized payload and concurrency contract, so in-process tests exercise the same resource boundaries as network deployments.
 - Correlation IDs remain stable across retry attempts, while idempotency keys suppress concurrent duplicate execution and replay completed responses within the configured process-local cache window.
 - Expanded the Transport, Agent, Client, Registry, and AgentCard documentation with complete signatures, defaults, protocol mappings, operational rationale, custom-transport guidance, and production examples. The documentation landing-page IDE now includes gRPC and production transport configuration with incremental line editing.
+
+### Removed
+
+- Removed facade-level `tls=` and `transport_config=` constructor arguments from `Agent`, `AgentClient`, and `Registry`. Advanced settings now have one owner and one API: the concrete transport instance.
 
 ### Fixed
 

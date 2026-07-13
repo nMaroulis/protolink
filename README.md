@@ -340,7 +340,7 @@ transport = HTTPTransport(
 agent = Agent(card=card, transport=transport)
 ```
 
-This keeps Agent concerns such as reasoning, tools, state, and policy separate from transport concerns such as TLS, payload limits, retries, keepalive, and connection management. Agent and Registry transports can therefore use different certificates and capacity policies without expanding or coupling the `Agent` constructor.
+This keeps Agent concerns such as reasoning, tools, state, and policy separate from transport concerns such as TLS, payload limits, retries, keepalive, and connection management. The same rule applies to `AgentClient` and `Registry`: pass a string for defaults or a configured transport object for advanced behavior. Every service boundary can therefore use its own certificates and capacity policy without expanding or coupling the high-level constructors.
 
 ## Documentation
 

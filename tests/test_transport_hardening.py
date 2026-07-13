@@ -170,14 +170,12 @@ def test_agent_card_round_trips_additional_interfaces() -> None:
     assert restored.interfaces == card.interfaces
 
 
-def test_high_level_client_propagates_transport_config() -> None:
+def test_client_uses_configured_transport_instance() -> None:
     config = TransportConfig(retry=RetryPolicy(max_attempts=2))
-    client = AgentClient(
-        transport="runtime",
-        url="runtime://client",
-        transport_config=config,
-    )
+    transport = RuntimeTransport("runtime://client", config=config)
+    client = AgentClient(transport)
 
+    assert client.transport is transport
     assert client.transport.config is config
 
 
@@ -197,11 +195,11 @@ def test_agent_and_registry_transports_own_independent_config() -> None:
         transport=agent_transport,
         registry=RegistryClient(registry_transport),
     )
-    registry = Registry(
-        transport="runtime",
-        url="runtime://configured-registry",
-        transport_config=registry_config,
+    standalone_registry_transport = RuntimeTransport(
+        "runtime://standalone-configured-registry",
+        config=registry_config,
     )
+    registry = Registry(transport=standalone_registry_transport)
     restored = Agent.from_dict(agent.to_dict())
 
     assert agent.transport is agent_transport
@@ -209,6 +207,7 @@ def test_agent_and_registry_transports_own_independent_config() -> None:
     assert agent.registry_client is not None
     assert agent.registry_client.transport is registry_transport
     assert agent.registry_client.transport.config is registry_config
+    assert registry.client.transport is standalone_registry_transport
     assert registry.client.transport.config is registry_config
     assert restored.transport is not None
     assert restored.transport.config == agent_config
@@ -235,6 +234,16 @@ def test_agent_constructor_keeps_advanced_settings_on_transport() -> None:
 
     assert "tls" not in parameters
     assert "transport_config" not in parameters
+
+
+def test_client_and_registry_constructors_keep_advanced_settings_on_transport() -> None:
+    client_parameters = inspect.signature(AgentClient).parameters
+    registry_parameters = inspect.signature(Registry).parameters
+
+    assert "tls" not in client_parameters
+    assert "transport_config" not in client_parameters
+    assert "tls" not in registry_parameters
+    assert "transport_config" not in registry_parameters
 
 
 @pytest.mark.asyncio

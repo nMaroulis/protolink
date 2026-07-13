@@ -1396,9 +1396,7 @@ class AgentSerializationMixin(_AgentMixinBase):
         if tls is not None:
             data["tls"] = tls.to_dict()
         if hasattr(transport, "backend"):
-            data["backend"] = (
-                "fastapi" if "FastAPIBackend" in transport.backend.__class__.__name__ else "starlette"
-            )
+            data["backend"] = "fastapi" if "FastAPIBackend" in transport.backend.__class__.__name__ else "starlette"
             if hasattr(transport.backend, "validate_schema"):
                 data["validate_schema"] = getattr(transport.backend, "validate_schema", False)
         return data

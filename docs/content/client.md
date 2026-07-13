@@ -10,17 +10,18 @@ The `AgentClient` is the primary entry point for programmatic agent interactions
 
 The distinction is useful because application code should think in Agent operations such as “send this task” or “cancel that task,” not in HTTP headers, WebSocket frames, or gRPC metadata. `AgentClient` chooses the operation contract and parses the result; the selected transport only maps that contract onto its wire protocol. Changing from HTTP to gRPC therefore does not require rewriting task-level client code.
 
-Pass `transport_config=` when the client constructs a transport by name. It uses the same production configuration object accepted by concrete Agent transports and `Registry`. The read-only `client.transport` property exposes health and metric snapshots when an application needs them.
+AgentClient follows the same progressive-control rule as Agent and Registry: a transport name creates a default client quickly, while a concrete transport carries TLS, limits, retries, keepalive, and protocol-specific behavior. The read-only `client.transport` property exposes the resolved transport for health and metric inspection.
 
 ```python
 from protolink import RetryPolicy, TransportConfig
 from protolink.client import AgentClient
+from protolink.transport import GRPCTransport
 
-client = AgentClient(
-    transport="grpc",
+transport = GRPCTransport(
     url="grpc://127.0.0.1:0",
-    transport_config=TransportConfig(retry=RetryPolicy(max_attempts=3)),
+    config=TransportConfig(retry=RetryPolicy(max_attempts=3)),
 )
+client = AgentClient(transport)
 print(client.transport.metrics)
 ```
 
@@ -98,9 +99,6 @@ AgentClient(
     transport: Transport | TransportType,
     url: str | None = None,
     timeout: int = 300,
-    *,
-    tls: TLSConfig | None = None,
-    transport_config: TransportConfig | None = None,
 )
 ```
 
@@ -109,24 +107,24 @@ AgentClient(
 | `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
 | `url` | `str ⎪ None` | Base URL when using a transport type string |
 | `timeout` | `int` | Timeout in seconds for the request (default: 300) |
-| `tls` | `TLSConfig ⎪ None` | Optional CA trust and client certificate identity for HTTPS, WSS, or secure gRPC calls. |
-| `transport_config` | `TransportConfig ⎪ None` | Limits, retry policy, keepalive, shutdown, idempotency cache, and local metrics configuration for a factory-created transport. |
 
-`tls` and `transport_config` are applied when `transport` is a string alias. When you pass an existing `Transport` instance, configure that instance directly; its existing `config` remains authoritative.
-
-Use a string alias when ProtoLink should create and own the transport for you. Use an existing transport object when the application needs protocol-specific constructor options or wants to share that exact instance. In both cases, `AgentClient` exposes the resolved object through `client.transport`; there is no second hidden transport.
-
-You can omit `transport_config` for local use and simple deployments. The default already bounds payloads and concurrency, records metrics, and performs no automatic retries. Supply it when your service has explicit capacity or failure-recovery requirements.
+Use a string alias when ProtoLink should create a client transport with defaults. Use an existing transport object when the application needs TLS, production limits, retries, protocol-specific constructor options, or ownership of that exact instance. AgentClient never copies settings onto the transport and never creates a second hidden transport.
 
 **Examples:**
 
 ```python
-# Using transport type string
+# Simple: construct by transport name
 client = AgentClient(transport="http", url="http://localhost:8000", timeout=120)
 
-# Using an existing transport instance
+# Advanced: configure the transport first
+from protolink import TLSConfig, TransportConfig
 from protolink.transport import HTTPTransport
-transport = HTTPTransport(url="http://localhost:8000")
+
+transport = HTTPTransport(
+    url="https://agent.internal:8443",
+    tls=TLSConfig(cafile="certs/ca.pem"),
+    config=TransportConfig(shutdown_timeout=10),
+)
 client = AgentClient(transport=transport)
 ```
 

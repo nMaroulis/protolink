@@ -76,7 +76,13 @@ def main() -> None:
         llm=create_llm("mock", default_response="hello over TLS"),
         verbosity=0,
     )
-    client = AgentClient("http", url="http://127.0.0.1:0", tls=client_tls)
+    client_transport = HTTPTransport(
+        "http://127.0.0.1:0",
+        tls=client_tls,
+        log_level="critical",
+        access_log=False,
+    )
+    client = AgentClient(client_transport)
 
     try:
         agent.start(register=False, background=True)
