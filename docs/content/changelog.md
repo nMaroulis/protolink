@@ -38,13 +38,51 @@ uv add --upgrade protolink
 
 ### Added
 
-- Added `GRPCTransport`, the `"grpc"` factory registration, gRPC transport conformance coverage, and `examples/grpc_agent.py` for provider-free request/response and streaming usage.
-- Added the top-level `TLSConfig` API with native TLS and optional mutual TLS for HTTP, SSE JSON-RPC, WebSocket, and gRPC transports; secure URL schemes; high-level `Agent`, `AgentClient`, and `Registry` propagation; certificate-backed integration coverage; and `examples/tls_agent.py`.
+- **Native gRPC transport**
+  - Added `GRPCTransport` and the `"grpc"` factory alias for unary task requests, server-streaming task events, metadata-based credentials, deadlines, and pooled async channels.
+  - Added standard `grpc.health.v1.Health` reporting and server reflection, with constructor switches for deployments that disable either service.
+  - Added gRPC transport conformance and integration coverage plus the provider-free `examples/grpc_agent.py` example.
+- **TLS and mutual TLS**
+  - Added the top-level `TLSConfig` API for shared certificate trust, server identity, and optional client-certificate verification across HTTP, SSE JSON-RPC, WebSocket, and gRPC.
+  - Added secure `https://`, `wss://`, and `grpcs://` URL handling, with TLS owned consistently by concrete transport instances.
+  - Added certificate-backed integration coverage and `examples/tls_agent.py`, while keeping transport encryption independent from application authentication and authorization.
+- **Shared production transport contract**
+  - Added `TransportConfig`, `TransportLimits`, and `RetryPolicy` for consistent payload bounds, request/stream concurrency, explicit idempotent retries, keepalive, graceful shutdown, response deduplication, and dependency-free metrics across every built-in transport.
+  - Added `TransportCapabilities`, `TransportMetricsSnapshot`, and the public `TransportRequestContext` extension type for capability inspection, operational counters, correlation IDs, idempotency keys, and retry-attempt tracking.
+  - Added typed connection, timeout, protocol, remote, and payload-limit errors carrying URL, request ID, retryability, and protocol-native status metadata.
+  - Added `/healthz` and `/readyz` Agent and Registry probes, configurable WebSocket ping/pong behavior, loop-owned pooled-resource cleanup, and idempotent transport lifecycle methods.
+- **Multi-transport Agent metadata**
+  - Added optional `AgentCard.interfaces` / `AgentInterface` metadata so one Agent can advertise additional protocol endpoints while retaining its primary URL and transport.
+  - Serialized this metadata as `additionalInterfaces` for wire compatibility and preserved it through AgentCard round trips.
+- Added `examples/transport_production.py` with provider-free configuration, capability, health, and metric inspection.
+
+### Changed
+
+- Unified transport construction across `Agent`, `AgentClient`, and `Registry`: string aliases remain the zero-configuration prototyping path, while TLS, limits, retries, keepalive, and protocol-specific settings are configured on a concrete transport object passed to the facade.
+- Agent serialization now restores its primary and Registry transports with independent TLS identities and production configurations.
+- `ClientRequestSpec` now declares operation idempotency explicitly. Retries remain disabled by default and run only when the request specification, method, and typed failure all permit a safe retry.
+- HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport now enforce the same serialized payload and concurrency contract, so in-process tests exercise the same resource boundaries as network deployments.
+- Correlation IDs remain stable across retry attempts, while idempotency keys suppress concurrent duplicate execution and replay completed responses within the configured process-local cache window.
+- Expanded the Transport, Agent, Client, Registry, and AgentCard documentation with complete signatures, defaults, protocol mappings, operational rationale, custom-transport guidance, and production examples. The documentation landing-page IDE now includes gRPC and production transport configuration with incremental line editing.
+
+### Removed
+
+- Removed facade-level `tls=` and `transport_config=` constructor arguments from `Agent`, `AgentClient`, and `Registry`. Advanced settings now have one owner and one API: the concrete transport instance.
 
 ### Fixed
 
 - Fixed SSE task streams so final nested LLM events no longer close the stream before the final task-status update.
-- Fixed gRPC shutdown so loop-local cached channels are closed and removed correctly.
+- Fixed concurrent duplicate idempotent requests so they await one in-flight operation instead of executing the same handler more than once.
+- Fixed HTTP health probes so `/healthz` and `/readyz` remain available when application authentication is enabled.
+- Fixed transport shutdown across background-thread and caller event loops by closing pooled clients and channels on the event loop that owns them.
+- Fixed gRPC shutdown so loop-local cached channels are closed and removed correctly, including repeated `start()` and `stop()` calls.
+- Fixed HTTP and SSE server-side request/stream accounting so shared concurrency limits and transport metrics apply on both sides of a connection.
+- Fixed SSE terminal-frame parsing so the final task event is emitted exactly once.
+- Fixed failed or cancelled WebSocket and gRPC idempotent operations so they release waiting duplicates without poisoning the completed-response cache.
+- Fixed WebSocket pooling after timeouts, protocol corruption, and abandoned streams so unread frames cannot leak into a later request.
+- Fixed Agent configuration round trips so restored Registry transports retain the Agent's serialized authentication strategy and credentials.
+- Fixed short-lived SQLite storage, run-store, and doctor connections so every database handle closes deterministically after use.
+- Fixed source-distribution contents so generated Docusaurus output and `docs/node_modules` are excluded from PyPI packages.
 
 ## [0.6.4] - 2026-07-03
 

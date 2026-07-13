@@ -12,11 +12,17 @@ from protolink.utils.serialization import Serializer
 if TYPE_CHECKING:
     from protolink.security.auth import Authenticator
     from protolink.security.tls import TLSConfig
+    from protolink.transport.base import Transport
 
 
 class BackendInterface(ABC):
     @abstractmethod
-    def setup_routes(self, endpoints: list[EndpointSpec], authenticator: Authenticator | None = None) -> None:
+    def setup_routes(
+        self,
+        endpoints: list[EndpointSpec],
+        authenticator: Authenticator | None = None,
+        transport: Transport | None = None,
+    ) -> None:
         """Register all abstract endpoints onto the physical ASGI routing table.
 
         Subclasses must implement this to iterate over the provided `EndpointSpec` models

@@ -19,7 +19,6 @@ from protolink.llms.base import LLM
 from protolink.logging import BaseLogger, ConsoleLogger
 from protolink.models import AgentCard
 from protolink.security.auth import Authenticator
-from protolink.security.tls import TLSConfig
 from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
 from protolink.telemetry.base import Telemetry
@@ -79,7 +78,6 @@ class Agent(
         expose_chat: bool = True,
         authenticator: Authenticator | None = None,
         credentials: str | None = None,
-        tls: TLSConfig | None = None,
         policy: Policy | None = None,
         approval_handler: ApprovalHandlerLike | None = None,
         run_store: Any | None = None,
@@ -91,10 +89,12 @@ class Agent(
             card: AgentCard or dict describing this agent's identity and capabilities.
             transport: Transport instance or transport type string. If a Transport object is provided, it's used
                 directly. If a string is provided (e.g., "http", "websocket"), a new Transport instance is created
-                (transport factory) using the agent's card URL.
+                with default settings using the agent's card URL. Configure TLS, limits, retries, keepalive, and
+                protocol-specific behavior on a concrete Transport before passing it to Agent.
             registry: Registry instance, RegistryClient, or transport type string. If a Registry object is provided,
                 its RegistryClient is extracted. If a RegistryClient is provided, it's used directly.
-                If a string is provided, a new RegistryClient is created using the transport factory with registry_url.
+                If a string is provided, a new RegistryClient is created with default transport settings using
+                registry_url. Pass a configured RegistryClient for advanced registry transport behavior.
             registry_url: URL of registry when using string transport type for registry creation.
             llm: Optional LLM instance for agent reasoning and inference.
             system_prompt: This is used as complementary text in the system prompt, which is responsible for explaining
@@ -116,8 +116,6 @@ class Agent(
             expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
             authenticator: Optional Authenticator instance for verifying incoming requests to this agent.
             credentials: Optional credentials string used for authenticating outgoing requests.
-            tls: Optional transport-security configuration. Secure agent and registry
-                URLs use it for certificate trust, server identity, and mutual TLS.
             policy: Optional runtime policy evaluated before concrete actions execute.
                 Defaults to a backward-compatible ``CapabilityPolicy`` that
                 allows actions unless a tool or ``RunContext`` rule restricts
@@ -183,7 +181,6 @@ class Agent(
         # Store authentication configuration
         self.authenticator: Authenticator | None = authenticator
         self.credentials: str | None = credentials
-        self.tls = tls
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None

@@ -8,6 +8,23 @@ The **Client** layer in Protolink provides a high-level interface for agent-to-a
 
 The `AgentClient` is the primary entry point for programmatic agent interactions. It wraps a transport and provides a unified interface for communicating with Protolink agents.
 
+The distinction is useful because application code should think in Agent operations such as “send this task” or “cancel that task,” not in HTTP headers, WebSocket frames, or gRPC metadata. `AgentClient` chooses the operation contract and parses the result; the selected transport only maps that contract onto its wire protocol. Changing from HTTP to gRPC therefore does not require rewriting task-level client code.
+
+AgentClient follows the same progressive-control rule as Agent and Registry: a transport name creates a default client quickly, while a concrete transport carries TLS, limits, retries, keepalive, and protocol-specific behavior. The read-only `client.transport` property exposes the resolved transport for health and metric inspection.
+
+```python
+from protolink import RetryPolicy, TransportConfig
+from protolink.client import AgentClient
+from protolink.transport import GRPCTransport
+
+transport = GRPCTransport(
+    url="grpc://127.0.0.1:0",
+    config=TransportConfig(retry=RetryPolicy(max_attempts=3)),
+)
+client = AgentClient(transport)
+print(client.transport.metrics)
+```
+
 <ApiSurface
   eyebrow="Client module"
   title="AgentClient"
@@ -82,8 +99,6 @@ AgentClient(
     transport: Transport | TransportType,
     url: str | None = None,
     timeout: int = 300,
-    *,
-    tls: TLSConfig | None = None,
 )
 ```
 
@@ -92,19 +107,40 @@ AgentClient(
 | `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
 | `url` | `str ⎪ None` | Base URL when using a transport type string |
 | `timeout` | `int` | Timeout in seconds for the request (default: 300) |
-| `tls` | `TLSConfig ⎪ None` | Optional CA trust and client certificate identity for HTTPS, WSS, or secure gRPC calls. |
+
+Use a string alias when ProtoLink should create a client transport with defaults. Use an existing transport object when the application needs TLS, production limits, retries, protocol-specific constructor options, or ownership of that exact instance. AgentClient never copies settings onto the transport and never creates a second hidden transport.
 
 **Examples:**
 
 ```python
-# Using transport type string
+# Simple: construct by transport name
 client = AgentClient(transport="http", url="http://localhost:8000", timeout=120)
 
-# Using an existing transport instance
+# Advanced: configure the transport first
+from protolink import TLSConfig, TransportConfig
 from protolink.transport import HTTPTransport
-transport = HTTPTransport(url="http://localhost:8000")
+
+transport = HTTPTransport(
+    url="https://agent.internal:8443",
+    tls=TLSConfig(cafile="certs/ca.pem"),
+    config=TransportConfig(shutdown_timeout=10),
+)
 client = AgentClient(transport=transport)
 ```
+
+### Transport Inspection
+
+The read-only `transport` property exposes the concrete transport used by the client. This is the supported path for health, readiness, capability, and metric inspection:
+
+```python
+snapshot = client.transport.metrics
+print(snapshot.requests_succeeded, snapshot.retries)
+
+health = client.transport.health()
+print(health["status"], health["ready"])
+```
+
+See the [Shared Transport API Reference](./transport.md#shared-transport-api-reference) for every configuration field, snapshot counter, exception type, and lifecycle probe.
 
 ---
 
@@ -374,36 +410,60 @@ for event in client.sync.send_task_streaming("http://localhost:8010", task):
 
 `ClientRequestSpec` defines the contract for an API endpoint in a transport-agnostic way.
 
+It is the small description that sits between the high-level client and the wire transport. For example, “send a task” is a `POST` operation with a body and a `Task` response parser. HTTP turns that description into a route request, while WebSocket and gRPC place the same method and path in their envelopes. The client behavior stays identical because the specification describes the operation rather than the protocol.
+
+Normal users rarely need to create request specs; the built-in Agent and Registry clients provide them. They become relevant when adding a new endpoint or implementing a custom client operation. At that point, `idempotent` deserves particular care because it authorizes the retry and duplicate-replay machinery.
+
 ```python
 @dataclass(frozen=True)
 class ClientRequestSpec:
-    name: str                    # Human-readable name (e.g., "send_task")
-    path: str                    # URL path (e.g., "/tasks/")
-    method: HttpMethod           # HTTP method (e.g., "POST")
-    response_parser: Callable    # Function to parse response data
-    request_source: str          # Where to put request data ("body", "query", etc.)
-    channel: str = "default"     # Multiplexed transport channel
+    name: str
+    path: str
+    method: HttpMethod
+    response_parser: Callable[[Any], Any] | None = None
+    request_source: RequestSourceType = "body"
+    content_type: ContentType | None = None
+    accept: ContentType | None = None
+    channel: str = "default"
+    idempotent: bool = False
 ```
+
+| Field | Default | Transport behavior |
+|------|---------|--------------------|
+| `name` | Required | Stable operation name used by request contexts, metrics, and diagnostics. |
+| `path` | Required | Protocol-neutral endpoint path. HTTP-based transports use it directly; multiplexed transports carry it in the request envelope. |
+| `method` | Required | Logical HTTP method used by HTTP routing and retry-method filtering. |
+| `response_parser` | `None` | Optional callable that converts the decoded response into a model such as `Task` or `AgentCard`. |
+| `request_source` | `"body"` | Selects body, query, path, or no request data according to `RequestSourceType`. |
+| `content_type` | `None` | Optional outbound media type override. The transport default is used when omitted. |
+| `accept` | `None` | Optional accepted response media type. The transport default is used when omitted. |
+| `channel` | `"default"` | Logical multiplexing channel. Control operations use `"control"` so persistent transports can isolate them from stream traffic. |
+| `idempotent` | `False` | Explicit declaration that the logical operation can be retried and replayed under one idempotency key. Retries never run unless this is `True`. |
+
+`idempotent=True` is an application-level safety promise, not an inference made from `POST` or a URL. Custom request specs should enable it only when repeating the operation with the same payload and idempotency key cannot apply the effect twice.
+
+The `channel` field matters only to transports that multiplex several logical operations. Control requests such as cancellation use a separate channel so they are not forced to wait behind the long-running task they are intended to stop. Request/response transports may ignore the distinction while preserving the same client contract.
 
 ### Built-in Request Specs
 
-| Spec | Path | Method | Description |
-|------|------|--------|-------------|
-| `TASK_REQUEST` | `/tasks/` | POST | Send a task to an agent |
-| `TASK_CANCEL_REQUEST` | `/tasks/cancel` | POST | Cancel an active task over a control channel |
-| `COMPACT_HISTORY_REQUEST` | `/llm/history/compact` | POST | Compact the target agent's LLM history over a control channel |
-| `DESCRIBE_STATE_REQUEST` | `/state/describe` | POST | Inspect target agent state over a control channel |
-| `RESET_STATE_REQUEST` | `/state/reset` | POST | Reset target agent state over a control channel |
-| `COMPACT_STATE_REQUEST` | `/state/compact` | POST | Compact target agent conversation state over a control channel |
-| `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | Retrieve agent metadata |
-| `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | Send task with streaming |
+| Spec | Path | Method | Channel | Idempotent | Description |
+|------|------|--------|---------|------------|-------------|
+| `TASK_REQUEST` | `/tasks/` | POST | default | Yes | Send a task to an agent. The task ID and idempotency key prevent duplicate execution. |
+| `TASK_CANCEL_REQUEST` | `/tasks/cancel` | POST | control | Yes | Cancel an active task. Repeating cancellation has the same terminal effect. |
+| `COMPACT_HISTORY_REQUEST` | `/llm/history/compact` | POST | control | No | Compact the target agent's LLM history. |
+| `DESCRIBE_STATE_REQUEST` | `/state/describe` | POST | control | Yes | Inspect target agent state without mutating it. |
+| `RESET_STATE_REQUEST` | `/state/reset` | POST | control | No | Reset target agent state. |
+| `COMPACT_STATE_REQUEST` | `/state/compact` | POST | control | No | Compact target agent conversation state. |
+| `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | default | Yes | Retrieve agent metadata. |
+| `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | default | No | Send a task and receive a live event stream. Streams are not replayed by the retry layer. |
 
 ### How It Works
 
 When you call a method like `send_task()`:
 
-1. The client selects the appropriate `ClientRequestSpec` (e.g., `TASK_REQUEST`)
-2. Passes the spec and data to `transport.send()`
-3. The transport uses the spec to construct the wire request
+1. The client selects the appropriate `ClientRequestSpec` (for example, `TASK_REQUEST`).
+2. It passes the specification and task data to `transport.send()`.
+3. The transport creates correlation and idempotency metadata, applies limits, and constructs the protocol-specific request.
+4. The decoded response passes through `response_parser`, so the caller receives a `Task`, `AgentCard`, or another domain model rather than a raw wire dictionary.
 
-This pattern allows new endpoints without modifying transport implementations.
+If the spec is idempotent and the configured retry policy permits its method, the transport preserves one request ID and idempotency key across attempts. This pattern allows new endpoints without modifying transport implementations while keeping retry safety explicit at the operation boundary.

@@ -1,6 +1,8 @@
+"""Public protocol models and transport-neutral request specifications."""
+
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.core.actions import RunAction
-from protolink.core.agent_card import AgentCard, AgentSkill
+from protolink.core.agent_card import AgentCard, AgentInterface, AgentSkill
 from protolink.core.artifact import Artifact
 from protolink.core.cancellation import TaskCancellationRequest
 from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
@@ -15,6 +17,7 @@ from protolink.state.operations import StateOperationRequest, StateOperationResu
 
 __all__ = [
     "AgentCard",
+    "AgentInterface",
     "AgentSkill",
     "Artifact",
     "ClientRequestSpec",

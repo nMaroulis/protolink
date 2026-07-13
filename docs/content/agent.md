@@ -204,7 +204,7 @@ Unlike the original A2A specification, Protolink's `Agent` combines client and s
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
 | `card` | `AgentCard ⎪ dict` | - | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `transport` | `Transport ⎪ str ⎪ None` | `None` | Optional transport for communication. Can be a Transport instance or a string alias (e.g. "http", "runtime"). If not provided, you must set one later via the `transport` property. |
+| `transport` | `Transport ⎪ str ⎪ None` | `None` | Transport instance or simple string alias such as `"http"` or `"runtime"`. String aliases use default transport settings; pass a configured object for TLS, limits, retries, or protocol-specific options. |
 | `registry` | `Registry ⎪ RegistryClient ⎪ str ⎪ None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string. |
 | `registry_url` | `str ⎪ None` | `None` | URL of the registry when using string transport type for registry creation. |
 | `llm` | `LLM ⎪ None` | `None` | Optional language model instance for the agent to use. |
@@ -220,7 +220,6 @@ Unlike the original A2A specification, Protolink's `Agent` combines client and s
 | `expose_chat` | `bool` | `True` | Whether an LLM-backed Agent will serve the interactive chat UI and accept chat messages. HTTP-compatible transports make this visible at `/chat`. |
 | `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
-| `tls` | `TLSConfig ⎪ None` | `None` | Optional transport-security configuration propagated to factory-created agent and registry transports. Use with `https://`, `wss://`, or `grpcs://` URLs. |
 | `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
 | `approval_handler` | `Callable ⎪ None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
 | `run_store` | `RunStore ⎪ None` | `None` | Optional durable task/run store. When provided, the default runtime records task snapshots after direct, server, and streaming execution paths. |
@@ -239,6 +238,59 @@ transport = HTTPTransport(url=url)
 
 agent = Agent(card=card, transport=transport, llm=llm)
 ```
+
+### Simple and Advanced Transports
+
+The Agent API uses progressive control. Pass a registered transport name when defaults are sufficient:
+
+```python
+agent = Agent(card=card, transport="http", llm=llm)
+```
+
+This is the prototyping path: ProtoLink creates an `HTTPTransport` from `card.url`, applies safe default limits, collects local metrics, and leaves retries disabled.
+
+For TLS, resource policies, retries, or protocol-specific constructor options, build the transport explicitly:
+
+```python
+from protolink import Agent, AgentCard, RetryPolicy, TLSConfig, TransportConfig, TransportLimits
+from protolink.transport import GRPCTransport
+
+card = AgentCard(
+    name="production-agent",
+    description="Production task worker",
+    url="grpcs://agent.internal:9443",
+)
+transport_config = TransportConfig(
+    limits=TransportLimits(
+        max_request_bytes=8 * 1024 * 1024,
+        max_response_bytes=8 * 1024 * 1024,
+        max_concurrent_requests=200,
+        max_concurrent_streams=50,
+    ),
+    retry=RetryPolicy(max_attempts=3),
+    shutdown_timeout=10.0,
+)
+transport = GRPCTransport(
+    url=card.url,
+    tls=TLSConfig(
+        certfile="certs/agent.pem",
+        keyfile="certs/agent-key.pem",
+        cafile="certs/ca.pem",
+    ),
+    config=transport_config,
+)
+
+agent = Agent(
+    card=card,
+    transport=transport,
+)
+```
+
+`Agent` deliberately does not duplicate `tls=` or `transport_config=` arguments. TLS, limits, retries, keepalive, and connection ownership belong to the transport. This keeps the common Agent constructor small and lets the Agent transport and Registry transport use independent certificates and capacity policies.
+
+An Agent uses its concrete transport in both directions: its server receives tasks from peers and its client sends tasks to peers. Inspect that instance through `agent.transport`; its `config`, `capabilities`, `metrics`, and `health()` surfaces are documented in the [transport reference](./transport.md#shared-transport-api-reference).
+
+For an advanced Registry connection, construct its transport separately and wrap it in `RegistryClient`. Passing `registry="http"` remains the simple default path.
 
 ### Durable Task Snapshots
 

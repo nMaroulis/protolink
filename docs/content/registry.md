@@ -279,18 +279,50 @@ Registry(
     *,
     entry_ttl_seconds: float | None = None,
     storage: Storage | None = None,
-    tls: TLSConfig | None = None,
 )
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `transport` | `TransportType | Transport` | `"http"` | Transport instance or registered transport string. |
-| `url` | `str | None` | `None` | Registry URL. Required when `transport` is a string. |
+| `transport` | `TransportType ⎪ Transport` | `"http"` | Transport instance or registered transport string. |
+| `url` | `str ⎪ None` | `None` | Registry URL. Required when `transport` is a string. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity: `0` = warning, `1` = info, `2` = debug. |
-| `entry_ttl_seconds` | `float | None` | `None` | Optional liveness TTL. Expired entries are pruned before discovery, status, and count/list operations. |
-| `storage` | `Storage | None` | `None` | Optional persistence for serialized registry entries. |
-| `tls` | `TLSConfig | None` | `None` | Optional certificate identity and trust configuration for a secure registry URL. |
+| `entry_ttl_seconds` | `float ⎪ None` | `None` | Optional liveness TTL. Expired entries are pruned before discovery, status, and count/list operations. |
+| `storage` | `Storage ⎪ None` | `None` | Optional persistence for serialized registry entries. |
+
+Registry follows the same construction rule as Agent and AgentClient. A string alias creates a default transport for fast setup; a concrete transport carries TLS, limits, retries, keepalive, and protocol-specific settings. The Registry passes that exact instance to both `RegistryClient` and `RegistryServer`, so inbound serving and outbound registry calls share one capability, health, and metrics surface.
+
+```python
+# Simple: defaults are sufficient
+registry = Registry(
+    transport="http",
+    url="http://127.0.0.1:9000",
+)
+
+# Advanced: configure the service boundary explicitly
+from protolink import RetryPolicy, TLSConfig, TransportConfig, TransportLimits
+from protolink.transport import HTTPTransport
+
+transport = HTTPTransport(
+    url="https://registry.internal:9000",
+    tls=TLSConfig(
+        certfile="certs/registry.pem",
+        keyfile="certs/registry-key.pem",
+        cafile="certs/ca.pem",
+    ),
+    config=TransportConfig(
+        limits=TransportLimits(max_concurrent_requests=300),
+        retry=RetryPolicy(max_attempts=3),
+    ),
+)
+registry = Registry(transport=transport)
+```
+
+The Registry needs the same protections as an Agent even though its requests are smaller. In a large deployment, many Agents may start or heartbeat at once. Concurrency limits keep that burst bounded, payload limits prevent malformed cards from consuming excessive memory, and health metrics reveal whether discovery traffic is failing or saturating the service. Keeping those settings on its transport also allows the Registry to use a different certificate identity and capacity policy from every Agent that calls it.
+
+The built-in registry request specs mark `unregister`, `heartbeat`, and `discover` as idempotent. `register` is intentionally not retried automatically because registration may have application-specific replacement semantics. See [ClientRequestSpec](./client.md#clientrequestspec) and the [retry contract](./transport.md#retrypolicy).
+
+In simple terms, reading discovery results, refreshing the same heartbeat, or removing an already removed URL has a repeatable outcome. Registration can mean “create,” “replace,” or trigger custom persistence behavior, so ProtoLink does not assume that repeating it is harmless. Applications that provide durable idempotent registration semantics can define an explicit custom request contract.
 
 :::info[Single source of truth]
 

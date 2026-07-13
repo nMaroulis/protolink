@@ -1,3 +1,5 @@
+"""Transport-neutral declarations for outbound ProtoLink operations."""
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -11,7 +13,21 @@ class ClientRequestSpec:
 
     ``channel`` lets multiplexed transports isolate control-plane requests such
     as cancellation from a long-lived streaming data channel. Request/response
-    transports may ignore it.
+    transports may ignore it. ``idempotent`` is an explicit safety declaration:
+    configured retry policies never retry a request unless it is true.
+
+    Args:
+        name: Stable operation name used by clients and diagnostics.
+        path: Transport-neutral endpoint path.
+        method: HTTP-style method used consistently across transports.
+        response_parser: Optional conversion from wire data to a domain model.
+        request_source: Whether input is sent as a body, query parameters, or
+            omitted.
+        content_type: Optional request media type.
+        accept: Optional expected response media type.
+        channel: Multiplexing channel used to isolate concurrent traffic.
+        idempotent: Whether retries and server-side response deduplication are
+            safe for this operation.
     """
 
     name: str
@@ -22,3 +38,4 @@ class ClientRequestSpec:
     content_type: ContentType | None = None
     accept: ContentType | None = None
     channel: str = "default"
+    idempotent: bool = False

@@ -295,6 +295,53 @@ When using an HTTP-compatible transport (`http`, `sse`, `json-rpc`, or `sse-json
   </tr>
 </table>
 
+## API Design
+
+ProtoLink's core philosophy is a **simple API with progressive control**: the shortest path should be enough for prototyping, while production features remain available through explicit, composable objects instead of adding every advanced option to `Agent`.
+
+For a fast prototype, pass a transport name. ProtoLink builds the transport with safe defaults:
+
+```python
+from protolink import Agent, AgentCard
+
+card = AgentCard(
+    name="assistant",
+    description="General-purpose assistant",
+    url="http://127.0.0.1:8000",
+)
+
+agent = Agent(card=card, transport="http")
+```
+
+For production, configure the transport directly and pass the completed object to the same Agent API:
+
+```python
+from protolink import Agent, AgentCard, RetryPolicy, TLSConfig, TransportConfig, TransportLimits
+from protolink.transport import HTTPTransport
+
+card = AgentCard(
+    name="assistant",
+    description="Production assistant",
+    url="https://agent.internal:8443",
+)
+transport = HTTPTransport(
+    url=card.url,
+    tls=TLSConfig(
+        certfile="certs/agent.pem",
+        keyfile="certs/agent-key.pem",
+        cafile="certs/ca.pem",
+    ),
+    config=TransportConfig(
+        limits=TransportLimits(max_concurrent_requests=200),
+        retry=RetryPolicy(max_attempts=3),
+    ),
+)
+
+agent = Agent(card=card, transport=transport)
+```
+
+This keeps Agent concerns such as reasoning, tools, state, and policy separate from transport concerns such as TLS, payload limits, retries, keepalive, and connection management. The same rule applies to `AgentClient` and `Registry`: pass a string for defaults or a configured transport object for advanced behavior. Every service boundary can therefore use its own certificates and capacity policy without expanding or coupling the high-level constructors.
+
 ## Documentation
 
 Follow the API documentation here: [Documentation](https://nmaroulis.github.io/protolink/)
@@ -312,10 +359,11 @@ For Agent-to-Agent & Agent-to-Registry communication:
 - `grpc` · [GRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py): Uses gRPC unary calls and unary-stream task events over compact JSON envelopes. [`grpcio`]
 - `runtime` · [RuntimeTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py): Simple **in-process, in-memory transport**.
 
-All network transports share one native TLS API. Use `https://`, `wss://`, or `grpcs://` and pass `TLSConfig` at the top level:
+All network transports share one native TLS API. Use `https://`, `wss://`, or `grpcs://` and configure `TLSConfig` on the transport:
 
 ```python
 from protolink import Agent, AgentCard, TLSConfig
+from protolink.transport import HTTPTransport
 
 tls = TLSConfig(
     certfile="certs/agent.pem",
@@ -324,18 +372,55 @@ tls = TLSConfig(
     # require_client_cert=True,  # enable mutual TLS
 )
 
-agent = Agent(
-    card=AgentCard(
-        name="secure-agent",
-        description="Agent served over HTTPS",
-        url="https://agent.internal:8443",
-    ),
-    transport="http",
+card = AgentCard(
+    name="secure-agent",
+    description="Agent served over HTTPS",
+    url="https://agent.internal:8443",
+)
+transport = HTTPTransport(
+    url=card.url,
     tls=tls,
 )
+agent = Agent(card=card, transport=transport)
 ```
 
 `TLSConfig` encrypts the connection and verifies certificates; `Authenticator` implementations handle application credentials and authorization. They are independent and can be combined. See the [TLS and mutual TLS guide](https://nmaroulis.github.io/protolink/docs/transport/#tls-and-mutual-tls) and [`examples/tls_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/tls_agent.py).
+
+All transports also share one production configuration surface:
+
+```python
+from protolink import Agent, AgentCard, RetryPolicy, TransportConfig, TransportLimits
+from protolink.transport import HTTPTransport
+
+agent_card = AgentCard(
+    name="production-agent",
+    description="Production task worker",
+    url="http://127.0.0.1:8000",
+)
+transport_config = TransportConfig(
+    limits=TransportLimits(max_concurrent_requests=200, max_concurrent_streams=50),
+    retry=RetryPolicy(max_attempts=3),
+)
+
+transport = HTTPTransport(url=agent_card.url, config=transport_config)
+agent = Agent(card=agent_card, transport=transport)
+```
+
+Retries remain off by default and run only for explicitly idempotent request specifications. Correlation IDs, server-side idempotency replay, bounded payloads/concurrency, loop-safe pooled-resource shutdown, WebSocket keepalive, typed transport errors, local metric snapshots, and `/healthz` and `/readyz` probes use the same contract across HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. The `grpc` extra also installs standard gRPC health checking and reflection. See the [production transport guide](https://nmaroulis.github.io/protolink/docs/transport/#production-configuration) and [`examples/transport_production.py`](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py).
+
+These controls exist so changing protocols does not change the Agent's production safety model. Limits prevent one payload or traffic burst from exhausting the process; retries recover explicitly safe operations from temporary connection failures; idempotency prevents those retries from executing the same operation twice; and metrics and health probes make the behavior visible. The defaults are suitable for getting started and do not enable retries automatically.
+
+The application-facing transport types are exported directly from `protolink`:
+
+| API | Purpose |
+|-----|---------|
+| `TransportConfig` | One immutable configuration for limits, retries, keepalive, shutdown, idempotency replay, and metrics. |
+| `TransportLimits` | Request, response, stream-event, request-concurrency, and stream-concurrency bounds. |
+| `RetryPolicy` | Explicit attempt count, exponential backoff, jitter, and retryable method set. |
+| `TransportMetricsSnapshot` | Dependency-free per-instance counters, byte totals, active work, retries, and cumulative latency. |
+| `TransportError` and typed subclasses | Stable connection, timeout, protocol, remote, and payload-limit failures with request metadata. |
+
+Transport authors can additionally import `Transport`, `TransportCapabilities`, and `TransportRequestContext` from `protolink.transport`. The [shared API reference](https://nmaroulis.github.io/protolink/docs/transport/#shared-transport-api-reference) lists every field, default, base-class hook, health payload, and protocol mapping.
 
 #### LLMs:
 

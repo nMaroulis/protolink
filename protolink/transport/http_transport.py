@@ -14,6 +14,8 @@ network boundary for Protolink agents. It facilitates the bidirectional transmis
   as an outbound client on the main thread without triggering `asyncio` loop contamination.
 """
 
+import asyncio
+import json
 from typing import Any, ClassVar
 
 import httpx
@@ -24,7 +26,14 @@ from protolink.security.auth import Authenticator
 from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport.backends import BackendInterface, FastAPIBackend, StarletteBackend
-from protolink.transport.base import Transport
+from protolink.transport.base import Transport, TransportRequestContext
+from protolink.transport.config import TransportCapabilities, TransportConfig
+from protolink.transport.errors import (
+    TransportConnectionError,
+    TransportProtocolError,
+    TransportRemoteError,
+    TransportTimeoutError,
+)
 from protolink.types import BackendType, TransportType
 
 
@@ -56,10 +65,16 @@ class HTTPTransport(Transport):
     tls:
         Optional TLS certificate and trust configuration. Use an ``https://``
         server URL to enable TLS.
+    config:
+        Shared limits, retry, keepalive, shutdown, idempotency, and metrics settings.
     """
 
     transport_type: ClassVar[TransportType] = "http"
     supports_streaming: ClassVar[bool] = False
+    capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
+        tls=True,
+        persistent_connections=True,
+    )
 
     def __init__(
         self,
@@ -71,10 +86,11 @@ class HTTPTransport(Transport):
         validate_schema: bool = False,
         credentials: str | None = None,
         tls: TLSConfig | None = None,
+        config: TransportConfig | None = None,
         log_level: str = "info",
         access_log: bool = True,
     ) -> None:
-        """Initialize HTTP transport. and underlying ASGI server framework.
+        """Initialize the HTTP client/server transport and ASGI backend.
 
         Args:
             url: The absolute URL (e.g., ``"http://localhost:8000"``) dictating both the
@@ -88,7 +104,11 @@ class HTTPTransport(Transport):
             validate_schema: If true, instructs the selected backend (such as FastAPI)
                              to enforce strict Pydantic model validation on inbound payloads.
             tls: Optional transport-security configuration for HTTPS and mutual TLS.
+            config: Shared production transport behavior.
+            log_level: Uvicorn log level.
+            access_log: Whether Uvicorn emits request access logs.
         """
+        super().__init__(config=config)
         self._url: str = url
         self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
@@ -108,9 +128,16 @@ class HTTPTransport(Transport):
                 validate_schema=validate_schema,
                 log_level=log_level,
                 access_log=access_log,
+                keepalive_timeout=self.config.keepalive_timeout,
+                limit_concurrency=self.config.limits.max_concurrent_requests,
             )
         else:
-            self.backend = StarletteBackend(log_level=log_level, access_log=access_log)
+            self.backend = StarletteBackend(
+                log_level=log_level,
+                access_log=access_log,
+                keepalive_timeout=self.config.keepalive_timeout,
+                limit_concurrency=self.config.limits.max_concurrent_requests,
+            )
 
     # ------------------------------------------------------------------
     # Client
@@ -137,61 +164,81 @@ class HTTPTransport(Transport):
         RuntimeError
             If the remote endpoint returns a non-200 HTTP status code.
         """
-        if self.authenticator and self.credentials and not self.security_context:
-            await self.authenticate(self.credentials)
-
-        client = await self._ensure_client()
-        headers = self._build_headers()
-
-        # Build URL
         url = f"{base_url.rstrip('/')}{request_spec.path}"
+        request_size = self.check_payload_limit({"data": data, "params": params}, kind="request", url=url)
+        context = self.new_request_context(request_spec, data)
 
-        # Prepare request arguments
-        kwargs: dict[str, Any] = {"headers": headers}
-        if params:
-            kwargs["params"] = params
+        async def operation(attempt: TransportRequestContext) -> Any:
+            if self.authenticator and self.credentials and not self.security_context:
+                await self.authenticate(self.credentials)
 
-        if request_spec.request_source == "body" and data is not None:
-            # Handle Pydantic models automatically
-            if hasattr(data, "to_json"):
-                kwargs["json"] = data.to_json()
-            elif hasattr(data, "to_dict"):
-                kwargs["json"] = data.to_dict()
-            elif isinstance(data, BaseModel):
-                kwargs["json"] = data.model_dump()
-            elif isinstance(data, dict):
-                kwargs["json"] = data
-            else:
-                # TODO: Fallback/Error? Assuming dict or compatible
-                kwargs["json"] = data
-        elif request_spec.request_source == "query_params" and data is not None:
-            # Send data as query parameters
-            if isinstance(data, dict):
-                kwargs["params"] = data
-            else:
-                # For single values, wrap in dict
-                kwargs["params"] = {"data": str(data)}
+            client = await self._ensure_client()
+            headers = {
+                **self._build_headers(),
+                "X-Protolink-Request-ID": attempt.request_id,
+            }
+            if attempt.idempotency_key:
+                headers["Idempotency-Key"] = attempt.idempotency_key
 
-        try:
-            response = await client.request(request_spec.method, url, timeout=self._timeout, **kwargs)
-            response.raise_for_status()
+            kwargs: dict[str, Any] = {"headers": headers}
+            if params:
+                kwargs["params"] = params
+            if request_spec.request_source == "body" and data is not None:
+                kwargs["json"] = self._serialize_payload(data)
+            elif request_spec.request_source == "query_params" and data is not None:
+                kwargs["params"] = data if isinstance(data, dict) else {"data": str(data)}
 
-            # Parse response
-            if request_spec.response_parser:
-                return request_spec.response_parser(response.json())
-            return response.json()
+            try:
+                self._metrics.add(bytes_sent=request_size)
+                response = await client.request(request_spec.method, url, timeout=self._timeout, **kwargs)
+                response.raise_for_status()
+            except httpx.TimeoutException as exc:
+                raise TransportTimeoutError(
+                    f"HTTP request to {base_url} timed out",
+                    url=url,
+                    request_id=attempt.request_id,
+                    retryable=True,
+                ) from exc
+            except httpx.ConnectError as exc:
+                raise TransportConnectionError(
+                    f"Failed to connect to agent at {base_url}. Make sure the agent is running and accessible.",
+                    url=url,
+                    request_id=attempt.request_id,
+                    retryable=True,
+                ) from exc
+            except httpx.RemoteProtocolError as exc:
+                raise TransportProtocolError(
+                    f"Protocol error when communicating with agent at {base_url}",
+                    url=url,
+                    request_id=attempt.request_id,
+                    retryable=True,
+                ) from exc
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                raise TransportRemoteError(
+                    f"Agent at {base_url} returned HTTP {status}: {exc.response.text}",
+                    url=url,
+                    request_id=attempt.request_id,
+                    retryable=status == 429 or status >= 500,
+                    status_code=status,
+                ) from exc
 
-        except httpx.ConnectError as e:
-            raise ConnectionError(
-                f"Failed to connect to agent at {base_url}. Make sure the agent is running and accessible."
-            ) from e
-        except httpx.RemoteProtocolError as e:
-            raise ConnectionError(
-                f"Protocol error when communicating with agent at {base_url}. "
-                f"The target may not be a proper HTTP server or may be misconfigured."
-            ) from e
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"Agent at {base_url} returned HTTP {e.response.status_code}: {e.response.text}") from e
+            response_size = len(response.content)
+            if response_size > self.config.limits.max_response_bytes:
+                self.check_payload_limit(response.text, kind="response", url=url)
+            self._metrics.add(bytes_received=response_size)
+            try:
+                payload = response.json()
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                raise TransportProtocolError(
+                    f"Agent at {base_url} returned invalid JSON",
+                    url=url,
+                    request_id=attempt.request_id,
+                ) from exc
+            return request_spec.response_parser(payload) if request_spec.response_parser else payload
+
+        async with self.request_slot():
+            return await self.run_with_retries(request_spec, context, operation)
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         """Return an initialized :class:`httpx.AsyncClient` instance for the current loop.
@@ -202,20 +249,27 @@ class HTTPTransport(Transport):
         the same underlying sockets or locks, avoiding `Future attached to a different loop`
         exceptions.
         """
-        import asyncio
-
         loop_id = id(asyncio.get_running_loop())
         client = self._clients.get(loop_id)
         if not client or client.is_closed:
             client = self._create_client()
             self._clients[loop_id] = client
+            self.register_loop_resource(
+                ("http", loop_id),
+                client.aclose,
+            )
         return client
 
     def _create_client(self) -> httpx.AsyncClient:
         """Create an HTTP client using configured TLS trust and identity."""
+        limits = httpx.Limits(
+            max_connections=self.config.limits.max_concurrent_requests,
+            max_keepalive_connections=self.config.limits.max_concurrent_requests,
+            keepalive_expiry=self.config.keepalive_interval,
+        )
         if self.tls is None:
-            return httpx.AsyncClient(timeout=self._timeout)
-        return httpx.AsyncClient(timeout=self._timeout, verify=self.tls.create_client_context())
+            return httpx.AsyncClient(timeout=self._timeout, limits=limits)
+        return httpx.AsyncClient(timeout=self._timeout, limits=limits, verify=self.tls.create_client_context())
 
     # ------------------------------------------------------------------
     # Server Routing
@@ -228,7 +282,7 @@ class HTTPTransport(Transport):
         or ``FastAPIBackend``) which binds the abstract ``EndpointSpec`` models into tangible
         RESTful routes on the underlying server application.
         """
-        self.backend.setup_routes(endpoints, authenticator=self.authenticator)
+        self.backend.setup_routes(endpoints, authenticator=self.authenticator, transport=self)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -251,12 +305,12 @@ class HTTPTransport(Transport):
         the current thread's loop selector, preventing cross-loop boundary violations.
         """
 
+        if self._transport_running:
+            return
         await self.backend.start(self._url, tls=self.tls)
+        self._transport_running = True
 
-        import asyncio
-
-        loop_id = id(asyncio.get_running_loop())
-        self._clients[loop_id] = self._create_client()
+        await self._ensure_client()
 
     async def stop(self) -> None:
         """Stop the HTTP server and gracefully close the loop-isolated HTTP client pool.
@@ -276,15 +330,11 @@ class HTTPTransport(Transport):
         to interact with a potentially defunct selector from another thread.
         """
 
-        # Stop the server backend
-        await self.backend.stop()
-
-        import asyncio
-
-        loop_id = id(asyncio.get_running_loop())
-        client = self._clients.pop(loop_id, None)
-        if client and not client.is_closed:
-            await client.aclose()
+        if self._transport_running:
+            await self.backend.stop()
+            self._transport_running = False
+        await self.close_loop_resources()
+        self._clients.clear()
 
     # ------------------------------------------------------------------
     # Authentication & Security
@@ -342,6 +392,17 @@ class HTTPTransport(Transport):
                 else:
                     headers["Authorization"] = f"Bearer {token}"
         return headers
+
+    @staticmethod
+    def _serialize_payload(data: Any) -> Any:
+        """Normalize a request body into JSON-compatible data."""
+        if hasattr(data, "to_json"):
+            return data.to_json()
+        if hasattr(data, "to_dict"):
+            return data.to_dict()
+        if isinstance(data, BaseModel):
+            return data.model_dump()
+        return data
 
     def validate_url(self) -> bool:
         """Ensure the target endpoint utilizes standard web protocols (http/https)."""

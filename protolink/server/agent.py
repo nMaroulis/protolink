@@ -173,6 +173,20 @@ class AgentServer:
                 content_type="html",
             ),
             EndpointSpec(
+                name="health",
+                path="/healthz",
+                method="GET",
+                handler=self._transport.health,
+                request_source="none",
+            ),
+            EndpointSpec(
+                name="readiness",
+                path="/readyz",
+                method="GET",
+                handler=self._transport.health,
+                request_source="none",
+            ),
+            EndpointSpec(
                 name="chat_page",
                 path="/chat",
                 method="GET",

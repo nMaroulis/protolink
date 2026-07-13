@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
-import uuid
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 from urllib.parse import urlparse
@@ -13,7 +12,14 @@ from protolink.security.auth import Authenticator
 from protolink.security.tls import TLSConfig
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport._streaming import is_stream_terminal_event
-from protolink.transport.base import Transport
+from protolink.transport.base import Transport, TransportRequestContext
+from protolink.transport.config import TransportCapabilities, TransportConfig
+from protolink.transport.errors import (
+    TransportConnectionError,
+    TransportProtocolError,
+    TransportRemoteError,
+    TransportTimeoutError,
+)
 from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
 from protolink.utils.serialization import Serializer
@@ -55,10 +61,17 @@ class WebSocketTransport(Transport):
         credentials: Optional credentials for outbound authentication.
         tls: Optional certificate and trust configuration used by ``wss://``
             servers and clients.
+        config: Shared limits, retry, keepalive, shutdown, idempotency, and metrics settings.
     """
 
     transport_type: ClassVar[TransportType] = "websocket"
     supports_streaming: ClassVar[bool] = True
+    capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
+        streaming=True,
+        tls=True,
+        bidirectional=True,
+        persistent_connections=True,
+    )
 
     def __init__(
         self,
@@ -68,8 +81,14 @@ class WebSocketTransport(Transport):
         credentials: str | None = None,
         *,
         tls: TLSConfig | None = None,
+        config: TransportConfig | None = None,
     ) -> None:
-        """Initialize a loop-safe WebSocket transport."""
+        """Initialize a loop-safe WebSocket transport.
+
+        Client connections are created lazily per event loop and closed on
+        their owning loops during shutdown.
+        """
+        super().__init__(config=config)
         self._url: str = url
         self._timeout: float = timeout
         self.authenticator: Authenticator | None = authenticator
@@ -117,12 +136,18 @@ class WebSocketTransport(Transport):
         lifecycle. Once bound to the designated port, all inbound TCP connections are immediately
         funneled directly into the ``_handle_connection`` multiplexer.
         """
+        if self._transport_running:
+            return
         host, port = self._get_host_port(self._url)
         if not host or not port:
             raise ValueError(f"Invalid URL: {self._url}. Missing host or port.")
 
         kwargs: dict[str, Any] = {
-            "close_timeout": 3.0,
+            "close_timeout": self.config.shutdown_timeout,
+            "max_size": self.config.limits.max_request_bytes,
+            "max_queue": self.config.limits.max_concurrent_requests,
+            "ping_interval": self.config.keepalive_interval,
+            "ping_timeout": self.config.keepalive_timeout,
         }
         if self.authenticator:
             kwargs["process_request"] = self._process_request
@@ -138,6 +163,7 @@ class WebSocketTransport(Transport):
             port=port,
             **kwargs,
         )
+        self._transport_running = True
 
     async def _process_request(self, path: str, request_headers: Any) -> Any:
         """Authenticate incoming websocket handshake requests."""
@@ -186,11 +212,7 @@ class WebSocketTransport(Transport):
 
     async def stop(self) -> None:
         """Stop the WebSocket server and close any cached client connections."""
-        for conn in list(self._client_conns.values()):
-            try:
-                await conn.close()
-            except Exception:
-                pass
+        await self.close_loop_resources()
         self._client_conns.clear()
         self._client_locks.clear()
 
@@ -198,6 +220,7 @@ class WebSocketTransport(Transport):
             self._server.close()
             await self._server.wait_closed()
             self._server = None
+        self._transport_running = False
 
     # ------------------------------------------------------------------
     # Client
@@ -220,59 +243,56 @@ class WebSocketTransport(Transport):
         This design facilitates transparent, bi-directional communication while appearing identical
         to standard HTTP request/response lifecycles to the developer.
         """
-        if self.authenticator and self.credentials and not self.security_context:
-            await self.authenticate(self.credentials)
+        context = self.new_request_context(request_spec, data)
 
-        message_id = uuid.uuid4().hex
+        async def operation(attempt: TransportRequestContext) -> Any:
+            if self.authenticator and self.credentials and not self.security_context:
+                await self.authenticate(self.credentials)
+            payload = self._build_request_payload(request_spec, data, params, attempt)
+            request_size = self.check_payload_limit(payload, kind="request", url=base_url)
+            loop_key = f"{base_url}_{id(asyncio.get_running_loop())}_{request_spec.channel}"
+            lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
+            async with lock:
+                conn = await self._ensure_client_connection(
+                    base_url,
+                    loop_key,
+                    request_id=attempt.request_id,
+                )
+                try:
+                    self._metrics.add(bytes_sent=request_size)
+                    await conn.send(json.dumps(payload))
+                    raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
+                except TimeoutError as exc:
+                    await self._discard_client_connection(loop_key, conn)
+                    raise TransportTimeoutError(
+                        f"WebSocket request to {base_url} timed out",
+                        url=base_url,
+                        request_id=attempt.request_id,
+                        retryable=True,
+                    ) from exc
+                except ConnectionClosed as exc:
+                    await self._discard_client_connection(loop_key, conn)
+                    raise TransportConnectionError(
+                        f"WebSocket connection closed while talking to {base_url}",
+                        url=base_url,
+                        request_id=attempt.request_id,
+                        retryable=True,
+                    ) from exc
+                except asyncio.CancelledError:
+                    await self._discard_client_connection(loop_key, conn)
+                    raise
+                try:
+                    response = self._decode_response(raw, base_url, attempt.request_id)
+                    result = self._unwrap_response(response, base_url, attempt.request_id)
+                    response_size = self.check_payload_limit(result, kind="response", url=base_url)
+                except TransportProtocolError:
+                    await self._discard_client_connection(loop_key, conn)
+                    raise
+            self._metrics.add(bytes_received=response_size)
+            return request_spec.response_parser(result) if request_spec.response_parser else result
 
-        payload: dict[str, Any] = {
-            "id": message_id,
-            "method": request_spec.method,
-            "path": request_spec.path,
-        }
-
-        if request_spec.request_source == "body" and data is not None:
-            payload["data"] = self._serialize_result(data)
-        elif request_spec.request_source == "query_params" and data is not None:
-            if isinstance(data, dict):
-                payload["params"] = data
-            else:
-                payload["params"] = {"data": str(data)}
-
-        if params:
-            payload.setdefault("params", {})
-            payload["params"].update(params)
-
-        loop_key = f"{base_url}_{id(asyncio.get_running_loop())}_{request_spec.channel}"
-        lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
-        async with lock:
-            conn = await self._ensure_client_connection(base_url, loop_key)
-            try:
-                await conn.send(json.dumps(payload))
-                raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
-            except ConnectionClosed as e:
-                self._client_conns.pop(loop_key, None)
-                raise ConnectionError(f"WebSocket connection closed while talking to {base_url}") from e
-
-        if isinstance(raw, (bytes, bytearray)):
-            raw = raw.decode("utf-8", errors="replace")
-
-        try:
-            response = json.loads(raw)
-        except Exception as e:
-            raise RuntimeError(f"Invalid JSON response from {base_url}: {raw!r}") from e
-
-        if response.get("id") != message_id:
-            raise RuntimeError(f"Mismatched response id from {base_url}: {response.get('id')}")
-
-        if not response.get("ok", False):
-            err = response.get("error") or {}
-            raise RuntimeError(f"WebSocket request failed at {base_url}: {err}")
-
-        result = response.get("result")
-        if request_spec.response_parser:
-            return request_spec.response_parser(result)
-        return result
+        async with self.request_slot():
+            return await self.run_with_retries(request_spec, context, operation)
 
     async def subscribe(self, agent_url: str, task: Any) -> AsyncIterator[Any]:
         """Establish an asynchronous streaming pipeline over a persistent WebSocket connection.
@@ -286,7 +306,14 @@ class WebSocketTransport(Transport):
         if self.authenticator and self.credentials and not self.security_context:
             await self.authenticate(self.credentials)
 
-        message_id = uuid.uuid4().hex
+        request_spec = ClientRequestSpec(
+            name="task_stream",
+            path="/tasks/stream",
+            method="POST",
+            request_source="body",
+        )
+        context = self.new_request_context(request_spec, task)
+        message_id = context.request_id
 
         payload: dict[str, Any] = {
             "id": message_id,
@@ -295,40 +322,56 @@ class WebSocketTransport(Transport):
             "data": self._serialize_result(task),
         }
 
-        loop_key = f"{agent_url}_{id(asyncio.get_running_loop())}_default"
-        lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
-        async with lock:
-            conn = await self._ensure_client_connection(agent_url, loop_key)
-            try:
-                await conn.send(json.dumps(payload))
-                while True:
-                    raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
-                    if isinstance(raw, (bytes, bytearray)):
-                        raw = raw.decode("utf-8", errors="replace")
+        request_size = self.check_payload_limit(payload, kind="request", url=agent_url)
+        async with self.stream_slot():
+            loop_key = f"{agent_url}_{id(asyncio.get_running_loop())}_default"
+            lock = self._client_locks.setdefault(loop_key, asyncio.Lock())
+            async with lock:
+                conn = await self._ensure_client_connection(
+                    agent_url,
+                    loop_key,
+                    request_id=message_id,
+                )
+                stream_complete = False
+                try:
+                    self._metrics.add(bytes_sent=request_size)
+                    await conn.send(json.dumps(payload))
+                    while True:
+                        raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
+                        msg = self._decode_response(raw, agent_url, message_id)
+                        result = self._unwrap_response(msg, agent_url, message_id, operation="stream")
+                        if result is not None:
+                            event_size = self.check_payload_limit(result, kind="event", url=agent_url)
+                            self._metrics.add(bytes_received=event_size)
+                            yield result
+                        if msg.get("final", False):
+                            stream_complete = True
+                            break
+                except TimeoutError as exc:
+                    raise TransportTimeoutError(
+                        f"WebSocket stream from {agent_url} timed out",
+                        url=agent_url,
+                        request_id=message_id,
+                        retryable=True,
+                    ) from exc
+                except ConnectionClosed as exc:
+                    raise TransportConnectionError(
+                        f"WebSocket connection closed while streaming from {agent_url}",
+                        url=agent_url,
+                        request_id=message_id,
+                        retryable=True,
+                    ) from exc
+                finally:
+                    if not stream_complete:
+                        await self._discard_client_connection(loop_key, conn)
 
-                    try:
-                        msg = json.loads(raw)
-                    except Exception as e:
-                        raise RuntimeError(f"Invalid JSON stream message from {agent_url}: {raw!r}") from e
-
-                    if msg.get("id") != message_id:
-                        raise RuntimeError(f"Mismatched stream id from {agent_url}: {msg.get('id')}")
-
-                    if not msg.get("ok", False):
-                        err = msg.get("error") or {}
-                        raise RuntimeError(f"WebSocket stream failed at {agent_url}: {err}")
-
-                    result = msg.get("result")
-                    if result is not None:
-                        yield result
-
-                    if msg.get("final", False):
-                        break
-            except ConnectionClosed as e:
-                self._client_conns.pop(loop_key, None)
-                raise ConnectionError(f"WebSocket connection closed while streaming from {agent_url}") from e
-
-    async def _ensure_client_connection(self, base_url: str, loop_key: str) -> Any:
+    async def _ensure_client_connection(
+        self,
+        base_url: str,
+        loop_key: str,
+        *,
+        request_id: str | None = None,
+    ) -> Any:
         """Get or create a cached client WebSocket connection for ``base_url``.
 
         This method utilizes a ``loop_key`` (incorporating the current ``asyncio`` event
@@ -342,15 +385,108 @@ class WebSocketTransport(Transport):
             return existing
 
         headers = self._build_headers()
-        connect_kwargs: dict[str, Any] = {}
+        connect_kwargs: dict[str, Any] = {
+            "close_timeout": self.config.shutdown_timeout,
+            "max_size": max(self.config.limits.max_response_bytes, self.config.limits.max_event_bytes),
+            "max_queue": self.config.limits.max_concurrent_requests,
+            "ping_interval": self.config.keepalive_interval,
+            "ping_timeout": self.config.keepalive_timeout,
+        }
         if urlparse(base_url).scheme.lower() == "wss" and self.tls is not None:
             connect_kwargs["ssl"] = self.tls.create_client_context()
         try:
-            conn = await websockets.connect(base_url, additional_headers=headers, **connect_kwargs)
-        except TypeError:
-            conn = await websockets.connect(base_url, extra_headers=headers, **connect_kwargs)
+            try:
+                conn = await websockets.connect(base_url, additional_headers=headers, **connect_kwargs)
+            except TypeError:
+                conn = await websockets.connect(base_url, extra_headers=headers, **connect_kwargs)
+        except (OSError, TimeoutError, ConnectionClosed) as exc:
+            raise TransportConnectionError(
+                f"Failed to connect to WebSocket agent at {base_url}",
+                url=base_url,
+                request_id=request_id,
+                retryable=True,
+            ) from exc
         self._client_conns[loop_key] = conn
+        self.register_loop_resource(("websocket", loop_key), conn.close)
         return conn
+
+    async def _discard_client_connection(self, loop_key: str, conn: Any) -> None:
+        """Close a pooled connection that can no longer provide aligned frames."""
+        if self._client_conns.get(loop_key) is conn:
+            self._client_conns.pop(loop_key, None)
+        self.discard_loop_resource(("websocket", loop_key))
+        try:
+            await conn.close()
+        except Exception:
+            pass
+
+    def _build_request_payload(
+        self,
+        request_spec: ClientRequestSpec,
+        data: Any,
+        params: dict[str, Any] | None,
+        context: TransportRequestContext,
+    ) -> dict[str, Any]:
+        """Build a correlated JSON request envelope."""
+        payload: dict[str, Any] = {
+            "id": context.request_id,
+            "method": request_spec.method,
+            "path": request_spec.path,
+        }
+        if context.idempotency_key:
+            payload["idempotency_key"] = context.idempotency_key
+        if request_spec.request_source == "body" and data is not None:
+            payload["data"] = self._serialize_result(data)
+        elif request_spec.request_source == "query_params" and data is not None:
+            payload["params"] = data if isinstance(data, dict) else {"data": str(data)}
+        if params:
+            payload.setdefault("params", {})
+            payload["params"].update(params)
+        return payload
+
+    def _decode_response(self, raw: Any, base_url: str, request_id: str) -> dict[str, Any]:
+        """Decode and validate one WebSocket response frame."""
+        if isinstance(raw, (bytes, bytearray)):
+            raw = raw.decode("utf-8", errors="replace")
+        try:
+            response = json.loads(raw)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise TransportProtocolError(
+                f"Invalid JSON response from {base_url}: {raw!r}",
+                url=base_url,
+                request_id=request_id,
+            ) from exc
+        if not isinstance(response, dict):
+            raise TransportProtocolError(
+                f"WebSocket response from {base_url} must be a JSON object",
+                url=base_url,
+                request_id=request_id,
+            )
+        return response
+
+    def _unwrap_response(
+        self,
+        response: dict[str, Any],
+        base_url: str,
+        request_id: str,
+        *,
+        operation: str = "request",
+    ) -> Any:
+        """Validate correlation and unwrap a WebSocket response envelope."""
+        if response.get("id") != request_id:
+            raise TransportProtocolError(
+                f"Mismatched WebSocket {operation} id from {base_url}: {response.get('id')}",
+                url=base_url,
+                request_id=request_id,
+            )
+        if not response.get("ok", False):
+            error = response.get("error") or {}
+            raise TransportRemoteError(
+                f"WebSocket {operation} failed at {base_url}: {error}",
+                url=base_url,
+                request_id=request_id,
+            )
+        return response.get("result")
 
     @staticmethod
     def _connection_is_open(conn: Any) -> bool:
@@ -432,10 +568,12 @@ class WebSocketTransport(Transport):
             async for raw in websocket:
                 response: dict[str, Any]
                 req: Any = None
+                idempotency_key: str | None = None
                 try:
                     if isinstance(raw, (bytes, bytearray)):
                         raw = raw.decode("utf-8", errors="replace")
                     req = json.loads(raw)
+                    self.check_payload_limit(req, kind="request", url=self._url)
                     request_id = req.get("id")
                     method = str(req.get("method")).upper()
                     path = req.get("path")
@@ -446,6 +584,18 @@ class WebSocketTransport(Transport):
                     ep = self._endpoints.get((method, path))
                     if ep is None:
                         raise ValueError(f"No endpoint registered for {method} {path}")
+
+                    raw_idempotency_key = req.get("idempotency_key")
+                    idempotency_key = f"{method}:{path}:{raw_idempotency_key}" if raw_idempotency_key else None
+                    if ep.mode != "stream" and not ep.streaming:
+                        owns_operation, cached = await self.acquire_idempotent_response(idempotency_key)
+                        if not owns_operation:
+                            if not isinstance(cached, dict):
+                                raise TypeError("Cached WebSocket response must be a mapping")
+                            cached_response = cached.copy()
+                            cached_response["id"] = request_id
+                            await websocket.send(json.dumps(cached_response))
+                            continue
 
                     if ep.request_source == "body":
                         payload = req.get("data")
@@ -466,54 +616,29 @@ class WebSocketTransport(Transport):
                     handler_is_async = is_async_callable(ep.handler)
 
                     if ep.mode == "stream" or ep.streaming:
-                        if ep.request_source != "none" and payload is not None:
-                            stream_obj = ep.handler(handler_input)
-                        else:
-                            stream_obj = ep.handler()
-
-                        if inspect.isawaitable(stream_obj):
-                            stream_obj = await stream_obj
-
-                        if not hasattr(stream_obj, "__aiter__"):
-                            raise TypeError("Streaming handler must return an async iterator")
-
-                        sent_final = False
-                        async for event in stream_obj:
-                            event_payload = self._serialize_result(event)
-                            event_final = False
-                            if isinstance(event_payload, dict):
-                                event_final = bool(event_payload.get("final", False))
-                            stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
-                            await websocket.send(
-                                json.dumps(
-                                    {
-                                        "id": request_id,
-                                        "ok": True,
-                                        "result": event_payload,
-                                        "final": stream_final,
-                                        "stream": True,
-                                    }
-                                )
-                            )
-                            if stream_final:
-                                sent_final = True
-                                break
-
-                        if not sent_final:
-                            await websocket.send(
-                                json.dumps(
-                                    {"id": request_id, "ok": True, "result": None, "final": True, "stream": True}
-                                )
-                            )
+                        await self._send_stream_response(
+                            websocket,
+                            ep,
+                            payload,
+                            handler_input,
+                            request_id,
+                        )
                         continue
 
-                    if ep.request_source != "none" and payload is not None:
-                        result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
-                    else:
-                        result = await ep.handler() if handler_is_async else ep.handler()
+                    async with self.inbound_request_slot():
+                        if ep.request_source != "none" and payload is not None:
+                            result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
+                        else:
+                            result = await ep.handler() if handler_is_async else ep.handler()
 
                     response = {"id": request_id, "ok": True, "result": self._serialize_result(result)}
+                    self.check_payload_limit(response, kind="response", url=self._url)
+                    self.complete_idempotent_response(idempotency_key, response)
+                except asyncio.CancelledError as exc:
+                    self.abort_idempotent_response(idempotency_key, exc)
+                    raise
                 except Exception as e:
+                    self.abort_idempotent_response(idempotency_key, e)
                     response = {
                         "id": req.get("id") if isinstance(req, dict) else None,
                         "ok": False,
@@ -526,6 +651,52 @@ class WebSocketTransport(Transport):
                 await websocket.send(json.dumps(response))
         except ConnectionClosed:
             pass
+
+    async def _send_stream_response(
+        self,
+        websocket: Any,
+        endpoint: EndpointSpec,
+        payload: Any,
+        handler_input: Any,
+        request_id: str,
+    ) -> None:
+        """Run one bounded server stream and emit correlated envelopes."""
+        async with self.stream_slot():
+            if endpoint.request_source != "none" and payload is not None:
+                stream_obj = endpoint.handler(handler_input)
+            else:
+                stream_obj = endpoint.handler()
+
+            if inspect.isawaitable(stream_obj):
+                stream_obj = await stream_obj
+            if not hasattr(stream_obj, "__aiter__"):
+                raise TypeError("Streaming handler must return an async iterator")
+
+            sent_final = False
+            async for event in stream_obj:
+                event_payload = self._serialize_result(event)
+                self.check_payload_limit(event_payload, kind="event", url=self._url)
+                event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
+                stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
+                await websocket.send(
+                    json.dumps(
+                        {
+                            "id": request_id,
+                            "ok": True,
+                            "result": event_payload,
+                            "final": stream_final,
+                            "stream": True,
+                        }
+                    )
+                )
+                if stream_final:
+                    sent_final = True
+                    break
+
+            if not sent_final:
+                await websocket.send(
+                    json.dumps({"id": request_id, "ok": True, "result": None, "final": True, "stream": True})
+                )
 
     def _serialize_result(self, result: Any) -> Any:
         """Recursively normalize complex data models into JSON-safe structures.

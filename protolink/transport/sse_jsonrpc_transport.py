@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import json
-import uuid
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
 import httpx
 
+from protolink.client.request_spec import ClientRequestSpec
+from protolink.transport.config import TransportCapabilities
+from protolink.transport.errors import (
+    TransportConnectionError,
+    TransportProtocolError,
+    TransportRemoteError,
+    TransportTimeoutError,
+)
 from protolink.transport.http_transport import HTTPTransport
 from protolink.types import TransportType
 
@@ -24,6 +31,11 @@ class SSEJSONRPCTransport(HTTPTransport):
 
     transport_type: ClassVar[TransportType] = "sse"
     supports_streaming: ClassVar[bool] = True
+    capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
+        streaming=True,
+        tls=True,
+        persistent_connections=True,
+    )
 
     async def subscribe(self, agent_url: str, task: Any) -> AsyncIterator[Any]:
         """Stream events from a remote agent's ``/tasks/stream`` endpoint.
@@ -37,8 +49,16 @@ class SSEJSONRPCTransport(HTTPTransport):
         if self.authenticator and self.credentials and not self.security_context:
             await self.authenticate(self.credentials)
 
+        request_spec = ClientRequestSpec(
+            name="task_stream",
+            path="/tasks/stream",
+            method="POST",
+            request_source="body",
+            idempotent=False,
+        )
+        context = self.new_request_context(request_spec, task)
         client = await self._ensure_client()
-        request_id = uuid.uuid4().hex
+        request_id = context.request_id
         headers = {
             **self._build_headers(),
             "Accept": "text/event-stream",
@@ -47,39 +67,61 @@ class SSEJSONRPCTransport(HTTPTransport):
         }
         payload = self._serialize_payload(task)
         url = f"{agent_url.rstrip('/')}/tasks/stream"
+        request_size = self.check_payload_limit(payload, kind="request", url=url)
 
-        try:
-            async with client.stream(
-                "POST",
-                url,
-                json=payload,
-                headers=headers,
-                timeout=self._timeout,
-            ) as response:
-                response.raise_for_status()
-                event_lines: list[str] = []
-                async for line in response.aiter_lines():
-                    if line == "":
-                        result, final = self._parse_event(event_lines, agent_url, request_id)
-                        if result is not None:
-                            yield result
-                        if final:
-                            break
-                        event_lines = []
-                        continue
-                    if line.startswith("data:"):
-                        event_lines.append(line[5:].strip())
+        async with self.stream_slot():
+            try:
+                async with client.stream(
+                    "POST",
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=self._timeout,
+                ) as response:
+                    response.raise_for_status()
+                    self._metrics.add(bytes_sent=request_size)
+                    event_lines: list[str] = []
+                    async for line in response.aiter_lines():
+                        if line == "":
+                            result, final = self._parse_event(event_lines, agent_url, request_id)
+                            event_lines = []
+                            if result is not None:
+                                event_size = self.check_payload_limit(result, kind="event", url=url)
+                                self._metrics.add(bytes_received=event_size)
+                                yield result
+                            if final:
+                                break
+                            continue
+                        if line.startswith("data:"):
+                            event_lines.append(line[5:].strip())
 
-                result, _final = self._parse_event(event_lines, agent_url, request_id)
-                if result is not None:
-                    yield result
-        except httpx.ConnectError as exc:
-            raise ConnectionError(
-                f"Failed to connect to agent at {agent_url}. Make sure the agent is running and accessible."
-            ) from exc
-        except httpx.HTTPStatusError as exc:
-            status_code = exc.response.status_code
-            raise RuntimeError(f"Agent at {agent_url} returned HTTP {status_code}: {exc.response.text}") from exc
+                    result, _final = self._parse_event(event_lines, agent_url, request_id)
+                    if result is not None:
+                        event_size = self.check_payload_limit(result, kind="event", url=url)
+                        self._metrics.add(bytes_received=event_size)
+                        yield result
+            except httpx.TimeoutException as exc:
+                raise TransportTimeoutError(
+                    f"SSE stream from {agent_url} timed out",
+                    url=url,
+                    request_id=request_id,
+                    retryable=True,
+                ) from exc
+            except httpx.ConnectError as exc:
+                raise TransportConnectionError(
+                    f"Failed to connect to agent at {agent_url}. Make sure the agent is running and accessible.",
+                    url=url,
+                    request_id=request_id,
+                    retryable=True,
+                ) from exc
+            except httpx.HTTPStatusError as exc:
+                status_code = exc.response.status_code
+                raise TransportRemoteError(
+                    f"Agent at {agent_url} returned HTTP {status_code}: {exc.response.text}",
+                    url=url,
+                    request_id=request_id,
+                    status_code=status_code,
+                ) from exc
 
     def _parse_event(self, event_lines: list[str], agent_url: str, request_id: str) -> tuple[Any | None, bool]:
         """Parse one SSE event block into ``(result, final)``.
@@ -95,24 +137,37 @@ class SSEJSONRPCTransport(HTTPTransport):
         try:
             message = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(f"Invalid SSE JSON-RPC event from {agent_url}: {raw!r}") from exc
+            raise TransportProtocolError(
+                f"Invalid SSE JSON-RPC event from {agent_url}: {raw!r}",
+                url=agent_url,
+                request_id=request_id,
+            ) from exc
 
         message_id = message.get("id")
         if message_id not in {None, request_id}:
-            raise RuntimeError(f"Mismatched SSE JSON-RPC event id from {agent_url}: {message_id}")
+            raise TransportProtocolError(
+                f"Mismatched SSE JSON-RPC event id from {agent_url}: {message_id}",
+                url=agent_url,
+                request_id=request_id,
+            )
 
         if not message.get("ok", False):
             error = message.get("error") or {}
-            raise RuntimeError(f"SSE JSON-RPC stream failed at {agent_url}: {error}")
+            raise TransportRemoteError(
+                f"SSE JSON-RPC stream failed at {agent_url}: {error}",
+                url=agent_url,
+                request_id=request_id,
+            )
 
         return message.get("result"), bool(message.get("final", False))
 
-    def _serialize_payload(self, payload: Any) -> Any:
+    @staticmethod
+    def _serialize_payload(data: Any) -> Any:
         """Convert Protolink domain objects into JSON-serializable payloads."""
-        if hasattr(payload, "to_json"):
-            return payload.to_json()
-        if hasattr(payload, "to_dict"):
-            return payload.to_dict()
-        if hasattr(payload, "model_dump"):
-            return payload.model_dump()
-        return payload
+        if hasattr(data, "to_json"):
+            return data.to_json()
+        if hasattr(data, "to_dict"):
+            return data.to_dict()
+        if hasattr(data, "model_dump"):
+            return data.model_dump()
+        return data

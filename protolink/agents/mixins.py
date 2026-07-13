@@ -1,8 +1,7 @@
 """Reusable behavior mixins for the public Agent class.
 
-These mixins keep the public :class:`protolink.agents.Agent` API stable while
-separating independent responsibilities such as lifecycle, control-plane
-operations, tools, registry communication, configuration, and serialization.
+These mixins keep the public :class:`protolink.agents.Agent` API stable while separating independent responsibilities
+such as lifecycle, control-plane operations, tools, registry communication, configuration, and serialization.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ from protolink.storage import Storage
 from protolink.telemetry.base import Telemetry
 from protolink.tools import ActionBuilder, BaseTool, Tool
 from protolink.tools.schema import validate_tool_args
-from protolink.transport import Transport, get_transport
+from protolink.transport import Transport, TransportConfig, get_transport
 from protolink.types import TransportType
 from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
@@ -93,8 +92,7 @@ class AgentLifecycleMixin(_AgentMixinBase):
     async def _serve_forever(self) -> None:
         """Keep the agent runtime alive until cancellation.
 
-        This method blocks indefinitely and gracefully shuts down the
-        agent when cancellation occurs.
+        This method blocks indefinitely and gracefully shuts down the agent when cancellation occurs.
         """
 
         try:
@@ -159,8 +157,8 @@ class AgentLifecycleMixin(_AgentMixinBase):
     ) -> None:
         """Start the agent runtime and initialize outbound/inbound communications.
 
-        This is the primary public entrypoint for running the agent. It is designed to be
-        environment-agnostic, working seamlessly in:
+        This is the primary public entrypoint for running the agent. It is designed to be environment-agnostic, working
+        seamlessly in:
         - standard scripts
         - async applications
         - background threads
@@ -168,18 +166,16 @@ class AgentLifecycleMixin(_AgentMixinBase):
 
 
         **Technical Note on Lifecycle Orchestration:**
-        Protolink handles the transition between synchronous and asynchronous contexts using
-        a dual-mode execution strategy:
+        Protolink handles the transition between synchronous and asynchronous contexts using a dual-mode execution
+        strategy:
 
-        1. **Deterministic Background Mode (``background=True``):** Starts a dedicated thread
-           with its own ``asyncio`` event loop. To prevent race conditions, this method
-           utilizes a ``threading.Event`` to block the caller until the background agent is
-           fully initialized, registered, and ready to receive traffic. Any startup
-           failures (e.g., port collisions) are captured and re-raised in the caller thread.
+        1. **Deterministic Background Mode (``background=True``):** Starts a dedicated thread with its own ``asyncio``
+           event loop. To prevent race conditions, this method utilizes a ``threading.Event`` to block the caller until
+           the background agent is fully initialized, registered, and ready to receive traffic. Any startup failures
+           (e.g., port collisions) are captured and re-raised in the caller thread.
 
-        2. **Blocking Mode (``background=False``):** Utilizes ``asyncio.run()`` to take over
-            the main thread's execution. This is the recommended pattern for standalone
-           agent scripts.
+        2. **Blocking Mode (``background=False``):** Utilizes ``asyncio.run()`` to take over the main thread's
+           execution. This is the recommended pattern for standalone agent scripts.
 
         Args:
             register: If True, registers the agent with the configured registry upon startup.
@@ -272,15 +268,14 @@ class AgentLifecycleMixin(_AgentMixinBase):
         It is specifically designed to safely terminate agents started with ``background=True``.
 
         **Technical Note on Thread-Safe Teardown:**
-        When an agent is running in a background thread, its lifecycle is managed by a private event loop.
-        To stop it from the main thread, we utilize ``call_soon_threadsafe`` to inject a cancellation request into
-        the background loop. This triggers a ``CancelledError`` within the ``_lifecycle()`` coroutine, allowing
-        it to execute its ``finally`` blocks which perform critical cleanup like closing the transport and stopping
-        the ASGI server.
+        When an agent is running in a background thread, its lifecycle is managed by a private event loop. To stop it
+        from the main thread, we utilize ``call_soon_threadsafe`` to inject a cancellation request into the background
+        loop. This triggers a ``CancelledError`` within the ``_lifecycle()`` coroutine, allowing it to execute its
+        ``finally`` blocks which perform critical cleanup like closing the transport and stopping the ASGI server.
 
-        The subsequent ``join(timeout=10)`` synchronizes the main thread with the background thread's exit.
-        This ensures that the caller doesn't proceed (or the process doesn't exit) while the background server
-        is still in the middle of a graceful port release or connection drain.
+        The subsequent ``join(timeout=10)`` synchronizes the main thread with the background thread's exit. This ensures
+        that the caller doesn't proceed (or the process doesn't exit) while the background server is still in the middle
+        of a graceful port release or connection drain.
 
         Notes:
             - Safe to call multiple times.
@@ -305,18 +300,16 @@ class AgentControlPlaneMixin(_AgentMixinBase):
     def active_task_ids(self) -> tuple[str, ...]:
         """Return task IDs currently executing on this Agent.
 
-        This is a process-local runtime view intended for diagnostics and
-        control planes. Completed tasks are removed immediately and should be
-        retrieved from application storage rather than this active registry.
+        This is a process-local runtime view intended for diagnostics and control planes. Completed tasks are removed
+        immediately and should be retrieved from application storage rather than this active registry.
         """
         return self._task_executions.task_ids
 
     def get_cancellation_token(self, task_id: str) -> CancellationToken | None:
         """Return the live cooperative token for an active task.
 
-        Custom handlers may use this token to add cancellation checkpoints
-        inside long-running loops. The token is never serialized into ``Task``
-        or ``RunContext``.
+        Custom handlers may use this token to add cancellation checkpoints inside long-running loops. The token is never
+        serialized into ``Task`` or ``RunContext``.
         """
         return self._task_executions.get_token(task_id)
 
@@ -327,15 +320,14 @@ class AgentControlPlaneMixin(_AgentMixinBase):
     ) -> Task:
         """Request best-effort cancellation of an active task.
 
-        Cancellation updates both the protocol ``Task`` state and serialized
-        ``RunContext``, then interrupts the owning ``asyncio.Task`` at its next
-        await point. Synchronous functions and already-issued external side
-        effects may not be immediately stoppable.
+        Cancellation updates both the protocol ``Task`` state and serialized ``RunContext``, then interrupts the owning
+        ``asyncio.Task`` at its next await point. Synchronous functions and already-issued external side effects may not
+        be immediately stoppable.
 
         Args:
             request: Active task ID or a typed A2A-style cancellation request.
-            reason: Optional reason used when ``request`` is a task ID. When a
-                typed request is supplied, an explicit argument takes precedence.
+            reason: Optional reason used when ``request`` is a task ID. When a typed request is supplied, an explicit
+                argument takes precedence.
 
         Returns:
             The active task after its state changes to ``canceled``.
@@ -358,15 +350,13 @@ class AgentControlPlaneMixin(_AgentMixinBase):
     ) -> HistoryCompactionResult:
         """Compact this agent's LLM history through a control-plane request.
 
-        This method backs the ``/llm/history/compact`` endpoint and the
-        matching ``AgentClient`` request spec. It is intentionally outside
-        ``Task`` execution and outside ``LLM.infer()``, so compaction is never
-        advertised to the model as a tool and never consumes prompt budget.
+        This method backs the ``/llm/history/compact`` endpoint and the matching ``AgentClient`` request spec. It is
+        intentionally outside ``Task`` execution and outside ``LLM.infer()``, so compaction is never advertised to the
+        model as a tool and never consumes prompt budget.
 
-        When ``request.session_id`` is provided and conversation state is
-        enabled, the session history is loaded before compaction and saved
-        afterward. The operation is authorized through the
-        ``llm.history.compact`` runtime capability before any history mutation.
+        When ``request.session_id`` is provided and conversation state is enabled, the session history is loaded before
+        compaction and saved afterward. The operation is authorized through the ``llm.history.compact`` runtime
+        capability before any history mutation.
         """
         if self.llm is None:
             raise RuntimeError("Agent has no LLM but received a history compaction request")
@@ -426,9 +416,8 @@ class AgentControlPlaneMixin(_AgentMixinBase):
     ) -> StateOperationResult:
         """Describe enabled state stores through the control plane.
 
-        This method reports what state stores are enabled and, for conversation
-        state, whether a specific session exists. It does not expose a model
-        tool and does not mutate state.
+        This method reports what state stores are enabled and, for conversation state, whether a specific session
+        exists. It does not expose a model tool and does not mutate state.
         """
         active_request = _coerce_state_operation_request(
             request,
@@ -454,10 +443,9 @@ class AgentControlPlaneMixin(_AgentMixinBase):
     ) -> StateOperationResult:
         """Reset persistent state and return a structured report.
 
-        Passing a ``session_id`` precisely clears conversation state for that
-        session. Omitting ``session_id`` performs a full agent-state reset for
-        all enabled stores. Partial full resets are rejected because the current
-        storage abstraction is namespace-based.
+        Passing a ``session_id`` precisely clears conversation state for that session. Omitting ``session_id`` performs
+        a full agent-state reset for all enabled stores. Partial full resets are rejected because the current storage
+        abstraction is namespace-based.
         """
         active_request = _coerce_state_operation_request(
             request,
@@ -486,11 +474,9 @@ class AgentControlPlaneMixin(_AgentMixinBase):
     ) -> StateOperationResult:
         """Compact persistent conversation state and return a state report.
 
-        Conversation state is currently the built-in compactable store. The
-        operation loads the selected session, runs the LLM-owned
-        ``HistoryCompactor``, saves the compacted session, and reports the
-        before/after counts. Explicit keyword arguments override fields on
-        ``request``; omitted keywords preserve request-spec values delivered by
+        Conversation state is currently the built-in compactable store. The operation loads the selected session, runs
+        the LLM-owned ``HistoryCompactor``, saves the compacted session, and reports the before/after counts. Explicit
+        keyword arguments override fields on ``request``; omitted keywords preserve request-spec values delivered by
         remote clients.
         """
         active_request = _coerce_state_operation_request(
@@ -794,8 +780,8 @@ class AgentToolMixin(_AgentMixinBase):
             tags: Optional discovery and presentation tags.
             examples: Optional usage examples.
             capabilities: Permission capabilities required before execution.
-            action_builder: Optional callable that enriches the prepared
-                ``RunAction`` with metadata or preview artifacts.
+            action_builder: Optional callable that enriches the prepared ``RunAction`` with metadata or preview
+                artifacts.
 
         Returns:
             A decorator that registers the wrapped callable on this agent.
@@ -823,9 +809,8 @@ class AgentToolMixin(_AgentMixinBase):
     async def call_tool(self, tool_name: str, **kwargs):
         """Invoke a registered tool after runtime policy authorization.
 
-        Direct calls use a fresh run context. Task-based execution uses the
-        context propagated on the task, allowing per-run permissions and
-        cancellation state to participate in the decision.
+        Direct calls use a fresh run context. Task-based execution uses the context propagated on the task, allowing
+        per-run permissions and cancellation state to participate in the decision.
         """
         tool = self.tools.get(tool_name, None)
         if not tool:
@@ -841,9 +826,8 @@ class AgentToolMixin(_AgentMixinBase):
     ) -> Any:
         """Invoke a registered tool using an explicit run context.
 
-        This variant is intended for application runtimes and deterministic
-        flows that call tools directly while preserving per-run permissions,
-        cancellation, trace correlation, and approval behavior.
+        This variant is intended for application runtimes and deterministic flows that call tools directly while
+        preserving per-run permissions, cancellation, trace correlation, and approval behavior.
 
         Args:
             tool_name: Name of the registered tool to invoke.
@@ -866,15 +850,13 @@ class AgentToolMixin(_AgentMixinBase):
     ) -> ActionAuthorization:
         """Authorize an arbitrary runtime action without executing it.
 
-        This public primitive supports deterministic flows and application
-        runtimes that prepare side effects outside the built-in tool dispatcher.
-        Tool execution paths call the same authorizer internally after enriching
-        actions with tool-declared capabilities and preview artifacts.
+        This public primitive supports deterministic flows and application runtimes that prepare side effects outside
+        the built-in tool dispatcher. Tool execution paths call the same authorizer internally after enriching actions
+        with tool-declared capabilities and preview artifacts.
 
         Args:
             action: Concrete operation to evaluate.
-            context: Optional active run context. A fresh context associated
-                with this agent is created when omitted.
+            context: Optional active run context. A fresh context associated with this agent is created when omitted.
 
         Returns:
             A successful authorization record.
@@ -968,10 +950,10 @@ class AgentToolMixin(_AgentMixinBase):
         """Automatically detect skills from available tools and methods.
 
         Args:
-            include_public_methods: Whether to automatically detect skills from public methods of the agent.
-                When True, scans all public methods (those not starting with '_') and creates
-                AgentSkill objects from them. When False, only detects skills from registered tools.
-                Defaults to False to avoid unintended exposure of all public methods as skills.
+            include_public_methods: Whether to automatically detect skills from public methods of the agent. When True,
+            scans all public methods (those not starting with '_') and creates AgentSkill objects from them. When False,
+            only detects skills from registered tools. Defaults to False to avoid unintended exposure of all public
+            methods as skills.
 
         Returns:
             List of AgentSkill objects detected from the agent
@@ -1042,7 +1024,6 @@ class AgentConfigurationMixin(_AgentMixinBase):
 
         authenticator = getattr(self, "authenticator", None)
         credentials = getattr(self, "credentials", None)
-        tls = self.tls
 
         if isinstance(transport, str):
             transport_kwargs: dict[str, Any] = {
@@ -1050,8 +1031,6 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 "authenticator": authenticator,
                 "credentials": credentials,
             }
-            if tls is not None:
-                transport_kwargs["tls"] = tls
             if getattr(self, "_verbosity", 1) == 0:
                 transport_kwargs["log_level"] = "critical"
                 transport_kwargs["access_log"] = False
@@ -1065,8 +1044,6 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 setattr(transport, "authenticator", authenticator)  # noqa: B010
             if credentials is not None and getattr(transport, "credentials", None) is None:
                 setattr(transport, "credentials", credentials)  # noqa: B010
-            if tls is not None and getattr(transport, "tls", None) is None and hasattr(transport, "tls"):
-                setattr(transport, "tls", tls)  # noqa: B010
         else:
             raise ValueError("Invalid transport type")
 
@@ -1179,8 +1156,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
     async def handle_chat_message(self, data: dict[str, Any]) -> dict[str, str]:
         """Handle an incoming chat message from the chat UI.
 
-        Expects a JSON body with 'message' and optional 'session_id'.
-        Uses the agent's invoke() method under the hood.
+        Expects a JSON body with 'message' and optional 'session_id'. Uses the agent's invoke() method under the hood.
 
         Args:
             data: Dict with 'message' (str) and optional 'session_id' (str)
@@ -1250,10 +1226,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
                 if registry_url is None:
                     self._logger.error("registry_url cannot be None")
                     return
-                transport_kwargs: dict[str, Any] = {"url": registry_url}
-                if self.tls is not None:
-                    transport_kwargs["tls"] = self.tls
-                transport = get_transport(registry, **transport_kwargs)
+                transport = get_transport(registry, url=registry_url)
                 self.registry_client = RegistryClient(transport=transport)
             elif isinstance(registry, RegistryClient):
                 self.registry_client = registry
@@ -1391,6 +1364,52 @@ class AgentSerializationMixin(_AgentMixinBase):
                 func=func,
             )
 
+    @staticmethod
+    def _serialize_transport(transport: Transport) -> dict[str, Any]:
+        """Serialize one transport with its independently owned settings."""
+        data: dict[str, Any] = {
+            "type": getattr(transport, "transport_type", "http"),
+            "url": transport.url,
+            "timeout": getattr(transport, "timeout", 360.0),
+            "config": transport.config.to_dict(),
+        }
+        tls = getattr(transport, "tls", None)
+        if tls is not None:
+            data["tls"] = tls.to_dict()
+        if hasattr(transport, "backend"):
+            data["backend"] = "fastapi" if "FastAPIBackend" in transport.backend.__class__.__name__ else "starlette"
+            if hasattr(transport.backend, "validate_schema"):
+                data["validate_schema"] = getattr(transport.backend, "validate_schema", False)
+        return data
+
+    @classmethod
+    def _deserialize_transport(
+        cls,
+        data: dict[str, Any],
+        *,
+        fallback_url: str,
+        authenticator: Any = None,
+        credentials: str | None = None,
+    ) -> Transport:
+        """Rebuild one transport without promoting its settings onto Agent."""
+        kwargs: dict[str, Any] = {
+            "url": data.get("url", fallback_url),
+            "timeout": data.get("timeout", 360.0),
+        }
+        if "backend" in data:
+            kwargs["backend"] = data["backend"]
+        if "validate_schema" in data:
+            kwargs["validate_schema"] = data["validate_schema"]
+        if isinstance(data.get("config"), dict):
+            kwargs["config"] = TransportConfig.from_dict(data["config"])
+        if isinstance(data.get("tls"), dict):
+            kwargs["tls"] = TLSConfig.from_dict(data["tls"])
+        if authenticator is not None:
+            kwargs["authenticator"] = authenticator
+        if credentials is not None:
+            kwargs["credentials"] = credentials
+        return get_transport(data.get("type", "http"), **kwargs)
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize the agent configuration to a dictionary representation."""
         level = getattr(self._logger, "level", 20)
@@ -1411,31 +1430,13 @@ class AgentSerializationMixin(_AgentMixinBase):
             "credentials": self.credentials,
         }
 
-        if self.tls is not None:
-            data["tls"] = self.tls.to_dict()
-
         # Transport
         if self._transport:
-            transport_config = {
-                "type": getattr(self._transport, "transport_type", "http"),
-                "url": self._transport.url,
-                "timeout": getattr(self._transport, "timeout", 360.0),
-            }
-            if hasattr(self._transport, "backend"):
-                backend_name = "starlette"
-                if "FastAPIBackend" in self._transport.backend.__class__.__name__:
-                    backend_name = "fastapi"
-                transport_config["backend"] = backend_name
-            if hasattr(self._transport, "backend") and hasattr(self._transport.backend, "validate_schema"):
-                transport_config["validate_schema"] = getattr(self._transport.backend, "validate_schema", False)
-            data["transport"] = transport_config
+            data["transport"] = self._serialize_transport(self._transport)
 
         # Registry
         if self.registry_client:
-            data["registry"] = {
-                "type": getattr(self.registry_client.transport, "transport_type", "http"),
-                "url": self.registry_client.url,
-            }
+            data["registry"] = self._serialize_transport(self.registry_client.transport)
 
         # LLM
         if self.llm:
@@ -1534,38 +1535,20 @@ class AgentSerializationMixin(_AgentMixinBase):
         # Credentials
         credentials = overrides.get("credentials", data.get("credentials"))
 
-        # Transport security
-        tls = overrides.get("tls")
-        if tls is None:
-            tls_config = data.get("tls")
-            if isinstance(tls_config, dict):
-                tls = TLSConfig.from_dict(tls_config)
-
         # Transport
         transport = overrides.get("transport")
         if transport is None:
             transport_config = data.get("transport")
             if transport_config:
-                transport_type = transport_config.get("type", "http")
                 try:
-                    from protolink.transport import get_transport
-
-                    t_kwargs = {
-                        "url": transport_config.get("url", card_data.get("url")),
-                        "timeout": transport_config.get("timeout", 360.0),
-                    }
-                    if "backend" in transport_config:
-                        t_kwargs["backend"] = transport_config["backend"]
-                    if "validate_schema" in transport_config:
-                        t_kwargs["validate_schema"] = transport_config["validate_schema"]
-
-                    t_kwargs["authenticator"] = authenticator
-                    t_kwargs["credentials"] = credentials
-                    t_kwargs["tls"] = tls
-
-                    transport = get_transport(transport_type, **t_kwargs)
+                    transport = cls._deserialize_transport(
+                        transport_config,
+                        fallback_url=card_data.get("url", ""),
+                        authenticator=authenticator,
+                        credentials=credentials,
+                    )
                 except Exception:
-                    transport = transport_type
+                    transport = transport_config.get("type", "http")
 
         # Registry
         registry = overrides.get("registry")
@@ -1573,8 +1556,18 @@ class AgentSerializationMixin(_AgentMixinBase):
         if registry is None:
             registry_config = data.get("registry")
             if registry_config:
-                registry = registry_config.get("type")
                 registry_url = registry_config.get("url")
+                try:
+                    registry = RegistryClient(
+                        cls._deserialize_transport(
+                            registry_config,
+                            fallback_url=registry_url or "",
+                            authenticator=authenticator,
+                            credentials=credentials,
+                        )
+                    )
+                except Exception:
+                    registry = registry_config.get("type")
 
         # LLM
         llm = overrides.get("llm")
@@ -1636,7 +1629,6 @@ class AgentSerializationMixin(_AgentMixinBase):
             expose_chat=expose_chat,
             authenticator=authenticator,
             credentials=credentials,
-            tls=tls,
         )
 
         tools_data = data.get("tools", [])

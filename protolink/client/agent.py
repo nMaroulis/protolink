@@ -33,7 +33,6 @@ from protolink.models import (
     Task,
     TaskCancellationRequest,
 )
-from protolink.security.tls import TLSConfig
 from protolink.transport import Transport, get_transport
 from protolink.types import TransportType
 
@@ -41,8 +40,8 @@ from protolink.types import TransportType
 class AgentClient:
     """High-level client for Agent-to-Agent and User-to-Agent communication.
 
-    This client provides a unified interface for interacting with Protolink agents over different
-    transports (HTTP, WebSocket, etc.).
+    This client provides a unified interface for interacting with Protolink agents over different transports
+    (HTTP, WebSocket, etc.).
 
     It exposes both:
     - Async API (recommended for modern applications)
@@ -83,6 +82,7 @@ class AgentClient:
         method="POST",
         response_parser=Task.from_dict,
         request_source="body",
+        idempotent=True,
     )
 
     AGENT_CARD_REQUEST = ClientRequestSpec(
@@ -91,6 +91,7 @@ class AgentClient:
         method="GET",
         response_parser=AgentCard.from_dict,
         request_source="none",
+        idempotent=True,
     )
 
     TASK_STREAM_REQUEST = ClientRequestSpec(
@@ -107,6 +108,7 @@ class AgentClient:
         response_parser=Task.from_dict,
         request_source="body",
         channel="control",
+        idempotent=True,
     )
 
     COMPACT_HISTORY_REQUEST = ClientRequestSpec(
@@ -125,6 +127,7 @@ class AgentClient:
         response_parser=StateOperationResult.from_dict,
         request_source="body",
         channel="control",
+        idempotent=True,
     )
 
     RESET_STATE_REQUEST = ClientRequestSpec(
@@ -150,8 +153,6 @@ class AgentClient:
         transport: Transport | TransportType,
         url: str | None = None,
         timeout: int = 300,
-        *,
-        tls: TLSConfig | None = None,
     ) -> None:
         """Initialize a client from a transport instance or registered name.
 
@@ -159,19 +160,21 @@ class AgentClient:
             transport: Existing transport or registered transport name.
             url: Local transport URL required when constructing by name.
             timeout: Outbound request timeout in seconds.
-            tls: Optional TLS trust and client-certificate configuration.
+
+        A transport name creates a default transport for rapid prototyping. Pass a concrete transport instance to
+        configure TLS, limits, retries, keepalive, or protocol-specific behavior.
         """
         if isinstance(transport, Transport):
-            if tls is not None and getattr(transport, "tls", None) is None and hasattr(transport, "tls"):
-                setattr(transport, "tls", tls)  # noqa: B010
             self._transport = transport
         else:
-            transport_kwargs: dict[str, Any] = {"url": url, "timeout": timeout}
-            if tls is not None:
-                transport_kwargs["tls"] = tls
-            self._transport = get_transport(transport=transport, **transport_kwargs)
+            self._transport = get_transport(transport=transport, url=url, timeout=timeout)
 
         self.sync = SyncAgentClient(self)
+
+    @property
+    def transport(self) -> Transport:
+        """Return the transport used for all client requests."""
+        return self._transport
 
     # ----------------------------------------------------------------------
     # Agent-to-Agent Communication
@@ -200,23 +203,21 @@ class AgentClient:
     async def send_task_streaming(self, agent_url: str, task: Task) -> AsyncIterator[Any]:
         """Send a task to a remote agent and receive streamed events.
 
-        This method is the high-level streaming entry point for agent-to-agent
-        communication. It delegates to the configured transport's
-        ``subscribe()`` implementation, so the same client call works with
-        streaming-capable transports such as ``"sse"``, ``"json-rpc"``,
-        ``"websocket"``, and ``"runtime"``.
+        This method is the high-level streaming entry point for agent-to-agent communication. It delegates to the
+        configured transport's ``subscribe()`` implementation, so the same client call works with streaming-capable
+        transports such as ``"sse"``, ``"json-rpc"``, ``"websocket"``, and ``"runtime"``.
 
         Args:
             agent_url: Target agent endpoint URL.
             task: Task to execute.
 
         Yields:
-            Streaming events emitted by the remote agent. Transports may yield
-            dictionaries or event objects depending on the backend.
+            Streaming events emitted by the remote agent. Transports may yield dictionaries or event objects depending
+            on the backend.
 
         Raises:
-            NotImplementedError: If the configured transport does not advertise
-                streaming support or does not implement ``subscribe()``.
+            NotImplementedError: If the configured transport does not advertise streaming support or does not implement
+            ``subscribe()``.
 
         Example:
             >>> async for event in client.send_task_streaming(url, task):
@@ -244,9 +245,8 @@ class AgentClient:
     ) -> Task:
         """Request best-effort cancellation of a task running on an agent.
 
-        The task ID is known before submission because Protolink tasks are
-        client-created. This allows a second coroutine, UI action, or control
-        request to cancel a blocking or streaming execution already in flight.
+        The task ID is known before submission because Protolink tasks are client-created. This allows a second
+        coroutine, UI action, or control request to cancel a blocking or streaming execution already in flight.
 
         Args:
             agent_url: Target agent endpoint URL.
@@ -258,8 +258,7 @@ class AgentClient:
             The remote task after the cancellation attempt is accepted.
 
         Raises:
-            RuntimeError: The remote task is unknown, terminal, or currently
-                cannot be canceled.
+            RuntimeError: The remote task is unknown, terminal, or currently cannot be canceled.
         """
         request = TaskCancellationRequest(
             id=task_id,
@@ -286,10 +285,8 @@ class AgentClient:
     ) -> HistoryCompactionResult:
         """Request LLM-history compaction from an agent control endpoint.
 
-        This uses the transport-neutral ``COMPACT_HISTORY_REQUEST`` spec and
-        calls ``POST /llm/history/compact`` on the target agent. It does not
-        send a task, does not create a model-visible tool, and does not modify
-        the LLM prompt.
+        This uses the transport-neutral ``COMPACT_HISTORY_REQUEST`` spec and calls ``POST /llm/history/compact`` on the
+        target agent. It does not send a task, does not create a model-visible tool, and does not modify the LLM prompt.
         """
         request = HistoryCompactionRequest(
             strategy=strategy,
@@ -435,8 +432,7 @@ class AgentClient:
 class SyncAgentClient:
     """Synchronous wrapper around AgentClient.
 
-    This class provides blocking equivalents of async methods
-    for use in:
+    This class provides blocking equivalents of async methods for use in:
     - scripts
     - CLI tools
     - notebooks without async support
@@ -444,8 +440,7 @@ class SyncAgentClient:
     Internally uses `asyncio.run()` to execute async operations.
 
     Warning:
-        This API should NOT be used inside an active event loop
-        (e.g., FastAPI, Jupyter async cells).
+        This API should NOT be used inside an active event loop (e.g., FastAPI, Jupyter async cells).
 
     Example:
         >>> client = AgentClient(transport="http", url="http://localhost:8000")
@@ -473,10 +468,9 @@ class SyncAgentClient:
     def send_task_streaming(self, agent_url: str, task: Task) -> Iterator[Any]:
         """Synchronously stream events from a remote agent.
 
-        This wrapper runs the async streaming API in a background thread and
-        yields events to the caller as they arrive. It is useful for scripts,
-        notebooks without an active event loop, and terminal UIs that want a
-        blocking iterator while still using Protolink's async transports.
+        This wrapper runs the async streaming API in a background thread and yields events to the caller as they arrive.
+        It is useful for scripts, notebooks without an active event loop, and terminal UIs that want a blocking iterator
+        while still using Protolink's async transports.
 
         Example:
             >>> for event in client.sync.send_task_streaming(url, task):
