@@ -76,6 +76,12 @@ uv add --upgrade protolink
 - Fixed HTTP health probes so `/healthz` and `/readyz` remain available when application authentication is enabled.
 - Fixed transport shutdown across background-thread and caller event loops by closing pooled clients and channels on the event loop that owns them.
 - Fixed gRPC shutdown so loop-local cached channels are closed and removed correctly, including repeated `start()` and `stop()` calls.
+- Fixed HTTP and SSE server-side request/stream accounting so shared concurrency limits and transport metrics apply on both sides of a connection.
+- Fixed SSE terminal-frame parsing so the final task event is emitted exactly once.
+- Fixed failed or cancelled WebSocket and gRPC idempotent operations so they release waiting duplicates without poisoning the completed-response cache.
+- Fixed WebSocket pooling after timeouts, protocol corruption, and abandoned streams so unread frames cannot leak into a later request.
+- Fixed Agent configuration round trips so restored Registry transports retain the Agent's serialized authentication strategy and credentials.
+- Fixed short-lived SQLite storage, run-store, and doctor connections so every database handle closes deterministically after use.
 - Fixed source-distribution contents so generated Docusaurus output and `docs/node_modules` are excluded from PyPI packages.
 
 ## [0.6.4] - 2026-07-03

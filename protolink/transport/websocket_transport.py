@@ -263,6 +263,7 @@ class WebSocketTransport(Transport):
                     await conn.send(json.dumps(payload))
                     raw = await asyncio.wait_for(conn.recv(), timeout=self._timeout)
                 except TimeoutError as exc:
+                    await self._discard_client_connection(loop_key, conn)
                     raise TransportTimeoutError(
                         f"WebSocket request to {base_url} timed out",
                         url=base_url,
@@ -270,18 +271,23 @@ class WebSocketTransport(Transport):
                         retryable=True,
                     ) from exc
                 except ConnectionClosed as exc:
-                    self._client_conns.pop(loop_key, None)
-                    self.discard_loop_resource(("websocket", loop_key))
+                    await self._discard_client_connection(loop_key, conn)
                     raise TransportConnectionError(
                         f"WebSocket connection closed while talking to {base_url}",
                         url=base_url,
                         request_id=attempt.request_id,
                         retryable=True,
                     ) from exc
-
-            response = self._decode_response(raw, base_url, attempt.request_id)
-            result = self._unwrap_response(response, base_url, attempt.request_id)
-            response_size = self.check_payload_limit(result, kind="response", url=base_url)
+                except asyncio.CancelledError:
+                    await self._discard_client_connection(loop_key, conn)
+                    raise
+                try:
+                    response = self._decode_response(raw, base_url, attempt.request_id)
+                    result = self._unwrap_response(response, base_url, attempt.request_id)
+                    response_size = self.check_payload_limit(result, kind="response", url=base_url)
+                except TransportProtocolError:
+                    await self._discard_client_connection(loop_key, conn)
+                    raise
             self._metrics.add(bytes_received=response_size)
             return request_spec.response_parser(result) if request_spec.response_parser else result
 
@@ -326,6 +332,7 @@ class WebSocketTransport(Transport):
                     loop_key,
                     request_id=message_id,
                 )
+                stream_complete = False
                 try:
                     self._metrics.add(bytes_sent=request_size)
                     await conn.send(json.dumps(payload))
@@ -338,6 +345,7 @@ class WebSocketTransport(Transport):
                             self._metrics.add(bytes_received=event_size)
                             yield result
                         if msg.get("final", False):
+                            stream_complete = True
                             break
                 except TimeoutError as exc:
                     raise TransportTimeoutError(
@@ -347,14 +355,15 @@ class WebSocketTransport(Transport):
                         retryable=True,
                     ) from exc
                 except ConnectionClosed as exc:
-                    self._client_conns.pop(loop_key, None)
-                    self.discard_loop_resource(("websocket", loop_key))
                     raise TransportConnectionError(
                         f"WebSocket connection closed while streaming from {agent_url}",
                         url=agent_url,
                         request_id=message_id,
                         retryable=True,
                     ) from exc
+                finally:
+                    if not stream_complete:
+                        await self._discard_client_connection(loop_key, conn)
 
     async def _ensure_client_connection(
         self,
@@ -400,6 +409,16 @@ class WebSocketTransport(Transport):
         self._client_conns[loop_key] = conn
         self.register_loop_resource(("websocket", loop_key), conn.close)
         return conn
+
+    async def _discard_client_connection(self, loop_key: str, conn: Any) -> None:
+        """Close a pooled connection that can no longer provide aligned frames."""
+        if self._client_conns.get(loop_key) is conn:
+            self._client_conns.pop(loop_key, None)
+        self.discard_loop_resource(("websocket", loop_key))
+        try:
+            await conn.close()
+        except Exception:
+            pass
 
     def _build_request_payload(
         self,
@@ -615,7 +634,11 @@ class WebSocketTransport(Transport):
                     response = {"id": request_id, "ok": True, "result": self._serialize_result(result)}
                     self.check_payload_limit(response, kind="response", url=self._url)
                     self.complete_idempotent_response(idempotency_key, response)
+                except asyncio.CancelledError as exc:
+                    self.abort_idempotent_response(idempotency_key, exc)
+                    raise
                 except Exception as e:
+                    self.abort_idempotent_response(idempotency_key, e)
                     response = {
                         "id": req.get("id") if isinstance(req, dict) else None,
                         "ok": False,
@@ -624,7 +647,6 @@ class WebSocketTransport(Transport):
 
                     if isinstance(req, dict) and req.get("path") == "/tasks/stream":
                         response["final"] = True
-                    self.complete_idempotent_response(idempotency_key, response)
 
                 await websocket.send(json.dumps(response))
         except ConnectionClosed:

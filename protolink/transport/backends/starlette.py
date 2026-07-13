@@ -125,7 +125,13 @@ class StarletteBackend(BackendInterface):
             handler_is_async = is_async_callable(ep.handler)
 
             try:
-                if ep.request_source != "none" and payload is not None:
+                if transport is not None:
+                    async with transport.inbound_request_slot():
+                        if ep.request_source != "none" and payload is not None:
+                            result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
+                        else:
+                            result = await ep.handler() if handler_is_async else ep.handler()
+                elif ep.request_source != "none" and payload is not None:
                     result = await ep.handler(handler_input) if handler_is_async else ep.handler(handler_input)
                 else:
                     result = await ep.handler() if handler_is_async else ep.handler()
@@ -167,39 +173,25 @@ class StarletteBackend(BackendInterface):
         HTTP clients can consume the same task stream shape as WebSocket clients.
         """
         try:
-            if ep.request_source != "none" and payload is not None:
-                stream_obj = ep.handler(handler_input)
+            if transport is not None:
+                async with transport.stream_slot():
+                    async for frame in self._iter_sse_frames(
+                        ep=ep,
+                        handler_input=handler_input,
+                        payload=payload,
+                        request_id=request_id,
+                        transport=transport,
+                    ):
+                        yield frame
             else:
-                stream_obj = ep.handler()
-
-            if inspect.isawaitable(stream_obj):
-                stream_obj = await stream_obj
-
-            if not hasattr(stream_obj, "__aiter__"):
-                raise TypeError("Streaming endpoint handler must return an async iterator")
-
-            sent_final = False
-            async for event in stream_obj:
-                event_payload = self._serialize_result(event)
-                if transport is not None:
-                    transport.check_payload_limit(event_payload, kind="event")
-                event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
-                stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
-                yield self._sse_frame(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": request_id,
-                        "ok": True,
-                        "result": event_payload,
-                        "final": stream_final,
-                    }
-                )
-                if stream_final:
-                    sent_final = True
-                    break
-
-            if not sent_final:
-                yield self._sse_frame({"jsonrpc": "2.0", "id": request_id, "ok": True, "result": None, "final": True})
+                async for frame in self._iter_sse_frames(
+                    ep=ep,
+                    handler_input=handler_input,
+                    payload=payload,
+                    request_id=request_id,
+                    transport=None,
+                ):
+                    yield frame
         except Exception as exc:
             yield self._sse_frame(
                 {
@@ -210,6 +202,49 @@ class StarletteBackend(BackendInterface):
                     "final": True,
                 }
             )
+
+    async def _iter_sse_frames(
+        self,
+        *,
+        ep: EndpointSpec,
+        handler_input: Any,
+        payload: Any,
+        request_id: str | None,
+        transport: "Transport | None",
+    ):
+        """Execute one SSE handler and yield successful protocol frames."""
+        if ep.request_source != "none" and payload is not None:
+            stream_obj = ep.handler(handler_input)
+        else:
+            stream_obj = ep.handler()
+
+        if inspect.isawaitable(stream_obj):
+            stream_obj = await stream_obj
+        if not hasattr(stream_obj, "__aiter__"):
+            raise TypeError("Streaming endpoint handler must return an async iterator")
+
+        sent_final = False
+        async for event in stream_obj:
+            event_payload = self._serialize_result(event)
+            if transport is not None:
+                transport.check_payload_limit(event_payload, kind="event")
+            event_final = bool(event_payload.get("final", False)) if isinstance(event_payload, dict) else False
+            stream_final = is_stream_terminal_event(event_payload, event_final=event_final)
+            yield self._sse_frame(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "ok": True,
+                    "result": event_payload,
+                    "final": stream_final,
+                }
+            )
+            if stream_final:
+                sent_final = True
+                break
+
+        if not sent_final:
+            yield self._sse_frame({"jsonrpc": "2.0", "id": request_id, "ok": True, "result": None, "final": True})
 
     def _sse_frame(self, payload: dict[str, Any]) -> str:
         """Serialize a JSON payload as a single Server-Sent Event frame."""

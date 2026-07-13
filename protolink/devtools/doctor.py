@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 from urllib.error import URLError
@@ -78,7 +79,7 @@ def _check_run_store(path: Path) -> CheckResult:
         return CheckResult("run store", "warn", f"{path} does not exist yet")
 
     try:
-        with sqlite3.connect(str(path)) as conn:
+        with closing(sqlite3.connect(str(path))) as conn:
             rows = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE '%run%' OR name LIKE '%task%')"
             ).fetchall()

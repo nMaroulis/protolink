@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+from contextlib import closing
 from typing import Any
 
 from protolink.storage.base import Storage
@@ -38,7 +39,7 @@ class SQLiteStorage(Storage):
 
     def _init_db(self) -> None:
         """Initializes the database schema."""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS {self.table_name} (
@@ -55,7 +56,7 @@ class SQLiteStorage(Storage):
         Data is serialized to JSON before storage.
         """
         serialized_data = json.dumps(data)
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute(
                 f"INSERT OR REPLACE INTO {self.table_name} (key, value) VALUES (?, ?)",
                 (self.namespace, serialized_data),
@@ -68,7 +69,7 @@ class SQLiteStorage(Storage):
         Returns:
             The loaded data deserialized from JSON, or None if not found.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(f"SELECT value FROM {self.table_name} WHERE key = ?", (self.namespace,))
             row = cursor.fetchone()
             if row:
@@ -84,6 +85,6 @@ class SQLiteStorage(Storage):
 
     def delete(self) -> None:
         """Deletes the data from the storage."""
-        with sqlite3.connect(self.db_path) as conn:
+        with closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute(f"DELETE FROM {self.table_name} WHERE key = ?", (self.namespace,))
             conn.commit()

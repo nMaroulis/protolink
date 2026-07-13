@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -186,7 +187,7 @@ class SQLiteRunStore:
 
     def _init_db(self) -> None:
         """Create storage tables and indexes when missing."""
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS {self.tasks_table} (
@@ -250,7 +251,7 @@ class SQLiteRunStore:
             created_at=task.created_at,
             updated_at=utc_now(),
         )
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 f"""
                 INSERT OR REPLACE INTO {self.tasks_table}
@@ -281,7 +282,7 @@ class SQLiteRunStore:
 
     def get_task_record(self, task_id: str) -> TaskRecord | None:
         """Load one task record by task ID."""
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             row = conn.execute(f"SELECT * FROM {self.tasks_table} WHERE task_id = ?", (task_id,)).fetchone()
         return _task_record_from_row(row) if row else None
 
@@ -312,7 +313,7 @@ class SQLiteRunStore:
 
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         values.append(limit)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 f"SELECT * FROM {self.tasks_table} {where} ORDER BY updated_at DESC LIMIT ?",
                 tuple(values),
@@ -343,7 +344,7 @@ class SQLiteRunStore:
             metadata=dict(metadata or {}),
             created_at=utc_now(),
         )
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(
                 f"""
                 INSERT OR REPLACE INTO {self.reports_table}
@@ -370,7 +371,7 @@ class SQLiteRunStore:
 
     def get_report_record(self, run_id: str) -> RunReportRecord | None:
         """Load one run report record by run ID."""
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             row = conn.execute(f"SELECT * FROM {self.reports_table} WHERE run_id = ?", (run_id,)).fetchone()
         return _report_record_from_row(row) if row else None
 
@@ -392,7 +393,7 @@ class SQLiteRunStore:
             values.append(agent_name)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         values.append(limit)
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             rows = conn.execute(
                 f"SELECT * FROM {self.reports_table} {where} ORDER BY created_at DESC LIMIT ?",
                 tuple(values),
@@ -401,13 +402,13 @@ class SQLiteRunStore:
 
     def delete_task(self, task_id: str) -> None:
         """Delete one task snapshot by task ID."""
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(f"DELETE FROM {self.tasks_table} WHERE task_id = ?", (task_id,))
             conn.commit()
 
     def delete_report(self, run_id: str) -> None:
         """Delete one run report by run ID."""
-        with self._connect() as conn:
+        with closing(self._connect()) as conn:
             conn.execute(f"DELETE FROM {self.reports_table} WHERE run_id = ?", (run_id,))
             conn.commit()
 

@@ -84,13 +84,13 @@ class SSEJSONRPCTransport(HTTPTransport):
                     async for line in response.aiter_lines():
                         if line == "":
                             result, final = self._parse_event(event_lines, agent_url, request_id)
+                            event_lines = []
                             if result is not None:
                                 event_size = self.check_payload_limit(result, kind="event", url=url)
                                 self._metrics.add(bytes_received=event_size)
                                 yield result
                             if final:
                                 break
-                            event_lines = []
                             continue
                         if line.startswith("data:"):
                             event_lines.append(line[5:].strip())

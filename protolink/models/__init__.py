@@ -1,3 +1,5 @@
+"""Public protocol models and transport-neutral request specifications."""
+
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.core.actions import RunAction
 from protolink.core.agent_card import AgentCard, AgentInterface, AgentSkill

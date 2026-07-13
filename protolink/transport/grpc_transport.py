@@ -394,9 +394,12 @@ class GRPCTransport(Transport):
             self.check_payload_limit(response, kind="response", url=self._url)
             self.complete_idempotent_response(idempotency_key, response)
             return response
+        except asyncio.CancelledError as exc:
+            self.abort_idempotent_response(idempotency_key, exc)
+            raise
         except Exception as exc:
             response = self._error_response(request_id, exc)
-            self.complete_idempotent_response(idempotency_key, response)
+            self.abort_idempotent_response(idempotency_key, exc)
             return response
 
     async def _handle_stream(self, request: dict[str, Any], context: Any) -> AsyncIterator[dict[str, Any]]:

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import threading
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -16,6 +19,7 @@ from protolink import (
     TransportConnectionError,
     TransportLimitError,
     TransportLimits,
+    TransportTimeoutError,
 )
 from protolink.client import AgentClient, RegistryClient
 from protolink.client.request_spec import ClientRequestSpec
@@ -155,6 +159,224 @@ async def test_runtime_transport_caches_idempotent_responses() -> None:
     assert calls == 1
 
 
+@pytest.mark.asyncio
+async def test_websocket_does_not_cache_failed_idempotent_responses() -> None:
+    pytest.importorskip("websockets")
+    from protolink.transport import WebSocketTransport
+
+    calls = 0
+
+    async def handler(payload: dict[str, Any]) -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("temporary failure")
+        return {"value": payload["value"]}
+
+    transport = WebSocketTransport("ws://127.0.0.1:9000")
+    transport.setup_routes(
+        [EndpointSpec(name="write", path="/value", method="POST", handler=handler, request_source="body")]
+    )
+    frames = iter(
+        [
+            json.dumps(
+                {
+                    "id": "request-1",
+                    "idempotency_key": "same-operation",
+                    "method": "POST",
+                    "path": "/value",
+                    "data": {"value": 3},
+                }
+            ),
+            json.dumps(
+                {
+                    "id": "request-2",
+                    "idempotency_key": "same-operation",
+                    "method": "POST",
+                    "path": "/value",
+                    "data": {"value": 3},
+                }
+            ),
+        ]
+    )
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.responses: list[str] = []
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self) -> str:
+            try:
+                return next(frames)
+            except StopIteration:
+                raise StopAsyncIteration from None
+
+        async def send(self, response: str) -> None:
+            self.responses.append(response)
+
+    websocket = FakeWebSocket()
+    await transport._handle_connection(websocket)
+    responses = [json.loads(response) for response in websocket.responses]
+
+    assert responses[0]["ok"] is False
+    assert responses[1] == {"id": "request-2", "ok": True, "result": {"value": 3}}
+    assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_grpc_does_not_cache_failed_idempotent_responses() -> None:
+    pytest.importorskip("grpc")
+    from protolink.transport import GRPCTransport
+
+    calls = 0
+
+    async def handler(payload: dict[str, Any]) -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("temporary failure")
+        return {"value": payload["value"]}
+
+    transport = GRPCTransport("grpc://127.0.0.1:9000")
+    transport.setup_routes(
+        [EndpointSpec(name="write", path="/value", method="POST", handler=handler, request_source="body")]
+    )
+    context = SimpleNamespace(invocation_metadata=lambda: ())
+    first = await transport._handle_unary(
+        {
+            "id": "request-1",
+            "idempotency_key": "same-operation",
+            "method": "POST",
+            "path": "/value",
+            "data": {"value": 3},
+        },
+        context,
+    )
+    second = await transport._handle_unary(
+        {
+            "id": "request-2",
+            "idempotency_key": "same-operation",
+            "method": "POST",
+            "path": "/value",
+            "data": {"value": 3},
+        },
+        context,
+    )
+
+    assert first["ok"] is False
+    assert second == {"id": "request-2", "ok": True, "result": {"value": 3}}
+    assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_websocket_timeout_discards_the_pooled_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("websockets")
+    from protolink.transport import WebSocketTransport
+
+    transport = WebSocketTransport("ws://127.0.0.1:9000", timeout=0.01)
+    connection = SimpleNamespace(
+        send=AsyncMock(),
+        recv=AsyncMock(side_effect=TimeoutError),
+        close=AsyncMock(),
+    )
+
+    async def ensure_connection(base_url: str, loop_key: str, *, request_id: str | None = None) -> Any:
+        del base_url, request_id
+        transport._client_conns[loop_key] = connection
+        return connection
+
+    monkeypatch.setattr(transport, "_ensure_client_connection", ensure_connection)
+    spec = ClientRequestSpec(name="read", path="/value", method="GET")
+
+    with pytest.raises(TransportTimeoutError):
+        await transport.send(spec, "ws://127.0.0.1:9001")
+
+    assert transport._client_conns == {}
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_websocket_request_discards_the_pooled_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("websockets")
+    from protolink.transport import WebSocketTransport
+
+    transport = WebSocketTransport("ws://127.0.0.1:9000")
+    sent = asyncio.Event()
+    never_respond = asyncio.Event()
+
+    async def send(raw: str) -> None:
+        del raw
+        sent.set()
+
+    async def recv() -> str:
+        await never_respond.wait()
+        raise AssertionError("unreachable")
+
+    connection = SimpleNamespace(send=send, recv=recv, close=AsyncMock())
+
+    async def ensure_connection(base_url: str, loop_key: str, *, request_id: str | None = None) -> Any:
+        del base_url, request_id
+        transport._client_conns[loop_key] = connection
+        return connection
+
+    monkeypatch.setattr(transport, "_ensure_client_connection", ensure_connection)
+    spec = ClientRequestSpec(name="read", path="/value", method="GET")
+    request = asyncio.create_task(transport.send(spec, "ws://127.0.0.1:9001"))
+    await sent.wait()
+    request.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await request
+
+    assert transport._client_conns == {}
+    connection.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_abandoned_websocket_stream_discards_the_pooled_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("websockets")
+    from protolink.transport import WebSocketTransport
+
+    transport = WebSocketTransport("ws://127.0.0.1:9000")
+
+    class FakeConnection:
+        def __init__(self) -> None:
+            self.request: dict[str, Any] | None = None
+            self.close = AsyncMock()
+
+        async def send(self, raw: str) -> None:
+            self.request = json.loads(raw)
+
+        async def recv(self) -> str:
+            assert self.request is not None
+            return json.dumps(
+                {
+                    "id": self.request["id"],
+                    "ok": True,
+                    "result": {"type": "task_progress", "final": False},
+                    "final": False,
+                }
+            )
+
+    connection = FakeConnection()
+
+    async def ensure_connection(base_url: str, loop_key: str, *, request_id: str | None = None) -> Any:
+        del base_url, request_id
+        transport._client_conns[loop_key] = connection
+        return connection
+
+    monkeypatch.setattr(transport, "_ensure_client_connection", ensure_connection)
+    stream = transport.subscribe("ws://127.0.0.1:9001", {"id": "task-1"})
+
+    assert await anext(stream) == {"type": "task_progress", "final": False}
+    await stream.aclose()
+
+    assert transport._client_conns == {}
+    connection.close.assert_awaited_once()
+
+
 def test_agent_card_round_trips_additional_interfaces() -> None:
     card = AgentCard(
         name="worker",
@@ -168,6 +390,33 @@ def test_agent_card_round_trips_additional_interfaces() -> None:
     assert restored.url == card.url
     assert restored.transport == "http"
     assert restored.interfaces == card.interfaces
+
+
+def test_agent_round_trip_restores_registry_authentication() -> None:
+    from protolink.security import APIKeyAuth
+    from protolink.transport import HTTPTransport
+
+    authenticator = APIKeyAuth(valid_keys={"secret": "client"})
+    registry_transport = HTTPTransport(
+        "https://registry.example",
+        authenticator=authenticator,
+        credentials="secret",
+    )
+    agent = Agent(
+        AgentCard(name="worker", description="Does work", url="https://worker.example"),
+        transport=HTTPTransport("https://worker.example"),
+        registry=RegistryClient(registry_transport),
+        authenticator=authenticator,
+        credentials="secret",
+        verbosity=0,
+    )
+
+    restored = Agent.from_dict(agent.to_dict())
+
+    assert restored.registry_client is not None
+    restored_transport = restored.registry_client.transport
+    assert isinstance(restored_transport.authenticator, APIKeyAuth)
+    assert restored_transport.credentials == "secret"
 
 
 def test_client_uses_configured_transport_instance() -> None:
@@ -292,8 +541,9 @@ async def test_pooled_resources_close_on_their_owning_event_loop() -> None:
         owner_thread.join(timeout=2)
 
 
+@pytest.mark.parametrize("backend", ["starlette", "fastapi"])
 @pytest.mark.asyncio
-async def test_http_health_probe_does_not_require_application_auth(unused_tcp_port: int) -> None:
+async def test_http_health_probe_does_not_require_application_auth(unused_tcp_port: int, backend: str) -> None:
     httpx = pytest.importorskip("httpx")
     from protolink.security import BearerTokenAuth
     from protolink.transport import HTTPTransport
@@ -301,6 +551,7 @@ async def test_http_health_probe_does_not_require_application_auth(unused_tcp_po
     transport = HTTPTransport(
         f"http://127.0.0.1:{unused_tcp_port}",
         authenticator=BearerTokenAuth(secret="health-test-secret"),
+        backend=backend,
         log_level="critical",
         access_log=False,
     )
@@ -322,6 +573,9 @@ async def test_http_health_probe_does_not_require_application_auth(unused_tcp_po
             response = await client.get(f"http://127.0.0.1:{unused_tcp_port}/healthz")
         assert response.status_code == 200
         assert response.json()["ready"] is True
+        assert transport.metrics.requests_started == 1
+        assert transport.metrics.requests_succeeded == 1
+        assert transport.metrics.active_requests == 0
     finally:
         await transport.stop()
 

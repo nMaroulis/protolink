@@ -44,6 +44,7 @@ async def _assert_request_response_contract(agent: Agent, client: AgentClient) -
         assert card.name == agent.card.name
         assert task.get_last_part_content() == "transport ok"
     finally:
+        await client.transport.stop()
         await agent.server.stop()
 
 
@@ -57,6 +58,7 @@ async def _assert_streaming_contract(agent: Agent, client: AgentClient) -> None:
         assert events[-1]["final"] is True
         assert events[-1]["new_state"] == "completed"
     finally:
+        await client.transport.stop()
         await agent.server.stop()
 
 
@@ -92,11 +94,12 @@ async def test_http_transport_conforms_to_agent_request_response_contract(unused
     await _assert_request_response_contract(agent, client)
 
 
+@pytest.mark.parametrize("backend", ["starlette", "fastapi"])
 @pytest.mark.asyncio
-async def test_sse_transport_streams_until_final_task_status(unused_tcp_port) -> None:
+async def test_sse_transport_streams_until_final_task_status(unused_tcp_port, backend: str) -> None:
     """SSE should not stop when a nested LLM event marks itself final."""
     url = f"http://127.0.0.1:{unused_tcp_port}"
-    server_transport = SSEJSONRPCTransport(url=url, log_level="critical", access_log=False)
+    server_transport = SSEJSONRPCTransport(url=url, backend=backend, log_level="critical", access_log=False)
     client_transport = SSEJSONRPCTransport(
         url="http://127.0.0.1:0",
         log_level="critical",
@@ -118,6 +121,10 @@ async def test_sse_transport_streams_until_final_task_status(unused_tcp_port) ->
         assert events[-1]["type"] == "task_status_update"
         assert events[-1]["final"] is True
         assert events[-1]["new_state"] == "completed"
+        assert sum(event["type"] == "task_status_update" and event["final"] is True for event in events) == 1
+        assert server_transport.metrics.streams_started == 1
+        assert server_transport.metrics.streams_completed == 1
+        assert server_transport.metrics.active_streams == 0
     finally:
         await client_transport.stop()
         await agent.server.stop()

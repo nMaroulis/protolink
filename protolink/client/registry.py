@@ -1,3 +1,5 @@
+"""Transport-neutral client operations for the ProtoLink Agent Registry."""
+
 from typing import Any
 
 from protolink.client.request_spec import ClientRequestSpec
@@ -10,6 +12,16 @@ from protolink.transport import Transport
 
 
 class RegistryClient:
+    """Call Registry endpoints through an already configured transport.
+
+    The transport owns its URL, TLS, authentication, limits, and retry policy.
+    Registry operations declare idempotency individually so transports can
+    retry only those calls whose semantics are safe to repeat.
+
+    Args:
+        transport: Concrete transport used for every Registry request.
+    """
+
     REGISTER_REQUEST = ClientRequestSpec(
         name="register",
         path="/agents/",
@@ -42,6 +54,7 @@ class RegistryClient:
     )
 
     def __init__(self, transport: Transport):
+        """Store the concrete Registry transport without modifying it."""
         self.transport = transport
 
     async def register(self, card: AgentCard) -> dict[str, str]:
@@ -60,6 +73,14 @@ class RegistryClient:
         return response
 
     async def unregister(self, agent_url: str) -> dict[str, str]:
+        """Remove an agent registration by its stable URL.
+
+        Args:
+            agent_url: URL that identifies the registered agent.
+
+        Returns:
+            Registry status payload.
+        """
         response = await self.transport.send(
             request_spec=self.UNREGISTER_REQUEST, base_url=self.transport.url, data={"agent_url": agent_url}
         )
@@ -82,6 +103,14 @@ class RegistryClient:
         return response
 
     async def discover(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
+        """Discover Agent cards matching optional Registry filters.
+
+        Args:
+            filter_by: Optional name, role, tag, or other supported filters.
+
+        Returns:
+            Agent cards reconstructed from the Registry response.
+        """
         response = await self.transport.send(
             request_spec=self.DISCOVER_REQUEST, base_url=self.transport.url, data=filter_by
         )
@@ -89,4 +118,5 @@ class RegistryClient:
 
     @property
     def url(self) -> str:
+        """Return the Registry URL owned by the configured transport."""
         return self.transport.url
