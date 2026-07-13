@@ -34,7 +34,10 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [Unreleased]
+## [0.6.5] - 2026-07-14
+
+:::note Latest release
+:::
 
 ### Added
 
@@ -85,9 +88,6 @@ uv add --upgrade protolink
 - Fixed source-distribution contents so generated Docusaurus output and `docs/node_modules` are excluded from PyPI packages.
 
 ## [0.6.4] - 2026-07-03
-
-:::note Latest release
-:::
 
 ### Added
 
