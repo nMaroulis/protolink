@@ -375,7 +375,7 @@ It draws inspiration from:
 - Actor models  
 - Ports & adapters (hexagonal architecture)  
 - Distributed systems design  
-- Google A2A concepts (agent cards, tasks, discovery)  
+- A2A concepts (agent cards, tasks, discovery)
 
 Most importantly:
 
@@ -736,69 +736,24 @@ The registry **never pushes behavior** to agents.
 
 ---
 
-## Comparison With Raw Google A2A
+## Native Runtime and A2A Boundary
 
-Protolink is inspired by Google’s A2A spec, but intentionally diverges in structure.
+ProtoLink's internal runtime and its A2A wire interface are deliberately
+separate. The runtime uses familiar card, task, message, part, artifact, and
+lifecycle concepts, but native transports are not presented as the canonical
+A2A wire format.
 
----
+For HTTP agents, a versioned adapter owns that boundary:
 
-### What Is Preserved
+- `/.well-known/agent-card.json` exposes the A2A 1.0 Agent Card.
+- `POST /` accepts the A2A 1.0 JSON-RPC operations implemented by the adapter.
+- Serialization, version negotiation, standard errors, and TCK verification
+  stay outside agent business logic.
 
-- Agent Cards  
-- Task-based communication  
-- Explicit discovery  
-- Stateless requests  
-- Protocol neutrality  
-
----
-
-### What Is Improved
-
-#### 1. Central Agent Abstraction
-
-In Protolink, the agent is the **primary unit**, not a loose collection of endpoints.
-
-This:
-- Improves composability  
-- Makes agents easier to reason about  
-- Encourages reusable agent logic  
-
----
-
-#### 2. Explicit Client / Server Split
-
-Google A2A often conflates:
-- Sending  
-- Receiving  
-- Hosting  
-
-Protolink separates them cleanly, which:
-- Improves testability  
-- Clarifies ownership  
-- Reduces hidden coupling  
-
----
-
-#### 3. Registry as a First-Class Component
-
-Instead of being an afterthought, the registry is:
-- Structured  
-- Extensible  
-- Transport-agnostic  
-- Distributed-ready  
-
----
-
-#### 4. Lower Boilerplate for Users
-
-A typical Protolink agent requires:
-- One subclass  
-- One `handle_task` method  
-- One transport  
-
-Everything else is handled by composition.
-
----
+This separation lets the Python runtime evolve without quietly changing a
+public protocol, while protocol work remains narrow enough to test against the
+official TCK. See [A2A compatibility](a2a.md) for the exact implemented scope,
+pinned commands, and current result.
 
 ## Mental Model Summary
 
@@ -806,58 +761,6 @@ If you remember only one thing:
 
 > **Agents think. Clients talk. Servers listen. Transports move bytes. Registries coordinate.**
 
-Each layer is small, focused, and replaceable.
-
-That is the entire philosophy.
-
----
-
-### Protolink vs Google A2A Concepts
-
-Protolink is inspired by Google’s **A2A (Agent-to-Agent)** concepts, but adds practical layers and abstractions to make building autonomous agents easier and more maintainable.
-
-| Concept | Google A2A | Protolink | Notes |
-|---------|------------|-----------|-------|
-| **Agent** | Logical actor with tasks | Logical actor with **tasks, tools, skills, and optional LLMs** | In Protolink, agents can include AI capabilities, not just task orchestration. |
-| **Communication** | Agent-to-Agent messages | **AgentClient / AgentServer** with pluggable transports | Explicit client/server layer reduces boilerplate and separates network logic from business logic. |
-| **Discovery** | Registry / Service Directory | **Registry, RegistryClient, RegistryServer** | Symmetric design; agents never talk to the registry directly except through `RegistryClient`. |
-| **Task Handling** | Internal message routing | `handle_task` logic inside the Agent | Agents remain autonomous; external orchestration is optional. |
-| **Protocol** | Implicit (HTTP, WS, etc.) | **Transport** layer handles protocol, serialization, runtime | Protocol-agnostic and swappable without touching agent logic. |
-| **Extensibility** | Limited by A2A spec | **Tools, LLMs, and custom skills** | Agents can mix AI and deterministic tools seamlessly. |
-| **Boilerplate** | Manual wiring, repetitive | Minimal; agent owns clients and servers, which own transports | Focuses on developer productivity and clarity. |
-| **Autonomy** | Agents are actors, often invoked manually | Agents run autonomously, discover peers, schedule and execute tasks | Protolink pushes complexity down into infrastructure layers. |
-
-#### Key Differences
-
-1. **LLM Integration**  
-   - In Protolink, an agent can include LLMs as part of its **tools/skills**, enabling advanced AI behavior.  
-   - Google A2A does not define AI capabilities natively.
-
-2. **Explicit Client/Server Layer**  
-   - Protolink separates **intent** from **transport**, reducing boilerplate and making testing easier.  
-   - Google A2A mixes communication concerns with agent logic in some implementations.
-
-3. **Registry Symmetry**  
-   - Registry, RegistryClient, and RegistryServer mirror the agent architecture for **consistency**.  
-   - A2A often has ad-hoc discovery mechanisms.
-
-4. **Protocol-Agnostic Transport**  
-   - Protolink agents never handle HTTP, WS, or serialization directly.  
-   - All networking is delegated to `Transport`.
-
-5. **Extensibility with Tools and Skills**  
-   - Developers can define custom tools, attach LLMs, or integrate external APIs without touching transport logic.  
-
-### Developer Takeaways
-
-- **Agents are rich actors**: Tasks, tools, skills, LLMs  
-- **Clients/Servers handle communication**, not the agent  
-- **Transport is pluggable**, reusable, and protocol-agnostic  
-- **Registry abstracts discovery** and coordination  
-- Minimal boilerplate allows focusing on **agent logic**, not infrastructure
-
-:::info[Transport]
-
-By explicitly layering Client, Server, Transport, and Registry, Protolink provides a **professional-grade framework** for autonomous agent development, while keeping A2A concepts at its core.
-
-:::
+Each layer is small, focused, and replaceable. The same progressive-control
+rule applies throughout: pass a compact alias for the normal path, or pass the
+concrete object when the boundary needs explicit configuration.

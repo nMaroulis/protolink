@@ -50,7 +50,7 @@ class Agent(
     AgentConfigurationMixin,
     AgentSerializationMixin,
 ):
-    """Base class for creating A2A-compatible agents.
+    """Base class for creating local or distributed ProtoLink agents.
 
     Users should subclass this and implement the handle_task method only when
     they need custom orchestration. The default implementation executes explicit
@@ -98,8 +98,8 @@ class Agent(
             registry_url: URL of registry when using string transport type for registry creation.
             llm: Optional LLM instance for agent reasoning and inference.
             system_prompt: This is used as complementary text in the system prompt, which is responsible for explaining
-                the agent logic and role. The agent calling, tool calling and other A2A functionalities are already
-                predefined, so the LLM already has the knowledge on how to interact with its environment.
+                the agent logic and role. Agent calling, tool calling, and other runtime actions are already predefined,
+                so the LLM already has the knowledge needed to interact with its environment.
                 If you wish to override the system prompt completely, set override_system_prompt to True.
             storage: Optional Storage instance for agent data persistence. It's also used for State persistence.
             state: Agent state. Choose for which modules state should be persistent.

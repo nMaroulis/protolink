@@ -2,13 +2,13 @@ import ProjectMap from '@site/src/components/ProjectMap';
 
 # Documentation
 
-{/* SEO: Protolink - Agent-to-Agent Communication Framework | Lightweight Production-Ready A2A Protocol Extension | Python Library | AI Agents | LLMs | Tools | Multi-Agent Systems | Distributed Computing */}
+{/* SEO: Protolink - Lightweight Python Agent Runtime | A2A 1.0 JSON-RPC Adapter | AI Agents | LLMs | Tools | Multi-Agent Systems */}
 
 <div className="centered-media">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%" />
 </div>
 
-> A lightweight, production-ready framework for **agent-to-agent communication**, built on and extending Google's A2A protocol.
+> A lightweight Python runtime for **agent-to-agent communication** with progressive control from local meshes to network transports.
 
 <div className="doc-button-row">
   <a className="doc-button primary" href="getting-started">Get Started</a>
@@ -40,7 +40,7 @@ ProtoLink is a lightweight, production-ready Python framework for building **dis
 
 Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
-ProtoLink implements and extends [Google's Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **true agent-to-agent collaboration**.
+ProtoLink's core types are inspired by the [A2A protocol](https://a2a-protocol.org/latest/specification/), while a dedicated HTTP adapter translates them to the canonical A2A 1.0 JSON-RPC wire contract. The adapter's exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md). ProtoLink's native transports remain a separate runtime protocol.
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
@@ -75,20 +75,19 @@ In Protolink, an Agent is an **autonomous, centralized object** that serves as t
 
 > **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
 
-Unlike the base A2A specifications, Protolink enables **more open and flexible communication**: agents can call another agent's LLM for reasoning, invoke its tools directly, or define custom communication schemes. This creates a **flexible mesh** where specialized agents leverage each other's native capabilities without rigid orchestration bottlenecks.
+ProtoLink agents can delegate tasks, call tools, run model inference, or use deterministic flows through one runtime contract. This creates a **flexible mesh** where specialized agents collaborate without requiring a central orchestration service.
 
-## Protolink vs Google A2A 💡
+## ProtoLink runtime and A2A 💡
 
-ProtoLink implements Google’s A2A protocol at the **wire level**, while providing a higher-level agent runtime that unifies client, server, transport, tools, and LLMs into a single composable abstraction **the Agent**.
+ProtoLink provides a higher-level runtime that unifies client, server, transport, tools, and LLMs in one composable `Agent`. Its A2A 1.0 adapter performs wire translation at the HTTP boundary; internal task models and native transports are not presented as the A2A wire format. See [A2A compatibility](a2a.md) for the tested binding and evidence.
 
-| Concept   | Google A2A              | ProtoLink       |
-| --------- | ----------------------- | --------------- |
-| Agent     | Protocol-level concept  | Runtime object  |
-| Transport | External server concern | Agent-owned     |
-| Client    | Separate                | Built-in        |
-| LLM       | Out of scope            | First-class     |
-| Tools     | Out of scope            | Native + MCP    |
-| UX        | Enterprise infra        | Developer-first |
+| Concern | Native ProtoLink runtime | A2A 1.0 adapter |
+| --- | --- | --- |
+| Agent logic | `handle_task(Task) -> Task` | Unchanged |
+| Communication | Runtime, HTTP, SSE, WebSocket, or gRPC | JSON-RPC over HTTP |
+| Discovery | ProtoLink registry and native card | Standard Agent Card endpoint |
+| Models | Runtime-optimized Python types | Canonical A2A JSON translation |
+| Verification | ProtoLink test suite | Official pinned TCK |
 
 
 

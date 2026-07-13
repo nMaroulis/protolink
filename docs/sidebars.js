@@ -8,6 +8,7 @@ const sidebars = {
       items: [
         'index',
         'concept',
+        'a2a',
         'whitepaper',
         'getting-started',
         'cli',

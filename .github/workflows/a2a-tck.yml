@@ -1,0 +1,87 @@
+name: A2A TCK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  A2A_TCK_COMMIT: 5996b79f9cefa6fc390980e383e358a66fb9e49e
+  A2A_TCK_URL: https://github.com/a2aproject/a2a-tck.git
+  SUT_URL: http://127.0.0.1:9999
+
+jobs:
+  jsonrpc-must:
+    name: Experimental JSON-RPC MUST probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out ProtoLink
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install ProtoLink and uv
+        run: |
+          python -m pip install --upgrade pip uv
+          python -m pip install -e ".[test,http]"
+
+      - name: Check out the pinned official TCK
+        run: |
+          git clone "$A2A_TCK_URL" "${RUNNER_TEMP}/a2a-tck"
+          git -C "${RUNNER_TEMP}/a2a-tck" checkout --detach "$A2A_TCK_COMMIT"
+          test "$(git -C "${RUNNER_TEMP}/a2a-tck" rev-parse HEAD)" = "$A2A_TCK_COMMIT"
+
+      - name: Install the pinned TCK
+        working-directory: ${{ runner.temp }}/a2a-tck
+        run: uv sync --frozen
+
+      - name: Start the provider-free SUT
+        id: sut
+        run: |
+          nohup python examples/a2a_tck_agent.py >"${RUNNER_TEMP}/a2a-tck-agent.log" 2>&1 &
+          echo "pid=$!" >> "$GITHUB_OUTPUT"
+
+      - name: Require the A2A 1.0 Agent Card
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent \
+              --output "${RUNNER_TEMP}/agent-card.json" \
+              "$SUT_URL/.well-known/agent-card.json"; then
+              python -m json.tool "${RUNNER_TEMP}/agent-card.json"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "The A2A 1.0 Agent Card did not become ready."
+          cat "${RUNNER_TEMP}/a2a-tck-agent.log"
+          exit 1
+
+      - name: Run the JSON-RPC MUST suite
+        working-directory: ${{ runner.temp }}/a2a-tck
+        run: |
+          uv run ./run_tck.py \
+            --sut-host "$SUT_URL" \
+            --transport jsonrpc \
+            --level must \
+            -v
+
+      - name: Upload TCK evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: a2a-tck-jsonrpc-must-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/a2a-tck/reports
+            ${{ runner.temp }}/a2a-tck-agent.log
+            ${{ runner.temp }}/agent-card.json
+
+      - name: Stop the SUT
+        if: always()
+        run: kill "${{ steps.sut.outputs.pid }}" 2>/dev/null || true

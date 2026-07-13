@@ -95,7 +95,7 @@ class AgentExecutionMixin(_AgentMixinBase):
 
     async def handle_task(self, task: Task) -> Task:
         """
-        Default task handler for A2A-compatible agents.
+        Default task handler for ProtoLink agents.
 
         This method provides the standard execution behavior for an agent.
         Users typically DO NOT need to override this method.

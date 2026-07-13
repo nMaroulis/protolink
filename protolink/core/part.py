@@ -10,7 +10,7 @@ class ToolCall:
     """
     Standardized tool/capability invocation.
 
-    This mirrors Google A2A semantics where an agent requests another agent
+    This mirrors A2A semantics where an agent requests another agent
     to execute a specific capability.
 
     Attributes:

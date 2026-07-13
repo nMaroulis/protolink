@@ -1,8 +1,8 @@
 """
 Protolink Pipeline Module.
 
-This package provides deterministic, programmatic orchestration tools that integrate seamlessly with the Protolink
-Agent-to-Agent (A2A) architecture. By encapsulating task execution logic within `Flow` implementations, developers can
+This package provides deterministic, programmatic orchestration tools that integrate seamlessly with the ProtoLink
+runtime architecture. By encapsulating task execution logic within `Flow` implementations, developers can
 enforce complex logic topologies like sequential chains, fan-out parallelization, or state graphs, without relying on
 the heuristic variations of LLM token inference.
 
@@ -30,7 +30,7 @@ Integration
 -----------
 To construct entirely autonomous microservices out of predefined flows, wrap any instantiated flow sequence inside a
 :class:`StructuredAgent` (`protolink.agents.builtins.StructuredAgent`). The resulting agent automatically inherits
-network discovery and fully exposes the flow globally to the broader A2A ecosystem.
+network discovery and exposes the flow through the configured ProtoLink transports.
 """
 
 from .base import Flow

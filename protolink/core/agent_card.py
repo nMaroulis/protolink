@@ -33,7 +33,7 @@ class AgentCapabilities:
     streaming: bool = False
     push_notifications: bool = False
     state_transition_history: bool = False
-    # Extensions to A2A spec
+    # ProtoLink-native discovery and runtime fields
     delegation: bool = True
     has_llm: bool = False
     max_concurrency: int = 1
@@ -137,15 +137,16 @@ class AgentCard:
         description: Agent purpose/description
         url: Service endpoint URL
         version: Agent version
-        protocol_version: Protolink Protocol version
+        protocol_version: Legacy ProtoLink native discovery-card version. A2A
+            adapters advertise their protocol version per interface instead.
         capabilities: Supported features
         skills: List of skills the agent can perform
         input_formats: List of supported input formats
         output_formats: List of supported output formats
         security_schemes: Security schemes for authentication
-        role: Agent role is a protocol-level contract that defines the agent's responsibility in the system topology
+        role: ProtoLink-native role describing the agent's responsibility in the runtime topology
         tags: List of tags for categorization. These tags can be used for filtering
-            during discovery (Protolink extension to A2A spec) [Optional]
+            during ProtoLink discovery. [Optional]
             E.g. "finance", "travel", "math" etc.
         interfaces: Optional additional endpoints for this same agent identity.
     """
@@ -182,7 +183,11 @@ class AgentCard:
             raise TypeError("interfaces must contain AgentInterface instances or mappings")
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to JSON format (A2A agent card spec)."""
+        """Convert to ProtoLink's native discovery-card JSON format.
+
+        Standard A2A bindings use their own versioned serializers at the wire
+        boundary; see :mod:`protolink.a2a.v1`.
+        """
         data = {
             "name": self.name,
             "description": self.description,

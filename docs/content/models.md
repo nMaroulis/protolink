@@ -10,7 +10,7 @@ This section provides detailed API documentation for the core data models in Pro
   path="protolink.models"
   description="The stable dataclass and protocol vocabulary shared by agents, clients, servers, transports, registries, LLM wrappers, and storage-aware runtime features."
   pills={[
-    "A2A-compatible cards",
+    "Adapter-ready cards",
     "Task lifecycle state",
     "Messages and parts",
     "Artifacts and endpoints",
@@ -87,15 +87,15 @@ Agent identity and capability declaration. This is the main metadata card that d
 | `url` | `str` | - | **Required.** Service endpoint URL |
 | `transport` | `TransportType` | `"http"` | Transport protocol to use (e.g. `"http"`, `"sse"`, `"websocket"`, `"runtime"`) |
 | `version` | `str` | `"1.0.0"` | Agent version |
-| `protocol_version` | `str` | `protolink_version` | Protolink Protocol version |
+| `protocol_version` | `str` | `protolink_version` | Legacy ProtoLink native-card protocol version. The A2A adapter owns its interface version separately. |
 | `capabilities` | `AgentCapabilities` | `AgentCapabilities()` | Supported features |
 | `skills` | `list[AgentSkill]` | `[]` | List of skills the agent can perform |
 | `input_formats` | `list[MimeType]` | `["text/plain"]` | Supported input MIME types |
 | `output_formats` | `list[MimeType]` | `["text/plain"]` | Supported output MIME types |
 | `security_schemes` | `dict[SecuritySchemeType, dict[str, Any]] | None` | `{}` | Authentication schemes |
-| `role` | `AgentRoleType` | `"worker"` | Agent role is a protocol-level contract that defines the agent's responsibility in the system topology (Extends A2A spec) |
-| `tags` | `list[str]` | `[]` | List of tags for categorization. These tags can be used for filtering during discovery (Protolink extension to A2A spec) E.g. "finance", "travel", "math" etc. (Extends A2A spec) |
-| `interfaces` | `list[AgentInterface]` | `[]` | Additional URLs and transports for the same agent identity. Serialized as `additionalInterfaces`; the card's `url` and `transport` remain primary. |
+| `role` | `AgentRoleType` | `"worker"` | ProtoLink-native role describing the agent's responsibility in the runtime topology. |
+| `tags` | `list[str]` | `[]` | ProtoLink-native discovery tags such as `"finance"`, `"travel"`, or `"math"`. |
+| `interfaces` | `list[AgentInterface]` | `[]` | Additional ProtoLink-native URLs and transports for the same agent identity. Serialized as `additionalInterfaces`; this is distinct from A2A 1.0 `supportedInterfaces`. |
 
 Use additional interfaces only when one agent is genuinely reachable through multiple transports:
 
@@ -116,7 +116,7 @@ card = AgentCard(
 
 #### `to_dict() -> dict[str, Any]`
 
-Convert the AgentCard to Python Dictionary / JSON format compatible with the A2A agent card specification.
+Convert the AgentCard to ProtoLink's native discovery dictionary. The A2A 1.0 adapter uses a separate canonical serializer for `supportedInterfaces`, media-mode fields, and protocol versioning.
 
 **Returns:**
 ```python
@@ -225,7 +225,7 @@ class AgentCapabilities:
     code_execution: bool = False
 ```
 
-Defines the capabilities and limitations of an agent. This extends the A2A specification with additional capability flags.
+Defines the capabilities and limitations advertised by ProtoLink's native runtime card. The A2A adapter serializes only capabilities implemented by that wire interface.
 
 ### Parameters
 

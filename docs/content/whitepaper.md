@@ -1,6 +1,6 @@
 # ProtoLink Whitepaper
 
-## An A2A-Native Runtime for Autonomous, Pluggable Agent Systems
+## A Protocol-Native Runtime for Autonomous, Pluggable Agent Systems
 
 ProtoLink is a Python framework for building distributed multi-agent systems
 where agents are not just function calls wrapped around a model. In ProtoLink,
@@ -14,13 +14,14 @@ The core idea is deliberately simple:
 > Agents are entities, not functions. A ProtoLink system is built by composing
 > autonomous agents that communicate through protocol-native tasks.
 
-ProtoLink implements and extends Google's Agent-to-Agent (A2A) model. A2A gives
-the system the right public language: agent cards, tasks, messages, parts,
-artifacts, task states, and discovery. ProtoLink keeps that language at the
-center, then adds the runtime substrate needed to make those protocol objects
+ProtoLink's runtime model is inspired by the Agent-to-Agent (A2A) vocabulary:
+agent cards, tasks, messages, parts, artifacts, task states, and discovery. It
+keeps those concepts at the center, then adds the substrate needed to make them
 useful in real systems: LLM execution, tool calling, agent delegation, transports,
 registry discovery, structured flows, state, cancellation, budgets, approvals,
-telemetry, normalized events, run reports, and replay.
+telemetry, normalized events, run reports, and replay. A dedicated adapter owns
+canonical A2A 1.0 wire translation and is verified independently from the native
+runtime protocol.
 
 The result is a framework for treating agent systems as distributed programs,
 not as opaque prompt graphs.
@@ -35,11 +36,11 @@ the system.
 Many frameworks begin with the model and build orchestration outward. ProtoLink
 begins with the agent. The model is one pluggable module inside an autonomous
 entity. Tools, transports, storage, telemetry, authentication, and runtime
-policy are also modules. The public contract between agents remains A2A-native:
+policy are also modules. The native runtime contract between agents stays stable:
 a `Task` is exchanged, `Message` and `Artifact` objects carry content, and
 `Part` objects describe atomic actions or outputs.
 
-ProtoLink extends that protocol foundation with a deterministic runtime:
+ProtoLink builds a deterministic runtime around those protocol-inspired models:
 
 - LLMs declare one typed action at a time.
 - The runtime validates, authorizes, executes, observes, and records that action.
@@ -49,7 +50,7 @@ ProtoLink extends that protocol foundation with a deterministic runtime:
 - `RunEvent` and `RunReport` provide stable application-facing streams and
   replayable summaries.
 - Structured flows remain `Flow.execute(Task) -> Task`, so deterministic
-  orchestration does not abandon the A2A data model.
+  orchestration does not abandon the shared runtime model.
 
 The design goal is not to hide distributed systems complexity behind magic. The
 goal is to make the useful boundaries explicit, typed, inspectable, swappable,
@@ -198,13 +199,13 @@ This is the core ports-and-adapters shape of ProtoLink. The agent expresses
 intent. The client/server layer turns intent into requests and handlers. The
 transport performs the protocol work.
 
-## Why Build On A2A?
+## Why Keep an A2A Boundary?
 
 A2A is valuable because it defines an interoperable grammar for agent systems.
 It gives agents a way to describe themselves and exchange work without assuming
 that every participant shares the same framework internals.
 
-ProtoLink uses that foundation for:
+ProtoLink uses that vocabulary in its runtime for:
 
 - Agent identity through `AgentCard`.
 - Capability and skill declaration.
@@ -219,9 +220,10 @@ model should choose between tools and peer agents, how state should be loaded,
 how approvals should be requested, how budgets should be enforced, or how a UI
 should replay a run.
 
-ProtoLink extends A2A at the runtime layer.
+ProtoLink handles those runtime concerns independently, while its versioned
+adapter owns canonical A2A interoperability at the HTTP boundary.
 
-| Concern | A2A foundation | ProtoLink extension |
+| Concern | A2A concept | ProtoLink runtime |
 | --- | --- | --- |
 | Identity | Agent card | Runtime `Agent` entity with card, lifecycle, modules, state, and policy |
 | Work unit | Task | Deterministic task execution over explicit `Part` actions |
@@ -523,8 +525,9 @@ and wraps their tools as ProtoLink-native tools. From the agent's perspective,
 a weather function written locally and a remote MCP tool are both capabilities
 available through the same tool registry.
 
-That makes MCP a plug-in surface for external tools while A2A remains the
-language agents use to exchange work.
+That makes MCP a plug-in surface for external tools. ProtoLink agents exchange
+native runtime tasks, and the A2A adapter translates them when an interoperable
+wire boundary is required.
 
 ## RunContext: The Execution Envelope
 
@@ -752,7 +755,7 @@ Flow.execute(task: Task) -> Task
 ```
 
 It does not introduce a competing graph runtime with private state. It moves a
-normal A2A-style task through deterministic topology and returns the enriched
+normal runtime task through deterministic topology and returns the enriched
 task.
 
 Flow targets can be:
@@ -804,7 +807,7 @@ but structured `Part.route(...)` is the inspectable path.
 edges, loops, and an entry point. It is useful for deterministic enterprise
 processes where the flow topology should be auditable in code.
 
-### Why Flows Stay A2A-Native
+### Why Flows Stay Runtime-Native
 
 Structured flows solve a different problem than autonomous delegation. They
 remove LLMs from routing when the process is known. But every step still
@@ -1015,10 +1018,12 @@ and policy events rather than relying on text snapshots alone.
 
 ProtoLink's value is the combination of protocol alignment and runtime control.
 
-### A2A-Native Interoperability
+### A2A Adapter Interoperability
 
 Agents communicate through task, message, part, artifact, and card models rather
-than framework-private graph objects. The protocol boundary is always visible.
+than framework-private graph objects. At an A2A boundary, the versioned adapter
+converts those native models to the canonical wire contract, keeping the
+protocol boundary visible and independently testable.
 
 ### Autonomous Agent Entities
 
@@ -1067,11 +1072,11 @@ piece a clean place.
 
 | Ecosystem idea | ProtoLink stance |
 | --- | --- |
-| A2A | The protocol foundation for identity, discovery, and task exchange |
+| A2A | A versioned interoperability boundary for identity and task exchange |
 | MCP | A tool integration layer that can be adapted into agent capabilities |
 | Langfuse and LangSmith | Observability backends, not execution engines |
 | LangChain-style model composition | Useful inspiration, but ProtoLink starts from autonomous agents rather than chains around model calls |
-| Graph orchestration | Useful when topology is known; ProtoLink implements it as flows over A2A tasks |
+| Graph orchestration | Useful when topology is known; ProtoLink implements it as flows over runtime tasks |
 | Local models | First-class participants through provider-agnostic LLM wrappers and JSON fallback |
 
 The point is not to force one abstraction to do everything. The point is to
@@ -1164,12 +1169,13 @@ The future of agent systems is not one giant prompt wrapped around one model. It
 is a mesh of specialized entities: some reason, some act, some coordinate, some
 observe, some guard side effects, and some execute deterministic workflows.
 
-ProtoLink provides the runtime substrate for that mesh. It uses A2A as the
-shared protocol language, then extends it with the practical machinery needed
-for real agent applications: LLM integration, tool execution, MCP adaptation,
-transport abstraction, registry discovery, structured flows, state, runtime
-context, budgets, cancellation, policy, approvals, telemetry, events, reports,
-and replay.
+ProtoLink provides the runtime substrate for that mesh. It keeps a stable native
+task language for its own transports and adds a versioned A2A adapter when an
+interoperable boundary is required. Around those contracts it provides the
+practical machinery needed for real agent applications: LLM integration, tool
+execution, MCP adaptation, transport abstraction, registry discovery,
+structured flows, state, runtime context, budgets, cancellation, policy,
+approvals, telemetry, events, reports, and replay.
 
 In ProtoLink, you do not build agents by burying behavior inside orchestration
 glue. You build autonomous entities, plug in the modules they need, and let them

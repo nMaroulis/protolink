@@ -9,7 +9,7 @@ Agents are the core building blocks in Protolink.
 
 ## Concepts
 
-An **Agent** in Protolink is a unified component that acts as both **client and server**, unlike Google’s A2A protocol, which separates these concerns.
+An **Agent** in Protolink is a unified component that acts as both **client and server**. Its business logic stays on the native runtime contract; an HTTP server can expose the separate A2A 1.0 adapter when interoperability is required.
 
 It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
 
@@ -151,11 +151,11 @@ e.g.
 
 # Agent API Reference
 
-This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. The `Agent` class is the core component for creating A2A-compatible agents, serving as both client and server.
+This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. The class serves as both client and server; HTTP agents can additionally expose the dedicated A2A 1.0 adapter described in [A2A compatibility](a2a.md).
 
 :::info[Unified Agent Model]
 
-Unlike the original A2A specification, Protolink's `Agent` combines client and server functionality in a single class. You can send tasks/messages to other agents while also serving incoming requests.
+Protolink's `Agent` combines client and server functionality in a single class. You can send tasks and messages to peers while also serving incoming requests; protocol-specific translation remains at the server boundary.
 
 :::
 

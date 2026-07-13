@@ -1,6 +1,6 @@
 # Flows
 
-Structured Flows let you define explicit workflows for your agents while still using the same Agent-to-Agent (A2A) `Task`, `Message`, `Artifact`, and `AgentCard` primitives used everywhere else in Protolink. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
+Structured Flows let you define explicit workflows while using the same native `Task`, `Message`, `Artifact`, and `AgentCard` models used everywhere else in Protolink. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
 
 Use flows when the shape of the process is known ahead of time. Instead of asking an LLM to decide the whole plan at runtime, you define the path in code: a sequential pipeline, a fan-out/fan-in review step, a controlled router, or a graph-shaped state machine with loops. The agents inside the flow can still use LLMs, tools, storage, and remote transports. The difference is that the orchestration itself is inspectable Python.
 

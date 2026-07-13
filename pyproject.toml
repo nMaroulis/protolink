@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "protolink"
 version = "0.6.5"
-description = "A framework for building and managing agents based on the A2A protocol."
+description = "A lightweight Python runtime for local and distributed agent meshes."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

@@ -11,7 +11,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from protolink.security.tls import TLSConfig
-from protolink.server.endpoint_handler import EndpointSpec
+from protolink.server.endpoint_handler import EndpointRequest, EndpointSpec
 from protolink.transport._deps import _require_fastapi
 from protolink.transport._streaming import is_stream_terminal_event
 from protolink.transport.backends.base import BackendInterface
@@ -57,32 +57,62 @@ class FastAPIBackend(BackendInterface):
             # -------------------------
             # Authenticate request
             # -------------------------
-            if authenticator and ep.path not in {"/healthz", "/readyz"}:
+            principal_id = None
+            if authenticator and ep.path not in {
+                "/.well-known/agent-card.json",
+                "/healthz",
+                "/readyz",
+            }:
                 from protolink.security.auth import extract_credentials
 
                 credentials = extract_credentials(request.headers, dict(request.query_params))
                 if not credentials:
                     return JSONResponse(status_code=401, content={"error": "Missing credentials"})
                 try:
-                    await authenticator.authenticate(credentials)
+                    security_context = await authenticator.authenticate(credentials)
+                    authenticated_principal = getattr(security_context, "principal_id", None)
+                    principal_id = str(authenticated_principal) if authenticated_principal is not None else None
                 except Exception as e:
                     return JSONResponse(status_code=401, content={"error": f"Authentication failed: {e}"})
 
             # -------------------------
             # Extract raw payload
             # -------------------------
-            if ep.request_source == "body":
+            raw_body = None
+            if ep.request_source in {"body", "request"}:
                 try:
-                    payload = await request.json()
+                    raw_body = await request.json()
                 except json.JSONDecodeError:
-                    payload = None
+                    raw_body = None
+
+            if ep.request_source == "body":
+                payload = raw_body
             elif ep.request_source == "query_params":
                 payload = dict(request.query_params)
+            elif ep.request_source == "headers":
+                payload = dict(request.headers)
+            elif ep.request_source == "path_params":
+                payload = dict(request.path_params)
+            elif ep.request_source == "request":
+                payload = EndpointRequest(
+                    body=raw_body,
+                    query_params=dict(request.query_params),
+                    path_params=dict(request.path_params),
+                    headers=dict(request.headers),
+                    method=request.method,
+                    url=str(request.url),
+                    principal_id=principal_id,
+                )
             else:
                 payload = None
 
             if transport is not None:
-                transport.check_payload_limit(payload, kind="request", url=str(request.url))
+                checked_payload = raw_body if ep.request_source == "request" else payload
+                transport.check_payload_limit(
+                    checked_payload,
+                    kind="request",
+                    url=str(request.url),
+                )
 
             # -------------------------
             # Parse payload

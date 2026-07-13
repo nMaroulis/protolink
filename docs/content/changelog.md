@@ -41,6 +41,10 @@ uv add --upgrade protolink
 
 ### Added
 
+- **A2A 1.0 JSON-RPC adapter and verification harness**
+  - HTTP agents now expose the canonical `/.well-known/agent-card.json` discovery endpoint and a versioned JSON-RPC boundary for `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` while preserving ProtoLink's native endpoints.
+  - Added canonical card, task, message, part, artifact, security-scheme, timestamp, and standard error translation, including blocking/non-blocking execution, task filtering and pagination, cancellation, and principal/tenant task isolation.
+  - Added a provider-free fixture, focused adapter tests, a manually dispatched official TCK workflow pinned to an exact commit, and documentation that records the current unmodified TCK result without claiming a pass.
 - **Native gRPC transport**
   - Added `GRPCTransport` and the `"grpc"` factory alias for unary task requests, server-streaming task events, metadata-based credentials, deadlines, and pooled async channels.
   - Added standard `grpc.health.v1.Health` reporting and server reflection, with constructor switches for deployments that disable either service.
@@ -61,6 +65,8 @@ uv add --upgrade protolink
 
 ### Changed
 
+- Reworked the README into a shorter product entry point led by a provider-free three-agent mesh and the "simple by default, explicit when it matters" progressive-control API design.
+- Clarified across the concept, model, registry, flow, and whitepaper documentation that native ProtoLink transports use the runtime contract while the A2A adapter owns canonical wire interoperability.
 - Unified transport construction across `Agent`, `AgentClient`, and `Registry`: string aliases remain the zero-configuration prototyping path, while TLS, limits, retries, keepalive, and protocol-specific settings are configured on a concrete transport object passed to the facade.
 - Agent serialization now restores its primary and Registry transports with independent TLS identities and production configurations.
 - `ClientRequestSpec` now declares operation idempotency explicitly. Retries remain disabled by default and run only when the request specification, method, and typed failure all permit a safe retry.

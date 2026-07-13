@@ -23,7 +23,7 @@ class Router(Flow):
 
     Routing destinations can be:
     - **Agent instances**: Local execution.
-    - **URL strings**: Remote A2A execution.
+    - **URL strings**: Remote execution through a configured ProtoLink transport.
     - **Nested Flows**: Sub-orchestration logic.
     """
 

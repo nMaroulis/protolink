@@ -15,7 +15,7 @@ class Pipeline(Flow):
 
     Steps can be:
     - **Local Agents**: Direct method calls to an `Agent` instance.
-    - **Remote Agents**: Identifiers (strings) resolved via registry and called via A2A.
+    - **Remote Agents**: Identifiers resolved via registry and called through a configured transport.
     - **Nested Flows**: Other `Flow` instances (e.g., `Parallel`, `Router`) enabling
       complex hierachical orchestration.
 
