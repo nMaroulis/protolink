@@ -42,7 +42,7 @@ Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, 
 
 ProtoLink is **A2A-first by design**. `AgentCard`, `Task`, `Message`, `Part`, `Artifact`, task lifecycle, and discovery form the shared language used across agents, flows, storage, telemetry, and transports. ProtoLink builds the pluggable execution runtime around that foundation: LLMs, local models, native and MCP tools, transports, registry discovery, state, policy, authentication, logging, and observability.
 
-These Python models are ergonomic runtime forms of A2A's core primitives, not copies of the canonical wire schema. Every HTTP agent automatically exposes a versioned adapter that maps its advertised capabilities to [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC operations and wire shapes. Its exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md).
+These Python models are ergonomic runtime forms of A2A's core primitives, not copies of the canonical wire schema. An HTTP agent opts into the versioned [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary with `Agent(..., a2a=True)`. The flag adds standard inbound routes and outbound translation without removing ProtoLink's native API. Its exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md).
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
@@ -81,7 +81,7 @@ ProtoLink agents can delegate tasks, call tools, run model inference, or use det
 
 ## A2A at the core; A2A 1.0 on the wire 💡
 
-ProtoLink provides a higher-level runtime that unifies client, server, transport, tools, and LLMs in one composable `Agent`. Its A2A 1.0 adapter performs wire translation at the HTTP boundary; internal task models and native transports are not presented as the A2A wire format. See [A2A compatibility](a2a.md) for the tested binding and evidence.
+ProtoLink provides a higher-level runtime that unifies client, server, transport, tools, and LLMs in one composable `Agent`. With `transport="http", a2a=True`, its A2A 1.0 adapters perform inbound and outbound wire translation; internal task models and native transports are not presented as the A2A wire format. `protocol="auto"` prefers the full ProtoLink contract when a peer offers both and selects A2A for an A2A-only peer. See [A2A compatibility](a2a.md) for the tested binding and evidence.
 
 | Concern | Native ProtoLink runtime | A2A 1.0 adapter |
 | --- | --- | --- |
@@ -89,6 +89,7 @@ ProtoLink provides a higher-level runtime that unifies client, server, transport
 | Communication | Runtime, HTTP, SSE, WebSocket, or gRPC | JSON-RPC over HTTP |
 | Discovery | ProtoLink registry and native card | Standard Agent Card endpoint |
 | Models | Runtime-optimized Python types | Canonical A2A JSON translation |
+| Activation | Default | Explicit `a2a=True` on HTTP |
 | Verification | ProtoLink test suite | Official pinned TCK |
 
 

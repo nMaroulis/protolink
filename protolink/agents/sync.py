@@ -59,7 +59,13 @@ class SyncAgent:
         """
         return asyncio.run(self._agent.discover_agents(filter_by))
 
-    def call_agent(self, agent_url: str, task: Task) -> Task:
+    def call_agent(
+        self,
+        agent_url: str,
+        task: Task,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task:
         """Synchronously send a task to another agent.
 
         Args:
@@ -69,7 +75,7 @@ class SyncAgent:
         Returns:
             Task with updated state and response messages
         """
-        return asyncio.run(self._agent.call_agent(agent_url, task))
+        return asyncio.run(self._agent.call_agent(agent_url, task, protocol=protocol))
 
     def cancel_task(self, task_id: str, reason: str | None = None) -> Task:
         """Synchronously request cancellation of an active local task.

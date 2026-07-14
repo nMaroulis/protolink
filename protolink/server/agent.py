@@ -90,13 +90,17 @@ class AgentServer:
     It intentionally contains no transport-specific or agent-specific logic.
     """
 
-    def __init__(self, transport: Transport, agent: AgentInterface) -> None:
+    def __init__(self, transport: Transport, agent: AgentInterface, *, a2a: bool = False) -> None:
         if transport is None:
             raise ValueError("AgentServer requires a transport instance")
 
+        transport_type = getattr(transport, "transport_type", None)
+        if a2a and transport_type != "http":
+            raise ValueError("a2a=True requires an HTTP transport")
+
         self._transport = transport
         self._agent = agent
-        self._a2a_adapter = A2AJSONRPCAdapter(agent) if getattr(transport, "transport_type", None) == "http" else None
+        self._a2a_adapter = A2AJSONRPCAdapter(agent) if a2a else None
         self._is_running = False
 
     # ------------------------------------------------------------------

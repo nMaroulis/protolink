@@ -54,6 +54,7 @@ class _HarnessAgent:
     def __init__(self) -> None:
         self.card = _card()
         self.llm = None
+        self.last_cancel_request: Any = None
 
     async def run_task(self, task: Task) -> Task:
         message_id = task.messages[-1].id
@@ -65,6 +66,7 @@ class _HarnessAgent:
         return task.complete("Adapter response")
 
     async def cancel_task(self, request: Any) -> Any:
+        self.last_cancel_request = request
         return request
 
     async def compact_history(self, request: Any) -> Any:
@@ -260,6 +262,15 @@ def test_agent_card_uses_a2a_1_0_fields_and_keeps_agent_version_distinct() -> No
     assert not {"url", "transport", "protocolVersion", "inputFormats", "outputFormats"}.intersection(card)
 
 
+def test_agent_card_synthesizes_a_required_tag_for_an_untagged_skill() -> None:
+    source = _card()
+    source.skills = [AgentSkill(id="plain_skill")]
+
+    card = agent_card_to_a2a(source)
+
+    assert card["skills"][0]["tags"] == ["plain_skill"]
+
+
 def test_agent_card_translates_native_security_schemes_to_a2a_unions() -> None:
     source = _card()
     source.security_schemes = {
@@ -363,13 +374,15 @@ def test_message_and_task_mapping_use_camel_case_enums_and_utc_timestamps() -> N
 
 @pytest.mark.asyncio
 async def test_jsonrpc_send_get_list_and_cancel_task_lifecycle() -> None:
-    adapter = A2AJSONRPCAdapter(_HarnessAgent())
+    agent = _HarnessAgent()
+    adapter = A2AJSONRPCAdapter(agent)
 
     sent = await adapter.handle(_request("SendMessage", {"message": _wire_message("needs-input-1")}))
     task = sent["result"]["task"]
     task_id = task["id"]
     context_id = task["contextId"]
     assert task["status"]["state"] == "TASK_STATE_INPUT_REQUIRED"
+    assert adapter._tasks[task_id].messages[0].parts[0].type == "text"
 
     fetched = await adapter.handle(_request("GetTask", {"id": task_id}, request_id=2))
     assert fetched["result"]["id"] == task_id
@@ -385,9 +398,17 @@ async def test_jsonrpc_send_get_list_and_cancel_task_lifecycle() -> None:
     assert listed["result"]["tasks"][0]["id"] == task_id
     assert "history" not in listed["result"]["tasks"][0]
 
-    canceled = await adapter.handle(_request("CancelTask", {"id": task_id}, request_id=4))
+    canceled = await adapter.handle(
+        _request(
+            "CancelTask",
+            {"id": task_id, "metadata": {"reason": "test complete", "source": "suite"}},
+            request_id=4,
+        )
+    )
     assert canceled["result"]["id"] == task_id
     assert canceled["result"]["status"]["state"] == "TASK_STATE_CANCELED"
+    assert agent.last_cancel_request.reason == "test complete"
+    assert agent.last_cancel_request.metadata == {"reason": "test complete", "source": "suite"}
 
 
 @pytest.mark.asyncio
@@ -656,7 +677,7 @@ async def test_jsonrpc_version_handling_accepts_patch_and_rejects_unsupported_ve
 
 def test_agent_server_mounts_a2a_card_and_jsonrpc_without_removing_native_card() -> None:
     transport = _CapturingHTTPTransport()
-    server = AgentServer(transport, _HarnessAgent())
+    server = AgentServer(transport, _HarnessAgent(), a2a=True)
 
     server._build_endpoints()
     routes = {(endpoint.method, endpoint.path): endpoint for endpoint in transport.endpoints}

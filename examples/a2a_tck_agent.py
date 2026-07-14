@@ -99,6 +99,7 @@ def main() -> None:
             transport="http",
         ),
         transport="http",
+        a2a=True,
         verbosity=0,
     )
 

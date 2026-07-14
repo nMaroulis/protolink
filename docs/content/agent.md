@@ -9,7 +9,7 @@ Agents are the core building blocks in Protolink.
 
 ## Concepts
 
-An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**. When the agent uses the HTTP transport, ProtoLink automatically exposes an [A2A 1.0](https://a2a-protocol.org/latest/specification/) adapter that maps its advertised capabilities to the canonical wire shapes, without changing `handle_task(Task)`.
+An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**. `Agent(..., transport="http", a2a=True)` adds [A2A 1.0](https://a2a-protocol.org/latest/specification/) inbound and outbound translation without changing `handle_task(Task)` or removing the native ProtoLink endpoints. The default `a2a=False` preserves the previous native-only behavior.
 
 It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
 
@@ -152,7 +152,7 @@ e.g.
 
 # Agent API Reference
 
-This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. It is the core component for creating pluggable, A2A-based agents while combining client, server, execution, and runtime modules in one facade. HTTP agents also expose the dedicated A2A 1.0 adapter described in [A2A compatibility](a2a.md).
+This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. It is the core component for creating pluggable, A2A-based agents while combining client, server, execution, and runtime modules in one facade. HTTP agents can opt into the dedicated A2A 1.0 adapters described in [A2A compatibility](a2a.md).
 
 :::info[Unified Agent Model]
 
@@ -219,6 +219,7 @@ Protolink's `Agent` combines client and server functionality in a single class. 
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent for standard Agent logs, `1` = normal (INFO), `2` = verbose (DEBUG). |
 | `expose_chat` | `bool` | `True` | Whether an LLM-backed Agent will serve the interactive chat UI and accept chat messages. HTTP-compatible transports make this visible at `/chat`. |
+| `a2a` | `bool` | `False` | Enable the A2A 1.0 inbound routes and outbound translation layer. Requires the exact HTTP transport. `False` keeps the native ProtoLink server and client behavior unchanged. |
 | `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
 | `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
@@ -377,6 +378,7 @@ Always use `agent.stop()` to ensure that the agent unregisters from the registry
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `transport` (property) | `Transport ⎪ str ⎪ None` | `None` | Gets or sets the transport used by this agent. Setting this initializes the client/server components and updates the agent card's transport and streaming capability. |
+| `a2a` (property) | - | `bool` | Read-only view of whether the A2A 1.0 boundary was enabled at construction. |
 | `client` (property) | - | `AgentClient ⎪ None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
 | `server` (property) | - | `AgentServer ⎪ None` | Returns the server instance if one is available via the transport. |
 
@@ -522,8 +524,20 @@ writer = Agent(
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `call_agent()` | `agent_url: str`, `task: Task` | `Task` | Sends a task to another agent and returns the processed result. |
-| `send_message_to()` | `agent_url: str`, `message: Message` | `Message` | Sends a message to another agent and returns the response. |
+| `call_agent()` | `agent_url: str`, `task: Task`, `protocol="auto"` | `Task` | Sends a task to another agent. `"auto"` prefers ProtoLink and discovers A2A-only peers; `"protolink"` and `"a2a"` select explicitly. |
+| `send_message_to()` | `agent_url: str`, `message: Message`, `protocol="auto"` | `Message` | Sends a message with the same protocol selection behavior. |
+
+```python
+agent = Agent(card=card, transport="http", a2a=True)
+
+# Preserve the richer native contract when the peer supports it; otherwise use A2A.
+result = await agent.call_agent(peer_url, task, protocol="auto")
+
+# Select the protocol explicitly when the peer protocol is known.
+result = await agent.call_agent(peer_url, task, protocol="a2a")
+```
+
+At the A2A boundary, a standard user text part remains a ProtoLink `Part(type="text")` for custom handlers. The default Agent engine recognizes `task.metadata["a2a_inbound"]` and treats that text as an inference request when an LLM is configured. A ProtoLink `infer` prompt becomes standard A2A user text outbound. Standard text, data, file, and URI content can be translated. ProtoLink-specific `tool_call` parts, structured-flow state, runtime context, and native control endpoints are not portable A2A contracts; keep `protocol="protolink"` when a peer needs those details.
 
 
 ## Synchronous API (`SyncAgent`)
@@ -553,7 +567,7 @@ The synchronous API is **not thread-safe** if called from within an active event
 |--------|------------|---------|-------------|
 | `agent.sync.invoke()` | `message, part_type, ...` | `str` | Blocking version of `invoke()`. Processes a message and returns the text result. |
 | `agent.sync.discover_agents()` | `filter_by` | `list[AgentCard]` | Blocking version of `discover_agents()`. Fetches agents from the registry. |
-| `agent.sync.call_agent()` | `agent_url, task` | `Task` | Blocking version of `call_agent()`. Sends a task to a remote agent. |
+| `agent.sync.call_agent()` | `agent_url, task, protocol="auto"` | `Task` | Blocking version of `call_agent()` with the same protocol selection. |
 
 ### Usage Example
 

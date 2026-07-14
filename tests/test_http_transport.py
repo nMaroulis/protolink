@@ -83,6 +83,35 @@ async def test_http_auth_headers():
     assert headers["Authorization"] == "Bearer test-token"
 
 
+@pytest.mark.asyncio
+async def test_http_send_applies_request_spec_media_types_and_headers():
+    transport = HTTPTransport(url="http://localhost:8000")
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"status": "ok"}
+    mock_response.raise_for_status = MagicMock()
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client.request.return_value = mock_response
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        spec = ClientRequestSpec(
+            name="a2a",
+            method="POST",
+            path="",
+            content_type="application/json",
+            accept="application/json",
+            headers={"A2A-Version": "1.0"},
+        )
+        await transport.send(spec, base_url="http://agent:8000/a2a/", data={"jsonrpc": "2.0"})
+
+    assert mock_client.request.call_args.args[1] == "http://agent:8000/a2a/"
+    headers = mock_client.request.call_args.kwargs["headers"]
+    assert headers["Content-Type"] == "application/json"
+    assert headers["Accept"] == "application/json"
+    assert headers["A2A-Version"] == "1.0"
+    assert headers["X-Protolink-Request-ID"]
+
+
 def test_http_validate_url():
     t1 = HTTPTransport(url="http://ok.com")
     assert t1.validate_url() is True

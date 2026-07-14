@@ -1,6 +1,6 @@
 """Transport-neutral declarations for outbound ProtoLink operations."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,6 +25,8 @@ class ClientRequestSpec:
             omitted.
         content_type: Optional request media type.
         accept: Optional expected response media type.
+        headers: Optional protocol-specific request headers. Transports that do
+            not use headers may ignore them.
         channel: Multiplexing channel used to isolate concurrent traffic.
         idempotent: Whether retries and server-side response deduplication are
             safe for this operation.
@@ -39,3 +41,4 @@ class ClientRequestSpec:
     accept: ContentType | None = None
     channel: str = "default"
     idempotent: bool = False
+    headers: Mapping[str, str] | None = None

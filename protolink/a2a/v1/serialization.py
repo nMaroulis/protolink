@@ -8,6 +8,7 @@ contract precise and testable.
 from __future__ import annotations
 
 import base64
+import copy
 from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from enum import Enum
@@ -31,6 +32,20 @@ _STATE_TO_A2A: dict[TaskState, str] = {
     TaskState.CANCELED: "TASK_STATE_CANCELED",
     TaskState.FAILED: "TASK_STATE_FAILED",
     TaskState.UNKNOWN: "TASK_STATE_UNSPECIFIED",
+}
+
+_STATE_FROM_A2A: dict[str, TaskState] = {
+    "TASK_STATE_SUBMITTED": TaskState.SUBMITTED,
+    "TASK_STATE_WORKING": TaskState.WORKING,
+    "TASK_STATE_INPUT_REQUIRED": TaskState.INPUT_REQUIRED,
+    "TASK_STATE_COMPLETED": TaskState.COMPLETED,
+    "TASK_STATE_CANCELED": TaskState.CANCELED,
+    "TASK_STATE_FAILED": TaskState.FAILED,
+    # ProtoLink has no distinct rejected/auth-required states. Keep the exact
+    # wire state in metadata while mapping to the closest local lifecycle state.
+    "TASK_STATE_REJECTED": TaskState.FAILED,
+    "TASK_STATE_AUTH_REQUIRED": TaskState.INPUT_REQUIRED,
+    "TASK_STATE_UNSPECIFIED": TaskState.UNKNOWN,
 }
 
 
@@ -57,7 +72,7 @@ def agent_card_to_a2a(
         "description": card.description,
         "supportedInterfaces": [
             {
-                "url": (interface_url or card.url).rstrip("/"),
+                "url": (interface_url or card.url).strip(),
                 "protocolBinding": protocol_binding,
                 "protocolVersion": A2A_PROTOCOL_VERSION,
             }
@@ -180,11 +195,14 @@ def _optional_text(value: Any) -> str | None:
 def _skill_to_a2a(skill: AgentSkill) -> dict[str, Any]:
     """Convert ProtoLink's compact skill declaration to A2A 1.0."""
 
+    tags = list(skill.tags) or [skill.id]
     result: dict[str, Any] = {
         "id": skill.id,
         "name": skill.id.replace("_", " ").replace("-", " ").title(),
         "description": skill.description or skill.id,
-        "tags": list(skill.tags),
+        # A2A requires at least one tag; the stable skill ID is the least
+        # surprising fallback for ProtoLink's optional local tag list.
+        "tags": tags,
     }
     string_examples = [example for example in skill.examples if isinstance(example, str)]
     if string_examples:
@@ -263,6 +281,12 @@ def part_to_a2a(part: Part) -> dict[str, Any]:
 
     if part.type in {"text", "infer_output"}:
         return {"text": str(part.content)}
+    if part.type == "infer":
+        if isinstance(part.content, Mapping):
+            prompt = part.content.get("prompt", part.content.get("user", ""))
+        else:
+            prompt = part.content
+        return {"text": str(prompt or "")}
     if part.type == "json":
         return {"data": _json_value(part.content)}
     if part.type in {"bytes", "file"}:
@@ -316,6 +340,85 @@ def artifact_to_a2a(artifact: Artifact) -> dict[str, Any]:
     if artifact.metadata:
         result["metadata"] = _json_value(artifact.metadata)
     return result
+
+
+def artifact_from_a2a(data: Mapping[str, Any]) -> Artifact:
+    """Deserialize one canonical A2A artifact into ProtoLink's runtime form."""
+
+    return Artifact(
+        id=str(data["artifactId"]),
+        name=_optional_text(data.get("name")),
+        parts=[part_from_a2a(part) for part in data.get("parts", [])],
+        metadata=dict(data.get("metadata") or {}),
+    )
+
+
+def task_from_a2a(
+    data: Mapping[str, Any],
+    *,
+    original: Task | None = None,
+    remote_url: str | None = None,
+) -> Task:
+    """Translate an A2A task result while preserving a caller's local task ID.
+
+    A2A servers assign their own task IDs. When ``original`` is supplied, the
+    returned ProtoLink task keeps that local ID and records the remote ID and
+    context in metadata for continuation and cancellation.
+    """
+
+    status = data.get("status")
+    if not isinstance(status, Mapping):
+        status = {}
+    wire_state = str(status.get("state") or "TASK_STATE_UNSPECIFIED")
+    state = _STATE_FROM_A2A.get(wire_state, TaskState.UNKNOWN)
+
+    if original is None:
+        task = Task(state=state)
+    else:
+        task = Task.from_dict(copy.deepcopy(original.to_dict()))
+        task.state = state
+
+    seen_message_ids = {message.id for message in task.messages}
+    wire_messages: list[Mapping[str, Any]] = []
+    history = data.get("history")
+    if isinstance(history, list):
+        wire_messages.extend(message for message in history if isinstance(message, Mapping))
+    status_message = status.get("message")
+    if isinstance(status_message, Mapping):
+        wire_messages.append(status_message)
+    for wire_message in wire_messages:
+        message = message_from_a2a(wire_message)
+        if message.id not in seen_message_ids:
+            task.add_message(message)
+            seen_message_ids.add(message.id)
+
+    artifacts = data.get("artifacts")
+    if isinstance(artifacts, list):
+        artifact_indexes = {artifact.id: index for index, artifact in enumerate(task.artifacts)}
+        for wire_artifact in artifacts:
+            if not isinstance(wire_artifact, Mapping):
+                continue
+            artifact = artifact_from_a2a(wire_artifact)
+            existing_index = artifact_indexes.get(artifact.id)
+            if existing_index is None:
+                task.add_artifact(artifact)
+                artifact_indexes[artifact.id] = len(task.artifacts) - 1
+            else:
+                # A2A artifacts can be updated across task continuations. The
+                # ID is stable, so replace stale partial output in place.
+                task.artifacts[existing_index] = artifact
+
+    task.metadata["a2a_remote_task_id"] = str(data["id"])
+    if data.get("contextId") is not None:
+        task.metadata["a2a_remote_context_id"] = str(data["contextId"])
+    if remote_url:
+        task.metadata["a2a_remote_agent_url"] = remote_url.rstrip("/")
+    task.metadata["a2a_remote_state"] = wire_state
+    if status.get("timestamp") is not None:
+        task.metadata["a2a_remote_status_timestamp"] = str(status["timestamp"])
+    if isinstance(data.get("metadata"), Mapping):
+        task.metadata["a2a_remote_metadata"] = _json_value(data["metadata"])
+    return task
 
 
 def task_to_a2a(

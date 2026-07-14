@@ -76,6 +76,8 @@ class Agent(
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
         expose_chat: bool = True,
+        a2a: bool = False,
+        a2a_allow_cross_origin: bool = False,
         authenticator: Authenticator | None = None,
         credentials: str | None = None,
         policy: Policy | None = None,
@@ -114,6 +116,10 @@ class Agent(
             override_system_prompt: If True, overrides system_prompt completely with the system_prompt provided.
             verbosity: Verbosity level - 0 for silent standard Agent logs, 1 for normal, 2 for verbose (debug mode).
             expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
+            a2a: Whether to enable the optional A2A 1.0 HTTP compatibility boundary. Disabled by default so existing
+                ProtoLink endpoints and outbound behavior remain unchanged. When enabled, the agent must use HTTP.
+            a2a_allow_cross_origin: Trust an outbound A2A interface on a different origin from its discovered card.
+                Keep disabled unless that cross-origin endpoint is explicitly trusted.
             authenticator: Optional Authenticator instance for verifying incoming requests to this agent.
             credentials: Optional credentials string used for authenticating outgoing requests.
             policy: Optional runtime policy evaluated before concrete actions execute.
@@ -181,6 +187,9 @@ class Agent(
         # Store authentication configuration
         self.authenticator: Authenticator | None = authenticator
         self.credentials: str | None = credentials
+        # A2A 1.0 compatibility is an explicit opt-in at the HTTP boundary.
+        self._a2a_enabled = bool(a2a)
+        self._a2a_allow_cross_origin = bool(a2a_allow_cross_origin)
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None

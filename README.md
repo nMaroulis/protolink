@@ -14,7 +14,7 @@
 
 ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python runtime for building **pluggable agents** and multi-agent systems. It began as an A2A-based alternative to chain-centric frameworks such as LangChain: instead of organizing an application around chains of model calls, ProtoLink treats each `Agent` as a self-contained runtime entity with identity, capabilities, lifecycle, tools, optional reasoning, and direct task-based communication.
 
-A2A is the architectural core, not a bolt-on integration. `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` underpin discovery, delegation, lifecycle transitions, tool results, and structured flows throughout the runtime. The A2A 1.0 adapter is the versioned wire boundary that exposes those first-class runtime concepts through the standard endpoints and canonical payloads.
+A2A is the architectural core, not a bolt-on integration. `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` underpin discovery, delegation, lifecycle transitions, tool results, and structured flows throughout the runtime. Set `a2a=True` on an HTTP agent when it should also expose and consume the canonical A2A 1.0 JSON-RPC wire protocol; the native ProtoLink API remains available.
 
 The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, native or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
@@ -171,7 +171,28 @@ Swap `"ollama"` for another built-in or custom `LLM`; the agent, tools, tasks, a
 
 ProtoLink uses A2A's core `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` concepts as first-class Python runtime primitives. Delegation, lifecycle transitions, structured flows, tool results, telemetry, and replay all operate on those explicit objects rather than escaping into a separate orchestration format.
 
-Every HTTP agent also exposes a versioned **A2A 1.0 JSON-RPC adapter** with the standard agent-card endpoint and canonical A2A wire models. The declared surface includes `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask`, while unsupported capabilities are advertised as disabled instead of being simulated.
+Standard wire compatibility is explicit and additive:
+
+```python
+a2a_agent = Agent(card=card, transport="http", a2a=True)
+
+# "auto" prefers the full ProtoLink contract and discovers A2A-only peers.
+result = await a2a_agent.call_agent(peer_url, task)
+
+# Select the protocol explicitly when the peer protocol is already known.
+result = await a2a_agent.call_agent(peer_url, task, protocol="a2a")
+result = await a2a_agent.call_agent(peer_url, task, protocol="protolink")
+```
+
+An explicit `protocol="a2a"` choice bypasses the native-vs-A2A selection step,
+but still fetches and validates the peer's standard Agent Card and compatible
+JSON-RPC interface before sending work.
+
+Outbound discovery is same-origin by default: an advertised A2A interface must
+match the Agent Card's origin. Set `a2a_allow_cross_origin=True` only for a
+split-origin endpoint you explicitly trust; see [A2A compatibility](https://nmaroulis.github.io/protolink/docs/a2a/) for the operational limits.
+
+With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat, and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` JSON-RPC operations, and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
 
 Compatibility is versioned and testable: the official [A2A Technology Compatibility Kit](https://github.com/a2aproject/a2a-tck) measures the adapter against a pinned protocol surface. The [A2A compatibility page](https://nmaroulis.github.io/protolink/docs/a2a/) records the exact binding, TCK commit, commands, current result, and the remaining upstream harness limitation.
 
@@ -206,7 +227,7 @@ The alias selects the communication boundary without changing the agent API:
 | If you need... | Start with | Why |
 | --- | --- | --- |
 | Agents in one Python process | `"runtime"` | Lowest transport overhead, streaming, and no ports |
-| A network service or A2A 1.0 endpoint | `"http"` | Broad compatibility plus status, health, optional chat, dashboard, and A2A routes |
+| A network service or optional A2A 1.0 endpoint | `"http"` | Status, health, optional chat, and dashboard utilities; add `a2a=True` for A2A routes and outbound translation |
 | Live progress for a browser or CLI | `"sse"` | HTTP utilities plus a one-way event stream; no A2A adapter today |
 | A persistent interactive connection | `"websocket"` | Bidirectional streaming with low per-frame overhead after connection setup |
 | Internal gRPC infrastructure | `"grpc"` | Pooled RPCs, streaming, deadlines, standard health, and reflection |

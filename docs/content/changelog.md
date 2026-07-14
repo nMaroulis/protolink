@@ -45,17 +45,29 @@ planned for that release.
 
 This release makes ProtoLink's A2A architecture explicit without replacing its
 small Python runtime API. `AgentCard`, `Task`, `Message`, `Part`, and `Artifact`
-remain ProtoLink's ergonomic runtime primitives; agents served over HTTP now
-expose a separate, versioned A2A 1.0 wire adapter. Existing ProtoLink clients,
-native endpoints, transports, and `handle_task(Task)` implementations continue
-to work unchanged.
+remain ProtoLink's ergonomic runtime primitives. An HTTP agent can now opt into
+a separate, versioned A2A 1.0 inbound and outbound translation boundary with
+`Agent(..., a2a=True)`. The default `False` preserves existing ProtoLink clients,
+native endpoints, transports, and `handle_task(Task)` implementations.
 
 ### Added
 
-- **Inbound A2A 1.0 HTTP adapter**
-  - Agents served through ProtoLink's HTTP transport now expose `GET /.well-known/agent-card.json` and `POST /` while retaining all native endpoints.
+- **Opt-in A2A 1.0 HTTP interoperability**
+  - `Agent(..., transport="http", a2a=True)` now exposes `GET /.well-known/agent-card.json` and `POST /` while retaining every native endpoint. The flag defaults to `False`, is available through the read-only `agent.a2a` property, and round-trips through dict/YAML configuration.
   - The adapter implements `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask`, with standard card, task, message, part, artifact, security, timestamp, version, content-type, and error translation for its advertised scope.
   - Blocking and non-blocking execution, filtering, pagination, cancellation, and authenticated principal/tenant task isolation reuse the existing `handle_task(Task)` execution path.
+  - The process-local task index retains at most 1,024 tasks for one hour, prunes expired or oldest inactive work first, and never evicts an active operation to admit a new task.
+- **Outbound A2A 1.0 translation**
+  - `AgentClient(..., a2a=True)`, `Agent.call_agent()`, and their synchronous facades can discover and call A2A 1.0 JSON-RPC peers without an `a2a-sdk` runtime dependency.
+  - `protocol="auto"` prefers the native ProtoLink contract and selects A2A for an A2A-only peer. `protocol="protolink"` goes directly to the native route; `protocol="a2a"` skips the native-vs-A2A choice but still discovers and validates the standard Agent Card and compatible JSON-RPC interface.
+  - Advertised A2A interfaces must share the discovered Agent Card's origin by default. `a2a_allow_cross_origin=True` is an explicit trust override for controlled split-origin deployments and is available on both `Agent` and `AgentClient`.
+  - Outbound calls reuse the configured HTTP transport's authentication, TLS, limits, pooling, metrics, and request headers. `SendMessage` is non-idempotent and is not retried automatically.
+  - ProtoLink preserves the caller's local task ID while retaining the remote A2A task ID, context, state, timestamp, and agent URL for continuation and cancellation. The protocol-selection cache is bounded to 1,024 peers for five minutes, and local-to-remote task-ID mappings are bounded to 1,024 entries for one hour.
+  - Cancellation reason and metadata translate through A2A `CancelTask`. A blocking outbound call cannot be canceled until its response reveals the server-assigned task ID; `"auto"` never guesses by sending a local ID to the native cancellation route.
+  - `send_message()` raises for an artifact-only A2A result so callers use `send_task()` and retain the full task artifacts.
+- **Execution-aware message translation**
+  - Inbound A2A user text remains a ProtoLink `Part(type="text")` for custom handlers. The default Agent engine recognizes `task.metadata["a2a_inbound"]` and treats that text as an inference request when an LLM is configured. Outbound ProtoLink `infer` prompts become standard A2A text.
+  - Standard text, data, raw/file, URI, message, artifact, and task-state forms translate directly. ProtoLink-specific tool-call, flow, runtime-context, and control-plane semantics remain native-only contracts.
 - **A2A verification harness**
   - Added a provider-free test agent, focused adapter tests, and a manually dispatched workflow pinned to the official A2A TCK commit documented in [A2A Core and 1.0 Compatibility](a2a.md).
   - The current unmodified JSON-RPC MUST run reports `67 passed, 1 failed, 167 skipped, 30 deselected`. The remaining failure is the documented upstream `CORE-SEND-003` metadata defect, so this release does not claim a complete TCK pass.
@@ -63,17 +75,25 @@ to work unchanged.
 ### Changed
 
 - Reworked the README around ProtoLink's lightweight, A2A-first, pluggable-agent design, with a provider-free one-agent quickstart, progressive configuration, local and small-model support, structured flows, and the CLI dashboard.
-- Updated the relevant architecture, agent, model, server, transport, registry, flow, authentication, example, and whitepaper documentation to distinguish ProtoLink's A2A-based runtime model from A2A 1.0 wire compatibility at the HTTP adapter boundary.
+- Updated the concept, agent, client, server, transport, getting-started, index, and example documentation to distinguish ProtoLink's A2A-based runtime model from A2A 1.0 wire compatibility at the HTTP adapter boundary.
 - Clarified that native `AgentCard` serialization, registry services, structured flows, non-HTTP transports, and control-plane endpoints remain ProtoLink runtime contracts rather than additional A2A 1.0 operations.
 
 ### Compatibility Notes
 
 - This release is additive for existing ProtoLink applications: it does not remove or rename the `Agent`, `Task`, `AgentClient`, transport, or native endpoint APIs.
-- The adapter is currently an inbound HTTP JSON-RPC boundary. ProtoLink's `AgentClient` still uses the native transport contract; streaming, push notifications, and extended Agent Cards are advertised as unsupported.
-- The two A2A routes are mounted automatically for every HTTP `AgentServer`; version 0.6.6 does not yet expose a per-Agent disable switch.
-- The A2A task index is process-local, in-memory, and currently has no TTL or size-based eviction. It contains only tasks submitted through the adapter; long-lived, multi-worker, or restart-durable deployments need bounded retention plus a shared task router or store before presenting multiple workers as one A2A interface.
+- `a2a=False` keeps HTTP native-only. `a2a=True` requires the exact HTTP transport and adds standard inbound routes plus outbound translation; native endpoints and native protocol selection remain available.
+- `a2a_allow_cross_origin=False` is the secure default. A card advertising a JSON-RPC interface on another scheme, host, or effective port is rejected before that interface receives a request; enable the override only for an explicitly trusted deployment.
+- In `"auto"` mode, the client probes ProtoLink's native card first and falls back to the standard A2A card only after `404` or `405`. It does not resubmit a task through another protocol after authentication, connection, timeout, or server errors.
+- The A2A task index is bounded but remains process-local and in-memory. It contains only tasks submitted through the inbound adapter and disappears on restart; multi-worker or restart-durable deployments still need a shared task router or store.
+- Outbound protocol decisions and task-ID mappings are also bounded, process-local caches. Losing or expiring a mapping prevents continuation or cancellation by the original local task ID.
 - Optional A2A message metadata, extensions, and reference task IDs are validated at the boundary but are not all retained by ProtoLink's smaller runtime models.
 - The standard Agent Card route is intentionally public; the JSON-RPC task endpoint uses the Agent's configured authenticator.
+
+### Roadmap
+
+- A2A `SendStreamingMessage` and `SubscribeToTask` support.
+- A2A task push-notification configuration and delivery.
+- Extended authenticated A2A Agent Cards.
 
 ## [0.6.5] - 2026-07-14
 

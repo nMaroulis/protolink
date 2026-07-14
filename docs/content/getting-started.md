@@ -90,7 +90,7 @@ uv pip install -e ".[dev]"
 
 :::info[A2A from the first agent]
 
-Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares identity and capabilities, while `Task`, `Message`, `Part`, and `Artifact` carry work and results. Starting it with `transport="http"` also mounts the [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC adapter automatically for the capabilities it advertises. See [A2A Core and 1.0 Compatibility](a2a.md) for the exact scope.
+Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares identity and capabilities, while `Task`, `Message`, `Part`, and `Artifact` carry work and results. `transport="http"` serves ProtoLink's native API by default. Add `a2a=True` when the agent should also expose and consume the [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary. This is additive: native endpoints and native peer calls remain available. See [A2A Core and 1.0 Compatibility](a2a.md) for the exact scope.
 
 :::
 
@@ -120,7 +120,7 @@ agent_card = AgentCard(
 llm = OpenAILLM(model="gpt-4o-mini")
 
 # Initialize the agent
-agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
+agent = Agent(agent_card, transport="http", a2a=True, llm=llm, registry=registry)
 
 # Add Native tool
 @agent.tool(name="add", description="Add two numbers")
@@ -140,7 +140,7 @@ agent.start()
 This example demonstrates the core pieces of Protolink:
 
 - **AgentCard** to describe the agent.
-- **Transport** (here the `"http"` shortcut) for native agent communication; an HTTP agent also mounts the A2A 1.0 adapter.
+- **Transport** (here the `"http"` shortcut) for native agent communication, with `a2a=True` adding the A2A 1.0 inbound and outbound adapters.
 - **LLM** backend (`OpenAILLM`).
 - **Native tools** (Python functions decorated with `@agent.tool`).
 - **MCP tools** registered via `MCPToolAdapter`.

@@ -745,12 +745,24 @@ part, artifact, lifecycle, and discovery concepts are the common language
 across the runtime. These are ergonomic Python forms of A2A primitives; native
 ProtoLink transports are not presented as canonical A2A 1.0 wire bindings.
 
-For HTTP agents, a versioned adapter owns that boundary:
+For agents created with `transport="http", a2a=True`, versioned inbound and
+outbound adapters own that boundary. The default `a2a=False` keeps the native
+ProtoLink behavior:
 
 - `/.well-known/agent-card.json` exposes the A2A 1.0 Agent Card.
 - `POST /` accepts the A2A 1.0 JSON-RPC operations implemented by the adapter.
+- `AgentClient` can discover a standard JSON-RPC 1.0 peer and translate
+  `call_agent(..., protocol="a2a")` without replacing the native client path.
 - Serialization, version negotiation, standard errors, and TCK verification
   stay outside agent business logic.
+
+With `protocol="auto"`, native ProtoLink discovery is attempted first so two
+ProtoLink agents retain their richer task, flow, and control-plane semantics.
+Only an A2A-only peer uses wire translation. At that boundary, standard A2A user
+text remains a ProtoLink text part for custom handlers. The default Agent engine
+recognizes the inbound A2A metadata and treats that text as an inference request
+when an LLM is configured. Outbound `infer` prompts map to standard A2A text;
+framework-specific parts remain native semantics.
 
 This separation lets the Python runtime evolve without quietly changing a
 public protocol, while protocol work remains narrow enough to test against the

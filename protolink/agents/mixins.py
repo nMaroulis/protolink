@@ -621,12 +621,21 @@ class AgentControlPlaneMixin(_AgentMixinBase):
 class AgentCommunicationMixin(_AgentMixinBase):
     """Handles direct invocation, registry discovery, and agent-to-agent calls."""
 
-    async def call_agent(self, agent_url: str, task: Task) -> Task:
+    async def call_agent(
+        self,
+        agent_url: str,
+        task: Task,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task:
         """Send a task to another agent.
 
         Args:
             agent_url: URL of the target agent
             task: Task to send
+            protocol: Peer protocol selection. ``"auto"`` preserves native
+                ProtoLink calls and discovers A2A-only peers when this agent
+                was created with ``a2a=True``.
 
         Returns:
             Task with updated state and response messages
@@ -642,11 +651,17 @@ class AgentCommunicationMixin(_AgentMixinBase):
             agent_name=self.card.name,
         )
         self._logger.debug(f"Sending to agent {agent_url} the task: {task.to_dict()}")
-        result: Task = await self._client.send_task(agent_url, task)
+        result: Task = await self._client.send_task(agent_url, task, protocol=protocol)
         self._logger.debug(f"Received response Task from agent {agent_url}: {result.to_dict()}")
         return result
 
-    async def send_message_to(self, agent_url: str, message: Message) -> Message:
+    async def send_message_to(
+        self,
+        agent_url: str,
+        message: Message,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Message:
         """Send a message to another agent.
 
         Args:
@@ -661,7 +676,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
         """
         if not self._client:
             raise RuntimeError("Agent has no transport configured, cannot send messages.")
-        return await self._client.send_message(agent_url, message)
+        return await self._client.send_message(agent_url, message, protocol=protocol)
 
     async def invoke(
         self,
@@ -990,6 +1005,12 @@ class AgentConfigurationMixin(_AgentMixinBase):
     """Owns transport, model, storage, registry, status, and chat configuration."""
 
     @property
+    def a2a(self) -> bool:
+        """Return whether the optional A2A 1.0 HTTP boundary is enabled."""
+
+        return self._a2a_enabled
+
+    @property
     def client(self) -> AgentClient | None:
         """Get the agent's client component.
 
@@ -1047,15 +1068,22 @@ class AgentConfigurationMixin(_AgentMixinBase):
         else:
             raise ValueError("Invalid transport type")
 
+        transport_type = getattr(transport, "transport_type", None)
+        if self._a2a_enabled and transport_type != "http":
+            raise ValueError("a2a=True requires an HTTP transport (transport='http' or HTTPTransport)")
+
         self._transport = transport
         self.card.capabilities.streaming = bool(getattr(transport, "supports_streaming", False))
-        transport_type = getattr(transport, "transport_type", None)
         if transport_type:
             self.card.transport = transport_type
         # Initialize Agent-to-Agent Client
-        self._client = AgentClient(transport=transport)
+        self._client = AgentClient(
+            transport=transport,
+            a2a=self._a2a_enabled,
+            a2a_allow_cross_origin=self._a2a_allow_cross_origin,
+        )
         # Exposes AgentProtocol to Server
-        self._server = AgentServer(transport=transport, agent=self)
+        self._server = AgentServer(transport=transport, agent=self, a2a=self._a2a_enabled)
 
         # Update AgentCard security schemes if authenticator is configured
         if authenticator:
@@ -1428,6 +1456,8 @@ class AgentSerializationMixin(_AgentMixinBase):
             "override_system_prompt": self.override_system_prompt,
             "system_prompt": self._system_prompt,
             "credentials": self.credentials,
+            "a2a": self._a2a_enabled,
+            "a2a_allow_cross_origin": self._a2a_allow_cross_origin,
         }
 
         # Transport
@@ -1601,6 +1631,12 @@ class AgentSerializationMixin(_AgentMixinBase):
         expose_chat_val = overrides.get("expose_chat", data.get("expose_chat"))
         expose_chat: bool = bool(expose_chat_val) if expose_chat_val is not None else True
 
+        a2a_val = overrides.get("a2a", data.get("a2a"))
+        a2a: bool = bool(a2a_val) if a2a_val is not None else False
+
+        cross_origin_val = overrides.get("a2a_allow_cross_origin", data.get("a2a_allow_cross_origin"))
+        a2a_allow_cross_origin: bool = bool(cross_origin_val) if cross_origin_val is not None else False
+
         discovery_ttl_val = overrides.get("discovery_ttl", data.get("discovery_ttl"))
         discovery_ttl: int = int(discovery_ttl_val) if discovery_ttl_val is not None else 0
 
@@ -1627,6 +1663,8 @@ class AgentSerializationMixin(_AgentMixinBase):
             override_system_prompt=override_system_prompt,
             verbosity=verbosity,
             expose_chat=expose_chat,
+            a2a=a2a,
+            a2a_allow_cross_origin=a2a_allow_cross_origin,
             authenticator=authenticator,
             credentials=credentials,
         )

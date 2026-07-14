@@ -5,6 +5,22 @@ in this package translate those models at the network boundary so protocol
 compatibility does not leak into agent business logic.
 """
 
-from protolink.a2a.v1 import A2A_PROTOCOL_VERSION, A2AJSONRPCAdapter
+from __future__ import annotations
 
-__all__ = ["A2A_PROTOCOL_VERSION", "A2AJSONRPCAdapter"]
+import importlib
+from typing import Any
+
+__all__ = [
+    "A2A_PROTOCOL_VERSION",
+    "A2AClientError",
+    "A2AJSONRPCAdapter",
+    "A2AJSONRPCClientAdapter",
+]
+
+
+def __getattr__(name: str) -> Any:
+    if name not in __all__:
+        raise AttributeError(name)
+    value = getattr(importlib.import_module("protolink.a2a.v1"), name)
+    globals()[name] = value
+    return value

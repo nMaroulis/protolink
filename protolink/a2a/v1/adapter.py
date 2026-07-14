@@ -8,8 +8,9 @@ index required by A2A task operations.  Agent authors still implement the same
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
@@ -51,16 +52,84 @@ class _A2AError(Exception):
 class A2AJSONRPCAdapter:
     """Expose one ProtoLink agent through the standard A2A 1.0 JSON-RPC binding."""
 
-    def __init__(self, agent: _Agent) -> None:
+    def __init__(
+        self,
+        agent: _Agent,
+        *,
+        _max_tasks: int = 1024,
+        _task_ttl: float = 3600.0,
+        _clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        if _max_tasks <= 0:
+            raise ValueError("_max_tasks must be greater than zero")
+        if _task_ttl <= 0:
+            raise ValueError("_task_ttl must be greater than zero")
         self._agent = agent
         self._tasks: dict[str, Task] = {}
+        self._task_updated_at: dict[str, float] = {}
+        self._active_tasks: dict[str, int] = {}
         self._executions: dict[str, asyncio.Task[Task]] = {}
+        self._max_tasks = _max_tasks
+        self._task_ttl = _task_ttl
+        self._clock = _clock
         self._lock = asyncio.Lock()
 
     def get_agent_card(self) -> dict[str, Any]:
         """Return the public A2A 1.0 Agent Card for this adapter."""
 
         return agent_card_to_a2a(self._agent.card)
+
+    def _activate_task_locked(self, task_id: str) -> None:
+        """Protect one task from retention pruning while an operation runs."""
+
+        self._active_tasks[task_id] = self._active_tasks.get(task_id, 0) + 1
+
+    def _deactivate_task_locked(self, task_id: str) -> None:
+        """Release one active-operation reference for a retained task."""
+
+        remaining = self._active_tasks.get(task_id, 0) - 1
+        if remaining > 0:
+            self._active_tasks[task_id] = remaining
+        else:
+            self._active_tasks.pop(task_id, None)
+
+    def _touch_task_locked(self, task_id: str) -> None:
+        """Record a task mutation without treating reads as retention activity."""
+
+        self._task_updated_at[task_id] = self._clock()
+
+    def _remove_task_locked(self, task_id: str) -> None:
+        self._tasks.pop(task_id, None)
+        self._task_updated_at.pop(task_id, None)
+
+    def _prune_tasks_locked(self, *, reserve: int = 0) -> bool:
+        """Expire and size-bound inactive tasks while preserving live work.
+
+        ``reserve`` requests free slots for an imminent insertion.  ``False``
+        means every remaining slot is protected by an active operation.
+        """
+
+        now = self._clock()
+        expired = [
+            task_id
+            for task_id, updated_at in self._task_updated_at.items()
+            if task_id not in self._active_tasks and now - updated_at >= self._task_ttl
+        ]
+        for task_id in expired:
+            self._remove_task_locked(task_id)
+
+        target_size = self._max_tasks - reserve
+        while len(self._tasks) > target_size:
+            candidates = [
+                (self._task_updated_at.get(task_id, float("-inf")), task_id)
+                for task_id in self._tasks
+                if task_id not in self._active_tasks
+            ]
+            if not candidates:
+                return False
+            _, oldest_task_id = min(candidates)
+            self._remove_task_locked(oldest_task_id)
+        return True
 
     async def close(self) -> None:
         """Cancel and drain non-blocking executions owned by this adapter."""
@@ -194,6 +263,7 @@ class A2AJSONRPCAdapter:
         )
 
         async with self._lock:
+            self._prune_tasks_locked()
             if task_id:
                 task = self._tasks.get(task_id)
                 if task is None or not _is_visible(task, principal_id, tenant):
@@ -207,8 +277,11 @@ class A2AJSONRPCAdapter:
                         f"Task {task_id!r} is terminal and cannot accept messages",
                         "UNSUPPORTED_OPERATION",
                     )
-                active_execution = self._executions.get(task_id)
-                if active_execution is not None and not active_execution.done():
+                # Both blocking and returnImmediately executions hold an
+                # active-operation reference.  `_executions` contains only
+                # background jobs, so consulting it alone would allow a
+                # continuation to mutate a blocking task concurrently.
+                if self._active_tasks.get(task_id, 0) > 0:
                     raise _A2AError(
                         -32004,
                         f"Task {task_id!r} is already being processed",
@@ -216,14 +289,21 @@ class A2AJSONRPCAdapter:
                     )
                 task.add_message(message_from_a2a(wire_message))
                 task.metadata["a2a_message_id"] = str(wire_message["messageId"])
+                task.metadata["a2a_inbound"] = True
+                self._touch_task_locked(task.id)
             else:
+                if not self._prune_tasks_locked(reserve=1):
+                    raise _A2AError(-32603, "A2A task capacity is exhausted; retry later")
                 context_id = requested_context_id or f"ctx-{uuid.uuid4()}"
                 task = Task.create(message_from_a2a(wire_message))
                 task.metadata["a2a_context_id"] = context_id
                 task.metadata["a2a_message_id"] = str(wire_message["messageId"])
+                task.metadata["a2a_inbound"] = True
                 task.metadata["a2a_principal_id"] = principal_id
                 task.metadata["a2a_tenant"] = tenant
                 self._tasks[task.id] = task
+                self._touch_task_locked(task.id)
+            self._activate_task_locked(task.id)
 
         if return_immediately:
             self._start_execution(task)
@@ -272,33 +352,40 @@ class A2AJSONRPCAdapter:
     ) -> Task:
         """Run an agent task and keep the adapter's process-local index current."""
 
+        completed = task
         try:
-            completed = await self._agent.run_task(task)
-        except asyncio.CancelledError:
-            if not task.is_terminal:
-                task.cancel("Canceled through A2A")
-            completed = task
-            if not suppress_cancellation:
-                raise
-        except Exception as exc:
-            if not task.is_terminal:
-                task.fail(str(exc))
-            completed = task
+            try:
+                completed = await self._agent.run_task(task)
+            except asyncio.CancelledError:
+                if not task.is_terminal:
+                    task.cancel("Canceled through A2A")
+                completed = task
+                if not suppress_cancellation:
+                    raise
+            except Exception as exc:
+                if not task.is_terminal:
+                    task.fail(str(exc))
+                completed = task
 
-        if completed.id != task.id:
-            if not suppress_cancellation:
-                raise _A2AError(
-                    -32006,
-                    "Agent returned a task with a different id",
-                    "INVALID_AGENT_RESPONSE",
-                )
-            if not task.is_terminal:
-                task.fail("Agent returned a task with a different id")
-            completed = task
-        completed.metadata.setdefault("a2a_context_id", task.metadata["a2a_context_id"])
-        async with self._lock:
-            self._tasks[completed.id] = completed
-        return completed
+            if completed.id != task.id:
+                if not suppress_cancellation:
+                    raise _A2AError(
+                        -32006,
+                        "Agent returned a task with a different id",
+                        "INVALID_AGENT_RESPONSE",
+                    )
+                if not task.is_terminal:
+                    task.fail("Agent returned a task with a different id")
+                completed = task
+            completed.metadata.setdefault("a2a_context_id", task.metadata["a2a_context_id"])
+            return completed
+        finally:
+            retained = completed if completed.id == task.id else task
+            async with self._lock:
+                self._tasks[task.id] = retained
+                self._touch_task_locked(task.id)
+                self._deactivate_task_locked(task.id)
+                self._prune_tasks_locked()
 
     def _validate_send_configuration(self, value: Any) -> Mapping[str, Any]:
         if value is None:
@@ -342,6 +429,7 @@ class A2AJSONRPCAdapter:
         tenant = _optional_string(params.get("tenant"))
         history_length = _history_length(_value(params, "historyLength", "history_length"))
         async with self._lock:
+            self._prune_tasks_locked()
             task = self._tasks.get(task_id)
         if task is None or not _is_visible(task, principal_id, tenant):
             raise _A2AError(-32001, f"Task {task_id!r} was not found", "TASK_NOT_FOUND")
@@ -385,6 +473,7 @@ class A2AJSONRPCAdapter:
         status_after = _timestamp(status_after_value) if status_after_value is not None else None
 
         async with self._lock:
+            self._prune_tasks_locked()
             tasks = [task for task in self._tasks.values() if _is_visible(task, principal_id, tenant)]
         if context_id:
             tasks = [task for task in tasks if task.metadata.get("a2a_context_id") == context_id]
@@ -423,35 +512,55 @@ class A2AJSONRPCAdapter:
     ) -> dict[str, Any]:
         task_id = _required_string(params, "id")
         tenant = _optional_string(params.get("tenant"))
+        wire_metadata = params.get("metadata")
+        if wire_metadata is not None and not isinstance(wire_metadata, Mapping):
+            raise _A2AError(-32602, "metadata must be an object")
+        cancellation_metadata = dict(wire_metadata or {})
+        requested_reason = cancellation_metadata.get("reason")
+        reason = requested_reason if isinstance(requested_reason, str) and requested_reason else "Canceled through A2A"
         async with self._lock:
+            self._prune_tasks_locked()
             task = self._tasks.get(task_id)
-        if task is None or not _is_visible(task, principal_id, tenant):
-            raise _A2AError(-32001, f"Task {task_id!r} was not found", "TASK_NOT_FOUND")
-        if task.is_terminal:
-            raise _A2AError(
-                -32002,
-                f"Task {task_id!r} is not cancelable",
-                "TASK_NOT_CANCELABLE",
-            )
+            if task is None or not _is_visible(task, principal_id, tenant):
+                raise _A2AError(-32001, f"Task {task_id!r} was not found", "TASK_NOT_FOUND")
+            if task.is_terminal:
+                raise _A2AError(
+                    -32002,
+                    f"Task {task_id!r} is not cancelable",
+                    "TASK_NOT_CANCELABLE",
+                )
+            self._activate_task_locked(task_id)
 
+        canceled: Task | None = None
         try:
-            canceled = await self._agent.cancel_task(TaskCancellationRequest(id=task_id, reason="Canceled through A2A"))
-        except TaskNotCancelableError as exc:
-            raise _A2AError(-32002, str(exc), "TASK_NOT_CANCELABLE") from exc
-        except TaskNotFoundError:
-            canceled = task
+            try:
+                result = await self._agent.cancel_task(
+                    TaskCancellationRequest(
+                        id=task_id,
+                        reason=reason,
+                        metadata=cancellation_metadata,
+                    )
+                )
+            except TaskNotCancelableError as exc:
+                raise _A2AError(-32002, str(exc), "TASK_NOT_CANCELABLE") from exc
+            except TaskNotFoundError:
+                result = task
 
-        if not isinstance(canceled, Task):
-            canceled = task
-        if not canceled.is_terminal:
-            canceled.cancel("Canceled through A2A")
+            canceled = result if isinstance(result, Task) else task
+            if not canceled.is_terminal:
+                canceled.cancel(reason)
 
-        execution = self._executions.get(task_id)
-        if execution is not None and not execution.done():
-            execution.cancel("Canceled through A2A")
-        async with self._lock:
-            self._tasks[task_id] = canceled
-        return task_to_a2a(canceled)
+            execution = self._executions.get(task_id)
+            if execution is not None and not execution.done():
+                execution.cancel(reason)
+            return task_to_a2a(canceled)
+        finally:
+            async with self._lock:
+                if canceled is not None:
+                    self._tasks[task_id] = canceled
+                    self._touch_task_locked(task_id)
+                self._deactivate_task_locked(task_id)
+                self._prune_tasks_locked()
 
     def _validate_message(self, value: Any) -> None:
         if not isinstance(value, Mapping):

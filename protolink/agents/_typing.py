@@ -62,6 +62,8 @@ class _AgentMixinBase(Protocol):
     _discovery_ttl: int
     _discovery_cache: dict[str, tuple[float, list[AgentCard]]]
     _expose_chat: bool
+    _a2a_enabled: bool
+    _a2a_allow_cross_origin: bool
 
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -100,7 +102,13 @@ class _AgentMixinBase(Protocol):
 
     async def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]: ...
 
-    async def call_agent(self, agent_url: str, task: Task) -> Task: ...
+    async def call_agent(
+        self,
+        agent_url: str,
+        task: Task,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task: ...
 
     async def run_task(self, task: Task) -> Task: ...
 

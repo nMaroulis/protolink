@@ -460,6 +460,18 @@ class AgentExecutionMixin(_AgentMixinBase):
                                 cancellation_token=cancellation_token,
                             )
                         )
+                    elif part.type == "text" and task.metadata.get("a2a_inbound") is True and self.llm is not None:
+                        # Keep the canonical A2A text -> ProtoLink text mapping
+                        # visible to custom handlers. Only the default engine
+                        # treats authenticated adapter input as an inference
+                        # instruction; ordinary local text remains inert.
+                        outputs.append(
+                            await self.call_llm(
+                                Part.infer(prompt=str(part.content)),
+                                task=task,
+                                cancellation_token=cancellation_token,
+                            )
+                        )
                     else:
                         self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
                 cancellation_token.raise_if_cancelled()

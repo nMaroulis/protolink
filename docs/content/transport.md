@@ -6,7 +6,7 @@ Protolink implements a **pluggable transport layer** that decouples the agent's 
 
 At its core, the Transport abstraction behaves as a **protocol adapter pattern**, normalizing disparate wire formats into standard `Task` and `Message` domain objects.
 
-A2A supplies the shared agent model; a Transport moves it. ProtoLink's transports carry the same A2A-derived task and message objects, but they are not all canonical A2A bindings. Today, the automatic HTTP `AgentServer` adapter is ProtoLink's A2A 1.0 JSON-RPC boundary; Runtime, WebSocket, SSE JSON-RPC, and gRPC remain ProtoLink-native transports.
+A2A supplies the shared agent model; a Transport moves it. ProtoLink's transports carry the same A2A-derived task and message objects, but they are not all canonical A2A bindings. `Agent(..., transport="http", a2a=True)` enables ProtoLink's A2A 1.0 JSON-RPC boundary; Runtime, WebSocket, SSE JSON-RPC, and gRPC remain ProtoLink-native transports.
 
 All transports implement a consistent interface:
 
@@ -26,7 +26,7 @@ All transports inherit from the base `Transport` class.
 - **HTTPTransport**
     - Uses HTTP/HTTPS for synchronous request/response.
     - Used for both Agent-to-Agent and Agent-to-Registry communication.
-    - When serving an Agent, also mounts the standard A2A Agent Card and A2A 1.0 JSON-RPC endpoints.
+    - When serving an Agent with `a2a=True`, also mounts the standard A2A Agent Card and A2A 1.0 JSON-RPC endpoints.
     - Serves browser-facing HTML pages such as `GET /status` and, for LLM-backed agents, `GET /chat`.
     - Backed by ASGI frameworks:
         - `Starlette` + `httpx` + `uvicorn` (lightweight default backend).
@@ -67,8 +67,8 @@ Choose the transport for the boundary around the agent; the `Agent`, `Task`, and
 | Transport | Use it when | Expected transport overhead | Streaming | Built-in surface and utilities | Main trade-off |
 | --- | --- | --- | --- | --- | --- |
 | [Runtime](#runtimetransport) (`"runtime"`) | All agents run in one Python process. It is the natural choice for tests, notebooks, local meshes, embedded agents, and deterministic flows. | **Lowest.** There is no socket or network round trip, although ProtoLink still enforces serialization and payload limits. | Yes | In-process routing plus Python-level `health()` and `metrics`. No listening port, browser pages, dashboard probe, TLS, or external A2A endpoint. | It cannot cross a process or host boundary and provides no network isolation. |
-| [HTTP](#httptransport) (`"http"`) | You want the default network service, broad client compatibility, browser-facing utilities, or the **A2A 1.0** wire boundary. | **Network baseline.** Pooled keep-alive connections make it a strong default for unary calls, but a caller receives the result only after the response is complete. | No live `subscribe()` stream | ProtoLink-native task and control APIs; A2A Agent Card and JSON-RPC adapter; `/status`, `/healthz`, `/readyz`, and LLM-backed `/chat`; dashboard status/chat actions; ordinary HTTP tooling, proxies, and TLS. | Use SSE, WebSocket, or gRPC when callers need incremental task events. |
-| [SSE JSON-RPC](#ssejsonrpctransport) (`"sse"`; aliases `"json-rpc"`, `"sse-json-rpc"`) | A browser, CLI, or dashboard needs one-way live progress while you keep an HTTP deployment model. | **HTTP-like for unary calls; progressive for streams.** One long-lived response delivers the first event before task completion and avoids polling, with text framing per event. | Yes, server to client | The native HTTP routes, status/health/chat pages, and dashboard actions, plus `POST /tasks/stream` as `text/event-stream`. The automatic A2A 1.0 adapter is **not** mounted on this transport today. | The event channel is one-way, and proxies must permit long-lived SSE responses instead of buffering or timing them out. |
+| [HTTP](#httptransport) (`"http"`) | You want the default network service, broad client compatibility, browser-facing utilities, or the optional **A2A 1.0** wire boundary. | **Network baseline.** Pooled keep-alive connections make it a strong default for unary calls, but a caller receives the result only after the response is complete. | No live `subscribe()` stream | ProtoLink-native task and control APIs; `/status`, `/healthz`, `/readyz`, LLM-backed `/chat`, dashboard actions, ordinary HTTP tooling, proxies, and TLS. `a2a=True` adds the standard Agent Card, JSON-RPC routes, and outbound translation. | Use SSE, WebSocket, or gRPC when callers need incremental task events. A2A currently remains unary. |
+| [SSE JSON-RPC](#ssejsonrpctransport) (`"sse"`; aliases `"json-rpc"`, `"sse-json-rpc"`) | A browser, CLI, or dashboard needs one-way live progress while you keep an HTTP deployment model. | **HTTP-like for unary calls; progressive for streams.** One long-lived response delivers the first event before task completion and avoids polling, with text framing per event. | Yes, server to client | The native HTTP routes, status/health/chat pages, and dashboard actions, plus `POST /tasks/stream` as `text/event-stream`. The A2A 1.0 adapter is **not** mounted on this transport today. | The event channel is one-way, and proxies must permit long-lived SSE responses instead of buffering or timing them out. |
 | [WebSocket](#websockettransport) (`"websocket"`) | You need a long-lived interactive connection, frequent messages, or bidirectional task and token streaming. | **Low per frame after connection setup.** A connection can be reused for many JSON frames, while persistent connections and per-channel serialization still consume resources. | Yes, bidirectional | ProtoLink-native task and control operations over JSON frames, WSS/TLS, and a dedicated control connection so cancellation does not wait behind an active stream. | There are no plain HTTP status/chat pages, dashboard probes, or A2A endpoints; reconnect and load-balancer handling is more involved. |
 | [gRPC](#grpctransport) (`"grpc"`) | Internal services or service meshes already use gRPC deadlines, metadata, pooled channels, health checks, and reflection. | **Low for repeated RPCs and streams.** It uses persistent HTTP/2 channels and compact framing, but ProtoLink carries JSON byte envelopes rather than generated protobuf messages, so measure your workload. | Yes, server streaming | Generic `Invoke` and `Stream` methods, metadata authentication, TLS, deadlines, compression options, standard gRPC health, and reflection. | It requires the gRPC extra, has no browser/dashboard or A2A pages, and is less convenient for direct browser clients. |
 
@@ -694,6 +694,8 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | `POST /state/reset` | Reset enabled state stores. | No, JSON API |
 | `POST /state/compact` | Compact persisted conversation state. | No, JSON API |
 | `GET /.well-known/agent.json` | Return the public `AgentCard`. | Yes, JSON document |
+| `GET /.well-known/agent-card.json` | Return the standard A2A 1.0 Agent Card. | Yes, JSON document; exact HTTP plus `a2a=True` only |
+| `POST /` | Handle A2A 1.0 JSON-RPC task operations. | No, JSON API; exact HTTP plus `a2a=True` only |
 | `GET /status` | Render the agent status page. | Yes, HTML page |
 | `GET /healthz` | Return transport liveness and metrics. | Yes, JSON document |
 | `GET /readyz` | Return transport readiness and metrics. | Yes, JSON document |
@@ -729,7 +731,7 @@ The browser pages themselves are not separate servers. Agent status and registry
 
 ## HTTPTransport
 
-`HTTPTransport` is the main network transport for communication in Protolink. It handles both Agent-to-Agent JSON HTTP APIs and Registry operations.
+`HTTPTransport` is the main network transport for communication in Protolink. It handles native Agent-to-Agent JSON HTTP APIs and Registry operations. On an `Agent`, `a2a=True` adds the canonical A2A 1.0 inbound routes and enables outbound translation through the same transport, preserving its TLS, authentication, pooling, limits, and metrics.
 
 ### Overview
 
@@ -742,6 +744,7 @@ The browser pages themselves are not separate servers. Agent status and registry
     - `POST /tasks/` - submit a `Task` to the agent.
     - `POST /tasks/cancel` - request best-effort cancellation of an active task ID.
     - `GET /.well-known/agent.json` - agent metadata.
+    - `GET /.well-known/agent-card.json` and `POST /` - A2A 1.0 discovery and JSON-RPC when the Agent uses `a2a=True`.
     - `GET /status` - agent or registry status HTML.
     - `GET /chat` - agent chat UI HTML when served by an agent.
     - Registry endpoints (if acting as a registry).
