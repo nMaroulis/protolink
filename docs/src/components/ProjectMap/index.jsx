@@ -50,6 +50,7 @@ const surfaces = [
       'Registry coordinates discovery without routing tasks',
     ],
     docs: [
+      ['A2A core', '/docs/a2a'],
       ['Concept', '/docs/concept'],
       ['Registry', '/docs/registry'],
       ['Types', '/docs/types'],
@@ -272,7 +273,7 @@ const flowSteps = [
 
 const quickLinks = [
   ['First agent', '/docs/getting-started'],
-  ['A2A concept', '/docs/concept'],
+  ['A2A core', '/docs/a2a'],
   ['Registry', '/docs/registry'],
   ['Transport', '/docs/transport'],
   ['Runtime control', '/docs/runtime'],

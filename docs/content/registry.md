@@ -2,11 +2,11 @@ import ApiSurface from '@site/src/components/ApiSurface';
 
 # Registry
 
-The Registry is Protolink's native discovery service. It gives a multi-agent system a shared address book where each running agent can publish its ProtoLink `AgentCard`, and where other agents can look up peers by name, role, tags, capabilities, or other card metadata.
+The Registry is ProtoLink's first-class discovery service for A2A-based agent meshes. It uses `AgentCard`—ProtoLink's runtime form of A2A's identity and capability primitive—as a shared address book where running agents publish who they are and other agents find peers by name, role, tags, capabilities, endpoint, or other card metadata.
 
 Its role is coordination, not orchestration. The registry does not decide which agent should handle a task, route messages between agents, or own workflow state. It answers a narrower question: which agents are currently available, where can they be reached, and what do they say they can do?
 
-That separation keeps agent-to-agent communication explicit. Agents still call each other through their own transports and clients, but they no longer need every peer URL hard-coded at startup. Indexed discovery, liveness heartbeats, optional TTL pruning, persistence hooks, and a browser status view remain native runtime features; they are not presented as part of the A2A 1.0 wire adapter.
+That separation keeps agent-to-agent communication explicit. Agents still call each other through their own transports and clients, but they no longer need every peer URL hard-coded at startup. [A2A 1.0](https://a2a-protocol.org/latest/specification/) standardizes per-agent card discovery; ProtoLink adds central indexed lookup, roles and tags, liveness heartbeats, optional TTL pruning, persistence hooks, and a browser status view around that model. Those registry endpoints are ProtoLink-native runtime services, not additional A2A 1.0 operations.
 
 Use a registry when agents should discover each other dynamically instead of hard-coding every peer URL.
 

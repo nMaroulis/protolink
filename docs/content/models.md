@@ -4,13 +4,15 @@ import ApiSurface from '@site/src/components/ApiSurface';
 
 This section provides detailed API documentation for the core data models in Protolink. These models represent the fundamental data structures used throughout the framework for agent communication, task management, and data exchange.
 
+These are ProtoLink's ergonomic runtime forms of A2A's core agent primitives. They form the shared contract across agents, flows, storage, telemetry, registries, and transports; the [A2A 1.0 adapter](a2a.md) maps its advertised scope to canonical wire models when interoperability is required.
+
 <ApiSurface
   eyebrow="Protocol model layer"
   title="Core Data Models"
   path="protolink.models"
   description="The stable dataclass and protocol vocabulary shared by agents, clients, servers, transports, registries, LLM wrappers, and storage-aware runtime features."
   pills={[
-    "Adapter-ready cards",
+    "A2A-derived cards and tasks",
     "Task lifecycle state",
     "Messages and parts",
     "Artifacts and endpoints",

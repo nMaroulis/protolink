@@ -2,7 +2,7 @@ import ApiSurface from '@site/src/components/ApiSurface';
 
 # Runtime
 
-Protolink's runtime primitives provide a stable execution layer above the core A2A-style `Task`, `Message`, `Part`, and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools, and any other agent application.
+Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part`, and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools, and any other agent application.
 
 The runtime layer does not replace transports, telemetry, storage, or structured flows. It gives them shared execution metadata, concrete action intents, policy and approval boundaries, and a normalized event stream.
 
@@ -278,7 +278,7 @@ canceled = await client.cancel_task(
 result = await running
 ```
 
-`AgentClient.cancel_task()` uses the A2A-style `POST /tasks/cancel` operation and returns the updated task. The same call works over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. WebSocket uses a separate control connection so cancellation cannot wait behind the request or stream it needs to stop.
+`AgentClient.cancel_task()` uses ProtoLink's native `POST /tasks/cancel` operation and returns the updated task. The HTTP adapter exposes the canonical A2A 1.0 `CancelTask` operation separately. The native client call works over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport; WebSocket uses a separate control connection so cancellation cannot wait behind the request or stream it needs to stop.
 
 The synchronous client exposes the same operation as `client.sync.cancel_task(...)`. A synchronous call can only cancel work running on another thread, process, or event loop; it cannot interrupt itself while blocked in the same call stack.
 

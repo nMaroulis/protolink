@@ -1,6 +1,6 @@
 # ProtoLink Whitepaper
 
-## A Protocol-Native Runtime for Autonomous, Pluggable Agent Systems
+## An A2A-First Runtime for Autonomous, Pluggable Agent Systems
 
 ProtoLink is a Python framework for building distributed multi-agent systems
 where agents are not just function calls wrapped around a model. In ProtoLink,
@@ -12,16 +12,16 @@ transports if it must communicate with other agents or applications.
 The core idea is deliberately simple:
 
 > Agents are entities, not functions. A ProtoLink system is built by composing
-> autonomous agents that communicate through protocol-native tasks.
+> autonomous agents that communicate through A2A-derived tasks.
 
-ProtoLink's runtime model is inspired by the Agent-to-Agent (A2A) vocabulary:
-agent cards, tasks, messages, parts, artifacts, task states, and discovery. It
-keeps those concepts at the center, then adds the substrate needed to make them
-useful in real systems: LLM execution, tool calling, agent delegation, transports,
-registry discovery, structured flows, state, cancellation, budgets, approvals,
-telemetry, normalized events, run reports, and replay. A dedicated adapter owns
-canonical A2A 1.0 wire translation and is verified independently from the native
-runtime protocol.
+ProtoLink is built around A2A's agent model. Agent cards, tasks, messages,
+parts, artifacts, task states, and discovery are the vocabulary of the
+runtime—not a bolt-on integration. ProtoLink adds the substrate needed to make
+those primitives useful in real systems: LLM execution, tools and MCP,
+delegation, transports, registry discovery, structured flows, state, policy,
+telemetry, and replay. The A2A 1.0 adapter maps these ergonomic runtime models
+to the canonical wire shapes for the capabilities it advertises, and its
+verification remains independent from the native runtime.
 
 The result is a framework for treating agent systems as distributed programs,
 not as opaque prompt graphs.
@@ -40,7 +40,7 @@ policy are also modules. The native runtime contract between agents stays stable
 a `Task` is exchanged, `Message` and `Artifact` objects carry content, and
 `Part` objects describe atomic actions or outputs.
 
-ProtoLink builds a deterministic runtime around those protocol-inspired models:
+ProtoLink builds a deterministic runtime around those A2A-derived models:
 
 - LLMs declare one typed action at a time.
 - The runtime validates, authorizes, executes, observes, and records that action.
@@ -101,9 +101,9 @@ A weather agent, a booking agent, a code-reading agent, and an approval-gated
 file-writing agent should be able to exist as separate processes, local in-memory
 actors, or remote services without changing their business logic.
 
-### 2. Protocol Objects Are The Shared Language
+### 2. A2A Objects Are The Shared Language
 
-ProtoLink keeps A2A-style primitives at the center:
+ProtoLink keeps A2A's core primitives at the center:
 
 - `AgentCard` declares identity, capabilities, skills, tags, formats, security,
   and transport metadata.
@@ -199,11 +199,14 @@ This is the core ports-and-adapters shape of ProtoLink. The agent expresses
 intent. The client/server layer turns intent into requests and handlers. The
 transport performs the protocol work.
 
-## Why Keep an A2A Boundary?
+## Why A2A Is The Core Model
 
-A2A is valuable because it defines an interoperable grammar for agent systems.
-It gives agents a way to describe themselves and exchange work without assuming
-that every participant shares the same framework internals.
+A2A supplies ProtoLink's semantic foundation; ProtoLink supplies the execution
+runtime around it. It gives agents a way to describe themselves and exchange
+work without assuming that every participant shares the same framework
+internals. ProtoLink's native serialization stays ergonomic and
+transport-independent, while canonical A2A 1.0 serialization belongs to the
+versioned HTTP adapter.
 
 ProtoLink uses that vocabulary in its runtime for:
 
@@ -221,7 +224,8 @@ how approvals should be requested, how budgets should be enforced, or how a UI
 should replay a run.
 
 ProtoLink handles those runtime concerns independently, while its versioned
-adapter owns canonical A2A interoperability at the HTTP boundary.
+adapter owns A2A 1.0 JSON-RPC operations and wire-shape translation at the HTTP
+boundary.
 
 | Concern | A2A concept | ProtoLink runtime |
 | --- | --- | --- |
@@ -239,7 +243,7 @@ adapter owns canonical A2A interoperability at the HTTP boundary.
 The important design choice is that the extension does not replace the protocol
 model. It builds on it.
 
-## The Protocol Core
+## The A2A-Based Core
 
 ProtoLink's core data model is small but expressive.
 
@@ -525,9 +529,10 @@ and wraps their tools as ProtoLink-native tools. From the agent's perspective,
 a weather function written locally and a remote MCP tool are both capabilities
 available through the same tool registry.
 
-That makes MCP a plug-in surface for external tools. ProtoLink agents exchange
-native runtime tasks, and the A2A adapter translates them when an interoperable
-wire boundary is required.
+That makes MCP a plug-in surface for external tools, while A2A-derived tasks and
+messages remain the language agents use to exchange work. At an interoperable
+HTTP boundary, the adapter translates that language to A2A 1.0 JSON-RPC and
+canonical wire shapes for its advertised scope.
 
 ## RunContext: The Execution Envelope
 
@@ -807,7 +812,7 @@ but structured `Part.route(...)` is the inspectable path.
 edges, loops, and an entry point. It is useful for deterministic enterprise
 processes where the flow topology should be auditable in code.
 
-### Why Flows Stay Runtime-Native
+### Why Flows Keep The A2A Model
 
 Structured flows solve a different problem than autonomous delegation. They
 remove LLMs from routing when the process is known. But every step still
@@ -815,8 +820,8 @@ receives and returns a task. Every intermediate result remains a message or
 artifact. Route decisions are parts and metadata. The same transports, events,
 state, and replay surfaces apply.
 
-That keeps deterministic orchestration compatible with the rest of the agent
-mesh.
+That keeps deterministic orchestration on the same A2A-based model as the rest
+of the agent mesh.
 
 ## Telemetry, Events, Reports, And Replay
 
@@ -1016,14 +1021,15 @@ and policy events rather than relying on text snapshots alone.
 
 ## What ProtoLink Brings To The Table
 
-ProtoLink's value is the combination of protocol alignment and runtime control.
+ProtoLink's value is the combination of an A2A foundation and runtime control.
 
-### A2A Adapter Interoperability
+### A2A-First Runtime And A2A 1.0 Interoperability
 
-Agents communicate through task, message, part, artifact, and card models rather
-than framework-private graph objects. At an A2A boundary, the versioned adapter
-converts those native models to the canonical wire contract, keeping the
-protocol boundary visible and independently testable.
+Agents use A2A-derived task, message, part, artifact, and card models throughout
+the runtime rather than framework-private graph objects. At an interoperable
+HTTP boundary, the versioned adapter converts those models to A2A 1.0 JSON-RPC
+operations and canonical wire shapes for its advertised scope, keeping that
+boundary visible and independently testable.
 
 ### Autonomous Agent Entities
 
@@ -1048,7 +1054,7 @@ Provider-native tool calling and JSON fallback produce the same internal action
 contract. Smaller and local models can participate without forcing a different
 application architecture.
 
-### Structured Flows Without Protocol Escape
+### Structured Flows Without Leaving The A2A Model
 
 Pipelines, parallel fan-out, routers, and graphs remain `Task -> Task`. Flow
 state and route decisions are serialized into the same task model used
@@ -1072,7 +1078,7 @@ piece a clean place.
 
 | Ecosystem idea | ProtoLink stance |
 | --- | --- |
-| A2A | A versioned interoperability boundary for identity and task exchange |
+| A2A | Core runtime model for identity, capabilities, discovery, and task exchange, plus a versioned A2A 1.0 JSON-RPC adapter |
 | MCP | A tool integration layer that can be adapted into agent capabilities |
 | Langfuse and LangSmith | Observability backends, not execution engines |
 | LangChain-style model composition | Useful inspiration, but ProtoLink starts from autonomous agents rather than chains around model calls |
@@ -1158,7 +1164,7 @@ application the hooks and data structures it needs to build one.
 
 ## Philosophy In One Sentence
 
-ProtoLink treats agents as autonomous, protocol-native runtime entities whose
+ProtoLink treats agents as autonomous, A2A-first runtime entities whose
 LLMs, tools, transports, state, telemetry, and policies are pluggable modules,
 while every meaningful action remains explicit, typed, observable, and
 replayable.
@@ -1169,12 +1175,12 @@ The future of agent systems is not one giant prompt wrapped around one model. It
 is a mesh of specialized entities: some reason, some act, some coordinate, some
 observe, some guard side effects, and some execute deterministic workflows.
 
-ProtoLink provides the runtime substrate for that mesh. It keeps a stable native
-task language for its own transports and adds a versioned A2A adapter when an
-interoperable boundary is required. Around those contracts it provides the
-practical machinery needed for real agent applications: LLM integration, tool
-execution, MCP adaptation, transport abstraction, registry discovery,
-structured flows, state, runtime context, budgets, cancellation, policy,
+ProtoLink provides the runtime substrate for that mesh. It uses A2A as the
+shared runtime model and maps its advertised HTTP capabilities to canonical A2A
+1.0 wire shapes through the versioned adapter. Around those contracts it
+provides the practical machinery needed for real agent applications: LLM
+integration, tool execution, MCP adaptation, transport abstraction, registry
+discovery, structured flows, state, runtime context, budgets, cancellation, policy,
 approvals, telemetry, events, reports, and replay.
 
 In ProtoLink, you do not build agents by burying behavior inside orchestration

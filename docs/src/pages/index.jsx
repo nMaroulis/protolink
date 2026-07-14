@@ -1182,16 +1182,16 @@ export default function Home() {
 
   return (
     <Layout
-      title="A2A-native autonomous agent systems"
+      title="A2A-first autonomous agent systems"
       description="ProtoLink documentation for autonomous agents, A2A protocol objects, LLMs, tools, transports, discovery, flows, and production-ready multi-agent systems."
     >
       <main className={styles.page}>
         <section className={styles.hero}>
           <div className={styles.heroInner}>
             <div className={styles.heroCopy}>
-              <p className={styles.kicker}>A2A-native Python framework</p>
+              <p className={styles.kicker}>A2A-first Python framework</p>
               <h1>
-                Build autonomous agents that communicate through protocol-native
+                Build autonomous agents that communicate through A2A-derived
                 tasks.
               </h1>
               <p className={styles.lede}>

@@ -8,7 +8,7 @@ import ProjectMap from '@site/src/components/ProjectMap';
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%" />
 </div>
 
-> A lightweight Python runtime for **agent-to-agent communication** with progressive control from local meshes to network transports.
+> A lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python runtime for autonomous, pluggable agents, with progressive control from local meshes to a versioned A2A 1.0 JSON-RPC boundary.
 
 <div className="doc-button-row">
   <a className="doc-button primary" href="getting-started">Get Started</a>
@@ -36,11 +36,13 @@ _Current release: **0.6.5** ([PyPI](https://pypi.org/project/protolink/) | [Chan
 
 ## What is Protolink?
 
-ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where AI agents **communicate directly with each other**.
+ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where autonomous agents **communicate directly through an A2A-based task model**.
 
 Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
-ProtoLink's core types are inspired by the [A2A protocol](https://a2a-protocol.org/latest/specification/), while a dedicated HTTP adapter translates them to the canonical A2A 1.0 JSON-RPC wire contract. The adapter's exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md). ProtoLink's native transports remain a separate runtime protocol.
+ProtoLink is **A2A-first by design**. `AgentCard`, `Task`, `Message`, `Part`, `Artifact`, task lifecycle, and discovery form the shared language used across agents, flows, storage, telemetry, and transports. ProtoLink builds the pluggable execution runtime around that foundation: LLMs, local models, native and MCP tools, transports, registry discovery, state, policy, authentication, logging, and observability.
+
+These Python models are ergonomic runtime forms of A2A's core primitives, not copies of the canonical wire schema. Every HTTP agent automatically exposes a versioned adapter that maps its advertised capabilities to [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC operations and wire shapes. Its exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md).
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
@@ -77,7 +79,7 @@ In Protolink, an Agent is an **autonomous, centralized object** that serves as t
 
 ProtoLink agents can delegate tasks, call tools, run model inference, or use deterministic flows through one runtime contract. This creates a **flexible mesh** where specialized agents collaborate without requiring a central orchestration service.
 
-## ProtoLink runtime and A2A 💡
+## A2A at the core; A2A 1.0 on the wire 💡
 
 ProtoLink provides a higher-level runtime that unifies client, server, transport, tools, and LLMs in one composable `Agent`. Its A2A 1.0 adapter performs wire translation at the HTTP boundary; internal task models and native transports are not presented as the A2A wire format. See [A2A compatibility](a2a.md) for the tested binding and evidence.
 
@@ -105,6 +107,7 @@ ProtoLink provides a higher-level runtime that unifies client, server, transport
 
 ## Key ideas
 
+- **A2A-first runtime model**: cards, tasks, messages, parts, artifacts, task states, and discovery are the shared language of the system.
 - **Unified Agent model**: a single autonomous `AI Agent` instance handles both client and server responsibilities, incorporating LLMs and tools.
 - **Flexible transports**: HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports.
 - **LLM‑ready architecture**: first‑class integration with API, local, and server‑hosted LLMs.

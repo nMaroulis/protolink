@@ -3,9 +3,10 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![ty](https://img.shields.io/badge/typed%20with-ty-4c8bf5.svg)](https://github.com/astral-sh/ty)
+[![ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nmaroulis/protolink)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/protolink?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=YELLOW&left_text=%E2%AC%87%EF%B8%8F)](https://pepy.tech/projects/protolink)
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="ProtoLink logo" width="60%">
@@ -199,6 +200,18 @@ The common path stays small:
 ```python
 agent = Agent(card=card, transport="http")
 ```
+
+The alias selects the communication boundary without changing the agent API:
+
+| If you need... | Start with | Why |
+| --- | --- | --- |
+| Agents in one Python process | `"runtime"` | Lowest transport overhead, streaming, and no ports |
+| A network service or A2A 1.0 endpoint | `"http"` | Broad compatibility plus status, health, optional chat, dashboard, and A2A routes |
+| Live progress for a browser or CLI | `"sse"` | HTTP utilities plus a one-way event stream; no A2A adapter today |
+| A persistent interactive connection | `"websocket"` | Bidirectional streaming with low per-frame overhead after connection setup |
+| Internal gRPC infrastructure | `"grpc"` | Pooled RPCs, streaming, deadlines, standard health, and reflection |
+
+These are qualitative protocol-overhead profiles, not benchmark results; model and tool latency commonly dominate an agent call. See the [transport guide](https://nmaroulis.github.io/protolink/docs/transport/) for the complete performance, utility, and deployment comparison.
 
 When a boundary needs TLS, resource limits, retries, keepalive settings, or other operational controls, construct the transport and pass it to the same API:
 

@@ -9,7 +9,7 @@ Agents are the core building blocks in Protolink.
 
 ## Concepts
 
-An **Agent** in Protolink is a unified component that acts as both **client and server**. Its business logic stays on the native runtime contract; an HTTP server can expose the separate A2A 1.0 adapter when interoperability is required.
+An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**. When the agent uses the HTTP transport, ProtoLink automatically exposes an [A2A 1.0](https://a2a-protocol.org/latest/specification/) adapter that maps its advertised capabilities to the canonical wire shapes, without changing `handle_task(Task)`.
 
 It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
 
@@ -23,6 +23,7 @@ Each component is **pluggable** to the agent and can be replaced with your own i
 
 High‑level ideas:
 
+- **A2A primitives**: cards describe agents, tasks carry work, and messages, parts, and artifacts carry instructions and results.
 - **Unified model**: a single `Agent` instance can send and receive messages.
 - **AgentCard**: a small model describing the agent (name, description, metadata).
 - **Modules**:
@@ -151,7 +152,7 @@ e.g.
 
 # Agent API Reference
 
-This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. The class serves as both client and server; HTTP agents can additionally expose the dedicated A2A 1.0 adapter described in [A2A compatibility](a2a.md).
+This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. It is the core component for creating pluggable, A2A-based agents while combining client, server, execution, and runtime modules in one facade. HTTP agents also expose the dedicated A2A 1.0 adapter described in [A2A compatibility](a2a.md).
 
 :::info[Unified Agent Model]
 

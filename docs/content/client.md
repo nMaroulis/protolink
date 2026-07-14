@@ -245,7 +245,7 @@ assert canceled.state.value == "canceled"
 assert result.state.value == "canceled"
 ```
 
-`cancel_task()` uses the A2A-style `POST /tasks/cancel` operation over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. Cancellation is a control-plane request: WebSocket sends it over a separate connection so it does not queue behind the active task stream.
+`cancel_task()` uses ProtoLink's native `POST /tasks/cancel` operation over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. This is separate from the canonical A2A 1.0 `CancelTask` operation exposed by the HTTP adapter. Cancellation is a control-plane request: WebSocket sends it over a separate connection so it does not queue behind the active task stream.
 
 Cancellation is intentionally best-effort. Async work normally stops at an `await` boundary; synchronous work and external systems may need their own cooperative cancellation or rollback mechanism. See [Runtime cancellation](runtime.md#canceling-running-tasks) for lifecycle, custom-handler, and side-effect guidance.
 

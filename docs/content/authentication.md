@@ -14,6 +14,12 @@ Whether you are communicating over stateless HTTP or establishing persistent Web
 
 The authentication workflow decouples credentials management from both your core cognitive agent code and the low-level network libraries.
 
+:::info[A2A requests]
+
+The same HTTP `Authenticator` protects ProtoLink's native task routes and the A2A JSON-RPC endpoint. The A2A Agent Card remains publicly discoverable and translates the configured card schemes into canonical A2A 1.0 `securitySchemes` and `securityRequirements`. Within the A2A adapter, task lookup and mutation are scoped to the authenticated principal and request tenant.
+
+:::
+
 Below is a sequence diagram representing a typical authenticated request cycle:
 
 ```mermaid

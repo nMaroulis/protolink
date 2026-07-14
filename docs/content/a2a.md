@@ -1,8 +1,16 @@
-# A2A 1.0 Compatibility
+# A2A Core and 1.0 Compatibility
 
-ProtoLink uses A2A concepts throughout its runtime, but protocol compatibility
-is a wire-level property that must be tested independently of the internal
-Python API. The official [A2A Technology Compatibility Kit
+ProtoLink is an **A2A-first runtime**. `AgentCard`, `Task`, `Message`, `Part`,
+`Artifact`, task states, and discovery are first-class concepts throughout its
+Python API, structured flows, agent delegation, storage, and observability.
+ProtoLink then adds the execution substrate A2A leaves open: pluggable LLMs,
+native and MCP tools, transports, registry services, state, policy,
+authentication, logging, and telemetry.
+
+This page addresses the narrower question of canonical **A2A 1.0 wire
+compatibility**. That is a property of the versioned HTTP adapter and must be
+tested independently from the A2A-based runtime architecture. The official
+[A2A Technology Compatibility Kit
 (TCK)](https://github.com/a2aproject/a2a-tck) is the source of evidence.
 
 :::caution[Compatibility status]

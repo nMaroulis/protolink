@@ -7,8 +7,8 @@ const sidebars = {
       collapsed: false,
       items: [
         'index',
-        'concept',
         'a2a',
+        'concept',
         'whitepaper',
         'getting-started',
         'cli',

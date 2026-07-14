@@ -4,8 +4,9 @@ After reading this page you should have a good understanding of the core concept
 
 ## Architecture Overview
 
-Protolink is designed around **explicit separation of concerns**, **protocol agnosticism**, and **low boilerplate** for agent authors.  
-At a high level, Protolink models an agent as a **logical actor** that communicates with other agents via well-defined client/server interfaces, backed by pluggable transports.
+Protolink is an **A2A-first agent runtime** designed around explicit separation of concerns, pluggable transports, and low boilerplate for agent authors. At a high level, it models an agent as an autonomous actor that communicates through well-defined client/server interfaces.
+
+[A2A](https://a2a-protocol.org/latest/specification/) supplies the core agent vocabulary: `AgentCard` for identity and capabilities; `Task` for work and lifecycle; `Message`, `Part`, and `Artifact` for communication and results; and discovery for finding peers. ProtoLink builds its pluggable execution runtime around those concepts without requiring a specific LLM, tool system, transport, storage backend, or deployment shape.
 
 The core idea is simple:  
 
@@ -19,6 +20,7 @@ This separation keeps agent logic **clean, testable, and future-proof**.
 
 Protolink is built from the following **core components**:
 
+- **A2A-based models** - cards, tasks, messages, parts, artifacts, and lifecycle
 - **Agent** - business logic and orchestration  
 - **Client** - outgoing communication  
 - **Server** - incoming communication  
@@ -370,12 +372,11 @@ This design is intentionally:
 - **Composable**: mix and match LLMs, tools, transports, storage
 - **Testable**: clean separation makes testing straightforward
 
-It draws inspiration from:
+A2A supplies the core agent model. The surrounding architecture also draws from:
 
 - Actor models  
 - Ports & adapters (hexagonal architecture)  
 - Distributed systems design  
-- A2A concepts (agent cards, tasks, discovery)
 
 Most importantly:
 
@@ -736,12 +737,13 @@ The registry **never pushes behavior** to agents.
 
 ---
 
-## Native Runtime and A2A Boundary
+## A2A Core and the A2A 1.0 Boundary
 
-ProtoLink's internal runtime and its A2A wire interface are deliberately
-separate. The runtime uses familiar card, task, message, part, artifact, and
-lifecycle concepts, but native transports are not presented as the canonical
-A2A wire format.
+ProtoLink began as an A2A-based alternative to chain-centric frameworks. The
+agent—not a chain around an LLM—is the primary unit, and card, task, message,
+part, artifact, lifecycle, and discovery concepts are the common language
+across the runtime. These are ergonomic Python forms of A2A primitives; native
+ProtoLink transports are not presented as canonical A2A 1.0 wire bindings.
 
 For HTTP agents, a versioned adapter owns that boundary:
 

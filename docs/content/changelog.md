@@ -34,6 +34,47 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.6.6] - Unreleased
+
+:::note Planned release
+
+Version 0.6.6 is not published yet. These notes describe the change currently
+planned for that release.
+
+:::
+
+This release makes ProtoLink's A2A architecture explicit without replacing its
+small Python runtime API. `AgentCard`, `Task`, `Message`, `Part`, and `Artifact`
+remain ProtoLink's ergonomic runtime primitives; agents served over HTTP now
+expose a separate, versioned A2A 1.0 wire adapter. Existing ProtoLink clients,
+native endpoints, transports, and `handle_task(Task)` implementations continue
+to work unchanged.
+
+### Added
+
+- **Inbound A2A 1.0 HTTP adapter**
+  - Agents served through ProtoLink's HTTP transport now expose `GET /.well-known/agent-card.json` and `POST /` while retaining all native endpoints.
+  - The adapter implements `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask`, with standard card, task, message, part, artifact, security, timestamp, version, content-type, and error translation for its advertised scope.
+  - Blocking and non-blocking execution, filtering, pagination, cancellation, and authenticated principal/tenant task isolation reuse the existing `handle_task(Task)` execution path.
+- **A2A verification harness**
+  - Added a provider-free test agent, focused adapter tests, and a manually dispatched workflow pinned to the official A2A TCK commit documented in [A2A Core and 1.0 Compatibility](a2a.md).
+  - The current unmodified JSON-RPC MUST run reports `67 passed, 1 failed, 167 skipped, 30 deselected`. The remaining failure is the documented upstream `CORE-SEND-003` metadata defect, so this release does not claim a complete TCK pass.
+
+### Changed
+
+- Reworked the README around ProtoLink's lightweight, A2A-first, pluggable-agent design, with a provider-free one-agent quickstart, progressive configuration, local and small-model support, structured flows, and the CLI dashboard.
+- Updated the relevant architecture, agent, model, server, transport, registry, flow, authentication, example, and whitepaper documentation to distinguish ProtoLink's A2A-based runtime model from A2A 1.0 wire compatibility at the HTTP adapter boundary.
+- Clarified that native `AgentCard` serialization, registry services, structured flows, non-HTTP transports, and control-plane endpoints remain ProtoLink runtime contracts rather than additional A2A 1.0 operations.
+
+### Compatibility Notes
+
+- This release is additive for existing ProtoLink applications: it does not remove or rename the `Agent`, `Task`, `AgentClient`, transport, or native endpoint APIs.
+- The adapter is currently an inbound HTTP JSON-RPC boundary. ProtoLink's `AgentClient` still uses the native transport contract; streaming, push notifications, and extended Agent Cards are advertised as unsupported.
+- The two A2A routes are mounted automatically for every HTTP `AgentServer`; version 0.6.6 does not yet expose a per-Agent disable switch.
+- The A2A task index is process-local, in-memory, and currently has no TTL or size-based eviction. It contains only tasks submitted through the adapter; long-lived, multi-worker, or restart-durable deployments need bounded retention plus a shared task router or store before presenting multiple workers as one A2A interface.
+- Optional A2A message metadata, extensions, and reference task IDs are validated at the boundary but are not all retained by ProtoLink's smaller runtime models.
+- The standard Agent Card route is intentionally public; the JSON-RPC task endpoint uses the Agent's configured authenticator.
+
 ## [0.6.5] - 2026-07-14
 
 :::note Latest release
@@ -41,10 +82,6 @@ uv add --upgrade protolink
 
 ### Added
 
-- **A2A 1.0 JSON-RPC adapter and verification harness**
-  - HTTP agents now expose the canonical `/.well-known/agent-card.json` discovery endpoint and a versioned JSON-RPC boundary for `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` while preserving ProtoLink's native endpoints.
-  - Added canonical card, task, message, part, artifact, security-scheme, timestamp, and standard error translation, including blocking/non-blocking execution, task filtering and pagination, cancellation, and principal/tenant task isolation.
-  - Added a provider-free fixture, focused adapter tests, a manually dispatched official TCK workflow pinned to an exact commit, and documentation that records the current unmodified TCK result without claiming a pass.
 - **Native gRPC transport**
   - Added `GRPCTransport` and the `"grpc"` factory alias for unary task requests, server-streaming task events, metadata-based credentials, deadlines, and pooled async channels.
   - Added standard `grpc.health.v1.Health` reporting and server reflection, with constructor switches for deployments that disable either service.
@@ -65,8 +102,6 @@ uv add --upgrade protolink
 
 ### Changed
 
-- Reworked the README into a shorter product entry point led by a provider-free three-agent mesh and the "simple by default, explicit when it matters" progressive-control API design.
-- Clarified across the concept, model, registry, flow, and whitepaper documentation that native ProtoLink transports use the runtime contract while the A2A adapter owns canonical wire interoperability.
 - Unified transport construction across `Agent`, `AgentClient`, and `Registry`: string aliases remain the zero-configuration prototyping path, while TLS, limits, retries, keepalive, and protocol-specific settings are configured on a concrete transport object passed to the facade.
 - Agent serialization now restores its primary and Registry transports with independent TLS identities and production configurations.
 - `ClientRequestSpec` now declares operation idempotency explicitly. Retries remain disabled by default and run only when the request specification, method, and typed failure all permit a safe retry.

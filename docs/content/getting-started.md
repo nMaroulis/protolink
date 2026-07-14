@@ -88,6 +88,12 @@ cd protolink
 uv pip install -e ".[dev]"
 ```
 
+:::info[A2A from the first agent]
+
+Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares identity and capabilities, while `Task`, `Message`, `Part`, and `Artifact` carry work and results. Starting it with `transport="http"` also mounts the [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC adapter automatically for the capabilities it advertises. See [A2A Core and 1.0 Compatibility](a2a.md) for the exact scope.
+
+:::
+
 ## First Agent
 
 Below is a compact example that wires together an agent, HTTP transport, an OpenAI-compatible LLM wrapper, and both native and MCP tools:
@@ -134,7 +140,7 @@ agent.start()
 This example demonstrates the core pieces of Protolink:
 
 - **AgentCard** to describe the agent.
-- **Transport** (here `HTTPTransport`) to handle A2A (agent-to-agent) communication.
+- **Transport** (here the `"http"` shortcut) for native agent communication; an HTTP agent also mounts the A2A 1.0 adapter.
 - **LLM** backend (`OpenAILLM`).
 - **Native tools** (Python functions decorated with `@agent.tool`).
 - **MCP tools** registered via `MCPToolAdapter`.
