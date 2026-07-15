@@ -740,7 +740,7 @@ The registry **never pushes behavior** to agents.
 ## A2A Core and the A2A 1.0 Boundary
 
 ProtoLink began as an A2A-based alternative to chain-centric frameworks. The
-agent—not a chain around an LLM—is the primary unit, and card, task, message,
+agent, not a chain around an LLM, is the primary unit, and card, task, message,
 part, artifact, lifecycle, and discovery concepts are the common language
 across the runtime. These are ergonomic Python forms of A2A primitives; native
 ProtoLink transports are not presented as canonical A2A 1.0 wire bindings.

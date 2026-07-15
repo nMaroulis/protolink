@@ -247,7 +247,7 @@ async def main():
         #   4. Call Coder.write_file("utils.py", new_content) to apply
         #   5. Return a summary to the user
         # All of this happens AUTONOMOUSLY through Protolink's inference
-        # loop — we just send one task and get the final result back.
+        # loop - we just send one task and get the final result back.
         print("⏳ Orchestrator is working...")
         print("   (watch the agent logs below to see the delegation chain)")
         print()

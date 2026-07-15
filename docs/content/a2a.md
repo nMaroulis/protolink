@@ -32,7 +32,7 @@ peer discovers a canonical Agent Card and exchanges canonical messages, tasks,
 parts, artifacts, and states through the implemented JSON-RPC operations.
 ProtoLink translates that surface to the same executor used by its native API.
 Compatibility therefore comes from explicit two-way translation and TCK
-verification—not from claiming that the A2A 0.3-based runtime objects are
+verification, not from claiming that the A2A 0.3-based runtime objects are
 identical to the A2A 1.0 wire schema.
 
 This design lets an A2A 1.0 peer communicate with a ProtoLink agent without

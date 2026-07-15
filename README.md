@@ -28,12 +28,12 @@ The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hoste
 
 ## Why ProtoLink?
 
-- **Pluggable by design** — compose an agent from independent modules instead of adopting a mandatory stack.
-- **A small, stable API** — string aliases cover the common path; concrete implementations expose full control when needed.
-- **Local first, distributed when needed** — develop with no network or provider, then move the same task contract to HTTP, SSE JSON-RPC, WebSocket, or gRPC.
-- **Friendly to smaller models** — one-action-at-a-time inference, schema validation, JSON fallback, and deterministic flows reduce reliance on hidden prompt behavior.
-- **Explicit and inspectable** — tool calls, delegation, task state, policy decisions, approvals, runtime events, traces, and reports have typed representations.
-- **A2A at the core** — agents communicate through cards, tasks, messages, parts, and artifacts rather than framework-private graph state.
+- **Pluggable by design** - compose an agent from independent modules instead of adopting a mandatory stack.
+- **A small, stable API** - string aliases cover the common path; concrete implementations expose full control when needed.
+- **Local first, distributed when needed** - develop with no network or provider, then move the same task contract to HTTP, SSE JSON-RPC, WebSocket, or gRPC.
+- **Friendly to smaller models** - one-action-at-a-time inference, schema validation, JSON fallback, and deterministic flows reduce reliance on hidden prompt behavior.
+- **Explicit and inspectable** - tool calls, delegation, task state, policy decisions, approvals, runtime events, traces, and reports have typed representations.
+- **A2A at the core** - agents communicate through cards, tasks, messages, parts, and artifacts rather than framework-private graph state.
 
 Focus on the agent's role and capabilities. ProtoLink handles the infer loop, validated tool execution, delegation, communication, lifecycle, and the operational modules around them.
 

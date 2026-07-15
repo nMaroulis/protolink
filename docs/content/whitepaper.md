@@ -222,8 +222,8 @@ implementation. That is what makes conveniences such as `Task.create_infer()`,
 `@agent.tool`, and `transport="http"` small without limiting what can be plugged
 into the agent.
 
-ProtoLink extended the A2A 0.3 foundation with execution concerns—including
-inference and tool actions, flow state, runtime context, policy, and events—that
+ProtoLink extended the A2A 0.3 foundation with execution concerns, including
+inference and tool actions, flow state, runtime context, policy, and events, that
 the communication protocol does not prescribe. Keeping those concerns in the
 runtime lets ProtoLink evolve agent execution without presenting
 framework-specific behavior as standard A2A semantics.
