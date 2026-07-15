@@ -34,21 +34,17 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.6.6] - Unreleased
+## [0.6.6] - 2026-07-16
 
-:::note Planned release
+:::note Latest release
 
-Version 0.6.6 is not published yet. These notes describe the change currently
-planned for that release.
+This release makes ProtoLink's A2A architecture explicit without replacing its small Python runtime API.
+`AgentCard`, `Task`, `Message`, `Part`, and `Artifact` remain ProtoLink's ergonomic runtime primitives.
+An HTTP agent can now opt into a separate, versioned A2A 1.0 inbound and outbound translation boundary with 
+`Agent(..., a2a=True)`. The default `False` preserves existing ProtoLink clients, native endpoints, transports
+and `handle_task(Task)` implementations.
 
 :::
-
-This release makes ProtoLink's A2A architecture explicit without replacing its
-small Python runtime API. `AgentCard`, `Task`, `Message`, `Part`, and `Artifact`
-remain ProtoLink's ergonomic runtime primitives. An HTTP agent can now opt into
-a separate, versioned A2A 1.0 inbound and outbound translation boundary with
-`Agent(..., a2a=True)`. The default `False` preserves existing ProtoLink clients,
-native endpoints, transports, and `handle_task(Task)` implementations.
 
 ### Added
 
@@ -96,9 +92,6 @@ native endpoints, transports, and `handle_task(Task)` implementations.
 - Extended authenticated A2A Agent Cards.
 
 ## [0.6.5] - 2026-07-14
-
-:::note Latest release
-:::
 
 ### Added
 
