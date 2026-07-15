@@ -7,16 +7,49 @@ ProtoLink then adds the execution substrate A2A leaves open: pluggable LLMs,
 native and MCP tools, transports, registry services, state, policy,
 authentication, logging, and telemetry.
 
+## From native A2A 0.3 primitives to A2A 1.0
+
+ProtoLink was originally built natively on the [A2A 0.3
+specification](https://a2a-protocol.org/v0.3.0/specification/): `AgentCard`,
+`Task`, `Message`, `Part`, `Artifact`, task states, and discovery became its
+public Python objects and its internal runtime language. Here, **0.3 is the A2A
+protocol version**, not the ProtoLink package version, and **native** means that
+these primitives underpin the runtime itself rather than existing only in an
+integration adapter.
+
+That foundation gives local and remote agents one small, typed language for
+identity, work, results, and lifecycle. Because it is independent of any model
+provider or transport, the same simple `Agent` and `Task` API can support local
+inference, native and MCP tools, deterministic flows, persistence, and remote
+delegation. ProtoLink extended the A2A 0.3 model with execution semantics such
+as inference instructions, tool actions, flow state, runtime context, and
+events; those are ProtoLink runtime features, not additional A2A operations.
+
+As A2A evolved to 1.0, its canonical cards, operations, and wire shapes evolved
+too. ProtoLink keeps its established native runtime model and places A2A 1.0
+interoperability at an explicit, versioned boundary. With `a2a=True`, a standard
+peer discovers a canonical Agent Card and exchanges canonical messages, tasks,
+parts, artifacts, and states through the implemented JSON-RPC operations.
+ProtoLink translates that surface to the same executor used by its native API.
+Compatibility therefore comes from explicit two-way translation and TCK
+verification—not from claiming that the A2A 0.3-based runtime objects are
+identical to the A2A 1.0 wire schema.
+
+This design lets an A2A 1.0 peer communicate with a ProtoLink agent without
+forcing application code, tools, LLMs, or flows to adopt a second API.
+
 This page addresses the narrower question of canonical **A2A 1.0 wire
-compatibility**. That is a property of the versioned HTTP adapter and must be
-tested independently from the A2A-based runtime architecture. The official
+compatibility** for the implemented JSON-RPC surface. That is a property of the
+versioned HTTP adapter and must be tested independently from the A2A-based
+runtime architecture. The official
 [A2A Technology Compatibility Kit
 (TCK)](https://github.com/a2aproject/a2a-tck) is the source of evidence.
 
 ## Enable the A2A 1.0 boundary
 
-A2A-derived runtime primitives are always part of ProtoLink. Canonical A2A 1.0
-wire compatibility is an explicit HTTP capability:
+ProtoLink's native A2A 0.3-based runtime primitives are always present.
+Translation for the implemented A2A 1.0 JSON-RPC surface is an explicit HTTP
+capability:
 
 ```python
 from protolink import Agent, AgentCard

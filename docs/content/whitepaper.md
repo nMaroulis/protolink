@@ -14,14 +14,14 @@ The core idea is deliberately simple:
 > Agents are entities, not functions. A ProtoLink system is built by composing
 > autonomous agents that communicate through A2A-derived tasks.
 
-ProtoLink is built around A2A's agent model. Agent cards, tasks, messages,
-parts, artifacts, task states, and discovery are the vocabulary of the
-runtime—not a bolt-on integration. ProtoLink adds the substrate needed to make
-those primitives useful in real systems: LLM execution, tools and MCP,
-delegation, transports, registry discovery, structured flows, state, policy,
-telemetry, and replay. The A2A 1.0 adapter maps these ergonomic runtime models
-to the canonical wire shapes for the capabilities it advertises, and its
-verification remains independent from the native runtime.
+ProtoLink was originally built natively on the A2A 0.3 agent model: agent cards,
+tasks, messages, parts, artifacts, task states, and discovery became the
+vocabulary of the runtime, not a bolt-on integration. ProtoLink adds the
+substrate needed to make those primitives useful in real systems: LLM
+execution, tools and MCP, delegation, transports, registry discovery,
+structured flows, state, policy, telemetry, and replay. The A2A 1.0 adapter maps
+this extended native runtime model to canonical wire shapes for the capabilities
+it advertises, and its verification remains independent from the native runtime.
 
 The result is a framework for treating agent systems as distributed programs,
 not as opaque prompt graphs.
@@ -207,6 +207,40 @@ work without assuming that every participant shares the same framework
 internals. ProtoLink's native serialization stays ergonomic and
 transport-independent, while canonical A2A 1.0 serialization belongs to the
 versioned HTTP adapter.
+
+The starting point was the [A2A 0.3
+specification](https://a2a-protocol.org/v0.3.0/specification/), not a ProtoLink
+release numbered 0.3. ProtoLink implemented its agent, task, message, part,
+artifact, state, and discovery concepts as native Python runtime objects. A2A
+was therefore present below the public API from the beginning rather than added
+later as a network connector.
+
+That native model is deliberately small. One task contract can move through an
+in-process agent, a network transport, a deterministic flow, storage, telemetry,
+or replay without making the application depend on an LLM provider or transport
+implementation. That is what makes conveniences such as `Task.create_infer()`,
+`@agent.tool`, and `transport="http"` small without limiting what can be plugged
+into the agent.
+
+ProtoLink extended the A2A 0.3 foundation with execution concerns—including
+inference and tool actions, flow state, runtime context, policy, and events—that
+the communication protocol does not prescribe. Keeping those concerns in the
+runtime lets ProtoLink evolve agent execution without presenting
+framework-specific behavior as standard A2A semantics.
+
+When A2A evolved to [A2A
+1.0](https://a2a-protocol.org/latest/specification/), its canonical cards,
+operations, and wire shapes also evolved. ProtoLink kept its established native
+runtime model and added explicit two-way translation at the HTTP boundary. A
+standard peer sees canonical Agent Cards, JSON-RPC operations, tasks, messages,
+parts, artifacts, and states for the surface ProtoLink advertises. The ProtoLink
+executor sees its normal `Task` and runs the same LLM, tool, MCP, flow, storage,
+policy, and telemetry machinery as a native call.
+
+Compatibility therefore comes from a versioned and independently tested
+translation boundary, not from claiming that the A2A 0.3-based runtime models
+are identical to A2A 1.0. This preserves the simple public API while allowing
+the wire contract to be audited and tested with the A2A TCK.
 
 ProtoLink uses that vocabulary in its runtime for:
 
