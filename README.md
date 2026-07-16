@@ -12,9 +12,9 @@
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="ProtoLink logo" width="60%">
 </div>
 
-ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python runtime for building **pluggable agents** and multi-agent systems. It began as an A2A-based alternative to chain-centric frameworks such as LangChain: instead of organizing an application around chains of model calls, ProtoLink treats each `Agent` as a self-contained runtime entity with identity, capabilities, lifecycle, tools, optional reasoning, and direct task-based communication.
+ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python framework for building **pluggable agents** and multi-agent systems. It began as an A2A-based alternative to chain-centric frameworks such as LangChain: instead of organizing an application around chains of model calls, ProtoLink treats each `Agent` as a self-contained runtime entity with identity, capabilities, lifecycle, tools, optional reasoning, and direct task-based communication.
 
-A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, flows, and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
+A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, structured agent flows and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
 
 The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, built-in, native, or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
@@ -140,7 +140,7 @@ Install the integrations used here with `uv add "protolink[http,mcp]"`; the Olla
 
 ## LLM-agnostic, with a strong local focus
 
-For LLM-backed agents, the infer loop is the heart of ProtoLink:
+For LLM-backed agents, the **infer loop** is the heart of ProtoLink:
 
 1. The model proposes one next action.
 2. ProtoLink parses and validates it.
@@ -149,6 +149,8 @@ For LLM-backed agents, the infer loop is the heart of ProtoLink:
 5. The loop repeats until completion or a configured bound is reached.
 
 Providers with reliable native tool calling use it. Local and smaller models can use the JSON fallback, which exposes the same `tool_call`, `agent_call`, and `final` action contract without depending on a provider-specific SDK feature.
+
+`agent_call` has two delegation modes: `tool_call` asks another agent to execute one of its tools, while `infer` asks that agent's LLM to handle a prompt and initiates the other agent's **infer loop**.
 
 ```python
 from protolink import Agent, AgentCard, create_llm
