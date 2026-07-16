@@ -1,8 +1,10 @@
 """Run ProtoLink's built-in web search through the normal Agent tool path.
 
-DuckDuckGo is the example's default because it needs no API key. Brave remains
-the built-in tool's default engine and can be selected here after exporting
-``BRAVE_SEARCH_API_KEY``.
+English Wikipedia is the example's default because its documented search API
+needs no API key and is suitable for unattended clients. Brave remains the
+built-in tool's default engine and can be selected here after exporting
+``BRAVE_SEARCH_API_KEY``. DuckDuckGo is also available as a best-effort option,
+but its human-facing HTML search may present a verification challenge.
 
 Run a keyless search:
 
@@ -12,6 +14,10 @@ Run the same search with Brave:
 
     export BRAVE_SEARCH_API_KEY="your-key"
     python examples/builtin_web_search.py "Python structured concurrency" --engine brave
+
+Try DuckDuckGo's best-effort HTML search:
+
+    python examples/builtin_web_search.py "Python structured concurrency" --engine duckduckgo
 
 Running the script without a query prints help and performs no network request.
 """
@@ -30,7 +36,7 @@ from protolink.tools import web_search
 def build_parser() -> argparse.ArgumentParser:
     """Create the small command-line interface for the example."""
     parser = argparse.ArgumentParser(
-        description="Search the public web with ProtoLink's built-in Brave or DuckDuckGo engine.",
+        description="Search with ProtoLink's built-in Brave, DuckDuckGo, or Wikipedia engine.",
     )
     parser.add_argument(
         "query",
@@ -39,15 +45,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--engine",
-        choices=("brave", "duckduckgo"),
-        default="duckduckgo",
-        help="Search engine to call (default: duckduckgo, which needs no API key).",
+        choices=("brave", "duckduckgo", "wikipedia"),
+        default="wikipedia",
+        help="Search engine to call (default: wikipedia, which needs no API key).",
     )
     parser.add_argument(
         "--freshness",
         choices=("any", "day", "week", "month", "year"),
         default="any",
-        help="Optional result-age filter (default: any).",
+        help="Optional result-age filter; Wikipedia supports only 'any' (default: any).",
     )
     parser.add_argument(
         "--max-results",

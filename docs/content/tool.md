@@ -175,10 +175,11 @@ Agent dict/YAML serialization preserves each built-in's stable identity and the 
 
 ### Web Search
 
-`web_search()` has one normalized result contract across two explicit engines:
+`web_search()` has one normalized result contract across three explicit engines:
 
 - `engine="brave"` is the default. It uses the [Brave Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get) and reads `BRAVE_SEARCH_API_KEY` from the environment only when invoked. The key is not captured by the Tool, stored in Agent configuration, or required merely to import or register the factory.
 - `engine="duckduckgo"` needs no API key or additional dependency. It reads DuckDuckGo's published [non-JavaScript HTML search](https://duckduckgo.com/duckduckgo-help-pages/features/non-javascript) as a best-effort interface.
+- `engine="wikipedia"` needs no API key or additional dependency. It uses English Wikipedia's documented [REST page-search API](https://www.mediawiki.org/wiki/API:REST_API/Reference#Search_pages), which is the reliable keyless choice for encyclopedia and factual discovery. It supports `freshness="any"` only.
 
 Engine selection is per call and there is no silent fallback. A missing Brave key therefore remains a clear configuration error instead of unexpectedly sending the query to another provider.
 
@@ -195,21 +196,30 @@ result = await agent.call_tool(
 
 keyless_result = await agent.call_tool(
     "web_search",
+    query="What is the capital of Greece?",
+    engine="wikipedia",
+)
+
+best_effort_result = await agent.call_tool(
+    "web_search",
     query="Python structured concurrency",
     engine="duckduckgo",
     freshness="month",
 )
 ```
 
-For a complete Agent-path CLI, see [`examples/builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py). It registers the built-in with an explicit `network.read` policy, supports both engines and every freshness option, and prints the normalized JSON result:
+For a complete Agent-path CLI, see [`examples/builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py). It registers the built-in with an explicit `network.read` policy, supports all three engines, and prints the normalized JSON result:
 
 ```bash
-# Keyless, best-effort DuckDuckGo search
-python examples/builtin_web_search.py "Python structured concurrency"
+# Keyless search through Wikipedia's documented API (example default)
+python examples/builtin_web_search.py "What is the capital of Greece?"
 
 # Documented Brave API
 export BRAVE_SEARCH_API_KEY="your-key"
 python examples/builtin_web_search.py "Python structured concurrency" --engine brave
+
+# Keyless, best-effort DuckDuckGo HTML search
+python examples/builtin_web_search.py "Python structured concurrency" --engine duckduckgo
 ```
 
 Running the example without a query only prints its CLI help, so it is safe to inspect without credentials or a network request.
@@ -218,12 +228,12 @@ Running the example without a query only prints its CLI help, so it is safe to i
 |----------|------|---------|----------|
 | `query` | `str` | Required | 1-400 characters and at most 50 words |
 | `max_results` | `int` | `5` | 1-10 normalized results |
-| `freshness` | `"any" ⎪ "day" ⎪ "week" ⎪ "month" ⎪ "year"` | `"any"` | Optional age filter sent to the selected engine |
-| `engine` | `"brave" ⎪ "duckduckgo"` | `"brave"` | Explicit provider selection; DuckDuckGo is keyless |
+| `freshness` | `"any" ⎪ "day" ⎪ "week" ⎪ "month" ⎪ "year"` | `"any"` | Optional age filter; Wikipedia accepts `"any"` only |
+| `engine` | `"brave" ⎪ "duckduckgo" ⎪ "wikipedia"` | `"brave"` | Explicit provider selection; DuckDuckGo and Wikipedia are keyless |
 
-The tool normalizes both engines into provider-neutral JSON-compatible data and bounds the result count and text placed into model context. Every result includes `sponsored`; Brave web results use `False`, while recognized DuckDuckGo advertisements stay in provider order with `sponsored=True`. Both engines use fixed HTTPS endpoints with DNS validation, a 2,000,000-byte response limit, a 10-second transport deadline, and no redirects. DuckDuckGo organic redirect links are decoded locally and validated; sponsored click URLs remain intact. Results also include the selected `provider`, `more_results_available`, and the explicit marker `untrusted_content=True`.
+The tool normalizes all three engines into provider-neutral JSON-compatible data and bounds the result count and text placed into model context. Every result includes `sponsored`; Brave and Wikipedia results use `False`, while recognized DuckDuckGo advertisements stay in provider order with `sponsored=True`. Every engine uses a fixed HTTPS endpoint with DNS validation, a 2,000,000-byte response limit, a 10-second transport deadline, and no redirects. Wikipedia excerpts are converted from bounded provider markup to plain text. DuckDuckGo organic redirect links are decoded locally and validated; sponsored click URLs remain intact. Results also include the selected `provider`, `more_results_available`, and the explicit marker `untrusted_content=True`.
 
-DuckDuckGo's HTML page is a human-facing interface rather than a versioned developer API. It can change markup, rate-limit automated requests, or return a human-verification challenge. ProtoLink does not spoof a browser, suppress or discard recognized advertising, retry a challenge, or attempt to bypass one; it raises a clear error. Applications distributing a DuckDuckGo-backed integration should review DuckDuckGo's [URL-parameter and partnership guidance](https://duckduckgo.com/duckduckgo-help-pages/settings/params). Use Brave when a documented, production-oriented provider contract is required. With either engine, search queries leave the process, and titles, URLs, snippets, and page content are untrusted external data. Do not treat search output as instructions, executable content, or proof that a claim is correct.
+DuckDuckGo's HTML page is a human-facing interface rather than a versioned developer API. It can change markup, rate-limit automated requests, or return a human-verification challenge. ProtoLink does not spoof a browser, suppress or discard recognized advertising, retry a challenge, or attempt to bypass one; it raises a clear error that points to Wikipedia as the keyless alternative. Applications distributing a DuckDuckGo-backed integration should review DuckDuckGo's [URL-parameter and partnership guidance](https://duckduckgo.com/duckduckgo-help-pages/settings/params). Use Wikipedia for reliable keyless encyclopedia search or Brave when a documented, general-web provider contract is required. With every engine, search queries leave the process, and titles, URLs, snippets, and page content are untrusted external data. Do not treat search output as instructions, executable content, or proof that a claim is correct.
 
 ### URL Fetch
 

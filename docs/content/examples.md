@@ -82,13 +82,15 @@ The repository includes several **standalone example scripts** that demonstrate 
 
 ### Built-in web search
 
-- [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) registers `web_search()` on a runtime Agent with an explicit `network.read` policy. It defaults to the keyless, best-effort DuckDuckGo engine and accepts `--engine`, `--freshness`, and `--max-results` options. Select Brave after exporting `BRAVE_SEARCH_API_KEY`.
+- [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) registers `web_search()` on a runtime Agent with an explicit `network.read` policy. It defaults to English Wikipedia's documented keyless search API and accepts `--engine`, `--freshness`, and `--max-results` options. DuckDuckGo remains an explicit best-effort HTML option; select Brave after exporting `BRAVE_SEARCH_API_KEY`.
 
 ```bash
-python examples/builtin_web_search.py "Python structured concurrency"
+python examples/builtin_web_search.py "What is the capital of Greece?"
 
 export BRAVE_SEARCH_API_KEY="your-key"
 python examples/builtin_web_search.py "Python structured concurrency" --engine brave
+
+python examples/builtin_web_search.py "Python structured concurrency" --engine duckduckgo
 ```
 
 Run it without a query to inspect the CLI without making a network request.

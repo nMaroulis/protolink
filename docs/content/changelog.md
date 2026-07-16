@@ -51,8 +51,8 @@ and `handle_task(Task)` implementations.
 
 - **Opt-in dependency-free built-in tools**
   - Added `web_search()`, `fetch_url()`, `calculator()`, and `current_datetime()` factories, exported from `protolink.tools` and registered explicitly with `agent.add_tool(factory())`.
-  - `web_search` selects `engine="brave"` by default or the keyless, best-effort `engine="duckduckgo"` per call, with the same bounded normalized result contract and no silent provider fallback. Brave reads `BRAVE_SEARCH_API_KEY` only at invocation; DuckDuckGo challenge and markup-drift responses fail explicitly, while recognized sponsored entries are retained and labeled.
-  - Added `examples/builtin_web_search.py`, an offline-safe CLI walkthrough that registers the tool through an Agent policy and runs either engine with freshness and result-count controls.
+  - `web_search` selects `engine="brave"` by default, documented keyless English Wikipedia search with `engine="wikipedia"`, or keyless best-effort DuckDuckGo HTML search with `engine="duckduckgo"`. All three use the same bounded normalized result contract with no silent provider fallback. Brave reads `BRAVE_SEARCH_API_KEY` only at invocation; DuckDuckGo challenge and markup-drift responses fail explicitly, while recognized sponsored entries are retained and labeled.
+  - Added `examples/builtin_web_search.py`, an offline-safe CLI walkthrough that registers the tool through an Agent policy, defaults to the reliable keyless Wikipedia engine, and exposes engine, freshness, and result-count controls.
   - The web tools declare `network.read`; URL fetch rejects non-public targets and bounds redirects, response types, and content size. Search and fetched content remain untrusted external data, and applications can restrict the allow-by-default policy with `CapabilityPolicy`.
   - Agent dict/YAML round-trips preserve built-in tool identities and first-party `CapabilityPolicy` rules without serializing executable custom policies, approval callbacks, or the Brave API key.
 - **Opt-in A2A 1.0 HTTP interoperability**

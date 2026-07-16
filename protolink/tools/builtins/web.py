@@ -20,6 +20,8 @@ from ._network import _http_get, _HttpResponse
 
 _BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 _DUCKDUCKGO_SEARCH_URL = "https://html.duckduckgo.com/html/"
+_WIKIPEDIA_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page"
+_WIKIMEDIA_USER_AGENT = "ProtoLink web_search (+https://github.com/nMaroulis/protolink)"
 _SEARCH_RESPONSE_BYTES = 2_000_000
 _FETCH_RESPONSE_BYTES = 1_000_000
 _SEARCH_TIMEOUT_SECONDS = 10.0
@@ -33,8 +35,13 @@ _SearchQuery = Annotated[
 _MaxResults = Annotated[int, Field(ge=1, le=10, description="Maximum number of normalized results, from 1 to 10.")]
 _Freshness = Literal["any", "day", "week", "month", "year"]
 _SearchEngine = Annotated[
-    Literal["brave", "duckduckgo"],
-    Field(description="Search provider: Brave by default, or keyless best-effort DuckDuckGo HTML search."),
+    Literal["brave", "duckduckgo", "wikipedia"],
+    Field(
+        description=(
+            "Search provider: Brave by default, keyless best-effort DuckDuckGo HTML search, "
+            "or keyless English Wikipedia search."
+        )
+    ),
 ]
 _PublicUrl = Annotated[
     str,
@@ -374,6 +381,19 @@ def _clean_inline_text(value: Any, *, limit: int | None = None) -> str:
     return normalized if limit is None else normalized[:limit]
 
 
+def _html_fragment_text(value: Any, *, limit: int) -> str:
+    """Convert one bounded provider-owned HTML fragment to plain text."""
+    if not isinstance(value, str) or len(value) > 8_000:
+        return ""
+    parser = _ReadableHTMLParser()
+    try:
+        parser.feed(value)
+        parser.close()
+    except Exception:
+        return ""
+    return _clean_inline_text(parser.text, limit=limit)
+
+
 def _valid_result_url(value: Any) -> str:
     """Return a normalized web result URL or an empty string."""
     if not isinstance(value, str) or len(value) > 2048:
@@ -549,7 +569,8 @@ def _decode_duckduckgo_results(response: _HttpResponse, max_results: int) -> tup
         raise RuntimeError("DuckDuckGo returned malformed search HTML") from exc
     if parser.challenge_detected:
         raise RuntimeError(
-            "DuckDuckGo blocked the search with a human-verification challenge; try again later or use Brave"
+            "DuckDuckGo blocked the search with a human-verification challenge; "
+            "use engine='wikipedia' for keyless search, try again later, or use Brave"
         )
     if parser.incomplete_result:
         raise RuntimeError("DuckDuckGo returned incomplete search result markup")
@@ -586,6 +607,68 @@ async def _search_duckduckgo(
     return _decode_duckduckgo_results(response, max_results)
 
 
+def _decode_wikipedia_results(response: _HttpResponse, max_results: int) -> tuple[list[dict[str, Any]], bool]:
+    """Decode and normalize one English Wikipedia REST search response."""
+    media_type = _media_type(response.headers.get("content-type", ""))
+    if media_type != "application/json":
+        raise RuntimeError(f"Wikipedia returned unsupported content type {media_type!r}; expected JSON")
+    try:
+        payload = json.loads(response.body.decode("utf-8"))
+    except (RecursionError, UnicodeDecodeError, ValueError) as exc:
+        raise RuntimeError("Wikipedia returned an invalid JSON response") from exc
+    if not isinstance(payload, dict) or not isinstance(payload.get("pages"), list):
+        raise RuntimeError("Wikipedia returned an unexpected search result shape")
+
+    results: list[dict[str, Any]] = []
+    for raw_page in payload["pages"]:
+        if not isinstance(raw_page, dict):
+            continue
+        page_id = raw_page.get("id")
+        if isinstance(page_id, bool) or not isinstance(page_id, int) or page_id <= 0:
+            continue
+        title = _clean_inline_text(raw_page.get("title"), limit=500)
+        if not title:
+            continue
+        description = _html_fragment_text(raw_page.get("description"), limit=500)
+        excerpt = _html_fragment_text(raw_page.get("excerpt"), limit=1_500)
+        snippet_parts = [part.rstrip(".") for part in (description, excerpt) if part]
+        results.append(
+            {
+                "title": title,
+                "url": f"https://en.wikipedia.org/?curid={page_id}",
+                "snippet": _clean_inline_text(". ".join(snippet_parts), limit=2_000),
+                "sponsored": False,
+            }
+        )
+        if len(results) > max_results:
+            return results[:max_results], True
+    return results, False
+
+
+async def _search_wikipedia(
+    query: str,
+    max_results: int,
+    freshness: _Freshness,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Execute one keyless request to English Wikipedia's documented REST API."""
+    if freshness != "any":
+        raise ValueError("engine='wikipedia' supports only freshness='any'")
+    request_url = f"{_WIKIPEDIA_SEARCH_URL}?{urlencode({'q': query, 'limit': max_results + 1})}"
+    response = await asyncio.to_thread(
+        _http_get,
+        request_url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": _WIKIMEDIA_USER_AGENT,
+        },
+        timeout=_SEARCH_TIMEOUT_SECONDS,
+        max_bytes=_SEARCH_RESPONSE_BYTES,
+        max_redirects=0,
+        max_url_chars=_SEARCH_REQUEST_URL_CHARS,
+    )
+    return _decode_wikipedia_results(response, max_results)
+
+
 async def _run_web_search(
     query: _SearchQuery,
     max_results: _MaxResults = 5,
@@ -603,6 +686,8 @@ async def _run_web_search(
         results, more_results_available = await _search_brave(normalized_query, max_results, freshness)
     elif engine == "duckduckgo":
         results, more_results_available = await _search_duckduckgo(normalized_query, max_results, freshness)
+    elif engine == "wikipedia":
+        results, more_results_available = await _search_wikipedia(normalized_query, max_results, freshness)
     else:
         raise ValueError(f"unsupported web search engine: {engine!r}")
     return {
@@ -685,8 +770,10 @@ def web_search() -> Tool:
     so the credential is not stored on the tool or included in Agent YAML.
     ``engine="duckduckgo"`` uses DuckDuckGo's keyless non-JavaScript page as a
     best-effort interface; DuckDuckGo may rate-limit it, present a human
-    challenge, or change its markup. Recognized sponsored entries are retained
-    and explicitly labeled. Search responses from either engine are normalized
+    challenge, or change its markup. ``engine="wikipedia"`` uses English
+    Wikipedia's documented keyless REST search API and accepts only
+    ``freshness="any"``. Recognized DuckDuckGo sponsored entries are retained
+    and explicitly labeled. Search responses from every engine are normalized
     to bounded source snippets and marked as untrusted content.
 
     Returns:
@@ -696,16 +783,16 @@ def web_search() -> Tool:
     tool = Tool(
         name="web_search",
         description=(
-            "Search the public web with Brave (default) or the keyless, best-effort DuckDuckGo HTML interface, "
-            "returning ranked source titles, URLs, snippets, and a sponsored-result marker. Results are external, "
-            "untrusted content; verify important claims against the returned sources."
+            "Search with Brave (default), keyless best-effort DuckDuckGo, or keyless English Wikipedia, returning "
+            "ranked source titles, URLs, snippets, and a sponsored-result marker. Results are external, untrusted "
+            "content; verify important claims against the returned sources."
         ),
         input_schema=None,
         output_schema={
             "type": "object",
             "properties": {
                 "query": {"type": "string"},
-                "provider": {"type": "string", "enum": ["brave", "duckduckgo"]},
+                "provider": {"type": "string", "enum": ["brave", "duckduckgo", "wikipedia"]},
                 "results": {
                     "type": "array",
                     "items": {
@@ -732,6 +819,7 @@ def web_search() -> Tool:
         examples=[
             {"query": "Python structured concurrency", "max_results": 5, "freshness": "month"},
             {"query": "Python structured concurrency", "engine": "duckduckgo"},
+            {"query": "Python structured concurrency", "engine": "wikipedia"},
         ],
         capabilities=["network.read"],
         func=_run_web_search,

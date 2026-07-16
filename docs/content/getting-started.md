@@ -151,7 +151,7 @@ This example demonstrates the core pieces of Protolink:
 - **Native tools** (Python functions decorated with `@agent.tool`).
 - **MCP tools** registered via `MCPToolAdapter`.
 
-The built-ins require no additional package extra. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked; pass `engine="duckduckgo"` in a tool call for the keyless, best-effort DuckDuckGo HTML engine. It declares `network.read`, and registering it does not perform a network request. Built-ins are opt-in, and the default capability policy is allow-by-default, so configure a restrictive `CapabilityPolicy` when network access should be denied or approval-gated. See [Tools](tool.md#built-in-tools) for the complete API and safety behavior.
+The built-ins require no additional package extra. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. It declares `network.read`, and registering it does not perform a network request. Built-ins are opt-in, and the default capability policy is allow-by-default, so configure a restrictive `CapabilityPolicy` when network access should be denied or approval-gated. See [Tools](tool.md#built-in-tools) for the complete API and safety behavior.
 
 
 ### Using the CLI

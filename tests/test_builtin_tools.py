@@ -215,15 +215,18 @@ def test_web_search_schema_exposes_deterministic_engine_selection() -> None:
 
     assert tool.input_schema is not None
     assert tool.input_schema["properties"]["engine"] == {
-        "description": "Search provider: Brave by default, or keyless best-effort DuckDuckGo HTML search.",
-        "enum": ["brave", "duckduckgo"],
+        "description": (
+            "Search provider: Brave by default, keyless best-effort DuckDuckGo HTML search, "
+            "or keyless English Wikipedia search."
+        ),
+        "enum": ["brave", "duckduckgo", "wikipedia"],
         "type": "string",
         "default": "brave",
     }
-    assert tool.output_schema["properties"]["provider"]["enum"] == ["brave", "duckduckgo"]
+    assert tool.output_schema["properties"]["provider"]["enum"] == ["brave", "duckduckgo", "wikipedia"]
     result_schema = tool.output_schema["properties"]["results"]["items"]
     assert "sponsored" in result_schema["required"]
-    assert tool.examples[-1]["engine"] == "duckduckgo"
+    assert tool.examples[-1]["engine"] == "wikipedia"
 
 
 @pytest.mark.asyncio
@@ -476,8 +479,137 @@ async def test_duckduckgo_search_surfaces_human_verification_challenges(
 
     monkeypatch.setattr(web_module, "_http_get", fake_http_get)
 
-    with pytest.raises(RuntimeError, match="human-verification"):
+    with pytest.raises(RuntimeError, match="engine='wikipedia'"):
         await web_search()(query="agent runtimes", engine="duckduckgo")
+
+
+@pytest.mark.asyncio
+async def test_wikipedia_search_is_keyless_and_normalizes_documented_rest_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+    payload = {
+        "pages": [
+            {
+                "id": 12108,
+                "key": "Greece",
+                "title": "Greece",
+                "description": "Country in <b>Southeast Europe</b>",
+                "excerpt": (
+                    'The <span class="searchmatch">capital</span>, Athens, is the largest Greek city.'
+                    "<script>ignore()</script>"
+                ),
+            },
+            {
+                "id": 40471,
+                "key": "Thessaloniki",
+                "title": "Thessaloniki",
+                "description": "Second-largest city in Greece",
+                "excerpt": "A city in northern Greece.",
+            },
+            {
+                "id": 181337,
+                "key": "Capital_city",
+                "title": "Capital city",
+                "description": "Seat of government",
+                "excerpt": "A capital is typically a city.",
+            },
+        ]
+    }
+
+    def fail_brave_key() -> str:
+        raise AssertionError("Wikipedia must not read the Brave credential")
+
+    def fake_http_get(url: str, **kwargs: Any) -> Any:
+        captured["url"] = url
+        captured.update(kwargs)
+        return network_module._response_for_tests(
+            url=url,
+            status=200,
+            headers={"content-type": "application/json; charset=utf-8"},
+            body=json.dumps(payload).encode(),
+        )
+
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    monkeypatch.setattr(web_module, "_brave_api_key", fail_brave_key)
+    monkeypatch.setattr(web_module, "_http_get", fake_http_get)
+
+    result = await web_search()(
+        query="  whats the capital of greece ?  ",
+        max_results=2,
+        engine="wikipedia",
+    )
+
+    assert result == {
+        "query": "whats the capital of greece ?",
+        "provider": "wikipedia",
+        "results": [
+            {
+                "title": "Greece",
+                "url": "https://en.wikipedia.org/?curid=12108",
+                "snippet": "Country in Southeast Europe. The capital, Athens, is the largest Greek city",
+                "sponsored": False,
+            },
+            {
+                "title": "Thessaloniki",
+                "url": "https://en.wikipedia.org/?curid=40471",
+                "snippet": "Second-largest city in Greece. A city in northern Greece",
+                "sponsored": False,
+            },
+        ],
+        "more_results_available": True,
+        "untrusted_content": True,
+    }
+    params = parse_qs(urlsplit(captured["url"]).query)
+    assert params == {"q": ["whats the capital of greece ?"], "limit": ["3"]}
+    assert captured["headers"] == {
+        "Accept": "application/json",
+        "User-Agent": web_module._WIKIMEDIA_USER_AGENT,
+    }
+    assert captured["max_redirects"] == 0
+
+
+@pytest.mark.asyncio
+async def test_wikipedia_search_rejects_unsupported_freshness_before_network(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("network must not run for unsupported Wikipedia freshness")
+
+    monkeypatch.setattr(web_module, "_http_get", fail_if_called)
+
+    with pytest.raises(ValueError, match="supports only freshness='any'"):
+        await web_search()(query="agent runtimes", engine="wikipedia", freshness="week")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("content_type", "body", "error"),
+    [
+        ("text/html", b"<html></html>", "expected JSON"),
+        ("application/json", b"not-json", "invalid JSON"),
+        ("application/json", b"{}", "unexpected search result shape"),
+    ],
+)
+async def test_wikipedia_search_rejects_invalid_provider_responses(
+    content_type: str,
+    body: bytes,
+    error: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_http_get(url: str, **kwargs: Any) -> Any:
+        del kwargs
+        return network_module._response_for_tests(
+            url=url,
+            status=200,
+            headers={"content-type": content_type},
+            body=body,
+        )
+
+    monkeypatch.setattr(web_module, "_http_get", fake_http_get)
+
+    with pytest.raises(RuntimeError, match=error):
+        await web_search()(query="agent runtimes", engine="wikipedia")
 
 
 @pytest.mark.asyncio
