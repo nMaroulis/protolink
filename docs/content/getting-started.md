@@ -96,11 +96,12 @@ Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares ident
 
 ## First Agent
 
-Below is a compact example that wires together an agent, HTTP transport, an OpenAI-compatible LLM wrapper, and both native and MCP tools:
+Below is a compact example that wires together an agent, HTTP transport, an OpenAI-compatible LLM wrapper, and built-in, native, and MCP tools:
 
 ```python
 from protolink.agents import Agent
 from protolink.models import AgentCard
+from protolink.tools import current_datetime, web_search
 from protolink.tools.adapters import MCPToolAdapter
 from protolink.llms.api import OpenAILLM
 from protolink.discovery import Registry
@@ -122,6 +123,10 @@ llm = OpenAILLM(model="gpt-4o-mini")
 # Initialize the agent
 agent = Agent(agent_card, transport="http", a2a=True, llm=llm, registry=registry)
 
+# Add opt-in built-in tools
+agent.add_tool(current_datetime())
+agent.add_tool(web_search())
+
 # Add Native tool
 @agent.tool(name="add", description="Add two numbers")
 async def add_numbers(a: int, b: int):
@@ -142,8 +147,11 @@ This example demonstrates the core pieces of Protolink:
 - **AgentCard** to describe the agent.
 - **Transport** (here the `"http"` shortcut) for native agent communication, with `a2a=True` adding the A2A 1.0 inbound and outbound adapters.
 - **LLM** backend (`OpenAILLM`).
+- **Built-in tools** registered explicitly as ordinary `Tool` instances.
 - **Native tools** (Python functions decorated with `@agent.tool`).
 - **MCP tools** registered via `MCPToolAdapter`.
+
+The built-ins require no additional package extra. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked; pass `engine="duckduckgo"` in a tool call for the keyless, best-effort DuckDuckGo HTML engine. It declares `network.read`, and registering it does not perform a network request. Built-ins are opt-in, and the default capability policy is allow-by-default, so configure a restrictive `CapabilityPolicy` when network access should be denied or approval-gated. See [Tools](tool.md#built-in-tools) for the complete API and safety behavior.
 
 
 ### Using the CLI

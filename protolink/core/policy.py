@@ -9,6 +9,7 @@ typed approval checkpoint for an application-provided handler.
 from __future__ import annotations
 
 import inspect
+import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
@@ -308,6 +309,79 @@ class CapabilityPolicy:
         self.default_effect = _coerce_effect(default_effect)
         self.name = name
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize this first-party policy as safe declarative configuration.
+
+        Only JSON-compatible rule data is accepted. Policy implementations and
+        approval callbacks are executable application objects and are therefore
+        intentionally outside this format.
+
+        Returns:
+            A dictionary containing the stable policy type, rules, default
+            effect, and name.
+
+        Raises:
+            TypeError: A capability name or nested rule value is not safe
+                declarative data.
+        """
+        rules: dict[str, Any] = {}
+        for capability, value in self.rules.items():
+            if not isinstance(capability, str):
+                raise TypeError("CapabilityPolicy rule names must be strings")
+            if not isinstance(value, (PolicyEffect, str, bool, Mapping)):
+                raise TypeError(f"CapabilityPolicy rule {capability!r} must be an effect, string, boolean, or mapping")
+            _coerce_effect(value)
+            rules[capability] = _policy_config_value(value)
+        if not isinstance(self.name, str) or not self.name:
+            raise TypeError("CapabilityPolicy name must be a non-empty string")
+        return {
+            "type": "capability",
+            "rules": rules,
+            "default_effect": self.default_effect.value,
+            "name": self.name,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> CapabilityPolicy:
+        """Restore first-party capability rules without importing executable code.
+
+        Args:
+            data: Declarative policy data produced by :meth:`to_dict`.
+
+        Returns:
+            A reconstructed :class:`CapabilityPolicy`.
+
+        Raises:
+            TypeError: The policy block contains a non-declarative value.
+            ValueError: The policy type or top-level shape is invalid.
+        """
+        policy_type = data.get("type", "capability")
+        if policy_type != "capability":
+            raise ValueError(f"Unsupported serialized policy type: {policy_type!r}")
+        raw_rules = data.get("rules", {})
+        if not isinstance(raw_rules, Mapping):
+            raise ValueError("Serialized CapabilityPolicy rules must be a mapping")
+
+        rules: dict[str, Any] = {}
+        for capability, value in raw_rules.items():
+            if not isinstance(capability, str):
+                raise TypeError("CapabilityPolicy rule names must be strings")
+            if not isinstance(value, (str, bool, Mapping)):
+                raise TypeError(
+                    f"Serialized CapabilityPolicy rule {capability!r} must be a string, boolean, or mapping"
+                )
+            _coerce_effect(value)
+            rules[capability] = _policy_config_value(value)
+
+        name = data.get("name", "capability_policy")
+        if not isinstance(name, str) or not name:
+            raise ValueError("Serialized CapabilityPolicy name must be a non-empty string")
+        return cls(
+            rules,
+            default_effect=data.get("default_effect", PolicyEffect.ALLOW.value),
+            name=name,
+        )
+
     async def evaluate(self, action: RunAction, context: RunContext) -> PolicyDecision:
         """Evaluate all capabilities required by an action.
 
@@ -376,6 +450,28 @@ ApprovalHandlerLike = (
     | Callable[[ApprovalRequest, RunContext], ApprovalDecision | bool | Awaitable[ApprovalDecision | bool]]
 )
 """Accepted callable shape for synchronous or asynchronous approval handlers."""
+
+
+def _policy_config_value(value: Any) -> Any:
+    """Normalize nested policy configuration into JSON-compatible values."""
+    if isinstance(value, PolicyEffect):
+        return value.value
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise TypeError("CapabilityPolicy configuration numbers must be finite")
+        return value
+    if isinstance(value, Mapping):
+        normalized: dict[str, Any] = {}
+        for key, nested_value in value.items():
+            if not isinstance(key, str):
+                raise TypeError("CapabilityPolicy configuration keys must be strings")
+            normalized[key] = _policy_config_value(nested_value)
+        return normalized
+    if isinstance(value, (list, tuple)):
+        return [_policy_config_value(item) for item in value]
+    raise TypeError(f"CapabilityPolicy configuration contains unsupported value {type(value).__name__}")
 
 
 class ActionAuthorizer:

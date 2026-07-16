@@ -38,7 +38,8 @@ uv add --upgrade protolink
 
 :::note Latest release
 
-This release makes ProtoLink's A2A architecture explicit without replacing its small Python runtime API.
+This release adds a small opt-in built-in tool set and makes ProtoLink's A2A architecture explicit without replacing
+its small Python runtime API.
 `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` remain ProtoLink's ergonomic runtime primitives.
 An HTTP agent can now opt into a separate, versioned A2A 1.0 inbound and outbound translation boundary with 
 `Agent(..., a2a=True)`. The default `False` preserves existing ProtoLink clients, native endpoints, transports
@@ -48,6 +49,12 @@ and `handle_task(Task)` implementations.
 
 ### Added
 
+- **Opt-in dependency-free built-in tools**
+  - Added `web_search()`, `fetch_url()`, `calculator()`, and `current_datetime()` factories, exported from `protolink.tools` and registered explicitly with `agent.add_tool(factory())`.
+  - `web_search` selects `engine="brave"` by default or the keyless, best-effort `engine="duckduckgo"` per call, with the same bounded normalized result contract and no silent provider fallback. Brave reads `BRAVE_SEARCH_API_KEY` only at invocation; DuckDuckGo challenge and markup-drift responses fail explicitly, while recognized sponsored entries are retained and labeled.
+  - Added `examples/builtin_web_search.py`, an offline-safe CLI walkthrough that registers the tool through an Agent policy and runs either engine with freshness and result-count controls.
+  - The web tools declare `network.read`; URL fetch rejects non-public targets and bounds redirects, response types, and content size. Search and fetched content remain untrusted external data, and applications can restrict the allow-by-default policy with `CapabilityPolicy`.
+  - Agent dict/YAML round-trips preserve built-in tool identities and first-party `CapabilityPolicy` rules without serializing executable custom policies, approval callbacks, or the Brave API key.
 - **Opt-in A2A 1.0 HTTP interoperability**
   - `Agent(..., transport="http", a2a=True)` now exposes `GET /.well-known/agent-card.json` and `POST /` while retaining every native endpoint. The flag defaults to `False`, is available through the read-only `agent.a2a` property, and round-trips through dict/YAML configuration.
   - The adapter implements `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask`, with standard card, task, message, part, artifact, security, timestamp, version, content-type, and error translation for its advertised scope.

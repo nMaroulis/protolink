@@ -6,20 +6,28 @@ Tools extend agent capabilities with additional functions. They enable LLMs and 
 
 ## Overview
 
-Protolink provides a flexible tool system with two main approaches:
+Protolink provides a flexible tool system with three approaches:
 
+- **Built-in Tools**: Opt-in, dependency-free factories for common read-only and pure operations
 - **Native Tools**: Python functions decorated directly on an agent
 - **MCP Tools**: Tools from external MCP (Model Context Protocol) servers
 
-Both types of tools are exposed through the same interface, making them interchangeable from the agent's perspective.
+All three tool sources use the same interface, making them interchangeable from the agent's perspective.
 
 ## Module Structure
 
 The tools module is organized as follows:
 
 ```python
-# Core tool interfaces
-from protolink.tools import BaseTool, Tool
+# Core interfaces and opt-in built-ins
+from protolink.tools import (
+    BaseTool,
+    Tool,
+    calculator,
+    current_datetime,
+    fetch_url,
+    web_search,
+)
 
 # Tool adapters for external integrations  
 from protolink.tools.adapters import MCPToolAdapter
@@ -27,7 +35,8 @@ from protolink.tools.adapters import MCPToolAdapter
 
 | Module | Description |
 |--------|-------------|
-| `protolink.tools` | Core tool interfaces and native tool implementation |
+| `protolink.tools` | Core interfaces, native implementation, and public built-in factories |
+| `protolink.tools.builtins` | Implementations for the dependency-free built-in tools |
 | `protolink.tools.adapters` | Adapters for integrating external tool systems |
 
 ---
@@ -45,6 +54,11 @@ from protolink.tools.adapters import MCPToolAdapter
     "AgentSkill advertising",
   ]}
   cards={[
+    {
+      title: "Built-in tools",
+      text: "Explicitly register dependency-free web search, safe URL fetch, calculator, and current-datetime tools.",
+      code: "agent.add_tool(web_search())",
+    },
     {
       title: "Base contract",
       text: "Tools are async callables with a name, description, input schema, output schema, tags, examples, and capabilities.",
@@ -108,6 +122,139 @@ All tools are **async callables** that accept keyword arguments matching their i
 # Tools are invoked with keyword arguments
 result = await tool(location="Tokyo", units="celsius")
 ```
+
+---
+
+## Built-in Tools
+
+ProtoLink includes four dependency-free tool factories for common agent tasks:
+
+| Factory | Tool name | Capability | Stable result |
+|---------|-----------|------------|---------------|
+| `web_search()` | `web_search` | `network.read` | Query, provider, ranked source snippets with sponsored labels, availability hint, and `untrusted_content` marker |
+| `fetch_url()` | `fetch_url` | `network.read` | Final URL, status, content type, title, text, truncation state, and `untrusted_content` marker |
+| `calculator()` | `calculator` | None | The expression and its finite numeric result |
+| `current_datetime()` | `current_datetime` | None | Timezone, ISO-8601 date/time, weekday, UTC offset, and Unix timestamp |
+
+Factories return fresh native `Tool` instances. Nothing is enabled automatically: register only the capabilities an agent needs.
+
+```python
+from protolink import Agent, AgentCard, CapabilityPolicy
+from protolink.tools import calculator, current_datetime, fetch_url, web_search
+
+agent = Agent(
+    card=AgentCard(
+        name="researcher",
+        description="Finds and summarizes public information",
+        url="runtime://researcher",
+    ),
+    transport="runtime",
+    policy=CapabilityPolicy(
+        {"network.read": "allow"},
+        default_effect="deny",
+    ),
+)
+
+agent.add_tool(web_search())
+agent.add_tool(fetch_url())
+agent.add_tool(calculator())
+agent.add_tool(current_datetime())
+```
+
+Registered tools participate in schema validation, runtime policy, and AgentSkill advertising. When the inference loop invokes one during a task, the task's cancellation, telemetry, and tool-call budget controls apply as well. `network.read` identifies the authority required by `web_search` and `fetch_url`; `calculator` and `current_datetime` declare no protected capability.
+
+:::warning[Default policy and direct calls]
+
+The default `CapabilityPolicy` is allow-by-default for backward compatibility. Declaring `network.read` makes authority visible and configurable, but does not deny it by itself. Pass a restrictive policy when network access should be denied or approval-gated.
+
+Calling a `Tool` object directly, such as `await web_search()(query="...")`, invokes the tool without the Agent and therefore bypasses Agent policy and approval. Use `agent.call_tool(...)` for Agent validation and policy, or let the inference loop invoke a registered tool when the task's full runtime controls should apply.
+
+Agent dict/YAML serialization preserves each built-in's stable identity and the declarative rules, default effect, and name of ProtoLink's first-party `CapabilityPolicy`. Custom policy implementations and approval callbacks are executable application objects and are not embedded; pass them explicitly when restoring, for example `Agent.from_yaml("agent.yaml", policy=custom_policy, approval_handler=approve)`. An explicit policy override takes precedence over serialized first-party policy data.
+
+:::
+
+### Web Search
+
+`web_search()` has one normalized result contract across two explicit engines:
+
+- `engine="brave"` is the default. It uses the [Brave Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get) and reads `BRAVE_SEARCH_API_KEY` from the environment only when invoked. The key is not captured by the Tool, stored in Agent configuration, or required merely to import or register the factory.
+- `engine="duckduckgo"` needs no API key or additional dependency. It reads DuckDuckGo's published [non-JavaScript HTML search](https://duckduckgo.com/duckduckgo-help-pages/features/non-javascript) as a best-effort interface.
+
+Engine selection is per call and there is no silent fallback. A missing Brave key therefore remains a clear configuration error instead of unexpectedly sending the query to another provider.
+
+```bash
+export BRAVE_SEARCH_API_KEY="your-key"
+```
+
+```python
+result = await agent.call_tool(
+    "web_search",
+    query="Python 3.14 release notes",
+    max_results=5,
+)
+
+keyless_result = await agent.call_tool(
+    "web_search",
+    query="Python structured concurrency",
+    engine="duckduckgo",
+    freshness="month",
+)
+```
+
+For a complete Agent-path CLI, see [`examples/builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py). It registers the built-in with an explicit `network.read` policy, supports both engines and every freshness option, and prints the normalized JSON result:
+
+```bash
+# Keyless, best-effort DuckDuckGo search
+python examples/builtin_web_search.py "Python structured concurrency"
+
+# Documented Brave API
+export BRAVE_SEARCH_API_KEY="your-key"
+python examples/builtin_web_search.py "Python structured concurrency" --engine brave
+```
+
+Running the example without a query only prints its CLI help, so it is safe to inspect without credentials or a network request.
+
+| Argument | Type | Default | Contract |
+|----------|------|---------|----------|
+| `query` | `str` | Required | 1-400 characters and at most 50 words |
+| `max_results` | `int` | `5` | 1-10 normalized results |
+| `freshness` | `"any" ⎪ "day" ⎪ "week" ⎪ "month" ⎪ "year"` | `"any"` | Optional age filter sent to the selected engine |
+| `engine` | `"brave" ⎪ "duckduckgo"` | `"brave"` | Explicit provider selection; DuckDuckGo is keyless |
+
+The tool normalizes both engines into provider-neutral JSON-compatible data and bounds the result count and text placed into model context. Every result includes `sponsored`; Brave web results use `False`, while recognized DuckDuckGo advertisements stay in provider order with `sponsored=True`. Both engines use fixed HTTPS endpoints with DNS validation, a 2,000,000-byte response limit, a 10-second transport deadline, and no redirects. DuckDuckGo organic redirect links are decoded locally and validated; sponsored click URLs remain intact. Results also include the selected `provider`, `more_results_available`, and the explicit marker `untrusted_content=True`.
+
+DuckDuckGo's HTML page is a human-facing interface rather than a versioned developer API. It can change markup, rate-limit automated requests, or return a human-verification challenge. ProtoLink does not spoof a browser, suppress or discard recognized advertising, retry a challenge, or attempt to bypass one; it raises a clear error. Applications distributing a DuckDuckGo-backed integration should review DuckDuckGo's [URL-parameter and partnership guidance](https://duckduckgo.com/duckduckgo-help-pages/settings/params). Use Brave when a documented, production-oriented provider contract is required. With either engine, search queries leave the process, and titles, URLs, snippets, and page content are untrusted external data. Do not treat search output as instructions, executable content, or proof that a claim is correct.
+
+### URL Fetch
+
+`fetch_url()` retrieves bounded textual content from a public HTTP or HTTPS URL. It rejects credentials in URLs, non-HTTP schemes, and private, loopback, link-local, reserved, or otherwise non-public targets. Redirect destinations are resolved and validated again before they are followed. Responses are subject to redirect, timeout, byte, character, and supported-text-content limits; the result reports when extracted text was truncated.
+
+```python
+page = await agent.call_tool("fetch_url", url="https://example.com/")
+```
+
+| Argument | Type | Default | Contract |
+|----------|------|---------|----------|
+| `url` | `str` | Required | Public HTTP(S) URL, at most 2,048 characters, using its standard port |
+| `max_chars` | `int` | `12000` | 1-50,000 returned text characters |
+
+After each destination is DNS-validated, the transfer is limited to 1,000,000 bytes, four validated redirects, and a 10-second transport deadline for each request or redirect before the `max_chars` return bound is applied. DNS lookup uses the host operating system's resolver and is not included in that transport deadline. These restrictions reduce accidental server-side request forgery and context exhaustion; they do not make remote content trustworthy. Treat returned text as untrusted input and keep application-specific authorization at the Agent policy boundary.
+
+### Calculator and Current Datetime
+
+`calculator()` evaluates a deliberately small arithmetic grammar rather than Python code. It never uses `eval`, rejects names and function calls, and enforces expression-complexity, exponent, magnitude, and finite-result limits.
+
+`current_datetime()` returns structured current-time data for the requested timezone. UTC works without a host timezone database; other IANA zones use the system database, or the `tzdata` package when a host does not provide one. Invalid or unavailable timezone identifiers raise a clear tool error rather than silently falling back to local machine time.
+
+```python
+calculation = await calculator()(expression="(18 + 6) / 3")
+now = await current_datetime()(timezone="Europe/Zurich")
+```
+
+| Tool | Argument contract |
+|------|-------------------|
+| `calculator` | Required `expression`: 1-256 characters using numbers, parentheses, and `+`, `-`, `*`, `/`, `//`, `%`, or `**` |
+| `current_datetime` | Optional `timezone`: IANA timezone name up to 100 characters; defaults to `"UTC"` |
 
 ---
 
@@ -707,6 +854,13 @@ Hello, World! 👋
 ---
 
 ## Best Practices
+
+### Built-in Tools
+
+1. **Register selectively**: Built-ins are opt-in; add only the tools an agent needs.
+2. **Configure policy**: Use `CapabilityPolicy` to allow, deny, or approval-gate `network.read` explicitly.
+3. **Treat external data as untrusted**: Search results and fetched pages can contain incorrect or adversarial text.
+4. **Use the Agent execution path**: Direct Tool calls are convenient for low-level tests but bypass Agent runtime controls.
 
 ### Tool Design
 

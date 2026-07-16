@@ -16,7 +16,7 @@ ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specificat
 
 A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, flows, and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
 
-The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, native or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
+The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, built-in, native, or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
 ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
 
@@ -66,7 +66,7 @@ No `async main()`, event-loop setup, model account, or API key is required. `sta
 
 ## Plug in only what the agent needs
 
-The constructor is the composition surface. This expanded example uses a local Ollama model, registry discovery, SQLite state and run storage, local telemetry, authentication, file logging, a native Python tool, and tools from an MCP server:
+The constructor is the composition surface. This expanded example uses a local Ollama model, registry discovery, SQLite state and run storage, local telemetry, authentication, file logging, dependency-free built-in web search, a native Python tool, and tools from an MCP server:
 
 ```python
 from protolink import (
@@ -79,6 +79,7 @@ from protolink import (
 from protolink.logging import FileLogger
 from protolink.security import APIKeyAuth
 from protolink.storage import SQLiteStorage
+from protolink.tools import web_search
 from protolink.tools.adapters import MCPToolAdapter
 
 planner_agent = Agent(
@@ -103,6 +104,8 @@ planner_agent = Agent(
     logger=FileLogger("planner.log"),
 )
 
+planner_agent.add_tool(web_search())
+
 @planner_agent.tool(name="search_notes", description="Search local notes")
 async def search_notes(query: str) -> str:
     return f"Results for {query}"
@@ -118,14 +121,14 @@ for tool in mcp_adapter.get_tools():
 planner_agent.start()
 ```
 
-Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. Remove any constructor argument you do not need, or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies, and observability backends.
+Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked; pass `engine="duckduckgo"` in a tool call for the keyless, best-effort DuckDuckGo HTML engine. Registering the tool performs no network request. Remove any constructor argument or tool you do not need, or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies, and observability backends.
 
 `MCPToolAdapter` supports local stdio and remote SSE servers. Once registered, MCP tools follow the same schema validation, policy, execution, and telemetry path as native Python tools.
 
 | Plug-in surface | Built-in choices |
 | --- | --- |
 | [LLMs](https://nmaroulis.github.io/protolink/docs/llm/) | OpenAI, Anthropic, Gemini, Grok, DeepSeek, Hugging Face, Ollama, llama.cpp, LM Studio, OpenAI-compatible servers, mock, custom |
-| [Tools](https://nmaroulis.github.io/protolink/docs/tool/) | Typed Python tools, MCP adapters, custom `BaseTool` implementations |
+| [Tools](https://nmaroulis.github.io/protolink/docs/tool/) | Built-in web search, URL fetch, calculator, current datetime, typed Python tools, MCP adapters, custom `BaseTool` implementations |
 | [Transports](https://nmaroulis.github.io/protolink/docs/transport/) | Runtime, HTTP, SSE JSON-RPC, WebSocket, gRPC, custom transports |
 | [Registry](https://nmaroulis.github.io/protolink/docs/registry/) | Local or network discovery through `Registry` and `RegistryClient` |
 | [State and storage](https://nmaroulis.github.io/protolink/docs/state/) | In-memory or SQLite state, conversation persistence, custom storage |
@@ -304,6 +307,7 @@ See the [developer tools guide](https://nmaroulis.github.io/protolink/docs/devto
 
 ## More examples
 
+- [Built-in multi-engine web search](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py)
 - [Provider-free runtime mesh](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py)
 - [HTTP agent communication](https://github.com/nMaroulis/protolink/blob/main/examples/http_agents.py)
 - [Production transport configuration](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py)

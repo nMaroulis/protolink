@@ -80,6 +80,19 @@ Run these notebooks in order to build a complete weather monitoring system:
 
 The repository includes several **standalone example scripts** that demonstrate specific Protolink capabilities:
 
+### Built-in web search
+
+- [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) registers `web_search()` on a runtime Agent with an explicit `network.read` policy. It defaults to the keyless, best-effort DuckDuckGo engine and accepts `--engine`, `--freshness`, and `--max-results` options. Select Brave after exporting `BRAVE_SEARCH_API_KEY`.
+
+```bash
+python examples/builtin_web_search.py "Python structured concurrency"
+
+export BRAVE_SEARCH_API_KEY="your-key"
+python examples/builtin_web_search.py "Python structured concurrency" --engine brave
+```
+
+Run it without a query to inspect the CLI without making a network request.
+
 ### A2A core and A2A 1.0 boundary
 
 - [`provider_free_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py) runs a deterministic three-agent mesh with no provider, API key, registry, or network port. It demonstrates the A2A-derived `AgentCard`, `Task`, and `Message` model through the in-process runtime transport.

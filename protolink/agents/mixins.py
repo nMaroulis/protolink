@@ -15,7 +15,7 @@ from typing import Any, Literal, TypeVar
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
 from protolink.core.cancellation import CancellationToken, TaskCancellationRequest
-from protolink.core.policy import ActionAuthorization
+from protolink.core.policy import ActionAuthorization, CapabilityPolicy
 from protolink.core.run_context import RunContext
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
@@ -762,7 +762,8 @@ class AgentToolMixin(_AgentMixinBase):
     """Manages tools, skills, and runtime action authorization."""
 
     def add_tool(self, tool: BaseTool) -> None:
-        """Register a Tool instance with the agent."""
+        """Register or replace a tool and keep its advertised skill in sync."""
+        replacing_runtime_tool = tool.name in self.tools
         self.tools[tool.name] = tool
         skill = AgentSkill(
             id=tool.name,
@@ -772,6 +773,11 @@ class AgentToolMixin(_AgentMixinBase):
             tags=tool.tags or [],
             examples=getattr(tool, "examples", None) or [],
         )
+        for index, existing_skill in enumerate(self.card.skills):
+            if existing_skill.id == tool.name:
+                if replacing_runtime_tool:
+                    self.card.skills[index] = skill
+                return
         self._add_skill_to_agent_card(skill)
 
     def tool(
@@ -1283,8 +1289,12 @@ class AgentSerializationMixin(_AgentMixinBase):
             "examples": getattr(tool, "examples", None),
             "capabilities": list(getattr(tool, "capabilities", None) or ()),
         }
+        builtin_id = getattr(tool, "_protolink_builtin_id", None)
+        if isinstance(builtin_id, str) and builtin_id:
+            tool_dict["type"] = "builtin"
+            tool_dict["builtin_id"] = builtin_id
         # Check if it is an MCPToolAdapter
-        if tool.__class__.__name__ == "MCPToolAdapter":
+        elif tool.__class__.__name__ == "MCPToolAdapter":
             tool_dict["type"] = "mcp"
             tool_dict["mcp_config"] = {
                 "transport": getattr(tool, "transport", "stdio"),
@@ -1305,6 +1315,19 @@ class AgentSerializationMixin(_AgentMixinBase):
     def _deserialize_tool(cls, tool_dict: dict[str, Any]) -> BaseTool:
         """Deserialize a tool from a dictionary representation."""
         tool_type = tool_dict.get("type", "native")
+        if tool_type == "builtin":
+            from protolink.tools.builtins import _create_builtin
+
+            builtin_id = tool_dict.get("builtin_id")
+            if not isinstance(builtin_id, str) or not builtin_id:
+                raise ValueError("Serialized built-in tool must include a non-empty builtin_id")
+            tool = _create_builtin(builtin_id)
+            serialized_name = tool_dict.get("name")
+            if serialized_name not in {None, tool.name}:
+                raise ValueError(
+                    f"Serialized built-in {builtin_id!r} cannot be restored with tool name {serialized_name!r}"
+                )
+            return tool
         if tool_type == "mcp":
             try:
                 from protolink.tools.adapters.mcp_adapter import MCPToolAdapter
@@ -1460,6 +1483,16 @@ class AgentSerializationMixin(_AgentMixinBase):
             "a2a_allow_cross_origin": self._a2a_allow_cross_origin,
         }
 
+        policy = self.action_authorizer.policy
+        if type(policy) is CapabilityPolicy:
+            policy_data = policy.to_dict()
+            if (
+                policy_data["rules"]
+                or policy_data["default_effect"] != "allow"
+                or policy_data["name"] != "capability_policy"
+            ):
+                data["policy"] = policy_data
+
         # Transport
         if self._transport:
             data["transport"] = self._serialize_transport(self._transport)
@@ -1524,6 +1557,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             data: The serialized configuration dictionary.
             **overrides: Override specific parameters passed to the Agent constructor.
+                First-party ``CapabilityPolicy`` configuration is restored by
+                default. An explicit ``policy`` takes precedence; custom policies
+                and approval handlers must be passed here.
         """
         card_data = overrides.get("card", data.get("card"))
         if not card_data:
@@ -1621,6 +1657,17 @@ class AgentSerializationMixin(_AgentMixinBase):
         state = overrides.get("state")
         telemetry = overrides.get("telemetry")
         logger = overrides.get("logger")
+        if "policy" in overrides:
+            policy = overrides["policy"]
+        else:
+            policy_config = data.get("policy")
+            if policy_config is None:
+                policy = None
+            elif isinstance(policy_config, dict):
+                policy = CapabilityPolicy.from_dict(policy_config)
+            else:
+                raise ValueError("Serialized policy configuration must be a dictionary")
+        approval_handler = overrides.get("approval_handler")
 
         skills_val = overrides.get("skills", data.get("skills"))
         skills: Literal["auto", "fixed"] = skills_val if skills_val in ("auto", "fixed") else "auto"
@@ -1667,6 +1714,8 @@ class AgentSerializationMixin(_AgentMixinBase):
             a2a_allow_cross_origin=a2a_allow_cross_origin,
             authenticator=authenticator,
             credentials=credentials,
+            policy=policy,
+            approval_handler=approval_handler,
         )
 
         tools_data = data.get("tools", [])
@@ -1698,6 +1747,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             yaml_str: The YAML string containing agent configuration.
             **overrides: Override specific parameters passed to the Agent constructor.
+                An explicit ``policy`` takes precedence over serialized first-party
+                policy data; custom policies and ``approval_handler`` values are
+                runtime-only.
         """
         import yaml
 
@@ -1713,6 +1765,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             filepath: Path to the YAML file.
             **overrides: Override specific parameters passed to the Agent constructor.
+                An explicit ``policy`` takes precedence over serialized first-party
+                policy data; custom policies and ``approval_handler`` values are
+                runtime-only.
         """
         with open(filepath, encoding="utf-8") as f:
             yaml_str = f.read()

@@ -103,6 +103,78 @@ async def test_capability_policy_reads_run_context_permissions():
 
 
 @pytest.mark.asyncio
+async def test_capability_policy_configuration_round_trip():
+    """First-party rules should round-trip through declarative safe data."""
+    policy = CapabilityPolicy(
+        {
+            "records.read": PolicyEffect.DENY,
+            "records.write": "require_approval",
+            "network.read": False,
+            "workspace.read": {
+                "effect": PolicyEffect.ALLOW,
+                "scope": {"paths": ["/workspace"], "recursive": True},
+            },
+        },
+        default_effect=PolicyEffect.REQUIRE_APPROVAL,
+        name="release_policy",
+    )
+
+    serialized = policy.to_dict()
+    restored = CapabilityPolicy.from_dict(serialized)
+
+    assert serialized == {
+        "type": "capability",
+        "rules": {
+            "records.read": "deny",
+            "records.write": "require_approval",
+            "network.read": False,
+            "workspace.read": {
+                "effect": "allow",
+                "scope": {"paths": ["/workspace"], "recursive": True},
+            },
+        },
+        "default_effect": "require_approval",
+        "name": "release_policy",
+    }
+    assert restored.rules == serialized["rules"]
+    assert restored.default_effect is PolicyEffect.REQUIRE_APPROVAL
+    assert restored.name == "release_policy"
+    expected_effects = {
+        "records.read": PolicyEffect.DENY,
+        "records.write": PolicyEffect.REQUIRE_APPROVAL,
+        "network.read": PolicyEffect.DENY,
+        "workspace.read": PolicyEffect.ALLOW,
+        "unmatched.capability": PolicyEffect.REQUIRE_APPROVAL,
+    }
+    for capability, expected_effect in expected_effects.items():
+        decision = await restored.evaluate(
+            RunAction(kind="tool.call", name="round_trip", capabilities=frozenset({capability})),
+            RunContext(run_id=f"run_{capability}"),
+        )
+        assert decision.effect is expected_effect
+
+
+def test_capability_policy_configuration_rejects_executable_type_hints():
+    """Policy configuration must never resolve an application object path."""
+    with pytest.raises(ValueError, match="Unsupported serialized policy type"):
+        CapabilityPolicy.from_dict(
+            {
+                "type": "python",
+                "module": "application.security",
+                "class": "CustomPolicy",
+            }
+        )
+
+    with pytest.raises(ValueError, match="Unsupported policy effect"):
+        CapabilityPolicy.from_dict(
+            {
+                "type": "capability",
+                "rules": {"network.read": {"effect": "application.CustomPolicy"}},
+            }
+        )
+
+
+@pytest.mark.asyncio
 async def test_context_permissions_cannot_weaken_runtime_policy():
     """Caller-provided grants must not override a stricter runtime-owned rule."""
     action = RunAction(

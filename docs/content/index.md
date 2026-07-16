@@ -21,10 +21,10 @@ Welcome to the Protolink documentation.
 
 This site provides an overview of the framework, its concepts, and how to use it in your projects.
 
-_Current release: **0.6.5** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
+_Current release: **0.6.6** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Current Version](https://img.shields.io/badge/current-0.6.5-0A84FF)](https://pypi.org/project/protolink/)
+[![Current Version](https://img.shields.io/badge/current-0.6.6-0A84FF)](https://pypi.org/project/protolink/)
 [![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)
 [![GitHub stars](https://img.shields.io/github/stars/nMaroulis/protolink?style=flat&logo=github)](https://github.com/nMaroulis/protolink/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/nMaroulis/protolink?style=flat&logo=github)](https://github.com/nMaroulis/protolink/forks)
@@ -38,9 +38,9 @@ _Current release: **0.6.5** ([PyPI](https://pypi.org/project/protolink/) | [Chan
 
 ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where autonomous agents **communicate directly through an A2A-based task model**.
 
-Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
+Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (built-in, native, or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
-ProtoLink is **A2A-first by design**. `AgentCard`, `Task`, `Message`, `Part`, `Artifact`, task lifecycle, and discovery form the shared language used across agents, flows, storage, telemetry, and transports. ProtoLink builds the pluggable execution runtime around that foundation: LLMs, local models, native and MCP tools, transports, registry discovery, state, policy, authentication, logging, and observability.
+ProtoLink is **A2A-first by design**. `AgentCard`, `Task`, `Message`, `Part`, `Artifact`, task lifecycle, and discovery form the shared language used across agents, flows, storage, telemetry, and transports. ProtoLink builds the pluggable execution runtime around that foundation: LLMs, local models, built-in, native, and MCP tools, transports, registry discovery, state, policy, authentication, logging, and observability.
 
 These Python models are ergonomic runtime forms of A2A's core primitives, not copies of the canonical wire schema. An HTTP agent opts into the versioned [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary with `Agent(..., a2a=True)`. The flag adds standard inbound routes and outbound translation without removing ProtoLink's native API. Its exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md).
 
@@ -103,7 +103,7 @@ ProtoLink provides a higher-level runtime that unifies client, server, transport
   Explore [Transports](transport.md) to switch between HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports with minimal code changes.
 
 - **Plug in LLMs & tools**  
-  Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and both native & MCP tools as agent modules.
+  Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and opt-in built-in, native, or MCP tools as agent modules.
 
 
 ## Key ideas

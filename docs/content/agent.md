@@ -648,7 +648,7 @@ agent = Agent(card, skills="fixed")
 
 ## Tool Management
 
-Tools allow agents to execute external functions and APIs.
+Tools give agents explicit callable capabilities. ProtoLink supports opt-in built-ins, native Python functions, custom `BaseTool` implementations, and MCP adapters.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
@@ -667,16 +667,14 @@ def calculate(operation: str, a: float, b: float) -> float:
     else:
         raise ValueError(f"Unsupported operation: {operation}")
 
-# Direct tool registration
-from protolink.tools import BaseTool
+# Direct registration of built-in Tool instances
+from protolink.tools import current_datetime, web_search
 
-class WeatherTool(BaseTool):
-    def call(self, location: str) -> dict:
-        # Weather API logic here
-        return {"temperature": 72, "conditions": "sunny"}
-
-agent.add_tool(WeatherTool())
+agent.add_tool(current_datetime())
+agent.add_tool(web_search())  # Brave by default; calls may select engine="duckduckgo".
 ```
+
+Built-ins are never enabled automatically. Registered built-ins follow the same validation, policy, telemetry, cancellation, and skill-advertising path as native tools. See [Tools](tool.md#built-in-tools) for the complete built-in API and network-safety contract.
 
 ## Registry & Discovery
 
@@ -811,7 +809,7 @@ The `/status` page shows the agent's operational health and metadata. The `/chat
 :::
 ## YAML Import and Export
 
-Protolink supports exporting an agent's configuration (identity card, capabilities, transport, TLS file references, LLM, security/authenticator, and registered tools) to a YAML file, and importing it back to reconstruct a functional `Agent` instance. TLS serialization stores certificate paths and settings, never certificate or private-key contents.
+Protolink supports exporting an agent's configuration (identity card, capabilities, transport, TLS file references, LLM, security/authenticator, registered tools, and non-default first-party capability policy) to a YAML file, and importing it back to reconstruct a functional `Agent` instance. TLS serialization stores certificate paths and settings, never certificate or private-key contents.
 
 ### Exporting an Agent
 
@@ -847,12 +845,14 @@ agent = Agent.from_dict(config_dict)
 
 #### Handling Dependencies and Overrides
 
-1. **Security & Credentials**: Sensitive information like API keys or passwords are not serialized by default. You can pass them as overrides during import:
+1. **Security & Credentials**: Treat exported Agent configuration as sensitive. Configured outbound `credentials` and authenticator settings can be serialized, including bearer secrets, API-key maps, basic credentials, and OAuth client secrets. Review and protect the file, or pass replacement values during import:
    ```python
    agent = Agent.from_yaml("agent_config.yaml", credentials="my-secret-key")
    ```
-2. **Tool Function Paths**: Standard Python tools are serialized using their module and function name paths (e.g. `my_module:my_tool_func`). When the agent is imported, Protolink dynamically imports the function. If the module cannot be imported (e.g., if loaded in a different environment), Protolink registers a stub tool that returns a clean runtime error when executed rather than crashing initialization.
-3. **MCP Tool Adapters**: Model Context Protocol (MCP) tool configs are fully serialized. If the MCP dependencies are installed on the target machine, they will be initialized and bound correctly.
+   `BRAVE_SEARCH_API_KEY` is different: `web_search()` reads it from the environment only when the default Brave engine is invoked, so the built-in tool does not place that key in Agent dict/YAML output. The explicit `engine="duckduckgo"` path is keyless.
+2. **Built-ins & Policy**: Built-in tools serialize by stable first-party identity. A non-default, exact `CapabilityPolicy` serializes its declarative rules, default effect, and name. Executable custom policies (including `CapabilityPolicy` subclasses) and approval callbacks are not embedded; pass them as `policy=` and `approval_handler=` overrides when importing. An explicit policy override takes precedence over serialized first-party rules.
+3. **Tool Function Paths**: Standard Python tools are serialized using their module and function name paths (e.g. `my_module:my_tool_func`). When the agent is imported, Protolink dynamically imports the function. If the module cannot be imported (e.g., if loaded in a different environment), Protolink registers a stub tool that returns a clean runtime error when executed rather than crashing initialization.
+4. **MCP Tool Adapters**: Model Context Protocol (MCP) tool configs are fully serialized. If the MCP dependencies are installed on the target machine, they will be initialized and bound correctly.
 
 
 ## Abstract Methods
