@@ -112,7 +112,7 @@ test = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.1",
     "ruff==0.14.4",
-    "ty>=0.0.50",
+    "ty>=0.0.60",
     "pre-commit>=4.4.0",
     "protolink[grpc]", # For testing gRPC transport
     "protolink[http]", # For testing HTTP transport
