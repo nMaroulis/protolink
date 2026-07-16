@@ -4,6 +4,8 @@ import ApiSurface from '@site/src/components/ApiSurface';
 
 Servers in Protolink act as the **coordination layer** between business logic (Agents or Registries) and the underlying Transport mechanism. They are responsible for wiring endpoints, managing lifecycle, and ensuring that the core logic remains transport-agnostic.
 
+`AgentServer` always binds ProtoLink's native endpoints. When an HTTP agent is created with `a2a=True`, it additionally binds the A2A 1.0 adapter to the same execution logic. Agent authors still implement `handle_task(Task)` once.
+
 <ApiSurface
   eyebrow="Server coordination layer"
   title="AgentServer and RegistryServer"
@@ -14,12 +16,13 @@ Servers in Protolink act as the **coordination layer** between business logic (A
     "Transport-agnostic",
     "Agent and registry servers",
     "Streaming routes",
+    "A2A 1.0 HTTP routes",
     "Status and chat endpoints",
   ]}
   cards={[
     {
       title: "AgentServer",
-      text: "Exposes task submission, streaming, discovery, cancellation, status, chat, and LLM control endpoints.",
+      text: "Exposes native task, streaming, discovery, cancellation, status, chat, and LLM control endpoints, with an opt-in A2A 1.0 JSON-RPC boundary.",
       code: "/tasks/",
     },
     {
@@ -59,6 +62,7 @@ The `AgentServer` exposes an `Agent` over a Transport.
 - Exposing the Task submission endpoint.
 - Exposing the Task streaming endpoint when the transport supports streaming.
 - Serving the Agent's identity card (`/.well-known/agent.json`).
+- On HTTP with `a2a=True`, serving the A2A 1.0 Agent Card and JSON-RPC adapter.
 - Providing a status page.
 - Exposing the Chat Gateway when the agent has an LLM.
 
@@ -69,17 +73,21 @@ The `AgentServer` exposes an `Agent` over a Transport.
 | `/tasks/` | `POST` | **Task Submission**. Accepts a `Task` object, processes it via the Agent, and returns the result. |
 | `/tasks/stream` | `POST` | **Task Streaming**. Accepts a `Task` object and streams status, LLM, tool, artifact, and final events. Only registered when the transport has `supports_streaming=True`. |
 | `/.well-known/agent.json` | `GET` | **Agent Discovery**. Returns the `AgentCard` describing this agent. |
+| `/.well-known/agent-card.json` | `GET` | **A2A 1.0 Agent Card**. Added only by `Agent(..., transport="http", a2a=True)`; returns the standard wire card. |
+| `/` | `POST` | **A2A 1.0 JSON-RPC**. Added only with `a2a=True`; handles `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask`. |
 | `/status` | `GET` | **Status Page**. Returns a human-readable HTML status dashboard. |
 | `/chat` | `GET` | **Chat Page**. Returns a self-contained HTML/CSS/JS chat interface. Always registered; shows a fallback message if no LLM is configured. |
 | `/chat` | `POST` | **Chat Message**. Accepts `{"message": "...", "session_id": "..."}` and returns the agent's response. *Only registered when the agent has an LLM.* |
 
+The two A2A 1.0 routes require both the exact `HTTPTransport` and `a2a=True`. With the default `False`, HTTP retains the native endpoint contract and does not expose `/.well-known/agent-card.json` or `POST /`. Other transports are not presented as A2A 1.0 wire bindings. See [A2A Core and 1.0 Compatibility](a2a.md) for the implemented scope and TCK evidence.
+
 ### Usage
 
-The `Agent` class automatically creates an `AgentServer` internally when a transport is provided. You rarely need to instantiate `AgentServer` directly.
+The `Agent` class automatically creates an `AgentServer` internally when a transport is provided. You rarely need to instantiate `AgentServer` or wire the A2A adapter directly.
 
 ```python
-# AgentServer is created internally here
-agent = Agent(card=card, transport=transport)
+# AgentServer is created internally; A2A routes are explicit and additive.
+agent = Agent(card=card, transport="http", a2a=True)
 
 agent.start()
 ```

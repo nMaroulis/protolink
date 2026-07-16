@@ -135,14 +135,14 @@ monitoring, evaluation, auditing, and human-in-the-loop inspection.
 
 ### Gateway
 
-**Purpose:** Define the boundary between external systems and the A2A network.
+**Purpose:** Define the boundary between external systems and the agent mesh.
 
 A Gateway is an edge agent responsible for ingress and egress. It translates
-external protocols into A2A messages and enforces trust and security policies.
+external protocols into runtime messages and enforces trust and security policies.
 
 **Responsibilities**
 - Accept inbound requests from external systems
-- Translate protocols (e.g. HTTP, WebSocket, gRPC) into A2A messages
+- Translate protocols (e.g. HTTP, WebSocket, gRPC) into runtime messages
 - Authenticate and authorize requests
 - Enforce rate limits, validation, and redaction
 - Emit final responses back to external systems
@@ -635,7 +635,7 @@ A polymorphic type alias used in the **Structured Flows** architecture. It repre
 | Target Type | Description |
 |-------------|-------------|
 | **Agent** | A local `Agent` instance. Execution happens via `agent.handle_task()`. |
-| **str** | An agent name or URL. It is resolved via the `Registry` and executed remotely via A2A. |
+| **str** | An agent name or URL. It is resolved via the `Registry` and executed through the configured ProtoLink transport. |
 | **Flow** | Another `Flow` instance (e.g., `Pipeline`, `Parallel`). Enables **recursive nesting** of workflows. |
 
 ### Usage Example

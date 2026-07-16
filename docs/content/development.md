@@ -262,7 +262,7 @@ Use conventional commits:
 
 If your change includes breaking changes:
 - Clearly document them in the PR
-- Update the version in `__version__.py`
+- Update every version source listed in the [Release Process](#release-process)
 - Add migration notes to documentation
 
 :::
@@ -312,12 +312,13 @@ python -c "import protolink; print(protolink.__file__)"
 
 Maintainers can follow this process for releases:
 
-1. **Update Version** in `protolink/__version__.py`
-2. **Update Changelog** in `docs/changelog.md`
-3. **Tag Release**: `git tag vX.Y.Z`
-4. **Push Tags**: `git push origin --tags`
-5. **Build Package**: `python -m build`
-6. **Upload to PyPI**: `python -m twine upload dist/*`
+1. **Update Python version sources** in `pyproject.toml` and `protolink/__version__.py`, then regenerate `uv.lock`.
+2. **Update documentation versions** in `docs/package.json`, regenerate `docs/package-lock.json`, and update the current-release labels in the documentation.
+3. **Finalize the changelog** in `docs/content/changelog.md`: replace `Unreleased` with the publication date and move the latest-release note to the new version.
+4. **Run release gates**: formatting, linting, type checking, the full test suite, the Docusaurus production build, `python -m build`, and `python -m twine check dist/*`.
+5. **Tag Release**: `git tag vX.Y.Z`
+6. **Push Tags**: `git push origin --tags`
+7. **Upload to PyPI**: `python -m twine upload dist/*`
 
 ---
 

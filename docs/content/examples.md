@@ -80,6 +80,26 @@ Run these notebooks in order to build a complete weather monitoring system:
 
 The repository includes several **standalone example scripts** that demonstrate specific Protolink capabilities:
 
+### Built-in web search
+
+- [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) registers `web_search()` on a runtime Agent with an explicit `network.read` policy. It defaults to English Wikipedia's documented keyless search API and accepts `--engine`, `--freshness`, and `--max-results` options. DuckDuckGo remains an explicit best-effort HTML option; select Brave after exporting `BRAVE_SEARCH_API_KEY`.
+
+```bash
+python examples/builtin_web_search.py "What is the capital of Greece?"
+
+export BRAVE_SEARCH_API_KEY="your-key"
+python examples/builtin_web_search.py "Python structured concurrency" --engine brave
+
+python examples/builtin_web_search.py "Python structured concurrency" --engine duckduckgo
+```
+
+Run it without a query to inspect the CLI without making a network request.
+
+### A2A core and A2A 1.0 boundary
+
+- [`provider_free_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py) runs a deterministic three-agent mesh with no provider, API key, registry, or network port. It demonstrates the A2A-derived `AgentCard`, `Task`, and `Message` model through the in-process runtime transport.
+- [`a2a_tck_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/a2a_tck_agent.py) is the provider-free HTTP fixture for the official A2A 1.0 TCK. It explicitly uses `Agent(..., a2a=True)`; ordinary HTTP agents remain native-only by default. It is a compatibility test target, not a substitute for a published passing TCK result; follow the pinned instructions in [A2A Core and 1.0 Compatibility](a2a.md).
+
 ### 🧩 Protolink 0.6.3 runtime-control examples
 
 The 0.6.3 examples are small, provider-free scripts intended for application integrators:

@@ -54,6 +54,11 @@ def _coerce_task_state(state: TaskState | str) -> TaskState:
     raise TypeError(f"Task state must be a TaskState or str, got {type(state).__name__}")
 
 
+def _task_item_timestamp(item: Message | Artifact) -> str:
+    """Return the timestamp used to order task messages and artifacts."""
+    return item.timestamp
+
+
 @dataclass
 class Task:
     """Shared Unit of work exchanged between agents.
@@ -104,7 +109,7 @@ class Task:
             candidates.append(self.artifacts[-1])
         if not candidates:
             return None
-        return max(candidates, key=lambda item: item.timestamp)
+        return max(candidates, key=_task_item_timestamp)
 
     def _record_state_transition(self, previous_state: TaskState, new_state: TaskState) -> None:
         """Append a serialized state transition to ``metadata['state_history']``."""

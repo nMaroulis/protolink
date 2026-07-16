@@ -1,4 +1,4 @@
-# Protolink
+# ProtoLink
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)
@@ -9,321 +9,243 @@
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/protolink?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=YELLOW&left_text=%E2%AC%87%EF%B8%8F)](https://pepy.tech/projects/protolink)
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%">
+  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="ProtoLink logo" width="60%">
 </div>
 
-> 📌 The framework is currently in **beta** and is subject to change.
+ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python framework for building **pluggable agents** and multi-agent systems. It began as an A2A-based alternative to chain-centric frameworks such as LangChain: instead of organizing an application around chains of model calls, ProtoLink treats each `Agent` as a self-contained runtime entity with identity, capabilities, lifecycle, tools, optional reasoning, and direct task-based communication.
 
-ProtoLink is a lightweight Python framework that allows you to build **autonomous, LLM-powered agents** that communicate directly, manage context, and **integrate tools seamlessly**. Build **distributed multi-agent systems** with minimal boilerplate and production-oriented architecture.
+A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, structured agent flows and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
 
-Each ProtoLink **agent** is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
+The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, built-in, native, or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
-ProtoLink implements and extends [Google’s Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/?utm_source=chatgpt.com) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **LLM & tool integration**.
+ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
 
-> ProtoLink is an **A2A-native agent runtime** for building distributed, typed, observable agent systems. LangChain composes model calls; ProtoLink runs agents.
+The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hosted model SDKs, MCP, telemetry providers, and other integrations are installed only when you choose them.
 
+> **Simple by default. Explicit when it matters.**
 
-#### 🎯 The Philosophy
+[Get started](https://nmaroulis.github.io/protolink/docs/getting-started/) · [Concept](https://nmaroulis.github.io/protolink/docs/concept/) · [API documentation](https://nmaroulis.github.io/protolink/docs/) · [Examples](https://nmaroulis.github.io/protolink/docs/examples/)
 
-Find more in the Protolink [whitepaper](https://nmaroulis.github.io/protolink/whitepaper).
+## Why ProtoLink?
 
-The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
+- **Pluggable by design** - compose an agent from independent modules instead of adopting a mandatory stack.
+- **A small, stable API** - string aliases cover the common path; concrete implementations expose full control when needed.
+- **Local first, distributed when needed** - develop with no network or provider, then move the same task contract to HTTP, SSE JSON-RPC, WebSocket, or gRPC.
+- **Friendly to smaller models** - one-action-at-a-time inference, schema validation, JSON fallback, and deterministic flows reduce reliance on hidden prompt behavior.
+- **Explicit and inspectable** - tool calls, delegation, task state, policy decisions, approvals, runtime events, traces, and reports have typed representations.
+- **A2A at the core** - agents communicate through cards, tasks, messages, parts, and artifacts rather than framework-private graph state.
 
-**Tool calling**, **agent delegation**, **LLM invocation**, and **task execution logic** are provided by Protolink. You describe the agent, its tools, and its capabilities; ProtoLink handles the infer loop, native tool calling where available, JSON fallback for smaller models, action validation, and deterministic execution.
+Focus on the agent's role and capabilities. ProtoLink handles the infer loop, validated tool execution, delegation, communication, lifecycle, and the operational modules around them.
 
-Protolink uses **dynamic semantic context injection**, automatically enriching agent prompts with **downstream agent capabilities, tools, and communication contracts** so agents remain **fully decoupled** while adapting their behavior at **runtime** without **hardcoded integrations**.
+## Start with one agent
 
-> **Focus on your agent logic** - ProtoLink handles communication, authentication, LLM integration, and tool management for you.
-
-Follow the API documentation here 📚 [documentation](https://nmaroulis.github.io/protolink/).
-
-The following *articles* published on ***Level Up Coding*** on ***Medium*** give a hands-on guide and overview of Protolink:
-- 📝 [Building My Own Local “Claude Code”: What I Learned Demystifying Agentic Coding under the Hood](https://levelup.gitconnected.com/building-my-own-local-claude-code-what-i-learned-demystifying-agentic-coding-under-the-hood-8772874b91b8)
-- 📝 [Your First Autonomous Agent Mesh - Easier Than You Think](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a)
-- 📝 [Build Easily Your Own “Claude Code” with Three Agents: Brain, Hands, and Coordinator](https://medium.com/gitconnected/build-easily-your-own-claude-code-with-three-agents-brain-hands-and-coordinator-5236b392ddf0)
-
-### NEW Feature: Flows 📣
-
-Update 0.5.0 introduces **Structured Flows**, a new feature that allows you to define **structured workflows** for your agents. Building on A2A transport layer, flows allow you to define **complex workflows** for your agents that can be executed in a **structured & deterministic manner**. Technically, each flow is a deterministic `Flow.execute(Task) -> Task` state machine over A2A `Task`, `Message`, `Artifact`, and `AgentCard` primitives, keeping orchestration protocol-native instead of creating a separate graph runtime. Again the **Semantic Context Injection** is handled by Protolink, meaning that the agents will **automatically** have the necessary context about the flow they are executing and what to pass down to next agents in the pipeline. See more here 🔀 [flows](https://nmaroulis.github.io/protolink/flows/).
-
-### The centralized agent architecture
-In Protolink the agent is the central component that handles all the logic and incorporates the **LLM**, **tools**, **transport layer** through **AgentClient** and **AgentServer**, the **Storage** and **OpenTelemetry** for logging.
-
-Each of these components is a separate module that can be used independently or in combination with other modules. 
-Each component is **pluggable** to the agent and can be replaced with your own implementation.
-
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%">
-</div>
-
-
-Here's a simple example on how **easy** it is to **create an agent**, define the neccessary **modules**, **provided by Protolink** and **plug** 🔌 them to the agent. The agent is then ready to **discover other agents** and send & receive **Tasks**.
-
-```python
-from protolink.agents import Agent
-
-# 1. Initialize & start the Registry for A2A Discovery (optional)
-from protolink.discovery import Registry
-registry = Registry(url="http://127.0.0.1:9000", transport="http")
-registry.start(background=True)
-
-# 2. Initialize OpenAI API LLM (optional)
-from protolink.llms.api import OpenAILLM
-llm = OpenAILLM(model="gpt-5.2") # for local model use protolink.llms.server.OllamaLLM and more...
-
-# 3. Initialize Storage (optional)
-from protolink.storage import SQLiteStorage
-storage = SQLiteStorage(db_path="agent.db")
-
-# 4. Initialize Telemetry (optional)
-from protolink.telemetry import LangfuseTelemetry
-telemetry = LangfuseTelemetry()
-
-# 5a. Define the agent card
-agent_card = {
-    "url": "http://127.0.0.1:8020",
-    "name": "example_agent",
-    "description": "A dummy agent",
-}
-
-# 5b. Initialize the agent (http transport will be created based on the agent card url)
-# Plug the modules to the agent
-agent = Agent(card=agent_card, transport="http", llm=llm, registry=registry, storage=storage, telemetry=telemetry)
-
-# 6. Add Native tool (Tools from MCP can also be added easily using the MCPToolAdapter)
-@agent.tool(name="add", description="Add two numbers")
-async def add_numbers(a: int, b: int):
-    return a + b
-
-# Start the agent.
-agent.start()
-```
-
-#### ✨ Ready to Orchestrate
-
-The agent is now fully initialized and prepared to **discover & be discovered by peers**, send & receive **tasks** across your system.
-
-Running tasks can be canceled by task ID across local and remote transports, with final canceled state propagated through `RunContext` and streamed runtime events.
-
-**Note**: `agent.start()` automatically **adapts** to the current environment under the hood, working seamlessly in **standard Python scripts, async applications, and Jupyter notebooks** with both **blocking** and **background** execution modes. When `background=True`, it runs the agent non-blocking using an **event loop task** or a **dedicated background thread** depending on the runtime context. See how Protolink handles [agent execution **lifecycle**](https://nmaroulis.github.io/protolink/agent/#lifecycle-methods).
-
-## Features
-
-- **A2A Protocol Implementation**: Fully compatible with **Google's A2A specification**
-- **Extended Capabilities**:
-  - **Unified Client/Server Agent Model**: Single agent instance handles both client and server responsibilities, reducing complexity.
-  - **Transport Layer Flexibility**: Swap between *HTTP*, *WebSocket*, *gRPC* or *in-memory* transports with minimal code changes.
-  - **Simplified Agent Creation and Registration**: Create and register **autonomous AI agents** with just a few lines of code.
-  - **LLM-Ready** Architecture: Native support for integrating LLMs to agents (APIs & local) directly as agent modules, allowing agents to expose LLM calls, reasoning functions, and chain-of-thought utilities with zero friction.
-  - **Tooling**: **Native support** for integrating tools to agents (APIs & local) directly as agent modules. Native Adapter for **MCP tooling**.
-  - **Runtime Transport Layer**: In-process agent communication using a shared memory space. Agents can easily communicate with each other within the same process, making it easier to build and test agent systems.
-  - **Enhanced Security**: Native **TLS/mTLS**, **OAuth 2.0**, bearer tokens, Basic auth, and **API key support**.
-  - **Comprehensive Logging**: Built-in support for **console** (colored), **file-based** logging (including structured **JSON** output), and a no-op quiet logger.
-  - Built-in support for streaming and async operations.
-- **Planned Integrations**:
-  - **Advanced Orchestration Patterns**
-    - Multi-step workflows, supervisory agents, role routing, and hierarchical control systems.
-- **Runtime Control Plane**: Typed client/server requests for cancellation, state inspection/reset/compaction, and LLM history compaction without exposing maintenance operations to the model prompt.
-- **Observable & Replayable Runs**: `RunContext`, `RunEvent`, `RunReport`, budgets, policy decisions, approvals, and redaction for production-facing UIs and tests.
-- **Developer Tools**: `protolink doctor`, registry inspection, run replay, and a local dashboard with agent ping, HTTP chat, registry health, and a disabled Studio preview for future topology work.
-
-## Dashboard Developer Tool Preview
-
-Protolink exposes a dashboard UI through the `protolink dashboard` CLI command, projecting run-store and registry state into a local browser view.
-
-Run the **dashboard** against an existing run store and a live registry (both optional):
+Install the HTTP extra:
 
 ```bash
-protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
-```
-
-The command serves a dependency-free local HTML dashboard over Protolink's public devtool collectors. It reads persisted task snapshots and `RunReport` records from `SQLiteRunStore`, pulls `AgentCard` entries from the registry, and exposes live dashboard actions through local endpoints for snapshot refresh, run replay, HTTP agent `/status` probes, and standard agent chat. The page does not create agents; it projects the runtime state your agents already emit through `AgentCard`, `RunContext`, `RunEvent`, and `RunReport`.
-
-![Protolink dashboard overview](https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif)
-
-## 💡 Protolink vs Google's A2A
-
-ProtoLink implements Google’s A2A protocol at the **wire level**, while providing a higher-level agent runtime that unifies client, server, transport, tools, and LLMs into a single composable abstraction **the Agent**.
-
-| Concept   | Google A2A              | ProtoLink       |
-| --------- | ----------------------- | --------------- |
-| Agent     | Protocol-level concept  | Runtime object  |
-| Transport | External server concern | Agent-owned     |
-| Client    | Separate                | Built-in        |
-| LLM       | Out of scope            | First-class     |
-| Tools     | Out of scope            | Native + MCP    |
-| UX        | Enterprise infra        | Developer-first |
-
-### Architecture - Centralized Agent & Transport Layer Design
-
-Protolink takes a **centralized agent** approach compared to Google's A2A protocol, which separates client and server concerns. Here's how it differs:
-
-| Feature | Google's A2A | Protolink |
-|---------|-------------|-----------|
-| **Architecture** | Decoupled client/server | Unified agent with built-in client/server |
-| **Transport** | Factory-based with provider pattern | Direct interface implementation |
-| **Deployment** | Requires managing separate services | Single process by default, scales to distributed |
-| **Complexity** | Higher (needs orchestration) | Lower (simpler to reason about) |
-| **Flexibility** | Runtime configuration via providers | Code-based implementation |
-| **Use Case** | Large-scale, distributed systems | Both simple and complex agent systems |
-
-
-#### Key Benefits
-
-1. **Simplified Development**: Manage a single agent runtime without separate client/server codebases.
-2. **Reduced Boilerplate**: Common functionality is handled by the base [Agent]() class, letting you focus on agent logic.
-3. **Flexible Deployment**: Start with a single process, scale to distributed when needed
-4. **Unified State Management**: Shared context between client and server operations
-5. **Maintainability**: 
-   - Direct code paths for easier debugging
-   - Clear control flow with fewer abstraction layers
-   - Type-safe interfaces for better IDE support
-6. **Extensibility**:
-   - Easily add new transport implementations
-   - Simple interface-based design
-   - No complex configuration needed for common use cases
-
-## Why Protolink? 🚀
-
-- **Real Multi-Agent Systems**: Build **autonomous agents** with embedded LLMs, tools, and memory that communicate directly.
-- **Simple API**: Built from the ground-up for **minimal boilerplate**, letting you focus on agent logic rather than infrastructure.
-- **Developer Friendly**: Clean abstractions and direct code paths make debugging and maintenance a breeze.
-- **Production Oriented**: Designed for **performance, reliability, and scalability** in real-world deployments.
-- **Extensible & Interoperable**: Add new agents, transports, or protocols easily; compatible with **A2A** and **MCP** standards.
-- **Community Focused**: Designed for the open-source community with clear contribution guidelines.
-
-## Installation
-
-### Basic Installation
-This will install the base package without any optional dependencies.
-```bash
-# Using uv (recommended)
-uv add protolink
-
-# Using pip
-pip install protolink
-```
-
-### Optional Dependencies
-Protolink supports optional features through extras. Install them using square brackets:
-Note: `uv add` can be replace with `pip install` if preferred.
-```bash
-# Install with all optional dependencies
-uv add "protolink[all]"
-
-# Install with HTTP support (for web-based agents)
 uv add "protolink[http]"
-
-# Install with gRPC support (for service-to-service agents)
-uv add "protolink[grpc]"
-
-# Install all the supported LLM libraries
-uv add "protolink[llms]"
-
-# For development (includes all optional dependencies and testing tools)
-uv add "protolink[dev]"
 ```
 
-
-### Development Installation
-To install from source and all optional dependencies:
-
-```bash
-git clone https://github.com/nmaroulis/protolink.git
-cd protolink
-uv pip install -e ".[dev]"
-```
-
-## Hello World Example
-
-👉 The example found in the jupyter notebooks here: [Hello World Example](https://github.com/nMaroulis/protolink/tree/main/examples/notebooks/basic_example)
-
-
-```python
-from protolink.agents import Agent
-from protolink.models import AgentCard
-from protolink.tools.adapters import MCPToolAdapter
-from protolink.llms.api import OpenAILLM
-from protolink.discovery import Registry
-
-# Initialize Registry for A2A Discovery
-registry = Registry(url="http://127.0.0.1:9000", transport="http")
-registry.start(background=True)
-
-# Define the agent card
-agent_card = AgentCard(
-    name="example_agent",
-    description="A dummy agent",
-    url="http://127.0.0.1:8020",
-)
-
-# OpenAI API LLM
-llm = OpenAILLM(model="gpt-5.2")
-
-# Initialize the agent
-agent = Agent(agent_card, transport="http", llm=llm, registry=registry)
-
-# Add Native tool
-@agent.tool(name="add", description="Add two numbers")
-async def add_numbers(a: int, b: int):
-    return a + b
-
-# Add MCP tools and return them as protolink native tools
-mcp_adapter = MCPToolAdapter(transport="sse", url="https://api.example.com/mcp/sse")
-mcp_tools = mcp_adapter.get_tools()
-for mcp_tool in mcp_tools:
-    agent.add_tool(mcp_tool)
-
-# Start the agent
-agent.start()
-```
-
-When using an HTTP-compatible transport (`http`, `sse`, `json-rpc`, or `sse-json-rpc`), the **Agent** and **Registry** expose lightweight browser pages: registry status at `/status`, agent status at `/status`, and agent chat at `/chat` for LLM-backed agents. WebSocket, gRPC, and runtime transports keep the same logical endpoints for clients, but they do not serve browser HTML directly.
-
-<table>
-  <tr style="border: none;">
-    <td style="text-align: center; border: none;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" alt="Registry Status Card" width="100%">
-    </td>
-    <td style="text-align: center; border: none;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_status_card.png" alt="Agent Status Card" width="100%">
-    </td>
-    <td style="text-align: center; border: none;">
-      <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_chat_card.png" alt="Agent Chat Card" width="100%">
-    </td>
-  </tr>
-</table>
-
-## API Design
-
-ProtoLink's core philosophy is a **simple API with progressive control**: the shortest path should be enough for prototyping, while production features remain available through explicit, composable objects instead of adding every advanced option to `Agent`.
-
-For a fast prototype, pass a transport name. ProtoLink builds the transport with safe defaults:
+Create and start a provider-free agent:
 
 ```python
 from protolink import Agent, AgentCard
 
-card = AgentCard(
-    name="assistant",
-    description="General-purpose assistant",
-    url="http://127.0.0.1:8000",
+planner_agent = Agent(
+    card=AgentCard(
+        name="planner",
+        description="Builds clear execution plans",
+        url="http://127.0.0.1:8000",
+    ),
+    transport="http",
 )
 
+planner_agent.start()
+```
+
+No `async main()`, event-loop setup, model account, or API key is required. `start()` owns the lifecycle and blocks for a standalone service; use `start(background=True)` when embedding the agent in another application.
+
+## Plug in only what the agent needs
+
+The constructor is the composition surface. This expanded example uses a local Ollama model, registry discovery, SQLite state and run storage, local telemetry, authentication, file logging, dependency-free built-in web search, a native Python tool, and tools from an MCP server:
+
+```python
+from protolink import (
+    Agent,
+    AgentCard,
+    LocalTraceTelemetry,
+    SQLiteRunStore,
+    create_llm,
+)
+from protolink.logging import FileLogger
+from protolink.security import APIKeyAuth
+from protolink.storage import SQLiteStorage
+from protolink.tools import web_search
+from protolink.tools.adapters import MCPToolAdapter
+
+planner_agent = Agent(
+    card=AgentCard(
+        name="planner",
+        description="Plans and coordinates work",
+        url="http://127.0.0.1:8000",
+    ),
+    llm=create_llm(
+        "ollama",
+        base_url="http://127.0.0.1:11434",
+        model="gemma4:e4b",
+    ),
+    transport="http",
+    registry="http",
+    registry_url="http://127.0.0.1:9000",
+    storage=SQLiteStorage("planner.db", namespace="planner"),
+    state=["conversation"],
+    run_store=SQLiteRunStore("runs.db"),
+    telemetry=LocalTraceTelemetry(path="traces.jsonl"),
+    authenticator=APIKeyAuth({"dev-key": []}),
+    logger=FileLogger("planner.log"),
+)
+
+planner_agent.add_tool(web_search())
+
+@planner_agent.tool(name="search_notes", description="Search local notes")
+async def search_notes(query: str) -> str:
+    return f"Results for {query}"
+
+mcp_adapter = MCPToolAdapter(
+    transport="stdio",
+    command="python",
+    args=["mcp_server.py"],
+)
+for tool in mcp_adapter.get_tools():
+    planner_agent.add_tool(tool)
+
+planner_agent.start()
+```
+
+Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. Registering the tool performs no network request. Remove any constructor argument or tool you do not need, or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies, and observability backends.
+
+`MCPToolAdapter` supports local stdio and remote SSE servers. Once registered, MCP tools follow the same schema validation, policy, execution, and telemetry path as native Python tools.
+
+| Plug-in surface | Built-in choices |
+| --- | --- |
+| [LLMs](https://nmaroulis.github.io/protolink/docs/llm/) | OpenAI, Anthropic, Gemini, Grok, DeepSeek, Hugging Face, Ollama, llama.cpp, LM Studio, OpenAI-compatible servers, mock, custom |
+| [Tools](https://nmaroulis.github.io/protolink/docs/tool/) | Built-in web search, URL fetch, calculator, current datetime, typed Python tools, MCP adapters, custom `BaseTool` implementations |
+| [Transports](https://nmaroulis.github.io/protolink/docs/transport/) | Runtime, HTTP, SSE JSON-RPC, WebSocket, gRPC, custom transports |
+| [Registry](https://nmaroulis.github.io/protolink/docs/registry/) | Local or network discovery through `Registry` and `RegistryClient` |
+| [State and storage](https://nmaroulis.github.io/protolink/docs/state/) | In-memory or SQLite state, conversation persistence, custom storage |
+| [Run storage](https://nmaroulis.github.io/protolink/docs/storage/) | `SQLiteRunStore` or custom durable `RunStore` implementations |
+| [Telemetry](https://nmaroulis.github.io/protolink/docs/telemetry/) | Dependency-free local traces, Langfuse, LangSmith, multi-telemetry, custom |
+| [Authentication](https://nmaroulis.github.io/protolink/docs/authentication/) | API keys, bearer JWT, basic auth, OAuth delegation, TLS |
+| [Logging](https://nmaroulis.github.io/protolink/docs/logging/) | Colored console, text/JSON files, quiet logger, custom `BaseLogger` |
+| [Runtime control](https://nmaroulis.github.io/protolink/docs/runtime/) | Budgets, cancellation, policy, approvals, events, reports, replay, redaction |
+
+## LLM-agnostic, with a strong local focus
+
+For LLM-backed agents, the **infer loop** is the heart of ProtoLink:
+
+1. The model proposes one next action.
+2. ProtoLink parses and validates it.
+3. The runtime executes a tool call, agent delegation, or final response.
+4. The structured result is added to the task context.
+5. The loop repeats until completion or a configured bound is reached.
+
+Providers with reliable native tool calling use it. Local and smaller models can use the JSON fallback, which exposes the same `tool_call`, `agent_call`, and `final` action contract without depending on a provider-specific SDK feature.
+
+`agent_call` has two delegation modes: `tool_call` asks another agent to execute one of its tools, while `infer` asks that agent's LLM to handle a prompt and initiates the other agent's **infer loop**.
+
+```python
+from protolink import Agent, AgentCard, create_llm
+
+local_agent = Agent(
+    card=AgentCard(
+        name="local-assistant",
+        description="Runs against a local model server",
+        url="runtime://local-assistant",
+    ),
+    transport="runtime",
+    llm=create_llm(
+        "ollama",
+        base_url="http://127.0.0.1:11434",
+        model="qwen3:4b",
+    ),
+)
+```
+
+Swap `"ollama"` for another built-in or custom `LLM`; the agent, tools, tasks, and flows do not change.
+
+## A2A primitives, standard wire compatibility
+
+ProtoLink uses A2A's core `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` concepts as first-class Python runtime primitives. Delegation, lifecycle transitions, structured flows, tool results, telemetry, and replay all operate on those explicit objects rather than escaping into a separate orchestration format.
+
+Standard wire compatibility is explicit and additive:
+
+```python
+a2a_agent = Agent(card=card, transport="http", a2a=True)
+
+# "auto" prefers the full ProtoLink contract and discovers A2A-only peers.
+result = await a2a_agent.call_agent(peer_url, task)
+
+# Select the protocol explicitly when the peer protocol is already known.
+result = await a2a_agent.call_agent(peer_url, task, protocol="a2a")
+result = await a2a_agent.call_agent(peer_url, task, protocol="protolink")
+```
+
+An explicit `protocol="a2a"` choice bypasses the native-vs-A2A selection step,
+but still fetches and validates the peer's standard Agent Card and compatible
+JSON-RPC interface before sending work.
+
+Agent-originated A2A discovery is always same-origin: an advertised interface
+must match the Agent Card's origin. For a split-origin deployment you explicitly
+trust, use a dedicated `AgentClient(..., a2a_allow_cross_origin=True)`; see
+[A2A compatibility](https://nmaroulis.github.io/protolink/docs/a2a/) for the operational limits.
+
+With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat, and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` JSON-RPC operations, and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
+
+Compatibility is versioned and testable: the official [A2A Technology Compatibility Kit](https://github.com/a2aproject/a2a-tck) measures the adapter against a pinned protocol surface. The [A2A compatibility page](https://nmaroulis.github.io/protolink/docs/a2a/) records the exact binding, TCK commit, commands, current result, and the remaining upstream harness limitation.
+
+## Structured flows
+
+Agents can choose their own next action, but not every workflow should be probabilistic. `Pipeline`, `Parallel`, `Router`, and `Graph` provide explicit, deterministic topology while keeping every step on the same `Task -> Task` contract.
+
+```python
+from protolink import Pipeline, Task
+
+review_flow = Pipeline(
+    steps=[researcher_agent, reviewer_agent, planner_agent],
+)
+
+result = review_flow.sync.execute(
+    Task.create_infer(prompt="Prepare the release plan"),
+)
+```
+
+Flows can contain local agents, registry-resolved remote agents, or other nested flows. Semantic context injection tells each agent what the next step expects without coupling that agent to the overall topology. See [structured flows](https://nmaroulis.github.io/protolink/docs/flows/) and the [runnable examples](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows).
+
+## Progressive control
+
+The common path stays small:
+
+```python
 agent = Agent(card=card, transport="http")
 ```
 
-For production, configure the transport directly and pass the completed object to the same Agent API:
+The alias selects the communication boundary without changing the agent API:
+
+| If you need... | Start with | Why |
+| --- | --- | --- |
+| Agents in one Python process | `"runtime"` | Lowest transport overhead, streaming, and no ports |
+| A network service or optional A2A 1.0 endpoint | `"http"` | Status, health, optional chat, and dashboard utilities; add `a2a=True` for A2A routes and outbound translation |
+| Live progress for a browser or CLI | `"sse"` | HTTP utilities plus a one-way event stream; no A2A adapter today |
+| A persistent interactive connection | `"websocket"` | Bidirectional streaming with low per-frame overhead after connection setup |
+| Internal gRPC infrastructure | `"grpc"` | Pooled RPCs, streaming, deadlines, standard health, and reflection |
+
+These are qualitative protocol-overhead profiles, not benchmark results; model and tool latency commonly dominate an agent call. See the [transport guide](https://nmaroulis.github.io/protolink/docs/transport/) for the complete performance, utility, and deployment comparison.
+
+When a boundary needs TLS, resource limits, retries, keepalive settings, or other operational controls, construct the transport and pass it to the same API:
 
 ```python
-from protolink import Agent, AgentCard, RetryPolicy, TLSConfig, TransportConfig, TransportLimits
+from protolink import RetryPolicy, TLSConfig, TransportConfig, TransportLimits
 from protolink.transport import HTTPTransport
 
-card = AgentCard(
-    name="assistant",
-    description="Production assistant",
-    url="https://agent.internal:8443",
-)
 transport = HTTPTransport(
     url=card.url,
     tls=TLSConfig(
@@ -340,486 +262,65 @@ transport = HTTPTransport(
 agent = Agent(card=card, transport=transport)
 ```
 
-This keeps Agent concerns such as reasoning, tools, state, and policy separate from transport concerns such as TLS, payload limits, retries, keepalive, and connection management. The same rule applies to `AgentClient` and `Registry`: pass a string for defaults or a configured transport object for advanced behavior. Every service boundary can therefore use its own certificates and capacity policy without expanding or coupling the high-level constructors.
+`AgentClient` and `Registry` follow the same rule: pass a string for built-in defaults or a concrete implementation for full control. The façade does not change as deployment requirements grow.
 
-## Documentation
+## Local telemetry and replay
 
-Follow the API documentation here: [Documentation](https://nmaroulis.github.io/protolink/)
-### API Documentation
-
-#### Transport:
-
-For Agent-to-Agent & Agent-to-Registry communication:
-
-- `http` · [HTTPTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py): Uses HTTP/HTTPS for synchronous requests. Two ASGI implementations are available.
-  - Lightweight: `starlette`, `httpx` & `uvicorn`
-  - Advanced | Schema Validation: `fastapi`, `pydantic` & `uvicorn`
-- `sse`, `json-rpc`, `sse-json-rpc` · [SSEJSONRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/sse_jsonrpc_transport.py): Uses normal HTTP routes plus Server-Sent Events for streamed task updates.
-- `websocket` · [WebSocketTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py): Uses WebSocket for streaming requests. [`websockets`]
-- `grpc` · [GRPCTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py): Uses gRPC unary calls and unary-stream task events over compact JSON envelopes. [`grpcio`]
-- `runtime` · [RuntimeTransport](https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py): Simple **in-process, in-memory transport**.
-
-All network transports share one native TLS API. Use `https://`, `wss://`, or `grpcs://` and configure `TLSConfig` on the transport:
+ProtoLink includes dependency-free local tracing. Attach `LocalTraceTelemetry`, run a task, and replay the captured spans without sending data to an external service:
 
 ```python
-from protolink import Agent, AgentCard, TLSConfig
-from protolink.transport import HTTPTransport
-
-tls = TLSConfig(
-    certfile="certs/agent.pem",
-    keyfile="certs/agent-key.pem",
-    cafile="certs/ca.pem",
-    # require_client_cert=True,  # enable mutual TLS
-)
-
-card = AgentCard(
-    name="secure-agent",
-    description="Agent served over HTTPS",
-    url="https://agent.internal:8443",
-)
-transport = HTTPTransport(
-    url=card.url,
-    tls=tls,
-)
-agent = Agent(card=card, transport=transport)
-```
-
-`TLSConfig` encrypts the connection and verifies certificates; `Authenticator` implementations handle application credentials and authorization. They are independent and can be combined. See the [TLS and mutual TLS guide](https://nmaroulis.github.io/protolink/docs/transport/#tls-and-mutual-tls) and [`examples/tls_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/tls_agent.py).
-
-All transports also share one production configuration surface:
-
-```python
-from protolink import Agent, AgentCard, RetryPolicy, TransportConfig, TransportLimits
-from protolink.transport import HTTPTransport
-
-agent_card = AgentCard(
-    name="production-agent",
-    description="Production task worker",
-    url="http://127.0.0.1:8000",
-)
-transport_config = TransportConfig(
-    limits=TransportLimits(max_concurrent_requests=200, max_concurrent_streams=50),
-    retry=RetryPolicy(max_attempts=3),
-)
-
-transport = HTTPTransport(url=agent_card.url, config=transport_config)
-agent = Agent(card=agent_card, transport=transport)
-```
-
-Retries remain off by default and run only for explicitly idempotent request specifications. Correlation IDs, server-side idempotency replay, bounded payloads/concurrency, loop-safe pooled-resource shutdown, WebSocket keepalive, typed transport errors, local metric snapshots, and `/healthz` and `/readyz` probes use the same contract across HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. The `grpc` extra also installs standard gRPC health checking and reflection. See the [production transport guide](https://nmaroulis.github.io/protolink/docs/transport/#production-configuration) and [`examples/transport_production.py`](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py).
-
-These controls exist so changing protocols does not change the Agent's production safety model. Limits prevent one payload or traffic burst from exhausting the process; retries recover explicitly safe operations from temporary connection failures; idempotency prevents those retries from executing the same operation twice; and metrics and health probes make the behavior visible. The defaults are suitable for getting started and do not enable retries automatically.
-
-The application-facing transport types are exported directly from `protolink`:
-
-| API | Purpose |
-|-----|---------|
-| `TransportConfig` | One immutable configuration for limits, retries, keepalive, shutdown, idempotency replay, and metrics. |
-| `TransportLimits` | Request, response, stream-event, request-concurrency, and stream-concurrency bounds. |
-| `RetryPolicy` | Explicit attempt count, exponential backoff, jitter, and retryable method set. |
-| `TransportMetricsSnapshot` | Dependency-free per-instance counters, byte totals, active work, retries, and cumulative latency. |
-| `TransportError` and typed subclasses | Stable connection, timeout, protocol, remote, and payload-limit failures with request metadata. |
-
-Transport authors can additionally import `Transport`, `TransportCapabilities`, and `TransportRequestContext` from `protolink.transport`. The [shared API reference](https://nmaroulis.github.io/protolink/docs/transport/#shared-transport-api-reference) lists every field, default, base-class hook, health payload, and protocol mapping.
-
-#### LLMs:
-
-Protolink separates LLMs into three types: `api`, `local`, and `server`.
-The following are the Protolink wrappers for each type. If you want to use another model, you can use it directly without going through Protolink’s `LLM` class.
-
-<p align="center">
-  <font color="#888" size="2">[ API ]</font>   <font color="#888" size="2">[ Server ]</font>   <font color="#888" size="2">[ Local ]</font>
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/openai.svg" width="45" alt="OpenAI" title="OpenAI"/> <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/anthropic_black.svg" width="45" alt="Anthropic" /> <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/gemini.svg" width="45" alt="Gemini" /> <img src="https://raw.githubusercontent.com/pheralb/svgl/476aabb842086433647755b0963640c6a0775f79/static/library/grok-light.svg" width="45" alt="Grok" /> <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/deepseek.svg" width="45" alt="DeepSeek" />    <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/ollama_light.svg" width="45" alt="Ollama" />    <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="45" alt="Llama.cpp" />
-</p>
-
-
-- **API**, calls the API, requires an API key:
-  - [OpenAILLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py): Uses **OpenAI API** for sync & async requests.
-  - [AnthropicLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py): Uses **Anthropic API** for sync & async requests.
-  - [GeminiLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/gemini_client.py): Uses **Gemini API** for sync & async requests.
-  - [GrokLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/grok_client.py): Uses **Grok API** for sync & async requests.
-  - [DeepSeekLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/deepseek_client.py): Uses **DeepSeek API** for sync & async requests.
-- **Local**, runs the model in runtime:
-  - [LlamaCPPLocalLLM](): Uses **local runtime llama-cpp-python** for sync & async requests.
-- **Server**, connects to an LLM Server, deployed locally or remotely:
-  - [OllamaLLM](https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/ollama_client.py): Uses **Ollama** for sync & async requests.
-  - [LlamaCPPServerLLM](): Connects to **llama-server** for sync & async requests.
-
-#### Tools:
-
-- [Native Tool](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py): Uses native tools.
-- [MCPToolAdapter](https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py): Connects to MCP Server and registers MCP tools as native tools.
-
-##### MCP Tool Adapter
-
-The `MCPToolAdapter` connects to [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers and exposes their tools as Protolink-native callables, wrapping remote **MCP tools** as native `Tool` instances. This enables seamless integration with the growing MCP ecosystem.
-
-**Supported transports:**
-- `stdio` - Local subprocess communication (for MCP servers as scripts/executables)
-- `sse` - Remote HTTP Server-Sent Events (for MCP servers as web services)
-
-```python
-from protolink.tools.adapters import MCPToolAdapter
-
-# Connect to a local MCP server
-adapter = MCPToolAdapter(
-    transport="stdio",
-    command="python",
-    args=["my_mcp_server.py"]
-)
-
-# Or connect to a remote MCP server
-adapter = MCPToolAdapter(
-    transport="sse",
-    url="https://api.example.com/mcp/sse"
-)
-
-# Get tools and add them to your agent
-for tool in adapter.get_tools():
-    agent.add_tool(tool)
-
-# Or call tools directly
-add_tool = adapter.get_callable("add")
-result = add_tool(a=5, b=7)
-```
-
-#### How Protolink Eliminates LLM Orchestration Boilerplate
-
-Protolink treats agentic systems as **distributed programs**, not probabilistic workflows.
-Every interaction between models, tools, and agents becomes an explicit action that the runtime can validate, execute, observe, and replay.
-Runs can also carry a typed `RunContext` and emit versioned `RunEvent`s, giving applications stable session, trace, budget, permission, and progress metadata without custom glue.
-`RunAction`, capability policy, and typed approval checkpoints gate side effects while keeping approval previews and user experience application-owned.
-
-At the heart of Protolink is the **infer loop**:
-
-1. The LLM proposes exactly one next action.
-2. Protolink validates that action.
-3. The runtime executes the tool call, agent delegation, or final response.
-4. The result is fed back into the conversation.
-5. The loop repeats until the agent returns a final answer.
-
-This is where Protolink removes the boilerplate most agent frameworks push onto you: provider-specific tool prompts, JSON parsing, schema validation, retries, routing, delegation, and error recovery.
-
-When a provider supports native tool calling, Protolink uses it. When a local or smaller model works better with simple JSON instructions, Protolink uses that instead. The user-facing contract stays the same.
-
-Protolink removes that complexity by standardizing all interactions through a small set of explicit primitives:
-
-- **Task** - a shared unit of work
-- **Message** - communication within a task
-- **Part** - an atomic, machine-interpretable action or result
-
-Agents never infer behavior implicitly. Instead, they declare intent explicitly using structured Parts such as:
-
-- **tool_call** - execute a local tool
-- **agent_call** - delegate work to another agent
-- **infer** - invoke LLM reasoning
-- **text** - return user-facing output
-
-and more...
-
-From there, the runtime handles everything deterministically.
-
-#### Zero-Boilerplate LLM → Tool → Agent Flow
-
-You do **not** need to:
-
-- Write provider-specific tool-calling prompts
-- Parse raw LLM text or JSON
-- Convert native tool calls into runtime actions
-- Write **routing** or **delegation logic**
-- Rebuild retry, validation, and self-correction loops
-
-The runtime automatically:
-
-- Selects the right prompt/tool-calling mode for the model
-- Injects tool schemas and discovered agent capabilities
-- Validates every LLM action before execution
-- Executes tools and agent calls deterministically
-- Emits structured events for tracing and debugging
-
-Tool calls, agent calls, and LLM invocations only happen when explicitly declared.
-All results are returned as structured Parts - no hidden side effects, no magic.
-From the user’s perspective:
-
-```python
-task = Task.create(
-    Message.user("What's the weather in Geneva?")
-)
-```
-That’s it.
-
-#### Deterministic by Design
-
-This is not a black-box agent framework.
-- No hidden reasoning
-- No implicit planning
-- No speculative execution
-
-Every action is **explicit, inspectable, and replayable**.
-
-If a tool runs, you see a `tool_call`.
-If an agent is contacted, you see an `agent_call`.
-If an LLM is invoked, you see an `infer`.
-
-This makes the system predictable, debuggable, composable, and production-ready.
-
-#### LLM-Agnostic and Provider-Independent
-
-The runtime is **fully LLM-agnostic**.
-Any model, **API-based, self-hosted, or local**, can be swapped in without changing behavior or results. OpenAI, Anthropic, local servers, or custom backends all operate through the same unified execution model.
-
-The orchestration stays the same.
-The contracts stay the same.
-Only the model changes.
-
-This lets you evolve providers, costs, latency, or deployment strategy without rewriting your agents.
-
-
-## Task, Message, Artifact, and Part in the Agent System
-
-This project uses a structured, Agent-to-Agent (A2A) style communication model. Understanding how **Tasks**, **Messages**, **Artifacts**, and **Parts** interact is key to using the agent effectively.
-
-### Concepts
-
-### 1. Task
-A **Task** represents a unit of work or a conversation thread between agents.  
-- It contains **Messages** and **Artifacts**.
-- Tracks lifecycle through `Task.state` (`submitted`, `working`, `completed`, `failed`, etc.).
-- Records successful state transitions in `metadata["state_history"]`.
-- Tasks are sent between agents; each agent executes what is explicitly defined in the task.
-
-### 2. Message
-A **Message** is a communicative unit in a task.
-- Can be sent by a user or an agent.
-- Contains **Parts** representing atomic content.
-- Example roles:
-  - `"user"` - input from a human or another agent
-  - `"agent"` - output from an agent
-
-### 3. Artifact
-An **Artifact** is a container for outputs generated by the agent.
-- Stores **Parts** that result from executing a tool (**tool_call**) or an LLM inference (**infer**).
-- Can include tool results, reasoning traces, or structured outputs.
-- Artifacts allow agents to append results without modifying the original message.
-
-### 4. Part
-A **Part** is the atomic content of a Message or Artifact.
-- Defines **what to do** or **what was produced**.
-- Example Part types (`PartType`):
-  - `"text"`: plain text content
-  - `"json"`: structured data
-  - `"tool_call"`: request to execute a registered tool
-  - `"tool_output"`: result outputfrom executing a tool
-  - `"infer"`: input to invoke the agent's LLM
-  - `"status"`, `"error"`, `"image"`, `"audio"`, etc.
-
-### Communication Flow
-
-1. **Task Creation**  
-   A user or agent creates a `Task` with a `Message` containing one or more `Parts`.
-
-2. **Task Execution**  
-   - The receiving agent inspects the **last message or artifact** in the task.
-   - Executes each `Part` sequentially:
-     - `tool_call` → executes a registered tool → produces `tool_output` Part in an Artifact.
-     - `infer` → invokes the agent's LLM → produces `infer_output` Part in an Artifact.
-
-3. **Appending Outputs**  
-   - Results are appended to the Task as new **Artifacts**.
-   - Lifecycle state transitions are applied to `Task.state` and recorded in `metadata["state_history"]`.
-
-4. **Sequential Processing**  
-   - Tasks are processed sequentially at the message/artifact level.
-   - Parallel execution is possible **within the parts of a single message/artifact**, but not across multiple messages/artifacts in the same task.
-
-#### Simple Example
-
-```python
-from protolink.models import Message, Part, Task
-
-# 1️⃣ User creates a Task with a message containing a Part
-task = Task.create(Message.user("What's the weather in Athens?"))
-
-# 2️⃣ Add a tool call Part
-tool_part = Part.tool_call(tool_name="weather_api", args={"city": "Athens"})
-task.add_message(Message.agent(parts=[tool_part]))
-
-# 3️⃣ Agent executes the task
-result_task = await agent.execute_task(task)
-
-# 4️⃣ Outputs are appended as artifacts
-for artifact in result_task.artifacts:
-    for part in artifact.parts:
-        if part.type == "tool_output":
-            print("Tool Output:", part.content)
-
-# 5️⃣ If needed, a infer Part can trigger the agent's LLM
-infer_part = Part.infer(prompt="Summarize today's weather in Athens")
-task.add_message(Message.agent(parts=[infer_part]))
-result_task = await agent.execute_task(task)
-```
-
-**Key Notes:**
-
-- Each `Task` maintains the full history of messages and artifacts.
-- Agents execute the **last message or artifact** to determine the next action.
-- Parts inside a message or artifact can be executed in parallel if needed.
-- Agents **do not guess intent**; they execute exactly what is defined in the Parts.
-
-This structured approach ensures predictable, deterministic agent behavior while still supporting multi-step interactions and LLM/tool execution.
-
-## Flows
-
-While frameworks like LangChain or LangGraph rely on complex implicit state machines or LLM-driven routing, Protolink's **Structured Flows** provide explicit, deterministic execution paths (`Pipeline`, `Parallel`, `Router`, `Graph`) without the heavy overhead.
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/flows.png" alt="Flows" width="100%">
-</div>
-
-Flows allow you to define highly composable, rigid, and predictable multi-step workflows. `Pipeline`, `Parallel`, and `Graph` define deterministic topology, while `Router` branches on structured `Part.route(...)` decisions that are serializable, trace-visible, and testable. Legacy `[ROUTE: key]` tags are still accepted for older prompts.
-
-### 🧠 Semantic Context Injection
-
-Even though flows are programmatically structured, agents executing inside them must remain **fully decoupled** from the overall flow topology. Protolink achieves this through **Dynamic Semantic Context Injection**:
-
-1. **Topological Analysis**: Before dispatching a step, the Flow orchestrator looks at the subsequent step in the topology (e.g., a single downstream agent, a parallel committee, or conditional routes).
-2. **Context-Aware Prompt Generation**: It automatically builds descriptive system instructions outlining the next target's capabilities, description, or routing choices (retrieved dynamically via their `AgentCard` from the Registry).
-3. **Flow State Injection**: It populates the prompt into `task.flow_state["prompt"]`.
-4. **Execution**: The executing agent's LLM automatically merges these instructions into its system prompt during inference. The agent adapts its behavior at runtime to optimize its output format for the downstream receiver without any hardcoded integration!
-
-In simple terms, the Flow tells the agents what to do and what format to use for their output based on the downstream agents' capabilities. In the Pipeline example below, the orchestrator tells the researcher that its output will be used by the summarizer, so it should format its output in a way that the summarizer can understand. This is done automatically and transparently to the developer!
-
----
-
-### ⚙️ Usage & Execution
-
-You can define and run structured flows programmatically using both asynchronous and synchronous APIs.
-
-#### 1. Define and Execute a Pipeline
-
-A `Pipeline` runs a predefined sequence of agents, passing the output of one agent as the input to the next:
-
-```python
-from protolink.flows import Pipeline
-from protolink.models import Task
-
-# 1. Define a deterministic sequence of steps (can be Agent names, instances, or other sub-flows)
-pipeline = Pipeline(
-    steps=["researcher", "summarizer"],
-    registry=registry  # Optional: allows discovering string-based agents by name
-)
-
-# 2. Run the flow asynchronously
-task = Task.create_infer(prompt="Research the future of Agentic computing.")
-result = await pipeline.execute(task)
-```
-
-#### 2. Fluent API Chaining
-
-Pipelines support a fluid builder pattern for dynamic step configuration:
-
-```python
-pipeline = Pipeline(registry=registry).add_step("researcher").add_step("summarizer")
-result = await pipeline.execute(task)
-```
-
-#### 3. Synchronous Execution Wrapper
-
-For simple scripts, Jupyter Notebooks, or background workers where async syntax is not preferred, use the `.sync` blocking wrapper:
-
-```python
-# Executes the flow synchronously in a clean event loop
-result = pipeline.sync.execute(task)
-print(result.get_last_part_content())
-```
-
-#### 4. Deep Composability & Nesting
-
-Since every flow primitive inherits from the base `Flow` class, they are fully polymorphic. You can nest complex flow structures inside one another seamlessly:
-
-```python
-from protolink.flows import Pipeline, Parallel
-
-# A parallel execution block containing multiple concurrent agents
-review_committee = Parallel(branches=["editor", "fact_checker"], registry=registry)
-
-# Embed the parallel block as a single step inside a pipeline!
-orchestrated_flow = Pipeline(registry=registry) \
-    .add_step("researcher") \
-    .add_step(review_committee) \
-    .add_step("summarizer")
-
-result = await orchestrated_flow.execute(task)
-```
-
-## Telemetry
-
-Protolink provides non-invasive, out-of-the-box observability for agent task execution, LLM inferences, and tool calls. It utilizes Python's `contextvars` to automatically track execution states asynchronously without cluttering core method signatures.
-
-Currently supported telemetry options:
-- **LocalTraceTelemetry** - built-in local traces for replay/debugging, with optional JSONL output
-- **[Langfuse](https://langfuse.com/)**
-- **[LangSmith](https://www.langchain.com/langsmith)**
-
-For local debugging, use `LocalTraceTelemetry` without any external service:
-
-```python
-from protolink import Agent, AgentCard, LocalTraceTelemetry, Task, create_llm
+from protolink import Agent, AgentCard, LocalTraceTelemetry, create_llm
 
 telemetry = LocalTraceTelemetry(path="traces.jsonl")
-
 agent = Agent(
-    card=AgentCard(name="debug_agent", description="Local debug agent", url="runtime://debug"),
-    llm=create_llm(
-        "mock",
-        sequential_responses=[
-            {"type": "final", "content": "done"}
-        ],
-    ),
+    AgentCard(name="debug", description="Debug agent", url="runtime://debug"),
+    transport="runtime",
+    llm=create_llm("mock", default_response="done"),
     telemetry=telemetry,
+    verbosity=0,
 )
 
-result = await agent.handle_task(Task.create_infer(prompt="Run a traced task"))
+result = agent.sync.invoke("Trace this task")
 trace = telemetry.recorder.replay()[-1]
-
-print(result.get_last_part_content())  # done
-print(trace["trace_id"])
-print([span["kind"] for span in trace["spans"]])  # task, llm, ...
 ```
 
-Local traces capture task spans, LLM events, tool calls, retry counts, redacted payloads, and model metadata. This makes the infer loop easy to inspect before sending anything to Langfuse, LangSmith, or another observability backend.
+The same runtime contracts power cancellation, budgets, policy decisions, approval previews, run reports, redaction, and deterministic replay.
 
-For hosted telemetry, install the optional dependency (`uv add "protolink[telemetry]"`) and inject the tracker to your agent. You can also broadcast events to multiple trackers using `MultiTelemetry`:
+## Dashboard developer tool
 
-```python
-from protolink.telemetry import LangfuseTelemetry, LangSmithTelemetry, MultiTelemetry
-from protolink.agents import Agent
+The `protolink dashboard` CLI command projects run-store and registry state into a dependency-free local browser UI:
 
-# Traces, spans and generations will be automatically recorded to both Langfuse and LangSmith!
-agent = Agent(
-    card={"name": "ObserverAgent", "url": "http://127.0.0.1:8000"},
-    telemetry=MultiTelemetry([LangfuseTelemetry(), LangSmithTelemetry()])
-)
+```bash
+protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
 ```
 
-See the [Telemetry Documentation](https://nmaroulis.github.io/protolink/docs/telemetry/) for full setup instructions and custom integrations.
+It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry, and provides local views for agent health, HTTP chat, task history, trace summaries, and run replay. The dashboard does not create agents or upload telemetry; it presents the runtime state your agents already emit.
 
-#### Logging:
+![ProtoLink dashboard overview](https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif)
 
-Protolink provides a flexible logging system to track agent activity across different outputs.
+The CLI also includes project scaffolding, environment diagnostics, registry inspection, and run replay:
 
-- [ConsoleLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/console.py): Provides colored, human-readable logs in the terminal.
-- [FileLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/file.py): Persists logs to disk, with optional **JSON** formatting for easy ingestion into log management tools.
-- [QuietLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/quiet.py): Implements the logger interface while intentionally dropping every log message.
-- [BaseLogger](https://github.com/nMaroulis/protolink/blob/main/protolink/logging/base.py): Abstract base class for creating custom logging implementations.
+```bash
+protolink init agent
+protolink doctor
+protolink run list --store runs.db
+```
 
-## License
+See the [developer tools guide](https://nmaroulis.github.io/protolink/docs/devtools/).
 
-MIT
+## More examples
+
+- [Built-in multi-engine web search](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py)
+- [Provider-free runtime mesh](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py)
+- [HTTP agent communication](https://github.com/nMaroulis/protolink/blob/main/examples/http_agents.py)
+- [Production transport configuration](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py)
+- [Runtime policy and approvals](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_policy_and_approvals.py)
+- [Task cancellation](https://github.com/nMaroulis/protolink/blob/main/examples/task_cancellation.py)
+- [Structured flows](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows)
+- [All examples](https://nmaroulis.github.io/protolink/docs/examples/)
 
 ## Contributing
 
-All contributions are more than welcome! Please see [CONTRIBUTING.md](https://github.com/nMaroulis/protolink/blob/main/CONTRIBUTING.md) for more information.
+Contributions are welcome. See [CONTRIBUTING.md](https://github.com/nMaroulis/protolink/blob/main/CONTRIBUTING.md) and the [development guide](https://nmaroulis.github.io/protolink/docs/development/).
+
+ProtoLink is available under the [MIT License](https://github.com/nMaroulis/protolink/blob/main/LICENSE).

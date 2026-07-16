@@ -38,6 +38,7 @@ class Tool(BaseTool):
     action_builder: ActionBuilder | None = field(default=None, repr=False)
     _signature: inspect.Signature = field(init=False, repr=False)
     _type_hints: dict[str, Any] = field(init=False, repr=False, default_factory=dict)
+    _protolink_builtin_id: str | None = field(init=False, repr=False, default=None)
     _protolink_validates_args: ClassVar[bool] = True
 
     def __post_init__(self) -> None:

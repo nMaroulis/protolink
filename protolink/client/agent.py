@@ -18,9 +18,11 @@ Example:
 import asyncio
 import queue
 import threading
+import time
 from collections.abc import AsyncIterator, Iterator
-from typing import Any
+from typing import Any, Literal
 
+from protolink.a2a.v1 import A2AClientError, A2AInterface, A2AJSONRPCClientAdapter
 from protolink.llms.compaction import HistoryCompactionStrategy
 from protolink.models import (
     AgentCard,
@@ -33,7 +35,7 @@ from protolink.models import (
     Task,
     TaskCancellationRequest,
 )
-from protolink.transport import Transport, get_transport
+from protolink.transport import Transport, TransportRemoteError, get_transport
 from protolink.types import TransportType
 
 
@@ -148,11 +150,17 @@ class AgentClient:
         channel="control",
     )
 
+    _PROTOCOL_CACHE_TTL = 300.0
+    _PROTOCOL_CACHE_MAX = 1024
+
     def __init__(
         self,
         transport: Transport | TransportType,
         url: str | None = None,
         timeout: int = 300,
+        *,
+        a2a: bool = False,
+        a2a_allow_cross_origin: bool = False,
     ) -> None:
         """Initialize a client from a transport instance or registered name.
 
@@ -160,6 +168,10 @@ class AgentClient:
             transport: Existing transport or registered transport name.
             url: Local transport URL required when constructing by name.
             timeout: Outbound request timeout in seconds.
+            a2a: Enable outbound A2A 1.0 discovery and translation. This is opt-in and requires HTTP.
+            a2a_allow_cross_origin: Trust A2A interface URLs on a different origin from the discovered Agent Card.
+                Disabled by default to prevent an untrusted card from redirecting transport credentials or requests to
+                another host.
 
         A transport name creates a default transport for rapid prototyping. Pass a concrete transport instance to
         configure TLS, limits, retries, keepalive, or protocol-specific behavior.
@@ -169,6 +181,16 @@ class AgentClient:
         else:
             self._transport = get_transport(transport=transport, url=url, timeout=timeout)
 
+        self._a2a_enabled = bool(a2a)
+        self._a2a = (
+            A2AJSONRPCClientAdapter(
+                self._transport,
+                allow_cross_origin_interfaces=a2a_allow_cross_origin,
+            )
+            if self._a2a_enabled
+            else None
+        )
+        self._protocol_cache: dict[str, tuple[float, Literal["protolink", "a2a"], A2AInterface | None]] = {}
         self.sync = SyncAgentClient(self)
 
     @property
@@ -176,11 +198,23 @@ class AgentClient:
         """Return the transport used for all client requests."""
         return self._transport
 
+    @property
+    def a2a(self) -> bool:
+        """Return whether outbound A2A compatibility is enabled."""
+
+        return self._a2a_enabled
+
     # ----------------------------------------------------------------------
     # Agent-to-Agent Communication
     # ----------------------------------------------------------------------
 
-    async def send_task(self, agent_url: str, task: Task) -> Task:
+    async def send_task(
+        self,
+        agent_url: str,
+        task: Task,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task:
         """Send a task to a remote agent and return the processed result.
 
         This is the core communication primitive for agent-to-agent interaction.
@@ -188,6 +222,11 @@ class AgentClient:
         Args:
             agent_url: Target agent endpoint URL.
             task: Task object containing instructions or input payload.
+            protocol: ``"auto"`` keeps ProtoLink-native peers on their full
+                native contract and selects A2A only for an A2A-only peer.
+                Use an explicit value to skip native-vs-A2A selection. An
+                explicit ``"a2a"`` call still discovers and validates the
+                standard Agent Card and compatible interface.
 
         Returns:
             Task: Updated task containing the response from the remote agent.
@@ -198,7 +237,76 @@ class AgentClient:
             ...     Task.create_infer(prompt="What is AI?")
             ... )
         """
-        return await self._transport.send(self.TASK_REQUEST, agent_url, data=task)
+        selected, interface = await self._select_protocol(agent_url, protocol)
+        if selected == "protolink":
+            return await self._transport.send(self.TASK_REQUEST, agent_url, data=task)
+        assert self._a2a is not None
+        return await self._a2a.send_task(agent_url, task, interface=interface)
+
+    async def _select_protocol(
+        self,
+        agent_url: str,
+        protocol: Literal["auto", "protolink", "a2a"],
+    ) -> tuple[Literal["protolink", "a2a"], A2AInterface | None]:
+        """Resolve a task protocol through discovery before any task is sent."""
+
+        if protocol not in {"auto", "protolink", "a2a"}:
+            raise ValueError("protocol must be 'auto', 'protolink', or 'a2a'")
+        if protocol == "protolink" or not self._a2a_enabled:
+            if protocol == "a2a":
+                raise RuntimeError("A2A compatibility is disabled; construct AgentClient(..., a2a=True)")
+            return "protolink", None
+        assert self._a2a is not None
+
+        normalized_url = agent_url.rstrip("/")
+        if protocol == "a2a":
+            _, interface = await self._a2a.discover(agent_url)
+            return "a2a", interface
+
+        cached = self._get_cached_protocol(normalized_url)
+        if cached is not None:
+            return cached[1], cached[2]
+
+        try:
+            await self._transport.send(self.AGENT_CARD_REQUEST, agent_url)
+        except TransportRemoteError as exc:
+            if exc.status_code not in {404, 405}:
+                raise
+        else:
+            selected: tuple[Literal["protolink", "a2a"], A2AInterface | None] = ("protolink", None)
+            self._cache_protocol(normalized_url, selected)
+            return selected
+
+        _, interface = await self._a2a.discover(agent_url)
+        selected = ("a2a", interface)
+        self._cache_protocol(normalized_url, selected)
+        return selected
+
+    def _get_cached_protocol(
+        self,
+        normalized_url: str,
+    ) -> tuple[float, Literal["protolink", "a2a"], A2AInterface | None] | None:
+        """Return one live protocol decision and prune expired cache entries."""
+
+        self._prune_protocol_cache()
+        return self._protocol_cache.get(normalized_url)
+
+    def _cache_protocol(
+        self,
+        normalized_url: str,
+        selected: tuple[Literal["protolink", "a2a"], A2AInterface | None],
+    ) -> None:
+        self._prune_protocol_cache()
+        self._protocol_cache[normalized_url] = (time.monotonic(), *selected)
+        while len(self._protocol_cache) > self._PROTOCOL_CACHE_MAX:
+            oldest = min(self._protocol_cache, key=lambda key: self._protocol_cache[key][0])
+            self._protocol_cache.pop(oldest, None)
+
+    def _prune_protocol_cache(self) -> None:
+        now = time.monotonic()
+        expired = [key for key, cached in self._protocol_cache.items() if now - cached[0] >= self._PROTOCOL_CACHE_TTL]
+        for key in expired:
+            self._protocol_cache.pop(key, None)
 
     async def send_task_streaming(self, agent_url: str, task: Task) -> AsyncIterator[Any]:
         """Send a task to a remote agent and receive streamed events.
@@ -242,6 +350,7 @@ class AgentClient:
         *,
         reason: str | None = None,
         metadata: dict[str, Any] | None = None,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
     ) -> Task:
         """Request best-effort cancellation of a task running on an agent.
 
@@ -260,6 +369,27 @@ class AgentClient:
         Raises:
             RuntimeError: The remote task is unknown, terminal, or currently cannot be canceled.
         """
+        if protocol not in {"auto", "protolink", "a2a"}:
+            raise ValueError("protocol must be 'auto', 'protolink', or 'a2a'")
+        if protocol == "a2a" and self._a2a is None:
+            raise RuntimeError("A2A compatibility is disabled; construct AgentClient(..., a2a=True)")
+        if self._a2a is not None and (
+            protocol == "a2a" or (protocol == "auto" and self._a2a.has_task(agent_url, task_id))
+        ):
+            return await self._a2a.cancel_task(
+                agent_url,
+                task_id,
+                reason=reason,
+                metadata=metadata,
+            )
+        if protocol == "auto" and self._a2a is not None:
+            selected, _ = await self._select_protocol(agent_url, "auto")
+            if selected == "a2a":
+                # A blocking SendMessage does not reveal its server-assigned
+                # task ID until the first response. Never guess by issuing a
+                # native cancel against an A2A-only peer.
+                raise A2AClientError(f"No A2A remote task ID is known for local task {task_id!r}")
+
         request = TaskCancellationRequest(
             id=task_id,
             reason=reason,
@@ -374,7 +504,13 @@ class AgentClient:
             data=request,
         )
 
-    async def send_message(self, agent_url: str, message: Message) -> Message:
+    async def send_message(
+        self,
+        agent_url: str,
+        message: Message,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Message:
         """Send a simple message to a remote agent and return its response.
 
         This is a convenience wrapper over task-based communication.
@@ -396,10 +532,16 @@ class AgentClient:
             ... )
         """
         task = Task.create(message)
-        result_task = await self.send_task(agent_url, task)
-        if result_task.messages:
-            return result_task.messages[-1]
-        raise RuntimeError("No response messages returned by agent")
+        result_task = await self.send_task(agent_url, task, protocol=protocol)
+        response = next(
+            (item for item in reversed(result_task.messages) if item.role in {"agent", "assistant"}),
+            None,
+        )
+        if response is not None:
+            return response
+        if result_task.artifacts:
+            raise RuntimeError("Agent returned artifacts but no response message; use send_task() to inspect them")
+        raise RuntimeError("No response message returned by agent")
 
     async def get_agent_card(self, agent_url: str) -> AgentCard:
         """Retrieve the public metadata (AgentCard) of an agent.
@@ -422,6 +564,14 @@ class AgentClient:
         """
 
         return await self._transport.send(self.AGENT_CARD_REQUEST, agent_url)
+
+    async def get_a2a_agent_card(self, agent_url: str) -> dict[str, Any]:
+        """Retrieve and validate a peer's standard A2A 1.0 Agent Card."""
+
+        if self._a2a is None:
+            raise RuntimeError("A2A compatibility is disabled; construct AgentClient(..., a2a=True)")
+        card, _ = await self._a2a.discover(agent_url)
+        return dict(card)
 
 
 # ----------------------------------------------------------------------
@@ -450,7 +600,13 @@ class SyncAgentClient:
     def __init__(self, async_client: AgentClient):
         self._client = async_client
 
-    def send_task(self, agent_url: str, task: Task) -> Task:
+    def send_task(
+        self,
+        agent_url: str,
+        task: Task,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task:
         """Synchronously send a task to a remote agent.
 
         This is a blocking version of `send_task()`.
@@ -463,7 +619,7 @@ class SyncAgentClient:
             ...     Task.create_infer(prompt="Hello")
             ... )
         """
-        return asyncio.run(self._client.send_task(agent_url, task))
+        return asyncio.run(self._client.send_task(agent_url, task, protocol=protocol))
 
     def send_task_streaming(self, agent_url: str, task: Task) -> Iterator[Any]:
         """Synchronously stream events from a remote agent.
@@ -514,6 +670,7 @@ class SyncAgentClient:
         *,
         reason: str | None = None,
         metadata: dict[str, Any] | None = None,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
     ) -> Task:
         """Synchronously request cancellation of a remote active task."""
         return asyncio.run(
@@ -522,6 +679,7 @@ class SyncAgentClient:
                 task_id,
                 reason=reason,
                 metadata=metadata,
+                protocol=protocol,
             )
         )
 
@@ -615,7 +773,13 @@ class SyncAgentClient:
             )
         )
 
-    def send_message(self, agent_url: str, message: Message) -> Message:
+    def send_message(
+        self,
+        agent_url: str,
+        message: Message,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Message:
         """Synchronously send a message to a remote agent.
 
         Blocking convenience wrapper for simple interactions.
@@ -626,7 +790,7 @@ class SyncAgentClient:
             ...     Message(role="user", content="Hi")
             ... )
         """
-        return asyncio.run(self._client.send_message(agent_url, message))
+        return asyncio.run(self._client.send_message(agent_url, message, protocol=protocol))
 
     def get_agent_card(self, agent_url: str) -> AgentCard:
         """Synchronously retrieve an agent's metadata (AgentCard).

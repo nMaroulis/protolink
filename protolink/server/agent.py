@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Literal, Protocol
 
+from protolink.a2a.v1 import A2A_AGENT_CARD_PATH, A2AJSONRPCAdapter
 from protolink.models import (
     AgentCard,
     HistoryCompactionRequest,
@@ -35,6 +36,8 @@ class AgentInterface(Protocol):
     Agents are not required to inherit from this protocol explicitly;
     structural typing (duck typing) is sufficient.
     """
+
+    card: AgentCard
 
     async def handle_task(self, task: Task) -> Task:
         """Handle an incoming task and return the updated task."""
@@ -87,12 +90,17 @@ class AgentServer:
     It intentionally contains no transport-specific or agent-specific logic.
     """
 
-    def __init__(self, transport: Transport, agent: AgentInterface) -> None:
+    def __init__(self, transport: Transport, agent: AgentInterface, *, a2a: bool = False) -> None:
         if transport is None:
             raise ValueError("AgentServer requires a transport instance")
 
+        transport_type = getattr(transport, "transport_type", None)
+        if a2a and transport_type != "http":
+            raise ValueError("a2a=True requires an HTTP transport")
+
         self._transport = transport
         self._agent = agent
+        self._a2a_adapter = A2AJSONRPCAdapter(agent) if a2a else None
         self._is_running = False
 
     # ------------------------------------------------------------------
@@ -210,6 +218,26 @@ class AgentServer:
                 )
             )
 
+        if self._a2a_adapter is not None:
+            endpoints.extend(
+                [
+                    EndpointSpec(
+                        name="a2a_agent_card_v1",
+                        path=A2A_AGENT_CARD_PATH,
+                        method="GET",
+                        handler=self._a2a_adapter.get_agent_card,
+                        request_source="none",
+                    ),
+                    EndpointSpec(
+                        name="a2a_jsonrpc_v1",
+                        path="/",
+                        method="POST",
+                        handler=self._a2a_adapter.handle,
+                        request_source="request",
+                    ),
+                ]
+            )
+
         self._transport.setup_routes(endpoints)
 
         # ── Chat endpoints (only when the agent has an LLM) ──
@@ -257,4 +285,6 @@ class AgentServer:
             return
 
         await self._transport.stop()
+        if self._a2a_adapter is not None:
+            await self._a2a_adapter.close()
         self._is_running = False

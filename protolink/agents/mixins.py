@@ -15,7 +15,7 @@ from typing import Any, Literal, TypeVar
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
 from protolink.core.cancellation import CancellationToken, TaskCancellationRequest
-from protolink.core.policy import ActionAuthorization
+from protolink.core.policy import ActionAuthorization, CapabilityPolicy
 from protolink.core.run_context import RunContext
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
@@ -621,12 +621,21 @@ class AgentControlPlaneMixin(_AgentMixinBase):
 class AgentCommunicationMixin(_AgentMixinBase):
     """Handles direct invocation, registry discovery, and agent-to-agent calls."""
 
-    async def call_agent(self, agent_url: str, task: Task) -> Task:
+    async def call_agent(
+        self,
+        agent_url: str,
+        task: Task,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task:
         """Send a task to another agent.
 
         Args:
             agent_url: URL of the target agent
             task: Task to send
+            protocol: Peer protocol selection. ``"auto"`` preserves native
+                ProtoLink calls and discovers A2A-only peers when this agent
+                was created with ``a2a=True``.
 
         Returns:
             Task with updated state and response messages
@@ -642,11 +651,17 @@ class AgentCommunicationMixin(_AgentMixinBase):
             agent_name=self.card.name,
         )
         self._logger.debug(f"Sending to agent {agent_url} the task: {task.to_dict()}")
-        result: Task = await self._client.send_task(agent_url, task)
+        result: Task = await self._client.send_task(agent_url, task, protocol=protocol)
         self._logger.debug(f"Received response Task from agent {agent_url}: {result.to_dict()}")
         return result
 
-    async def send_message_to(self, agent_url: str, message: Message) -> Message:
+    async def send_message_to(
+        self,
+        agent_url: str,
+        message: Message,
+        *,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Message:
         """Send a message to another agent.
 
         Args:
@@ -661,7 +676,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
         """
         if not self._client:
             raise RuntimeError("Agent has no transport configured, cannot send messages.")
-        return await self._client.send_message(agent_url, message)
+        return await self._client.send_message(agent_url, message, protocol=protocol)
 
     async def invoke(
         self,
@@ -747,7 +762,8 @@ class AgentToolMixin(_AgentMixinBase):
     """Manages tools, skills, and runtime action authorization."""
 
     def add_tool(self, tool: BaseTool) -> None:
-        """Register a Tool instance with the agent."""
+        """Register or replace a tool and keep its advertised skill in sync."""
+        replacing_runtime_tool = tool.name in self.tools
         self.tools[tool.name] = tool
         skill = AgentSkill(
             id=tool.name,
@@ -757,6 +773,11 @@ class AgentToolMixin(_AgentMixinBase):
             tags=tool.tags or [],
             examples=getattr(tool, "examples", None) or [],
         )
+        for index, existing_skill in enumerate(self.card.skills):
+            if existing_skill.id == tool.name:
+                if replacing_runtime_tool:
+                    self.card.skills[index] = skill
+                return
         self._add_skill_to_agent_card(skill)
 
     def tool(
@@ -990,6 +1011,12 @@ class AgentConfigurationMixin(_AgentMixinBase):
     """Owns transport, model, storage, registry, status, and chat configuration."""
 
     @property
+    def a2a(self) -> bool:
+        """Return whether the optional A2A 1.0 HTTP boundary is enabled."""
+
+        return self._a2a_enabled
+
+    @property
     def client(self) -> AgentClient | None:
         """Get the agent's client component.
 
@@ -1047,15 +1074,21 @@ class AgentConfigurationMixin(_AgentMixinBase):
         else:
             raise ValueError("Invalid transport type")
 
+        transport_type = getattr(transport, "transport_type", None)
+        if self._a2a_enabled and transport_type != "http":
+            raise ValueError("a2a=True requires an HTTP transport (transport='http' or HTTPTransport)")
+
         self._transport = transport
         self.card.capabilities.streaming = bool(getattr(transport, "supports_streaming", False))
-        transport_type = getattr(transport, "transport_type", None)
         if transport_type:
             self.card.transport = transport_type
         # Initialize Agent-to-Agent Client
-        self._client = AgentClient(transport=transport)
+        self._client = AgentClient(
+            transport=transport,
+            a2a=self._a2a_enabled,
+        )
         # Exposes AgentProtocol to Server
-        self._server = AgentServer(transport=transport, agent=self)
+        self._server = AgentServer(transport=transport, agent=self, a2a=self._a2a_enabled)
 
         # Update AgentCard security schemes if authenticator is configured
         if authenticator:
@@ -1255,8 +1288,12 @@ class AgentSerializationMixin(_AgentMixinBase):
             "examples": getattr(tool, "examples", None),
             "capabilities": list(getattr(tool, "capabilities", None) or ()),
         }
+        builtin_id = getattr(tool, "_protolink_builtin_id", None)
+        if isinstance(builtin_id, str) and builtin_id:
+            tool_dict["type"] = "builtin"
+            tool_dict["builtin_id"] = builtin_id
         # Check if it is an MCPToolAdapter
-        if tool.__class__.__name__ == "MCPToolAdapter":
+        elif tool.__class__.__name__ == "MCPToolAdapter":
             tool_dict["type"] = "mcp"
             tool_dict["mcp_config"] = {
                 "transport": getattr(tool, "transport", "stdio"),
@@ -1277,6 +1314,19 @@ class AgentSerializationMixin(_AgentMixinBase):
     def _deserialize_tool(cls, tool_dict: dict[str, Any]) -> BaseTool:
         """Deserialize a tool from a dictionary representation."""
         tool_type = tool_dict.get("type", "native")
+        if tool_type == "builtin":
+            from protolink.tools.builtins import _create_builtin
+
+            builtin_id = tool_dict.get("builtin_id")
+            if not isinstance(builtin_id, str) or not builtin_id:
+                raise ValueError("Serialized built-in tool must include a non-empty builtin_id")
+            tool = _create_builtin(builtin_id)
+            serialized_name = tool_dict.get("name")
+            if serialized_name not in {None, tool.name}:
+                raise ValueError(
+                    f"Serialized built-in {builtin_id!r} cannot be restored with tool name {serialized_name!r}"
+                )
+            return tool
         if tool_type == "mcp":
             try:
                 from protolink.tools.adapters.mcp_adapter import MCPToolAdapter
@@ -1428,7 +1478,18 @@ class AgentSerializationMixin(_AgentMixinBase):
             "override_system_prompt": self.override_system_prompt,
             "system_prompt": self._system_prompt,
             "credentials": self.credentials,
+            "a2a": self._a2a_enabled,
         }
+
+        policy = self.action_authorizer.policy
+        if type(policy) is CapabilityPolicy:
+            policy_data = policy.to_dict()
+            if (
+                policy_data["rules"]
+                or policy_data["default_effect"] != "allow"
+                or policy_data["name"] != "capability_policy"
+            ):
+                data["policy"] = policy_data
 
         # Transport
         if self._transport:
@@ -1494,6 +1555,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             data: The serialized configuration dictionary.
             **overrides: Override specific parameters passed to the Agent constructor.
+                First-party ``CapabilityPolicy`` configuration is restored by
+                default. An explicit ``policy`` takes precedence; custom policies
+                and approval handlers must be passed here.
         """
         card_data = overrides.get("card", data.get("card"))
         if not card_data:
@@ -1591,6 +1655,17 @@ class AgentSerializationMixin(_AgentMixinBase):
         state = overrides.get("state")
         telemetry = overrides.get("telemetry")
         logger = overrides.get("logger")
+        if "policy" in overrides:
+            policy = overrides["policy"]
+        else:
+            policy_config = data.get("policy")
+            if policy_config is None:
+                policy = None
+            elif isinstance(policy_config, dict):
+                policy = CapabilityPolicy.from_dict(policy_config)
+            else:
+                raise ValueError("Serialized policy configuration must be a dictionary")
+        approval_handler = overrides.get("approval_handler")
 
         skills_val = overrides.get("skills", data.get("skills"))
         skills: Literal["auto", "fixed"] = skills_val if skills_val in ("auto", "fixed") else "auto"
@@ -1600,6 +1675,9 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         expose_chat_val = overrides.get("expose_chat", data.get("expose_chat"))
         expose_chat: bool = bool(expose_chat_val) if expose_chat_val is not None else True
+
+        a2a_val = overrides.get("a2a", data.get("a2a"))
+        a2a: bool = bool(a2a_val) if a2a_val is not None else False
 
         discovery_ttl_val = overrides.get("discovery_ttl", data.get("discovery_ttl"))
         discovery_ttl: int = int(discovery_ttl_val) if discovery_ttl_val is not None else 0
@@ -1627,8 +1705,11 @@ class AgentSerializationMixin(_AgentMixinBase):
             override_system_prompt=override_system_prompt,
             verbosity=verbosity,
             expose_chat=expose_chat,
+            a2a=a2a,
             authenticator=authenticator,
             credentials=credentials,
+            policy=policy,
+            approval_handler=approval_handler,
         )
 
         tools_data = data.get("tools", [])
@@ -1660,6 +1741,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             yaml_str: The YAML string containing agent configuration.
             **overrides: Override specific parameters passed to the Agent constructor.
+                An explicit ``policy`` takes precedence over serialized first-party
+                policy data; custom policies and ``approval_handler`` values are
+                runtime-only.
         """
         import yaml
 
@@ -1675,6 +1759,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             filepath: Path to the YAML file.
             **overrides: Override specific parameters passed to the Agent constructor.
+                An explicit ``policy`` takes precedence over serialized first-party
+                policy data; custom policies and ``approval_handler`` values are
+                runtime-only.
         """
         with open(filepath, encoding="utf-8") as f:
             yaml_str = f.read()

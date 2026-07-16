@@ -87,7 +87,15 @@ MimeType: TypeAlias = Literal[
 ReasoningLevel: TypeAlias = Literal["none", "low", "medium", "high"]
 
 # Supported request sources for endpoints
-RequestSourceType: TypeAlias = Literal["none", "body", "query_params", "form", "headers", "path_params"]
+RequestSourceType: TypeAlias = Literal[
+    "none",
+    "body",
+    "query_params",
+    "form",
+    "headers",
+    "path_params",
+    "request",
+]
 
 # Supported part content types
 PartType: TypeAlias = Literal[

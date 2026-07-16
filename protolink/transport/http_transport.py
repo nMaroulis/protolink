@@ -164,7 +164,10 @@ class HTTPTransport(Transport):
         RuntimeError
             If the remote endpoint returns a non-200 HTTP status code.
         """
-        url = f"{base_url.rstrip('/')}{request_spec.path}"
+        # An empty path means the caller supplied an exact endpoint URL (for
+        # example, an A2A AgentInterface). Preserve it byte-for-byte apart from
+        # surrounding whitespace, including a potentially significant slash.
+        url = base_url.strip() if request_spec.path == "" else f"{base_url.rstrip('/')}{request_spec.path}"
         request_size = self.check_payload_limit({"data": data, "params": params}, kind="request", url=url)
         context = self.new_request_context(request_spec, data)
 
@@ -173,10 +176,17 @@ class HTTPTransport(Transport):
                 await self.authenticate(self.credentials)
 
             client = await self._ensure_client()
-            headers = {
-                **self._build_headers(),
-                "X-Protolink-Request-ID": attempt.request_id,
-            }
+            headers: dict[str, str] = {}
+            if request_spec.content_type:
+                headers["Content-Type"] = request_spec.content_type
+            if request_spec.accept:
+                headers["Accept"] = request_spec.accept
+            if request_spec.headers:
+                headers.update(request_spec.headers)
+            # Authentication and correlation headers are transport-owned and
+            # cannot be replaced accidentally by an operation declaration.
+            headers.update(self._build_headers())
+            headers["X-Protolink-Request-ID"] = attempt.request_id
             if attempt.idempotency_key:
                 headers["Idempotency-Key"] = attempt.idempotency_key
 

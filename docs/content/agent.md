@@ -9,9 +9,10 @@ Agents are the core building blocks in Protolink.
 
 ## Concepts
 
-An **Agent** in Protolink is a unified component that acts as both **client and server**, unlike Google’s A2A protocol, which separates these concerns.
-
+An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**.
 It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
+
+`Agent(..., transport="http", a2a=True)` adds [A2A 1.0](https://a2a-protocol.org/latest/specification/) inbound and outbound translation without changing `handle_task(Task)` or removing the native ProtoLink endpoints. The default `a2a=False` preserves the previous native-only behavior.
 
 Agents **communicate through Tasks**, the fundamental unit of work:
 - **Receive tasks** via ``handle_task()``
@@ -23,6 +24,7 @@ Each component is **pluggable** to the agent and can be replaced with your own i
 
 High‑level ideas:
 
+- **A2A primitives**: cards describe agents, tasks carry work, and messages, parts, and artifacts carry instructions and results.
 - **Unified model**: a single `Agent` instance can send and receive messages.
 - **AgentCard**: a small model describing the agent (name, description, metadata).
 - **Modules**:
@@ -151,11 +153,11 @@ e.g.
 
 # Agent API Reference
 
-This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. The `Agent` class is the core component for creating A2A-compatible agents, serving as both client and server.
+This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. It is the core component for creating pluggable, A2A-based agents while combining client, server, execution, and runtime modules in one facade. HTTP agents can opt into the dedicated A2A 1.0 adapters described in [A2A compatibility](a2a.md).
 
 :::info[Unified Agent Model]
 
-Unlike the original A2A specification, Protolink's `Agent` combines client and server functionality in a single class. You can send tasks/messages to other agents while also serving incoming requests.
+Protolink's `Agent` combines client and server functionality in a single class. You can send tasks and messages to peers while also serving incoming requests; protocol-specific translation remains at the server boundary.
 
 :::
 
@@ -218,6 +220,7 @@ Unlike the original A2A specification, Protolink's `Agent` combines client and s
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent for standard Agent logs, `1` = normal (INFO), `2` = verbose (DEBUG). |
 | `expose_chat` | `bool` | `True` | Whether an LLM-backed Agent will serve the interactive chat UI and accept chat messages. HTTP-compatible transports make this visible at `/chat`. |
+| `a2a` | `bool` | `False` | Enable the A2A 1.0 inbound routes and outbound translation layer. Requires the exact HTTP transport. Agent-originated A2A calls accept only interfaces matching the discovered card's origin; use a dedicated `AgentClient` for an explicitly trusted split-origin deployment. |
 | `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
 | `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
@@ -376,6 +379,7 @@ Always use `agent.stop()` to ensure that the agent unregisters from the registry
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `transport` (property) | `Transport ⎪ str ⎪ None` | `None` | Gets or sets the transport used by this agent. Setting this initializes the client/server components and updates the agent card's transport and streaming capability. |
+| `a2a` (property) | - | `bool` | Read-only view of whether the A2A 1.0 boundary was enabled at construction. |
 | `client` (property) | - | `AgentClient ⎪ None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
 | `server` (property) | - | `AgentServer ⎪ None` | Returns the server instance if one is available via the transport. |
 
@@ -521,8 +525,22 @@ writer = Agent(
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `call_agent()` | `agent_url: str`, `task: Task` | `Task` | Sends a task to another agent and returns the processed result. |
-| `send_message_to()` | `agent_url: str`, `message: Message` | `Message` | Sends a message to another agent and returns the response. |
+| `call_agent()` | `agent_url: str`, `task: Task`, `protocol="auto"` | `Task` | Sends a task to another agent. `"auto"` prefers ProtoLink and discovers A2A-only peers; `"protolink"` and `"a2a"` select explicitly. |
+| `send_message_to()` | `agent_url: str`, `message: Message`, `protocol="auto"` | `Message` | Sends a message with the same protocol selection behavior. |
+
+```python
+agent = Agent(card=card, transport="http", a2a=True)
+
+# Preserve the richer native contract when the peer supports it; otherwise use A2A.
+result = await agent.call_agent(peer_url, task, protocol="auto")
+
+# Select the protocol explicitly when the peer protocol is known.
+result = await agent.call_agent(peer_url, task, protocol="a2a")
+```
+
+Agent-originated A2A calls require the advertised JSON-RPC interface to share the discovered Agent Card's origin. This secure policy is intentionally fixed on the compact `Agent` facade. Applications that explicitly trust a split-origin deployment can construct an `AgentClient(..., a2a_allow_cross_origin=True)` for that outbound integration.
+
+At the A2A boundary, a standard user text part remains a ProtoLink `Part(type="text")` for custom handlers. The default Agent engine recognizes `task.metadata["a2a_inbound"]` and treats that text as an inference request when an LLM is configured. A ProtoLink `infer` prompt becomes standard A2A user text outbound. Standard text, data, file, and URI content can be translated. ProtoLink-specific `tool_call` parts, structured-flow state, runtime context, and native control endpoints are not portable A2A contracts; keep `protocol="protolink"` when a peer needs those details.
 
 
 ## Synchronous API (`SyncAgent`)
@@ -552,7 +570,7 @@ The synchronous API is **not thread-safe** if called from within an active event
 |--------|------------|---------|-------------|
 | `agent.sync.invoke()` | `message, part_type, ...` | `str` | Blocking version of `invoke()`. Processes a message and returns the text result. |
 | `agent.sync.discover_agents()` | `filter_by` | `list[AgentCard]` | Blocking version of `discover_agents()`. Fetches agents from the registry. |
-| `agent.sync.call_agent()` | `agent_url, task` | `Task` | Blocking version of `call_agent()`. Sends a task to a remote agent. |
+| `agent.sync.call_agent()` | `agent_url, task, protocol="auto"` | `Task` | Blocking version of `call_agent()` with the same protocol selection. |
 
 ### Usage Example
 
@@ -633,7 +651,7 @@ agent = Agent(card, skills="fixed")
 
 ## Tool Management
 
-Tools allow agents to execute external functions and APIs.
+Tools give agents explicit callable capabilities. ProtoLink supports opt-in built-ins, native Python functions, custom `BaseTool` implementations, and MCP adapters.
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
@@ -652,16 +670,14 @@ def calculate(operation: str, a: float, b: float) -> float:
     else:
         raise ValueError(f"Unsupported operation: {operation}")
 
-# Direct tool registration
-from protolink.tools import BaseTool
+# Direct registration of built-in Tool instances
+from protolink.tools import current_datetime, web_search
 
-class WeatherTool(BaseTool):
-    def call(self, location: str) -> dict:
-        # Weather API logic here
-        return {"temperature": 72, "conditions": "sunny"}
-
-agent.add_tool(WeatherTool())
+agent.add_tool(current_datetime())
+agent.add_tool(web_search())  # Brave by default; calls may select engine="duckduckgo".
 ```
+
+Built-ins are never enabled automatically. Registered built-ins follow the same validation, policy, telemetry, cancellation, and skill-advertising path as native tools. See [Tools](tool.md#built-in-tools) for the complete built-in API and network-safety contract.
 
 ## Registry & Discovery
 
@@ -796,7 +812,7 @@ The `/status` page shows the agent's operational health and metadata. The `/chat
 :::
 ## YAML Import and Export
 
-Protolink supports exporting an agent's configuration (identity card, capabilities, transport, TLS file references, LLM, security/authenticator, and registered tools) to a YAML file, and importing it back to reconstruct a functional `Agent` instance. TLS serialization stores certificate paths and settings, never certificate or private-key contents.
+Protolink supports exporting an agent's configuration (identity card, capabilities, transport, TLS file references, LLM, security/authenticator, registered tools, and non-default first-party capability policy) to a YAML file, and importing it back to reconstruct a functional `Agent` instance. TLS serialization stores certificate paths and settings, never certificate or private-key contents.
 
 ### Exporting an Agent
 
@@ -832,12 +848,14 @@ agent = Agent.from_dict(config_dict)
 
 #### Handling Dependencies and Overrides
 
-1. **Security & Credentials**: Sensitive information like API keys or passwords are not serialized by default. You can pass them as overrides during import:
+1. **Security & Credentials**: Treat exported Agent configuration as sensitive. Configured outbound `credentials` and authenticator settings can be serialized, including bearer secrets, API-key maps, basic credentials, and OAuth client secrets. Review and protect the file, or pass replacement values during import:
    ```python
    agent = Agent.from_yaml("agent_config.yaml", credentials="my-secret-key")
    ```
-2. **Tool Function Paths**: Standard Python tools are serialized using their module and function name paths (e.g. `my_module:my_tool_func`). When the agent is imported, Protolink dynamically imports the function. If the module cannot be imported (e.g., if loaded in a different environment), Protolink registers a stub tool that returns a clean runtime error when executed rather than crashing initialization.
-3. **MCP Tool Adapters**: Model Context Protocol (MCP) tool configs are fully serialized. If the MCP dependencies are installed on the target machine, they will be initialized and bound correctly.
+   `BRAVE_SEARCH_API_KEY` is different: `web_search()` reads it from the environment only when the default Brave engine is invoked, so the built-in tool does not place that key in Agent dict/YAML output. The explicit `engine="duckduckgo"` path is keyless.
+2. **Built-ins & Policy**: Built-in tools serialize by stable first-party identity. A non-default, exact `CapabilityPolicy` serializes its declarative rules, default effect, and name. Executable custom policies (including `CapabilityPolicy` subclasses) and approval callbacks are not embedded; pass them as `policy=` and `approval_handler=` overrides when importing. An explicit policy override takes precedence over serialized first-party rules.
+3. **Tool Function Paths**: Standard Python tools are serialized using their module and function name paths (e.g. `my_module:my_tool_func`). When the agent is imported, Protolink dynamically imports the function. If the module cannot be imported (e.g., if loaded in a different environment), Protolink registers a stub tool that returns a clean runtime error when executed rather than crashing initialization.
+4. **MCP Tool Adapters**: Model Context Protocol (MCP) tool configs are fully serialized. If the MCP dependencies are installed on the target machine, they will be initialized and bound correctly.
 
 
 ## Abstract Methods

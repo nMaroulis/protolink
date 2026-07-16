@@ -267,8 +267,10 @@ control-plane request and is never shown to the model as a tool.
 
 ## Comparison: Manual vs. Automated State
 
-### Manual Persistence (Standard A2A)
-You have to manually load and save data inside `handle_task`.
+### Persistence Beyond A2A
+
+A2A provides the task exchange model but does not prescribe application state storage. Without ProtoLink State, you load and save data inside `handle_task` yourself.
+
 ```python
 async def handle_task(self, task):
     data = self.storage.load()

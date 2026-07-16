@@ -2,13 +2,13 @@ import ProjectMap from '@site/src/components/ProjectMap';
 
 # Documentation
 
-{/* SEO: Protolink - Agent-to-Agent Communication Framework | Lightweight Production-Ready A2A Protocol Extension | Python Library | AI Agents | LLMs | Tools | Multi-Agent Systems | Distributed Computing */}
+{/* SEO: Protolink - Lightweight Python Agent Runtime | A2A 1.0 JSON-RPC Adapter | AI Agents | LLMs | Tools | Multi-Agent Systems */}
 
 <div className="centered-media">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%" />
 </div>
 
-> A lightweight, production-ready framework for **agent-to-agent communication**, built on and extending Google's A2A protocol.
+> A lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python runtime for autonomous, pluggable agents, with progressive control from local meshes to a versioned A2A 1.0 JSON-RPC boundary.
 
 <div className="doc-button-row">
   <a className="doc-button primary" href="getting-started">Get Started</a>
@@ -21,10 +21,10 @@ Welcome to the Protolink documentation.
 
 This site provides an overview of the framework, its concepts, and how to use it in your projects.
 
-_Current release: **0.6.5** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
+_Current release: **0.6.6** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Current Version](https://img.shields.io/badge/current-0.6.5-0A84FF)](https://pypi.org/project/protolink/)
+[![Current Version](https://img.shields.io/badge/current-0.6.6-0A84FF)](https://pypi.org/project/protolink/)
 [![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)
 [![GitHub stars](https://img.shields.io/github/stars/nMaroulis/protolink?style=flat&logo=github)](https://github.com/nMaroulis/protolink/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/nMaroulis/protolink?style=flat&logo=github)](https://github.com/nMaroulis/protolink/forks)
@@ -36,11 +36,13 @@ _Current release: **0.6.5** ([PyPI](https://pypi.org/project/protolink/) | [Chan
 
 ## What is Protolink?
 
-ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where AI agents **communicate directly with each other**.
+ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where autonomous agents **communicate directly through an A2A-based task model**.
 
-Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (native or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
+Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (built-in, native, or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
 
-ProtoLink implements and extends [Google's Agent-to-Agent (A2A)](https://a2a-protocol.org/v0.3.0/specification/) specification for **agent identity, capability declaration, and discovery**, while **going beyond A2A** by enabling **true agent-to-agent collaboration**.
+ProtoLink is **A2A-first by design**. `AgentCard`, `Task`, `Message`, `Part`, `Artifact`, task lifecycle, and discovery form the shared language used across agents, flows, storage, telemetry, and transports. ProtoLink builds the pluggable execution runtime around that foundation: LLMs, local models, built-in, native, and MCP tools, transports, registry discovery, state, policy, authentication, logging, and observability.
+
+These Python models are ergonomic runtime forms of A2A's core primitives, not copies of the canonical wire schema. An HTTP agent opts into the versioned [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary with `Agent(..., a2a=True)`. The flag adds standard inbound routes and outbound translation without removing ProtoLink's native API. Its exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md).
 
 The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
 
@@ -75,20 +77,20 @@ In Protolink, an Agent is an **autonomous, centralized object** that serves as t
 
 > **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
 
-Unlike the base A2A specifications, Protolink enables **more open and flexible communication**: agents can call another agent's LLM for reasoning, invoke its tools directly, or define custom communication schemes. This creates a **flexible mesh** where specialized agents leverage each other's native capabilities without rigid orchestration bottlenecks.
+ProtoLink agents can delegate tasks, call tools, run model inference, or use deterministic flows through one runtime contract. This creates a **flexible mesh** where specialized agents collaborate without requiring a central orchestration service.
 
-## Protolink vs Google A2A 💡
+## A2A at the core; A2A 1.0 on the wire 💡
 
-ProtoLink implements Google’s A2A protocol at the **wire level**, while providing a higher-level agent runtime that unifies client, server, transport, tools, and LLMs into a single composable abstraction **the Agent**.
+ProtoLink provides a higher-level runtime that unifies client, server, transport, tools, and LLMs in one composable `Agent`. With `transport="http", a2a=True`, its A2A 1.0 adapters perform inbound and outbound wire translation; internal task models and native transports are not presented as the A2A wire format. `protocol="auto"` prefers the full ProtoLink contract when a peer offers both and selects A2A for an A2A-only peer. See [A2A compatibility](a2a.md) for the tested binding and evidence.
 
-| Concept   | Google A2A              | ProtoLink       |
-| --------- | ----------------------- | --------------- |
-| Agent     | Protocol-level concept  | Runtime object  |
-| Transport | External server concern | Agent-owned     |
-| Client    | Separate                | Built-in        |
-| LLM       | Out of scope            | First-class     |
-| Tools     | Out of scope            | Native + MCP    |
-| UX        | Enterprise infra        | Developer-first |
+| Concern | Native ProtoLink runtime | A2A 1.0 adapter |
+| --- | --- | --- |
+| Agent logic | `handle_task(Task) -> Task` | Unchanged |
+| Communication | Runtime, HTTP, SSE, WebSocket, or gRPC | JSON-RPC over HTTP |
+| Discovery | ProtoLink registry and native card | Standard Agent Card endpoint |
+| Models | Runtime-optimized Python types | Canonical A2A JSON translation |
+| Activation | Default | Explicit `a2a=True` on HTTP |
+| Verification | ProtoLink test suite | Official pinned TCK |
 
 
 
@@ -101,11 +103,12 @@ ProtoLink implements Google’s A2A protocol at the **wire level**, while provid
   Explore [Transports](transport.md) to switch between HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports with minimal code changes.
 
 - **Plug in LLMs & tools**  
-  Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and both native & MCP tools as agent modules.
+  Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and opt-in built-in, native, or MCP tools as agent modules.
 
 
 ## Key ideas
 
+- **A2A-first runtime model**: cards, tasks, messages, parts, artifacts, task states, and discovery are the shared language of the system.
 - **Unified Agent model**: a single autonomous `AI Agent` instance handles both client and server responsibilities, incorporating LLMs and tools.
 - **Flexible transports**: HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports.
 - **LLM‑ready architecture**: first‑class integration with API, local, and server‑hosted LLMs.

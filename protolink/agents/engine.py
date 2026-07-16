@@ -95,7 +95,7 @@ class AgentExecutionMixin(_AgentMixinBase):
 
     async def handle_task(self, task: Task) -> Task:
         """
-        Default task handler for A2A-compatible agents.
+        Default task handler for ProtoLink agents.
 
         This method provides the standard execution behavior for an agent.
         Users typically DO NOT need to override this method.
@@ -456,6 +456,18 @@ class AgentExecutionMixin(_AgentMixinBase):
                         outputs.append(
                             await self.call_llm(
                                 part,
+                                task=task,
+                                cancellation_token=cancellation_token,
+                            )
+                        )
+                    elif part.type == "text" and task.metadata.get("a2a_inbound") is True and self.llm is not None:
+                        # Keep the canonical A2A text -> ProtoLink text mapping
+                        # visible to custom handlers. Only the default engine
+                        # treats authenticated adapter input as an inference
+                        # instruction; ordinary local text remains inert.
+                        outputs.append(
+                            await self.call_llm(
+                                Part.infer(prompt=str(part.content)),
                                 task=task,
                                 cancellation_token=cancellation_token,
                             )

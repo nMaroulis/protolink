@@ -12,6 +12,8 @@ The distinction is useful because application code should think in Agent operati
 
 AgentClient follows the same progressive-control rule as Agent and Registry: a transport name creates a default client quickly, while a concrete transport carries TLS, limits, retries, keepalive, and protocol-specific behavior. The read-only `client.transport` property exposes the resolved transport for health and metric inspection.
 
+By default, `AgentClient` uses ProtoLink's native request contract. `AgentClient(..., a2a=True)` requires HTTP and adds outbound A2A 1.0 discovery and translation. It does not remove the native methods: `protocol="auto"` prefers a native ProtoLink peer and selects A2A only for an A2A-only peer, while `"protolink"` and `"a2a"` are explicit choices. Advertised A2A interfaces must share the discovered card's origin unless the application explicitly sets `a2a_allow_cross_origin=True` for a trusted split-origin deployment.
+
 ```python
 from protolink import RetryPolicy, TransportConfig
 from protolink.client import AgentClient
@@ -99,6 +101,9 @@ AgentClient(
     transport: Transport | TransportType,
     url: str | None = None,
     timeout: int = 300,
+    *,
+    a2a: bool = False,
+    a2a_allow_cross_origin: bool = False,
 )
 ```
 
@@ -107,6 +112,8 @@ AgentClient(
 | `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
 | `url` | `str ⎪ None` | Base URL when using a transport type string |
 | `timeout` | `int` | Timeout in seconds for the request (default: 300) |
+| `a2a` | `bool` | Enable outbound A2A 1.0 discovery and translation. Default `False`; requires the exact HTTP transport. |
+| `a2a_allow_cross_origin` | `bool` | Trust an A2A interface whose origin differs from the discovered Agent Card. Secure default: `False`. Enable only for an explicitly trusted split-origin deployment. |
 
 Use a string alias when ProtoLink should create a client transport with defaults. Use an existing transport object when the application needs TLS, production limits, retries, protocol-specific constructor options, or ownership of that exact instance. AgentClient never copies settings onto the transport and never creates a second hidden transport.
 
@@ -115,6 +122,21 @@ Use a string alias when ProtoLink should create a client transport with defaults
 ```python
 # Simple: construct by transport name
 client = AgentClient(transport="http", url="http://localhost:8000", timeout=120)
+
+# Add A2A 1.0 outbound interoperability while retaining native calls
+a2a_client = AgentClient(
+    transport="http",
+    url="http://localhost:8000",
+    a2a=True,
+)
+
+# Only for a trusted deployment whose card intentionally advertises another origin
+split_origin_client = AgentClient(
+    transport="http",
+    url="https://discovery.example",
+    a2a=True,
+    a2a_allow_cross_origin=True,
+)
 
 # Advanced: configure the transport first
 from protolink import TLSConfig, TransportConfig
@@ -151,13 +173,19 @@ See the [Shared Transport API Reference](./transport.md#shared-transport-api-ref
 Sends a `Task` to a remote agent and returns the processed result.
 
 ```python
-async def send_task(agent_url: str, task: Task) -> Task
+async def send_task(
+    agent_url: str,
+    task: Task,
+    *,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
+) -> Task
 ```
 
 | Parameter | Description |
 |-----------|-------------|
 | `agent_url` | The full URL of the target agent (e.g., `"http://localhost:8010"`) |
 | `task` | The `Task` object to send |
+| `protocol` | `"auto"` prefers ProtoLink and discovers A2A-only peers. `"protolink"` goes directly to the native route. `"a2a"` skips the native-vs-A2A choice but still fetches and validates the standard Agent Card and compatible interface. A2A requires `a2a=True`. |
 
 **Example:**
 
@@ -171,6 +199,31 @@ task = Task.create_infer(prompt="What's the weather in Athens?")
 result = await client.send_task("http://localhost:8010", task)
 print(result.get_last_part_content())
 ```
+
+With A2A enabled, automatic selection performs discovery before task
+submission. It probes `/.well-known/agent.json` first and falls back to
+`/.well-known/agent-card.json` only after a `404` or `405`; authentication,
+network, timeout, and server failures are propagated rather than retried through
+another protocol. The process-local selection cache holds at most 1,024 peers,
+expires entries after five minutes, and removes the oldest entries when full.
+A2A `SendMessage` itself is non-idempotent and is not automatically retried
+because the remote server assigns the task ID.
+
+```python
+client = AgentClient(transport="http", url="http://localhost:8000", a2a=True)
+
+automatic = await client.send_task(peer_url, task)
+a2a_only = await client.send_task(peer_url, task, protocol="a2a")
+native_only = await client.send_task(peer_url, task, protocol="protolink")
+```
+
+Outbound A2A translation keeps the caller's local task ID and records the
+remote task ID, context, state, status timestamp, and agent URL in namespaced
+metadata. A fresh task does not send its local ID as an A2A `taskId`; that field
+is used only when continuing work previously returned by the same remote peer.
+The process-local local-to-remote mapping holds at most 1,024 tasks for one hour
+and removes expired or oldest entries. Continuation and A2A cancellation require
+a live mapping in the same client process.
 
 ---
 
@@ -220,6 +273,7 @@ async def cancel_task(
     *,
     reason: str | None = None,
     metadata: dict[str, Any] | None = None,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
 ) -> Task
 ```
 
@@ -245,7 +299,9 @@ assert canceled.state.value == "canceled"
 assert result.state.value == "canceled"
 ```
 
-`cancel_task()` uses the A2A-style `POST /tasks/cancel` operation over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. Cancellation is a control-plane request: WebSocket sends it over a separate connection so it does not queue behind the active task stream.
+For native tasks, `cancel_task()` uses `POST /tasks/cancel` over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. For a task previously returned through this client's A2A adapter, `protocol="auto"` uses the stored local-to-remote ID mapping and sends canonical A2A `CancelTask`; `protocol="a2a"` selects that path explicitly. The optional `reason` and `metadata` are translated into A2A cancellation metadata and reconstructed by a ProtoLink A2A server.
+
+A blocking outbound A2A `SendMessage` does not reveal its server-assigned task ID until a response is returned, so it cannot be canceled through this client while that initial call is still blocked. An A2A task unknown to this client has no safe local-to-remote mapping and raises `A2AClientError`. In `"auto"`, the client confirms an A2A peer and raises instead of sending the local ID to the native cancellation route. Cancellation remains a control-plane request: WebSocket sends native cancellation over a separate connection so it does not queue behind the active task stream.
 
 Cancellation is intentionally best-effort. Async work normally stops at an `await` boundary; synchronous work and external systems may need their own cooperative cancellation or rollback mechanism. See [Runtime cancellation](runtime.md#canceling-running-tasks) for lifecycle, custom-handler, and side-effect guidance.
 
@@ -321,7 +377,12 @@ specs: `DESCRIBE_STATE_REQUEST` (`POST /state/describe`),
 Convenience wrapper that creates a Task from a Message, sends it, and returns the response message.
 
 ```python
-async def send_message(agent_url: str, message: Message) -> Message
+async def send_message(
+    agent_url: str,
+    message: Message,
+    *,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
+) -> Message
 ```
 
 **Example:**
@@ -335,6 +396,11 @@ response = await client.send_message(
 )
 print(response.parts[0].content)
 ```
+
+`send_message()` requires a response message. If an A2A peer returns a
+completed task containing artifacts but no agent message, this convenience
+method raises `RuntimeError`; call `send_task()` to receive the full task and
+inspect its artifacts.
 
 ---
 
@@ -353,6 +419,15 @@ card = await client.get_agent_card("http://localhost:8010")
 print(f"Agent: {card.name}")
 print(f"Description: {card.description}")
 print(f"Skills: {[s.id for s in card.skills]}")
+```
+
+`get_agent_card()` reads ProtoLink's native card. When A2A is enabled, use
+`get_a2a_agent_card()` to fetch and validate the standard card and its JSON-RPC
+1.0 interface:
+
+```python
+card = await client.get_a2a_agent_card("http://localhost:8010")
+print(card["supportedInterfaces"])
 ```
 
 ---
@@ -426,6 +501,7 @@ class ClientRequestSpec:
     accept: ContentType | None = None
     channel: str = "default"
     idempotent: bool = False
+    headers: Mapping[str, str] | None = None
 ```
 
 | Field | Default | Transport behavior |
@@ -439,6 +515,7 @@ class ClientRequestSpec:
 | `accept` | `None` | Optional accepted response media type. The transport default is used when omitted. |
 | `channel` | `"default"` | Logical multiplexing channel. Control operations use `"control"` so persistent transports can isolate them from stream traffic. |
 | `idempotent` | `False` | Explicit declaration that the logical operation can be retried and replayed under one idempotency key. Retries never run unless this is `True`. |
+| `headers` | `None` | Optional protocol-specific request headers. The A2A adapter uses this for `A2A-Version`; transports without headers may ignore it. |
 
 `idempotent=True` is an application-level safety promise, not an inference made from `POST` or a URL. Custom request specs should enable it only when repeating the operation with the same payload and idempotency key cannot apply the effect twice.
 
@@ -456,6 +533,10 @@ The `channel` field matters only to transports that multiplex several logical op
 | `COMPACT_STATE_REQUEST` | `/state/compact` | POST | control | No | Compact target agent conversation state. |
 | `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | default | Yes | Retrieve agent metadata. |
 | `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | default | No | Send a task and receive a live event stream. Streams are not replayed by the retry layer. |
+
+The outbound A2A adapter owns separate card-discovery and JSON-RPC request
+specifications. Card discovery is idempotent; `SendMessage` is deliberately not,
+so transport retry policy cannot create duplicate server-assigned tasks.
 
 ### How It Works
 

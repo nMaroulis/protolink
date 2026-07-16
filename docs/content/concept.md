@@ -4,8 +4,9 @@ After reading this page you should have a good understanding of the core concept
 
 ## Architecture Overview
 
-Protolink is designed around **explicit separation of concerns**, **protocol agnosticism**, and **low boilerplate** for agent authors.  
-At a high level, Protolink models an agent as a **logical actor** that communicates with other agents via well-defined client/server interfaces, backed by pluggable transports.
+Protolink is an **A2A-first agent runtime** designed around explicit separation of concerns, pluggable transports, and low boilerplate for agent authors. At a high level, it models an agent as an autonomous actor that communicates through well-defined client/server interfaces.
+
+[A2A](https://a2a-protocol.org/latest/specification/) supplies the core agent vocabulary: `AgentCard` for identity and capabilities; `Task` for work and lifecycle; `Message`, `Part`, and `Artifact` for communication and results; and discovery for finding peers. ProtoLink builds its pluggable execution runtime around those concepts without requiring a specific LLM, tool system, transport, storage backend, or deployment shape.
 
 The core idea is simple:  
 
@@ -19,6 +20,7 @@ This separation keeps agent logic **clean, testable, and future-proof**.
 
 Protolink is built from the following **core components**:
 
+- **A2A-based models** - cards, tasks, messages, parts, artifacts, and lifecycle
 - **Agent** - business logic and orchestration  
 - **Client** - outgoing communication  
 - **Server** - incoming communication  
@@ -370,12 +372,11 @@ This design is intentionally:
 - **Composable**: mix and match LLMs, tools, transports, storage
 - **Testable**: clean separation makes testing straightforward
 
-It draws inspiration from:
+A2A supplies the core agent model. The surrounding architecture also draws from:
 
 - Actor models  
 - Ports & adapters (hexagonal architecture)  
 - Distributed systems design  
-- Google A2A concepts (agent cards, tasks, discovery)  
 
 Most importantly:
 
@@ -736,69 +737,37 @@ The registry **never pushes behavior** to agents.
 
 ---
 
-## Comparison With Raw Google A2A
+## A2A Core and the A2A 1.0 Boundary
 
-Protolink is inspired by Google’s A2A spec, but intentionally diverges in structure.
+ProtoLink began as an A2A-based alternative to chain-centric frameworks. The
+agent, not a chain around an LLM, is the primary unit, and card, task, message,
+part, artifact, lifecycle, and discovery concepts are the common language
+across the runtime. These are ergonomic Python forms of A2A primitives; native
+ProtoLink transports are not presented as canonical A2A 1.0 wire bindings.
 
----
+For agents created with `transport="http", a2a=True`, versioned inbound and
+outbound adapters own that boundary. The default `a2a=False` keeps the native
+ProtoLink behavior:
 
-### What Is Preserved
+- `/.well-known/agent-card.json` exposes the A2A 1.0 Agent Card.
+- `POST /` accepts the A2A 1.0 JSON-RPC operations implemented by the adapter.
+- `AgentClient` can discover a standard JSON-RPC 1.0 peer and translate
+  `call_agent(..., protocol="a2a")` without replacing the native client path.
+- Serialization, version negotiation, standard errors, and TCK verification
+  stay outside agent business logic.
 
-- Agent Cards  
-- Task-based communication  
-- Explicit discovery  
-- Stateless requests  
-- Protocol neutrality  
+With `protocol="auto"`, native ProtoLink discovery is attempted first so two
+ProtoLink agents retain their richer task, flow, and control-plane semantics.
+Only an A2A-only peer uses wire translation. At that boundary, standard A2A user
+text remains a ProtoLink text part for custom handlers. The default Agent engine
+recognizes the inbound A2A metadata and treats that text as an inference request
+when an LLM is configured. Outbound `infer` prompts map to standard A2A text;
+framework-specific parts remain native semantics.
 
----
-
-### What Is Improved
-
-#### 1. Central Agent Abstraction
-
-In Protolink, the agent is the **primary unit**, not a loose collection of endpoints.
-
-This:
-- Improves composability  
-- Makes agents easier to reason about  
-- Encourages reusable agent logic  
-
----
-
-#### 2. Explicit Client / Server Split
-
-Google A2A often conflates:
-- Sending  
-- Receiving  
-- Hosting  
-
-Protolink separates them cleanly, which:
-- Improves testability  
-- Clarifies ownership  
-- Reduces hidden coupling  
-
----
-
-#### 3. Registry as a First-Class Component
-
-Instead of being an afterthought, the registry is:
-- Structured  
-- Extensible  
-- Transport-agnostic  
-- Distributed-ready  
-
----
-
-#### 4. Lower Boilerplate for Users
-
-A typical Protolink agent requires:
-- One subclass  
-- One `handle_task` method  
-- One transport  
-
-Everything else is handled by composition.
-
----
+This separation lets the Python runtime evolve without quietly changing a
+public protocol, while protocol work remains narrow enough to test against the
+official TCK. See [A2A compatibility](a2a.md) for the exact implemented scope,
+pinned commands, and current result.
 
 ## Mental Model Summary
 
@@ -806,58 +775,6 @@ If you remember only one thing:
 
 > **Agents think. Clients talk. Servers listen. Transports move bytes. Registries coordinate.**
 
-Each layer is small, focused, and replaceable.
-
-That is the entire philosophy.
-
----
-
-### Protolink vs Google A2A Concepts
-
-Protolink is inspired by Google’s **A2A (Agent-to-Agent)** concepts, but adds practical layers and abstractions to make building autonomous agents easier and more maintainable.
-
-| Concept | Google A2A | Protolink | Notes |
-|---------|------------|-----------|-------|
-| **Agent** | Logical actor with tasks | Logical actor with **tasks, tools, skills, and optional LLMs** | In Protolink, agents can include AI capabilities, not just task orchestration. |
-| **Communication** | Agent-to-Agent messages | **AgentClient / AgentServer** with pluggable transports | Explicit client/server layer reduces boilerplate and separates network logic from business logic. |
-| **Discovery** | Registry / Service Directory | **Registry, RegistryClient, RegistryServer** | Symmetric design; agents never talk to the registry directly except through `RegistryClient`. |
-| **Task Handling** | Internal message routing | `handle_task` logic inside the Agent | Agents remain autonomous; external orchestration is optional. |
-| **Protocol** | Implicit (HTTP, WS, etc.) | **Transport** layer handles protocol, serialization, runtime | Protocol-agnostic and swappable without touching agent logic. |
-| **Extensibility** | Limited by A2A spec | **Tools, LLMs, and custom skills** | Agents can mix AI and deterministic tools seamlessly. |
-| **Boilerplate** | Manual wiring, repetitive | Minimal; agent owns clients and servers, which own transports | Focuses on developer productivity and clarity. |
-| **Autonomy** | Agents are actors, often invoked manually | Agents run autonomously, discover peers, schedule and execute tasks | Protolink pushes complexity down into infrastructure layers. |
-
-#### Key Differences
-
-1. **LLM Integration**  
-   - In Protolink, an agent can include LLMs as part of its **tools/skills**, enabling advanced AI behavior.  
-   - Google A2A does not define AI capabilities natively.
-
-2. **Explicit Client/Server Layer**  
-   - Protolink separates **intent** from **transport**, reducing boilerplate and making testing easier.  
-   - Google A2A mixes communication concerns with agent logic in some implementations.
-
-3. **Registry Symmetry**  
-   - Registry, RegistryClient, and RegistryServer mirror the agent architecture for **consistency**.  
-   - A2A often has ad-hoc discovery mechanisms.
-
-4. **Protocol-Agnostic Transport**  
-   - Protolink agents never handle HTTP, WS, or serialization directly.  
-   - All networking is delegated to `Transport`.
-
-5. **Extensibility with Tools and Skills**  
-   - Developers can define custom tools, attach LLMs, or integrate external APIs without touching transport logic.  
-
-### Developer Takeaways
-
-- **Agents are rich actors**: Tasks, tools, skills, LLMs  
-- **Clients/Servers handle communication**, not the agent  
-- **Transport is pluggable**, reusable, and protocol-agnostic  
-- **Registry abstracts discovery** and coordination  
-- Minimal boilerplate allows focusing on **agent logic**, not infrastructure
-
-:::info[Transport]
-
-By explicitly layering Client, Server, Transport, and Registry, Protolink provides a **professional-grade framework** for autonomous agent development, while keeping A2A concepts at its core.
-
-:::
+Each layer is small, focused, and replaceable. The same progressive-control
+rule applies throughout: pass a compact alias for the normal path, or pass the
+concrete object when the boundary needs explicit configuration.
