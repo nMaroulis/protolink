@@ -77,7 +77,6 @@ class Agent(
         verbosity: Literal[0, 1, 2] = 1,
         expose_chat: bool = True,
         a2a: bool = False,
-        a2a_allow_cross_origin: bool = False,
         authenticator: Authenticator | None = None,
         credentials: str | None = None,
         policy: Policy | None = None,
@@ -118,24 +117,18 @@ class Agent(
             expose_chat: Whether the Agent will expose a chat endpoint for interaction with a UI.
             a2a: Whether to enable the optional A2A 1.0 HTTP compatibility boundary. Disabled by default so existing
                 ProtoLink endpoints and outbound behavior remain unchanged. When enabled, the agent must use HTTP.
-            a2a_allow_cross_origin: Trust an outbound A2A interface on a different origin from its discovered card.
-                Keep disabled unless that cross-origin endpoint is explicitly trusted.
             authenticator: Optional Authenticator instance for verifying incoming requests to this agent.
             credentials: Optional credentials string used for authenticating outgoing requests.
-            policy: Optional runtime policy evaluated before concrete actions execute.
-                Defaults to a backward-compatible ``CapabilityPolicy`` that
-                allows actions unless a tool or ``RunContext`` rule restricts
-                one of their declared capabilities.
-            approval_handler: Optional synchronous or asynchronous application
-                callback that resolves typed approval checkpoints. Protolink
-                owns the safety contract; the application owns the user
-                experience used to obtain the decision.
-            run_store: Optional persistent task/run store. When provided, the
-                agent records task snapshots after direct, server, and streaming
-                execution paths.
-            registry_heartbeat_interval: Optional seconds between registry
-                heartbeat requests after successful registration. Leave ``None``
-                to disable automatic heartbeats.
+            policy: Optional runtime policy evaluated before concrete actions execute. Defaults to a backward-compatible
+                ``CapabilityPolicy`` that allows actions unless a tool or ``RunContext`` rule restricts one of their
+                declared capabilities.
+            approval_handler: Optional synchronous or asynchronous application callback that resolves typed approval
+                checkpoints. Protolink owns the safety contract; the application owns the user experience used to obtain
+                the decision.
+            run_store: Optional persistent task/run store. When provided, the agent records task snapshots after direct,
+                server, and streaming execution paths.
+            registry_heartbeat_interval: Optional seconds between registry heartbeat requests after successful
+                registration. Leave ``None`` to disable automatic heartbeats.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
@@ -189,7 +182,6 @@ class Agent(
         self.credentials: str | None = credentials
         # A2A 1.0 compatibility is an explicit opt-in at the HTTP boundary.
         self._a2a_enabled = bool(a2a)
-        self._a2a_allow_cross_origin = bool(a2a_allow_cross_origin)
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None

@@ -63,7 +63,7 @@ and `handle_task(Task)` implementations.
 - **Outbound A2A 1.0 translation**
   - `AgentClient(..., a2a=True)`, `Agent.call_agent()`, and their synchronous facades can discover and call A2A 1.0 JSON-RPC peers without an `a2a-sdk` runtime dependency.
   - `protocol="auto"` prefers the native ProtoLink contract and selects A2A for an A2A-only peer. `protocol="protolink"` goes directly to the native route; `protocol="a2a"` skips the native-vs-A2A choice but still discovers and validates the standard Agent Card and compatible JSON-RPC interface.
-  - Advertised A2A interfaces must share the discovered Agent Card's origin by default. `a2a_allow_cross_origin=True` is an explicit trust override for controlled split-origin deployments and is available on both `Agent` and `AgentClient`.
+  - Advertised A2A interfaces must share the discovered Agent Card's origin by default. The compact `Agent` facade always keeps that secure policy; `a2a_allow_cross_origin=True` remains an explicit `AgentClient` trust override for controlled split-origin deployments.
   - Outbound calls reuse the configured HTTP transport's authentication, TLS, limits, pooling, metrics, and request headers. `SendMessage` is non-idempotent and is not retried automatically.
   - ProtoLink preserves the caller's local task ID while retaining the remote A2A task ID, context, state, timestamp, and agent URL for continuation and cancellation. The protocol-selection cache is bounded to 1,024 peers for five minutes, and local-to-remote task-ID mappings are bounded to 1,024 entries for one hour.
   - Cancellation reason and metadata translate through A2A `CancelTask`. A blocking outbound call cannot be canceled until its response reveals the server-assigned task ID; `"auto"` never guesses by sending a local ID to the native cancellation route.
@@ -85,7 +85,7 @@ and `handle_task(Task)` implementations.
 
 - This release is additive for existing ProtoLink applications: it does not remove or rename the `Agent`, `Task`, `AgentClient`, transport, or native endpoint APIs.
 - `a2a=False` keeps HTTP native-only. `a2a=True` requires the exact HTTP transport and adds standard inbound routes plus outbound translation; native endpoints and native protocol selection remain available.
-- `a2a_allow_cross_origin=False` is the secure default. A card advertising a JSON-RPC interface on another scheme, host, or effective port is rejected before that interface receives a request; enable the override only for an explicitly trusted deployment.
+- Agent-originated A2A calls always enforce same-origin discovery. A card advertising a JSON-RPC interface on another scheme, host, or effective port is rejected before that interface receives a request. For an explicitly trusted split-origin deployment, construct a dedicated `AgentClient(..., a2a_allow_cross_origin=True)`.
 - In `"auto"` mode, the client probes ProtoLink's native card first and falls back to the standard A2A card only after `404` or `405`. It does not resubmit a task through another protocol after authentication, connection, timeout, or server errors.
 - The A2A task index is bounded but remains process-local and in-memory. It contains only tasks submitted through the inbound adapter and disappears on restart; multi-worker or restart-durable deployments still need a shared task router or store.
 - Outbound protocol decisions and task-ID mappings are also bounded, process-local caches. Losing or expiring a mapping prevents continuation or cancellation by the original local task ID.

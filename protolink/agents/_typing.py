@@ -63,7 +63,6 @@ class _AgentMixinBase(Protocol):
     _discovery_cache: dict[str, tuple[float, list[AgentCard]]]
     _expose_chat: bool
     _a2a_enabled: bool
-    _a2a_allow_cross_origin: bool
 
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
 

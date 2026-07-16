@@ -1086,7 +1086,6 @@ class AgentConfigurationMixin(_AgentMixinBase):
         self._client = AgentClient(
             transport=transport,
             a2a=self._a2a_enabled,
-            a2a_allow_cross_origin=self._a2a_allow_cross_origin,
         )
         # Exposes AgentProtocol to Server
         self._server = AgentServer(transport=transport, agent=self, a2a=self._a2a_enabled)
@@ -1480,7 +1479,6 @@ class AgentSerializationMixin(_AgentMixinBase):
             "system_prompt": self._system_prompt,
             "credentials": self.credentials,
             "a2a": self._a2a_enabled,
-            "a2a_allow_cross_origin": self._a2a_allow_cross_origin,
         }
 
         policy = self.action_authorizer.policy
@@ -1681,9 +1679,6 @@ class AgentSerializationMixin(_AgentMixinBase):
         a2a_val = overrides.get("a2a", data.get("a2a"))
         a2a: bool = bool(a2a_val) if a2a_val is not None else False
 
-        cross_origin_val = overrides.get("a2a_allow_cross_origin", data.get("a2a_allow_cross_origin"))
-        a2a_allow_cross_origin: bool = bool(cross_origin_val) if cross_origin_val is not None else False
-
         discovery_ttl_val = overrides.get("discovery_ttl", data.get("discovery_ttl"))
         discovery_ttl: int = int(discovery_ttl_val) if discovery_ttl_val is not None else 0
 
@@ -1711,7 +1706,6 @@ class AgentSerializationMixin(_AgentMixinBase):
             verbosity=verbosity,
             expose_chat=expose_chat,
             a2a=a2a,
-            a2a_allow_cross_origin=a2a_allow_cross_origin,
             authenticator=authenticator,
             credentials=credentials,
             policy=policy,

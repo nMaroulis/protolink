@@ -9,9 +9,10 @@ Agents are the core building blocks in Protolink.
 
 ## Concepts
 
-An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**. `Agent(..., transport="http", a2a=True)` adds [A2A 1.0](https://a2a-protocol.org/latest/specification/) inbound and outbound translation without changing `handle_task(Task)` or removing the native ProtoLink endpoints. The default `a2a=False` preserves the previous native-only behavior.
-
+An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**.
 It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
+
+`Agent(..., transport="http", a2a=True)` adds [A2A 1.0](https://a2a-protocol.org/latest/specification/) inbound and outbound translation without changing `handle_task(Task)` or removing the native ProtoLink endpoints. The default `a2a=False` preserves the previous native-only behavior.
 
 Agents **communicate through Tasks**, the fundamental unit of work:
 - **Receive tasks** via ``handle_task()``
@@ -219,7 +220,7 @@ Protolink's `Agent` combines client and server functionality in a single class. 
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent for standard Agent logs, `1` = normal (INFO), `2` = verbose (DEBUG). |
 | `expose_chat` | `bool` | `True` | Whether an LLM-backed Agent will serve the interactive chat UI and accept chat messages. HTTP-compatible transports make this visible at `/chat`. |
-| `a2a` | `bool` | `False` | Enable the A2A 1.0 inbound routes and outbound translation layer. Requires the exact HTTP transport. `False` keeps the native ProtoLink server and client behavior unchanged. |
+| `a2a` | `bool` | `False` | Enable the A2A 1.0 inbound routes and outbound translation layer. Requires the exact HTTP transport. Agent-originated A2A calls accept only interfaces matching the discovered card's origin; use a dedicated `AgentClient` for an explicitly trusted split-origin deployment. |
 | `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
 | `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
 | `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
@@ -536,6 +537,8 @@ result = await agent.call_agent(peer_url, task, protocol="auto")
 # Select the protocol explicitly when the peer protocol is known.
 result = await agent.call_agent(peer_url, task, protocol="a2a")
 ```
+
+Agent-originated A2A calls require the advertised JSON-RPC interface to share the discovered Agent Card's origin. This secure policy is intentionally fixed on the compact `Agent` facade. Applications that explicitly trust a split-origin deployment can construct an `AgentClient(..., a2a_allow_cross_origin=True)` for that outbound integration.
 
 At the A2A boundary, a standard user text part remains a ProtoLink `Part(type="text")` for custom handlers. The default Agent engine recognizes `task.metadata["a2a_inbound"]` and treats that text as an inference request when an LLM is configured. A ProtoLink `infer` prompt becomes standard A2A user text outbound. Standard text, data, file, and URI content can be translated. ProtoLink-specific `tool_call` parts, structured-flow state, runtime context, and native control endpoints are not portable A2A contracts; keep `protocol="protolink"` when a peer needs those details.
 

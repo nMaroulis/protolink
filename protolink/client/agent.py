@@ -168,12 +168,10 @@ class AgentClient:
             transport: Existing transport or registered transport name.
             url: Local transport URL required when constructing by name.
             timeout: Outbound request timeout in seconds.
-            a2a: Enable outbound A2A 1.0 discovery and translation. This is
-                opt-in and requires HTTP.
-            a2a_allow_cross_origin: Trust A2A interface URLs on a different
-                origin from the discovered Agent Card. Disabled by default to
-                prevent an untrusted card from redirecting transport
-                credentials or requests to another host.
+            a2a: Enable outbound A2A 1.0 discovery and translation. This is opt-in and requires HTTP.
+            a2a_allow_cross_origin: Trust A2A interface URLs on a different origin from the discovered Agent Card.
+                Disabled by default to prevent an untrusted card from redirecting transport credentials or requests to
+                another host.
 
         A transport name creates a default transport for rapid prototyping. Pass a concrete transport instance to
         configure TLS, limits, retries, keepalive, or protocol-specific behavior.

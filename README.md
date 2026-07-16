@@ -191,9 +191,10 @@ An explicit `protocol="a2a"` choice bypasses the native-vs-A2A selection step,
 but still fetches and validates the peer's standard Agent Card and compatible
 JSON-RPC interface before sending work.
 
-Outbound discovery is same-origin by default: an advertised A2A interface must
-match the Agent Card's origin. Set `a2a_allow_cross_origin=True` only for a
-split-origin endpoint you explicitly trust; see [A2A compatibility](https://nmaroulis.github.io/protolink/docs/a2a/) for the operational limits.
+Agent-originated A2A discovery is always same-origin: an advertised interface
+must match the Agent Card's origin. For a split-origin deployment you explicitly
+trust, use a dedicated `AgentClient(..., a2a_allow_cross_origin=True)`; see
+[A2A compatibility](https://nmaroulis.github.io/protolink/docs/a2a/) for the operational limits.
 
 With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat, and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` JSON-RPC operations, and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
 

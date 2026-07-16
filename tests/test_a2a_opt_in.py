@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar, cast
 
@@ -16,18 +17,16 @@ from protolink.transport.config import TransportCapabilities
 
 
 class _CapturingClient:
-    """Record whether Agent forwards its A2A configuration to AgentClient."""
+    """Record the compact A2A configuration Agent forwards to AgentClient."""
 
     def __init__(
         self,
         transport: Transport,
         *,
         a2a: bool = False,
-        a2a_allow_cross_origin: bool = False,
     ) -> None:
         self.transport = transport
         self.a2a = a2a
-        self.a2a_allow_cross_origin = a2a_allow_cross_origin
 
 
 class _CapturingTransport(Transport):
@@ -107,6 +106,10 @@ def test_a2a_defaults_off_and_native_routes_remain_unchanged(card: AgentCard) ->
     assert ("POST", "/") not in routes
 
 
+def test_agent_constructor_keeps_cross_origin_trust_on_dedicated_client() -> None:
+    assert "a2a_allow_cross_origin" not in inspect.signature(Agent).parameters
+
+
 def test_a2a_true_adds_standard_routes_without_removing_native_routes(card: AgentCard) -> None:
     transport = _CapturingTransport()
     agent = Agent(card, transport=transport, a2a=True, verbosity=0)
@@ -149,7 +152,6 @@ def test_a2a_round_trips_through_dict_and_yaml(card: AgentCard) -> None:
         card,
         transport=_CapturingTransport(),
         a2a=True,
-        a2a_allow_cross_origin=True,
         verbosity=0,
     )
 
@@ -158,8 +160,21 @@ def test_a2a_round_trips_through_dict_and_yaml(card: AgentCard) -> None:
     restored_yaml = Agent.from_yaml_string(agent.to_yaml_string(), transport=_CapturingTransport())
 
     assert serialized["a2a"] is True
-    assert serialized["a2a_allow_cross_origin"] is True
+    assert "a2a_allow_cross_origin" not in serialized
     assert restored_dict.a2a is True
     assert restored_yaml.a2a is True
-    assert cast(Any, restored_dict.client).a2a_allow_cross_origin is True
-    assert cast(Any, restored_yaml.client).a2a_allow_cross_origin is True
+
+
+def test_agent_ignores_legacy_serialized_cross_origin_override(card: AgentCard) -> None:
+    serialized = Agent(
+        card,
+        transport=_CapturingTransport(),
+        a2a=True,
+        verbosity=0,
+    ).to_dict()
+    serialized["a2a_allow_cross_origin"] = True
+
+    restored = Agent.from_dict(serialized, transport=_CapturingTransport())
+
+    assert restored.a2a is True
+    assert "a2a_allow_cross_origin" not in restored.to_dict()

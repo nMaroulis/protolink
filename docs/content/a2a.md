@@ -141,10 +141,10 @@ client = AgentClient(
 )
 ```
 
-`Agent(..., a2a_allow_cross_origin=True)` configures its outbound client in the
-same way. The flag trusts a cross-origin interface advertised by the card; it
-is not an origin allowlist, so keep the default unless the split-origin
-deployment is under your control.
+The compact `Agent` facade always keeps this same-origin policy. The override
+belongs only to a dedicated `AgentClient`: it trusts any cross-origin interface
+advertised by the discovered card and is not an origin allowlist, so use it only
+when that split-origin deployment is under your control.
 
 :::caution[Compatibility status]
 
