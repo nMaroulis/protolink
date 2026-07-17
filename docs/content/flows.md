@@ -257,6 +257,34 @@ For deterministic edges, Graph can inject downstream context just like Pipeline.
 | Named state machine with loops or Python conditions | `Graph` |
 | A reusable sub-workflow inside another workflow | Any `Flow` as a nested target |
 
+## Flow API Reference
+
+`FlowTarget` accepts an `Agent` ⎪ `str` ⎪ `Flow`. A string can be a direct URL or a registry name.
+
+### Constructors
+
+| Type | Parameters |
+| ---- | ---------- |
+| `Flow` | `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
+| `Pipeline` | `steps: list[FlowTarget]` ⎪ `None = None`, `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
+| `Parallel` | `branches: list[FlowTarget]`, `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
+| `Router` | `routes: dict[str, FlowTarget]`, `routing_prompt: str`, `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
+| `Graph` | `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
+
+`Flow` is abstract; construct one of its concrete subclasses in application code.
+
+### Public Methods
+
+| Method | Signature and behavior |
+| ------ | ---------------------- |
+| `execute()` | `task: Task`<br />Returns `Task`. Asynchronously executes any flow; each concrete flow implements this contract. |
+| `sync.execute()` | `task: Task`<br />Returns `Task`. Blocking wrapper around `execute()` for code without an active event loop. |
+| `Pipeline.add_step()` | `step: FlowTarget`<br />Returns `Pipeline`. Appends one step and supports chaining. |
+| `Graph.add_node()` | `node_name: str`, `target: FlowTarget`<br />Returns `Graph`. Adds a named execution target. |
+| `Graph.add_edge()` | `from_node: str`, `to_node: str`<br />Returns `Graph`. Adds one deterministic edge; use `"__END__"` as the terminal destination. |
+| `Graph.add_conditional_edge()` | `from_node: str`, `condition_fn: Callable[[Task], str]`, `path_map: dict[str, str]`<br />Returns `Graph`. Maps the condition function's result to a destination node. |
+| `Graph.set_entry_point()` | `node_name: str`<br />Returns `Graph`. Selects the first graph node. |
+
 ## Practical Notes
 
 - Keep long-lived workflow state in `Task.metadata`, messages, artifacts, or storage. Treat `task.flow_state` as short-lived execution context.

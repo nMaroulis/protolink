@@ -109,8 +109,8 @@ AgentClient(
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `transport` | `Transport ⎪ str` | A Transport instance or type string (`"http"`, `"websocket"`, etc.) |
-| `url` | `str ⎪ None` | Base URL when using a transport type string |
+| `transport` | `Transport` ⎪ `TransportType` | A Transport instance or registered transport type (`"http"`, `"websocket"`, etc.) |
+| `url` | `str` ⎪ `None` | Base URL when using a transport type string |
 | `timeout` | `int` | Timeout in seconds for the request (default: 300) |
 | `a2a` | `bool` | Enable outbound A2A 1.0 discovery and translation. Default `False`; requires the exact HTTP transport. |
 | `a2a_allow_cross_origin` | `bool` | Trust an A2A interface whose origin differs from the discovered Agent Card. Secure default: `False`. Enable only for an explicitly trusted split-origin deployment. |
@@ -181,11 +181,11 @@ async def send_task(
 ) -> Task
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `agent_url` | The full URL of the target agent (e.g., `"http://localhost:8010"`) |
-| `task` | The `Task` object to send |
-| `protocol` | `"auto"` prefers ProtoLink and discovers A2A-only peers. `"protolink"` goes directly to the native route. `"a2a"` skips the native-vs-A2A choice but still fetches and validates the standard Agent Card and compatible interface. A2A requires `a2a=True`. |
+| Parameter | Type and default | Description |
+|-----------|------------------|-------------|
+| `agent_url` | `str` · required | The full URL of the target agent (e.g., `"http://localhost:8010"`). |
+| `task` | `Task` · required | The task object to send. |
+| `protocol` | `Literal["auto", "protolink", "a2a"]` · default `"auto"` | `"auto"` prefers ProtoLink and discovers A2A-only peers. `"protolink"` goes directly to the native route. `"a2a"` skips the native-vs-A2A choice but still fetches and validates the standard Agent Card and compatible interface. A2A requires `a2a=True`. |
 
 **Example:**
 
@@ -315,7 +315,7 @@ Requests LLM conversation-history compaction from an agent over the control plan
 async def compact_history(
     agent_url: str,
     *,
-    strategy: str = "recent",
+    strategy: HistoryCompactionStrategy = "recent",
     max_messages: int = 20,
     max_tokens: int = 4000,
     preserve_recent: int = 6,
@@ -345,6 +345,12 @@ When the target agent has `state=["conversation"]` and `session_id` is supplied,
 
 Inspect, reset, or compact a remote agent's persistent state without sending a
 model-visible task.
+
+| Method | Signature and behavior |
+|--------|------------------------|
+| `describe_state()` | `agent_url: str`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None`, `include_data: bool = False`, `metadata: dict[str, Any]` ⎪ `None = None`<br />Returns `StateOperationResult`. Inspects the selected state stores without mutating them. |
+| `reset_state()` | `agent_url: str`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None`, `metadata: dict[str, Any]` ⎪ `None = None`<br />Returns `StateOperationResult`. Resets the selected session or persistent state stores. |
+| `compact_state()` | `agent_url: str`, `session_id: str`, `strategy: HistoryCompactionStrategy = "tokens"`, `max_messages: int = 20`, `max_tokens: int = 4000`, `preserve_recent: int = 6`, `summary_max_tokens: int = 512`, `metadata: dict[str, Any]` ⎪ `None = None`<br />Returns `StateOperationResult`. Compacts persisted conversation state for a required session. |
 
 ```python
 state = await client.describe_state(
@@ -443,17 +449,17 @@ Internally, these methods use `asyncio.run()` to handle the asynchronous transpo
 The synchronous API should **NOT** be used inside an active event loop (e.g., inside FastAPI endpoints or async Jupyter cells) as it uses `asyncio.run()`, which will raise a `RuntimeError`.
 
 :::
-| Async Method | Synchronous Equivalent | Description |
-|--------------|------------------------|-------------|
-| `send_task()` | `client.sync.send_task()` | Synchronously send a task and wait for the result. |
-| `send_task_streaming()` | `client.sync.send_task_streaming()` | Synchronously iterate over streamed task events. |
-| `cancel_task()` | `client.sync.cancel_task()` | Synchronously request cancellation of a task running elsewhere. |
-| `compact_history()` | `client.sync.compact_history()` | Synchronously request LLM history compaction from an agent. |
-| `describe_state()` | `client.sync.describe_state()` | Synchronously inspect remote persistent state. |
-| `reset_state()` | `client.sync.reset_state()` | Synchronously reset remote persistent state. |
-| `compact_state()` | `client.sync.compact_state()` | Synchronously compact remote persistent conversation state. |
-| `send_message()` | `client.sync.send_message()` | Synchronously send a message and wait for the response message. |
-| `get_agent_card()` | `client.sync.get_agent_card()` | Synchronously retrieve an agent's public card. |
+| Async / synchronous method | Signature and behavior |
+|----------------------------|------------------------|
+| `send_task()` / `client.sync.send_task()` | `agent_url: str`, `task: Task`, `protocol: "auto"` ⎪ `"protolink"` ⎪ `"a2a"` · default `"auto"`<br />Returns `Task`. Sends a task and waits for the result. |
+| `send_task_streaming()` / `client.sync.send_task_streaming()` | `agent_url: str`, `task: Task`<br />Returns `AsyncIterator[Any]` / `Iterator[Any]`. Iterates over streamed task events. |
+| `cancel_task()` / `client.sync.cancel_task()` | `agent_url: str`, `task_id: str`, `reason: str` ⎪ `None = None`, `metadata: dict[str, Any]` ⎪ `None = None`, `protocol: "auto"` ⎪ `"protolink"` ⎪ `"a2a"` · default `"auto"`<br />Returns `Task`. Requests cancellation of a task running elsewhere. |
+| `compact_history()` / `client.sync.compact_history()` | `agent_url: str`, `strategy: HistoryCompactionStrategy = "recent"`, `max_messages: int = 20`, `max_tokens: int = 4000`, `preserve_recent: int = 6`, `summary_max_tokens: int = 512`, `session_id: str` ⎪ `None = None`, `metadata: dict[str, Any]` ⎪ `None = None`<br />Returns `HistoryCompactionResult`. Requests LLM history compaction from an agent. |
+| `describe_state()` / `client.sync.describe_state()` | `agent_url: str`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None`, `include_data: bool = False`, `metadata: dict[str, Any]` ⎪ `None = None`<br />Returns `StateOperationResult`. Inspects remote persistent state. |
+| `reset_state()` / `client.sync.reset_state()` | `agent_url: str`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None`, `metadata: dict[str, Any]` ⎪ `None = None`<br />Returns `StateOperationResult`. Resets remote persistent state. |
+| `compact_state()` / `client.sync.compact_state()` | `agent_url: str`, `session_id: str`, `strategy: HistoryCompactionStrategy = "tokens"`, `max_messages: int = 20`, `max_tokens: int = 4000`, `preserve_recent: int = 6`, `summary_max_tokens: int = 512`, `metadata: dict[str, Any]` ⎪ `None = None`<br />Returns `StateOperationResult`. Compacts remote persistent conversation state. |
+| `send_message()` / `client.sync.send_message()` | `agent_url: str`, `message: Message`, `protocol: "auto"` ⎪ `"protolink"` ⎪ `"a2a"` · default `"auto"`<br />Returns `Message`. Sends a message and waits for the response message. |
+| `get_agent_card()` / `client.sync.get_agent_card()` | `agent_url: str`<br />Returns `AgentCard`. Retrieves an agent's public card. |
 
 **Example:**
 
@@ -504,18 +510,18 @@ class ClientRequestSpec:
     headers: Mapping[str, str] | None = None
 ```
 
-| Field | Default | Transport behavior |
-|------|---------|--------------------|
-| `name` | Required | Stable operation name used by request contexts, metrics, and diagnostics. |
-| `path` | Required | Protocol-neutral endpoint path. HTTP-based transports use it directly; multiplexed transports carry it in the request envelope. |
-| `method` | Required | Logical HTTP method used by HTTP routing and retry-method filtering. |
-| `response_parser` | `None` | Optional callable that converts the decoded response into a model such as `Task` or `AgentCard`. |
-| `request_source` | `"body"` | Selects body, query, path, or no request data according to `RequestSourceType`. |
-| `content_type` | `None` | Optional outbound media type override. The transport default is used when omitted. |
-| `accept` | `None` | Optional accepted response media type. The transport default is used when omitted. |
-| `channel` | `"default"` | Logical multiplexing channel. Control operations use `"control"` so persistent transports can isolate them from stream traffic. |
-| `idempotent` | `False` | Explicit declaration that the logical operation can be retried and replayed under one idempotency key. Retries never run unless this is `True`. |
-| `headers` | `None` | Optional protocol-specific request headers. The A2A adapter uses this for `A2A-Version`; transports without headers may ignore it. |
+| Field | Type and default | Transport behavior |
+|------|------------------|--------------------|
+| `name` | `str` · required | Stable operation name used by request contexts, metrics, and diagnostics. |
+| `path` | `str` · required | Protocol-neutral endpoint path. HTTP-based transports use it directly; multiplexed transports carry it in the request envelope. |
+| `method` | `HttpMethod` · required | Logical HTTP method used by HTTP routing and retry-method filtering. |
+| `response_parser` | `Callable[[Any], Any]` ⎪ `None` · default `None` | Optional callable that converts the decoded response into a model such as `Task` or `AgentCard`. |
+| `request_source` | `RequestSourceType` · default `"body"` | Selects body, query, path, or no request data according to `RequestSourceType`. |
+| `content_type` | `ContentType` ⎪ `None` · default `None` | Optional outbound media type override. The transport default is used when omitted. |
+| `accept` | `ContentType` ⎪ `None` · default `None` | Optional accepted response media type. The transport default is used when omitted. |
+| `channel` | `str` · default `"default"` | Logical multiplexing channel. Control operations use `"control"` so persistent transports can isolate them from stream traffic. |
+| `idempotent` | `bool` · default `False` | Explicit declaration that the logical operation can be retried and replayed under one idempotency key. Retries never run unless this is `True`. |
+| `headers` | `Mapping[str, str]` ⎪ `None` · default `None` | Optional protocol-specific request headers. The A2A adapter uses this for `A2A-Version`; transports without headers may ignore it. |
 
 `idempotent=True` is an application-level safety promise, not an inference made from `POST` or a URL. Custom request specs should enable it only when repeating the operation with the same payload and idempotency key cannot apply the effect twice.
 
@@ -523,16 +529,16 @@ The `channel` field matters only to transports that multiplex several logical op
 
 ### Built-in Request Specs
 
-| Spec | Path | Method | Channel | Idempotent | Description |
-|------|------|--------|---------|------------|-------------|
-| `TASK_REQUEST` | `/tasks/` | POST | default | Yes | Send a task to an agent. The task ID and idempotency key prevent duplicate execution. |
-| `TASK_CANCEL_REQUEST` | `/tasks/cancel` | POST | control | Yes | Cancel an active task. Repeating cancellation has the same terminal effect. |
-| `COMPACT_HISTORY_REQUEST` | `/llm/history/compact` | POST | control | No | Compact the target agent's LLM history. |
-| `DESCRIBE_STATE_REQUEST` | `/state/describe` | POST | control | Yes | Inspect target agent state without mutating it. |
-| `RESET_STATE_REQUEST` | `/state/reset` | POST | control | No | Reset target agent state. |
-| `COMPACT_STATE_REQUEST` | `/state/compact` | POST | control | No | Compact target agent conversation state. |
-| `AGENT_CARD_REQUEST` | `/.well-known/agent.json` | GET | default | Yes | Retrieve agent metadata. |
-| `TASK_STREAM_REQUEST` | `/tasks/stream` | POST | default | No | Send a task and receive a live event stream. Streams are not replayed by the retry layer. |
+| Spec | Request contract | Description |
+|------|------------------|-------------|
+| `TASK_REQUEST` | `POST`, `/tasks/`, `channel: default`, `idempotent: True` | Send a task to an agent. The task ID and idempotency key prevent duplicate execution. |
+| `TASK_CANCEL_REQUEST` | `POST`, `/tasks/cancel`, `channel: control`, `idempotent: True` | Cancel an active task. Repeating cancellation has the same terminal effect. |
+| `COMPACT_HISTORY_REQUEST` | `POST`, `/llm/history/compact`, `channel: control`, `idempotent: False` | Compact the target agent's LLM history. |
+| `DESCRIBE_STATE_REQUEST` | `POST`, `/state/describe`, `channel: control`, `idempotent: True` | Inspect target agent state without mutating it. |
+| `RESET_STATE_REQUEST` | `POST`, `/state/reset`, `channel: control`, `idempotent: False` | Reset target agent state. |
+| `COMPACT_STATE_REQUEST` | `POST`, `/state/compact`, `channel: control`, `idempotent: False` | Compact target agent conversation state. |
+| `AGENT_CARD_REQUEST` | `GET`, `/.well-known/agent.json`, `channel: default`, `idempotent: True` | Retrieve agent metadata. |
+| `TASK_STREAM_REQUEST` | `POST`, `/tasks/stream`, `channel: default`, `idempotent: False` | Send a task and receive a live event stream. Streams are not replayed by the retry layer. |
 
 The outbound A2A adapter owns separate card-discovery and JSON-RPC request
 specifications. Card discovery is idempotent; `SendMessage` is deliberately not,
