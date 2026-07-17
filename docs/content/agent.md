@@ -205,28 +205,28 @@ Protolink's `Agent` combines client and server functionality in a single class. 
 
 | Parameter | Type | Default | Description |
 |-----------|-----|---------|-------------|
-| `card` | `AgentCard ⎪ dict` | - | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `transport` | `Transport ⎪ str ⎪ None` | `None` | Transport instance or simple string alias such as `"http"` or `"runtime"`. String aliases use default transport settings; pass a configured object for TLS, limits, retries, or protocol-specific options. |
-| `registry` | `Registry ⎪ RegistryClient ⎪ str ⎪ None` | `None` | Optional registry for agent discovery. Can be a Registry instance, RegistryClient, or URL string. |
-| `registry_url` | `str ⎪ None` | `None` | URL of the registry when using string transport type for registry creation. |
-| `llm` | `LLM ⎪ None` | `None` | Optional language model instance for the agent to use. |
-| `system_prompt` | `str ⎪ None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
-| `storage` | `Storage ⎪ None` | `None` | Optional storage instance for agent data persistence. |
-| `state` | `list[StateMode] ⎪ State ⎪ None` | `None` | Optional agent state configuration. Defines which modules (conversation, tools, etc.) should be persistent. |
-| `telemetry` | `Telemetry ⎪ None` | `None` | Optional telemetry instance for observability and tracing. |
+| `card` | `AgentCard` ⎪ `dict[str, Any]` | - | **Required.** The agent's metadata card containing name, description, and other identifying information. |
+| `transport` | `TransportType` ⎪ `Transport` ⎪ `None` | `None` | Transport instance or simple string alias such as `"http"` or `"runtime"`. String aliases use default transport settings; pass a configured object for TLS, limits, retries, or protocol-specific options. |
+| `registry` | `TransportType` ⎪ `Registry` ⎪ `RegistryClient` ⎪ `None` | `None` | Optional registry for agent discovery. Can be a transport alias, `Registry` instance, or `RegistryClient`. |
+| `registry_url` | `str` ⎪ `None` | `None` | URL of the registry when using string transport type for registry creation. |
+| `llm` | `LLM` ⎪ `None` | `None` | Optional language model instance for the agent to use. |
+| `system_prompt` | `str` ⎪ `None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
+| `storage` | `Storage` ⎪ `None` | `None` | Optional storage instance for agent data persistence. |
+| `state` | `list[StateMode]` ⎪ `State` ⎪ `None` | `None` | Optional agent state configuration. Defines which modules (conversation, tools, etc.) should be persistent. |
+| `telemetry` | `Telemetry` ⎪ `None` | `None` | Optional telemetry instance for observability and tracing. |
 | `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
-| `logger` | `BaseLogger ⎪ None` | `None` | Custom logger instance (e.g. `ConsoleLogger`, `FileLogger`, or `QuietLogger`). |
+| `logger` | `BaseLogger` ⎪ `None` | `None` | Custom logger instance (e.g. `ConsoleLogger`, `FileLogger`, or `QuietLogger`). |
 | `discovery_ttl` | `int` | `0` | Time to live in seconds for caching Agent information discovered from the Registry. Default is `0` (no caching). |
 | `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
 | `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent for standard Agent logs, `1` = normal (INFO), `2` = verbose (DEBUG). |
 | `expose_chat` | `bool` | `True` | Whether an LLM-backed Agent will serve the interactive chat UI and accept chat messages. HTTP-compatible transports make this visible at `/chat`. |
 | `a2a` | `bool` | `False` | Enable the A2A 1.0 inbound routes and outbound translation layer. Requires the exact HTTP transport. Agent-originated A2A calls accept only interfaces matching the discovered card's origin; use a dedicated `AgentClient` for an explicitly trusted split-origin deployment. |
-| `authenticator` | `Authenticator ⎪ None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
-| `credentials` | `str ⎪ None` | `None` | Optional credentials string used for authenticating outgoing requests. |
-| `policy` | `Policy ⎪ None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
-| `approval_handler` | `Callable ⎪ None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
-| `run_store` | `RunStore ⎪ None` | `None` | Optional durable task/run store. When provided, the default runtime records task snapshots after direct, server, and streaming execution paths. |
-| `registry_heartbeat_interval` | `float ⎪ None` | `None` | Optional seconds between registry heartbeat requests after successful registration. Use with a registry TTL to prune dead agents automatically. |
+| `authenticator` | `Authenticator` ⎪ `None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
+| `credentials` | `str` ⎪ `None` | `None` | Optional credentials string used for authenticating outgoing requests. |
+| `policy` | `Policy` ⎪ `None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
+| `approval_handler` | `ApprovalHandlerLike` ⎪ `None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
+| `run_store` | `RunStore` ⎪ `None` | `None` | Optional durable task/run store. When provided, the default runtime records task snapshots after direct, server, and streaming execution paths. |
+| `registry_heartbeat_interval` | `float` ⎪ `None` | `None` | Optional seconds between registry heartbeat requests after successful registration. Use with a registry TTL to prune dead agents automatically. |
 
 ```python
 from protolink.agents import Agent
@@ -378,10 +378,10 @@ Always use `agent.stop()` to ensure that the agent unregisters from the registry
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `transport` (property) | `Transport ⎪ str ⎪ None` | `None` | Gets or sets the transport used by this agent. Setting this initializes the client/server components and updates the agent card's transport and streaming capability. |
+| `transport` (property) | `TransportType` ⎪ `Transport` | `Transport` ⎪ `None` | Gets or sets the transport used by this agent. Setting this initializes the client/server components and updates the agent card's transport and streaming capability. |
 | `a2a` (property) | - | `bool` | Read-only view of whether the A2A 1.0 boundary was enabled at construction. |
-| `client` (property) | - | `AgentClient ⎪ None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
-| `server` (property) | - | `AgentServer ⎪ None` | Returns the server instance if one is available via the transport. |
+| `client` (property) | - | `AgentClient` ⎪ `None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
+| `server` (property) | - | `AgentServer` ⎪ `None` | Returns the server instance if one is available via the transport. |
 
 ## Task and Message Handling
 
@@ -394,17 +394,17 @@ Always use `agent.stop()` to ensure that the agent unregisters from the registry
 | `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls and inference) and executes them. Can be overridden for custom orchestration. |
 | `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Streams task status, LLM inference events, tool progress, artifact updates, and final completion for streaming-capable transports. |
 | `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()`. For `tool_call` parts, it executes the tool directly. |
-| `compact_history()` | `request: HistoryCompactionRequest` | `HistoryCompactionResult` | Control-plane method behind `POST /llm/history/compact`. Calls `llm.compact_history()` without exposing compaction to the model prompt. |
-| `describe_state()` | `request/session_id` | `StateOperationResult` | Control-plane method behind `POST /state/describe`. Reports enabled stores and optional session state. |
-| `reset_state()` | `request/session_id` | `StateOperationResult` | Control-plane method behind `POST /state/reset`. Clears a conversation session or performs a full state reset when no session is supplied. |
-| `compact_state()` | `request/session_id` | `StateOperationResult` | Control-plane method behind `POST /state/compact`. Compacts persisted conversation state through the LLM-owned compactor. |
-| `cancel_task()` | `task_id | TaskCancellationRequest`, `reason=None` | `Task` | Marks an active task and its `RunContext` canceled, then interrupts its owning coroutine. |
-| `get_cancellation_token()` | `task_id: str` | `CancellationToken ⎪ None` | Returns the process-local token for checkpoints in custom long-running handlers. |
+| `compact_history()` | `request: HistoryCompactionRequest` ⎪ `dict[str, Any]` ⎪ `None = None` | `HistoryCompactionResult` | Control-plane method behind `POST /llm/history/compact`. Calls `llm.compact_history()` without exposing compaction to the model prompt. |
+| `describe_state()` | `request: str` ⎪ `StateOperationRequest` ⎪ `dict[str, Any]` ⎪ `None = None`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None`, `include_data: bool` ⎪ `None = None` | `StateOperationResult` | Control-plane method behind `POST /state/describe`. Reports enabled stores and optional session state. |
+| `reset_state()` | `request: str` ⎪ `StateOperationRequest` ⎪ `dict[str, Any]` ⎪ `None = None`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None` | `StateOperationResult` | Control-plane method behind `POST /state/reset`. Clears a conversation session or performs a full state reset when no session is supplied. |
+| `compact_state()` | `request: str` ⎪ `StateOperationRequest` ⎪ `dict[str, Any]` ⎪ `None = None`, `session_id: str` ⎪ `None = None`, `strategy: HistoryCompactionStrategy` ⎪ `None = None`, `max_messages: int` ⎪ `None = None`, `max_tokens: int` ⎪ `None = None`, `preserve_recent: int` ⎪ `None = None`, `summary_max_tokens: int` ⎪ `None = None` | `StateOperationResult` | Control-plane method behind `POST /state/compact`. Compacts persisted conversation state through the LLM-owned compactor. |
+| `cancel_task()` | `request: str` ⎪ `TaskCancellationRequest`, `reason: str` ⎪ `None = None` | `Task` | Marks an active task and its `RunContext` canceled, then interrupts its owning coroutine. |
+| `get_cancellation_token()` | `task_id: str` | `CancellationToken` ⎪ `None` | Returns the process-local token for checkpoints in custom long-running handlers. |
 | `active_task_ids` | - | `tuple[str, ...]` | Snapshot of task IDs currently registered on this Agent. |
-| `invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. Accepts an optional `session_id` for memory. |
-| `sync.invoke()` | `message, part_type="infer", tool_name=None, tool_args=None, session_id="invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
-| `sync.discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Synchronous version of `discover_agents()`. |
-| `sync.call_agent()` | `agent_url: str`, `task: Task` | `Task` | Synchronous version of `call_agent()`. |
+| `invoke()` | `message: str`, `part_type: Literal["tool_call", "infer"] = "infer"`, `tool_name: str` ⎪ `None = None`, `tool_args: dict[str, Any]` ⎪ `None = None`, `session_id: str = "invocation_session_id"` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. Accepts an optional `session_id` for memory. |
+| `sync.invoke()` | `message: str`, `part_type: Literal["tool_call", "infer"] = "infer"`, `tool_name: str` ⎪ `None = None`, `tool_args: dict[str, Any]` ⎪ `None = None`, `session_id: str = "invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
+| `sync.discover_agents()` | `filter_by: dict[str, Any]` ⎪ `None = None` | `list[AgentCard]` | Synchronous version of `discover_agents()`. |
+| `sync.call_agent()` | `agent_url: str`, `task: Task`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Task` | Synchronous version of `call_agent()`. |
 
 #### Task Lifecycle
 
@@ -525,8 +525,8 @@ writer = Agent(
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `call_agent()` | `agent_url: str`, `task: Task`, `protocol="auto"` | `Task` | Sends a task to another agent. `"auto"` prefers ProtoLink and discovers A2A-only peers; `"protolink"` and `"a2a"` select explicitly. |
-| `send_message_to()` | `agent_url: str`, `message: Message`, `protocol="auto"` | `Message` | Sends a message with the same protocol selection behavior. |
+| `call_agent()` | `agent_url: str`, `task: Task`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Task` | Sends a task to another agent. `"auto"` prefers ProtoLink and discovers A2A-only peers; `"protolink"` and `"a2a"` select explicitly. |
+| `send_message_to()` | `agent_url: str`, `message: Message`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Message` | Sends a message with the same protocol selection behavior. |
 
 ```python
 agent = Agent(card=card, transport="http", a2a=True)
@@ -568,9 +568,9 @@ The synchronous API is **not thread-safe** if called from within an active event
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `agent.sync.invoke()` | `message, part_type, ...` | `str` | Blocking version of `invoke()`. Processes a message and returns the text result. |
-| `agent.sync.discover_agents()` | `filter_by` | `list[AgentCard]` | Blocking version of `discover_agents()`. Fetches agents from the registry. |
-| `agent.sync.call_agent()` | `agent_url, task, protocol="auto"` | `Task` | Blocking version of `call_agent()` with the same protocol selection. |
+| `agent.sync.invoke()` | `message: str`, `part_type: Literal["tool_call", "infer"] = "infer"`, `tool_name: str` ⎪ `None = None`, `tool_args: dict[str, Any]` ⎪ `None = None`, `session_id: str = "invocation_session_id"` | `str` | Blocking version of `invoke()`. Processes a message and returns the text result. |
+| `agent.sync.discover_agents()` | `filter_by: dict[str, Any]` ⎪ `None = None` | `list[AgentCard]` | Blocking version of `discover_agents()`. Fetches agents from the registry. |
+| `agent.sync.call_agent()` | `agent_url: str`, `task: Task`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Task` | Blocking version of `call_agent()` with the same protocol selection. |
 
 ### Usage Example
 
@@ -656,7 +656,7 @@ Tools give agents explicit callable capabilities. ProtoLink supports opt-in buil
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
 | `add_tool()` | `tool: BaseTool` | `None` | Registers a tool with the agent and automatically adds it as a skill to the AgentCard. |
-| `tool()` | `name: str`, `description: str` | `decorator` | Decorator for registering Python functions as tools (automatically adds as skills). |
+| `tool()` | `name: str`, `description: str`, `input_schema: dict[str, Any]` ⎪ `None = None`, `output_schema: dict[str, Any]` ⎪ `None = None`, `tags: list[str]` ⎪ `None = None`, `examples: list[Any]` ⎪ `None = None`, `capabilities: list[str]` ⎪ `tuple[str, ...]` ⎪ `set[str]` ⎪ `None = None`, `action_builder: ActionBuilder` ⎪ `None = None` | `decorator` | Decorator for registering Python functions as tools (automatically adds as skills). |
 | `call_tool()` | `tool_name: str`, `**kwargs` | `Any` | Executes a registered tool by name with provided arguments. |
 
 ```python
@@ -683,7 +683,7 @@ Built-ins are never enabled automatically. Registered built-ins follow the same 
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `discover_agents()` | `filter_by: dict ⎪ None = None` | `list[AgentCard]` | Discover agents in the registry matching the filter criteria. |
+| `discover_agents()` | `filter_by: dict[str, Any]` ⎪ `None = None` | `list[AgentCard]` | Discover agents in the registry matching the filter criteria. |
 | `register()` | - | `None` | Registers this agent in the global registry. |
 | `unregister()` | - | `None` | Unregisters this agent from the global registry. |
 
@@ -691,13 +691,13 @@ Built-ins are never enabled automatically. Registered built-ins follow the same 
 
 | Name | Parameters | Returns | Description |
 |------|------------|---------|-------------|
-| `get_agent_card()` | `as_json: bool = True` | `AgentCard ⎪ dict` | Returns the agent's identity card. |
+| `get_agent_card()` | `as_json: bool = True` | `AgentCard` ⎪ `dict[str, Any]` | Returns the agent's identity card. |
 | `get_status()` | `output_format: Literal["html", "json"] = "html"` | `str` | Returns the agent's status as HTML or JSON. HTML is a rich status page for the agent (displayed at `/status`). JSON is a machine-readable representation of the agent's status. |
 | `get_chat()` | - | `str` | Returns a self-contained chat UI as HTML. Only functional when the agent has an LLM configured (served at `/chat`). |
-| `handle_chat_message()` | `data: dict` | `dict` | Processes an incoming chat message via the agent's `invoke()` method and returns the response. |
-| `llm` (property) | `LLM ⎪ None` | `None` | Gets or sets the agent's language model. Setting this validates the connection and updates `card.capabilities.has_llm` automatically. |
-| `storage` (property) | `Storage` | `None` | Gets or sets the agent's storage instance. Setting this automatically updates the internal `SessionManager`. |
-| `set_registry()` | `registry, registry_url=None` | `None` | Configures the agent's connection to a Protolink registry. |
+| `handle_chat_message()` | `data: dict[str, Any]` | `dict[str, str]` | Processes an incoming chat message via the agent's `invoke()` method and returns the response. |
+| `llm` (property) | `LLM` ⎪ `None` | `LLM` ⎪ `None` | Gets or sets the agent's language model. Setting this validates the connection and updates `card.capabilities.has_llm` automatically. |
+| `storage` (property) | `Storage` | `Storage` | Gets or sets the agent's storage instance. Setting this automatically updates the internal `State` storage reference. |
+| `set_registry()` | `registry: TransportType` ⎪ `Registry` ⎪ `RegistryClient` ⎪ `None`, `registry_url: str` ⎪ `None = None` | `None` | Configures the agent's connection to a Protolink registry. |
 | `sync` (property) | - | `SyncAgent` | Returns a synchronous wrapper around the agent for blocking operations. |
 
 ## Storage and Persistence
