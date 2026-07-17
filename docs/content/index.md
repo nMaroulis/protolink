@@ -8,7 +8,7 @@ import ProjectMap from '@site/src/components/ProjectMap';
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="Protolink Logo" width="60%" />
 </div>
 
-> A lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python runtime for autonomous, pluggable agents, with progressive control from local meshes to a versioned A2A 1.0 JSON-RPC boundary.
+> A lightweight Python framework for autonomous, **pluggable agents** and **multi-agent systems**, with [**A2A**](https://a2a-protocol.org/latest/specification/) at the core, LLM-agnostic and local-first with optional, **replaceable runtime modules**.
 
 <div className="doc-button-row">
   <a className="doc-button primary" href="getting-started">Get Started</a>
@@ -36,15 +36,17 @@ _Current release: **0.6.6** ([PyPI](https://pypi.org/project/protolink/) | [Chan
 
 ## What is Protolink?
 
-ProtoLink is a lightweight, production-ready Python framework for building **distributed multi-agent systems** where autonomous agents **communicate directly through an A2A-based task model**.
+ProtoLink is a lightweight Python framework for building **pluggable agents** and multi-agent systems. It began as an A2A-based alternative to chain-centric frameworks: instead of organizing an application around chains of model calls, ProtoLink treats each `Agent` as a self-contained runtime entity with identity, capabilities, lifecycle, tools, optional reasoning, and direct task-based communication.
 
-Each ProtoLink agent is a **self-contained runtime** that can embed an **LLM**, manage execution context, expose and consume **tools** (built-in, native, or via [MCP](https://modelcontextprotocol.io/docs/getting-started/intro)), and coordinate with other agents over a unified **transport layer**.
-
-ProtoLink is **A2A-first by design**. `AgentCard`, `Task`, `Message`, `Part`, `Artifact`, task lifecycle, and discovery form the shared language used across agents, flows, storage, telemetry, and transports. ProtoLink builds the pluggable execution runtime around that foundation: LLMs, local models, built-in, native, and MCP tools, transports, registry discovery, state, policy, authentication, logging, and observability.
+**A2A is the architectural core, not a bolt-on integration.** ProtoLink's native `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, structured agent flows, storage, telemetry, and other operational modules without abandoning those protocol primitives.
 
 These Python models are ergonomic runtime forms of A2A's core primitives, not copies of the canonical wire schema. An HTTP agent opts into the versioned [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary with `Agent(..., a2a=True)`. The flag adds standard inbound routes and outbound translation without removing ProtoLink's native API. Its exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md).
 
-The framework emphasizes **minimal boilerplate**, **explicit control**, and **production-readiness**, making it suitable for both research and real-world systems.
+The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, built-in, native, or [**MCP**](https://modelcontextprotocol.io/docs/getting-started/intro) tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
+
+ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
+
+The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hosted model SDKs, MCP, telemetry providers, and other integrations are installed only when you choose them.
 
 :::tip[Simple API, progressive control]
 
@@ -73,7 +75,7 @@ But today's frameworks often trap you in a **walled garden**:
 
 **Protolink breaks free from this model.**
 
-In Protolink, an Agent is an **autonomous, centralized object** that serves as the core unit of your system. It is designed to be **fully modular** so you can **plug in** any LLM, tools, transport, storage, telemetry, and authentication stack you need.
+In Protolink, an Agent is an **autonomous, self-contained runtime entity** that serves as the core unit of your system. It is designed to be **fully modular** so you can **plug in** any LLM, tools, transport, storage, telemetry, and authentication stack you need.
 
 > **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
 
