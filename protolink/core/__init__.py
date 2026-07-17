@@ -41,9 +41,23 @@ from protolink.core.report import (
     assert_no_denied_actions,
     assert_run_events,
 )
+from protolink.core.report_diff import (
+    ALL_RUN_REPORT_SECTIONS,
+    RunReportDiff,
+    RunReportDiffConfig,
+    RunReportDifference,
+    RunReportDifferenceKind,
+    RunReportSection,
+    RunReportSource,
+    RunReportTolerance,
+    assert_run_matches,
+    diff_run_reports,
+    normalize_run_report,
+)
 from protolink.core.run_context import RunBudget, RunContext
 
 __all__ = [
+    "ALL_RUN_REPORT_SECTIONS",
     "DEFAULT_REDACTION_POLICY",
     "ActionAuthorization",
     "ActionAuthorizer",
@@ -74,6 +88,13 @@ __all__ = [
     "RunRecorder",
     "RunReplay",
     "RunReport",
+    "RunReportDiff",
+    "RunReportDiffConfig",
+    "RunReportDifference",
+    "RunReportDifferenceKind",
+    "RunReportSection",
+    "RunReportSource",
+    "RunReportTolerance",
     "TaskAlreadyRunningError",
     "TaskCancellationError",
     "TaskCancellationRequest",
@@ -82,4 +103,7 @@ __all__ = [
     "assert_budget_under",
     "assert_no_denied_actions",
     "assert_run_events",
+    "assert_run_matches",
+    "diff_run_reports",
+    "normalize_run_report",
 ]

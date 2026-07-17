@@ -3,6 +3,7 @@
 from protolink.__version__ import __version__
 from protolink.agents import Agent
 from protolink.core import (
+    ALL_RUN_REPORT_SECTIONS,
     DEFAULT_REDACTION_POLICY,
     ActionAuthorization,
     ActionAuthorizer,
@@ -33,6 +34,13 @@ from protolink.core import (
     RunRecorder,
     RunReplay,
     RunReport,
+    RunReportDiff,
+    RunReportDiffConfig,
+    RunReportDifference,
+    RunReportDifferenceKind,
+    RunReportSection,
+    RunReportSource,
+    RunReportTolerance,
     TaskAlreadyRunningError,
     TaskCancellationError,
     TaskCancellationRequest,
@@ -41,6 +49,9 @@ from protolink.core import (
     assert_budget_under,
     assert_no_denied_actions,
     assert_run_events,
+    assert_run_matches,
+    diff_run_reports,
+    normalize_run_report,
 )
 from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
 from protolink.llms import (
@@ -74,6 +85,7 @@ from protolink.transport import (
 )
 
 __all__ = [
+    "ALL_RUN_REPORT_SECTIONS",
     "DEFAULT_REDACTION_POLICY",
     "ActionAuthorization",
     "ActionAuthorizer",
@@ -127,7 +139,14 @@ __all__ = [
     "RunRecorder",
     "RunReplay",
     "RunReport",
+    "RunReportDiff",
+    "RunReportDiffConfig",
+    "RunReportDifference",
+    "RunReportDifferenceKind",
     "RunReportRecord",
+    "RunReportSection",
+    "RunReportSource",
+    "RunReportTolerance",
     "RunStore",
     "SQLiteRunStore",
     "StateOperationRequest",
@@ -156,6 +175,9 @@ __all__ = [
     "assert_budget_under",
     "assert_no_denied_actions",
     "assert_run_events",
+    "assert_run_matches",
     "build_context_manifest",
     "create_llm",
+    "diff_run_reports",
+    "normalize_run_report",
 ]

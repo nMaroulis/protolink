@@ -34,14 +34,14 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.6.6] - 2026-07-16
+## [0.6.6] - 2026-07-17
 
 :::note Latest release
 
-This release adds a small opt-in built-in tool set and makes ProtoLink's A2A architecture explicit without replacing
-its small Python runtime API.
+This release adds normalized run-report regression diffing, a small opt-in built-in tool set, and an explicit
+description of ProtoLink's A2A architecture without replacing its small Python runtime API.
 `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` remain ProtoLink's ergonomic runtime primitives.
-An HTTP agent can now opt into a separate, versioned A2A 1.0 inbound and outbound translation boundary with 
+An HTTP agent can now opt into a separate, versioned A2A 1.0 inbound and outbound translation boundary with
 `Agent(..., a2a=True)`. The default `False` preserves existing ProtoLink clients, native endpoints, transports
 and `handle_task(Task)` implementations.
 
@@ -49,6 +49,12 @@ and `handle_task(Task)` implementations.
 
 ### Added
 
+- **Normalized run-report regression diffing**
+  - Added `RunReportDiff`, `RunReportDifference`, `RunReportDiffConfig`, `RunReportTolerance`, `ALL_RUN_REPORT_SECTIONS`, `normalize_run_report()`, `diff_run_reports()`, and `assert_run_matches()` for comparing baseline and candidate reports. Regression suites normally record final reports, but the helpers do not require a particular task lifecycle state.
+  - Comparisons normalize known ProtoLink runtime-envelope identifiers, timestamps, and sequence counters while preserving repeated identifier relationships, report structured path-level changes, and support configurable ignored paths and numeric tolerances without mutating the source reports. Application-owned payloads and report metadata remain exact by default.
+  - Added `protolink run diff BASELINE CANDIDATE --store runs.db [--json]` for offline comparison of two stored reports. The command exits `0` for a match, `1` for behavioral changes, and `2` when either report is missing.
+  - Text and JSON CLI diff output apply the default redaction policy to compared values. The core `RunReportDiff.to_dict()` API remains raw unless the caller supplies a redaction policy.
+  - Added the provider-free `examples/run_regression_diff.py` walkthrough for pinning a baseline, detecting a changed result, and using the assertion helper in tests.
 - **Opt-in dependency-free built-in tools**
   - Added `web_search()`, `fetch_url()`, `calculator()`, and `current_datetime()` factories, exported from `protolink.tools` and registered explicitly with `agent.add_tool(factory())`.
   - `web_search` selects `engine="brave"` by default, documented keyless English Wikipedia search with `engine="wikipedia"`, or keyless best-effort DuckDuckGo HTML search with `engine="duckduckgo"`. All three use the same bounded normalized result contract with no silent provider fallback. Brave reads `BRAVE_SEARCH_API_KEY` only at invocation; DuckDuckGo challenge and markup-drift responses fail explicitly, while recognized sponsored entries are retained and labeled.

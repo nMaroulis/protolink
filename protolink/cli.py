@@ -15,6 +15,7 @@ from pathlib import Path
 
 from protolink.devtools import (
     build_doctor_report,
+    build_run_diff_view,
     build_run_replay_view,
     fetch_registry_agents,
     inspect_registry_agent,
@@ -95,6 +96,15 @@ def _build_parser() -> argparse.ArgumentParser:
     run_replay_parser.add_argument("run_id", help="Run ID or task ID.")
     run_replay_parser.add_argument("--store", default="runs.db", help="SQLite run-store path.")
     run_replay_parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
+
+    run_diff_parser = run_subparsers.add_parser(
+        "diff",
+        help="Compare two stored run reports after normalizing volatile fields.",
+    )
+    run_diff_parser.add_argument("baseline_run_id", help="Baseline run-report ID.")
+    run_diff_parser.add_argument("candidate_run_id", help="Candidate run-report ID.")
+    run_diff_parser.add_argument("--store", default="runs.db", help="SQLite run-store path.")
+    run_diff_parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
 
     dashboard_parser = subparsers.add_parser("dashboard", help="Open the local Protolink dashboard.")
     dashboard_parser.add_argument("--registry-url", help="Optional HTTP registry URL.")
@@ -216,6 +226,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(text_renderer.render_run_replay(view))
         return 1 if view.source == "missing" else 0
+
+    if args.command == "run" and args.run_command == "diff":
+        view = build_run_diff_view(
+            args.store,
+            args.baseline_run_id,
+            args.candidate_run_id,
+        )
+        if args.json:
+            print(json.dumps(view.to_dict(), indent=2))
+        else:
+            print(text_renderer.render_run_diff(view))
+        if view.status == "missing":
+            return 2
+        return 0 if view.status == "match" else 1
 
     if args.command == "dashboard":
         html_renderer = DevtoolsHtmlRenderer()

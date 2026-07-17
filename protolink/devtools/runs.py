@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from protolink.core.report import RunReplay
-from protolink.devtools.models import RunReplayItem, RunReplayView
+from protolink.core.report_diff import RunReportDiffConfig, diff_run_reports
+from protolink.devtools.models import RunDiffView, RunReplayItem, RunReplayView
 from protolink.storage import SQLiteRunStore
 
 
@@ -67,6 +68,48 @@ def build_run_replay_view(store_path: str | Path, run_id: str) -> RunReplayView:
         final_task=task_record.task,
         items=(item,),
         source="task",
+    )
+
+
+def build_run_diff_view(
+    store_path: str | Path,
+    baseline_run_id: str,
+    candidate_run_id: str,
+    *,
+    config: RunReportDiffConfig | None = None,
+) -> RunDiffView:
+    """Compare two stored run reports after applying diff normalization.
+
+    Unlike replay, report diffing never falls back to task snapshots. A task
+    snapshot does not contain the event, action, approval, metric, or context
+    sections needed for a meaningful behavioral comparison.
+    """
+    store = SQLiteRunStore(store_path)
+    baseline = store.get_report(baseline_run_id)
+    candidate = store.get_report(candidate_run_id)
+    missing_run_ids = tuple(
+        dict.fromkeys(
+            run_id
+            for run_id, report in (
+                (baseline_run_id, baseline),
+                (candidate_run_id, candidate),
+            )
+            if report is None
+        )
+    )
+    if missing_run_ids:
+        return RunDiffView(
+            baseline_run_id=baseline_run_id,
+            candidate_run_id=candidate_run_id,
+            missing_run_ids=missing_run_ids,
+        )
+
+    if baseline is None or candidate is None:  # pragma: no cover - narrowed above
+        raise RuntimeError("Stored run-report lookup produced an inconsistent result")
+    return RunDiffView(
+        baseline_run_id=baseline_run_id,
+        candidate_run_id=candidate_run_id,
+        diff=diff_run_reports(baseline, candidate, config=config),
     )
 
 

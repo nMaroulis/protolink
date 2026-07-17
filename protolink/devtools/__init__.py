@@ -8,16 +8,18 @@ collectors and renderers in their own CLIs or notebooks.
 
 from .agents import chat_with_agent, ping_agent
 from .doctor import build_doctor_report
-from .models import CheckResult, DoctorReport, RunReplayItem, RunReplayView
+from .models import CheckResult, DoctorReport, RunDiffView, RunReplayItem, RunReplayView
 from .registry import fetch_registry_agents, inspect_registry_agent
-from .runs import build_run_replay_view, list_run_store_records
+from .runs import build_run_diff_view, build_run_replay_view, list_run_store_records
 
 __all__ = [
     "CheckResult",
     "DoctorReport",
+    "RunDiffView",
     "RunReplayItem",
     "RunReplayView",
     "build_doctor_report",
+    "build_run_diff_view",
     "build_run_replay_view",
     "chat_with_agent",
     "fetch_registry_agents",

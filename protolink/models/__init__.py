@@ -9,6 +9,15 @@ from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
 from protolink.core.message import Message
 from protolink.core.part import Part, RouteDecision
 from protolink.core.report import RunRecorder, RunReplay, RunReport
+from protolink.core.report_diff import (
+    RunReportDiff,
+    RunReportDiffConfig,
+    RunReportDifference,
+    RunReportDifferenceKind,
+    RunReportSection,
+    RunReportSource,
+    RunReportTolerance,
+)
 from protolink.core.run_context import RunBudget, RunContext
 from protolink.core.task import Task, TaskState
 from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
@@ -36,6 +45,13 @@ __all__ = [
     "RunRecorder",
     "RunReplay",
     "RunReport",
+    "RunReportDiff",
+    "RunReportDiffConfig",
+    "RunReportDifference",
+    "RunReportDifferenceKind",
+    "RunReportSection",
+    "RunReportSource",
+    "RunReportTolerance",
     "StateOperationRequest",
     "StateOperationResult",
     "StateStoreReport",

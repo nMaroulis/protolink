@@ -10,7 +10,7 @@ The runtime layer does not replace transports, telemetry, storage, or structured
   eyebrow="Runtime control layer"
   title="Runtime Primitives"
   path="protolink.runtime"
-  description="The application-facing contracts for run context, cancellation, budgets, policies, approvals, actions, normalized events, reports, replay, and redaction."
+  description="The application-facing contracts for run context, cancellation, budgets, policies, approvals, actions, normalized events, reports, replay, regression comparison, and redaction."
   pills={[
     "RunContext",
     "RunBudget",
@@ -18,6 +18,7 @@ The runtime layer does not replace transports, telemetry, storage, or structured
     "ApprovalRequest",
     "RunEvent",
     "RunReport",
+    "RunReportDiffConfig",
   ]}
   cards={[
     {
@@ -36,9 +37,9 @@ The runtime layer does not replace transports, telemetry, storage, or structured
       code: "CapabilityPolicy",
     },
     {
-      title: "Replay",
-      text: "Emit stable events and durable reports for UIs, CLIs, tests, and local inspection tools.",
-      code: "RunEvent",
+      title: "Reports and regression",
+      text: "Replay recorded facts safely and compare normalized reports without repeating model or tool calls.",
+      code: "diff_run_reports",
     },
   ]}
 />
@@ -502,7 +503,7 @@ Applications can implement their own sinks for terminal rendering, WebSocket fan
 
 An event sink observes execution; it does not authorize it. Approval decisions still flow through the configured approval handler, while sinks distribute the resulting lifecycle to interested consumers.
 
-## Run Reports And Replay
+## Run Reports, Replay, And Regression Diffing
 
 `RunReport` is the durable app-facing summary built from normalized events. It collects context manifests, action records, approval checkpoints, artifacts, LLM metrics, and the final serialized task when the final stream event includes it.
 
@@ -534,6 +535,63 @@ assert_budget_under(replay, max_total_tokens=8_000)
 
 `RunReplay` never re-executes tools or model calls. It is a read-only view over report events with helpers such as `event_types`, `iter_events()`, and `find_events("context.prepared")`.
 
+### Comparing Run Reports
+
+Execute a baseline and candidate separately, then compare their recorded reports. Final reports are the usual regression input, but the comparison helpers do not inspect or enforce a task lifecycle state:
+
+```python
+from protolink import (
+    RunReportDiffConfig,
+    RunReportTolerance,
+    assert_run_matches,
+    diff_run_reports,
+    normalize_run_report,
+)
+
+config = RunReportDiffConfig(
+    ignore_paths=("/metadata/build_host",),
+    tolerances=(
+        # These application-owned scores are 0.910 and 0.915 in the reports.
+        RunReportTolerance(
+            "/metadata/evaluation_score",
+            absolute_tolerance=0.01,
+        ),
+    ),
+)
+normalized_baseline = normalize_run_report(baseline_report, config=config)
+comparison = diff_run_reports(baseline_report, candidate_report, config=config)
+
+if not comparison.matches:
+    print(comparison.format())
+
+# Convenient in a regression test: raises with a formatted, redacted summary.
+assert_run_matches(baseline_report, candidate_report, config=config)
+```
+
+The comparison canonicalizes known identifiers, timestamps, and sequence counters in ProtoLink-owned report envelopes. Recognized task-stream events also normalize runtime-derived summaries and timing values. Application-owned values inside tool payloads and report metadata remain exact unless they match an explicit ignore or tolerance rule. The result contains `matches`, `changed_sections`, and path-level `differences`.
+
+`RunReportDiffConfig(sections=..., normalize_volatile=True, ignore_paths=(), tolerances=())` controls the comparison. Each `RunReportTolerance(path, absolute_tolerance=0.0, relative_tolerance=0.0)` allows bounded numeric variation at one selected path; rules are checked in declaration order and the first match wins. An explicit tolerance takes precedence over built-in volatile normalization for the selected numeric value, so a test can opt a timing field back into bounded comparison. Defaults remain strict for fields that are not part of the built-in volatile-field normalization.
+
+Ignore and tolerance paths use RFC 6901 JSON Pointer syntax. `*` is ProtoLink's extension and matches exactly one path segment, so `/metrics/*/usage/total_tokens` covers every metric item's token count. `**` has no recursive meaning; it is a literal segment. Bracket notation is not interpreted either: `/events[0]/type` addresses a literal top-level key named `events[0]`, not item zero of `events`. Use `/events/0/type` for that list item.
+
+This is comparison, not execution. Neither `diff_run_reports()` nor `assert_run_matches()` invokes an agent, model, tool, transport, or external service. For a reproducible regression test, run the candidate against the same input with mock, captured, or otherwise controlled dependencies; with live dependencies, the diff is still useful evidence of what changed but does not make the run deterministic.
+
+The public comparison surface is:
+
+| API | Contract |
+|------|----------|
+| `ALL_RUN_REPORT_SECTIONS` | Default section tuple: `context`, `context_manifests`, `events`, `actions`, `approvals`, `artifacts`, `metrics`, `final_task`, and `metadata`. The report object's root `created_at` field is not part of this projection. |
+| `normalize_run_report(source, config=...)` | Return a new normalized dictionary without mutating the source. Accepts a `RunReport`, `RunReplay`, serialized report mapping, or iterable of `RunEvent` objects/dictionaries. |
+| `RunReportDiffConfig` | Select sections, enable or disable built-in volatile-field normalization, ignore pointer patterns, and attach numeric tolerances. |
+| `RunReportTolerance` | Define the absolute and/or relative numeric tolerance for one pointer pattern. Booleans are not treated as numbers. |
+| `diff_run_reports(baseline, candidate, config=...)` | Return a `RunReportDiff` containing the complete structured comparison. |
+| `RunReportDifference` | One `added`, `removed`, or `changed` value with its report section, RFC 6901 path, and available baseline/candidate value. Missing and explicit `None` remain distinct. |
+| `RunReportDiff` | Exposes `matches`, `differences`, `changed_sections`, `compared_sections`, `ignored_paths`, `format()`, and `to_dict()`. |
+| `RunReportSection`, `RunReportDifferenceKind`, `RunReportSource` | Public typing aliases for section names, difference kinds, and accepted comparison inputs. |
+| `assert_run_matches(...)` | Return the successful `RunReportDiff`, or raise `AssertionError` with `RunReportDiff.format()` when differences exist. |
+
+Core serialization is intentionally explicit about secrets. `RunReportDifference.to_dict()` always returns its raw fields, and `RunReportDiff.to_dict()` returns raw compared values unless a policy is supplied. Pass `redaction_policy=RedactionPolicy()` to `RunReportDiff.to_dict()` before exporting it. `RunReportDiff.format()` and the `assert_run_matches()` failure message apply the default redaction policy unless explicitly disabled. The `protolink run diff` text and JSON views also redact difference values by default.
+
 The assertion helpers are intentionally small:
 
 | Helper | Use |
@@ -541,6 +599,7 @@ The assertion helpers are intentionally small:
 | `assert_run_events(...)` | Verify that stable event types appeared, either exactly or as an ordered subsequence. |
 | `assert_no_denied_actions(...)` | Fail if policy, approval, or action events denied runtime work. |
 | `assert_budget_under(...)` | Aggregate report metrics and context manifests, then fail if token or runtime limits are exceeded. |
+| `assert_run_matches(...)` | Normalize and compare a baseline and candidate report, then fail with a formatted, redacted difference summary. |
 
 Use `RedactionPolicy` whenever persisting reports, approval payloads, context manifests, or telemetry data. The default policy masks common fields such as API keys, tokens, passwords, secrets, authorization headers, and credentials.
 

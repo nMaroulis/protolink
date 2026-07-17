@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from html import escape
 from typing import Any
 
-from protolink.devtools.models import DoctorReport, RunReplayView
+from protolink.devtools.models import DoctorReport, RunDiffView, RunReplayView
 
 
 class DevtoolsTextRenderer:
@@ -78,6 +78,22 @@ class DevtoolsTextRenderer:
             for item in view.items
         ]
         return header + "\n" + _table(("TIME", "EVENT", "LEVEL", "AGENT", "SUMMARY"), rows)
+
+    def render_run_diff(self, view: RunDiffView) -> str:
+        """Render a normalized comparison of two stored run reports."""
+        if view.status == "missing":
+            label = "Run report not found" if len(view.missing_run_ids) == 1 else "Run reports not found"
+            return f"{label}: {', '.join(view.missing_run_ids)}"
+
+        header = f"Normalized run report diff: {view.baseline_run_id} -> {view.candidate_run_id}"
+        if view.diff is None:  # pragma: no cover - guarded by status
+            return header + "\nResult: MISSING"
+        if view.diff.matches:
+            return header + "\nResult: MATCH\nNo behavioral differences after normalization."
+
+        count = len(view.diff.differences)
+        label = "difference" if count == 1 else "differences"
+        return header + f"\nResult: CHANGED ({count} {label})\n" + view.diff.format(max_differences=50)
 
 
 class DevtoolsHtmlRenderer:
