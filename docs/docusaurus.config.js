@@ -75,7 +75,7 @@ const config = {
           sidebarPath: require.resolve("./sidebars.js"),
           routeBasePath: "docs",
           editUrl:
-            "https://github.com/nMaroulis/protolink/tree/main/docs/content/",
+            "https://github.com/nMaroulis/protolink/blob/main/docs/",
           showLastUpdateAuthor: false,
           showLastUpdateTime: false,
         },
