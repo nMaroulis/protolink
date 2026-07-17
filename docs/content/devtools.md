@@ -10,7 +10,7 @@ The current surface has four command groups plus one disabled dashboard preview:
 
 - `protolink doctor` checks local installation, optional extras, run-store readability, and optional agent/registry endpoints.
 - `protolink registry list` and `protolink registry inspect` inspect a running HTTP registry.
-- `protolink run list` and `protolink run replay` read durable task snapshots and run reports.
+- `protolink run list`, `protolink run replay`, and `protolink run diff` inspect durable task snapshots and run reports.
 - `protolink dashboard` serves or writes a local HTML dashboard for runs and registry state, with a disabled Studio preview tab.
 
 ## When To Use Each Tool
@@ -22,6 +22,7 @@ The current surface has four command groups plus one disabled dashboard preview:
 | `registry inspect` | You want one full agent card by name or URL. | Registry `/agents/` endpoint. | No |
 | `run list` | You need recent task snapshots and run-report IDs. | `SQLiteRunStore`. | No |
 | `run replay` | You need a readable timeline for a stored run. | `SQLiteRunStore`. | No |
+| `run diff` | You need a normalized regression comparison between two stored reports. | `SQLiteRunStore`. | No |
 | `dashboard` | You want a local visual summary of registry and run-store state. | Registry and/or `SQLiteRunStore`. | No |
 | Dashboard Studio preview | You want to see where the future topology canvas will live. | Starter blueprint preview. | No |
 
@@ -187,6 +188,20 @@ A good replay should answer questions such as:
 
 Replay is not deterministic re-execution. It is a read-only reconstruction of recorded facts. That distinction is important for debugging: you can inspect a run without causing side effects, making provider calls, or repeating tool actions.
 
+## Run Regression Diffing
+
+After executing and recording a candidate separately against the same controlled inputs and dependencies as a baseline, compare the two stored reports offline:
+
+```bash
+protolink run diff baseline_run candidate_run --store runs.db
+```
+
+The comparison canonicalizes known ProtoLink runtime-envelope identifiers, timestamps, sequence counters, and runtime-derived timing fields before reporting path-level differences. Application-owned tool payloads and report metadata remain exact. It does not execute an agent, contact a provider, or repeat a tool action. With live models or external services, the result shows what changed; it does not make those dependencies deterministic. Regression suites normally compare final reports, but report lookup does not enforce a task lifecycle state.
+
+`run diff` requires two `RunReport` records in the same `SQLiteRunStore`. It deliberately does not compare task-snapshot fallbacks because a snapshot does not contain the full event, action, approval, artifact, and metric record.
+
+The command exits `0` when the normalized reports match, `1` when they changed, and `2` when either report is missing. Add `--json` in CI or custom tooling to receive `status`, `missing_run_ids`, `changed_sections`, and structured differences in addition to the baseline and candidate selectors. Both terminal and JSON output mask sensitive baseline/candidate values with the default redaction policy while retaining their JSON Pointer paths.
+
 ## Dashboard
 
 Serve the local dashboard:
@@ -257,26 +272,27 @@ Typical uses:
 - Explain how an agent plugs into LLMs, tools, telemetry, registry, and storage.
 - Keep the future structured-flow or scaffold-generator direction visible.
 
-## Renderer APIs
+## Collector And Renderer APIs
 
 The UI pieces live in `protolink.utils.renderers.devtools`:
 
 <ApiSurface
   eyebrow="Developer tooling module"
-  title="Devtools Renderers"
+  title="Devtools Collectors And Renderers"
   path="protolink.devtools"
-  description="The collector and renderer API for local dashboards, run replay, registry inspection, chat probes, terminal summaries, and application-specific debug panels."
+  description="The collector and renderer API for local dashboards, run replay and comparison, registry inspection, chat probes, terminal summaries, and application-specific debug panels."
   pills={[
     "Dashboard snapshots",
     "HTML renderer",
     "Text renderer",
     "Run replay",
+    "Run diff",
     "Agent probes",
   ]}
   cards={[
     {
       title: "Collect",
-      text: "Build plain dashboard and run-replay data structures from local run stores and registry state.",
+      text: "Build plain dashboard, replay, and report-diff data structures from local run stores and registry state.",
       code: "build_dashboard_snapshot()",
     },
     {
@@ -286,7 +302,7 @@ The UI pieces live in `protolink.utils.renderers.devtools`:
     },
     {
       title: "Render text",
-      text: "Format terminal-friendly run lists, replay output, and inspection summaries.",
+      text: "Format terminal-friendly run lists, replay output, normalized report diffs, and inspection summaries.",
       code: "DevtoolsTextRenderer",
     },
     {
@@ -314,7 +330,7 @@ Use `DevtoolsTextRenderer` for terminals and logs. Use `DevtoolsHtmlRenderer` fo
 
 The collectors and renderers are separate on purpose:
 
-- Collectors such as `build_dashboard_snapshot()`, `list_run_store_records()`, and `build_run_replay_view()` return plain dictionaries or small dataclasses.
+- Collectors such as `build_dashboard_snapshot()`, `list_run_store_records()`, `build_run_replay_view()`, and `build_run_diff_view()` return plain dictionaries or small dataclasses.
 - Agent actions such as `ping_agent()` and `chat_with_agent()` call public HTTP agent endpoints. They are deliberately separate from the renderer so applications can reuse them in their own debug panels.
 - Text renderers turn those structures into terminal-friendly tables.
 - HTML renderers turn those structures into standalone dashboard pages with registry health, chat, run replay, and the disabled Studio preview included.
@@ -330,6 +346,18 @@ view = build_run_replay_view("runs.db", "dashboard_demo_1")
 for item in view.items:
     print(item.event_type, item.summary)
 ```
+
+The stored-report comparison collector returns a `RunDiffView`:
+
+```python
+from protolink.devtools import build_run_diff_view
+
+view = build_run_diff_view("runs.db", "baseline_run", "candidate_run")
+print(view.status)  # "match", "changed", or "missing"
+safe_payload = view.to_dict()  # diff values are redacted by default
+```
+
+`build_run_diff_view()` requires two report records and never falls back to task snapshots. `RunDiffView.diff` is the core `RunReportDiff` when both reports exist; otherwise `missing_run_ids` identifies the failed lookups. Passing `redaction_policy=None` to `RunDiffView.to_dict()` returns raw values, so keep the default or supply a policy when the payload can leave the process.
 
 ## Provider-Free Example
 

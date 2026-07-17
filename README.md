@@ -136,7 +136,7 @@ Install the integrations used here with `uv add "protolink[http,mcp]"`; the Olla
 | [Telemetry](https://nmaroulis.github.io/protolink/docs/telemetry/) | Dependency-free local traces, Langfuse, LangSmith, multi-telemetry, custom |
 | [Authentication](https://nmaroulis.github.io/protolink/docs/authentication/) | API keys, bearer JWT, basic auth, OAuth delegation, TLS |
 | [Logging](https://nmaroulis.github.io/protolink/docs/logging/) | Colored console, text/JSON files, quiet logger, custom `BaseLogger` |
-| [Runtime control](https://nmaroulis.github.io/protolink/docs/runtime/) | Budgets, cancellation, policy, approvals, events, reports, replay, redaction |
+| [Runtime control](https://nmaroulis.github.io/protolink/docs/runtime/) | Budgets, cancellation, policy, approvals, events, reports, replay, regression diffing, redaction |
 
 ## LLM-agnostic, with a strong local focus
 
@@ -284,7 +284,7 @@ result = agent.sync.invoke("Trace this task")
 trace = telemetry.recorder.replay()[-1]
 ```
 
-The same runtime contracts power cancellation, budgets, policy decisions, approval previews, run reports, redaction, and deterministic replay.
+The same runtime contracts power cancellation, budgets, policy decisions, approval previews, run reports, redaction, read-only replay, and normalized report comparison for regression testing. Replay and comparison never re-execute model or tool calls: execute the candidate separately against controlled dependencies, record its report, and then diff it against the baseline. Normalization is limited to known ProtoLink report-envelope fields; application-owned payloads and report metadata remain exact unless you configure an ignore rule or numeric tolerance.
 
 ## Dashboard developer tool
 
@@ -298,12 +298,13 @@ It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `Ag
 
 ![ProtoLink dashboard overview](https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif)
 
-The CLI also includes project scaffolding, environment diagnostics, registry inspection, and run replay:
+The CLI also includes project scaffolding, environment diagnostics, registry inspection, run replay, and normalized report diffing:
 
 ```bash
 protolink init agent
 protolink doctor
 protolink run list --store runs.db
+protolink run diff baseline_run candidate_run --store runs.db
 ```
 
 See the [developer tools guide](https://nmaroulis.github.io/protolink/docs/devtools/).
@@ -312,6 +313,7 @@ See the [developer tools guide](https://nmaroulis.github.io/protolink/docs/devto
 
 - [Built-in multi-engine web search](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py)
 - [Provider-free runtime mesh](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py)
+- [Normalized run regression diffing](https://github.com/nMaroulis/protolink/blob/main/examples/run_regression_diff.py)
 - [HTTP agent communication](https://github.com/nMaroulis/protolink/blob/main/examples/http_agents.py)
 - [Production transport configuration](https://github.com/nMaroulis/protolink/blob/main/examples/transport_production.py)
 - [Runtime policy and approvals](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_policy_and_approvals.py)

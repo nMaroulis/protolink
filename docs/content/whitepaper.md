@@ -857,7 +857,7 @@ state, and replay surfaces apply.
 That keeps deterministic orchestration on the same A2A-based model as the rest
 of the agent mesh.
 
-## Telemetry, Events, Reports, And Replay
+## Telemetry, Events, Reports, Replay, And Regression Diffing
 
 ProtoLink separates live application events from observability traces.
 
@@ -909,27 +909,53 @@ Promoted event types include:
 built-in sink for tests and local apps. `RunRecorder` records a stream and turns
 it into a `RunReport`. `RunReplay` provides a read-only view over that report.
 
-This makes golden-run testing practical:
+This makes event assertions and golden-run regression testing practical. The
+baseline and candidate are executed and recorded separately:
 
 ```python
-from protolink import RunRecorder, RunReplay, assert_run_events
+from protolink import (
+    RunRecorder,
+    RunReplay,
+    assert_run_events,
+    assert_run_matches,
+    diff_run_reports,
+)
 
-recorder = RunRecorder(context=context)
+baseline_recorder = RunRecorder(context=baseline_context)
 
-async for task_event in agent.handle_task_streaming(task):
-    await recorder.record_task_event(task_event)
+async for task_event in baseline_agent.handle_task_streaming(baseline_task):
+    await baseline_recorder.record_task_event(task_event)
 
-report = recorder.to_report()
-replay = RunReplay(report)
+baseline_report = baseline_recorder.to_report()
+replay = RunReplay(baseline_report)
 
 assert_run_events(
     replay,
     ["task.status", "context.prepared", "llm.call.started", "llm.call.completed", "task.status"],
 )
+
+# Execute the changed agent separately against controlled model/tool dependencies.
+candidate_recorder = RunRecorder(context=candidate_context)
+async for task_event in candidate_agent.handle_task_streaming(candidate_task):
+    await candidate_recorder.record_task_event(task_event)
+candidate_report = candidate_recorder.to_report()
+
+comparison = diff_run_reports(baseline_report, candidate_report)
+if not comparison.matches:
+    print(comparison.format())
+assert_run_matches(baseline_report, candidate_report)
 ```
 
 Replay does not re-execute tools or model calls. It lets applications inspect
-what happened through a durable, redacted, structured summary.
+what happened through a durable, structured summary that can be redacted before
+persistence or rendering. Regression diffing also operates only on already
+recorded data: it canonicalizes known ProtoLink runtime-envelope identifiers,
+timestamps, sequence counters, and derived timing fields, then compares event,
+action, approval, artifact, metric, and final-task content. Application-owned
+payloads remain exact. Final reports are the normal regression input, although
+the comparison API does not enforce a task lifecycle state. Deterministic tests
+still require controlled or captured model, tool, and external-service
+responses.
 
 ## State And Memory
 
@@ -1048,10 +1074,11 @@ summaries, causal IDs, and replay compatibility.
 
 ### Testing
 
-Use `MockLLM`, `RuntimeTransport`, `InMemoryEventSink`, `RunRecorder`, and
-golden-run assertions to test agent behavior without live providers or network
-ports. This is especially valuable because the runtime records concrete action
-and policy events rather than relying on text snapshots alone.
+Use `MockLLM`, `RuntimeTransport`, `InMemoryEventSink`, `RunRecorder`,
+`diff_run_reports()`, and golden-run assertions to test agent behavior without
+live providers or network ports. This is especially valuable because the
+runtime records concrete action and policy events rather than relying on text
+snapshots alone.
 
 ## What ProtoLink Brings To The Table
 

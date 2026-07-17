@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from protolink.core.redaction import DEFAULT_REDACTION_POLICY, RedactionPolicy
+from protolink.core.report_diff import RunReportDiff
+
 CheckStatus = Literal["ok", "warn", "error"]
 """Status values emitted by devtool health checks."""
 
@@ -100,3 +103,52 @@ class RunReplayView:
             "source": self.source,
             "items": [item.to_dict() for item in self.items],
         }
+
+
+@dataclass(frozen=True)
+class RunDiffView:
+    """Human-facing comparison of two stored run reports.
+
+    ``RunDiffView`` keeps store lookup state separate from the core diff
+    contract. A missing report is therefore distinguishable from a valid
+    comparison that found behavioral differences.
+    """
+
+    baseline_run_id: str
+    candidate_run_id: str
+    diff: RunReportDiff | None = None
+    missing_run_ids: tuple[str, ...] = ()
+
+    @property
+    def status(self) -> Literal["match", "changed", "missing"]:
+        """Return the comparison outcome."""
+        if self.missing_run_ids or self.diff is None:
+            return "missing"
+        return "match" if self.diff.matches else "changed"
+
+    def to_dict(
+        self,
+        *,
+        redaction_policy: RedactionPolicy | None = DEFAULT_REDACTION_POLICY,
+    ) -> dict[str, Any]:
+        """Serialize this comparison, masking diff secrets by default."""
+        payload: dict[str, Any] = {
+            "baseline_run_id": self.baseline_run_id,
+            "candidate_run_id": self.candidate_run_id,
+            "status": self.status,
+            "missing_run_ids": list(self.missing_run_ids),
+        }
+        if self.diff is None:
+            payload.update(
+                {
+                    "matches": None,
+                    "difference_count": 0,
+                    "changed_sections": [],
+                    "compared_sections": [],
+                    "ignored_paths": [],
+                    "differences": [],
+                }
+            )
+        else:
+            payload.update(self.diff.to_dict(redaction_policy=redaction_policy))
+        return payload

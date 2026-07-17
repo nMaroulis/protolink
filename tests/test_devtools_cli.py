@@ -5,7 +5,13 @@ import pytest
 
 from protolink import RunContext, RunEvent, RunReport, SQLiteRunStore, Task
 from protolink.cli import main as cli_main
-from protolink.devtools import build_run_replay_view, chat_with_agent, list_run_store_records, ping_agent
+from protolink.devtools import (
+    build_run_diff_view,
+    build_run_replay_view,
+    chat_with_agent,
+    list_run_store_records,
+    ping_agent,
+)
 from protolink.devtools.server import build_dashboard_snapshot
 from protolink.utils.renderers.devtools import DevtoolsHtmlRenderer
 
@@ -34,6 +40,127 @@ def test_cli_run_list_and_replay_use_sqlite_run_store(tmp_path: Path, capsys):
 
     assert "Run replay: run_cli" in output
     assert "llm.call.completed" in output
+
+
+def test_cli_run_diff_matches_after_volatile_normalization(tmp_path: Path, capsys):
+    store_path = tmp_path / "runs.db"
+    _seed_run_store(store_path)
+    _seed_candidate_report(store_path, run_id="run_cli_match", model="mock")
+
+    args = ["run", "diff", "run_cli", "run_cli_match", "--store", str(store_path)]
+    assert cli_main(args) == 0
+    output = capsys.readouterr().out
+
+    assert "Normalized run report diff: run_cli -> run_cli_match" in output
+    assert "Result: MATCH" in output
+
+    assert cli_main([*args, "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["baseline_run_id"] == "run_cli"
+    assert payload["candidate_run_id"] == "run_cli_match"
+    assert payload["status"] == "match"
+    assert payload["matches"] is True
+    assert payload["changed_sections"] == []
+    assert payload["differences"] == []
+
+
+def test_cli_run_diff_emits_text_and_json_for_behavior_changes(tmp_path: Path, capsys):
+    store_path = tmp_path / "runs.db"
+    _seed_run_store(store_path)
+    _seed_candidate_report(store_path, run_id="run_cli_changed", model="mock-v2")
+
+    args = ["run", "diff", "run_cli", "run_cli_changed", "--store", str(store_path)]
+    assert cli_main(args) == 1
+    output = capsys.readouterr().out
+
+    assert "Normalized run report diff: run_cli -> run_cli_changed" in output
+    assert "Result: CHANGED" in output
+    assert "events" in output
+
+    assert cli_main([*args, "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["status"] == "changed"
+    assert payload["matches"] is False
+    assert "events" in payload["changed_sections"]
+    assert any(
+        difference.get("baseline") == "mock" and difference.get("candidate") == "mock-v2"
+        for difference in payload["differences"]
+    )
+
+
+def test_cli_run_diff_requires_two_reports_without_task_fallback(tmp_path: Path, capsys):
+    store_path = tmp_path / "runs.db"
+    _seed_run_store(store_path)
+    store = SQLiteRunStore(store_path)
+    task = Task.create_infer(prompt="task snapshots are not reports")
+    context = RunContext(run_id="run_task_only")
+    context.attach_to_task(task)
+    task.complete("done")
+    store.save_task(task, context=context, agent_name="cli_agent")
+
+    view = build_run_diff_view(store_path, "run_cli", "run_task_only")
+    assert view.status == "missing"
+    assert view.missing_run_ids == ("run_task_only",)
+
+    args = ["run", "diff", "run_cli", "run_task_only", "--store", str(store_path)]
+    assert cli_main(args) == 2
+    assert capsys.readouterr().out.strip() == "Run report not found: run_task_only"
+
+    assert cli_main([*args, "--json"]) == 2
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload == {
+        "baseline_run_id": "run_cli",
+        "candidate_run_id": "run_task_only",
+        "status": "missing",
+        "missing_run_ids": ["run_task_only"],
+        "matches": None,
+        "difference_count": 0,
+        "changed_sections": [],
+        "compared_sections": [],
+        "ignored_paths": [],
+        "differences": [],
+    }
+
+
+def test_cli_run_diff_json_redacts_secret_values(tmp_path: Path, capsys):
+    store_path = tmp_path / "runs.db"
+    store = SQLiteRunStore(store_path)
+    for run_id, secret in (
+        ("run_secret_baseline", "baseline-secret"),
+        ("run_secret_candidate", "candidate-secret"),
+    ):
+        context = RunContext(run_id=run_id)
+        report = RunReport.from_events(
+            [],
+            context=context,
+            metadata={"credentials": {"client_id": secret}},
+        )
+        store.save_report(report)
+
+    assert (
+        cli_main(
+            [
+                "run",
+                "diff",
+                "run_secret_baseline",
+                "run_secret_candidate",
+                "--store",
+                str(store_path),
+                "--json",
+            ]
+        )
+        == 1
+    )
+    payload = json.loads(capsys.readouterr().out)
+    difference = payload["differences"][0]
+
+    assert difference["baseline"] == "[REDACTED]"
+    assert difference["candidate"] == "[REDACTED]"
+    assert "baseline-secret" not in json.dumps(payload)
+    assert "candidate-secret" not in json.dumps(payload)
 
 
 def test_devtools_helpers_project_store_records(tmp_path: Path):
@@ -192,3 +319,37 @@ def _seed_run_store(store_path: Path) -> str:
     )
     store.save_report(report, agent_name="cli_agent")
     return task.id
+
+
+def _seed_candidate_report(store_path: Path, *, run_id: str, model: str) -> None:
+    store = SQLiteRunStore(store_path)
+    task = Task.create_infer(prompt="hello")
+    context = RunContext(
+        run_id=run_id,
+        session_id="session_cli",
+        trace_id="trace_cli",
+        agent_chain=["client"],
+    )
+    context.attach_to_task(task)
+    task.complete("done")
+    report = RunReport.from_events(
+        [
+            RunEvent(
+                type="task.status",
+                run_id=context.run_id,
+                task_id=task.id,
+                agent_name="cli_agent",
+                payload={"previous_state": "working", "new_state": "completed"},
+            ),
+            RunEvent(
+                type="llm.call.completed",
+                run_id=context.run_id,
+                task_id=task.id,
+                agent_name="cli_agent",
+                payload={"provider": "mock", "model": model},
+            ),
+        ],
+        context=context,
+        final_task=task.to_dict(),
+    )
+    store.save_report(report, agent_name="cli_agent")

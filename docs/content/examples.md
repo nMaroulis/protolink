@@ -100,6 +100,10 @@ Run it without a query to inspect the CLI without making a network request.
 - [`provider_free_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py) runs a deterministic three-agent mesh with no provider, API key, registry, or network port. It demonstrates the A2A-derived `AgentCard`, `Task`, and `Message` model through the in-process runtime transport.
 - [`a2a_tck_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/a2a_tck_agent.py) is the provider-free HTTP fixture for the official A2A 1.0 TCK. It explicitly uses `Agent(..., a2a=True)`; ordinary HTTP agents remain native-only by default. It is a compatibility test target, not a substitute for a published passing TCK result; follow the pinned instructions in [A2A Core and 1.0 Compatibility](a2a.md).
 
+### Run regression diffing
+
+- [`run_regression_diff.py`](https://github.com/nMaroulis/protolink/blob/main/examples/run_regression_diff.py) creates provider-free baseline and candidate reports with different known runtime IDs, timestamps, sequence counters, and bounded latency, proves that schema-aware normalization plus an explicit tolerance remove that noise, and then detects a real final-output change with `diff_run_reports()` and `assert_run_matches()`. Real candidate runs must be executed and recorded separately.
+
 ### 🧩 Protolink 0.6.3 runtime-control examples
 
 The 0.6.3 examples are small, provider-free scripts intended for application integrators:

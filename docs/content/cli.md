@@ -1,13 +1,13 @@
 # CLI
 
-Protolink ships with a command-line interface for project scaffolding, local health checks, registry inspection, run replay, and the local dashboard developer tools.
+Protolink ships with a command-line interface for project scaffolding, local health checks, registry inspection, run replay and regression diffing, and the local dashboard developer tools.
 
 The CLI is meant to be the shortest path from "I have a Protolink project" to "I can see what is installed, what agents are registered, what happened during a run, and how my agent topology is shaped." It does not replace the Python API. Instead, it sits on top of the same public runtime contracts that applications use directly: `AgentCard`, `RunContext`, `RunEvent`, `RunReport`, `SQLiteRunStore`, and registry discovery.
 
 Use the CLI in three common moments:
 
 - **First setup**: create a starter agent and confirm optional dependencies with `protolink doctor`.
-- **Local debugging**: inspect registry entries, list stored runs, and replay a run timeline without writing custom scripts.
+- **Local debugging and regression checks**: inspect registry entries, list stored runs, replay a timeline, and compare stored reports without writing custom scripts.
 - **Developer presentation**: open the dashboard when you want a visual view of runs, agents, and the future Studio preview.
 
 Most inspection commands support both human-readable terminal output and JSON. Use text while working interactively; use `--json` when integrating with CI, shell scripts, notebooks, or another application.
@@ -185,6 +185,26 @@ The difference matters:
 
 Use `run list` first when you do not remember the run ID. Use `run replay` when you want to understand why a run behaved a certain way. Use `--json` if you want to feed the replay into another renderer or a golden-run assertion workflow.
 
+Compare two run reports from the same store:
+
+```bash
+protolink run diff baseline_run candidate_run --store runs.db
+```
+
+`run diff` loads reports only; unlike `run replay`, it does not fall back to task snapshots. It canonicalizes known ProtoLink runtime-envelope identifiers, timestamps, sequence counters, and runtime-derived timing fields, then compares the remaining report content. Application-owned tool payloads and report metadata remain exact. This lets CI detect changes in event sequences, actions, approvals, artifacts, metrics, and final task output.
+
+The command compares facts that have already been recorded; it does not run either agent. Execute the candidate separately with the same input and controlled or captured model, tool, and external-service dependencies before comparing it with the baseline. A comparison against live dependencies can show what changed, but it cannot make those dependencies deterministic. Final reports are the usual regression input, although the API and CLI do not enforce a task lifecycle state.
+
+The exit status is designed for automation:
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | The normalized reports match. |
+| `1` | The reports contain behavioral differences. |
+| `2` | One or both report IDs are missing from the store. |
+
+Use `--json` for a structured result containing the baseline and candidate selectors, `status` (`match`, `changed`, or `missing`), missing IDs, changed sections, and path-level differences. The default text view prints `Normalized run report diff: BASELINE -> CANDIDATE`, followed by `Result: MATCH` or `Result: CHANGED`. Both text and JSON output apply ProtoLink's default redaction policy to baseline and candidate values in a difference; the JSON Pointer path remains visible.
+
 ## Dashboard
 
 Open the local dashboard:
@@ -231,6 +251,7 @@ protolink registry list --url URL [--name NAME] [--role ROLE] [--tag TAG] [--jso
 protolink registry inspect SELECTOR --url URL [--json]
 protolink run list [--store PATH] [--limit N] [--json]
 protolink run replay RUN_ID [--store PATH] [--json]
+protolink run diff BASELINE CANDIDATE [--store PATH] [--json]
 protolink dashboard [--store PATH] [--registry-url URL] [--host HOST] [--port PORT] [--open] [--output PATH]
 ```
 
