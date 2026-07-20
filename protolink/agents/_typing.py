@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 if TYPE_CHECKING:
     from protolink.client import AgentClient, RegistryClient
     from protolink.core.actions import RunAction
+    from protolink.core.budget import BudgetEnforcer
     from protolink.core.cancellation import CancellationToken, TaskCancellationRequest, TaskExecutionRegistry
     from protolink.core.policy import ActionAuthorization, ActionAuthorizer
     from protolink.core.run_context import RunContext
@@ -45,6 +46,7 @@ class _AgentMixinBase(Protocol):
     _storage: Storage
     _state: State
     _telemetry: Telemetry | None
+    _telemetry_error_hooks: set[str]
     _logger: BaseLogger
     _task_executions: TaskExecutionRegistry
     _control_tasks: set[asyncio.Task[Any]]
@@ -158,6 +160,7 @@ class _AgentMixinBase(Protocol):
         *,
         task: Task | None = None,
         cancellation_token: CancellationToken | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> Part: ...
 
     async def call_llm(
@@ -168,6 +171,7 @@ class _AgentMixinBase(Protocol):
         streaming: bool = False,
         event_callback: Any = None,
         cancellation_token: CancellationToken | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> Part: ...
 
     def call_llm_stream(
@@ -176,4 +180,5 @@ class _AgentMixinBase(Protocol):
         task: Task | None = None,
         *,
         cancellation_token: CancellationToken | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> AsyncIterator[Any]: ...

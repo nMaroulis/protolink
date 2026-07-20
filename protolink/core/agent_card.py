@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any, final
@@ -258,50 +259,51 @@ class AgentCard:
             )
 
     def get_prompt_format(self) -> str:
-        """
-        Generate a structured text representation of this agent for LLM prompts.
+        """Generate deterministic JSON metadata for delegation prompts.
 
-        This method produces a human-readable, LLM-friendly description of the agent that includes its name,
-        description, and available tools (skills). The output is designed to be embedded in a system prompt,
-        enabling LLMs to understand which agents are available for delegation via ``agent_call``.
+        The result is a complete JSON object rather than a Python-style repr,
+        so quotes, newlines, booleans, and nested schemas cannot corrupt the
+        surrounding prompt. Capabilities are emitted as an explicit data
+        object, and skills are sorted by identifier for stable prompt caching.
 
         The format includes:
         - Agent name and description
+        - Capability metadata
         - List of tools with their schemas (if any skills are registered)
 
         Example:
-            name: "Weather Agent"
-            description: "Use this agent if the user asks about weather, temperature, or climate."
-            tools:
-                "name": "get_temperature"
-                "description": "Returns the temperature in a location for a given date"
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "location": {"type": "string"},
-                        "datetime": {"type": "string", "format": "date-time", "default": "now"}
-                    },
-                    "required": ["location"],
+            {
+              "capabilities": {"delegation": true},
+              "description": "Weather forecasts",
+              "name": "weather_agent",
+              "tools": [
+                {
+                  "description": "Return a forecast",
+                  "examples": [{"location": "Athens"}],
+                  "input_schema": {"type": "object"},
+                  "name": "get_weather",
+                  "output_schema": {"type": "object"}
                 }
-                "output_schema": {"type": "number"}
-                "examples": [{"location": "Athens", "datetime": "now"}]
+              ]
+            }
 
         Returns:
-            str: A formatted multi-line string describing the agent and its capabilities.
+            A valid JSON object describing the agent and its capabilities.
         """
-        prompt_text: str = f"""
-            name: {self.name},
-            description: {self.description},
-        """
-        if self.skills:
-            prompt_text += "\ntools:\n"
-            for skill in self.skills:
-                prompt_text += f"""
-                    "name": {skill.id},
-                    "description": {skill.description},
-                    "input_schema": {skill.input_schema}
-                    "output_schema": {skill.output_schema}
-                    "examples": {skill.examples}
-                    \n
-                """
-        return prompt_text
+        tools = [
+            {
+                "name": skill.id,
+                "description": skill.description,
+                "input_schema": skill.input_schema,
+                "output_schema": skill.output_schema,
+                "examples": skill.examples,
+            }
+            for skill in sorted(self.skills, key=lambda item: item.id)
+        ]
+        metadata = {
+            "name": self.name,
+            "description": self.description,
+            "capabilities": self.capabilities.as_dict(),
+            "tools": tools,
+        }
+        return json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True, default=str)

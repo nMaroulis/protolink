@@ -208,6 +208,17 @@ class BudgetEnforcer:
         """Record and evaluate the current runtime step."""
         return self._evaluate_candidate(replace(self.usage, steps=step), commit=True)
 
+    def check_next_step(self) -> BudgetDecision:
+        """Increment and evaluate the task-wide runtime step counter.
+
+        ``LLM.infer()`` can be invoked more than once while one task is being
+        processed (for example, when the latest message contains multiple infer
+        parts).  A caller-provided enforcer must therefore advance from its
+        current usage rather than overwrite the counter with an infer-local step
+        number.
+        """
+        return self.check_step(self.usage.steps + 1)
+
     def check_llm_call(self, *, input_tokens: int = 0) -> BudgetDecision:
         """Record and evaluate a model call before it starts."""
         candidate = replace(

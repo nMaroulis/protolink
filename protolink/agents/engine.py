@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar, Token
 from typing import Any
 
 from protolink.core.actions import RunAction
+from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError
 from protolink.core.cancellation import ActiveTaskExecution, CancellationToken, mark_task_canceled
 from protolink.core.policy import ActionAuthorization, ActionPolicyError
 from protolink.core.run_context import RunContext
@@ -16,6 +19,48 @@ from protolink.llms.history import ConversationHistory
 from protolink.models import Artifact, Message, Part, Task
 
 from ._typing import _AgentMixinBase
+
+_TaskBudgetScope = tuple[str, BudgetEnforcer]
+_active_task_budget: ContextVar[_TaskBudgetScope | None] = ContextVar(
+    "protolink_active_task_budget",
+    default=None,
+)
+
+
+def _activate_task_budget(task: Task, context: RunContext) -> Token[_TaskBudgetScope | None] | None:
+    """Install one enforcer per task id without resetting same-task nesting."""
+    current = _active_task_budget.get()
+    if current is not None and current[0] == task.id:
+        return None
+    return _active_task_budget.set((task.id, BudgetEnforcer(context)))
+
+
+def _deactivate_task_budget(token: Token[_TaskBudgetScope | None] | None) -> None:
+    """Restore the previous task budget context when this scope installed it."""
+    if token is not None:
+        _active_task_budget.reset(token)
+
+
+def _current_task_budget(task: Task | None) -> BudgetEnforcer | None:
+    """Return the scoped enforcer only for the matching task."""
+    current = _active_task_budget.get()
+    if current is None:
+        return None
+    task_id, enforcer = current
+    if task is None or task.id == task_id:
+        return enforcer
+    return None
+
+
+def _accepts_keyword_argument(callback: Any, name: str) -> bool:
+    """Return whether a callable accepts one named keyword or arbitrary kwargs."""
+    try:
+        parameters = inspect.signature(callback).parameters
+    except (TypeError, ValueError):
+        return False
+    return name in parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
 
 
 class AgentExecutionMixin(_AgentMixinBase):
@@ -33,16 +78,31 @@ class AgentExecutionMixin(_AgentMixinBase):
             return task
 
         execution, owner = self._task_executions.register(task)
+        context = RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
+        budget_token = _activate_task_budget(task, context)
         try:
-            execution.token.raise_if_cancelled()
+            self._raise_if_execution_canceled(task, execution.token)
             result = await self.handle_task(task)
             self._persist_task_snapshot(result)
             return result
-        except asyncio.CancelledError:
-            mark_task_canceled(task, execution.token.reason)
+        except asyncio.CancelledError as exc:
+            protocol_cancellation = execution.token.is_cancelled
+            mark_task_canceled(task, self._cancellation_reason(exc, execution.token))
             self._persist_task_snapshot(task)
+            if not protocol_cancellation:
+                raise
             return task
+        except Exception as exc:
+            if not task.is_terminal:
+                task.fail(str(exc))
+            self._persist_task_snapshot(task)
+            raise
         finally:
+            _deactivate_task_budget(budget_token)
             if owner:
                 self._task_executions.unregister(task.id, execution.execution_task)
 
@@ -66,15 +126,28 @@ class AgentExecutionMixin(_AgentMixinBase):
             return
 
         execution, owner = self._task_executions.register(task)
+        context = RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
+        budget_token = _activate_task_budget(task, context)
         try:
-            execution.token.raise_if_cancelled()
+            self._raise_if_execution_canceled(task, execution.token)
             async for event in self.handle_task_streaming(task):
                 yield event
-        except asyncio.CancelledError:
-            mark_task_canceled(task, execution.token.reason)
+        except asyncio.CancelledError as exc:
+            protocol_cancellation = execution.token.is_cancelled
+            mark_task_canceled(task, self._cancellation_reason(exc, execution.token))
+            self._persist_task_snapshot(task)
+            if not protocol_cancellation:
+                raise
             yield self._canceled_status_event(task, execution)
         finally:
+            if not task.is_terminal:
+                mark_task_canceled(task, "Streaming consumer closed before task completion")
             self._persist_task_snapshot(task)
+            _deactivate_task_budget(budget_token)
             if owner:
                 self._task_executions.unregister(task.id, execution.execution_task)
 
@@ -130,28 +203,30 @@ class AgentExecutionMixin(_AgentMixinBase):
             The updated Task after applying all explicitly requested executions.
         """
         self._logger.debug(f"Received task: {task.to_dict()}")
-        RunContext.ensure_task_context(
+        context = RunContext.ensure_task_context(
             task,
             default_session_id=task.metadata.get("session_id", task.id),
             agent_name=self.card.name,
         )
+        if context.canceled:
+            mark_task_canceled(task, context.cancel_reason)
+            self._persist_task_snapshot(task)
+            return task
         if self.telemetry:
-            await self.telemetry.on_task_start(task, self.card.name)
+            await self._emit_telemetry("on_task_start", task, self.card.name)
             RunContext.ensure_task_context(
                 task,
                 default_session_id=task.metadata.get("session_id", task.id),
                 agent_name=self.card.name,
             )
 
+        result = task
         try:
             result = await self.execute_task(task)
-            if self.telemetry:
-                await self.telemetry.on_task_end(task, result, self.card.name)
             return result
-        except Exception:
+        finally:
             if self.telemetry:
-                await self.telemetry.on_task_end(task, task, self.card.name)
-            raise
+                await self._emit_telemetry("on_task_end", task, result, self.card.name)
 
     async def handle_task_streaming(self, task: Task) -> AsyncIterator:
         """Process a task while streaming under live cancellation control."""
@@ -161,14 +236,32 @@ class AgentExecutionMixin(_AgentMixinBase):
             return
 
         execution, owner = self._task_executions.register(task)
+        context = RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
+        budget_token = _activate_task_budget(task, context)
         try:
-            execution.token.raise_if_cancelled()
+            self._raise_if_execution_canceled(task, execution.token)
+            if self.telemetry:
+                await self._emit_telemetry("on_task_start", task, self.card.name)
             async for event in self._handle_task_streaming_impl(task, execution.token):
                 yield event
-        except asyncio.CancelledError:
-            mark_task_canceled(task, execution.token.reason)
+        except asyncio.CancelledError as exc:
+            protocol_cancellation = execution.token.is_cancelled
+            mark_task_canceled(task, self._cancellation_reason(exc, execution.token))
+            self._persist_task_snapshot(task)
+            if not protocol_cancellation:
+                raise
             yield self._canceled_status_event(task, execution)
         finally:
+            if not task.is_terminal:
+                mark_task_canceled(task, "Streaming consumer closed before task completion")
+                self._persist_task_snapshot(task)
+            if self.telemetry:
+                await self._emit_telemetry("on_task_end", task, task, self.card.name)
+            _deactivate_task_budget(budget_token)
             if owner:
                 self._task_executions.unregister(task.id, execution.execution_task)
 
@@ -190,6 +283,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             default_session_id=task.metadata.get("session_id", task.id),
             agent_name=self.card.name,
         )
+        self._raise_if_execution_canceled(task, cancellation_token, context=context)
         previous_state = self._begin_task_if_needed(task)
         if previous_state is None:
             yield TaskStatusUpdateEvent(
@@ -316,6 +410,59 @@ class AgentExecutionMixin(_AgentMixinBase):
         """Return a serialized task state value for events and metadata."""
         return state.value if isinstance(state, TaskState) else str(state)
 
+    def _enforce_budget_decision(self, decision: BudgetDecision) -> None:
+        """Apply an explicit runtime-part budget decision."""
+        if decision.effect == "warn":
+            self._logger.warning(decision.message or "Run budget is approaching a configured limit")
+        if not decision.allowed:
+            raise BudgetExceededError(decision)
+
+    async def _emit_telemetry(self, hook_name: str, *args: Any, **kwargs: Any) -> Any:
+        """Invoke one telemetry hook without making observability authoritative."""
+        telemetry = self.telemetry
+        if telemetry is None:
+            return None
+        hook = getattr(telemetry, hook_name, None)
+        if not callable(hook):
+            return None
+        try:
+            return await hook(*args, **kwargs)
+        except Exception as exc:
+            if hook_name not in self._telemetry_error_hooks:
+                self._telemetry_error_hooks.add(hook_name)
+                self._logger.warning(f"Telemetry hook {hook_name} failed; continuing without it: {exc}")
+            return None
+
+    def _raise_if_execution_canceled(
+        self,
+        task: Task,
+        cancellation_token: CancellationToken | None = None,
+        *,
+        context: RunContext | None = None,
+    ) -> None:
+        """Honor serialized and live cancellation before execution starts."""
+        active_context = context or RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
+        if active_context.canceled:
+            if cancellation_token is not None:
+                cancellation_token.cancel(active_context.cancel_reason)
+            mark_task_canceled(task, active_context.cancel_reason)
+            raise asyncio.CancelledError(active_context.cancel_reason or "Task was canceled before execution")
+        if cancellation_token is not None:
+            cancellation_token.raise_if_cancelled()
+
+    @staticmethod
+    def _cancellation_reason(exc: asyncio.CancelledError, cancellation_token: CancellationToken) -> str | None:
+        """Return the protocol reason or preserve an external cancel message."""
+        if cancellation_token.is_cancelled:
+            return cancellation_token.reason
+        if exc.args and exc.args[0]:
+            return str(exc.args[0])
+        return "Execution coroutine was canceled"
+
     @staticmethod
     def _part_requires_input(part: Part) -> bool:
         """Return whether an output part explicitly asks for more input."""
@@ -410,16 +557,29 @@ class AgentExecutionMixin(_AgentMixinBase):
             return task
 
         execution, owner = self._task_executions.register(task)
+        context = RunContext.ensure_task_context(
+            task,
+            default_session_id=task.metadata.get("session_id", task.id),
+            agent_name=self.card.name,
+        )
+        budget_token = _activate_task_budget(task, context)
         try:
-            execution.token.raise_if_cancelled()
+            self._raise_if_execution_canceled(task, execution.token)
             result = await self._execute_task_impl(task, execution.token)
             self._persist_task_snapshot(result)
             return result
-        except asyncio.CancelledError:
-            mark_task_canceled(task, execution.token.reason)
+        except asyncio.CancelledError as exc:
+            protocol_cancellation = execution.token.is_cancelled
+            mark_task_canceled(task, self._cancellation_reason(exc, execution.token))
             self._persist_task_snapshot(task)
+            if not protocol_cancellation:
+                raise
             return task
+        except Exception:
+            self._persist_task_snapshot(task)
+            raise
         finally:
+            _deactivate_task_budget(budget_token)
             if owner:
                 self._task_executions.unregister(task.id, execution.execution_task)
 
@@ -430,6 +590,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             default_session_id=task.metadata.get("session_id", task.id),
             agent_name=self.card.name,
         )
+        self._raise_if_execution_canceled(task, cancellation_token, context=context)
         self._begin_task_if_needed(task)
 
         try:
@@ -543,6 +704,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         *,
         task: Task | None = None,
         cancellation_token: CancellationToken | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> Part:
         """
         Execute a single tool call described by a `tool_call` Part.
@@ -564,6 +726,8 @@ class AgentExecutionMixin(_AgentMixinBase):
             task: Optional active task supplying the propagated ``RunContext``.
             cancellation_token: Optional live token for cooperative checks
                 before authorization and after the tool returns.
+            budget_enforcer: Optional task-scoped enforcer shared with other
+                infer and tool parts in the same task.
 
         Returns:
             A Part of type "tool_output" containing:
@@ -572,10 +736,25 @@ class AgentExecutionMixin(_AgentMixinBase):
             - error: Error information (on failure)
         """
 
+        active_token = cancellation_token
+        if active_token is None and task is not None:
+            active_token = self.get_cancellation_token(task.id)
+        context = (
+            RunContext.ensure_task_context(task, agent_name=self.card.name)
+            if task is not None
+            else RunContext(agent_chain=[self.card.name])
+        )
+        if task is not None:
+            self._raise_if_execution_canceled(task, active_token, context=context)
+        elif active_token is not None:
+            active_token.raise_if_cancelled()
+
+        active_budget_enforcer = budget_enforcer or _current_task_budget(task) or BudgetEnforcer(context)
+        self._enforce_budget_decision(active_budget_enforcer.check_next_step())
+
         tc = part.as_tool_call()
         tool_name, args, call_id = tc.tool_name, tc.args, tc.call_id
         self._logger.debug(f"Executing tool: {tool_name}")
-
         tool = self.tools.get(tool_name)
         if not tool:
             return Part.tool_output(
@@ -584,36 +763,32 @@ class AgentExecutionMixin(_AgentMixinBase):
             )
 
         if self.telemetry:
-            await self.telemetry.on_tool_start(tool_name, args)
+            await self._emit_telemetry("on_tool_start", tool_name, args)
 
         try:
-            active_token = cancellation_token
-            if active_token is None and task is not None:
-                active_token = self.get_cancellation_token(task.id)
-            if active_token is not None:
-                active_token.raise_if_cancelled()
-
-            context = (
-                RunContext.ensure_task_context(task, agent_name=self.card.name)
-                if task is not None
-                else RunContext(agent_chain=[self.card.name])
-            )
             _, call_args = await self._authorize_tool_action(tool, args, context)
             if active_token is not None:
                 active_token.raise_if_cancelled()
+            self._enforce_budget_decision(active_budget_enforcer.evaluate())
+            self._enforce_budget_decision(active_budget_enforcer.check_tool_call())
             result = await tool(**call_args)
             if active_token is not None:
                 active_token.raise_if_cancelled()
+            self._enforce_budget_decision(active_budget_enforcer.evaluate())
             if self.telemetry:
-                await self.telemetry.on_tool_end(tool_name, result)
+                await self._emit_telemetry("on_tool_end", tool_name, result)
             return Part.tool_output(call_id=call_id, result=result)
         except ActionPolicyError as e:
             if self.telemetry:
-                await self.telemetry.on_tool_end(tool_name, None, error=str(e))
+                await self._emit_telemetry("on_tool_end", tool_name, None, error=str(e))
+            raise
+        except BudgetExceededError as e:
+            if self.telemetry:
+                await self._emit_telemetry("on_tool_end", tool_name, None, error=str(e))
             raise
         except Exception as e:
             if self.telemetry:
-                await self.telemetry.on_tool_end(tool_name, None, error=str(e))
+                await self._emit_telemetry("on_tool_end", tool_name, None, error=str(e))
             return Part.tool_output(
                 call_id=call_id,
                 error={"message": str(e)},
@@ -627,6 +802,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         streaming: bool = False,
         event_callback=None,
         cancellation_token: CancellationToken | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> Part:
         """
         Invoke the agent's LLM to process an inference request.
@@ -652,6 +828,8 @@ class AgentExecutionMixin(_AgentMixinBase):
                 ``call_llm_stream()`` and task streaming transports.
             cancellation_token: Optional live token checked throughout the
                 inference loop and before side-effect dispatch.
+            budget_enforcer: Optional task-scoped enforcer shared with other
+                infer and tool parts in the same task.
 
         Returns:
             Part: A Part of type ``infer_output`` containing the LLM's final response,
@@ -663,23 +841,43 @@ class AgentExecutionMixin(_AgentMixinBase):
             results are injected back into the conversation for the LLM to process.
         """
 
+        active_token = cancellation_token
+        if active_token is None and task is not None:
+            active_token = self.get_cancellation_token(task.id)
+        active_context = (
+            RunContext.ensure_task_context(task, agent_name=self.card.name)
+            if task is not None
+            else RunContext(agent_chain=[self.card.name])
+        )
+        if task is not None:
+            self._raise_if_execution_canceled(task, active_token, context=active_context)
+        elif active_token is not None:
+            active_token.raise_if_cancelled()
+
         if not self.llm:
             return Part.error(
                 code="no_llm",
                 message="Agent has no LLM but received a infer instruction",
             )
 
-        active_token = cancellation_token
-        if active_token is None and task is not None:
-            active_token = self.get_cancellation_token(task.id)
-        if active_token is not None:
-            active_token.raise_if_cancelled()
-
-        # Get Available Agents (Guardrail: excluding ourselves to prevent self-delegation loops)
+        # Discovery is an optional prompt affordance. An unavailable registry
+        # must not take down otherwise-local inference.
         discovered = []
-        if self.card.capabilities.delegation:  # If the agent supports delegation
-            discovered = await self.discover_agents()
-            discovered = [agent for agent in discovered if agent.url != self.card.url]
+        if self.card.capabilities.delegation:
+            try:
+                discovered = await self.discover_agents()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self._logger.warning(f"Agent discovery failed; continuing inference without delegation targets: {exc}")
+                discovered = []
+
+            ancestor_names = {name.strip().casefold() for name in active_context.agent_chain}
+            discovered = [
+                agent
+                for agent in discovered
+                if agent.url != self.card.url and agent.name.strip().casefold() not in ancestor_names
+            ]
             agent_cards_list = [
                 f"Agent {i}:\n{agent.get_prompt_format()}" for i, agent in enumerate(discovered, start=1)
             ]
@@ -715,7 +913,8 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         model_name = getattr(self.llm, "model_name", None) or getattr(self.llm, "model", None)
         if self.telemetry:
-            await self.telemetry.on_llm_start(
+            await self._emit_telemetry(
+                "on_llm_start",
                 query,
                 model_name,
                 {
@@ -729,15 +928,9 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         async def emit_inference_event(event: dict[str, Any]) -> None:
             if self.telemetry:
-                await self.telemetry.on_llm_event(event)
+                await self._emit_telemetry("on_llm_event", event)
             if event_callback:
                 await event_callback(event)
-
-        active_context = (
-            RunContext.ensure_task_context(task, agent_name=self.card.name)
-            if task is not None
-            else RunContext(agent_chain=[self.card.name])
-        )
 
         async def authorize_inference_action(action: RunAction) -> ActionAuthorization:
             """Prepare tool actions and enforce this agent's runtime policy."""
@@ -768,17 +961,18 @@ class AgentExecutionMixin(_AgentMixinBase):
         response: Part = await self.llm.infer(
             query=query,
             tools=self.tools,
-            agent_callback=handle_inference_agent_call if self.card.capabilities.delegation else None,
-            agent_cards=discovered if self.card.capabilities.delegation else None,
+            agent_callback=handle_inference_agent_call if discovered else None,
+            agent_cards=discovered or None,
             streaming=streaming,
             event_callback=emit_inference_event if self.telemetry or event_callback else None,
             action_authorizer=authorize_inference_action,
             cancellation_token=active_token,
             run_context=active_context,
+            budget_enforcer=budget_enforcer or _current_task_budget(task),
         )
 
         if self.telemetry:
-            await self.telemetry.on_llm_end(response)
+            await self._emit_telemetry("on_llm_end", response)
 
         return response
 
@@ -788,6 +982,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         task: Task | None = None,
         *,
         cancellation_token: CancellationToken | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> AsyncIterator[Any]:
         """Invoke the agent LLM in streaming mode and yield task events.
 
@@ -818,6 +1013,11 @@ class AgentExecutionMixin(_AgentMixinBase):
             )
 
         async def run_inference() -> None:
+            explicit_budget_token = (
+                _active_task_budget.set((task.id if task is not None else "", budget_enforcer))
+                if budget_enforcer is not None
+                else None
+            )
             try:
                 part = await self.call_llm(
                     infer_part,
@@ -827,6 +1027,8 @@ class AgentExecutionMixin(_AgentMixinBase):
                     cancellation_token=cancellation_token,
                 )
                 await queue.put({"__protolink_part__": part.to_dict()})
+            except asyncio.CancelledError as exc:
+                await queue.put(exc)
             except Exception as exc:
                 await queue.put(
                     TaskErrorEvent(
@@ -837,6 +1039,8 @@ class AgentExecutionMixin(_AgentMixinBase):
                     )
                 )
             finally:
+                if explicit_budget_token is not None:
+                    _active_task_budget.reset(explicit_budget_token)
                 await queue.put(sentinel)
 
         runner = asyncio.create_task(run_inference())
@@ -845,6 +1049,8 @@ class AgentExecutionMixin(_AgentMixinBase):
                 item = await queue.get()
                 if item is sentinel:
                     break
+                if isinstance(item, asyncio.CancelledError):
+                    raise item
                 yield item
         finally:
             if not runner.done():
@@ -869,7 +1075,8 @@ class AgentExecutionMixin(_AgentMixinBase):
         into a Task and sends it to the target agent using the transport layer.
 
         Args:
-            agent_name: Name or URL of the agent to delegate to.
+            agent_name: Registry-advertised name of the agent to delegate to.
+                Model-originated direct URLs are rejected.
             action: The action type - either "tool_call" (execute a tool on the remote agent) or "infer" (ask the
                 remote agent to generate a response).
             payload: The full agent_call payload from the LLM, containing tool/args or prompt.
@@ -880,10 +1087,26 @@ class AgentExecutionMixin(_AgentMixinBase):
             The result from the delegated agent (typically the last part content from the response task).
 
         Raises:
-            ValueError: If the action type is unknown.
+            ValueError: If the target is a direct URL, would create a
+                delegation cycle, or the action type is unknown.
             RuntimeError: If the delegation fails (propagated from call_agent).
         """
-        # Resolve agent name to URL
+        if "://" in agent_name:
+            raise ValueError(
+                "Direct URL delegation is not allowed for model-originated agent calls; "
+                "use the name of an agent advertised by the registry."
+            )
+
+        if parent_context is not None:
+            target_name = agent_name.strip().casefold()
+            ancestor_names = {name.strip().casefold() for name in parent_context.agent_chain}
+            if target_name in ancestor_names:
+                chain = " -> ".join(parent_context.agent_chain)
+                raise ValueError(
+                    f"Delegation cycle detected: agent '{agent_name}' already appears in the ancestor chain ({chain})."
+                )
+
+        # Resolve the registry-advertised agent name to its transport URL.
         agent_url = await self._resolve_agent_url(agent_name)
 
         # Guardrail Check for self-delegation
@@ -895,7 +1118,7 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         async def call_delegated_task(task: Task) -> Task:
             if parent_context is not None:
-                parent_context.child().attach_to_task(task)
+                parent_context.child(agent_name=agent_name).attach_to_task(task)
             try:
                 return await self.call_agent(agent_url, task)
             except asyncio.CancelledError:

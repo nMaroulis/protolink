@@ -66,6 +66,50 @@ def test_anthropic_llm_native_tool_call_action():
     assert result.metadata["tool_use_id"] == "toolu_123"
 
 
+def test_anthropic_call_action_derives_system_prompt_from_passed_history():
+    llm = _make_anthropic_llm()
+    llm.system_prompt = "stale shared prompt"
+
+    mock_response = SimpleNamespace(
+        content=[
+            SimpleNamespace(
+                type="tool_use",
+                name="search",
+                input={"query": "protolink"},
+                id="toolu_history",
+            )
+        ]
+    )
+    llm._client.messages.create.return_value = mock_response
+
+    history = ConversationHistory(system_prompt="task-local prompt")
+    history.add_user("Find docs")
+    history.add_system("Correct the previous invalid action.")
+    history.add_assistant("I will search.")
+
+    llm.call_action(history, tools=_tools(), agent_callback_available=False)
+
+    kwargs = llm._client.messages.create.call_args.kwargs
+    assert kwargs["system"] == "task-local prompt\n\nCorrect the previous invalid action."
+    assert kwargs["messages"] == [
+        {"role": "user", "content": "Find docs"},
+        {"role": "assistant", "content": "I will search."},
+    ]
+
+
+def test_anthropic_call_action_rejects_parallel_tool_uses():
+    llm = _make_anthropic_llm()
+    llm._client.messages.create.return_value = SimpleNamespace(
+        content=[
+            SimpleNamespace(type="tool_use", name="search", input={"query": "one"}, id="toolu_1"),
+            SimpleNamespace(type="tool_use", name="search", input={"query": "two"}, id="toolu_2"),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="multiple parallel tool calls"):
+        llm.call_action(ConversationHistory(), tools=_tools(), agent_callback_available=False)
+
+
 def test_anthropic_llm_parse_plain_text():
     llm = _make_anthropic_llm()
 
@@ -97,11 +141,15 @@ async def test_anthropic_call_action_stream_collects_tool_use_json_deltas():
         [
             SimpleNamespace(
                 type="content_block_start",
-                content_block=SimpleNamespace(type="tool_use", name="search", id="toolu_stream", input=None),
+                content_block=SimpleNamespace(type="tool_use", name="search", id="toolu_stream", input={}),
             ),
             SimpleNamespace(
                 type="content_block_delta",
-                delta=SimpleNamespace(type="input_json_delta", partial_json='{"query":"protolink"}'),
+                delta=SimpleNamespace(type="input_json_delta", partial_json='{"query":'),
+            ),
+            SimpleNamespace(
+                type="content_block_delta",
+                delta=SimpleNamespace(type="input_json_delta", partial_json='"protolink"}'),
             ),
         ]
     )
@@ -118,3 +166,23 @@ async def test_anthropic_call_action_stream_collects_tool_use_json_deltas():
     assert result.native is True
     assert result.metadata["tool_use_id"] == "toolu_stream"
     assert result.metadata["streaming"] is True
+
+
+@pytest.mark.asyncio
+async def test_anthropic_call_action_stream_rejects_parallel_tool_uses():
+    llm = _make_anthropic_llm()
+    llm._client.messages.stream.return_value = _FakeAnthropicStream(
+        [
+            SimpleNamespace(
+                type="content_block_start",
+                content_block=SimpleNamespace(type="tool_use", name="search", id="toolu_1", input={}),
+            ),
+            SimpleNamespace(
+                type="content_block_start",
+                content_block=SimpleNamespace(type="tool_use", name="search", id="toolu_2", input={}),
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="multiple parallel tool calls"):
+        await llm.call_action_stream(ConversationHistory(), tools=_tools(), agent_callback_available=False)

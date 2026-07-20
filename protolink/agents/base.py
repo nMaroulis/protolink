@@ -141,6 +141,7 @@ class Agent(
         self.storage = storage if storage is not None else InMemoryStorage(namespace=self.card.name)
         # Telemetry
         self._telemetry: Telemetry | None = None
+        self._telemetry_error_hooks: set[str] = set()
         self.telemetry = telemetry
         # Tools & skills
         self.tools: dict[str, BaseTool] = {}

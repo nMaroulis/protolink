@@ -36,6 +36,8 @@ from protolink.llms.actions import LLMAction, validate_action_payload
 if TYPE_CHECKING:
     from protolink.tools import BaseTool
 
+_RAW_RESPONSE_PREVIEW_CHARS = 2_000
+
 
 def parse_infer_response(
     response: str,
@@ -314,9 +316,10 @@ def _load_response_json(response: str) -> Any:
 
     The primary contract is a strict JSON action object. As a practical
     fallback for smaller or less instruction-following models, this helper also
-    accepts the first balanced-looking object span between the first ``{`` and
-    last ``}``. That covers common wrappers such as Markdown code fences or a
-    short explanatory sentence around the JSON.
+    accepts exactly one balanced, valid JSON object embedded in prose or a code
+    fence. The extractor tracks JSON string and escape state, so braces inside
+    string values do not terminate an object early. Multiple valid objects are
+    rejected rather than selecting one ambiguously.
 
     This function does not validate the action schema; it only decodes JSON.
     Schema validation remains in ``parse_infer_response`` so malformed objects
@@ -330,17 +333,83 @@ def _load_response_json(response: str) -> Any:
 
     Raises:
         ValueError: If neither the full response nor the embedded-object
-            fallback can be decoded. The raw response is included for debugging
-            and model feedback.
+            fallback can be decoded, or if multiple embedded objects are found.
+            A bounded raw-response preview is included for debugging and model
+            feedback.
     """
     try:
         return json.loads(response, strict=False)
     except json.JSONDecodeError as original_error:
-        start = response.find("{")
-        end = response.rfind("}")
-        if start != -1 and end != -1 and start < end:
+        objects = []
+        for candidate_text in _extract_balanced_top_level_objects(response):
             try:
-                return json.loads(response[start : end + 1], strict=False)
+                candidate = json.loads(candidate_text, strict=False)
             except json.JSONDecodeError:
-                pass
-        raise ValueError(f"Invalid JSON: {original_error}\nRaw response: {response}") from original_error
+                continue
+            if isinstance(candidate, dict):
+                objects.append(candidate)
+        if len(objects) == 1:
+            return objects[0]
+        raw_diagnostic = _format_raw_response_diagnostic(response)
+        if len(objects) > 1:
+            raise ValueError(
+                f"Invalid JSON action response: found {len(objects)} valid top-level JSON objects; "
+                f"expected exactly one.\n{raw_diagnostic}"
+            ) from original_error
+        raise ValueError(f"Invalid JSON: {original_error}\n{raw_diagnostic}") from original_error
+
+
+def _extract_balanced_top_level_objects(response: str) -> list[str]:
+    """Extract disjoint top-level object spans in one string-aware pass.
+
+    Quotes outside an object belong to arbitrary wrapper prose and do not alter
+    scanning. Once an opening brace starts a candidate, JSON string and escape
+    state ensure literal braces inside values do not change nesting. Unterminated
+    candidates are ignored, matching the conservative fallback contract without
+    repeated rescans of adversarial brace-heavy responses.
+    """
+    objects: list[str] = []
+    start: int | None = None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index, char in enumerate(response):
+        if depth == 0:
+            if char == "{":
+                start = index
+                depth = 1
+                in_string = False
+                escaped = False
+            continue
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                objects.append(response[start : index + 1])
+                start = None
+    return objects
+
+
+def _format_raw_response_diagnostic(response: str) -> str:
+    """Return a bounded response preview suitable for parse diagnostics."""
+    if len(response) <= _RAW_RESPONSE_PREVIEW_CHARS:
+        return f"Raw response: {response}"
+
+    head_chars = _RAW_RESPONSE_PREVIEW_CHARS // 2
+    tail_chars = _RAW_RESPONSE_PREVIEW_CHARS - head_chars
+    omitted_chars = len(response) - _RAW_RESPONSE_PREVIEW_CHARS
+    preview = f"{response[:head_chars]}\n... [{omitted_chars} characters omitted] ...\n{response[-tail_chars:]}"
+    return f"Raw response (truncated; {len(response)} characters total): {preview}"

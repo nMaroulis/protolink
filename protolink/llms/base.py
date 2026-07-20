@@ -71,7 +71,9 @@ See Also:
 """
 
 import asyncio
+import inspect
 import json
+import re
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import contextmanager
@@ -137,9 +139,12 @@ from protolink.llms.prompts import (
 )
 from protolink.llms.serialization import json_history_default
 from protolink.tools import BaseTool
+from protolink.tools.schema import validate_tool_args
 from protolink.types import LLMProvider, LLMType, ReasoningLevel
+from protolink.utils.logging import get_logger
 
 MAX_INFER_STEPS: int = 10  # safety against infinite loops
+logger = get_logger(__name__)
 
 
 def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext:
@@ -570,6 +575,7 @@ class LLM(ABC):
         cancellation_token: CancellationToken | None = None,
         run_context: RunContext | dict[str, Any] | None = None,
         budget_policy: BudgetPolicy | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -660,6 +666,10 @@ class LLM(ABC):
         budget_policy : BudgetPolicy, optional
             Policy used by the built-in ``BudgetEnforcer``. Omit this to use
             the default allow/warn/deny policy.
+        budget_enforcer : BudgetEnforcer, optional
+            Existing task-scoped enforcer. The Agent runtime supplies one when
+            several infer/tool parts share a task so usage, warnings, and runtime
+            accounting remain cumulative. Direct LLM callers may omit it.
 
         Returns
         -------
@@ -733,11 +743,13 @@ class LLM(ABC):
         build_system_prompt : Constructs the system prompt with tools and agents.
         """
 
+        active_context = _coerce_run_context(run_context)
+        if active_context.canceled:
+            raise asyncio.CancelledError(active_context.cancel_reason or "Run context was canceled before inference")
         if cancellation_token is not None:
             cancellation_token.raise_if_cancelled()
 
-        active_context = _coerce_run_context(run_context)
-        budget_enforcer = BudgetEnforcer(active_context, policy=budget_policy)
+        active_budget_enforcer = budget_enforcer or BudgetEnforcer(active_context, policy=budget_policy)
         self.history.add_user(query)
 
         steps: int = 0
@@ -745,10 +757,27 @@ class LLM(ABC):
         max_parse_failures: int = 3  # Circuit breaker for consecutive parse failures
         recent_actions: list[str] = []  # Track recent actions for dedup detection
         max_recent_actions: int = 5  # Window for detecting repeated actions
+        observer_disabled = False
 
         async def emit(event: dict[str, Any]) -> None:
-            if event_callback is not None:
-                await event_callback(event)
+            nonlocal observer_disabled
+            if event_callback is not None and not observer_disabled:
+                try:
+                    await event_callback(event)
+                except Exception as exc:
+                    # Event observers are explicitly non-authoritative. A broken
+                    # telemetry/export callback must not invalidate an already
+                    # completed model or tool operation.
+                    logger.warning(
+                        f"Inference event callback failed; continuing without interrupting the run: {exc}"
+                    )
+                    observer_disabled = True
+
+        def remember_action(signature: str) -> None:
+            """Remember only actions that completed successfully."""
+            recent_actions.append(signature)
+            if len(recent_actions) > max_recent_actions:
+                recent_actions.pop(0)
 
         async def emit_budget_decision(decision: BudgetDecision) -> None:
             if decision.effect == "warn":
@@ -797,7 +826,7 @@ class LLM(ABC):
             if cancellation_token is not None:
                 cancellation_token.raise_if_cancelled()
             steps += 1
-            await enforce_budget(budget_enforcer.check_step(steps))
+            await enforce_budget(active_budget_enforcer.check_next_step())
             await emit({"type": "llm_step", "step": steps})
             action_error: ValueError | None = None
             action_result: LLMActionResult | None = None
@@ -814,7 +843,7 @@ class LLM(ABC):
             )
             manifest_payload = manifest.to_dict()
             await emit({"type": "context_prepared", "step": steps, "manifest": manifest_payload})
-            await enforce_budget(budget_enforcer.check_llm_call(input_tokens=manifest.total_estimated_tokens))
+            await enforce_budget(active_budget_enforcer.check_llm_call(input_tokens=manifest.total_estimated_tokens))
 
             if metrics_active:
                 context_usage: LLMContextUsage = context_usage_from_tokens(
@@ -836,24 +865,62 @@ class LLM(ABC):
             # ─────────────────────────────────────────────────────────────────
             # Step 1: Ask the LLM adapter for one typed action
             # ─────────────────────────────────────────────────────────────────
-            try:
-                import time
+            attempt_count = 0
+            stream_state = {"output_exposed": False}
 
+            async def before_llm_attempt(
+                attempt: int,
+                current_step: int = steps,
+                input_tokens: int = manifest.total_estimated_tokens,
+                current_manifest: dict[str, Any] = manifest_payload,
+            ) -> None:
+                nonlocal attempt_count
+                if cancellation_token is not None:
+                    cancellation_token.raise_if_cancelled()
+                if attempt > 1:
+                    await enforce_budget(active_budget_enforcer.evaluate())
+                    await enforce_budget(active_budget_enforcer.check_llm_call(input_tokens=input_tokens))
+                attempt_count = attempt
                 await emit(
                     {
                         "type": "llm_call_started",
-                        "step": steps,
+                        "step": current_step,
+                        "attempt": attempt,
                         "provider": self.provider,
                         "model": self.model,
                         "streaming": streaming,
-                        "manifest": manifest_payload,
+                        "manifest": current_manifest,
                     }
                 )
+
+            async def on_llm_retry(
+                failed_attempt: int,
+                exc: Exception,
+                delay: float,
+                current_step: int = steps,
+            ) -> None:
+                await emit(
+                    {
+                        "type": "llm_retry",
+                        "step": current_step,
+                        "reason": "transient_error",
+                        "attempt": failed_attempt,
+                        "next_attempt": failed_attempt + 1,
+                        "retry_in_seconds": round(delay, 3),
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                    }
+                )
+
+            try:
+                import time
+
                 call_started_at = time.perf_counter()
                 if streaming:
 
-                    async def stream_action(current_step=steps):
+                    async def stream_action(current_step=steps, current_stream_state=stream_state):
                         async def emit_chunk(chunk: str) -> None:
+                            current_stream_state["output_exposed"] = True
                             await emit({"type": "llm_chunk", "step": current_step, "content": chunk})
 
                         return await self.call_action_stream(
@@ -864,7 +931,15 @@ class LLM(ABC):
                             chunk_callback=emit_chunk,
                         )
 
-                    action_result = await self._call_with_retry(stream_action)
+                    def allow_stream_retry(_exc: Exception, current_stream_state=stream_state) -> bool:
+                        return not current_stream_state["output_exposed"]
+
+                    action_result = await self._call_with_retry(
+                        stream_action,
+                        _before_attempt=before_llm_attempt,
+                        _on_retry=on_llm_retry,
+                        _retry_predicate=allow_stream_retry,
+                    )
                     raw_response = action_result.raw_response
                 else:
                     action_result = await self._call_with_retry(
@@ -873,13 +948,16 @@ class LLM(ABC):
                         tools=tools,
                         agent_callback_available=agent_callback is not None,
                         agent_cards=agent_cards,
+                        _before_attempt=before_llm_attempt,
+                        _on_retry=on_llm_retry,
                     )
                     raw_response = action_result.raw_response
-                    action_obj = action_result.action
                 latency_ms = round((time.perf_counter() - call_started_at) * 1000, 3)
                 response_metadata = dict(action_result.metadata if action_result is not None else {})
+                response_metadata["attempts"] = attempt_count
+                response_metadata["retry_attempts"] = max(attempt_count - 1, 0)
                 needs_call_metrics = (
-                    metrics_active or budget_enforcer.has_output_token_limit
+                    metrics_active or active_budget_enforcer.has_output_token_limit
                 ) and action_result is not None
                 if needs_call_metrics and action_result is not None:
                     call_metrics = build_call_metrics(
@@ -898,7 +976,7 @@ class LLM(ABC):
                     response_metadata["metrics"] = metrics_payload
                     if metrics_active:
                         await emit({"type": "llm_call_metrics", **metrics_payload})
-                    await enforce_budget(budget_enforcer.record_output_tokens(call_metrics.usage.output_tokens))
+                    await enforce_budget(active_budget_enforcer.record_output_tokens(call_metrics.usage.output_tokens))
                 await emit(
                     {
                         "type": "llm_call_completed",
@@ -906,10 +984,11 @@ class LLM(ABC):
                         "provider": self.provider,
                         "model": self.model,
                         "latency_ms": latency_ms,
+                        "attempts": attempt_count,
                         "streaming": streaming,
                         "native": action_result.native if action_result is not None else False,
                         "metrics": call_metrics.to_dict() if call_metrics else None,
-                        "budget": budget_enforcer.usage.to_dict(),
+                        "budget": active_budget_enforcer.usage.to_dict(),
                     }
                 )
                 await emit(
@@ -922,6 +1001,11 @@ class LLM(ABC):
                         "metrics": call_metrics.to_dict() if call_metrics else None,
                     }
                 )
+                # Runtime budgets are checked after every physical operation as
+                # well as before the next step. This catches a call that itself
+                # crossed the configured wall-clock limit, including final calls
+                # that would otherwise return immediately.
+                await enforce_budget(active_budget_enforcer.evaluate())
             except ValueError as e:
                 action_error = e
             except BudgetExceededError:
@@ -961,14 +1045,24 @@ class LLM(ABC):
                     raise RuntimeError(
                         f"Failed to parse LLM output after {parse_failures} consecutive attempts. Last error: {e}"
                     ) from e
-                # Inject error feedback to help LLM self-correct
+                # Keep correction prompts concise and capability-aware so small
+                # models are not invited to select unavailable action types.
+                examples = ['{"type":"final","content":"..."}']
+                if tools:
+                    examples.append('{"type":"tool_call","tool":"tool_name","args":{}}')
+                if agent_callback is not None:
+                    examples.extend(
+                        [
+                            '{"type":"agent_call","agent":"agent_name","action":"infer","prompt":"..."}',
+                            (
+                                '{"type":"agent_call","agent":"agent_name","action":"tool_call",'
+                                '"tool":"tool_name","args":{}}'
+                            ),
+                        ]
+                    )
                 self.history.add_system(
                     f"Your previous response could not be parsed or validated. Error:\n{e}\n"
-                    f"Return exactly one JSON action object, for example:\n"
-                    f'{{"type":"final","content":"..."}}\n'
-                    f'{{"type":"tool_call","tool":"tool_name","args":{{}}}}\n'
-                    f'{{"type":"agent_call","agent":"agent_name","action":"infer","prompt":"..."}}\n'
-                    f'{{"type":"agent_call","agent":"agent_name","action":"tool_call","tool":"tool_name","args":{{}}}}'
+                    "Return exactly one JSON action object, for example:\n" + "\n".join(examples)
                 )
                 continue
 
@@ -976,6 +1070,15 @@ class LLM(ABC):
             # Step 3: Deduplication detection for repeated actions
             # ─────────────────────────────────────────────────────────────────
             await emit({"type": "llm_action", "step": steps, "action": action, "payload": payload})
+
+            # Final actions have no side effect to deduplicate and should be
+            # returned immediately even if their content repeats earlier text.
+            if isinstance(action_obj, FinalAction):
+                content = action_obj.content
+                self.history.add_assistant(raw_response)
+                await emit({"type": "llm_final", "step": steps, "content": content, "final": True})
+                return Part("infer_output", content)
+
             action_signature = self._compute_action_signature(action_obj)
             if action_signature in recent_actions:
                 # Detected repeated action - inject guidance to prevent infinite loop
@@ -995,22 +1098,10 @@ class LLM(ABC):
                 )
                 continue
 
-            # Track recent actions (sliding window)
-            recent_actions.append(action_signature)
-            if len(recent_actions) > max_recent_actions:
-                recent_actions.pop(0)
-
             # ─────────────────────────────────────────────────────────────────
             # Step 4: Handle action types
             # ─────────────────────────────────────────────────────────────────
-            if isinstance(action_obj, FinalAction):
-                content = action_obj.content
-                # Add final response to history
-                self.history.add_assistant(raw_response)
-                await emit({"type": "llm_final", "step": steps, "content": content, "final": True})
-                return Part("infer_output", content)
-
-            elif isinstance(action_obj, ToolCallAction):
+            if isinstance(action_obj, ToolCallAction):
                 # Add assistant call to history before result
                 self.history.add_assistant(raw_response)
 
@@ -1020,15 +1111,42 @@ class LLM(ABC):
 
                 if tool_name not in tools:
                     available = list(tools.keys())
+                    await emit(
+                        {
+                            "type": "tool_error",
+                            "step": steps,
+                            "tool": tool_name,
+                            "message": f"Unknown tool: {tool_name}",
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
                     self.history.add_system(f"Unknown tool: '{tool_name}'. Available tools: {available}")
                     continue
 
                 tool = tools[tool_name]
 
                 try:
+                    tool_args = self._validate_tool_arguments(tool, tool_args)
+                except (TypeError, ValueError) as e:
+                    await emit(
+                        {
+                            "type": "tool_error",
+                            "step": steps,
+                            "tool": tool_name,
+                            "message": str(e),
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
+                    self.history.add_system(
+                        f"Tool '{tool_name}' arguments were invalid: {e}. Check the tool's input schema and try again."
+                    )
+                    continue
+
+                try:
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
-                    await enforce_budget(budget_enforcer.check_tool_call())
                     runtime_action = RunAction(
                         kind="tool.call",
                         name=tool_name,
@@ -1041,10 +1159,12 @@ class LLM(ABC):
                         authorized_arguments = authorization.action.payload.get("arguments", tool_args)
                         if not isinstance(authorized_arguments, dict):
                             raise TypeError("Authorized tool action payload.arguments must be a dictionary")
-                        tool_args = authorized_arguments
+                        tool_args = self._validate_tool_arguments(tool, authorized_arguments)
                         action_id = authorization.action.action_id
                     else:
                         action_id = runtime_action.action_id
+                    await enforce_budget(active_budget_enforcer.evaluate())
+                    await enforce_budget(active_budget_enforcer.check_tool_call())
                     await emit(
                         {
                             "type": "tool_start",
@@ -1057,17 +1177,11 @@ class LLM(ABC):
                     tool_result = await tool(**tool_args)
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
+                    await enforce_budget(active_budget_enforcer.evaluate())
                 except ActionPolicyError:
                     raise
                 except BudgetExceededError:
                     raise
-                except TypeError as e:
-                    # Likely wrong arguments - help LLM correct
-                    self.history.add_system(
-                        f"Tool '{tool_name}' call failed due to argument error: {e}. "
-                        f"Please check the tool's input_schema and try again."
-                    )
-                    continue
                 except Exception as e:
                     await emit(
                         {
@@ -1094,10 +1208,22 @@ class LLM(ABC):
                     tool_args=tool_args,
                     tool_result=tool_result,
                 )
+                remember_action(action_signature)
                 continue
 
             elif isinstance(action_obj, AgentCallAction):
                 if not agent_callback:
+                    await emit(
+                        {
+                            "type": "agent_call_error",
+                            "step": steps,
+                            "agent": action_obj.agent,
+                            "action": action_obj.action,
+                            "message": "Agent delegation is unavailable in this context",
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
                     self.history.add_system(
                         "agent_call is not available in this context. "
                         "Please use 'tool_call' for local tools or produce a 'final' response."
@@ -1125,6 +1251,7 @@ class LLM(ABC):
                     action_id = (
                         authorization.action.action_id if authorization is not None else runtime_action.action_id
                     )
+                    await enforce_budget(active_budget_enforcer.evaluate())
                     await emit(
                         {
                             "type": "agent_call_start",
@@ -1138,12 +1265,24 @@ class LLM(ABC):
                     agent_result = await agent_callback(agent_name, agent_action, payload)
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
+                    await enforce_budget(active_budget_enforcer.evaluate())
                 except ActionPolicyError:
                     raise
                 except BudgetExceededError:
                     raise
                 except ValueError as e:
                     # Agent not found or validation error - help LLM correct
+                    await emit(
+                        {
+                            "type": "agent_call_error",
+                            "step": steps,
+                            "agent": agent_name,
+                            "action": agent_action,
+                            "message": str(e),
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
                     self.history.add_system(f"Agent call failed: {e}")
                     continue
                 except Exception as e:
@@ -1174,6 +1313,7 @@ class LLM(ABC):
                     agent_action=agent_action,
                     agent_result=agent_result,
                 )
+                remember_action(action_signature)
                 continue
 
             else:
@@ -1219,13 +1359,41 @@ class LLM(ABC):
             if action.action == "tool_call":
                 key = f"agent_call:{action.agent}:tool_call:{action.tool}:{canonical(action.args or {})}"
             else:
-                key = f"agent_call:{action.agent}:infer:{action.prompt[:50] if action.prompt else ''}"
+                key = f"agent_call:{action.agent}:infer:{action.prompt or ''}"
         else:
-            # For final or other actions, use content hash
+            # For final or other actions, use content as the source material.
             content = getattr(action, "content", "")
-            key = f"final:{hashlib.md5(content.encode()).hexdigest()[:8]}"
+            key = f"final:{content}"
 
-        return key
+        # Keep the deduplication window bounded even when model arguments or
+        # delegated prompts are very large.
+        return hashlib.sha256(key.encode()).hexdigest()
+
+    @staticmethod
+    def _validate_tool_arguments(tool: "BaseTool", arguments: dict[str, Any] | None) -> dict[str, Any]:
+        """Validate and lightly coerce model-proposed arguments before execution.
+
+        Native :class:`Tool` instances own richer validation that includes
+        resolved annotations. Protocol-compatible custom tools still receive
+        schema and callable-signature validation here, which keeps malformed
+        small-model calls recoverable without mistaking a ``TypeError`` raised
+        by the tool body for a bad argument list.
+        """
+        validate_args = getattr(tool, "validate_args", None)
+        if getattr(tool, "_protolink_validates_args", False) and callable(validate_args):
+            return validate_args(arguments)
+
+        signature: inspect.Signature | None = None
+        if callable(tool):
+            try:
+                signature = inspect.signature(tool)
+            except (TypeError, ValueError):
+                signature = None
+        return validate_tool_args(
+            arguments,
+            getattr(tool, "input_schema", None),
+            signature=signature,
+        )
 
     def _parse_infer_response(
         self,
@@ -1292,6 +1460,8 @@ class LLM(ABC):
             Keyword arguments forwarded to ``fn``. The retry controls
             ``max_retries``, ``base_delay``, and ``max_delay`` may be provided
             as keyword-only values and are consumed before calling ``fn``.
+            Private runtime hooks ``_before_attempt``, ``_on_retry``, and
+            ``_retry_predicate`` are likewise consumed by this wrapper.
         max_retries : int
             Maximum number of retry attempts. Defaults to 3.
         base_delay : float
@@ -1316,13 +1486,23 @@ class LLM(ABC):
         max_retries = int(kwargs.pop("max_retries", 3))
         base_delay = float(kwargs.pop("base_delay", 1.0))
         max_delay = float(kwargs.pop("max_delay", 30.0))
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+        if base_delay < 0 or max_delay < 0:
+            raise ValueError("base_delay and max_delay must be non-negative")
+        before_attempt = kwargs.pop("_before_attempt", None)
+        on_retry = kwargs.pop("_on_retry", None)
+        retry_predicate = kwargs.pop("_retry_predicate", None)
         last_exception: Exception | None = None
 
         for attempt in range(max_retries + 1):
             try:
+                if before_attempt is not None:
+                    hook_result = before_attempt(attempt + 1)
+                    if inspect.isawaitable(hook_result):
+                        await hook_result
                 result = fn(*args, **kwargs)
-                # If the callable returned a coroutine, await it
-                if asyncio.iscoroutine(result):
+                if inspect.isawaitable(result):
                     return await result
                 return result
             except Exception as e:
@@ -1331,6 +1511,8 @@ class LLM(ABC):
                 # Determine if this is a retryable (transient) error
                 if not self._is_transient_error(e):
                     raise
+                if retry_predicate is not None and not retry_predicate(e):
+                    raise
 
                 if attempt >= max_retries:
                     raise
@@ -1338,7 +1520,12 @@ class LLM(ABC):
                 # Exponential backoff with jitter
                 delay = min(base_delay * (2**attempt), max_delay)
                 jitter = random.uniform(0, delay * 0.5)
-                await asyncio.sleep(delay + jitter)
+                retry_delay = delay + jitter
+                if on_retry is not None:
+                    hook_result = on_retry(attempt + 1, e, retry_delay)
+                    if inspect.isawaitable(hook_result):
+                        await hook_result
+                await asyncio.sleep(retry_delay)
 
         # Should never reach here, but satisfy the type checker
         if last_exception is None:
@@ -1361,16 +1548,35 @@ class LLM(ABC):
         Returns:
             True if the error is transient and the call should be retried.
         """
-        # Check for HTTP status code on the exception object (common across providers)
-        status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
-        if isinstance(status, int):
-            if status == 429 or status == 529 or 500 <= status < 600:
+        # Check common direct and response-wrapped HTTP status fields used by
+        # provider SDKs (OpenAI, Anthropic, httpx, requests, and compatibles).
+        response = getattr(exc, "response", None)
+        status_candidates = (
+            getattr(exc, "status_code", None),
+            getattr(exc, "status", None),
+            getattr(exc, "code", None),
+            getattr(response, "status_code", None),
+            getattr(response, "status", None),
+        )
+        for raw_status in status_candidates:
+            if isinstance(raw_status, bool):
+                continue
+            if isinstance(raw_status, str) and raw_status.isdigit():
+                raw_status = int(raw_status)
+            if isinstance(raw_status, int) and (raw_status in {429, 529} or 500 <= raw_status < 600):
                 return True
 
         # Check exception class name for provider-specific rate limit types
         exc_name = type(exc).__name__.lower()
-        transient_names = {"ratelimiterror", "ratelimit", "overloaded", "overloadederror", "apitimeouterror"}
-        if exc_name in transient_names:
+        transient_name_fragments = (
+            "ratelimit",
+            "overloaded",
+            "timeout",
+            "connectionerror",
+            "serviceunavailable",
+            "internalservererror",
+        )
+        if any(fragment in exc_name for fragment in transient_name_fragments):
             return True
 
         # Check for connection-level errors
@@ -1379,7 +1585,20 @@ class LLM(ABC):
 
         # Check the string representation as a last resort
         msg = str(exc).lower()
-        if any(keyword in msg for keyword in ("rate limit", "429", "overloaded", "timeout", "timed out", "connection")):
+        if any(
+            keyword in msg
+            for keyword in (
+                "rate limit",
+                "overloaded",
+                "timeout",
+                "timed out",
+                "connection",
+                "service unavailable",
+                "temporarily unavailable",
+            )
+        ):
+            return True
+        if re.search(r"\b(?:429|529|5\d{2})\b", msg):
             return True
 
         return False
