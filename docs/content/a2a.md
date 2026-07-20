@@ -1,4 +1,6 @@
-# A2A Core and 1.0 Compatibility
+# A2A Core
+
+### A2A Core and 1.0 Compatibility
 
 ProtoLink is an **A2A-first runtime**. `AgentCard`, `Task`, `Message`, `Part`,
 `Artifact`, task states, and discovery are first-class concepts throughout its

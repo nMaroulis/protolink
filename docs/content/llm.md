@@ -8,11 +8,88 @@ import ApiReference, {
 
 # LLMs
 
-ProtoLink integrates with API-hosted, server-hosted, local, and deterministic test models through one provider-neutral runtime contract.
+ProtoLink's LLM package starts with a simple promise: choose where a model runs, then use the same application-facing contract to talk to it. That contract can stop after one text response, stream text as it arrives, or continue into a controlled Agent loop where the model requests tools and delegates work while ProtoLink remains responsible for execution.
 
-## LLM types
+The useful mental model is a progression:
 
-ProtoLink groups model backends into three broad categories:
+1. **Choose a backend**: hosted API, model server, in-process local model, or deterministic mock.
+2. **Create one adapter** with `create_llm()` or a concrete provider class.
+3. **Pick the interaction level**: `chat()` for one direct response, `infer()` for controlled multi-step work, or the lower-level `call*()` methods when implementing an adapter.
+4. **Let an Agent own runtime concerns** such as tool selection, delegation, policy, cancellation, state, and events.
+5. **Add operational features when needed**: persistent history, explicit compaction, context reporting, cost estimates, and run budgets.
+
+<ApiSurface
+  eyebrow="Model runtime module"
+  title="LLM"
+  path="protolink.llms"
+  description="Choose a model backend, make direct or streamed calls, and graduate to a controlled inference loop without rewriting the rest of the application."
+  pills={[
+    "Provider-neutral",
+    "Direct and streamed text",
+    "Tool-aware inference",
+    "Agent integration",
+    "Optional operations",
+  ]}
+  cards={[
+    {
+      title: "Choose",
+      text: "Use a hosted API, your own model server, an in-process GGUF model, or a deterministic mock.",
+      code: "create_llm()",
+    },
+    {
+      title: "Converse",
+      text: "Ask for one complete response or consume text chunks as they arrive.",
+      code: "LLM.chat()",
+    },
+    {
+      title: "Act",
+      text: "Run the typed action loop used by Agent for tools and delegation.",
+      code: "LLM.infer()",
+    },
+    {
+      title: "Operate",
+      text: "Manage history and add compaction, metrics, context visibility, and budgets when the application needs them.",
+      code: "LLM.compact_history()",
+    },
+  ]}
+/>
+
+## Start with the interaction you need
+
+Most application code should begin with either `chat()` or an `Agent`. The other methods exist so provider adapters and advanced integrations can participate in the same runtime.
+
+- **One complete response — `llm.chat("...")`**<br />
+  Adds the user message and performs one synchronous provider call.
+
+- **Visible incremental text — `llm.chat("...", streaming=True)`**<br />
+  Returns an asynchronous iterator of text chunks.
+
+- **Tools, delegation, policy, retries, budgets, and multiple steps — `Agent(..., llm=llm)`**<br />
+  The Agent prepares the runtime and invokes `LLM.infer()` with the appropriate services.
+
+- **A custom controlled runtime — `await llm.infer(...)`**<br />
+  Advanced integration path where the caller prepares the prompt, history, tools, callbacks, and runtime context that an Agent normally supplies.
+
+- **A provider adapter or diagnostic integration — `call()`, `call_stream()`, and `call_action()`**<br />
+  Works at the provider boundary with explicit `ConversationHistory` and normalized actions.
+
+`chat()` and `infer()` are intentionally different. A chat call asks the model for text. Inference asks the model for one typed decision at a time: finish with text, call a local tool, or delegate to another Agent. ProtoLink validates that decision and performs the side effect outside the model.
+
+:::tip[The common application path]
+
+Use `chat()` for a small standalone model interaction. Use an `Agent` when model output can cause work to happen. Reach for `call()` and `call_stream()` primarily when extending or diagnosing a provider adapter.
+
+:::
+
+:::note[Provider-neutral scope]
+
+The current common contract is text-oriented: chat inputs, canonical history content, complete responses, and stream chunks are strings. Provider support does not imply that every provider-specific feature is wrapped. Use the provider SDK directly for capabilities outside this surface, such as file-upload APIs, image or audio generation, embeddings, fine-tuning, batch administration, or model management.
+
+:::
+
+## Choose where the model runs
+
+ProtoLink groups model backends into hosted APIs, model servers, and in-process local runtimes. A deterministic testing adapter follows the same contract without making a model request.
 
 <div className="provider-strip-label">[ API ]   [ Server ]   [ Local ]</div>
 
@@ -43,27 +120,22 @@ ProtoLink groups model backends into three broad categories:
 - **Local** - runs the model inside the Python process:
     - `LlamaCPPLocalLLM`: loads a local GGUF file through `llama-cpp-python`.
 
-For deterministic tests and offline examples, `MockLLM` implements the same contract without a provider dependency. You can also use third-party LLM clients directly if your application does not need ProtoLink's history, action, inference, metrics, or agent integration.
+For deterministic tests and offline examples, `MockLLM` can return fixed responses, response sequences, or callback-generated responses. It is the fastest way to test Agent behavior without credentials, network access, or nondeterministic model output.
 
-## Runtime boundaries
+You can also use a third-party LLM client directly when your application only needs that client's raw API. ProtoLink's wrappers become valuable when you want provider-neutral history, streaming, typed actions, Agent integration, compaction, events, metrics, or budgets.
 
-The public LLM facade remains `protolink.llms.base.LLM`. Internally, the base class owns orchestration: history binding, metrics, budgets, retries, tool execution, agent delegation, and final response handling. The strict action parser lives in `protolink.llms.parsing`, where raw model text is converted into one validated `LLMAction` and narrow fallback shorthands are repaired only when the target tool or agent is unambiguous.
+### How to choose
 
-Provider adapters keep provider-specific request and stream handling in their own modules, then return typed results to the shared inference loop. Hosted adapters live in `protolink.llms.api`, HTTP server adapters in `protolink.llms.server`, the in-process llama.cpp adapter in `protolink.llms.local`, and deterministic testing support in `protolink.llms.mock_client`.
+- Choose a **hosted API** when you want a managed model and accept provider credentials, network latency, and usage billing.
+- Choose a **server adapter** when the model is exposed by Ollama, llama-server, LM Studio, or another OpenAI-compatible endpoint that you control.
+- Choose **`LlamaCPPLocalLLM`** when the GGUF model should run inside the Python process and the process can afford model-loading and inference resources.
+- Choose **`MockLLM`** for tests, examples, and runtime development.
 
-The rest of the package is partitioned by responsibility:
+Native tool support is an adapter-and-model capability, not a requirement for ProtoLink inference. OpenAI, Anthropic, and Gemini use provider-native tool structures. DeepSeek and Grok enable native tools by default but can fall back to the portable JSON action protocol. Self-hosted and local adapters use that JSON path by default unless a known-compatible model/server is explicitly opted into native tool calling.
 
-- `factory.py` lazily resolves provider names and constructs adapters.
-- `history.py`, `context.py`, and `compaction.py` own provider-neutral conversation state, context manifests, and explicit history reduction.
-- `actions.py`, `parsing.py`, and `tool_calling.py` define typed runtime actions and translate provider-native function calls into them.
-- `metrics.py` normalizes usage, estimates missing token counts, and calculates application-supplied costs.
-- `prompts/` contains separate JSON-action and provider-native prompt families, preventing conflicting tool instructions.
+## Install, configure, and make the first call
 
-This separation keeps the user-facing API small while allowing native tool-calling providers and JSON-fallback models to share the same execution contract.
-
-## Configuration
-
-Configuration depends on the backend, but the general pattern is:
+Configuration varies by backend, but the first successful model interaction follows one continuous path.
 
 1. **Install the relevant extras**:
 
@@ -98,13 +170,34 @@ If you only need a subset of providers, install their SDKs directly instead of t
    llm = OpenAILLM(model="gpt-4o-mini")
    ```
 
+   The factory lazily imports only the selected adapter and its optional SDK. Construction itself is not deferred: concrete adapters currently validate during initialization and may perform network, server-health, model-loading, or filesystem work.
+
 :::warning[API keys]
 
 Never commit API keys to version control. Read them from environment variables or a secure secrets manager.
 
 :::
 
-3. **Pass the LLM to an Agent**:
+3. **Make a direct call**:
+
+   ```python
+   response = llm.chat("Explain what this service does in two sentences.")
+   print(response)
+   ```
+
+   As an alternative, use a fresh or explicitly managed history and consume the asynchronous iterator returned by streaming chat:
+
+   ```python
+   streaming_llm = create_llm("openai", model="gpt-4o-mini")
+
+   async for chunk in streaming_llm.chat(
+       "Draft a short welcome message.",
+       streaming=True,
+   ):
+       print(chunk, end="", flush=True)
+   ```
+
+4. **Pass the same LLM to an Agent** when the model should participate in a controlled runtime:
 
    ```python
    from protolink.agents import Agent
@@ -121,9 +214,58 @@ Never commit API keys to version control. Read them from environment variables o
 
 For local and server-style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`, `LMStudioLLM`, and `OpenAICompatibleLLM`), configuration additionally includes a model-file path or server URL. The individual class entries below describe the resolution order for those values.
 
----
+Generation parameters are deliberately provider-specific. `model_params` is forwarded to the selected SDK or server; ProtoLink does not translate names such as `max_tokens`, `max_output_tokens`, or provider-specific thinking controls into one synthetic schema.
 
-## Agent history isolation and concurrency
+:::note[Direct chat history]
+
+`chat()` appends the user message before calling the provider, but it does not append the returned assistant text. That small behavior keeps the base method predictable across streaming and non-streaming adapters. Manage `ConversationHistory` explicitly for a standalone multi-turn script, or let an `Agent` own task-local and persistent conversation history.
+
+:::
+
+## From text generation to controlled inference
+
+Direct generation ends when the provider returns text. Controlled inference can continue because the model is treated as a planner rather than an executor.
+
+Each inference step follows the same story:
+
+1. ProtoLink adds the user query and prepares the current system prompt, history, tools, and discovered Agents.
+2. The provider adapter obtains one decision, either through native function/tool calling or the portable JSON action protocol.
+3. ProtoLink validates the decision as `FinalAction`, `ToolCallAction`, or `AgentCallAction`.
+4. A final action returns user-facing text. A tool or Agent action passes through authorization and is executed by the runtime.
+5. The result becomes a new observation in history, and the model receives another step only when more work is necessary.
+
+```python
+answer = await agent.invoke(
+    "Summarize the available information.",
+    session_id="customer-42",
+)
+print(answer)
+```
+
+The Agent rebuilds the system prompt for the current tool set, action mode, discovered Agents, flow position, and application instructions before it invokes `LLM.infer()`. It also supplies the policy authorizer, cancellation token, run context, budget policy, event callback, and isolated history.
+
+:::caution[Calling `infer()` directly]
+
+Direct inference is available for custom runtimes, but passing a `tools` dictionary does not itself rebuild the LLM's system prompt. A direct caller must call `build_system_prompt()` with the matching tool and Agent descriptions and must provide any callbacks, authorization, cancellation, and context it needs. For normal tool use, prefer `Agent.add_tool()` or `@agent.tool` followed by `await agent.invoke(...)`.
+
+:::
+
+### Streaming means two different things
+
+- `chat(..., streaming=True)` returns an async iterator because the chunks are the result.
+- `infer(streaming=True)` still returns one final `Part`. Intermediate model text is emitted as `llm_chunk` events through the inference event callback while the runtime waits for a complete, validated action.
+
+This distinction lets an Agent show live progress without dispatching a partial or malformed tool request.
+
+### Tools and delegated Agents stay behind a runtime boundary
+
+Provider-native adapters expose tool schemas using the provider's function-calling format. Other adapters describe the same choices in the system prompt and parse one JSON action. Both routes converge on the same typed action models before anything executes.
+
+The runtime then applies the protections that a raw model call does not provide: unknown-tool checks, policy and approval decisions, cancellation, duplicate-action detection, parse-error feedback, transient provider retries, per-run budgets, and a ten-step inference limit.
+
+The detailed [controlled inference and tool-use](#controlled-inference-and-tool-use) chapter below explains action acquisition, recovery, prompts, and delegation. The `LLM.infer()` reference documents every integration hook.
+
+## Conversation history inside and outside an Agent
 
 An `LLM` instance still exposes `llm.history` for direct usage and backward-compatible introspection. When the same LLM is plugged into an `Agent`, ProtoLink binds a task-local `ConversationHistory` around each run so concurrent tasks do not interleave messages on one shared mutable history object.
 
@@ -150,90 +292,6 @@ await agent.execute_task(task)
 ```
 
 Direct `llm.infer(...)` calls are unchanged: they use the LLM's default history unless you explicitly call `llm.use_history(history)`.
-
-## Model profiles, context manifests, and budget metrics
-
-LLM wrappers can emit pre-call context manifests plus per-call latency, token usage, context-window pressure, and estimated cost through the existing `infer()` event stream and telemetry hooks. This is optional and does not change the request payload sent to the provider.
-
-```python
-from protolink import LLMModelProfile, create_llm
-
-llm = create_llm(
-    "openai-compatible",
-    model="my-model",
-    metrics_profile=LLMModelProfile(
-        context_window=128_000,
-        input_cost_per_million=1.0,   # example value; use current provider pricing
-        output_cost_per_million=5.0,  # example value; use current provider pricing
-        supports_tools=True,
-        supports_streaming=True,
-        supports_json_schema=True,
-        tokenizer="cl100k_base",
-    ),
-)
-```
-
-You can also configure metrics after construction:
-
-```python
-llm.configure_metrics(
-    context_window=128_000,
-    input_cost_per_million=1.25,
-    output_cost_per_million=10.0,
-)
-```
-
-Provider-reported token usage is used when the SDK response includes it. Otherwise ProtoLink estimates token counts locally. If `tiktoken` is installed through `protolink[metrics]`, ProtoLink uses it for estimates; without it, ProtoLink falls back to a lightweight character heuristic. Prices, model limits, and capabilities change over time, so `LLMModelProfile` is application-owned metadata rather than a hardcoded billing catalog.
-
-Before each model call, ProtoLink emits a provider-neutral `context_prepared` event:
-
-```python
-{
-    "type": "context_prepared",
-    "step": 1,
-    "manifest": {
-        "run_id": "run_123",
-        "agent_name": "researcher",
-        "system_tokens": 900,
-        "tool_prompt_tokens": 300,
-        "history_tokens": 2200,
-        "user_tokens": 120,
-        "total_estimated_tokens": 3520,
-        "context_window": 128000,
-    },
-}
-```
-
-When an `event_callback` or telemetry backend is attached, each model call inside the inference loop can also emit:
-
-```python
-{
-    "type": "llm_call_metrics",
-    "step": 1,
-    "provider": "openai-compatible",
-    "model": "my-model",
-    "latency_ms": 842.37,
-    "usage": {
-        "input_tokens": 1200,
-        "output_tokens": 180,
-        "estimated": False,
-    },
-    "context": {
-        "used_tokens": 1200,
-        "window_tokens": 200000,
-        "used_percent": 0.6,
-    },
-    "cost": {
-        "input_cost": 0.0036,
-        "output_cost": 0.0027,
-        "total_cost": 0.0063,
-    },
-}
-```
-
-This is especially useful for CLIs, dashboards, and budget-aware agents that want to show context pressure or session cost while a multi-step tool loop is running.
-
-If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before the provider is invoked; `max_tool_calls` is checked before model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
 
 ## History compaction
 
@@ -313,89 +371,162 @@ ProtoLink does not compact history automatically based on an arbitrary context t
 
 :::
 
+## How the LLM package is organized
+
+The public facade is `protolink.llms.base.LLM`. Internally, the base class owns provider-neutral orchestration: history binding, metrics, budgets, retries, tool execution, Agent delegation, and final response handling. The strict action parser lives in `protolink.llms.parsing`, where raw model text becomes one validated `LLMAction` and narrow fallback shorthands are repaired only when the target tool or Agent is unambiguous.
+
+Provider adapters keep request and stream handling in their own modules, then return typed results to the shared inference loop:
+
+- `protolink.llms.api` contains hosted-provider adapters.
+- `protolink.llms.server` contains HTTP model-server adapters.
+- `protolink.llms.local` contains the in-process llama.cpp adapter.
+- `protolink.llms.mock_client` provides deterministic testing behavior.
+
+The rest of the package is partitioned by responsibility:
+
+- `factory.py` lazily resolves provider names and constructs adapters.
+- `history.py` defines canonical messages and provider-neutral conversation history.
+- `actions.py`, `parsing.py`, and `tool_calling.py` define typed runtime actions and translate provider-native function calls into them.
+- `context.py` builds a context manifest for each inference step.
+- `compaction.py` owns explicit history reduction and summary compaction.
+- `metrics.py` normalizes usage, estimates missing token counts, and calculates application-supplied costs.
+- `prompts/` keeps JSON-action and provider-native prompt families separate so the model never receives conflicting tool instructions.
+- `serialization.py` provides JSON-safe conversion for history and runtime payloads.
+- `_deps.py` loads optional provider SDKs only when their adapter is selected.
+
+This separation keeps the everyday API small while allowing native tool-calling providers and JSON-fallback models to participate in the same controlled runtime.
+
+## Observe and constrain model work
+
+Profiles, context manifests, call metrics, and run budgets matter when a working model integration becomes an operated system. They are intentionally optional and do not need to be configured before the first call.
+
+### Model metadata
+
+`LLMModelProfile` describes the deployment information ProtoLink cannot safely hardcode: context-window size, application-supplied input and output prices, tokenizer metadata, and descriptive capability flags. A profile does not change the provider request or enable a feature in the selected model.
+
+```python
+from protolink import LLMModelProfile, create_llm
+
+llm = create_llm(
+    "openai-compatible",
+    model="my-model",
+    metrics_profile=LLMModelProfile(
+        context_window=128_000,
+        input_cost_per_million=1.0,   # example value; use current provider pricing
+        output_cost_per_million=5.0,  # example value; use current provider pricing
+        supports_tools=True,
+        supports_streaming=True,
+        supports_json_schema=True,
+        tokenizer="cl100k_base",
+    ),
+)
+```
+
+You can also configure metrics after construction:
+
+```python
+llm.configure_metrics(
+    context_window=128_000,
+    input_cost_per_million=1.25,
+    output_cost_per_million=10.0,
+)
+```
+
+Provider-reported token usage is used when the SDK response includes it. Otherwise ProtoLink estimates token counts locally. If `tiktoken` is installed through `protolink[metrics]`, ProtoLink resolves an encoder from the active model name and falls back to `cl100k_base`; without it, ProtoLink uses a lightweight character heuristic. The profile's `tokenizer` field is currently descriptive metadata and does not select the estimator. Prices, model limits, and capabilities change over time, so `LLMModelProfile` is application-owned metadata rather than a hardcoded billing catalog.
+
+### Context and call events
+
+LLM wrappers can emit pre-call context manifests plus per-call latency, token usage, context-window pressure, and estimated cost through the existing `infer()` event stream and telemetry hooks. Observing these events does not change the request payload sent to the provider.
+
+Before each model call, ProtoLink emits a provider-neutral `context_prepared` event:
+
+```python
+{
+    "type": "context_prepared",
+    "step": 1,
+    "manifest": {
+        "run_id": "run_123",
+        "agent_name": "researcher",
+        "system_tokens": 900,
+        "tool_prompt_tokens": 300,
+        "history_tokens": 2200,
+        "user_tokens": 120,
+        "total_estimated_tokens": 3520,
+        "context_window": 128000,
+    },
+}
+```
+
+When an `event_callback` or telemetry backend is attached, each model call inside the inference loop can also emit:
+
+```python
+{
+    "type": "llm_call_metrics",
+    "step": 1,
+    "provider": "openai-compatible",
+    "model": "my-model",
+    "latency_ms": 842.37,
+    "usage": {
+        "input_tokens": 1200,
+        "output_tokens": 180,
+        "estimated": False,
+    },
+    "context": {
+        "used_tokens": 1200,
+        "window_tokens": 128000,
+        "used_percent": 0.938,
+    },
+    "cost": {
+        "input_cost": 0.0012,
+        "output_cost": 0.0009,
+        "total_cost": 0.0021,
+    },
+}
+```
+
+This is especially useful for CLIs, dashboards, and budget-aware agents that want to show context pressure or session cost while a multi-step tool loop is running.
+
+### Run-budget enforcement
+
+Model profiles are observational metadata. Run budgets are the separate enforcement mechanism.
+
+If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before the provider is invoked; `max_tool_calls` is checked before model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
+
 ## LLM API reference
 
-This section provides a detailed reference for all LLM classes in ProtoLink. All implementations inherit from `LLM` and expose a consistent surface for direct text generation, streaming, typed actions, controlled inference, history management, and metrics.
-
-:::tip[Unified LLM interface]
-
-Whether you use OpenAI, Anthropic, Ollama, an OpenAI-compatible server, or a local model, application code uses the same core methods: `call()`, `call_stream()`, `chat()`, and `infer()`. Swapping providers changes construction and provider-specific parameters, not the runtime contract.
-
-:::
-
-:::tip[Why use ProtoLink's LLM wrappers?]
-
-- **Provider agnostic**: switch providers without rewriting the inference runtime.
-- **Consistent interface**: use the same core methods across all implementations.
-- **Built-in runtime features**: connection validation, task-local history, explicit compaction, metrics, retries, cancellation, budgets, and events.
-- **Agent ready**: acquire typed tool and delegation actions through native provider tools or portable JSON.
-- **Controlled execution**: the model declares intent; ProtoLink validates policy and performs side effects.
-
-:::
-
-<ApiSurface
-  eyebrow="Model runtime module"
-  title="LLM"
-  path="protolink.llms"
-  description="The provider-neutral model interface for chat, streaming, structured inference, tool calling, delegated agents, history compaction, and optional context-window metrics."
-  pills={[
-    "Provider-neutral",
-    "Streaming and non-streaming",
-    "Tool-aware inference",
-    "History compaction",
-    "Optional metrics",
-  ]}
-  cards={[
-    {
-      title: "Construct",
-      text: "Select a provider lazily or instantiate a concrete adapter.",
-      code: "create_llm()",
-    },
-    {
-      title: "Chat",
-      text: "Make a direct text call or consume an asynchronous text stream.",
-      code: "LLM.chat()",
-    },
-    {
-      title: "Infer",
-      text: "Run the controlled action loop used by Agent.",
-      code: "LLM.infer()",
-    },
-    {
-      title: "Maintain",
-      text: "Bind isolated histories, compact context, and emit budget metrics.",
-      code: "LLM.compact_history()",
-    },
-  ]}
-/>
+The rest of this page is the detailed contract. It starts with construction and the base methods, then follows controlled inference, prompts, concrete providers, related objects, examples, and failure handling.
 
 ### Provider switching in action
 
-The same application code works across providers. `chat()` is the high-level convenience method for direct chat-style interactions; internally it selects `call()` or `call_stream()`.
+The same application code works across providers. Keep provider choice in configuration, construct exactly one adapter, and leave the calling code unchanged. `chat()` is the high-level convenience method for direct text generation; internally it selects `call()` or `call_stream()`.
 
 ```python
 from protolink import create_llm
 
-# Choose a provider by changing construction.
-llm = create_llm("openai", model="gpt-4o-mini")
-llm = create_llm("anthropic", model="claude-sonnet-4-20250514")
-llm = create_llm(
-    "ollama",
-    model="qwen3",
-    base_url="http://localhost:11434",
-)
-llm = create_llm(
-    "lmstudio",
-    model="local-model",
-    base_url="http://localhost:1234/v1",
-)
+# Choose one deployment in application configuration.
+provider = "ollama"
+provider_options = {
+    "openai": {
+        "model": "gpt-4o-mini",
+    },
+    "anthropic": {
+        "model": "claude-sonnet-4-20250514",
+    },
+    "ollama": {
+        "model": "qwen3",
+        "base_url": "http://localhost:11434",
+    },
+    "lmstudio": {
+        "model": "local-model",
+        "base_url": "http://localhost:1234/v1",
+    },
+}
+
+llm = create_llm(provider, **provider_options[provider])
 
 # The calling code stays the same.
 response = llm.chat("Hello! How are you?")
 print(response)
-
-async for chunk in llm.chat("Hello!", streaming=True):
-    print(chunk, end="", flush=True)
 ```
 
 :::info[LLM hierarchy]
@@ -810,7 +941,7 @@ Streaming counterpart to `call_action()`. The fallback implementation forwards t
 
 </ApiReference>
 
-## Advanced inference system
+## Controlled inference and tool use
 
 ### What inference means in ProtoLink
 
@@ -989,28 +1120,31 @@ The layered design keeps the runtime strict without making every provider use th
 - `LLM.infer()` dispatches one typed action at a time.
 - Provider adapters own provider-specific request and stream parsing.
 - Small and local models keep a compact JSON protocol by default.
-- Native providers use their real tool API without receiving JSON tool instructions.
+- On the Agent-prepared path, native providers use their real tool API without receiving JSON tool instructions.
 - Every path converges on `FinalAction`, `ToolCallAction`, and `AgentCallAction`.
 - Policy, approval, cancellation, budgets, retries, events, and execution remain outside the model.
 
 ### Inference example
 
 ```python
-from protolink.llms.api import OpenAILLM
-from protolink.tools import BaseTool
+from protolink import Agent, AgentCard, create_llm
 
-class WeatherTool(BaseTool):
-    async def __call__(self, location: str) -> str:
-        return f"The weather in {location} is sunny."
-
-llm = OpenAILLM(model="gpt-4o-mini")
-tools = {"weather": WeatherTool()}
-
-result = await llm.infer(
-    query="What's the weather in Tokyo?",
-    tools=tools,
+agent = Agent(
+    AgentCard(
+        name="weather-assistant",
+        description="Answers weather questions",
+        url="runtime://weather-assistant",
+    ),
+    transport="runtime",
+    llm=create_llm("openai", model="gpt-4o-mini"),
 )
-print(result.content)
+
+@agent.tool(name="weather", description="Return the weather for a location")
+async def weather(location: str) -> str:
+    return f"The weather in {location} is sunny."
+
+answer = await agent.invoke("What's the weather in Tokyo?")
+print(answer)
 ```
 
 In JSON action mode, the intermediate model response must be exactly one supported object:
@@ -1119,12 +1253,17 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
   Unknown tools, malformed actions, missing agents, and argument mismatches are normally reported back to the model for correction. They do not usually escape from <code>infer()</code> as <code>ValueError</code>.
 </ApiCallout>
 
+<ApiCallout label="Direct-call responsibility">
+  <code>Agent</code> normally rebuilds the system prompt before calling this method. A custom runtime that invokes <code>infer()</code> directly must prepare matching tool and Agent descriptions with <code>build_system_prompt()</code>; supplying <code>tools</code> here only provides executables to the loop.
+</ApiCallout>
+
 <ApiSection title="Examples">
 
 ```python
+# Safe direct use when no tools or delegated Agents need to be advertised.
 result = await llm.infer(
-    query="Summarize the latest account balance.",
-    tools={"lookup_balance": lookup_balance_tool},
+    query="Summarize the supplied context.",
+    tools={},
 )
 
 print(result.content)
@@ -1242,7 +1381,7 @@ with llm.use_history(customer_history):
 
 </ApiReference>
 
-### LLM.compact_history {#history-compaction}
+### LLM.compact_history {#llm-compact-history}
 
 <ApiReference
   kind="method"
@@ -2326,8 +2465,17 @@ llm = create_llm("openai", model="gpt-4o-mini")
 
 response = llm.chat("Hello, how are you?")
 print(response)
+```
 
-async for chunk in llm.chat("Draft a short welcome message.", streaming=True):
+Choose streaming as a separate interaction with a fresh or explicitly managed history:
+
+```python
+streaming_llm = create_llm("openai", model="gpt-4o-mini")
+
+async for chunk in streaming_llm.chat(
+    "Draft a short welcome message.",
+    streaming=True,
+):
     print(chunk, end="", flush=True)
 ```
 
@@ -2338,29 +2486,30 @@ async for chunk in llm.chat("Draft a short welcome message.", streaming=True):
 ```python
 import asyncio
 
-from protolink import create_llm
-from protolink.tools import BaseTool
-
-class MultiplyTool(BaseTool):
-    """Multiply two numbers."""
-
-    async def __call__(self, left: float, right: float) -> float:
-        return left * right
+from protolink import Agent, AgentCard, create_llm
 
 async def main():
-    llm = create_llm("openai", model="gpt-4o-mini")
-    tools = {"multiply": MultiplyTool()}
-
-    result = await llm.infer(
-        query="What is 15 multiplied by 8?",
-        tools=tools,
+    agent = Agent(
+        AgentCard(
+            name="calculator",
+            description="Performs checked calculations",
+            url="runtime://calculator",
+        ),
+        transport="runtime",
+        llm=create_llm("openai", model="gpt-4o-mini"),
     )
-    print(f"Final answer: {result.content}")
+
+    @agent.tool(name="multiply", description="Multiply two numbers")
+    async def multiply(left: float, right: float) -> float:
+        return left * right
+
+    answer = await agent.invoke("What is 15 multiplied by 8?")
+    print(f"Final answer: {answer}")
 
 asyncio.run(main())
 ```
 
-When the LLM is installed on an `Agent`, the Agent prepares the tool mapping, history binding, discovered-agent context, policy boundary, cancellation token, run context, and budget configuration before invoking this same inference loop.
+The Agent prepares the tool prompt and executable mapping, history binding, discovered-Agent context, policy boundary, cancellation token, run context, and budget configuration before invoking the LLM loop.
 
 ### Updating parameters and prompts
 
@@ -2471,9 +2620,10 @@ When migrating code written against earlier ProtoLink model wrappers:
 
 1. Replace `generate_response()` with `chat()`.
 2. Replace `generate_stream_response()` with `chat(..., streaming=True)`.
-3. Use `infer()` for Agent-style tool calling, delegation, policy, and multi-step execution.
-4. Await `infer()`; direct non-streaming `chat()` remains synchronous.
-5. Expect a string from `chat()` and a `Part` with type `infer_output` from `infer()`.
+3. Use `Agent.invoke()` for normal tool calling, delegation, policy, and multi-step execution.
+4. Use `LLM.infer()` directly only when implementing the surrounding prompt and runtime preparation yourself.
+5. Await Agent or inference calls; direct non-streaming `chat()` remains synchronous.
+6. Expect a string from `chat()` and `Agent.invoke()`, or a `Part` with type `infer_output` from direct `infer()`.
 
 ```python
 # Earlier style
@@ -2484,12 +2634,9 @@ When migrating code written against earlier ProtoLink model wrappers:
 response = llm.chat("Hello, how are you?")
 print(response)
 
-# Controlled agent inference
-result = await llm.infer(
-    query="What's the weather?",
-    tools=tools,
-)
-print(result.content)
+# Controlled Agent inference
+answer = await agent.invoke("What's the weather?")
+print(answer)
 ```
 
 ## See also
