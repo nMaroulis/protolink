@@ -1,3 +1,10 @@
+import ApiReference, {
+  ApiCallout,
+  ApiField,
+  ApiFields,
+  ApiSection,
+} from '@site/src/components/ApiReference';
+
 # Flows
 
 Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact`, and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
@@ -259,31 +266,283 @@ For deterministic edges, Graph can inject downstream context just like Pipeline.
 
 ## Flow API Reference
 
-`FlowTarget` accepts an `Agent` ⎪ `str` ⎪ `Flow`. A string can be a direct URL or a registry name.
+`FlowTarget` accepts an `Agent | str | Flow`. A string can be a direct URL or a registry name.
 
 ### Constructors
 
-| Type | Parameters |
-| ---- | ---------- |
-| `Flow` | `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
-| `Pipeline` | `steps: list[FlowTarget]` ⎪ `None = None`, `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
-| `Parallel` | `branches: list[FlowTarget]`, `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
-| `Router` | `routes: dict[str, FlowTarget]`, `routing_prompt: str`, `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
-| `Graph` | `client: AgentClient` ⎪ `None = None`, `registry: Registry` ⎪ `RegistryClient` ⎪ `None = None` |
-
 `Flow` is abstract; construct one of its concrete subclasses in application code.
+
+### Flow
+
+<ApiReference kind="abstract class" path="protolink.flows.Flow" signature={`Flow(
+    client: AgentClient | None = None,
+    registry: Registry | RegistryClient | None = None,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/base.py">
+Base contract and shared dispatcher for deterministic workflows. It owns remote-client and registry wiring, the synchronous facade, semantic-context generation, target resolution, and nested-flow dependency propagation.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Flow constructor parameters">
+  <ApiField name="client" type="AgentClient | None" defaultValue="None">Client used for string targets. When omitted, remote dispatch can infer one from a configured RegistryClient transport at execution time.</ApiField>
+  <ApiField name="registry" type="Registry | RegistryClient | None" defaultValue="None">Discovery source for string targets that are names rather than direct HTTP, HTTPS, WS, WSS, or runtime URLs. A Registry contributes its client.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Attributes"><ApiFields ariaLabel="Flow attributes"><ApiField name="sync" type="SyncFlow">Blocking facade bound to this exact flow instance.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Abstract type">Instantiate <code>Pipeline</code>, <code>Parallel</code>, <code>Router</code>, or <code>Graph</code>. Subclasses implement only traversal; shared target execution stays in Flow.</ApiCallout>
+
+</ApiReference>
+
+### Pipeline
+
+<ApiReference kind="class" path="protolink.flows.Pipeline" signature={`Pipeline(
+    steps: list[FlowTarget] | None = None,
+    client: AgentClient | None = None,
+    registry: Registry | RegistryClient | None = None,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/pipeline.py">
+Execute an ordered sequence against one evolving Task. Before each step, Pipeline clears transient <code>flow_state</code> and compiles instructions for the known downstream target; the final step receives terminal-output guidance.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Pipeline constructor parameters">
+  <ApiField name="steps" type="list[FlowTarget] | None" defaultValue="None">Initial ordered targets. The list is retained as <code>pipeline.steps</code>; <code>None</code> creates an empty pipeline.</ApiField>
+  <ApiField name="client" type="AgentClient | None" defaultValue="None">Remote-dispatch client inherited by unconfigured nested flows.</ApiField>
+  <ApiField name="registry" type="Registry | RegistryClient | None" defaultValue="None">Optional name-resolution source.</ApiField>
+</ApiFields></ApiSection>
+
+</ApiReference>
+
+### Parallel
+
+<ApiReference kind="class" path="protolink.flows.Parallel" signature={`Parallel(
+    branches: list[FlowTarget],
+    client: AgentClient | None = None,
+    registry: Registry | RegistryClient | None = None,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/parallel.py">
+Fan one Task out to independently deep-copied branches, await every branch concurrently, then merge new messages, artifacts, and metadata back into the original Task in configured branch order.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Parallel constructor parameters">
+  <ApiField name="branches" type="list[FlowTarget]" required>Concurrent local Agents, strings, or nested Flows. An empty list is valid and returns the original task without additions.</ApiField>
+  <ApiField name="client" type="AgentClient | None" defaultValue="None">Remote branch client.</ApiField>
+  <ApiField name="registry" type="Registry | RegistryClient | None" defaultValue="None">Optional name resolver.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Failure and merge order"><code>asyncio.gather(..., return_exceptions=False)</code> propagates a branch exception and skips fan-in. Successful results merge in branch-list order, so a later branch wins metadata-key collisions.</ApiCallout>
+
+</ApiReference>
+
+### Router
+
+<ApiReference kind="class" path="protolink.flows.Router" signature={`Router(
+    routes: dict[str, FlowTarget],
+    routing_prompt: str,
+    client: AgentClient | None = None,
+    registry: Registry | RegistryClient | None = None,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/router.py">
+Dispatch to one developer-approved target using a route decision already written by the preceding step. Router prefers structured route parts, accepts JSON-shaped decisions, and retains the historical text tag as a compatibility fallback.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Router constructor parameters">
+  <ApiField name="routes" type="dict[str, FlowTarget]" required>Allowed decision keys mapped to targets. Router never guesses an unknown key.</ApiField>
+  <ApiField name="routing_prompt" type="str" required>Criteria injected by a preceding Pipeline into that preceding Agent's prompt; Router itself does not make another model call.</ApiField>
+  <ApiField name="client" type="AgentClient | None" defaultValue="None">Remote-route client.</ApiField>
+  <ApiField name="registry" type="Registry | RegistryClient | None" defaultValue="None">Optional target-name resolver.</ApiField>
+</ApiFields></ApiSection>
+
+</ApiReference>
+
+### Graph
+
+<ApiReference kind="class" path="protolink.flows.Graph" signature={`Graph(
+    client: AgentClient | None = None,
+    registry: Registry | RegistryClient | None = None,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py">
+Create an initially empty named state machine. Nodes, edges, and entry point are added separately; <code>"__END__"</code> is reserved as the terminal destination.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Graph constructor parameters">
+  <ApiField name="client" type="AgentClient | None" defaultValue="None">Remote-node client.</ApiField>
+  <ApiField name="registry" type="Registry | RegistryClient | None" defaultValue="None">Optional node-name resolver.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Attributes"><ApiFields ariaLabel="Graph attributes">
+  <ApiField name="nodes" type="dict[str, FlowTarget]">Named execution targets.</ApiField>
+  <ApiField name="edges" type="dict[str, str]">One fixed destination per origin.</ApiField>
+  <ApiField name="conditional_edges" type="dict[str, tuple[Callable, dict[str, str]]]">Condition function and route map per origin.</ApiField>
+  <ApiField name="entry_point" type="str | None">First node, initially unset.</ApiField>
+  <ApiField name="finish_point" type="str" defaultValue={'"__END__"'}>Reserved terminal sentinel.</ApiField>
+</ApiFields></ApiSection>
+
+</ApiReference>
 
 ### Public Methods
 
-| Method | Signature and behavior |
-| ------ | ---------------------- |
-| `execute()` | `task: Task`<br />Returns `Task`. Asynchronously executes any flow; each concrete flow implements this contract. |
-| `sync.execute()` | `task: Task`<br />Returns `Task`. Blocking wrapper around `execute()` for code without an active event loop. |
-| `Pipeline.add_step()` | `step: FlowTarget`<br />Returns `Pipeline`. Appends one step and supports chaining. |
-| `Graph.add_node()` | `node_name: str`, `target: FlowTarget`<br />Returns `Graph`. Adds a named execution target. |
-| `Graph.add_edge()` | `from_node: str`, `to_node: str`<br />Returns `Graph`. Adds one deterministic edge; use `"__END__"` as the terminal destination. |
-| `Graph.add_conditional_edge()` | `from_node: str`, `condition_fn: Callable[[Task], str]`, `path_map: dict[str, str]`<br />Returns `Graph`. Maps the condition function's result to a destination node. |
-| `Graph.set_entry_point()` | `node_name: str`<br />Returns `Graph`. Selects the first graph node. |
+### Flow.execute
+
+<ApiReference kind="abstract async method" path="protolink.flows.Flow.execute" signature={`async execute(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/base.py">
+Execute one concrete flow's topology against a Task.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Flow execute parameters"><ApiField name="task" type="Task" required>Mutable task passed through targets. Concrete flows return the same logical task, enriched by target outputs and flow metadata.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Flow execute return value"><ApiField name="task" type="Task">Final task after the topology terminates.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Local Agent dispatch">A local Agent target is called through <code>agent.handle_task(task)</code>, not <code>agent.run_task(task)</code>. Remote targets go through AgentClient. Applications needing the Agent live-cancellation/run-store wrapper for local steps should account for that distinction.</ApiCallout>
+
+</ApiReference>
+
+### Flow.sync.execute
+
+<ApiReference kind="method" path="protolink.flows.SyncFlow.execute" signature={`execute(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/base.py#L300-L310">
+Blocking equivalent of the concrete flow's <code>execute()</code>, implemented with <code>asyncio.run()</code>.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="synchronous flow execute parameters"><ApiField name="task" type="Task" required>Mutable task to pass through the concrete flow's topology. The wrapper forwards this exact object to the asynchronous implementation.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="synchronous flow execute return value"><ApiField name="task" type="Task">Final task after every selected target finishes and the topology terminates.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Event loops">Do not call this wrapper inside an active event loop. Await <code>flow.execute(task)</code> there.</ApiCallout>
+
+</ApiReference>
+
+### Pipeline.add_step
+
+<ApiReference kind="method" path="protolink.flows.Pipeline.add_step" signature={`add_step(step: FlowTarget) -> Pipeline`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/pipeline.py">
+Append one target to <code>steps</code> and return this Pipeline for fluent chaining.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Pipeline add step parameters"><ApiField name="step" type="FlowTarget" required>Local Agent, direct URL or registry name, or nested Flow.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Pipeline add step return value"><ApiField name="pipeline" type="Pipeline">This same Pipeline instance, allowing calls such as <code>pipeline.add_step(a).add_step(b)</code>.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Graph.add_node
+
+<ApiReference kind="method" path="protolink.flows.Graph.add_node" signature={`add_node(
+    node_name: str,
+    target: FlowTarget,
+) -> Graph`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py#L48-L61">
+Add or replace a named target and return this Graph. The reserved terminal name cannot be used as a node.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Graph add node parameters">
+  <ApiField name="node_name" type="str" required>Unique identifier used by edges and the entry point. Reusing an existing non-reserved name replaces that node's target.</ApiField>
+  <ApiField name="target" type="FlowTarget" required>Local Agent, direct URL or registry name, or nested Flow executed when traversal reaches this node.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Graph add node return value"><ApiField name="graph" type="Graph">This same Graph instance for fluent construction.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Graph add node errors"><ApiField name="ValueError"><code>node_name == "__END__"</code>.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Graph.add_edge
+
+<ApiReference kind="method" path="protolink.flows.Graph.add_edge" signature={`add_edge(
+    from_node: str,
+    to_node: str,
+) -> Graph`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py#L63-L83">
+Assign a fixed outbound transition. Both nodes must already exist, except that the destination may be <code>"__END__"</code>.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Graph add edge parameters">
+  <ApiField name="from_node" type="str" required>Existing origin node whose next transition should be deterministic.</ApiField>
+  <ApiField name="to_node" type="str" required>Existing destination node, or the reserved <code>"__END__"</code> sentinel to terminate traversal.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Graph add edge return value"><ApiField name="graph" type="Graph">This same Graph instance for fluent construction.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Graph add edge errors"><ApiField name="ValueError">A node is missing or the origin already owns a conditional edge.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Graph.add_conditional_edge
+
+<ApiReference kind="method" path="protolink.flows.Graph.add_conditional_edge" signature={`add_conditional_edge(
+    from_node: str,
+    condition_fn: Callable[[Task], str],
+    path_map: dict[str, str],
+) -> Graph`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py#L85-L113">
+Evaluate a synchronous Python function after the origin finishes and map its returned key to the next node.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Graph conditional edge parameters">
+  <ApiField name="from_node" type="str" required>Existing origin node.</ApiField>
+  <ApiField name="condition_fn" type="Callable[[Task], str]" required>Synchronous decision function. Async callables are not awaited.</ApiField>
+  <ApiField name="path_map" type="dict[str, str]" required>Decision keys to existing nodes or <code>"__END__"</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Graph conditional edge return value"><ApiField name="graph" type="Graph">This same Graph instance for fluent construction.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Graph conditional edge errors"><ApiField name="ValueError">An origin or destination is missing, the origin already owns a fixed edge, or execution later returns an unmapped key.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Graph.set_entry_point
+
+<ApiReference kind="method" path="protolink.flows.Graph.set_entry_point" signature={`set_entry_point(node_name: str) -> Graph`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py#L115-L126">
+Select an existing node as the traversal start and return this Graph.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Graph set entry point parameters"><ApiField name="node_name" type="str" required>Name of an existing node that should execute first.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Graph set entry point return value"><ApiField name="graph" type="Graph">This same Graph instance for fluent construction.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Graph set entry point errors"><ApiField name="ValueError">No node with <code>node_name</code> has been added to the graph.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Concrete execute behavior
+
+Each concrete method implements the traversal described earlier on this page. Pipeline mutates sequentially; Parallel copies then merges; Router records and dispatches one decision; Graph traverses named edges with a hard limit of 50 executed nodes.
+
+#### Pipeline.execute
+
+<ApiReference kind="async method" path="protolink.flows.Pipeline.execute" signature={`async execute(
+    task: Task,
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/pipeline.py#L56">
+Run the task through <code>steps</code> in declaration order. Before each step, Pipeline clears transient flow state and injects context for the known downstream target; the last step receives terminal-output guidance.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Pipeline execute parameters"><ApiField name="task" type="Task" required>Initial task that every sequential step reads and enriches.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Pipeline execute return value"><ApiField name="task" type="Task">Fully processed task containing the accumulated messages, artifacts, metadata, and final flow context.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Pipeline execute errors"><ApiField name="ValueError | RuntimeError">Target resolution fails, a target type is invalid, or a remote target has no usable client.</ApiField><ApiField name="target error">Agent, nested-flow, registry, and transport exceptions propagate immediately; remaining steps are not executed.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+#### Parallel.execute
+
+<ApiReference kind="async method" path="protolink.flows.Parallel.execute" signature={`async execute(
+    task: Task,
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/parallel.py#L47">
+Deep-copy the input task for every branch, execute all branches concurrently, and merge only newly added messages and artifacts into the original task. Successful branch results are merged in configured order, regardless of completion order.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Parallel execute parameters"><ApiField name="task" type="Task" required>Source task copied independently for each configured branch.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Parallel execute return value"><ApiField name="task" type="Task">Original task enriched with deduplicated branch messages and artifacts plus merged metadata.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Parallel execute errors"><ApiField name="branch error">Any branch exception propagates through <code>asyncio.gather()</code>; fan-in is skipped instead of returning a partial merge.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+#### Router.execute
+
+<ApiReference kind="async method" path="protolink.flows.Router.execute" signature={`async execute(
+    task: Task,
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/router.py#L128">
+Read the route decision already produced by the preceding step, validate it against the configured route map, record the decision, and dispatch the task to exactly one developer-approved target.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Router execute parameters"><ApiField name="task" type="Task" required>Active task whose latest output contains a structured route part, JSON-shaped decision, or legacy route tag.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Router execute return value"><ApiField name="task" type="Task">Task returned by the selected route after the decision has been recorded.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Router execute errors"><ApiField name="ValueError">The decision is missing, malformed, or names a key absent from <code>routes</code>.</ApiField><ApiField name="target error">Resolution, nested-flow, Agent, registry, and transport failures from the selected route propagate.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+#### Graph.execute
+
+<ApiReference kind="async method" path="protolink.flows.Graph.execute" signature={`async execute(
+    task: Task,
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py#L128">
+Traverse from the configured entry point until the reserved <code>"__END__"</code> destination is reached. Fixed edges allow downstream context injection before a node runs; conditional edges select their destination from the node's resulting task.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Graph execute parameters"><ApiField name="task" type="Task" required>Initial task carried from node to node and passed to each condition function after its origin node finishes.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Graph execute return value"><ApiField name="task" type="Task">Final enriched task after traversal reaches <code>"__END__"</code>.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Graph execute errors"><ApiField name="ValueError">A conditional result has no destination in its path map, or shared target resolution rejects a target.</ApiField><ApiField name="RuntimeError">No entry point is configured, a remote target lacks a client, or traversal exceeds the 50-node safety limit.</ApiField><ApiField name="target error">Agent, nested-flow, registry, transport, and condition-function exceptions propagate.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
 
 ## Practical Notes
 

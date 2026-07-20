@@ -1,12 +1,18 @@
 import ApiSurface from '@site/src/components/ApiSurface';
+import ApiReference, {
+  ApiCallout,
+  ApiField,
+  ApiFields,
+  ApiSection,
+} from '@site/src/components/ApiReference';
 
 # LLMs
 
-Protolink integrates with various LLM backends.
+ProtoLink integrates with API-hosted, server-hosted, local, and deterministic test models through one provider-neutral runtime contract.
 
-## LLM Types
+## LLM types
 
-Protolink groups LLM backends into three broad categories:
+ProtoLink groups model backends into three broad categories:
 
 <div className="provider-strip-label">[ API ]   [ Server ]   [ Local ]</div>
 
@@ -20,36 +26,46 @@ Protolink groups LLM backends into three broad categories:
   <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="55" className="hover-icon" />
 </div>
 
-- **API** - calls a remote API and requires an API key:
-    - `OpenAILLM`: uses the **OpenAI API** for sync & async requests.
-    - `AnthropicLLM`: uses the **Anthropic API** for sync & async requests.
-    - `GeminiLLM`: uses the **Google Gemini API** for sync & async requests.
-    - `DeepSeekLLM`: uses the **DeepSeek API** for sync & async requests.
-    - `GrokLLM`: uses the **Grok API** for sync & async requests.
-    - `HuggingFaceLLM`: uses the **HuggingFace Inference API** for sync & async requests.
+- **API** - calls a remote provider and normally requires an API key:
+    - `OpenAILLM`: OpenAI Responses API, including native function tools and streamed tool-call events.
+    - `AnthropicLLM`: Anthropic Messages API, including native `tool_use` blocks.
+    - `GeminiLLM`: Google GenAI API, including native function declarations.
+    - `DeepSeekLLM`: DeepSeek Chat Completions API, with optional native tools.
+    - `GrokLLM`: xAI Chat Completions API, with optional native tools.
+    - `HuggingFaceLLM`: Hugging Face Inference API for non-streaming direct calls.
 
-- **Server** - connects to an LLM server, locally or remotely:
-    - `OllamaLLM`: connects to an **Ollama** server for sync & async requests.
-    - `LlamaCPPServerLLM`: connects to a **llama-server** for sync & async requests.
-    - `LMStudioLLM`: connects to an **LM Studio** OpenAI-compatible server.
-    - `OpenAICompatibleLLM`: connects to any server exposing OpenAI-compatible `/v1/chat/completions` and `/v1/models` endpoints.
+- **Server** - connects to a model server that you run locally or remotely:
+    - `OllamaLLM`: connects to an Ollama `/api/chat` endpoint.
+    - `LlamaCPPServerLLM`: connects directly to a `llama-server`.
+    - `LMStudioLLM`: connects to LM Studio's OpenAI-compatible server.
+    - `OpenAICompatibleLLM`: connects to a service exposing `/v1/chat/completions` and `/v1/models`.
 
-- **Local** - runs the model directly in your runtime:
-    - `LlamaCPPLocalLLM`: uses a local **llama-cpp-python** runtime for sync & async requests.
+- **Local** - runs the model inside the Python process:
+    - `LlamaCPPLocalLLM`: loads a local GGUF file through `llama-cpp-python`.
 
-You can also use other LLM clients directly without going through Protolink's `LLM` wrappers if you prefer.
+For deterministic tests and offline examples, `MockLLM` implements the same contract without a provider dependency. You can also use third-party LLM clients directly if your application does not need ProtoLink's history, action, inference, metrics, or agent integration.
 
-## Runtime Boundaries
+## Runtime boundaries
 
 The public LLM facade remains `protolink.llms.base.LLM`. Internally, the base class owns orchestration: history binding, metrics, budgets, retries, tool execution, agent delegation, and final response handling. The strict action parser lives in `protolink.llms.parsing`, where raw model text is converted into one validated `LLMAction` and narrow fallback shorthands are repaired only when the target tool or agent is unambiguous.
 
-Provider adapters should keep provider-specific request and stream handling in their own modules, then return a typed action to the shared infer loop. That keeps the user-facing API simple while still allowing native tool-calling providers and JSON-fallback models to share the same runtime contract.
+Provider adapters keep provider-specific request and stream handling in their own modules, then return typed results to the shared inference loop. Hosted adapters live in `protolink.llms.api`, HTTP server adapters in `protolink.llms.server`, the in-process llama.cpp adapter in `protolink.llms.local`, and deterministic testing support in `protolink.llms.mock_client`.
+
+The rest of the package is partitioned by responsibility:
+
+- `factory.py` lazily resolves provider names and constructs adapters.
+- `history.py`, `context.py`, and `compaction.py` own provider-neutral conversation state, context manifests, and explicit history reduction.
+- `actions.py`, `parsing.py`, and `tool_calling.py` define typed runtime actions and translate provider-native function calls into them.
+- `metrics.py` normalizes usage, estimates missing token counts, and calculates application-supplied costs.
+- `prompts/` contains separate JSON-action and provider-native prompt families, preventing conflicting tool instructions.
+
+This separation keeps the user-facing API small while allowing native tool-calling providers and JSON-fallback models to share the same execution contract.
 
 ## Configuration
 
-Configuration depends on the specific backend, but the general pattern is:
+Configuration depends on the backend, but the general pattern is:
 
-1. **Install the relevant extras** (from the README):
+1. **Install the relevant extras**:
 
    ```bash
    # All supported LLM backends
@@ -58,18 +74,28 @@ Configuration depends on the specific backend, but the general pattern is:
 
 :::info[Choosing LLM extras]
 
-If you only need a subset of LLMs (e.g. OpenAI API), it is advised to **install them manually** instead of using the `llms` extra, which will install all the supported libraries.
+If you only need a subset of providers, install their SDKs directly instead of the `llms` extra, which installs every supported integration. Server and local adapters may not need a hosted-provider SDK.
 
 :::
-2. **Instantiate the LLM** with the desired model and credentials:
+
+2. **Construct the LLM** through the lazy factory:
+
+   ```python
+   from protolink import create_llm
+
+   llm = create_llm(
+       "openai",
+       model="gpt-4o-mini",
+       # api_key is normally read from OPENAI_API_KEY
+   )
+   ```
+
+   Import a concrete adapter when provider-specific configuration makes the code clearer:
 
    ```python
    from protolink.llms.api import OpenAILLM
 
-   llm = OpenAILLM(
-       api_key="your_api_key", # api_key is typically read from the environment, e.g. OPENAI_API_KEY
-       model="gpt-4o-mini",
-   )
+   llm = OpenAILLM(model="gpt-4o-mini")
    ```
 
 :::warning[API keys]
@@ -77,7 +103,8 @@ If you only need a subset of LLMs (e.g. OpenAI API), it is advised to **install 
 Never commit API keys to version control. Read them from environment variables or a secure secrets manager.
 
 :::
-3. **Pass the LLM to your Agent**:
+
+3. **Pass the LLM to an Agent**:
 
    ```python
    from protolink.agents import Agent
@@ -85,20 +112,20 @@ Never commit API keys to version control. Read them from environment variables o
 
    agent_card = AgentCard(
        url="http://localhost:8020",
-       name="llm_agent", 
-       description="Agent backed by an LLM"
+       name="llm_agent",
+       description="Agent backed by an LLM",
    )
 
    agent = Agent(card=agent_card, transport="http", llm=llm)
    ```
 
-For local and server‑style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`, `LMStudioLLM`, `OpenAICompatibleLLM`), configuration additionally includes paths to model files or server URLs. Refer to the corresponding example scripts for concrete usage patterns.
+For local and server-style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`, `LMStudioLLM`, and `OpenAICompatibleLLM`), configuration additionally includes a model-file path or server URL. The individual class entries below describe the resolution order for those values.
 
 ---
 
-## Agent History Isolation And Concurrency
+## Agent history isolation and concurrency
 
-An `LLM` instance still exposes `llm.history` for direct usage and backward-compatible introspection. When the same LLM is plugged into an `Agent`, Protolink binds a task-local `ConversationHistory` around each run so concurrent tasks do not interleave messages on one shared mutable history object.
+An `LLM` instance still exposes `llm.history` for direct usage and backward-compatible introspection. When the same LLM is plugged into an `Agent`, ProtoLink binds a task-local `ConversationHistory` around each run so concurrent tasks do not interleave messages on one shared mutable history object.
 
 For stateless agents, each task receives a fresh history seeded by the compiled system prompt. After the task finishes, `llm.history` points at a copy of the last completed task history for debugging and simple scripts.
 
@@ -108,7 +135,11 @@ For persistent conversation state, enable `state=["conversation"]`. The Agent lo
 from protolink import Agent, AgentCard, RunContext, Task, create_llm
 
 agent = Agent(
-    AgentCard(name="assistant", description="Assistant", url="runtime://assistant"),
+    AgentCard(
+        name="assistant",
+        description="Assistant",
+        url="runtime://assistant",
+    ),
     llm=create_llm("mock", default_response="ok"),
     state=["conversation"],
 )
@@ -120,7 +151,7 @@ await agent.execute_task(task)
 
 Direct `llm.infer(...)` calls are unchanged: they use the LLM's default history unless you explicitly call `llm.use_history(history)`.
 
-## Model Profiles, Context Manifests, And Budget Metrics
+## Model profiles, context manifests, and budget metrics
 
 LLM wrappers can emit pre-call context manifests plus per-call latency, token usage, context-window pressure, and estimated cost through the existing `infer()` event stream and telemetry hooks. This is optional and does not change the request payload sent to the provider.
 
@@ -132,8 +163,8 @@ llm = create_llm(
     model="my-model",
     metrics_profile=LLMModelProfile(
         context_window=128_000,
-        input_cost_per_million=1.0,   # example value; use your provider's current pricing
-        output_cost_per_million=5.0,  # example value; use your provider's current pricing
+        input_cost_per_million=1.0,   # example value; use current provider pricing
+        output_cost_per_million=5.0,  # example value; use current provider pricing
         supports_tools=True,
         supports_streaming=True,
         supports_json_schema=True,
@@ -152,9 +183,9 @@ llm.configure_metrics(
 )
 ```
 
-Provider-reported token usage is used when the SDK response includes it. Otherwise Protolink estimates token counts locally. If `tiktoken` is installed through `protolink[metrics]`, Protolink uses it for estimates; without it, Protolink falls back to a lightweight character heuristic. Prices, model limits, and capabilities change over time, so Protolink treats `LLMModelProfile` as application-owned metadata rather than a hardcoded billing catalog.
+Provider-reported token usage is used when the SDK response includes it. Otherwise ProtoLink estimates token counts locally. If `tiktoken` is installed through `protolink[metrics]`, ProtoLink uses it for estimates; without it, ProtoLink falls back to a lightweight character heuristic. Prices, model limits, and capabilities change over time, so `LLMModelProfile` is application-owned metadata rather than a hardcoded billing catalog.
 
-Before each model call, Protolink emits a provider-neutral `context_prepared` event:
+Before each model call, ProtoLink emits a provider-neutral `context_prepared` event:
 
 ```python
 {
@@ -182,9 +213,21 @@ When an `event_callback` or telemetry backend is attached, each model call insid
     "provider": "openai-compatible",
     "model": "my-model",
     "latency_ms": 842.37,
-    "usage": {"input_tokens": 1200, "output_tokens": 180, "estimated": False},
-    "context": {"used_tokens": 1200, "window_tokens": 200000, "used_percent": 0.6},
-    "cost": {"input_cost": 0.0036, "output_cost": 0.0027, "total_cost": 0.0063},
+    "usage": {
+        "input_tokens": 1200,
+        "output_tokens": 180,
+        "estimated": False,
+    },
+    "context": {
+        "used_tokens": 1200,
+        "window_tokens": 200000,
+        "used_percent": 0.6,
+    },
+    "cost": {
+        "input_cost": 0.0036,
+        "output_cost": 0.0027,
+        "total_cost": 0.0063,
+    },
 }
 ```
 
@@ -192,9 +235,9 @@ This is especially useful for CLIs, dashboards, and budget-aware agents that wan
 
 If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before the provider is invoked; `max_tool_calls` is checked before model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
 
-## History Compaction
+## History compaction
 
-Every LLM wrapper owns a modular `HistoryCompactor` at `llm.compactor`. Its `compact()` method mutates the current `ConversationHistory` in place and returns a `HistoryCompactionResult` with before/after message and estimated-token counts. `LLM.compact_history()` remains as a convenient facade, so existing direct usage stays concise.
+Every LLM wrapper owns a modular `HistoryCompactor` at `llm.compactor`. Its `compact()` method mutates the current `ConversationHistory` in place and returns a `HistoryCompactionResult` with before/after message and estimated-token counts. `LLM.compact_history()` remains as a convenient facade, so direct usage stays concise.
 
 ```python
 # Fastest: keep the system prompt and 19 newest messages.
@@ -220,13 +263,7 @@ print(report.to_dict())
 report = llm.compactor.compact("tokens", max_tokens=8_000)
 ```
 
-Three **strategies** cover different cost and fidelity needs:
-
-- ``"recent"`` keeps the system prompt and newest messages. It is the simplest and fastest option and makes no model call.
-- ``"tokens"`` keeps the newest chronological suffix that fits an estimated token budget. It makes no model call and uses the same optional tokenizer/fallback heuristic as LLM metrics.
-- ``"summary"`` asks this LLM to summarize older messages in one isolated call, replaces them with a system summary, and preserves the newest messages verbatim.
-
-The summary call receives a temporary ``ConversationHistory`` and does not write into the live history. If it fails or returns an empty summary, the live history remains unchanged.
+Three strategies cover different cost and fidelity needs:
 
 | Strategy | Model calls | Behavior | Best for |
 |----------|-------------|----------|----------|
@@ -234,7 +271,7 @@ The summary call receives a temporary ``ConversationHistory`` and does not write
 | `tokens` | 0 | Keeps the newest chronological suffix near `max_tokens`, using `tiktoken` when installed or the built-in estimate otherwise. | Deterministic context-budget control. |
 | `summary` | 1 | Replaces older turns with a model-generated system summary and keeps `preserve_recent` turns verbatim. | Retaining decisions and constraints from long sessions. |
 
-The `tokens` limit is deliberately soft when the leading system prompt plus protected recent messages already exceed the budget: Protolink preserves those messages instead of silently removing the active request. The `summary` strategy makes its model call with a temporary history. The live history is changed only after a non-empty summary is returned, so a provider failure leaves it untouched.
+The `tokens` limit is deliberately soft when the leading system prompt plus protected recent messages already exceed the budget: ProtoLink preserves those messages instead of silently removing the active request. The `summary` strategy makes its model call with a temporary history. The live history is changed only after a non-empty summary is returned, so a provider failure leaves it untouched.
 
 ### Agent-requested compaction
 
@@ -272,25 +309,27 @@ The remote path is `POST /llm/history/compact`, represented by `AgentClient.COMP
 
 :::note[Compaction is explicit]
 
-Protolink does not compact history automatically based on an arbitrary context threshold. Applications can call `llm.compact_history()` for local use, `agent.compact_history()` inside an Agent process, or `AgentClient.compact_history()` over a transport. Natural-language requests such as “please compact your context” are application intent; convert them into a control-plane request before calling the Agent if you want deterministic behavior.
+ProtoLink does not compact history automatically based on an arbitrary context threshold. Applications can call `llm.compact_history()` for local use, `agent.compact_history()` inside an Agent process, or `AgentClient.compact_history()` over a transport. Natural-language requests such as “please compact your context” are application intent; convert them into a control-plane request before calling the Agent if you want deterministic behavior.
 
 :::
-## LLM API Reference
 
-This section provides a detailed API reference for all LLM classes in Protolink. All LLM implementations inherit from the base `LLM` class and provide a consistent interface for generating responses.
+## LLM API reference
 
-:::tip[Unified LLM Interface]
+This section provides a detailed reference for all LLM classes in ProtoLink. All implementations inherit from `LLM` and expose a consistent surface for direct text generation, streaming, typed actions, controlled inference, history management, and metrics.
 
-**Protolink provides a single, consistent API for all LLM providers.** Whether you're using OpenAI, Anthropic, Ollama, or local models, you interact with them through the same methods: `call()`, `call_stream()`, `chat()`, and the advanced `infer()` method. This unified approach means you can swap LLM providers without changing your application code - just update the initialization and you're done!
+:::tip[Unified LLM interface]
+
+Whether you use OpenAI, Anthropic, Ollama, an OpenAI-compatible server, or a local model, application code uses the same core methods: `call()`, `call_stream()`, `chat()`, and `infer()`. Swapping providers changes construction and provider-specific parameters, not the runtime contract.
 
 :::
-:::tip[Why Use Protolink's LLM Wrappers?]
 
-- **Provider Agnostic**: Switch between OpenAI, Anthropic, Ollama, and future providers with minimal code changes
-- **Consistent Interface**: Same method signatures and behavior across all implementations
-- **Built-in Features**: Connection validation, parameter validation, and error handling out of the box
-- **Agent-Ready**: Built-in support for tool calling, agent delegation, and structured inference
-- **Production Ready**: Robust error handling and logging for real-world applications
+:::tip[Why use ProtoLink's LLM wrappers?]
+
+- **Provider agnostic**: switch providers without rewriting the inference runtime.
+- **Consistent interface**: use the same core methods across all implementations.
+- **Built-in runtime features**: connection validation, task-local history, explicit compaction, metrics, retries, cancellation, budgets, and events.
+- **Agent ready**: acquire typed tool and delegation actions through native provider tools or portable JSON.
+- **Controlled execution**: the model declares intent; ProtoLink validates policy and performs side effects.
 
 :::
 
@@ -308,276 +347,583 @@ This section provides a detailed API reference for all LLM classes in Protolink.
   ]}
   cards={[
     {
-      title: "Base contract",
-      text: "Every provider implements the same call, streaming, chat, and infer methods.",
-      code: "LLM",
+      title: "Construct",
+      text: "Select a provider lazily or instantiate a concrete adapter.",
+      code: "create_llm()",
     },
     {
-      title: "API providers",
-      text: "OpenAI, Anthropic, Gemini, DeepSeek, Hugging Face, and OpenAI-compatible providers share the same surface.",
-      code: "APILLM",
+      title: "Chat",
+      text: "Make a direct text call or consume an asynchronous text stream.",
+      code: "LLM.chat()",
     },
     {
-      title: "Local servers",
-      text: "Ollama, LM Studio, and local runtimes plug into the same application code.",
-      code: "ServerLLM",
+      title: "Infer",
+      text: "Run the controlled action loop used by Agent.",
+      code: "LLM.infer()",
     },
     {
-      title: "Runtime control",
-      text: "Compaction and metrics are explicit APIs rather than hidden prompt mutations.",
-      code: "compact_history()",
+      title: "Maintain",
+      text: "Bind isolated histories, compact context, and emit budget metrics.",
+      code: "LLM.compact_history()",
     },
   ]}
 />
 
-#### Provider Switching in Action
+### Provider switching in action
 
-Protolink provides a single, consistent API for all LLM providers. Whether you're using OpenAI, Anthropic, Ollama, or local models, you interact with them through the same methods: `call()`, `call_stream()`, `chat()`, and the advanced `infer()` method.
-
-Protolink also provides the method **`chat()`** which is a convenience method for chat-style interactions. It calls the `call()` and `call_stream()` methods.
+The same application code works across providers. `chat()` is the high-level convenience method for direct chat-style interactions; internally it selects `call()` or `call_stream()`.
 
 ```python
-# The same code works with ANY LLM provider
+from protolink import create_llm
 
-# Choose your provider - just change the import and initialization!
-from protolink.llms.api import OpenAILLM, AnthropicLLM, GeminiLLM # etc.
-from protolink.llms.server import LMStudioLLM, OllamaLLM   # or any other provider
+# Choose a provider by changing construction.
+llm = create_llm("openai", model="gpt-4o-mini")
+llm = create_llm("anthropic", model="claude-sonnet-4-20250514")
+llm = create_llm(
+    "ollama",
+    model="qwen3",
+    base_url="http://localhost:11434",
+)
+llm = create_llm(
+    "lmstudio",
+    model="local-model",
+    base_url="http://localhost:1234/v1",
+)
 
-# Initialize your chosen LLM
-llm = OpenAILLM(model="gpt-4o")
-llm = AnthropicLLM(model="claude-3-5-sonnet")
-llm = OllamaLLM(model="gemma4:e4b", base_url="http://localhost:11434")
-llm = LMStudioLLM(model="local-model", base_url="http://localhost:1234/v1")
-
-# The rest of your code stays EXACTLY the same!
+# The calling code stays the same.
 response = llm.chat("Hello! How are you?")
 print(response)
 
-# Streaming returns an async iterator
 async for chunk in llm.chat("Hello!", streaming=True):
     print(chunk, end="", flush=True)
 ```
 
-:::info[LLM Hierarchy]
+:::info[LLM hierarchy]
 
-- **`LLM`** - abstract base class with core functionality
-- **`APILLM`** - base for API-based LLMs
-- **`ServerLLM`** - base for server-based LLMs
-- **`LocalLLM`** - base for local runtime LLMs
-- **Concrete implementations**: `OpenAILLM`, `AnthropicLLM`, `GeminiLLM`, `DeepSeekLLM`, `HuggingFaceLLM`, `OllamaLLM`, `LMStudioLLM`, `OpenAICompatibleLLM`, etc.
-
-:::
-### Base LLM Class
-
-The `LLM` class defines the common interface that all LLM implementations must follow.
-
-#### Core Constants
-
-| Constant | Type | Value | Description |
-|----------|-----|-------|-------------|
-| `MAX_INFER_STEPS` | `int` | `10` | Safety limit for inference loops to prevent infinite execution |
-
-#### Attributes
-
-| Attribute | Type | Description |
-|-----------|-----|-------------|
-| `model_type` | `LLMType` | The type of LLM (`"api"`, `"local"`, or `"server"`). |
-| `provider` | `LLMProvider` | The provider name (`"openai"`, `"anthropic"`, `"ollama"`, etc.). |
-| `model` | `str` | The model name/identifier. |
-| `model_params` | `dict[str, Any]` | Model-specific parameters (temperature, max_tokens, etc.). |
-| `system_prompt` | `str` | Default system prompt for the model. |
-| `history` | `ConversationHistory` | Tracks conversation messages for multi-turn interactions. Automatically managed by the [Agent state system](agent.md#state-persistence) when enabled. |
-| `compactor` | `HistoryCompactor` | LLM-owned component that handles compaction algorithms and isolated summary calls. It is not exposed to the model as a tool. |
-| `reasoning` | `ReasoningLevel` | Whether to set reasoning/chain-of-thought instructions in the system prompt. When enabled, the LLM is prompted to reason step-by-step before producing a response. Possible values that indicate the level of reasoning to use: `"none"`, `"low"`, `"medium"`, `"high"`. Default: `"none"`. |
-| `metrics_profile` | `LLMModelProfile ⎪ None` | Optional application-owned model metadata for context-window percentages, cost estimates, context manifests, and descriptive capabilities such as tool, streaming, and JSON-schema support. |
-| `metrics_enabled` | `bool` | Whether metrics events are emitted when telemetry or an `event_callback` is attached. Defaults to `True`. |
-
-:::info[History Performance]
-
-Protolink's `ConversationHistory` uses a **`collections.deque`** internally. This optimizes two critical hot-paths in agentic workflows:
-
-1.  **System Prompt Updates**: Updating or prepending the system prompt is an **$O(1)$** operation (no list re-allocation).
-2.  **History Truncation**: Trimming old messages to fit context windows is significantly faster than standard list slicing.
+- **`LLM`** - abstract base class with the common runtime behavior.
+- **`APILLM`** - base for API-hosted adapters.
+- **`ServerLLM`** - base for HTTP model servers.
+- **`LocalLLM`** - base for in-process local runtimes.
+- **Concrete implementations** - `OpenAILLM`, `AnthropicLLM`, `GeminiLLM`, `DeepSeekLLM`, `GrokLLM`, `HuggingFaceLLM`, `OllamaLLM`, `LlamaCPPServerLLM`, `LMStudioLLM`, `OpenAICompatibleLLM`, `LlamaCPPLocalLLM`, and `MockLLM`.
 
 :::
-#### Core Methods
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `call()` | `history: ConversationHistory` | `str` | **Abstract.** Generate a single response from the model. |
-| `call_stream()` | `history: ConversationHistory` | `AsyncIterator[str]` | **Abstract.** Generate a streaming response, yielding chunks. |
-| `call_action()` | `history, tools, agent_callback_available=False, agent_cards=None` | `LLMActionResult` | Return one validated runtime action. Native providers override this to consume provider tool calls; fallback providers parse JSON text. |
-| `call_action_stream()` | `history, tools, agent_callback_available=False, agent_cards=None, chunk_callback=None` | `LLMActionResult` | Streaming equivalent of `call_action()`. Native-stream providers consume tool-call events; fallback providers stream JSON text and parse it after completion. |
-| `chat()` | `user_query: str, streaming: bool=False` | `str ⎪ AsyncIterator[str]` | High-level convenience method for standard chat usage. |
-| `infer()` | `query: str, tools: dict[str, BaseTool], streaming: bool=False, event_callback=None` | `Part` | **Async.** Execute controlled multi-step inference with tool calling, optional streaming LLM calls, and optional event observation. |
-| `compact_history()` | `strategy="recent", max_messages=20, max_tokens=4000, preserve_recent=6, summary_max_tokens=512` | `HistoryCompactionResult` | Compact live history using a message window, estimated token budget, or model-generated summary. |
-| `compactor.compact()` | Same as `compact_history()` | `HistoryCompactionResult` | Component-oriented form of the same operation. |
-| `configure_metrics()` | `profile=None, context_window=None, input_cost_per_million=None, output_cost_per_million=None` | `LLM` | Configure optional context/cost metadata used for emitted metrics. |
-| `build_system_prompt()` | `user_instructions, agent_cards, tools, action_mode=None, override_system_prompt=False, persist=False` | `str` | Build the final system prompt. `action_mode="json"` uses the portable JSON action contract; `action_mode="native"` uses provider-native tool instructions. If `persist=True`, preserves existing conversation history. |
-| `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
-| `validate_connection()` | - | `bool` | **Abstract.** Validate that the LLM connection is working. |
+Each callable below keeps the scikit-learn-style layout: exact signature, explanation, separately labeled parameters and defaults, return values, raised errors, notes, and focused examples.
 
-#### Properties
+### create_llm
 
-| Property | Type | Description |
-|----------|-----|-------------|
-| `model_params` | `dict[str, Any]` | Get/set model-specific generation parameters. |
-| `uses_native_action_prompt` | `bool` | Whether non-streaming `infer()` should use provider-native tool instructions instead of JSON action instructions. |
-| `supports_native_action_stream` | `bool` | Whether streaming `infer()` can acquire tool/agent actions from native streaming provider events. |
+<ApiReference
+  kind="function"
+  path="protolink.create_llm"
+  signature={`create_llm(
+    provider: str | LLMProvider,
+    **kwargs,
+) -> LLM`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/factory.py#L97"
+>
 
-:::note[Abstract Methods]
+Create an LLM adapter without importing the selected provider until it is needed.
 
-The `LLM` base class is abstract. You should use one of the concrete implementations like `OpenAILLM` or `AnthropicLLM`.
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="create_llm parameters">
+    <ApiField name="provider" type="str | LLMProvider" required>
+      Provider selector. Supported string values are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, and <code>openai-compatible</code>.
+    </ApiField>
+    <ApiField name="**kwargs" type="Any">
+      Forwarded to the selected adapter constructor. Two factory-only keywords are also recognized: <code>metrics_profile</code> configures model metrics after construction, and <code>metrics_enabled</code> enables or disables their emission.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-:::
-### Advanced Inference System
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="create_llm return value">
+    <ApiField name="llm" type="LLM">
+      An initialized concrete adapter for the requested provider.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-#### The `infer()` Method
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="create_llm errors">
+    <ApiField name="ValueError">
+      Raised when the provider string is unknown.
+    </ApiField>
+    <ApiField name="ImportError">
+      Raised when the selected adapter requires an optional dependency that is not installed.
+    </ApiField>
+    <ApiField name="provider or constructor error">
+      Credential, model-path, URL, and client-construction errors from the selected adapter are not hidden.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-The `infer()` method is the core of Protolink's agent system. It implements a deterministic, multi-step inference loop that enables LLMs to:
+<ApiCallout label="Current behavior">
+  Pass provider names as strings. Although the annotation includes <code>LLMProvider</code>, enum instances are not currently normalized correctly by the factory.
+</ApiCallout>
 
-1. **Make tool calls** - Execute external tools with structured arguments
-2. **Delegate to agents** - Pass work to other specialized agents  
-3. **Generate final responses** - Produce user-facing answers
-
-:::note[The **infer** method is the cornerstone of Protolink's agent system.]
-
-This method implements a deterministic, multi-step inference loop that enables LLMs to make tool calls, delegate to agents, and generate final responses. **This method is called automatically by the agent and not manually by the user.**
-
-:::
-#### Method Signature
+<ApiSection title="Examples">
 
 ```python
-async def infer(
-    *, 
-    query: str, 
-    tools: dict[str, BaseTool], 
-    streaming: bool = False,
-    event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
-) -> Part
+from protolink import LLMModelProfile, create_llm
+
+llm = create_llm(
+    "openai-compatible",
+    base_url="http://localhost:1234/v1",
+    model="local-model",
+    metrics_profile=LLMModelProfile(context_window=32_768),
+)
 ```
 
-#### Parameters
+</ApiSection>
 
-| Parameter | Type | Description |
-|-----------|-----|-------------|
-| `query` | `str` | The user-provided task or instruction to be processed. |
-| `tools` | `dict[str, BaseTool]` | Available tools that the agent may invoke during inference. |
-| `streaming` | `bool` | Whether to use streaming mode for underlying LLM calls. |
-| `event_callback` | `Callable[[dict], Awaitable[None]] ⎪ None` | Optional observer for normalized inference events such as chunks, tool starts/results, agent calls, parse errors, and final output. |
+</ApiReference>
 
-#### Returns
+## Base LLM contract
 
-- `Part` with type `"infer_output"` containing the final response
+The `LLM` class defines the common interface that every implementation follows. Concrete adapters are deliberately thin at the runtime boundary: they translate `ConversationHistory` into a provider request, translate responses and streams back into ProtoLink values, and validate connectivity. The base class supplies the shared behavior around those calls.
 
-#### Raises
+Application code normally constructs a provider through `create_llm()` and calls `chat()` for direct text generation. `Agent` uses the more powerful `infer()` path, which adds typed actions, tool execution, delegation, policy checks, budgets, events, retries, and bounded iteration.
 
-- `RuntimeError`: LLM call failures, tool execution errors, or step limit exceeded
-- `ValueError`: Invalid actions, unknown tools, or malformed responses
+The core surface falls into four groups:
 
-#### How It Works
+- **Provider invocation**: `call()` and `call_stream()` are implemented by concrete adapters.
+- **Direct conversation**: `chat()` appends a user message and selects the blocking or streaming provider path.
+- **Structured action acquisition**: `call_action()` and `call_action_stream()` normalize native tool calls or JSON output into `LLMActionResult`.
+- **Runtime orchestration**: `infer()` repeatedly validates and dispatches those actions until the model returns a final answer.
 
-`infer()` always dispatches typed actions, but the LLM can produce those actions through two acquisition modes:
+:::info[History performance]
 
-| Mode | Used By | Model Instruction | Runtime Behavior |
+`ConversationHistory` uses a `collections.deque` internally. Prepending or replacing the system prompt is an O(1) operation, and trimming older turns avoids repeated list reallocation on hot agent paths.
+
+:::
+
+:::note[Abstract base class]
+
+Do not instantiate `LLM` directly. Use a concrete implementation such as `OpenAILLM`, `AnthropicLLM`, `OllamaLLM`, or `MockLLM`, normally through `create_llm()`.
+
+:::
+
+### LLM
+
+<ApiReference
+  kind="abstract class"
+  path="protolink.llms.base.LLM"
+  signature={`class LLM(
+    model: str,
+    model_params: dict[str, Any],
+    *,
+    reasoning: Literal["none", "low", "medium", "high"] = "none",
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L154"
+>
+
+Abstract provider-neutral model contract. Subclasses implement text generation and connection validation; the base class owns history binding, typed action parsing, inference orchestration, compaction, and metrics.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM constructor parameters">
+    <ApiField name="model" type="str" required>
+      Provider-specific model identifier or local model path.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any]" required>
+      Generation parameters passed to the adapter. The base class verifies only that later assignments remain dictionaries; the downstream SDK or server validates individual keys and values.
+    </ApiField>
+    <ApiField name="reasoning" type={'"none" | "low" | "medium" | "high"'} defaultValue={'"none"'}>
+      Selects the reasoning instruction block included when the base system prompt is built. This argument is mainly for custom subclasses; current concrete provider constructors do not expose it.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="LLM attributes">
+    <ApiField name="model" type="str">
+      Resolved model identifier.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any]">
+      Mutable provider generation parameters.
+    </ApiField>
+    <ApiField name="history" type="ConversationHistory">
+      Default history for direct calls, or the task-local history currently bound by <code>use_history()</code>.
+    </ApiField>
+    <ApiField name="has_active_history" type="bool">
+      Whether the current execution context has a task-local history binding.
+    </ApiField>
+    <ApiField name="compactor" type="HistoryCompactor">
+      Component that mutates the live history using recent-message, token-budget, or summary compaction.
+    </ApiField>
+    <ApiField name="system_prompt" type="str">
+      Prompt last built or assigned on the adapter.
+    </ApiField>
+    <ApiField name="metrics_profile" type="LLMModelProfile | None">
+      Optional application-owned context-window and cost metadata.
+    </ApiField>
+    <ApiField name="metrics_enabled" type="bool">
+      Whether inference may emit metrics when an observer is attached.
+    </ApiField>
+    <ApiField name="sync" type="SyncLLM">
+      Blocking wrapper for <code>infer()</code>. Do not use it inside an active event loop.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Module constant">
+  The ten-step inference limit is <code>protolink.llms.base.MAX_INFER_STEPS</code>. It is a module constant, not an <code>LLM</code> class attribute.
+</ApiCallout>
+
+</ApiReference>
+
+### LLM.chat
+
+<ApiReference
+  kind="method"
+  path="protolink.llms.base.LLM.chat"
+  signature={`chat(
+    user_query: str,
+    *,
+    streaming: bool = False,
+) -> str | AsyncIterator[str]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L441"
+>
+
+Add one user message to the active history, then make a direct provider call.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM chat parameters">
+    <ApiField name="user_query" type="str" required>
+      User text appended to the current <code>ConversationHistory</code>.
+    </ApiField>
+    <ApiField name="streaming" type="bool" defaultValue="False">
+      When <code>False</code>, return the complete provider response. When <code>True</code>, return an asynchronous iterator of text chunks.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM chat return value">
+    <ApiField name="response" type="str">
+      Complete model text when <code>streaming=False</code>.
+    </ApiField>
+    <ApiField name="chunks" type="AsyncIterator[str]">
+      Asynchronous text stream when <code>streaming=True</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="History behavior">
+  <code>chat()</code> appends the user message, but it does not append the returned assistant text. Use <code>Agent</code> state or manage <code>ConversationHistory</code> explicitly when you need durable multi-turn history.
+</ApiCallout>
+
+<ApiSection title="Examples">
+
+```python
+answer = llm.chat("Give me a title for this report.")
+
+async for chunk in llm.chat("Draft the introduction.", streaming=True):
+    print(chunk, end="")
+```
+
+</ApiSection>
+
+</ApiReference>
+
+### LLM.call
+
+<ApiReference
+  kind="abstract method"
+  path="protolink.llms.base.LLM.call"
+  signature={`call(
+    history: ConversationHistory,
+) -> str`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L407"
+>
+
+Generate one complete text response from a conversation history. Concrete adapters translate the history into their provider’s request format.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM call parameters">
+    <ApiField name="history" type="ConversationHistory" required>
+      Ordered system, user, assistant, and tool messages sent to the model.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM call return value">
+    <ApiField name="response" type="str">
+      Raw text extracted from the provider response.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="LLM call errors">
+    <ApiField name="NotImplementedError">
+      Raised by the abstract base implementation.
+    </ApiField>
+    <ApiField name="provider error">
+      Concrete adapters generally propagate authentication, HTTP, SDK, and model errors from the provider call.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### LLM.call_stream
+
+<ApiReference
+  kind="abstract method"
+  path="protolink.llms.base.LLM.call_stream"
+  signature={`call_stream(
+    history: ConversationHistory,
+) -> AsyncIterator[str]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L421"
+>
+
+Start a streaming provider call and yield incremental text chunks.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM call stream parameters">
+    <ApiField name="history" type="ConversationHistory" required>
+      Conversation sent to the provider.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Yields">
+  <ApiFields ariaLabel="LLM call stream yields">
+    <ApiField name="chunk" type="str">
+      The next incremental piece of model output.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Consumption">
+  Consume the returned object with <code>async for</code>. Do not await <code>call_stream()</code> itself.
+</ApiCallout>
+
+</ApiReference>
+
+### LLM.call_action
+
+<ApiReference
+  kind="method"
+  path="protolink.llms.base.LLM.call_action"
+  signature={`call_action(
+    history: ConversationHistory,
+    *,
+    tools: dict[str, BaseTool],
+    agent_callback_available: bool = False,
+    agent_cards: list[Any] | None = None,
+) -> LLMActionResult`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L480"
+>
+
+Acquire one validated runtime action. The base implementation parses a JSON action from text; native-capable adapters override it and normalize provider tool calls into the same result type.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM call action parameters">
+    <ApiField name="history" type="ConversationHistory" required>
+      Conversation for the current inference step.
+    </ApiField>
+    <ApiField name="tools" type="dict[str, BaseTool]" required>
+      Tool names mapped to executable tool objects. Native adapters turn this mapping into provider tool declarations.
+    </ApiField>
+    <ApiField name="agent_callback_available" type="bool" defaultValue="False">
+      Whether the runtime can dispatch agent-delegation actions.
+    </ApiField>
+    <ApiField name="agent_cards" type="list[Any] | None" defaultValue="None">
+      Discovered agents available for native declarations and unambiguous fallback repair.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM call action return value">
+    <ApiField name="result" type="LLMActionResult">
+      A validated <code>FinalAction</code>, <code>ToolCallAction</code>, or <code>AgentCallAction</code>, together with the raw response and provider metadata.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="LLM call action errors">
+    <ApiField name="ValueError">
+      Raised when direct fallback parsing cannot produce a valid action.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### LLM.call_action_stream
+
+<ApiReference
+  kind="async method"
+  path="protolink.llms.base.LLM.call_action_stream"
+  signature={`async call_action_stream(
+    history: ConversationHistory,
+    *,
+    tools: dict[str, BaseTool],
+    agent_callback_available: bool = False,
+    agent_cards: list[Any] | None = None,
+    chunk_callback: Callable[[str], Awaitable[None]] | None = None,
+) -> LLMActionResult`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L518"
+>
+
+Streaming counterpart to `call_action()`. The fallback implementation forwards text chunks to the observer, buffers the complete response, and validates exactly one action after the stream ends.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM streaming action parameters">
+    <ApiField name="history" type="ConversationHistory" required>
+      Conversation for the current inference step.
+    </ApiField>
+    <ApiField name="tools" type="dict[str, BaseTool]" required>
+      Tools available to the model.
+    </ApiField>
+    <ApiField name="agent_callback_available" type="bool" defaultValue="False">
+      Whether agent delegation can be dispatched.
+    </ApiField>
+    <ApiField name="agent_cards" type="list[Any] | None" defaultValue="None">
+      Discovered agents available for delegation.
+    </ApiField>
+    <ApiField name="chunk_callback" type="Callable[[str], Awaitable[None]] | None" defaultValue="None">
+      Async observer invoked for each emitted text chunk.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM streaming action return value">
+    <ApiField name="result" type="LLMActionResult">
+      One complete validated runtime action. Partial JSON fragments are never dispatched.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="LLM streaming action errors">
+    <ApiField name="ValueError">
+      Raised when an empty or malformed fallback stream cannot be parsed as an action.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+## Advanced inference system
+
+### What inference means in ProtoLink
+
+`infer()` is the cornerstone of ProtoLink's agent runtime. A normal model call asks for text and returns text. Inference instead treats the model as a decision-maker inside a controlled loop: the model declares one typed action, ProtoLink validates and performs that action, the result is returned to the model as an observation, and the cycle continues until the model can produce a final answer.
+
+This distinction is important. The LLM never executes Python code, invokes a remote agent, grants its own approval, or decides whether a budget may be exceeded. It can only request a `final`, `tool_call`, or `agent_call` action. ProtoLink remains the executor and policy boundary.
+
+In normal applications, `Agent` prepares the prompt and calls `infer()` automatically. Direct calls remain available for advanced integrations that already have tools, callbacks, runtime policy, and history under their own control.
+
+`infer()` enables a model to:
+
+1. **Make tool calls** - request external functions with structured arguments.
+2. **Delegate to agents** - pass work to a discovered specialized agent.
+3. **Observe results** - receive tool or agent output in conversation history.
+4. **Self-correct** - revise malformed actions, wrong arguments, or unavailable targets.
+5. **Generate a final response** - return user-facing content only after the required work is complete.
+
+### How action acquisition works
+
+Every provider ultimately returns the same `LLMActionResult`, but it can acquire that action in one of two ways:
+
+| Mode | Used by | Model instruction | Runtime behavior |
 |------|---------|-------------------|------------------|
-| JSON action mode | Default for local/small models and providers without reliable native tools | Return one JSON object such as `{"type":"tool_call","tool":"search","args":{"q":"..."}}` | `call_action()` or fallback `call_action_stream()` parses the text, validates it with Pydantic, then dispatches it. |
-| Native action mode | OpenAI, Anthropic, Gemini, and opted-in tool-capable servers | Use the provider's tool/function interface | The adapter sends real tool declarations, receives native tool events, and normalizes them into the same typed action models. |
+| JSON action mode | Default for local/small models and providers without reliable native tools | Return one JSON object such as `{"type":"tool_call","tool":"search","args":{"q":"..."}}` | `call_action()` or the fallback `call_action_stream()` parses text, validates it with Pydantic, and returns a typed action. |
+| Native action mode | OpenAI, Anthropic, Gemini, and opted-in tool-capable servers | Use the provider's function or tool interface | The adapter sends real tool declarations, receives provider-native tool events, and normalizes them into the same typed action models. |
 
-The loop is otherwise identical in both modes:
+The rest of the loop is identical:
 
-1. **Prompt selection**: `Agent.call_llm()` builds either the JSON prompt or the native-tool prompt. Streaming calls use the native prompt only when `llm.supports_native_action_stream` is true; otherwise they force JSON mode so small/local models keep the simple contract.
-2. **Action acquisition**: `LLM.infer()` calls `call_action()` for non-streaming runs or `call_action_stream()` for streaming runs. These methods return an `LLMActionResult`, not raw provider data.
-3. **Action validation**: JSON mode validates the parsed object against the typed action union. Native mode validates the normalized provider tool call against the same `FinalAction`, `ToolCallAction`, or `AgentCallAction` models.
-4. **Runtime dispatch**: The runtime executes local tools, delegates to agents, or returns a final answer. The LLM declares intent only; Protolink performs all side effects. History compaction is handled outside this loop by `Agent.compact_history()` and the client/server request spec.
-5. **Observation injection**: Tool and agent results are added back to `ConversationHistory` through provider-specific injection hooks when needed, or through the provider-neutral fallback message format.
-6. **Iteration**: The loop repeats until a `final` action is produced or a guardrail stops execution.
-
-History is automatically committed to the `ConversationHistory` object. If the agent's `state=["conversation"]` is enabled, this history is persisted to the [Storage](storage.md) backend and resumed in later sessions.
+1. **Prompt selection**: the Agent builds either the portable JSON prompt or the native-tool prompt. Streaming uses native instructions only when the adapter supports native streamed actions.
+2. **Context preparation**: the current query, history, tools, discovered agents, flow context, and runtime manifest are assembled.
+3. **Action acquisition**: `call_action()` or `call_action_stream()` obtains one model decision.
+4. **Validation**: the decision becomes a `FinalAction`, `ToolCallAction`, or `AgentCallAction`. Raw provider objects never reach the dispatcher.
+5. **Policy and budget checks**: cancellation, authorization, capabilities, approvals, and remaining run budget are evaluated before side effects.
+6. **Dispatch**: ProtoLink executes a local tool, delegates to another agent, or accepts the final response.
+7. **Observation injection**: tool and agent results are appended through the provider-specific or provider-neutral history path.
+8. **Iteration**: the process repeats until `final` is produced or a guardrail stops the run.
 
 :::info[What streaming JSON means]
 
-Streaming JSON does not mean Protolink dispatches partial JSON fragments. It means the model streams ordinary text chunks that eventually form one complete JSON action object. Protolink forwards chunks to observers for UI feedback, buffers them internally, and validates the full JSON object only after the provider finishes the response.
+Streaming JSON does not mean ProtoLink dispatches incomplete JSON fragments. The model streams ordinary text chunks that eventually form one complete action object. ProtoLink can forward those chunks to observers, but it buffers and validates the complete object before executing anything.
 
 :::
-:::tip[Small model support]
 
-Ollama, llama.cpp, LM Studio, and OpenAI-compatible local servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model/server combination you know can reliably emit native tool calls.
+:::tip[Small-model support]
+
+Ollama, llama.cpp, LM Studio, and generic OpenAI-compatible servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model and chat-template combination that reliably emits native tool calls.
 
 :::
-### Inference Loop Safety Guardrails
 
-The `infer()` method implements multiple layers of safety guarantees to ensure robust, deterministic execution:
+### Inference-loop safety guardrails
 
-#### 1. Deduplication Detection
+The inference loop includes multiple layers of protection against unreliable model output and runaway execution.
 
-The runtime tracks recent actions using a sliding window (default: 5 actions). If the LLM produces an identical action (same tool/agent call with identical arguments), the runtime:
+#### 1. Deduplication detection
 
-- **Does not re-execute** the action
-- **Injects corrective guidance** into the conversation history
-- Prompts the LLM to proceed with its task or take a different action
+The runtime tracks a sliding window of recent action signatures. If the model requests an identical tool or agent action with identical arguments, ProtoLink:
 
-This prevents infinite loops where the LLM repeatedly calls the same tool expecting different results.
+- does not execute the duplicate;
+- injects corrective guidance into history; and
+- asks the model to use the existing observation, choose a different action, or finish.
 
-```
-# Example: LLM tries to call get_weather("Tokyo") twice in a row
-# Runtime detects the duplicate and injects:
-"You have already performed this action: tool_call. The result is in your context.
-Please proceed with your task - either produce a 'final' response or take a different action."
-```
+This prevents a model from repeatedly calling the same tool while expecting a different result.
 
-#### 2. Parse Failure Circuit Breaker
-
-Instead of consuming the entire step budget on parse failures, the runtime implements a circuit breaker:
-
-- **Tracks consecutive parse failures** (not total failures)
-- After **3 consecutive failures**, raises `RuntimeError` immediately
-- Each failure **injects corrective feedback** to help the LLM self-correct
-
-```python
-# After a parse failure, the runtime injects:
-"Your previous response could not be parsed as valid JSON. Error: {error}
-Please respond with a valid JSON object containing 'type' and required fields."
+```text
+You have already performed this action. The result is in your context.
+Proceed with the task: produce a final response or choose a different action.
 ```
 
-#### 3. Self-Correcting Error Recovery
+#### 2. Parse-failure circuit breaker
 
-Rather than failing immediately on validation errors, the runtime injects helpful context back to the LLM:
+JSON-mode parsing failures are recoverable at first. The runtime describes the exact parsing or validation error and lets the model try again. After three consecutive failures, it raises `RuntimeError` instead of consuming the full inference-step budget.
 
-| Error Type | Runtime Response |
+```text
+Your previous response could not be parsed as a valid action.
+Correct the reported fields and return exactly one supported action.
+```
+
+#### 3. Self-correcting error recovery
+
+Many model mistakes are observations, not immediate application failures:
+
+| Error type | Runtime response |
 |------------|------------------|
-| Unknown tool | Lists available tools |
-| Missing required fields | Shows expected JSON format |
-| Type errors (wrong args) | Prompts to check `input_schema` |
-| Agent not found | Provides the error message |
-| Invalid action type | Lists valid action types |
+| Unknown tool | Lists the tools that are actually available. |
+| Missing required fields | Returns field-level validation details. |
+| Wrong tool arguments | Explains the callable mismatch and asks the model to check the input schema. |
+| Agent not found | Reports the unavailable target and the known discovered agents. |
+| Invalid action type | Lists `final`, `tool_call`, and `agent_call`. |
 
-This approach allows the LLM to self-correct without consuming the entire step budget on recoverable errors.
+These failures normally remain inside `infer()` so the model can correct them. They surface as `RuntimeError` only when the correction circuit breaker or another unrecoverable boundary is reached.
 
-#### 4. Bounded Execution
+#### 4. Bounded execution
 
-A hard limit of `MAX_INFER_STEPS` (default: 10) prevents runaway execution:
+`MAX_INFER_STEPS` limits a run to ten model decisions. If the model never produces a final action, the method raises `RuntimeError` with diagnostic context instead of looping indefinitely.
 
-- If exceeded, raises `RuntimeError` with diagnostic information
-- The error message indicates the LLM may be stuck in a loop
-- Suggests simplifying the task or checking prompts
+:::tip[Debugging inference loops]
 
-:::tip[Debugging Inference Loops]
+If “maximum inference steps exceeded” appears frequently:
 
-If you encounter "Maximum inference steps exceeded" errors frequently:
-
-1. **Check your prompts**: Ensure clear instructions for when to produce `final` responses
-2. **Simplify the task**: Break complex tasks into smaller steps
-3. **Review tool schemas**: Ensure tools have clear descriptions and valid schemas
-4. **Enable logging**: Add logging to track LLM decisions at each step
+1. make the completion condition explicit in the system prompt;
+2. split a broad task into smaller agent or flow steps;
+3. improve tool names, descriptions, and input schemas;
+4. observe normalized inference events to inspect each decision; and
+5. verify that tool observations give the model enough information to finish.
 
 :::
-#### Tool Call Handling (`call_action`, `call_action_stream`, `_inject_tool_call`)
 
-Tool calls have two separate phases:
+### Tool-call handling
 
-1. **Action acquisition**: The adapter gets one model decision and returns `LLMActionResult`.
-2. **Observation injection**: After Protolink executes the tool, the adapter adds the result back to history so the model can continue.
+Tool use has two separate phases:
+
+1. **Action acquisition**: the adapter obtains one model decision and returns `LLMActionResult`.
+2. **Observation injection**: after ProtoLink executes the tool, the adapter adds the result to history so the model can continue.
 
 ```python
 def call_action(...) -> LLMActionResult:
@@ -586,62 +932,68 @@ def call_action(...) -> LLMActionResult:
 async def call_action_stream(...) -> LLMActionResult:
     """Return one validated action from a streaming inference step."""
 
-def _inject_tool_call(self, *, tool_name: str, tool_args: dict, tool_result: Any) -> None:
+def _inject_tool_call(
+    self,
+    *,
+    tool_name: str,
+    tool_args: dict,
+    tool_result: Any,
+) -> None:
     """Inject the runtime observation after a tool has executed."""
 ```
 
-The base implementation is intentionally portable: it asks the model for JSON, validates that JSON, executes the tool, and injects the result as a provider-neutral observation. Native adapters override the acquisition methods to consume provider tool events, but still return the same Protolink action objects to the loop.
+The base implementation asks for JSON, validates it, and injects a provider-neutral observation. Native adapters override action acquisition and observation injection where their API requires provider-specific tool-call IDs or message roles, but all paths converge before runtime dispatch.
 
-## Provider-Specific Action Modes
+### Provider-specific action modes
 
-| Provider | Non-Streaming `infer()` | Streaming `infer()` | Notes |
+| Provider | Non-streaming `infer()` | Streaming `infer()` | Notes |
 |----------|-------------------------|---------------------|-------|
-| OpenAI | Native Responses function tools | Native streamed function-call events | Uses real tool declarations and disables parallel tool calls so the runtime receives one action at a time. |
-| Anthropic | Native `tool_use` blocks | Native `input_json_delta` tool streams | Text deltas stream to observers; tool JSON is buffered until complete. |
-| Gemini | Native function declarations | Native streamed function-call parts | Function-call parts are normalized into Protolink actions. |
-| DeepSeek | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Can be disabled to use JSON mode. |
-| Grok | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Can be disabled to use JSON mode. |
-| Ollama | JSON mode by default; native tools only with `supports_tool_calling=True` | JSON stream by default; native tool stream only with `supports_tool_calling=True` | Keeps small/local model behavior simple unless the model is known to support tools. |
-| llama.cpp server/local | JSON mode by default; native tools only with `supports_tool_calling=True` | JSON stream by default; native tool stream only with `supports_tool_calling=True` | Depends on the model and chat template. |
-| LM Studio / OpenAI-compatible servers | JSON mode by default; native tools only with `supports_tool_calling=True` | JSON stream by default; native tool stream only with `supports_tool_calling=True` | Useful for vLLM, LocalAI, LM Studio, and custom servers. |
-| HuggingFace | JSON mode | JSON stream fallback when supported | Provider-native tool calling is not assumed. |
+| OpenAI | Native Responses function tools | Native streamed function-call events | Parallel tool calls are disabled so the runtime receives one action at a time. |
+| Anthropic | Native `tool_use` blocks | Native streamed `input_json_delta` tool input | Text deltas can reach observers while tool JSON is buffered until complete. |
+| Gemini | Native function declarations | Native streamed function-call parts | Function-call parts are normalized into ProtoLink actions. |
+| DeepSeek | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Set the flag to `False` to force JSON action mode. |
+| Grok | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Set the flag to `False` to force JSON action mode. |
+| Ollama | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Keeps small/local model behavior simple unless tool support is known to work. |
+| llama.cpp server/local | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Reliability depends on the selected model and chat template. |
+| LM Studio / OpenAI-compatible | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Covers LM Studio, vLLM, LocalAI, and compatible custom servers. |
+| Hugging Face | JSON fallback for non-streaming inference | Not currently usable | `call_stream()` currently yields an empty chunk, so streaming inference is unsupported. |
 
-### Prompt Selection
+### Prompt selection
 
-Protolink uses two prompt families:
+ProtoLink uses two prompt families:
 
-- **JSON prompt**: Describes `final`, `tool_call`, and `agent_call` JSON objects. This is the default compatibility path and is optimized for small/local model support.
-- **Native prompt**: Tells the model to use the provider tool interface. It does not include JSON action examples, so OpenAI, Anthropic, Gemini, and opted-in native providers are not given conflicting instructions.
+- **JSON prompt**: describes `final`, `tool_call`, and `agent_call` objects. It is the compatibility path for small and local models.
+- **Native prompt**: tells the model to use the provider tool interface. It intentionally omits JSON action examples so native providers do not receive two conflicting tool protocols.
 
-For streaming agent calls, Protolink chooses the prompt based on `supports_native_action_stream`:
+For streaming inference, prompt selection follows the adapter capability:
 
 ```python
 action_mode = "native" if llm.supports_native_action_stream else "json"
 ```
 
-This matters because native tool calls are not text. A provider may stream text deltas, function argument deltas, or SDK objects. `call_action_stream()` hides that provider shape and returns a single typed action to the infer loop.
+Native tool calls are not ordinary text. A provider may stream text deltas, function-argument fragments, or SDK objects. `call_action_stream()` hides those shapes and returns one complete typed action to the shared loop.
 
-### Agent Delegation Tools
+### Agent delegation tools
 
 Native providers receive synthetic delegation tools only when both conditions are true:
 
-- The current agent can dispatch agent calls.
-- Discovered agent cards are available.
+- the current runtime can dispatch agent calls; and
+- discovered agent cards provide valid targets.
 
-This avoids exposing a callable delegation surface with no valid targets. JSON mode still supports `agent_call` objects directly and can self-correct if delegation is unavailable.
+This avoids advertising a callable delegation interface that cannot succeed. JSON action mode can still produce an `agent_call`; if delegation is unavailable, the runtime injects corrective feedback instead of performing a side effect.
 
-## Design Rationale
+### Design rationale
 
-This layered design keeps the core runtime strict while avoiding unnecessary prompt complexity:
+The layered design keeps the runtime strict without making every provider use the same wire protocol:
 
 - `LLM.infer()` dispatches one typed action at a time.
 - Provider adapters own provider-specific request and stream parsing.
-- Small/local models keep the simple JSON protocol by default.
-- Native providers use native tools without seeing JSON action instructions.
-- Every path converges on the same `FinalAction`, `ToolCallAction`, and `AgentCallAction` models.
+- Small and local models keep a compact JSON protocol by default.
+- Native providers use their real tool API without receiving JSON tool instructions.
+- Every path converges on `FinalAction`, `ToolCallAction`, and `AgentCallAction`.
+- Policy, approval, cancellation, budgets, retries, events, and execution remain outside the model.
 
-
-#### Example Usage
+### Inference example
 
 ```python
 from protolink.llms.api import OpenAILLM
@@ -651,581 +1003,1498 @@ class WeatherTool(BaseTool):
     async def __call__(self, location: str) -> str:
         return f"The weather in {location} is sunny."
 
-llm = OpenAILLM(model="gpt-4o")
+llm = OpenAILLM(model="gpt-4o-mini")
 tools = {"weather": WeatherTool()}
 
-# Execute inference with tool calling
 result = await llm.infer(
     query="What's the weather in Tokyo?",
-    tools=tools
+    tools=tools,
 )
-print(result.content)  # "The weather in Tokyo is sunny."
+print(result.content)
 ```
 
-#### JSON Mode Response Format
+In JSON action mode, the intermediate model response must be exactly one supported object:
 
-When an adapter is using JSON action mode, the model must respond with one valid JSON object:
+```json
+{
+  "type": "tool_call",
+  "tool": "weather",
+  "args": {"location": "Tokyo"}
+}
+```
+
+After observing the tool result, the model completes with:
 
 ```json
 {
   "type": "final",
-  "content": "The capital of Greece is Athens."
+  "content": "The weather in Tokyo is sunny."
 }
 ```
 
+### LLM.infer
+
+<ApiReference
+  kind="async method"
+  path="protolink.llms.base.LLM.infer"
+  signature={`async infer(
+    *,
+    query: str,
+    tools: dict[str, BaseTool],
+    agent_callback: Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None = None,
+    agent_cards: list[Any] | None = None,
+    streaming: bool = False,
+    event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
+    cancellation_token: CancellationToken | None = None,
+    run_context: RunContext | dict[str, Any] | None = None,
+    budget_policy: BudgetPolicy | None = None,
+) -> Part`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L560"
+>
+
+Run the controlled multi-step inference loop used by `Agent`. The model declares typed intent; ProtoLink validates and executes tools or agent calls, feeds observations back to the model, and stops on a final action or safety limit.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM infer parameters">
+    <ApiField name="query" type="str" required>
+      User task added to the active conversation history.
+    </ApiField>
+    <ApiField name="tools" type="dict[str, BaseTool]" required>
+      Executable tools available during this run.
+    </ApiField>
+    <ApiField name="agent_callback" type="Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None" defaultValue="None">
+      Async dispatcher for delegated <code>tool_call</code> and <code>infer</code> actions. Without it, attempted delegation is returned to the model as corrective feedback.
+    </ApiField>
+    <ApiField name="agent_cards" type="list[Any] | None" defaultValue="None">
+      Discovered agents exposed to the model for delegation.
+    </ApiField>
+    <ApiField name="streaming" type="bool" defaultValue="False">
+      Acquire each model action from the streaming adapter path.
+    </ApiField>
+    <ApiField name="event_callback" type="Callable[[dict[str, Any]], Awaitable[None]] | None" defaultValue="None">
+      Async observer for normalized chunks, actions, tool events, delegation events, budget decisions, errors, and final output.
+    </ApiField>
+    <ApiField name="action_authorizer" type="Callable[[RunAction], Awaitable[ActionAuthorization]] | None" defaultValue="None">
+      Policy boundary invoked after validation and before any tool or delegated-agent side effect.
+    </ApiField>
+    <ApiField name="cancellation_token" type="CancellationToken | None" defaultValue="None">
+      Live token checked before provider calls and action dispatch.
+    </ApiField>
+    <ApiField name="run_context" type="RunContext | dict[str, Any] | None" defaultValue="None">
+      Correlation, session, and budget context for the run.
+    </ApiField>
+    <ApiField name="budget_policy" type="BudgetPolicy | None" defaultValue="None">
+      Allow, warn, or deny policy used by the built-in budget enforcer.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM infer return value">
+    <ApiField name="part" type="Part">
+      A part with type <code>infer_output</code> and the final user-facing content.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="LLM infer errors">
+    <ApiField name="RuntimeError">
+      Raised after three consecutive parse failures, after ten steps without a final action, or when an unrecoverable provider, tool, or delegated-agent failure is wrapped by the loop.
+    </ApiField>
+    <ApiField name="BudgetExceededError">
+      Raised when the configured run budget denies further work.
+    </ApiField>
+    <ApiField name="ApprovalRequiredError | ActionDeniedError">
+      Raised when runtime authorization requires approval or denies an action.
+    </ApiField>
+    <ApiField name="asyncio.CancelledError">
+      Raised when the run is cancelled.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Self-correction">
+  Unknown tools, malformed actions, missing agents, and argument mismatches are normally reported back to the model for correction. They do not usually escape from <code>infer()</code> as <code>ValueError</code>.
+</ApiCallout>
+
+<ApiSection title="Examples">
+
+```python
+result = await llm.infer(
+    query="Summarize the latest account balance.",
+    tools={"lookup_balance": lookup_balance_tool},
+)
+
+print(result.content)
+```
+
+</ApiSection>
+
+</ApiReference>
+
+### LLM.sync.infer
+
+<ApiReference
+  kind="method"
+  path="protolink.llms.base.SyncLLM.infer"
+  signature={`llm.sync.infer(
+    *,
+    query: str,
+    tools: dict[str, BaseTool],
+    agent_callback: Callable | None = None,
+    agent_cards: list[Any] | None = None,
+    streaming: bool = False,
+    event_callback: Callable | None = None,
+) -> Part`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1704"
+>
+
+Blocking wrapper around `LLM.infer()` for scripts and synchronous command-line programs.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="synchronous infer parameters">
+    <ApiField name="query" type="str" required>
+      User task passed to the asynchronous inference loop.
+    </ApiField>
+    <ApiField name="tools" type="dict[str, BaseTool]" required>
+      Tools available during inference.
+    </ApiField>
+    <ApiField name="agent_callback" type="Callable | None" defaultValue="None">
+      Optional async agent dispatcher.
+    </ApiField>
+    <ApiField name="agent_cards" type="list[Any] | None" defaultValue="None">
+      Discovered agents available for delegation.
+    </ApiField>
+    <ApiField name="streaming" type="bool" defaultValue="False">
+      Use the underlying streaming action path.
+    </ApiField>
+    <ApiField name="event_callback" type="Callable | None" defaultValue="None">
+      Optional async event observer.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="synchronous infer return value">
+    <ApiField name="part" type="Part">
+      Final <code>infer_output</code> part.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Event loops">
+  This wrapper uses <code>asyncio.run()</code>. Do not call it from FastAPI handlers, asynchronous notebook cells, or any other active event loop; await <code>llm.infer()</code> there instead.
+</ApiCallout>
+
+</ApiReference>
+
+### LLM.use_history
+
+<ApiReference
+  kind="context manager"
+  path="protolink.llms.base.LLM.use_history"
+  signature={`use_history(
+    history: ConversationHistory,
+) -> ContextManager[ConversationHistory]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L291"
+>
+
+Temporarily bind a conversation history to the current execution context. The binding uses `contextvars`, so concurrent asyncio tasks can share one LLM instance without sharing mutable messages.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM use history parameters">
+    <ApiField name="history" type="ConversationHistory" required>
+      History returned by <code>llm.history</code> inside the context.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Yields">
+  <ApiFields ariaLabel="LLM use history yield value">
+    <ApiField name="history" type="ConversationHistory">
+      The same object supplied by the caller.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="LLM use history errors">
+    <ApiField name="TypeError">
+      Raised when <code>history</code> is not a <code>ConversationHistory</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
+
+```python
+from protolink.llms.history import ConversationHistory
+
+customer_history = ConversationHistory("You support account customer-42.")
+
+with llm.use_history(customer_history):
+    response = llm.chat("What do you remember about this account?")
+```
+
+</ApiSection>
+
+</ApiReference>
+
+### LLM.compact_history {#history-compaction}
+
+<ApiReference
+  kind="method"
+  path="protolink.llms.base.LLM.compact_history"
+  signature={`compact_history(
+    strategy: Literal["recent", "tokens", "summary"] = "recent",
+    *,
+    max_messages: int = 20,
+    max_tokens: int = 4000,
+    preserve_recent: int = 6,
+    summary_max_tokens: int = 512,
+) -> HistoryCompactionResult`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L370"
+>
+
+Compact the active history in place. `recent` and `tokens` are local operations; `summary` makes one isolated synchronous model call before replacing older messages.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM compact history parameters">
+    <ApiField name="strategy" type={'"recent" | "tokens" | "summary"'} defaultValue={'"recent"'}>
+      <code>recent</code> retains a message window, <code>tokens</code> retains the newest suffix near a soft estimated-token ceiling, and <code>summary</code> replaces older messages with model-generated durable context.
+    </ApiField>
+    <ApiField name="max_messages" type="int" defaultValue="20">
+      Maximum retained messages for the <code>recent</code> strategy, including a leading system prompt.
+    </ApiField>
+    <ApiField name="max_tokens" type="int" defaultValue="4000">
+      Soft estimated-token ceiling for the <code>tokens</code> strategy. Protected messages may exceed it.
+    </ApiField>
+    <ApiField name="preserve_recent" type="int" defaultValue="6">
+      Newest non-system messages protected by <code>tokens</code> and <code>summary</code>.
+    </ApiField>
+    <ApiField name="summary_max_tokens" type="int" defaultValue="512">
+      Requested maximum length of a generated summary.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM compact history return value">
+    <ApiField name="report" type="HistoryCompactionResult">
+      Before/after message counts, estimated token counts, removed-message count, selected strategy, and whether a summary was created.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="LLM compact history errors">
+    <ApiField name="ValueError">
+      Raised for an unknown strategy, invalid limits, or an empty summary result.
+    </ApiField>
+    <ApiField name="provider error">
+      Errors from the isolated summary call propagate when <code>strategy="summary"</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Equivalent API">
+  <code>llm.compactor.compact(...)</code> has the same signature and behavior.
+</ApiCallout>
+
+<ApiSection title="Examples">
+
+```python
+report = llm.compact_history("recent", max_messages=20)
+report = llm.compact_history("tokens", max_tokens=8_000, preserve_recent=6)
+report = llm.compact_history("summary", preserve_recent=8, summary_max_tokens=600)
+
+print(report.to_dict())
+```
+
+</ApiSection>
+
+</ApiReference>
+
+### LLM.configure_metrics
+
+<ApiReference
+  kind="method"
+  path="protolink.llms.base.LLM.configure_metrics"
+  signature={`configure_metrics(
+    profile: LLMModelProfile | dict[str, Any] | None = None,
+    *,
+    context_window: int | None = None,
+    input_cost_per_million: float | None = None,
+    output_cost_per_million: float | None = None,
+    currency: str = "USD",
+    enabled: bool = True,
+) -> LLM`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L313"
+>
+
+Attach application-owned model limits and prices used for observational inference metrics.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM configure metrics parameters">
+    <ApiField name="profile" type="LLMModelProfile | dict[str, Any] | None" defaultValue="None">
+      Complete profile object or equivalent mapping. When supplied, it takes precedence and the individual context/cost arguments are ignored.
+    </ApiField>
+    <ApiField name="context_window" type="int | None" defaultValue="None">
+      Model context window used to calculate pressure and remaining-token estimates.
+    </ApiField>
+    <ApiField name="input_cost_per_million" type="float | None" defaultValue="None">
+      Input-token price per one million tokens.
+    </ApiField>
+    <ApiField name="output_cost_per_million" type="float | None" defaultValue="None">
+      Output-token price per one million tokens.
+    </ApiField>
+    <ApiField name="currency" type="str" defaultValue={'"USD"'}>
+      Currency label attached to calculated costs.
+    </ApiField>
+    <ApiField name="enabled" type="bool" defaultValue="True">
+      Whether inference may emit metrics events.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM configure metrics return value">
+    <ApiField name="self" type="LLM">
+      The same LLM instance for fluent configuration.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Observational only">
+  Metrics do not change provider payloads, retry behavior, or responses. They are emitted by <code>infer()</code> when an event observer or telemetry backend is attached.
+</ApiCallout>
+
+</ApiReference>
+
+## Prompt architecture
+
+ProtoLink keeps its prompt families in `protolink/llms/prompts` and chooses between them according to the action-acquisition mode. The runtime deliberately avoids giving a model two tool-calling contracts at once.
+
+### The system-prompt blueprint
+
+`LLM.build_system_prompt()` assembles the prompt used by `infer()`. In JSON mode it describes the portable action objects. In native mode it tells the model to use the provider tool interface and leaves function-call syntax to the backend SDK or API.
+
+By default, building a prompt resets history to the new system message. Passing `persist=True` updates the system message while retaining the rest of the current conversation, which is essential for long-lived sessions.
+
+The final prompt is composed from:
+
+1. **Base instructions**
+    - Define the model's role inside a deterministic runtime.
+    - Make it clear that the model requests actions rather than pretending to execute them.
+    - Select `BASE_SYSTEM_PROMPT` for JSON mode or `NATIVE_SYSTEM_PROMPT` for native mode.
+
+2. **Tool instructions**
+    - JSON mode injects the available tool descriptions and the `tool_call` object format.
+    - Native mode adds a short instruction to use the provider tool interface; concrete schemas travel in the provider request.
+
+3. **Agent capabilities**
+    - JSON mode describes the `agent_call` object and discovered targets.
+    - Native mode exposes synthetic delegation functions only when dispatch is available and agent cards exist.
+
+4. **Flow context**
+    - Pipelines, routers, and graphs can inject topology-aware instructions for the current step.
+    - The model receives only the semantic context it needs for the active flow position.
+
+5. **Application instructions**
+    - Your domain-specific prompt, such as “You are a coding assistant.”
+    - Appended to the shared runtime rules unless `override_system_prompt=True`.
+
+### Reasoning versus execution
+
+When `infer()` runs, the prompt makes the LLM a reasoning and action-selection engine while ProtoLink remains the executor:
+
+1. **Input**: the model receives the task, history, tools, agents, and relevant flow context.
+2. **Selection**: it chooses `final`, `tool_call`, or `agent_call`.
+3. **Structured output**: it returns JSON or uses the provider-native tool channel.
+4. **Validation**: ProtoLink converts the result into a typed action.
+5. **Execution**: the runtime applies policy and performs the actual Python call or agent dispatch.
+6. **Observation**: the result is returned to the model for its next decision.
+
 ```json
 {
-  "type": "tool_call", 
-  "tool": "weather",
+  "type": "tool_call",
+  "tool": "get_weather",
   "args": {"location": "Geneva"}
 }
 ```
 
-### Prompt Architecture
+This separation of reasoning from execution is what allows one inference loop to support hosted APIs, local servers, and in-process models without handing runtime authority to untrusted model output.
 
-Protolink uses prompt families in `protolink/llms/prompts` to match the action acquisition mode. The runtime deliberately avoids giving the model two tool-calling contracts at once.
+### LLM.build_system_prompt
 
-#### The System Prompt Blueprint
+<ApiReference
+  kind="method"
+  path="protolink.llms.base.LLM.build_system_prompt"
+  signature={`build_system_prompt(
+    user_instructions: str | None = None,
+    agent_cards: str | None = None,
+    tools: str | None = None,
+    *,
+    action_mode: Literal["json", "native"] | None = None,
+    flow_instructions: str | None = None,
+    override_system_prompt: bool = False,
+    persist: bool = False,
+    agent_name: str | None = None,
+) -> str`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1530"
+>
 
-The `LLM.build_system_prompt()` method dynamically assembles the prompt used by `infer()`. In JSON mode it describes the portable action objects. In native mode it tells the model to use the provider tool interface and leaves the function-call syntax to the backend SDK/API.
+Build and store the complete runtime system prompt from base instructions, action mode, tools, discovered agents, flow context, and application instructions.
 
-By default, this method calls `reset_to_system(self, new_system_prompt: str)` which clears the history. However, when using the **`persist=True`** flag, it calls `set_system()`, which updates the instructions while keeping the conversation history intact, which is essential for persistent sessions.
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM build system prompt parameters">
+    <ApiField name="user_instructions" type="str | None" defaultValue="None">
+      Application instructions appended to the shared runtime prompt, or used as the complete prompt when <code>override_system_prompt=True</code>.
+    </ApiField>
+    <ApiField name="agent_cards" type="str | None" defaultValue="None">
+      Serialized discovered-agent descriptions used for delegation guidance.
+    </ApiField>
+    <ApiField name="tools" type="str | None" defaultValue="None">
+      Serialized tool descriptions used by the selected action prompt.
+    </ApiField>
+    <ApiField name="action_mode" type={'"json" | "native" | None'} defaultValue="None">
+      Explicit action acquisition mode. When omitted, the adapter’s <code>uses_native_action_prompt</code> property selects the mode.
+    </ApiField>
+    <ApiField name="flow_instructions" type="str | None" defaultValue="None">
+      Optional pipeline, router, or graph context.
+    </ApiField>
+    <ApiField name="override_system_prompt" type="bool" defaultValue="False">
+      Replace the shared runtime template with <code>user_instructions</code>.
+    </ApiField>
+    <ApiField name="persist" type="bool" defaultValue="False">
+      Preserve non-system history while updating the system message. The default clears history and resets it to the newly built system prompt.
+    </ApiField>
+    <ApiField name="agent_name" type="str | None" defaultValue="None">
+      Current registered agent name used to prohibit self-delegation.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-It is composed of several key components:
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM build system prompt return value">
+    <ApiField name="prompt" type="str">
+      The assembled prompt, also stored on <code>llm.system_prompt</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-1. **Base Instructions**:
-    - Define the agent's role inside a deterministic runtime.
-    - Prohibit the LLM from pretending to execute actions itself.
-    - Use either `BASE_SYSTEM_PROMPT` for JSON mode or `NATIVE_SYSTEM_PROMPT` for native mode.
+<ApiCallout label="History mutation">
+  With <code>persist=False</code>, this method removes existing conversation turns. Use <code>persist=True</code> to retain them.
+</ApiCallout>
 
-2. **Tool Instructions**:
-    - JSON mode injects `TOOL_CALL_PROMPT` with available tool schemas and the `tool_call` JSON format.
-    - Native mode injects a short instruction to use the provider tool interface; concrete schemas are sent through the provider API.
+</ApiReference>
 
-3. **Agent Capabilities**:
-    - JSON mode injects `AGENT_LIST_PROMPT` with the `agent_call` JSON format.
-    - Native mode exposes synthetic delegation tools only when discovered agents are available.
+### LLM.set_system_prompt
 
-4. **Semantic Context Injection**:
-    - Injected automatically when the Agent is executing inside a Flow (`Pipeline`, `Router`, `Graph`).
-    - Provides downstream topology awareness for the current flow step.
+<ApiReference
+  kind="method"
+  path="protolink.llms.base.LLM.set_system_prompt"
+  signature={`set_system_prompt(
+    system_prompt: str,
+) -> None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1649"
+>
 
-5. **User Instructions**:
-    - Your specific customization (e.g., "You are a coding assistant").
-    - Appended to guide the task domain.
+Assign a new value to `llm.system_prompt`.
 
-#### How It Works
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLM set system prompt parameters">
+    <ApiField name="system_prompt" type="str" required>
+      Replacement prompt string.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-When `infer()` is called, the prompt ensures the LLM acts as a reasoning engine while Protolink remains the executor.
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM set system prompt return value">
+    <ApiField name="None" type="None">
+      This method mutates the adapter.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-1.  **Input**: The LLM receives the Task context.
-2.  **Action Selection**: The model chooses a valid action: `final`, `tool_call`, or `agent_call`.
-3.  **Structured Output**: JSON mode returns a JSON object; native mode returns a provider tool call or final text.
-    ```json
-    { "type": "tool_call", "tool": "get_weather", "args": { ... } }
-    ```
-4.  **Runtime Execution**: Protolink validates the action, executes the real Python code or agent dispatch, and feeds the result back to the LLM.
+<ApiCallout label="Important">
+  This setter does not rewrite the system message already stored in <code>llm.history</code>. Use <code>build_system_prompt(..., override_system_prompt=True)</code> when history and prompt state must be updated together.
+</ApiCallout>
 
-This separation of **Reasoning (LLM)** and **Execution (Runtime)** is what allows Protolink to stay provider-agnostic while still using native provider tools where they are reliable.
+</ApiReference>
 
-## API-based LLMs
+### LLM.validate_connection
 
-API-based LLMs connect to external services and require API keys or authentication.
+<ApiReference
+  kind="abstract method"
+  path="protolink.llms.base.LLM.validate_connection"
+  signature={`validate_connection() -> bool`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1623"
+>
 
-### Available API LLMs
+Check whether the provider client, server, or local model can respond.
 
-| Provider | Class | Default Model | API Key Env Var |
-|----------|-------|---------------|----------------|
-| OpenAI | `OpenAILLM` | `gpt-4o-mini` | `OPENAI_API_KEY` |
-| Anthropic | `AnthropicLLM` | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
-| Google Gemini | `GeminiLLM` | `gemini-3-flash-preview` | `GEMINI_API_KEY` |
-| DeepSeek | `DeepSeekLLM` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
-| Grok | `GrokLLM` | `grok-4-latest` | `XAI_API_KEY` or `GROK_API_KEY` |
-| HuggingFace | `HuggingFaceLLM` | Explicit `model` required | `HF_API_TOKEN` |
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="LLM validate connection return value">
+    <ApiField name="connected" type="bool">
+      <code>True</code> when adapter-specific validation succeeds; otherwise usually <code>False</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Construction">
+  Current concrete adapters already call validation during initialization. Most implementations catch validation failures, log them, and return <code>False</code> rather than failing construction.
+</ApiCallout>
+
+</ApiReference>
+
+## API providers
+
+Hosted-provider adapters read credentials from their conventional environment variable when `api_key` is omitted. They all implement direct `call()`, `call_stream()`, and `validate_connection()` methods and inherit `chat()`, history management, compaction, metrics, and the controlled `infer()` loop.
+
+OpenAI, Anthropic, and Gemini always acquire actions through their provider-native function interface. DeepSeek and Grok use native Chat Completions tools by default but can be forced into portable JSON mode. Hugging Face currently supports non-streaming text generation only, so it is best suited to direct `call()` or `chat(..., streaming=False)` usage.
+
+- **OpenAI** - `OpenAILLM`, default model `gpt-4o-mini`, credential `OPENAI_API_KEY`.
+- **Anthropic** - `AnthropicLLM`, default model `claude-sonnet-4-20250514`, credential `ANTHROPIC_API_KEY`.
+- **Google Gemini** - `GeminiLLM`, default model `gemini-3-flash-preview`, credential `GEMINI_API_KEY`.
+- **DeepSeek** - `DeepSeekLLM`, default model `deepseek-chat`, credential `DEEPSEEK_API_KEY`.
+- **Grok** - `GrokLLM`, default model `grok-4-latest`, credential `XAI_API_KEY` or `GROK_API_KEY`.
+- **Hugging Face** - `HuggingFaceLLM`, explicit model recommended, credential `HF_API_TOKEN`.
 
 ### OpenAILLM
 
-OpenAI API implementation using the official OpenAI client.
+<ApiReference
+  kind="class"
+  path="protolink.llms.api.OpenAILLM"
+  signature={`class OpenAILLM(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    base_url: str | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py#L25"
+>
 
-#### Constructor
+OpenAI Responses API adapter with native function tools and native streamed tool-call events. Use it for the official OpenAI service or for a custom `base_url` that implements the Responses API—not merely Chat Completions.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `api_key` | `str ⎪ None` | `None` | OpenAI API key. Uses `OPENAI_API_KEY` env var if not provided. |
-| `model` | `str ⎪ None` | `"gpt-4o-mini"` | OpenAI model name. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
-| `base_url` | `str ⎪ None` | `None` | Custom base URL for OpenAI-compatible APIs. |
+Direct calls translate `ConversationHistory` into Responses input and extract text from the returned response. In inference mode, real function declarations are sent to the provider, parallel tool calls are disabled, and returned function calls are normalized into ProtoLink actions before the runtime executes them. Streaming follows the same contract while forwarding text deltas and buffering function arguments until they form one complete action.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="OpenAILLM parameters">
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      OpenAI API key. Falls back to <code>OPENAI_API_KEY</code>.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Model identifier. <code>None</code> resolves to <code>gpt-4o-mini</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=1.0</code>, <code>top_p=1.0</code>, <code>top_logprobs=None</code>, and <code>truncation="disabled"</code>.
+    </ApiField>
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Optional OpenAI client base URL. The endpoint must implement the Responses API; use <code>OpenAICompatibleLLM</code> for Chat Completions-only servers.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="OpenAILLM errors">
+    <ApiField name="ImportError">
+      Raised when the OpenAI SDK is not installed.
+    </ApiField>
+    <ApiField name="OpenAI client error">
+      Missing credentials and request errors originate from the SDK.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
 
 ```python
 from protolink.llms.api import OpenAILLM
 
-# Basic usage
-llm = OpenAILLM(model="gpt-4o")
-
-# With custom parameters
 llm = OpenAILLM(
-    model="gpt-4o",
-    model_params={
-        "temperature": 0.7,
-        "max_tokens": 1000,
-        "top_p": 0.9
-    }
-)
-
-# With custom base URL (for OpenAI-compatible APIs)
-llm = OpenAILLM(
-    model="custom-model",
-    base_url="https://api.custom-provider.com/v1",
-    api_key="your-api-key"
+    model="gpt-4o-mini",
+    model_params={"temperature": 0.3, "max_output_tokens": 800},
 )
 ```
 
-#### Default Model Parameters
+</ApiSection>
 
-| Parameter | Type | Default | Range/Description |
-|-----------|-----|---------|-------------------|
-| `temperature` | `float` | `1.0` | `0.0` to `2.0` - Controls randomness |
-| `top_p` | `float` | `1.0` | Nucleus sampling parameter |
-| `max_tokens` | `int ⎪ None` | `None` | Maximum tokens to generate |
-| `presence_penalty` | `float` | `0.0` | `-2.0` to `2.0` - Presence penalty |
-| `frequency_penalty` | `float` | `0.0` | `-2.0` to `2.0` - Frequency penalty |
+</ApiReference>
 
 ### AnthropicLLM
 
-Anthropic Claude API implementation using the official Anthropic client.
+<ApiReference
+  kind="class"
+  path="protolink.llms.api.AnthropicLLM"
+  signature={`class AnthropicLLM(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    base_url: str | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py#L26"
+>
 
-#### Constructor
+Anthropic Messages API adapter with native `tool_use` actions and streamed tool-input deltas. The adapter separates the system prompt from conversational messages, converts ProtoLink tools to Anthropic tool schemas, and keeps the provider's tool-use identifier in action metadata.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `api_key` | `str ⎪ None` | `None` | Anthropic API key. Uses `ANTHROPIC_API_KEY` env var if not provided. |
-| `model` | `str ⎪ None` | `"claude-sonnet-4-20250514"` | Claude model name. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
-| `base_url` | `str ⎪ None` | `None` | Custom base URL for Anthropic-compatible APIs. |
+After ProtoLink executes a requested tool, the adapter uses that identifier to inject the observation in the shape expected by the Messages API. Both streaming and non-streaming inference therefore share the same public `LLMActionResult` even though Anthropic's wire representation differs from OpenAI's.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="AnthropicLLM parameters">
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      Anthropic API key. Falls back to <code>ANTHROPIC_API_KEY</code>.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Claude model identifier. <code>None</code> resolves to <code>claude-sonnet-4-20250514</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=1.0</code>, <code>top_p=1.0</code>, and <code>max_tokens=1024</code>.
+    </ApiField>
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Optional Anthropic-compatible API base URL passed to the SDK.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
 
 ```python
 from protolink.llms.api import AnthropicLLM
 
-# Basic usage
-llm = AnthropicLLM(model="claude-sonnet-4-20250514")
-
-# With custom parameters
 llm = AnthropicLLM(
-    model="claude-3-5-haiku-20241022",
-    model_params={
-        "temperature": 0.5,
-        "max_tokens": 2000,
-        "top_p": 0.8
-    }
+    model="claude-sonnet-4-20250514",
+    model_params={"max_tokens": 2048},
 )
 ```
 
-#### Default Model Parameters
+</ApiSection>
 
-| Parameter | Type | Default | Range/Description |
-|-----------|-----|---------|-------------------|
-| `max_tokens` | `int` | `8192` | Maximum tokens to generate |
-| `temperature` | `float` | `1.0` | `0.0` to `1.0` - Controls randomness |
-| `top_p` | `float` | `1.0` | Nucleus sampling parameter |
-| `top_k` | `int ⎪ None` | `None` | Top-k sampling parameter |
+</ApiReference>
 
 ### GeminiLLM
 
-Google Gemini API implementation.
+<ApiReference
+  kind="class"
+  path="protolink.llms.api.GeminiLLM"
+  signature={`class GeminiLLM(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    base_url: str | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/gemini_client.py#L24"
+>
 
-#### Constructor
+Google GenAI adapter with native function declarations and native streamed actions. It converts conversation messages and tool schemas into Google GenAI content, generation configuration, and function declarations.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `api_key` | `str ⎪ None` | `None` | Google API key. Uses `GEMINI_API_KEY` env var if not provided. |
-| `model` | `str ⎪ None` | `"gemini-3-flash-preview"` | Gemini model name. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+Function-call parts are normalized into `ToolCallAction` or `AgentCallAction` before dispatch. Text-only responses become final actions, so application and Agent code sees the same result types used by every other provider.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="GeminiLLM parameters">
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      Google API key. Falls back to <code>GEMINI_API_KEY</code>.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Gemini model identifier. <code>None</code> resolves to <code>gemini-3-flash-preview</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Generation configuration merged over <code>temperature=1.0</code> and <code>top_p=1.0</code>.
+    </ApiField>
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Stored by the shared API base class. The current Gemini client does not forward this value to <code>genai.Client</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
+
+```python
+from protolink.llms.api import GeminiLLM
+
+llm = GeminiLLM(model="gemini-3-flash-preview")
+```
+
+</ApiSection>
+
+</ApiReference>
 
 ### DeepSeekLLM
 
-DeepSeek API implementation.
+<ApiReference
+  kind="class"
+  path="protolink.llms.api.DeepSeekLLM"
+  signature={`class DeepSeekLLM(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    base_url: str | None = "https://api.deepseek.com",
+    supports_tool_calling: bool = True,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/deepseek_client.py#L27"
+>
 
-#### Constructor
+DeepSeek Chat Completions adapter implemented through the OpenAI SDK with DeepSeek's API root. It supports ordinary text calls, incremental content streams, native Chat Completions tool calls, and streamed tool-argument deltas.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `api_key` | `str ⎪ None` | `None` | DeepSeek API key. Uses `DEEPSEEK_API_KEY` env var if not provided. |
-| `model` | `str ⎪ None` | `"deepseek-chat"` | DeepSeek model name. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
-| `base_url` | `str ⎪ None` | `"https://api.deepseek.com"` | DeepSeek-compatible base URL. |
-| `supports_tool_calling` | `bool` | `True` | Whether to use native Chat Completions tool calls and streamed tool deltas. Set to `False` to force JSON mode. |
+Native action acquisition is enabled by default. Set `supports_tool_calling=False` when the selected model behaves more reliably with ProtoLink's JSON action prompt; the surrounding inference loop, tool execution, and return types remain unchanged.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="DeepSeekLLM parameters">
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      DeepSeek API key. Falls back to <code>DEEPSEEK_API_KEY</code>.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Model identifier. <code>None</code> resolves to <code>deepseek-chat</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=1.0</code> and <code>top_p=1.0</code>.
+    </ApiField>
+    <ApiField name="base_url" type="str | None" defaultValue={'"https://api.deepseek.com"'}>
+      DeepSeek-compatible API root.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="True">
+      Use native Chat Completions tools. Set to <code>False</code> to force the portable JSON action fallback.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
+
+```python
+from protolink.llms.api import DeepSeekLLM
+
+llm = DeepSeekLLM(model="deepseek-chat")
+```
+
+</ApiSection>
+
+</ApiReference>
 
 ### GrokLLM
 
-xAI Grok API implementation.
+<ApiReference
+  kind="class"
+  path="protolink.llms.api.GrokLLM"
+  signature={`class GrokLLM(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    base_url: str | None = None,
+    supports_tool_calling: bool = True,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/grok_client.py#L31"
+>
 
-#### Constructor
+xAI Chat Completions adapter using direct synchronous and asynchronous HTTP clients. It builds OpenAI-style message and tool payloads, parses content or tool calls, and normalizes usage metadata when the response includes it.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `api_key` | `str ⎪ None` | `None` | xAI API key. Uses `XAI_API_KEY` or `GROK_API_KEY` if not provided. |
-| `model` | `str ⎪ None` | `"grok-4-latest"` | Grok model name. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
-| `base_url` | `str ⎪ None` | `"https://api.x.ai/v1"` | xAI-compatible base URL. |
-| `supports_tool_calling` | `bool` | `True` | Whether to use native Chat Completions tool calls and streamed tool deltas. Set to `False` to force JSON mode. |
+Native tools and streamed tool deltas are enabled by default. Disable `supports_tool_calling` to use the portable JSON action protocol with a model or endpoint that cannot reliably follow the native function format.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="GrokLLM parameters">
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      xAI key. Falls back to <code>XAI_API_KEY</code>, then <code>GROK_API_KEY</code>.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Model identifier. <code>None</code> resolves to <code>grok-4-latest</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=1.0</code>.
+    </ApiField>
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      API root. <code>None</code> resolves to <code>https://api.x.ai/v1</code>.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="True">
+      Use native tool calls and streamed tool deltas. Set to <code>False</code> for JSON action mode.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
+
+```python
+from protolink.llms.api import GrokLLM
+
+llm = GrokLLM(model="grok-4-latest")
+```
+
+</ApiSection>
+
+</ApiReference>
 
 ### HuggingFaceLLM
 
-HuggingFace Inference API implementation.
+<ApiReference
+  kind="class"
+  path="protolink.llms.api.HuggingFaceLLM"
+  signature={`class HuggingFaceLLM(
+    *,
+    api_key: str | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/hugging_face_client.py#L16"
+>
 
-#### Constructor
+Hugging Face Inference API adapter for non-streaming direct calls. It is useful when a hosted Hub model is available through the inference service and you want that model behind the same `LLM` interface.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `api_key` | `str ⎪ None` | `None` | HuggingFace API token. Uses `HF_API_TOKEN` env var if not provided. |
-| `model` | `str ⎪ None` | `""` | HuggingFace model name. Pass a concrete model id for production use. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, max_tokens, etc.). |
+Pass an explicit Hub model identifier. The current adapter does not implement a usable text stream or provider-native actions, and only part of `model_params` is forwarded by `call()`, so choose another adapter when streaming or agent tool loops are required.
 
-:::warning[Model Availability]
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="HuggingFaceLLM parameters">
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      Hugging Face token. Falls back to <code>HF_API_TOKEN</code>.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Hub model identifier. The effective built-in default is an empty string, so pass an explicit model for normal use.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>max_new_tokens=512</code>, <code>temperature=1.0</code>, <code>top_p=1.0</code>, and <code>repetition_penalty=1.0</code>. The current <code>call()</code> path forwards only <code>temperature</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-Not all HuggingFace models are available through the Inference API. Use models that are explicitly supported for inference.
+<ApiCallout label="Streaming limitation">
+  <code>HuggingFaceLLM.call_stream()</code> is not implemented yet and currently yields one empty string. Do not use <code>chat(..., streaming=True)</code> or <code>infer(streaming=True)</code> with this adapter.
+</ApiCallout>
 
-:::
-## Server-based LLMs
+<ApiSection title="Examples">
 
-Server-based LLMs connect to local or remote LLM servers.
+```python
+from protolink.llms.api import HuggingFaceLLM
 
-### ServerLLM Base Class
+llm = HuggingFaceLLM(model="your-org/your-chat-model")
+```
 
-Base class for all server-based LLM implementations.
+</ApiSection>
 
-#### Constructor
+</ApiReference>
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `base_url` | `str` | - | **Required.** URL of the LLM server. |
-| `model` | `str` | - | **Required.** Model identifier understood by the server. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Optional model parameters. |
-| `supports_tool_calling` | `bool` | `False` | Whether this server/model combination supports tool calling. |
+## Server providers
 
-#### Methods
+Server adapters connect to a model process over HTTP, whether that process runs on the same machine or on remote infrastructure. The server owns model loading and hardware resources; the ProtoLink adapter owns history serialization, request construction, streaming, action normalization, connection validation, and integration with the shared inference loop.
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `set_model_params()` | `model_params: dict[str, Any]` | `None` | Update existing model parameters, ignoring invalid keys. |
-| `set_system_prompt()` | `system_prompt: str` | `None` | Set the system prompt for the model. |
-| `validate_connection()` | - | `bool` | Validate that the server is reachable. |
+All server adapters inherit from `ServerLLM`. Their common configuration consists of a server URL, a model identifier understood by that server, optional generation parameters, and a `supports_tool_calling` capability flag. Native tool calling is opt-in because protocol compatibility alone does not guarantee that the selected model and chat template can use tools reliably.
+
+The inherited `model_params` property can be replaced with a dictionary, `set_system_prompt()` updates the adapter's prompt value, and each concrete provider implements `call()`, `call_stream()`, and `validate_connection()` for its endpoint.
 
 ### OllamaLLM
 
-Ollama server implementation for connecting to local or remote Ollama instances.
+<ApiReference
+  kind="class"
+  path="protolink.llms.server.OllamaLLM"
+  signature={`class OllamaLLM(
+    *,
+    base_url: str | None = None,
+    headers: dict[str, str] | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    supports_tool_calling: bool = False,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/ollama_client.py#L27"
+>
 
-#### Constructor
+Client for Ollama's `/api/chat` endpoint. It serializes `ConversationHistory` into Ollama messages and supports ordinary responses, streamed chunks, usage normalization, and optional native tool events.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `base_url` | `str ⎪ None` | `None` | Ollama server URL. If not provided, uses the `OLLAMA_URL` environment variable. |
-| `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers (including auth). |
-| `model` | `str ⎪ None` | `"gemma4:e4b"` | Ollama model name. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, etc.). |
-| `supports_tool_calling` | `bool` | `False` | Whether this model/server should use native Ollama tool calling. Defaults to JSON mode for small-model reliability. |
+JSON action mode is the default because local-model tool reliability depends on both the model and its template. Set `supports_tool_calling=True` only after verifying that the selected Ollama model produces correct native tool calls; direct `chat()` and `call()` usage does not require that flag.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="OllamaLLM parameters">
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Ollama server root. Falls back to <code>OLLAMA_URL</code>; if neither is supplied, construction raises <code>ValueError</code>.
+    </ApiField>
+    <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
+      Accepted by the constructor, but the current request path does not forward custom headers.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Ollama model name. <code>None</code> resolves to <code>gemma4:e4b</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=1.0</code>, <code>num_predict=8192</code>, and <code>num_ctx=8192</code>.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
+      Opt into native Ollama tools. The default uses JSON action mode.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="OllamaLLM errors">
+    <ApiField name="ValueError">
+      Raised for a missing base URL, unsupported URL scheme, missing hostname, or unavailable client during a call.
+    </ApiField>
+    <ApiField name="RuntimeError">
+      Raised for non-success Ollama responses or malformed response payloads.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
 
 ```python
 from protolink.llms.server import OllamaLLM
 
-# Local Ollama server
 llm = OllamaLLM(
     base_url="http://localhost:11434",
-    model="llama3"
+    model="qwen3",
 )
-
-# Remote Ollama with authentication
-llm = OllamaLLM(
-    base_url="https://ollama.example.com",
-    headers={"Authorization": "Bearer your-token"},
-    model="codellama"
-)
-
-# Using environment variables
-# Set OLLAMA_URL=http://localhost:11434 or pass directly
-llm = OllamaLLM(model="mistral", base_url="http://localhost:11434")
 ```
 
-#### Default Model Parameters
+</ApiSection>
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `temperature` | `float` | `1.0` | Controls randomness (range depends on model). |
+</ApiReference>
 
-#### Methods
-
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `call()` | `history: ConversationHistory` | `str` | Generate a single response using Ollama's API. |
-| `call_stream()` | `history: ConversationHistory` | `AsyncIterator[str]` | Generate a streaming response, yielding text chunks. |
-| `validate_connection()` | - | `bool` | Check if Ollama server is reachable and has models available. |
-
-:::note[Ollama Server Required]
-
-OllamaLLM requires a running Ollama server. Install Ollama and start it with `ollama serve`.
-
-:::
 ### LlamaCPPServerLLM
 
-Llama.cpp server implementation for communicating directly with `llama-server`.
+<ApiReference
+  kind="class"
+  path="protolink.llms.server.LlamaCPPServerLLM"
+  signature={`class LlamaCPPServerLLM(
+    *,
+    base_url: str | None = None,
+    headers: dict[str, str] | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    supports_tool_calling: bool = False,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/llamacpp_client.py#L27"
+>
 
-#### Constructor
+Direct client for a `llama-server` OpenAI-style Chat Completions endpoint. It talks to the server over HTTP without loading a model in the ProtoLink process, making it suitable when model lifecycle and hardware allocation belong to a separate service.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `base_url` | `str ⎪ None` | `None` | `llama-server` URL. Defaults to `http://localhost:8080`. |
-| `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers. |
-| `model` | `str ⎪ None` | `"gemma4:e4b"` | The requested model representation. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters (temperature, etc.). |
-| `supports_tool_calling` | `bool` | `False` | Whether this `llama-server` model/template supports native Chat Completions tool calls. |
+The adapter supports direct and streamed text calls. Native tool declarations are opt-in because correctness depends on the loaded model, chat template, and server build; JSON actions remain the compatibility default.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LlamaCPPServerLLM parameters">
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Server root. Resolution order is the argument, <code>LLAMACPP_SERVER_URL</code>, then <code>http://localhost:8080</code>.
+    </ApiField>
+    <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
+      Extra HTTP headers. <code>Content-Type: application/json</code> is added when absent.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Server model identifier. <code>None</code> resolves to <code>gemma4:e4b</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=1.0</code>.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
+      Opt into native Chat Completions tools for a compatible model/template.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
 
 ```python
 from protolink.llms.server import LlamaCPPServerLLM
 
-llm = LlamaCPPServerLLM(
-    base_url="http://localhost:8080",
-    model="llama3"
-)
+llm = LlamaCPPServerLLM(base_url="http://localhost:8080")
 ```
+
+</ApiSection>
+
+</ApiReference>
 
 ### OpenAICompatibleLLM
 
-Generic server client for OpenAI-compatible chat completion APIs. Use this for LM Studio-compatible servers, vLLM, LocalAI, llama.cpp server variants, or any custom service exposing `/v1/chat/completions` and `/v1/models`.
+<ApiReference
+  kind="class"
+  path="protolink.llms.server.OpenAICompatibleLLM"
+  signature={`class OpenAICompatibleLLM(
+    *,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    headers: dict[str, str] | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    supports_tool_calling: bool = False,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L29"
+>
 
-#### Constructor
+Generic client for servers exposing `/v1/chat/completions` and `/v1/models`, including vLLM, LocalAI, and compatible custom services. Use it when the endpoint follows the Chat Completions protocol but is not the official OpenAI Responses API.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `base_url` | `str ⎪ None` | `None` | Server URL. Defaults to `OPENAI_COMPATIBLE_BASE_URL` or `http://localhost:1234/v1`. |
-| `api_key` | `str ⎪ None` | `None` | Optional bearer token. Defaults to `OPENAI_COMPATIBLE_API_KEY`. |
-| `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers. |
-| `model` | `str ⎪ None` | `"local-model"` | Model id passed to the server. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters such as `temperature`. |
-| `supports_tool_calling` | `bool` | `False` | Whether the server/model supports native tool calling payloads. |
+It supports custom headers, optional bearer authentication, direct and streamed content, and opt-in native tools. The default JSON response format makes the adapter well suited to ProtoLink's portable action protocol, while `supports_tool_calling=True` switches action acquisition to provider-style tool payloads.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="OpenAICompatibleLLM parameters">
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Server root. Falls back to <code>OPENAI_COMPATIBLE_BASE_URL</code>, then <code>http://localhost:1234/v1</code>.
+    </ApiField>
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      Optional bearer token. Falls back to <code>OPENAI_COMPATIBLE_API_KEY</code>.
+    </ApiField>
+    <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
+      Extra request headers merged with the JSON defaults and authorization header.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Model id passed to the server. <code>None</code> resolves to <code>local-model</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=1.0</code>. Direct text calls also add <code>{'response_format={"type": "json_object"}'}</code> unless you override it.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
+      Enable native Chat Completions tool payloads for a compatible server/model pair.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
 
 ```python
 from protolink.llms.server import OpenAICompatibleLLM
 
 llm = OpenAICompatibleLLM(
-    base_url="http://localhost:1234/v1",
-    api_key="optional-token",
-    model="qwen2.5-coder-7b-instruct",
+    base_url="http://localhost:8000/v1",
+    model="Qwen/Qwen3-8B",
 )
 ```
 
+</ApiSection>
+
+</ApiReference>
+
 ### LMStudioLLM
 
-Convenience wrapper for LM Studio's local OpenAI-compatible server.
+<ApiReference
+  kind="class"
+  path="protolink.llms.server.LMStudioLLM"
+  signature={`class LMStudioLLM(
+    *,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    headers: dict[str, str] | None = None,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+    supports_tool_calling: bool = False,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L377"
+>
 
-#### Constructor
+Convenience specialization of `OpenAICompatibleLLM` for LM Studio. It keeps the complete compatible-server behavior while supplying LM Studio's conventional URL, credential fallback, and provider identity.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `base_url` | `str ⎪ None` | `None` | LM Studio URL. Defaults to `LMSTUDIO_URL` or `http://localhost:1234/v1`. |
-| `api_key` | `str ⎪ None` | `None` | Optional bearer token. Defaults to `LMSTUDIO_API_KEY`; otherwise uses `lm-studio`. |
-| `headers` | `dict[str, str] ⎪ None` | `None` | Additional HTTP headers. |
-| `model` | `str ⎪ None` | `"local-model"` | Model id selected in LM Studio. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters such as `temperature`. |
-| `supports_tool_calling` | `bool` | `False` | Whether the selected model/server supports native tool calling. |
+Use the generic parent class when you want environment variables and labels that are not tied to LM Studio. Use this subclass when local development should work with LM Studio's normal defaults and appear as `lmstudio` in events and metrics.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LMStudioLLM parameters">
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Resolution order is the argument, <code>LMSTUDIO_URL</code>, then <code>http://localhost:1234/v1</code>.
+    </ApiField>
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      Optional token. Falls back to <code>LMSTUDIO_API_KEY</code>, then the local placeholder <code>lm-studio</code>.
+    </ApiField>
+    <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
+      Extra request headers.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Model id selected in LM Studio. Inherited default: <code>local-model</code>.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Generation parameters forwarded to the compatible server.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
+      Opt into native tools when the selected model supports them.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
 
 ```python
 from protolink.llms.server import LMStudioLLM
 
-llm = LMStudioLLM(
-    model="local-model",
-    base_url="http://localhost:1234/v1",
-)
+llm = LMStudioLLM(model="local-model")
 ```
 
-## Local LLMs
+</ApiSection>
 
-Local LLMs run natively within the Python host machine rather than transmitting requests over the network.
+</ApiReference>
+
+## Local provider
+
+Local adapters run inference inside the Python host rather than transmitting prompts to a server. This offers complete control over model files and data movement, but it also makes the application responsible for compatible native libraries, model loading, memory use, acceleration, and process stability.
 
 ### LlamaCPPLocalLLM
 
-Local LLM integration using the `llama-cpp-python` distribution explicitly loading a local `.gguf` file path.
+<ApiReference
+  kind="class"
+  path="protolink.llms.local.llamacpp_client.LlamaCPPLocalLLM"
+  signature={`class LlamaCPPLocalLLM(
+    *,
+    model: str,
+    model_params: dict[str, Any] | None = None,
+    supports_tool_calling: bool = False,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/local/llamacpp_client.py#L25"
+>
 
-#### Constructor
+In-process `llama-cpp-python` adapter for a local GGUF model file. Unlike `LlamaCPPServerLLM`, it loads the model in the current Python process, so model initialization time, native-library installation, memory use, and hardware configuration belong to the application.
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `model` | `str` | - | **Required.** Absolute Path to your downloaded `.gguf` model file. |
-| `model_params` | `dict[str, Any] ⎪ None` | `None` | Model parameters. |
-| `supports_tool_calling` | `bool` | `False` | Whether the loaded model/chat handler supports native tool calls. Defaults to JSON mode. |
+The class implements complete and streamed chat-completion calls. Native tools are opt-in and depend on the loaded model and chat handler; JSON action mode is the safer default for portable inference.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LlamaCPPLocalLLM parameters">
+    <ApiField name="model" type="str" required>
+      Path to the local model file.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Values merged over <code>temperature=0.8</code> and <code>max_tokens=8192</code>.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
+      Opt into native llama.cpp tools when the loaded model and chat handler support them.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="LlamaCPPLocalLLM errors">
+    <ApiField name="ImportError">
+      Raised when <code>llama-cpp-python</code> is not installed.
+    </ApiField>
+    <ApiField name="FileNotFoundError">
+      Raised when <code>model</code> does not exist.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Recommended construction">
+  The local package currently has no convenience <code>__init__</code> export. Prefer <code>create_llm("llama.cpp-local", model="...")</code>, or import the class from the full path shown above.
+</ApiCallout>
+
+<ApiSection title="Examples">
 
 ```python
-from protolink.llms.local import LlamaCPPLocalLLM
+from protolink import create_llm
 
-llm = LlamaCPPLocalLLM(
-    model="/Users/dev/models/llama-3-8b-instruct.gguf",
-    model_params={"temperature": 0.5, "max_tokens": 1024}
+llm = create_llm(
+    "llama.cpp-local",
+    model="/models/qwen3-8b.gguf",
 )
 ```
 
-### Usage Examples
+</ApiSection>
 
-#### Basic Chat Usage
+</ApiReference>
+
+## Testing provider
+
+### MockLLM
+
+<ApiReference
+  kind="class"
+  path="protolink.llms.MockLLM"
+  signature={`class MockLLM(
+    model: str = "mock-gpt",
+    model_params: dict[str, Any] | None = None,
+    *,
+    mock_responses: dict[str, Any] | None = None,
+    sequential_responses: list[Any] | None = None,
+    response_callback: Callable[[ConversationHistory, str], Any] | None = None,
+    default_response: str = "Unprocessed generic mock response",
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/mock_client.py#L9"
+>
+
+Dependency-free deterministic adapter for tests, examples, and offline runtime development. It implements the same `LLM` contract without network access, credentials, model files, or nondeterministic generation.
+
+Responses are selected in a predictable priority order: a custom callback can inspect the full history, sequential responses can model multi-step action loops, keyword mappings can match prompts, and `default_response` handles everything else. This makes `MockLLM` suitable for testing Agent behavior, tool dispatch, parsing, history isolation, and failure paths rather than only simple chat.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="MockLLM parameters">
+    <ApiField name="model" type="str" defaultValue={'"mock-gpt"'}>
+      Identifier reported by the mock adapter.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Optional generation metadata retained on the instance.
+    </ApiField>
+    <ApiField name="mock_responses" type="dict[str, Any] | None" defaultValue="None">
+      Keyword-based response mapping. Nested mappings can first match system-prompt text and then the latest user message.
+    </ApiField>
+    <ApiField name="sequential_responses" type="list[Any] | None" defaultValue="None">
+      Responses consumed in order across calls.
+    </ApiField>
+    <ApiField name="response_callback" type="Callable[[ConversationHistory, str], Any] | None" defaultValue="None">
+      Custom callback receiving the full history and system prompt.
+    </ApiField>
+    <ApiField name="default_response" type="str" defaultValue={'"Unprocessed generic mock response"'}>
+      Fallback returned when no callback, sequential response, or mapping matches.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Examples">
 
 ```python
-from protolink.llms.api import OpenAILLM
+from protolink import create_llm
 
-# Initialize LLM
-llm = OpenAILLM(model="gpt-4o")
+llm = create_llm(
+    "mock",
+    sequential_responses=[
+        {"type": "tool_call", "tool": "search", "args": {"query": "ProtoLink"}},
+        {"type": "final", "content": "Done"},
+    ],
+)
+```
 
-# Simple chat
+</ApiSection>
+
+</ApiReference>
+
+## Related objects
+
+### LLMModelProfile
+
+<ApiReference
+  kind="dataclass"
+  path="protolink.LLMModelProfile"
+  signature={`class LLMModelProfile(
+    context_window: int | None = None,
+    input_cost_per_million: float | None = None,
+    output_cost_per_million: float | None = None,
+    currency: str = "USD",
+    provider: str | None = None,
+    model: str | None = None,
+    supports_tools: bool | None = None,
+    supports_streaming: bool | None = None,
+    supports_json_schema: bool | None = None,
+    tokenizer: str | None = None,
+    metadata: dict[str, Any] = {},
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/metrics.py#L21"
+>
+
+Immutable application-owned metadata used to calculate context pressure and estimated cost. It describes a deployment rather than configuring the provider request: changing this profile cannot enable tools, streaming, JSON schema support, or a larger model context window.
+
+ProtoLink does not maintain a provider pricing catalog because limits and prices change independently of the library. Supply values from the provider contract used by your application and update them on your own release schedule. The class does not range-check those supplied values.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="LLMModelProfile parameters">
+    <ApiField name="context_window" type="int | None" defaultValue="None">
+      Total model context window in tokens.
+    </ApiField>
+    <ApiField name="input_cost_per_million" type="float | None" defaultValue="None">
+      Input price per one million tokens.
+    </ApiField>
+    <ApiField name="output_cost_per_million" type="float | None" defaultValue="None">
+      Output price per one million tokens.
+    </ApiField>
+    <ApiField name="currency" type="str" defaultValue={'"USD"'}>
+      Currency label for estimates.
+    </ApiField>
+    <ApiField name="provider" type="str | None" defaultValue="None">
+      Optional provider label.
+    </ApiField>
+    <ApiField name="model" type="str | None" defaultValue="None">
+      Optional model label.
+    </ApiField>
+    <ApiField name="supports_tools" type="bool | None" defaultValue="None">
+      Descriptive tool support flag.
+    </ApiField>
+    <ApiField name="supports_streaming" type="bool | None" defaultValue="None">
+      Descriptive streaming support flag.
+    </ApiField>
+    <ApiField name="supports_json_schema" type="bool | None" defaultValue="None">
+      Descriptive JSON-schema support flag.
+    </ApiField>
+    <ApiField name="tokenizer" type="str | None" defaultValue="None">
+      Optional tokenizer name used by application metadata.
+    </ApiField>
+    <ApiField name="metadata" type="dict[str, Any]" defaultValue="{}">
+      Additional application-defined metadata.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+## Usage examples
+
+### Basic chat
+
+```python
+from protolink import create_llm
+
+llm = create_llm("openai", model="gpt-4o-mini")
+
 response = llm.chat("Hello, how are you?")
 print(response)
 
-# Streaming chat
-async for chunk in llm.chat("Hello!", streaming=True):
+async for chunk in llm.chat("Draft a short welcome message.", streaming=True):
     print(chunk, end="", flush=True)
 ```
 
-#### Advanced Inference with Tools
+`chat()` is deliberately small: it appends the user message and makes one provider call. It does not run tools, delegate to agents, apply the multi-step safety loop, or append the returned assistant text. Use `infer()` through an Agent when those runtime capabilities are needed.
+
+### Advanced inference with tools
 
 ```python
-from protolink.llms.api import OpenAILLM
-from protolink.tools import BaseTool
 import asyncio
 
-class CalculatorTool(BaseTool):
-    """Simple calculator tool."""
-    
-    async def __call__(self, expression: str) -> str:
-        try:
-            result = eval(expression)  # Simple evaluation
-            return f"Result: {result}"
-        except Exception as e:
-            return f"Error: {e}"
+from protolink import create_llm
+from protolink.tools import BaseTool
+
+class MultiplyTool(BaseTool):
+    """Multiply two numbers."""
+
+    async def __call__(self, left: float, right: float) -> float:
+        return left * right
 
 async def main():
-    llm = OpenAILLM(model="gpt-4o")
-    tools = {"calculator": CalculatorTool()}
-    
-    # Execute inference with tool calling
+    llm = create_llm("openai", model="gpt-4o-mini")
+    tools = {"multiply": MultiplyTool()}
+
     result = await llm.infer(
-        query="What is 15 * 8?",
-        tools=tools
+        query="What is 15 multiplied by 8?",
+        tools=tools,
     )
-    
     print(f"Final answer: {result.content}")
 
 asyncio.run(main())
 ```
 
-#### Updating Parameters
+When the LLM is installed on an `Agent`, the Agent prepares the tool mapping, history binding, discovered-agent context, policy boundary, cancellation token, run context, and budget configuration before invoking this same inference loop.
+
+### Updating parameters and prompts
 
 ```python
-# Update model parameters
 llm.model_params = {
     "temperature": 0.7,
-    "max_tokens": 500
+    "max_output_tokens": 500,
 }
 
-# Update system prompt
 llm.set_system_prompt("You are a helpful coding assistant.")
 ```
 
-#### Connection Validation
+Generation-parameter names are provider-specific. The base class requires a dictionary but does not translate keys such as `max_tokens` and `max_output_tokens`; the selected SDK or server decides which values are valid.
+
+`set_system_prompt()` changes the adapter attribute only. To rebuild the runtime prompt and update the system message in history, use `build_system_prompt()`. Pass `persist=True` when existing turns must be retained.
+
+### Connection validation
 
 ```python
-# Validate connection before use
 if llm.validate_connection():
-    print("LLM is ready!")
+    print("LLM is reachable.")
 else:
-    print("LLM connection failed.")
+    print("LLM validation failed.")
 ```
 
-### Error Handling
+Concrete constructors currently perform their own validation during initialization. Calling the method explicitly is still useful for health checks and diagnostics after a server, credential, network, or model state may have changed.
 
-All LLM implementations include comprehensive error handling:
+## Error handling
 
-#### Common Error Types
+LLM failures can originate at several different boundaries:
 
-- **Authentication Errors**: Missing or invalid API keys
-- **Connection Errors**: Network issues or unavailable servers
-- **Model Errors**: Invalid model names or unavailable models
-- **Parameter Errors**: Invalid parameter values
-- **Inference Errors**: Tool execution failures, response parsing errors
-- **Runtime Errors**: Maximum inference steps exceeded
+- **Authentication errors**: a provider rejects a missing, expired, or invalid credential.
+- **Connection errors**: a server is unavailable, a URL is invalid, or the network call fails.
+- **Model errors**: a model identifier is unknown, unavailable, or incompatible with the requested feature.
+- **Parameter errors**: the downstream SDK or server rejects generation settings.
+- **Action errors**: a model emits malformed or invalid structured intent.
+- **Execution errors**: a selected tool, delegated agent, authorization policy, cancellation token, or run budget stops the loop.
+- **Guardrail errors**: repeated parse failures or the ten-step safety limit produces `RuntimeError`.
 
-#### Error Handling Patterns
+Recoverable action mistakes are normally injected back into history so the model can self-correct. Application-level exception handling should focus on provider failures and runtime boundaries that cannot be repaired inside the loop.
 
 ```python
-from protolink.llms.api import OpenAILLM
 import asyncio
 
+from protolink import (
+    ActionDeniedError,
+    ApprovalRequiredError,
+    BudgetExceededError,
+    create_llm,
+)
+
 async def safe_inference():
-    llm = OpenAILLM(model="gpt-4o")
-    
+    llm = create_llm("openai", model="gpt-4o-mini")
+
     try:
         result = await llm.infer(
-            query="What's the weather like?",
-            tools={}  # No tools in this example
+            query="Summarize the available information.",
+            tools={},
         )
         print(f"Success: {result.content}")
-    except RuntimeError as e:
-        print(f"Runtime error: {e}")
-    except ValueError as e:
-        print(f"Value error: {e}")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+    except BudgetExceededError as exc:
+        print(f"Budget stopped the run: {exc}")
+    except (ApprovalRequiredError, ActionDeniedError) as exc:
+        print(f"Policy stopped the action: {exc}")
+    except asyncio.CancelledError:
+        print("The run was cancelled.")
+        raise
+    except RuntimeError as exc:
+        print(f"Inference failed: {exc}")
+    except Exception as exc:
+        print(f"Provider or configuration error: {exc}")
 
 asyncio.run(safe_inference())
 ```
 
-:::tip[Connection Validation]
+## Type aliases
 
-Always call `validate_connection()` before using an LLM to ensure it's properly configured and reachable.
-
-:::
-### Type Aliases
-
-The LLM module defines several type aliases for clarity:
+The public type aliases describe provider-neutral model metadata:
 
 ```python
+from typing import Literal, TypeAlias
+
 LLMType: TypeAlias = Literal["api", "local", "server"]
+
 LLMProvider: TypeAlias = Literal[
-    "openai", "anthropic", "gemini", "deepseek", "grok",
-    "huggingface", "llama.cpp-local", "llama.cpp-server",
-    "lmstudio", "mock", "ollama", "openai-compatible"
+    "openai",
+    "anthropic",
+    "gemini",
+    "deepseek",
+    "grok",
+    "huggingface",
+    "llama.cpp-local",
+    "llama.cpp-server",
+    "lmstudio",
+    "mock",
+    "ollama",
+    "openai-compatible",
 ]
+
+ReasoningLevel: TypeAlias = Literal["none", "low", "medium", "high"]
 ```
 
-These are used throughout the LLM implementations to ensure type safety and clarity.
+The factory also defines an `LLMProvider` enum with the same provider values. For current factory behavior, pass the string value such as `"openai"` or `"ollama"`.
 
-### Migration Guide
+## Migration guide
 
-#### From Previous Versions
+When migrating code written against earlier ProtoLink model wrappers:
 
-If you're migrating from an earlier version of Protolink:
-
-1. **Method Changes**: 
-   - `generate_response()` → `chat()`
-   - `generate_stream_response()` → `chat(..., streaming=True)`
-
-2. **New Inference System**: 
-   - Use `infer()` for agent-based interactions with tool calling
-   - Old methods still work for simple chat use cases
-
-3. **Async Required**: 
-   - `infer()` is async and requires `await`
-   - Simple `chat()` methods remain synchronous
-
-4. **Response Format**: 
-   - `chat()` returns strings directly
-   - `infer()` returns `Part` objects with structured content
+1. Replace `generate_response()` with `chat()`.
+2. Replace `generate_stream_response()` with `chat(..., streaming=True)`.
+3. Use `infer()` for Agent-style tool calling, delegation, policy, and multi-step execution.
+4. Await `infer()`; direct non-streaming `chat()` remains synchronous.
+5. Expect a string from `chat()` and a `Part` with type `infer_output` from `infer()`.
 
 ```python
-# Old way (deprecated)
+# Earlier style
 # response = llm.generate_response(messages)
 # print(response.content)
 
-# New way (recommended)
+# Direct text generation
 response = llm.chat("Hello, how are you?")
 print(response)
 
-# For agent use cases with tools
-result = await llm.infer(query="What's the weather?", tools=tools)
+# Controlled agent inference
+result = await llm.infer(
+    query="What's the weather?",
+    tools=tools,
+)
 print(result.content)
 ```
+
+## See also
+
+- [LLM examples](llm_examples.md) for larger provider and tool-call examples.
+- [Agents](agent.md) for how `Agent` binds state and invokes `LLM.infer()`.
+- [State](state.md) for persistent conversation sessions.
+- [Runtime](runtime.md) for cancellation, policy, approvals, budgets, and event recording.

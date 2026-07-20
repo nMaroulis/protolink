@@ -1,0 +1,331 @@
+.reference {
+  margin: 1rem 0 3.35rem;
+  scroll-margin-top: 5.5rem;
+}
+
+.signatureCard {
+  overflow: hidden;
+  border: 1px solid var(--protolink-border-strong);
+  border-radius: 12px;
+  background: var(--protolink-surface);
+  box-shadow:
+    0 18px 48px rgba(15, 23, 42, 0.075),
+    inset 3px 0 0 var(--protolink-blue);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.8rem;
+  padding: 0.58rem 0.8rem 0.58rem 1rem;
+  border-bottom: 1px solid var(--protolink-border);
+  background:
+    radial-gradient(circle at 100% 0, rgba(10, 132, 255, 0.12), transparent 42%),
+    var(--protolink-surface-soft);
+}
+
+.identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.kind {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0.12rem 0.48rem;
+  border: 1px solid rgba(10, 132, 255, 0.24);
+  border-radius: 999px;
+  color: var(--protolink-blue-700);
+  font-size: 0.69rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  line-height: 1;
+  text-transform: uppercase;
+  background: rgba(10, 132, 255, 0.08);
+}
+
+.path {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--protolink-muted);
+  font-size: 0.79rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+
+.source {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.22rem;
+  color: var(--protolink-blue-700);
+  font-size: 0.76rem;
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.source:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.18rem;
+}
+
+.signature {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.5rem;
+  padding: 1rem 0.8rem 1rem 1.1rem;
+  background:
+    linear-gradient(115deg, rgba(10, 132, 255, 0.055), transparent 56%),
+    var(--protolink-surface);
+}
+
+.signature pre {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--protolink-ink);
+  font-size: clamp(0.82rem, 1.4vw, 0.94rem);
+  font-weight: 700;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: transparent;
+}
+
+.signature code {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  white-space: inherit;
+  background: transparent;
+}
+
+.signatureDefault {
+  color: #7b6a9d;
+  font-weight: 760;
+}
+
+.copy {
+  min-width: 4.15rem;
+  min-height: 2rem;
+  padding: 0.28rem 0.58rem;
+  border: 1px solid var(--protolink-border-strong);
+  border-radius: 7px;
+  color: var(--protolink-muted);
+  cursor: pointer;
+  font-size: 0.73rem;
+  font-weight: 740;
+  background: var(--protolink-surface-soft);
+}
+
+.copy:hover,
+.copy:focus-visible {
+  color: var(--protolink-blue-700);
+  border-color: rgba(10, 132, 255, 0.4);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.12);
+}
+
+.body {
+  padding: 1.15rem 0.15rem 0;
+}
+
+.body > :first-child {
+  margin-top: 0;
+}
+
+.body > p {
+  max-width: 72ch;
+}
+
+.section {
+  margin-top: 1.55rem;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
+  margin: 0 0 0.8rem !important;
+  color: var(--protolink-ink);
+  font-size: 0.82rem !important;
+  font-weight: 820;
+  letter-spacing: 0.065em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.sectionTitle::after {
+  height: 1px;
+  flex: 1 1 auto;
+  content: "";
+  background: linear-gradient(90deg, var(--protolink-border-strong), transparent);
+}
+
+.fields {
+  margin: 0;
+}
+
+.field {
+  padding: 0.78rem 0 0.86rem;
+  border-bottom: 1px solid var(--protolink-border);
+}
+
+.field:first-child {
+  padding-top: 0.2rem;
+}
+
+.field:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.term {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.55rem;
+  margin: 0;
+}
+
+.name {
+  padding: 0.13rem 0.38rem;
+  border: 1px solid rgba(10, 132, 255, 0.2);
+  border-radius: 6px;
+  color: var(--protolink-blue-700);
+  font-size: 0.88rem;
+  font-weight: 780;
+  background: rgba(10, 132, 255, 0.07);
+}
+
+.classifier {
+  color: var(--protolink-ink);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.82rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.required,
+.defaultValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  color: var(--protolink-muted);
+  font-size: 0.69rem;
+  font-weight: 720;
+  line-height: 1;
+  background: rgba(92, 107, 122, 0.09);
+}
+
+.defaultValue {
+  border: 1px solid rgba(123, 106, 157, 0.16);
+  color: #71628f;
+  background: rgba(123, 106, 157, 0.075);
+}
+
+.required {
+  color: #8a4b08;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.description {
+  max-width: 76ch;
+  margin: 0.42rem 0 0 1.05rem;
+  padding-left: 0.85rem;
+  border-left: 2px solid rgba(10, 132, 255, 0.18);
+  color: var(--protolink-muted);
+  line-height: 1.62;
+}
+
+.description > :first-child {
+  margin-top: 0;
+}
+
+.description > :last-child {
+  margin-bottom: 0;
+}
+
+.callout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  margin-top: 1rem;
+  padding: 0.78rem 0.9rem;
+  border: 1px solid rgba(10, 132, 255, 0.2);
+  border-radius: 9px;
+  color: var(--protolink-muted);
+  background: rgba(10, 132, 255, 0.055);
+}
+
+.callout strong {
+  color: var(--protolink-blue-700);
+  font-size: 0.8rem;
+}
+
+.callout p {
+  margin: 0;
+}
+
+:global([data-theme='dark']) .signatureCard {
+  box-shadow:
+    0 20px 56px rgba(0, 0, 0, 0.26),
+    inset 3px 0 0 var(--ifm-color-primary);
+}
+
+:global([data-theme='dark']) .kind,
+:global([data-theme='dark']) .name,
+:global([data-theme='dark']) .source,
+:global([data-theme='dark']) .callout strong {
+  color: var(--ifm-color-primary-light);
+}
+
+:global([data-theme='dark']) .required {
+  color: #fbc36b;
+}
+
+:global([data-theme='dark']) .signatureDefault,
+:global([data-theme='dark']) .defaultValue {
+  color: #c8b9e8;
+}
+
+:global([data-theme='dark']) .defaultValue {
+  border-color: rgba(200, 185, 232, 0.18);
+  background: rgba(200, 185, 232, 0.09);
+}
+
+@media (max-width: 640px) {
+  .meta {
+    align-items: flex-start;
+  }
+
+  .signature {
+    grid-template-columns: 1fr;
+    padding: 0.9rem;
+  }
+
+  .copy {
+    justify-self: start;
+  }
+
+  .description {
+    margin-left: 0.35rem;
+  }
+
+  .callout {
+    grid-template-columns: 1fr;
+    gap: 0.3rem;
+  }
+}

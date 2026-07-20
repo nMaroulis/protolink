@@ -1,4 +1,10 @@
 import ApiSurface from '@site/src/components/ApiSurface';
+import ApiReference, {
+  ApiCallout,
+  ApiField,
+  ApiFields,
+  ApiSection,
+} from '@site/src/components/ApiReference';
 
 # Tools
 
@@ -84,39 +90,270 @@ from protolink.tools.adapters import MCPToolAdapter
 
 ## BaseTool Protocol
 
-All tools in Protolink conform to the `BaseTool` protocol, which defines the minimal interface for a tool:
+All tools in ProtoLink conform structurally to `BaseTool`. It is a typing protocol rather than a concrete base class: any object with the advertised metadata and asynchronous call behavior can be registered, including native `Tool` instances and wrapped MCP tools.
 
-```python
-from collections.abc import Collection
-from typing import Any, Protocol
+### BaseTool
 
-class BaseTool(Protocol):
+<ApiReference
+  kind="protocol"
+  path="protolink.tools.BaseTool"
+  signature={`class BaseTool(Protocol):
     name: str
     description: str
     input_schema: dict[str, Any] | None
-    output_schema: dict[str, Any] | None
+    output_schema: Any | None
     tags: list[str] | None
     examples: list[Any] | None
     capabilities: Collection[str] | None
 
-    async def __call__(self, **kwargs) -> Any: ...
-```
+    async __call__(**kwargs) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/base.py#L5"
+>
 
-### Protocol Attributes
+The protocol is the smallest contract understood by Agent registration and execution. Metadata describes the tool to models, discovery clients, and policy; `__call__()` performs the actual operation.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `name` | `str` | Unique identifier for the tool |
-| `description` | `str` | Human-readable description of what the tool does |
-| `input_schema` | `dict[str, Any] ⎪ None` | JSON Schema object for accepted keyword arguments |
-| `output_schema` | `dict[str, Any] ⎪ None` | JSON Schema object for the returned value |
-| `tags` | `list[str] ⎪ None` | Categorization tags for filtering and discovery |
-| `examples` | `list[Any] ⎪ None` | Example inputs, outputs, or usage scenarios advertised on `AgentSkill` |
-| `capabilities` | `Collection[str] ⎪ None` | Permission capabilities evaluated before execution |
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="BaseTool protocol attributes">
+    <ApiField name="name" type="str">
+      Stable identifier used in model tool declarations, task parts, registry skills, policy actions, and <code>agent.call_tool()</code>. Names should be unique within one Agent because registering the same name replaces the runtime tool.
+    </ApiField>
+    <ApiField name="description" type="str">
+      Human-readable purpose shown to the model and copied to the advertised <code>AgentSkill</code>. Explain when to call the tool, not only what its Python function is named.
+    </ApiField>
+    <ApiField name="input_schema" type="dict[str, Any] | None">
+      JSON Schema for accepted keyword arguments. Agent execution validates model-provided arguments against this schema before the callable runs.
+    </ApiField>
+    <ApiField name="output_schema" type="Any | None">
+      Optional schema describing the returned value. It is advertised to callers but does not currently validate the runtime result.
+    </ApiField>
+    <ApiField name="tags" type="list[str] | None">
+      Discovery and presentation labels copied to the Agent's skill card.
+    </ApiField>
+    <ApiField name="examples" type="list[Any] | None">
+      Representative calls or values copied to <code>AgentSkill.examples</code>. They guide clients and models but are not executed automatically.
+    </ApiField>
+    <ApiField name="capabilities" type="Collection[str] | None">
+      Authority strings merged into the <code>RunAction</code> evaluated immediately before execution. Capabilities become enforceable only when the call passes through Agent policy.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-### The `__call__` Method
+<ApiSection title="Call">
+  <ApiFields ariaLabel="BaseTool call contract">
+    <ApiField name="**kwargs" type="Any">
+      Keyword arguments matching <code>input_schema</code>. Positional invocation is outside the protocol.
+    </ApiField>
+    <ApiField name="return" type="Any">
+      Tool-specific result. Implementations may return any JSON-compatible or application value.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-All tools are **async callables** that accept keyword arguments matching their input schema:
+<ApiCallout label="Runtime boundary">
+  Calling a tool object directly bypasses Agent authorization, approval, cancellation, telemetry, and tool-call budget checks. Register it and use <code>agent.call_tool()</code>, <code>agent.call_tool_in_context()</code>, or task inference when those controls matter.
+</ApiCallout>
+
+</ApiReference>
+
+### Tool
+
+<ApiReference
+  kind="dataclass"
+  path="protolink.tools.Tool"
+  signature={`class Tool(
+    name: str,
+    description: str,
+    input_schema: dict[str, Any] | None,
+    output_schema: Any | None,
+    tags: list[str] | None,
+    func: Callable[..., Any],
+    args: dict[str, Any] | None = None,
+    examples: list[Any] | None = None,
+    capabilities: Collection[str] | None = None,
+    action_builder: ActionBuilder | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L17"
+>
+
+Adapt a synchronous or asynchronous Python callable to the `BaseTool` contract. Construction inspects the callable signature and resolved type hints, infers any missing schemas, normalizes explicit schemas, and converts missing tags, examples, and capabilities into empty collections.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Tool constructor parameters">
+    <ApiField name="name" type="str" required>
+      Stable runtime and advertised identifier.
+    </ApiField>
+    <ApiField name="description" type="str" required>
+      Purpose presented to models and discovery clients.
+    </ApiField>
+    <ApiField name="input_schema" type="dict[str, Any] | None" required>
+      Explicit JSON Schema or legacy field map. Pass <code>None</code> to infer an object schema from <code>func</code>'s parameters and type annotations.
+    </ApiField>
+    <ApiField name="output_schema" type="Any | None" required>
+      Explicit result schema, or <code>None</code> to infer one from the callable's return annotation.
+    </ApiField>
+    <ApiField name="tags" type="list[str] | None" required>
+      Discovery labels. <code>None</code> becomes an empty list.
+    </ApiField>
+    <ApiField name="func" type="Callable[..., Any]" required>
+      Wrapped Python function. Synchronous return values are accepted; awaitable results are awaited automatically.
+    </ApiField>
+    <ApiField name="args" type="dict[str, Any] | None" defaultValue="None">
+      Legacy metadata retained on the dataclass. Runtime invocation uses arguments passed to <code>__call__()</code>, not this mapping.
+    </ApiField>
+    <ApiField name="examples" type="list[Any] | None" defaultValue="None">
+      Advertised examples. <code>None</code> becomes an empty list.
+    </ApiField>
+    <ApiField name="capabilities" type="Collection[str] | None" defaultValue="None">
+      Required policy capabilities. Empty values are removed and duplicates are discarded while preserving first occurrence.
+    </ApiField>
+    <ApiField name="action_builder" type="ActionBuilder | None" defaultValue="None">
+      Optional sync or async callback that receives validated arguments and the active <code>RunContext</code>, then returns a customized <code>RunAction</code> with preview artifacts or metadata.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Tool errors">
+    <ApiField name="ValueError | TypeError">
+      Callable inspection, type-hint resolution, or explicit schema normalization can fail during construction.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### Tool.validate_args
+
+<ApiReference
+  kind="method"
+  path="protolink.tools.Tool.validate_args"
+  signature={`validate_args(
+    kwargs: dict[str, Any] | None,
+) -> dict[str, Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L76"
+>
+
+Validate proposed keyword arguments with the normalized input schema, wrapped callable signature, and resolved type hints. Custom execution paths can call this method to perform the same coercion as `Tool.__call__()` before preparing policy metadata.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Tool validate_args parameters">
+    <ApiField name="kwargs" type="dict[str, Any] | None" required>
+      Untrusted argument mapping. <code>None</code> becomes an empty dictionary, and the supplied mapping is copied before coercion.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Tool validate_args return value">
+    <ApiField name="arguments" type="dict[str, Any]">
+      Validated mapping containing any safe scalar conversions or reconstructed annotated objects.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Tool validate_args errors">
+    <ApiField name="ValueError">
+      Schema violations, missing or unexpected fields, incompatible values, and annotation-validation failures.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### Tool.__call__
+
+<ApiReference
+  kind="async method"
+  path="protolink.tools.Tool.__call__"
+  signature={`async __call__(
+    **kwargs: Any,
+) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L85"
+>
+
+Validate keyword arguments and invoke the wrapped Python callable. A synchronous result is returned from the coroutine immediately; an awaitable result is awaited before returning.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Tool call parameters">
+    <ApiField name="**kwargs" type="Any">
+      Values accepted by the generated or explicit input schema and the callable signature.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Tool call return value">
+    <ApiField name="result" type="Any">
+      Direct or awaited result from <code>func</code>. <code>output_schema</code> advertises this value but is not enforced here.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Tool call errors">
+    <ApiField name="ValueError">
+      Argument validation fails before user code executes.
+    </ApiField>
+    <ApiField name="callable error">
+      Exceptions from the wrapped function propagate unchanged.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Direct invocation">
+  This method does not apply Agent policy or task controls by itself. Those surround the call in <code>Agent.call_tool_in_context()</code> and the task engine.
+</ApiCallout>
+
+</ApiReference>
+
+### Tool.prepare_action
+
+<ApiReference
+  kind="async method"
+  path="protolink.tools.Tool.prepare_action"
+  signature={`async prepare_action(
+    arguments: dict[str, Any],
+    context: RunContext,
+) -> RunAction`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L98"
+>
+
+Build the runtime action evaluated before this tool executes. Without a custom builder, the action has kind `tool.call`, the tool name and description, validated arguments as payload, and the tool's declared capability set.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Tool prepare_action parameters">
+    <ApiField name="arguments" type="dict[str, Any]" required>
+      Already validated keyword arguments proposed for execution.
+    </ApiField>
+    <ApiField name="context" type="RunContext" required>
+      Active run identity, permissions, session, cancellation, and budget context supplied to a custom builder.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Tool prepare_action return value">
+    <ApiField name="action" type="RunAction">
+      Domain-neutral policy action. A sync or async custom builder may add metadata or preview artifacts, but the tool's required capabilities are merged back into the result.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Tool prepare_action errors">
+    <ApiField name="TypeError">
+      The configured <code>action_builder</code> does not return <code>RunAction</code>.
+    </ApiField>
+    <ApiField name="builder error">
+      Exceptions raised by the application builder propagate to the execution layer.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+All tools are async callables from the caller's perspective and accept keyword arguments matching their input schema:
 
 ```python
 # Tools are invoked with keyword arguments
@@ -129,12 +366,10 @@ result = await tool(location="Tokyo", units="celsius")
 
 ProtoLink includes four dependency-free tool factories for common agent tasks:
 
-| Factory | Tool name | Capability | Stable result |
-|---------|-----------|------------|---------------|
-| `web_search()` | `web_search` | `network.read` | Query, provider, ranked source snippets with sponsored labels, availability hint, and `untrusted_content` marker |
-| `fetch_url()` | `fetch_url` | `network.read` | Final URL, status, content type, title, text, truncation state, and `untrusted_content` marker |
-| `calculator()` | `calculator` | None | The expression and its finite numeric result |
-| `current_datetime()` | `current_datetime` | None | Timezone, ISO-8601 date/time, weekday, UTC offset, and Unix timestamp |
+- `web_search()` creates `web_search`, which requires `network.read` and returns normalized ranked source snippets.
+- `fetch_url()` creates `fetch_url`, which requires `network.read` and returns bounded readable text from one public URL.
+- `calculator()` creates `calculator`, a pure bounded arithmetic evaluator with no protected capability.
+- `current_datetime()` creates `current_datetime`, a timezone-aware clock tool with no protected capability.
 
 Factories return fresh native `Tool` instances. Nothing is enabled automatically: register only the capabilities an agent needs.
 
@@ -224,12 +459,60 @@ python examples/builtin_web_search.py "Python structured concurrency" --engine d
 
 Running the example without a query only prints its CLI help, so it is safe to inspect without credentials or a network request.
 
-| Argument | Type | Default | Contract |
-|----------|------|---------|----------|
-| `query` | `str` | Required | 1-400 characters and at most 50 words |
-| `max_results` | `int` | `5` | 1-10 normalized results |
-| `freshness` | `"any" ⎪ "day" ⎪ "week" ⎪ "month" ⎪ "year"` | `"any"` | Optional age filter; Wikipedia accepts `"any"` only |
-| `engine` | `"brave" ⎪ "duckduckgo" ⎪ "wikipedia"` | `"brave"` | Explicit provider selection; DuckDuckGo and Wikipedia are keyless |
+<ApiReference
+  kind="factory"
+  path="protolink.tools.web_search"
+  signature={`web_search() -> Tool`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/web.py#L766"
+>
+
+Create a fresh `Tool` named `web_search`. The factory does not make a request and does not read the Brave credential; provider selection and credential lookup happen only when the returned tool is invoked.
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="web_search factory return value">
+    <ApiField name="tool" type="Tool">
+      A native tool tagged <code>builtin</code>, <code>web</code>, <code>search</code>, and <code>read-only</code>, with the <code>network.read</code> capability and a bounded provider-neutral output schema.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Generated tool call">
+  <ApiFields ariaLabel="web_search generated tool arguments">
+    <ApiField name="query" type="str" required>
+      Search text after surrounding whitespace is removed. It must contain 1–400 characters and no more than 50 whitespace-separated words.
+    </ApiField>
+    <ApiField name="max_results" type="int" defaultValue="5">
+      Maximum normalized results returned to the model. Accepted range: 1–10.
+    </ApiField>
+    <ApiField name="freshness" type={'"any" | "day" | "week" | "month" | "year"'} defaultValue={'"any"'}>
+      Optional result-age filter. Wikipedia accepts only <code>"any"</code>; requesting another value with that engine raises <code>ValueError</code>.
+    </ApiField>
+    <ApiField name="engine" type={'"brave" | "duckduckgo" | "wikipedia"'} defaultValue={'"brave"'}>
+      Explicit provider. Brave requires <code>BRAVE_SEARCH_API_KEY</code>; DuckDuckGo and Wikipedia are keyless and never selected as a silent fallback.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns from invocation">
+  <ApiFields ariaLabel="web_search generated tool result">
+    <ApiField name="result" type="dict[str, Any]">
+      Contains the normalized query, selected provider, ranked result objects, <code>more_results_available</code>, and <code>untrusted_content=True</code>. Each result includes title, URL, snippet, and an explicit sponsored marker.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="web_search errors">
+    <ApiField name="ValueError">
+      Invalid query length, word count, result limit, freshness, provider selection, or missing Brave credential.
+    </ApiField>
+    <ApiField name="RuntimeError">
+      Provider response, content, challenge, HTTP, decoding, or bounded-transfer failures.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 The tool normalizes all three engines into provider-neutral JSON-compatible data and bounds the result count and text placed into model context. Every result includes `sponsored`; Brave and Wikipedia results use `False`, while recognized DuckDuckGo advertisements stay in provider order with `sponsored=True`. Every engine uses a fixed HTTPS endpoint with DNS validation, a 2,000,000-byte response limit, a 10-second transport deadline, and no redirects. Wikipedia excerpts are converted from bounded provider markup to plain text. DuckDuckGo organic redirect links are decoded locally and validated; sponsored click URLs remain intact. Results also include the selected `provider`, `more_results_available`, and the explicit marker `untrusted_content=True`.
 
@@ -243,10 +526,54 @@ DuckDuckGo's HTML page is a human-facing interface rather than a versioned devel
 page = await agent.call_tool("fetch_url", url="https://example.com/")
 ```
 
-| Argument | Type | Default | Contract |
-|----------|------|---------|----------|
-| `url` | `str` | Required | Public HTTP(S) URL, at most 2,048 characters, using its standard port |
-| `max_chars` | `int` | `12000` | 1-50,000 returned text characters |
+<ApiReference
+  kind="factory"
+  path="protolink.tools.fetch_url"
+  signature={`fetch_url() -> Tool`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/web.py#L831"
+>
+
+Create a fresh `Tool` named `fetch_url`. Construction is side-effect free; DNS resolution and network access begin only when the returned tool is invoked.
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="fetch_url factory return value">
+    <ApiField name="tool" type="Tool">
+      A native read-only web tool with the <code>network.read</code> capability, public-destination validation, bounded redirects and bytes, and an explicit output schema.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Generated tool call">
+  <ApiFields ariaLabel="fetch_url generated tool arguments">
+    <ApiField name="url" type="str" required>
+      Public HTTP or HTTPS URL of at most 2,048 characters. Embedded credentials, nonstandard ports, unsafe address ranges, HTTPS downgrades, and non-public redirect targets are rejected.
+    </ApiField>
+    <ApiField name="max_chars" type="int" defaultValue="12000">
+      Maximum readable text characters returned after download and decoding. Accepted range: 1–50,000; transfer bytes are bounded separately.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns from invocation">
+  <ApiFields ariaLabel="fetch_url generated tool result">
+    <ApiField name="result" type="dict[str, Any]">
+      Final validated URL, HTTP status, normalized content type, extracted title, bounded text, truncation flag, and <code>untrusted_content=True</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="fetch_url errors">
+    <ApiField name="ValueError">
+      Invalid URL shape, scheme, credentials, port, address, redirect destination, or character limit.
+    </ApiField>
+    <ApiField name="RuntimeError">
+      HTTP, redirect, timeout, response-size, content-type, charset, or HTML-decoding failures.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 After each destination is DNS-validated, the transfer is limited to 1,000,000 bytes, four validated redirects, and a 10-second transport deadline for each request or redirect before the `max_chars` return bound is applied. DNS lookup uses the host operating system's resolver and is not included in that transport deadline. These restrictions reduce accidental server-side request forgery and context exhaustion; they do not make remote content trustworthy. Treat returned text as untrusted input and keep application-specific authorization at the Agent policy boundary.
 
@@ -261,10 +588,79 @@ calculation = await calculator()(expression="(18 + 6) / 3")
 now = await current_datetime()(timezone="Europe/Zurich")
 ```
 
-| Tool | Argument contract |
-|------|-------------------|
-| `calculator` | Required `expression`: 1-256 characters using numbers, parentheses, and `+`, `-`, `*`, `/`, `//`, `%`, or `**` |
-| `current_datetime` | Optional `timezone`: IANA timezone name up to 100 characters; defaults to `"UTC"` |
+#### calculator
+
+<ApiReference
+  kind="factory"
+  path="protolink.tools.calculator"
+  signature={`calculator() -> Tool`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/calculator.py#L104"
+>
+
+Create a fresh pure arithmetic tool. The returned callable parses a restricted Python expression AST; it never uses `eval` and cannot resolve names, attributes, calls, booleans, or complex values.
+
+<ApiSection title="Generated tool call">
+  <ApiFields ariaLabel="calculator generated tool arguments">
+    <ApiField name="expression" type="str" required>
+      Arithmetic expression of 1–256 characters using numbers, parentheses, unary signs, and <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>//</code>, <code>%</code>, or <code>**</code>. Syntax-tree size, exponent size, numeric magnitude, and finite-result limits prevent resource-heavy evaluation.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="calculator result">
+    <ApiField name="result" type="dict[str, int | float | str]">
+      The trimmed original <code>expression</code> and its finite numeric <code>result</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="calculator errors">
+    <ApiField name="ValueError">
+      Empty or invalid arithmetic, unsupported syntax, division by zero, oversized powers or values, excessive complexity, and non-finite results.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### current_datetime
+
+<ApiReference
+  kind="factory"
+  path="protolink.tools.current_datetime"
+  signature={`current_datetime() -> Tool`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/clock.py#L67"
+>
+
+Create a fresh timezone-aware clock tool. UTC requires no external service or timezone database; other IANA identifiers are resolved through the host database or the optional `tzdata` package.
+
+<ApiSection title="Generated tool call">
+  <ApiFields ariaLabel="current_datetime generated tool arguments">
+    <ApiField name="timezone" type="str" defaultValue={'"UTC"'}>
+      IANA timezone name of at most 100 characters. The tool never silently substitutes host-local time for an unknown zone.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="current_datetime result">
+    <ApiField name="result" type="dict[str, Any]">
+      Requested timezone, ISO-8601 timestamp, date, time, weekday, UTC offset, and Unix timestamp.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="current_datetime errors">
+    <ApiField name="ValueError">
+      Empty, oversized, unknown, or unavailable timezone identifiers.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 ---
 
@@ -311,18 +707,68 @@ async def multiply_numbers(a: float, b: float) -> float:
 # output_schema: {"type": "integer"}
 ```
 
-### Decorator Parameters
+### Agent.tool
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `name` | `str` | The tool's identifier (used in tool calls) |
-| `description` | `str` | Description shown to the LLM for tool selection |
-| `input_schema` | `dict[str, Any] ⎪ None` | Optional explicit JSON Schema. If omitted, Protolink infers it from type hints. Legacy `{name: type}` maps are still accepted and normalized. |
-| `output_schema` | `dict[str, Any] ⎪ None` | Optional explicit JSON Schema. If omitted, Protolink infers it from the return type hint. |
-| `tags` | `list[str]` | Optional categorization tags |
-| `examples` | `list[Any]` | Optional examples copied to the advertised `AgentSkill` |
-| `capabilities` | `Collection[str]` | Optional capability names enforced before execution |
-| `action_builder` | `Callable` | Optional action factory for metadata and approval preview artifacts |
+<ApiReference
+  kind="method"
+  path="protolink.agents.Agent.tool"
+  signature={`tool(
+    name: str,
+    description: str,
+    input_schema: dict[str, Any] | None = None,
+    output_schema: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
+    examples: list[Any] | None = None,
+    capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
+    action_builder: ActionBuilder | None = None,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py#L783"
+>
+
+Create a decorator that wraps a Python callable in `Tool`, registers it immediately on this Agent, and synchronizes the corresponding advertised `AgentSkill`. The decorated name remains bound to the original function, while the runtime wrapper is available through `agent.tools[name]`.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Agent tool decorator parameters">
+    <ApiField name="name" type="str" required>
+      Stable identifier exposed to models, clients, task parts, and policy actions. Reusing an existing runtime name replaces the tool and its matching skill.
+    </ApiField>
+    <ApiField name="description" type="str" required>
+      Selection guidance shown to the LLM and discovery clients. Include the operation's purpose, prerequisites, and important side effects.
+    </ApiField>
+    <ApiField name="input_schema" type="dict[str, Any] | None" defaultValue="None">
+      Explicit JSON Schema or legacy field map. <code>None</code> infers a schema from the decorated function's signature and type hints.
+    </ApiField>
+    <ApiField name="output_schema" type="dict[str, Any] | None" defaultValue="None">
+      Explicit result schema. <code>None</code> infers it from the return annotation; it is advertised but does not validate the returned runtime value.
+    </ApiField>
+    <ApiField name="tags" type="list[str] | None" defaultValue="None">
+      Discovery labels copied to the generated <code>AgentSkill</code>.
+    </ApiField>
+    <ApiField name="examples" type="list[Any] | None" defaultValue="None">
+      Representative examples copied to the skill card.
+    </ApiField>
+    <ApiField name="capabilities" type="list[str] | tuple[str, ...] | set[str] | None" defaultValue="None">
+      Authority required before Agent execution. The wrapper normalizes non-empty values and merges them into every prepared action.
+    </ApiField>
+    <ApiField name="action_builder" type="ActionBuilder | None" defaultValue="None">
+      Optional sync or async builder for action metadata and approval-preview artifacts. It runs after argument validation and before policy evaluation.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Agent tool decorator return value">
+    <ApiField name="decorator" type="Callable">
+      A decorator that registers the wrapped function and then returns that original function unchanged.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Registration timing">
+  Registration occurs when Python evaluates the decorated function definition, not when the tool is first called. In <code>skills="auto"</code> mode the Agent card is updated at the same time.
+</ApiCallout>
+
+</ApiReference>
 
 ### JSON Schema and Runtime Validation
 
@@ -345,6 +791,169 @@ async def book_hotel(booking: BookingRequest) -> dict[str, str]:
 ```
 
 The inferred input schema is a JSON Schema object with a nested `booking` property. Runtime calls such as `{"booking": {"location": "Athens", "guests": "2"}}` are coerced before the function receives a `BookingRequest` instance. Missing required fields, unexpected fields, invalid enums, and incompatible scalar values return a structured tool error instead of reaching user code.
+
+### Schema helper API
+
+The helpers below are public for applications that build custom tool wrappers or want to inspect exactly what `Tool` will infer.
+
+#### normalize_schema
+
+<ApiReference
+  kind="function"
+  path="protolink.tools.normalize_schema"
+  signature={`normalize_schema(
+    schema: Any,
+    title: str | None = None,
+) -> dict[str, Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/schema.py#L206"
+>
+
+Normalize a full JSON Schema, a Pydantic model, a Python annotation, or a legacy `{field: type}` map into one JSON Schema dictionary. Object schemas receive stable defaults for `properties`, `required`, and `additionalProperties`, and local `$ref` definitions are inlined for provider portability.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="normalize_schema parameters">
+    <ApiField name="schema" type="Any" required>
+      Supported schema representation. <code>None</code> becomes an empty closed object schema; dictionaries that already look like JSON Schema are copied before normalization.
+    </ApiField>
+    <ApiField name="title" type="str | None" defaultValue="None">
+      Optional title written onto the returned top-level schema.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="normalize_schema return value">
+    <ApiField name="schema" type="dict[str, Any]">
+      New normalized schema dictionary. The input dictionary is not mutated.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### infer_input_schema
+
+<ApiReference
+  kind="function"
+  path="protolink.tools.infer_input_schema"
+  signature={`infer_input_schema(
+    func: Callable[..., Any],
+    *,
+    title: str,
+) -> dict[str, Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/schema.py#L266"
+>
+
+Inspect a callable and build a closed object schema for its named parameters. `self`, `cls`, `*args`, and `**kwargs` are omitted; parameters without Python defaults become required and parameters with defaults include that value in their property schema.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="infer_input_schema parameters">
+    <ApiField name="func" type="Callable[..., Any]" required>
+      Function whose signature and resolved type hints describe tool input.
+    </ApiField>
+    <ApiField name="title" type="str" required>
+      Required schema title, normally derived from the tool name.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="infer_input_schema return value">
+    <ApiField name="schema" type="dict[str, Any]">
+      JSON Schema object with <code>additionalProperties=False</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### infer_output_schema
+
+<ApiReference
+  kind="function"
+  path="protolink.tools.infer_output_schema"
+  signature={`infer_output_schema(
+    func: Callable[..., Any],
+    *,
+    title: str,
+) -> dict[str, Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/schema.py#L299"
+>
+
+Convert a callable's resolved return annotation to JSON Schema. Missing or unresolvable annotations produce a permissive schema rather than inspecting or executing the function.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="infer_output_schema parameters">
+    <ApiField name="func" type="Callable[..., Any]" required>
+      Callable whose return type should be advertised.
+    </ApiField>
+    <ApiField name="title" type="str" required>
+      Title added to the returned schema.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="infer_output_schema return value">
+    <ApiField name="schema" type="dict[str, Any]">
+      JSON Schema describing the annotated return value.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### validate_tool_args
+
+<ApiReference
+  kind="function"
+  path="protolink.tools.validate_tool_args"
+  signature={`validate_tool_args(
+    args: dict[str, Any] | None,
+    input_schema: dict[str, Any] | None,
+    *,
+    type_hints: dict[str, Any] | None = None,
+    signature: inspect.Signature | None = None,
+) -> dict[str, Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/schema.py#L478"
+>
+
+Validate and coerce untrusted keyword arguments before tool code runs. JSON Schema validation happens first, Python signature checks catch missing and unexpected fields next, and resolved annotations can finally reconstruct typed values through Pydantic `TypeAdapter`.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="validate_tool_args parameters">
+    <ApiField name="args" type="dict[str, Any] | None" required>
+      Proposed arguments. <code>None</code> is normalized to an empty dictionary and the caller's mapping is copied.
+    </ApiField>
+    <ApiField name="input_schema" type="dict[str, Any] | None" required>
+      Schema used for structural validation and conservative coercion of strings, numbers, booleans, arrays, and nested objects.
+    </ApiField>
+    <ApiField name="type_hints" type="dict[str, Any] | None" defaultValue="None">
+      Resolved annotations keyed by parameter name. When supplied, matching values are validated and reconstructed after schema checks.
+    </ApiField>
+    <ApiField name="signature" type="inspect.Signature | None" defaultValue="None">
+      Callable signature used to detect required and unexpected keyword fields. A callable accepting <code>**kwargs</code> permits additional names.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="validate_tool_args return value">
+    <ApiField name="arguments" type="dict[str, Any]">
+      New validated mapping, potentially containing coerced scalars or reconstructed annotated objects.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="validate_tool_args errors">
+    <ApiField name="ValueError">
+      Schema violations, missing fields, unexpected fields, incompatible scalar values, invalid enums or constants, and annotation-validation failures.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 ### Capabilities And Approval
 
@@ -473,27 +1082,58 @@ The `MCPToolAdapter` class connects to MCP servers and exposes their tools as ca
 
 #### Constructor
 
-```python
-from protolink.tools.adapters import MCPToolAdapter
+<ApiReference
+  kind="class"
+  path="protolink.tools.adapters.MCPToolAdapter"
+  signature={`class MCPToolAdapter(
+    transport: str = "stdio",
+    *,
+    command: str | None = None,
+    args: list[str] | None = None,
+    url: str | None = None,
+    headers: dict[str, str] | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L96"
+>
 
-adapter = MCPToolAdapter(
-    transport: str = "stdio",      # "stdio" or "sse"
-    command: str | None = None,    # Command for stdio (e.g., "python")
-    args: list[str] | None = None, # Args for command (e.g., ["server.py"])
-    url: str | None = None,        # URL for SSE transport
-    headers: dict[str, str] | None = None,  # Headers for SSE
-)
-```
+Store the connection configuration for an MCP server and provide discovery and wrapping helpers. Construction does not open a subprocess, network connection, or MCP session; each discovery or invocation operation creates and initializes a session for that operation.
 
-#### Constructor Parameters
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="MCPToolAdapter constructor parameters">
+    <ApiField name="transport" type="str" defaultValue={'"stdio"'}>
+      MCP client transport. Supported values are <code>"stdio"</code> for a local subprocess and <code>"sse"</code> for a remote Server-Sent Events endpoint.
+    </ApiField>
+    <ApiField name="command" type="str | None" defaultValue="None">
+      Executable launched for <code>stdio</code>, such as <code>"python"</code>, <code>"node"</code>, or an MCP server binary. It is required when the first stdio operation runs.
+    </ApiField>
+    <ApiField name="args" type="list[str] | None" defaultValue="None">
+      Arguments passed unchanged to the stdio command. <code>None</code> becomes an empty list.
+    </ApiField>
+    <ApiField name="url" type="str | None" defaultValue="None">
+      SSE endpoint required when the first <code>sse</code> operation runs.
+    </ApiField>
+    <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
+      Headers forwarded by the SSE client, commonly for authentication. <code>None</code> becomes an empty dictionary.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `transport` | `str` | `"stdio"` | Transport type: `"stdio"` or `"sse"` |
-| `command` | `str ⎪ None` | `None` | Command to run for stdio transport |
-| `args` | `list[str] ⎪ None` | `None` | Arguments for the stdio command |
-| `url` | `str ⎪ None` | `None` | URL for SSE transport |
-| `headers` | `dict[str, str] ⎪ None` | `None` | HTTP headers for SSE (e.g., auth) |
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="MCPToolAdapter errors">
+    <ApiField name="ImportError">
+      Importing <code>protolink.tools.adapters</code> fails when the optional MCP dependency is unavailable. Install <code>protolink[mcp]</code>.
+    </ApiField>
+    <ApiField name="ValueError">
+      Discovery or invocation raises for an unknown transport, missing stdio command, or missing SSE URL. Configuration is validated lazily, not by the constructor.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Session lifetime">
+  The current adapter does not keep one MCP session open across calls. It caches discovered metadata, but each uncached discovery or tool invocation opens, initializes, and closes its own stdio or SSE session.
+</ApiCallout>
+
+</ApiReference>
 
 ---
 
@@ -561,16 +1201,7 @@ for tool in tools:
     print(f"  Callable: {tool['callable']}")
 ```
 
-**Returns** a list of dictionaries with:
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `name` | `str` | Tool identifier |
-| `description` | `str` | Human-readable description |
-| `input_schema` | `dict` | Original JSON Schema for inputs |
-| `input_types` | `dict[str, type]` | Parsed Python types |
-| `output` | `None` | Reserved (MCP doesn't provide output schemas) |
-| `callable` | `Callable` | Synchronous function to invoke the tool |
+The returned dictionaries contain the MCP name, description, input schema, shallow Python input-type mapping, an output placeholder, and a synchronous callable. See [`MCPToolAdapter.list_tools`](#mcptooladapterlist_tools) for the exact result contract, caching behavior, and event-loop limitation.
 
 #### get_tools()
 
@@ -840,26 +1471,260 @@ Hello, World! 👋
 
 ## MCPToolAdapter API Reference
 
-### Methods
+### MCPToolAdapter.list_tools
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `list_tools(refresh=False)` | `list[dict]` | List all tools as dictionaries with metadata and callables |
-| `get_tools()` | `list[Tool]` | Get all tools as native Protolink `Tool` objects (tagged with `"mcp"`) |
-| `get_tool(name)` | `dict ⎪ None` | Get a specific tool's metadata by name |
-| `get_callable(name)` | `Callable` | Get a synchronous callable for a tool |
-| `wrap_tool(name)` | `MCPToolAdapter` | Wrap a tool as a BaseTool instance |
-| `print_tools()` | `None` | Print all tools in human-readable format |
+<ApiReference
+  kind="method"
+  path="protolink.tools.adapters.MCPToolAdapter.list_tools"
+  signature={`list_tools(
+    *,
+    refresh: bool = False,
+) -> list[dict]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L283"
+>
 
-### Attributes (when wrapping a tool)
+Discover tools synchronously and return metadata dictionaries. The first call opens an MCP session and caches the resulting list; later calls return the cached list object unless `refresh=True`.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `name` | `str` | Tool name |
-| `description` | `str` | Tool description |
-| `input_schema` | `dict[str, Any]` | JSON Schema input object |
-| `output_schema` | `dict[str, Any] ⎪ None` | Output JSON Schema when available |
-| `tags` | `list[str] ⎪ None` | Tool tags |
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="MCPToolAdapter list_tools parameters">
+    <ApiField name="refresh" type="bool" defaultValue="False">
+      Bypass cached discovery and replace it with a fresh server response.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="MCPToolAdapter list_tools result">
+    <ApiField name="name" type="str">
+      MCP tool identifier.
+    </ApiField>
+    <ApiField name="description" type="str">
+      Server-provided description, normalized to an empty string when absent.
+    </ApiField>
+    <ApiField name="input_schema" type="dict[str, Any]">
+      Original MCP <code>inputSchema</code>, or an empty dictionary.
+    </ApiField>
+    <ApiField name="input_types" type="dict[str, type]">
+      Shallow mapping from top-level JSON Schema types to Python classes for display and introspection. Unsupported shapes become <code>Any</code>.
+    </ApiField>
+    <ApiField name="output" type="None">
+      Reserved placeholder; the current adapter does not expose MCP output schemas.
+    </ApiField>
+    <ApiField name="callable" type="Callable[..., Any]">
+      Synchronous closure for this tool. It uses <code>asyncio.run()</code> and opens a new MCP session per invocation.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="MCPToolAdapter list_tools errors">
+    <ApiField name="RuntimeError">
+      Calling this synchronous method inside an active event loop fails because it uses <code>asyncio.run()</code>.
+    </ApiField>
+    <ApiField name="MCP or transport error">
+      Subprocess startup, SSE connection, initialization, protocol, and discovery failures propagate.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Mutable cache">
+  The returned list and its dictionaries are the cached objects, not defensive copies. Treat them as read-only or use <code>refresh=True</code> to replace mutated cache state.
+</ApiCallout>
+
+</ApiReference>
+
+### MCPToolAdapter.get_tool
+
+<ApiReference
+  kind="method"
+  path="protolink.tools.adapters.MCPToolAdapter.get_tool"
+  signature={`get_tool(
+    tool_name: str,
+) -> dict | None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L336"
+>
+
+Find one discovered metadata dictionary by exact name. This is a linear search over `list_tools()` and therefore uses its cache and synchronous event-loop constraints.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="MCPToolAdapter get_tool parameters">
+    <ApiField name="tool_name" type="str" required>
+      Exact case-sensitive MCP tool name.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="MCPToolAdapter get_tool return value">
+    <ApiField name="tool" type="dict | None">
+      Cached metadata dictionary when found; otherwise <code>None</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### MCPToolAdapter.get_tools
+
+<ApiReference
+  kind="method"
+  path="protolink.tools.adapters.MCPToolAdapter.get_tools"
+  signature={`get_tools() -> list[Tool]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L359"
+>
+
+Convert every discovered MCP definition into a native asynchronous `Tool`. Each call constructs a new wrapper list, while discovery metadata can come from the adapter cache.
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="MCPToolAdapter get_tools return value">
+    <ApiField name="tools" type="list[Tool]">
+      Native tools with the MCP name, description, input schema, <code>output_schema=None</code>, and <code>tags=["mcp"]</code>. Their async callables open a fresh MCP session for each invocation.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Recommended for Agent">
+  Register these wrappers with <code>agent.add_tool()</code>. Their asynchronous call path is compatible with Agent execution and does not nest <code>asyncio.run()</code>.
+</ApiCallout>
+
+</ApiReference>
+
+### MCPToolAdapter.get_callable
+
+<ApiReference
+  kind="method"
+  path="protolink.tools.adapters.MCPToolAdapter.get_callable"
+  signature={`get_callable(
+    tool_name: str,
+) -> Callable[..., Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L455"
+>
+
+Create a synchronous closure that invokes the named MCP tool. The name is not checked against discovery at construction; the MCP server validates it when the closure runs.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="MCPToolAdapter get_callable parameters">
+    <ApiField name="tool_name" type="str" required>
+      Tool identifier sent to <code>session.call_tool()</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="MCPToolAdapter get_callable return value">
+    <ApiField name="callable" type="Callable[..., Any]">
+      Keyword-only synchronous wrapper returning the first text content item when present, otherwise <code>None</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Event loops">
+  The closure uses <code>asyncio.run()</code>. Do not call it from an asynchronous handler or notebook cell with an active event loop; use <code>get_tools()</code> there.
+</ApiCallout>
+
+</ApiReference>
+
+### MCPToolAdapter.wrap_tool
+
+<ApiReference
+  kind="method"
+  path="protolink.tools.adapters.MCPToolAdapter.wrap_tool"
+  signature={`wrap_tool(
+    tool_name: str,
+) -> MCPToolAdapter`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L543"
+>
+
+Discover one tool and return a new adapter configured to act as that asynchronous `BaseTool`. Connection settings and the metadata cache are shared by reference with the parent at wrapping time.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="MCPToolAdapter wrap_tool parameters">
+    <ApiField name="tool_name" type="str" required>
+      Exact tool name that must already be discoverable from the MCP server.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="MCPToolAdapter wrap_tool return value">
+    <ApiField name="wrapped" type="MCPToolAdapter">
+      New adapter with <code>name</code>, <code>description</code>, and <code>input_schema</code> populated. <code>output_schema</code> and <code>tags</code> remain <code>None</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="MCPToolAdapter wrap_tool errors">
+    <ApiField name="ValueError">
+      No discovered tool has the requested name.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### MCPToolAdapter.__call__
+
+<ApiReference
+  kind="async method"
+  path="protolink.tools.adapters.MCPToolAdapter.__call__"
+  signature={`async __call__(
+    **kwargs,
+) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L510"
+>
+
+Invoke the MCP tool represented by a wrapped adapter. A plain connection adapter has an empty `name` and cannot be called directly.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="MCPToolAdapter call parameters">
+    <ApiField name="**kwargs" type="Any">
+      Arguments sent unchanged to the MCP server. This adapter path does not run ProtoLink's native <code>Tool.validate_args()</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="MCPToolAdapter call return value">
+    <ApiField name="result" type="Any">
+      Text from the first MCP content item when it has a <code>text</code> attribute; otherwise <code>None</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="MCPToolAdapter call errors">
+    <ApiField name="ValueError">
+      The adapter does not wrap a named tool.
+    </ApiField>
+    <ApiField name="MCP or transport error">
+      Session and remote tool failures propagate.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### MCPToolAdapter.print_tools
+
+<ApiReference
+  kind="method"
+  path="protolink.tools.adapters.MCPToolAdapter.print_tools"
+  signature={`print_tools() -> None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L599"
+>
+
+Print cached or freshly discovered names, descriptions, input schemas, and shallow Python input types to standard output.
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="MCPToolAdapter print_tools return value">
+    <ApiField name="None" type="None">
+      Output is written for human inspection; no formatted string is returned.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 ---
 

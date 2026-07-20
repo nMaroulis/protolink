@@ -1,4 +1,10 @@
 import ApiSurface from '@site/src/components/ApiSurface';
+import ApiReference, {
+  ApiCallout,
+  ApiField,
+  ApiFields,
+  ApiSection,
+} from '@site/src/components/ApiReference';
 import agentChatCard from '@site/assets/agent_chat_card.png';
 import agentStatusCard from '@site/assets/agent_status_card.png';
 import registryStatusCard from '@site/assets/registry_status_card.png';
@@ -135,7 +141,7 @@ Common patterns:
 - **HTTPTransport / SSEJSONRPCTransport**: agents expose normal HTTP endpoints so other agents, CLIs, dashboards, browser pages, or external clients can send requests. SSE adds streamed task events over `text/event-stream`.
 - **WebSocketTransport**: agents expose the same endpoint specs over JSON frames on a WebSocket connection. Use this for streamed task events and long-lived clients rather than direct browser page URLs.
 
-#### Agent Transport Layers
+### Agent Transport Layers
 
 | Layer          | Responsibility                                 |
 | -------------- | ---------------------------------------------- |
@@ -151,7 +157,7 @@ e.g.
 
 ---
 
-# Agent API Reference
+## Agent API Reference
 
 This section provides a detailed API reference for the `Agent` base class in `protolink.agents.base`. It is the core component for creating pluggable, A2A-based agents while combining client, server, execution, and runtime modules in one facade. HTTP agents can opt into the dedicated A2A 1.0 adapters described in [A2A compatibility](a2a.md).
 
@@ -203,30 +209,117 @@ Protolink's `Agent` combines client and server functionality in a single class. 
 
 ## Constructor
 
-| Parameter | Type | Default | Description |
-|-----------|-----|---------|-------------|
-| `card` | `AgentCard` ⎪ `dict[str, Any]` | - | **Required.** The agent's metadata card containing name, description, and other identifying information. |
-| `transport` | `TransportType` ⎪ `Transport` ⎪ `None` | `None` | Transport instance or simple string alias such as `"http"` or `"runtime"`. String aliases use default transport settings; pass a configured object for TLS, limits, retries, or protocol-specific options. |
-| `registry` | `TransportType` ⎪ `Registry` ⎪ `RegistryClient` ⎪ `None` | `None` | Optional registry for agent discovery. Can be a transport alias, `Registry` instance, or `RegistryClient`. |
-| `registry_url` | `str` ⎪ `None` | `None` | URL of the registry when using string transport type for registry creation. |
-| `llm` | `LLM` ⎪ `None` | `None` | Optional language model instance for the agent to use. |
-| `system_prompt` | `str` ⎪ `None` | `None` | Optional complementary text for the system prompt to explain agent logic and role. |
-| `storage` | `Storage` ⎪ `None` | `None` | Optional storage instance for agent data persistence. |
-| `state` | `list[StateMode]` ⎪ `State` ⎪ `None` | `None` | Optional agent state configuration. Defines which modules (conversation, tools, etc.) should be persistent. |
-| `telemetry` | `Telemetry` ⎪ `None` | `None` | Optional telemetry instance for observability and tracing. |
-| `skills` | `Literal["auto", "fixed"]` | `"auto"` | Skills mode - `"auto"` to automatically detect and add skills, `"fixed"` to use only the skills defined by the user in the AgentCard. |
-| `logger` | `BaseLogger` ⎪ `None` | `None` | Custom logger instance (e.g. `ConsoleLogger`, `FileLogger`, or `QuietLogger`). |
-| `discovery_ttl` | `int` | `0` | Time to live in seconds for caching Agent information discovered from the Registry. Default is `0` (no caching). |
-| `override_system_prompt` | `bool` | `False` | If True, overrides the default system prompt completely with the provided `system_prompt`. |
-| `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity level: `0` = silent for standard Agent logs, `1` = normal (INFO), `2` = verbose (DEBUG). |
-| `expose_chat` | `bool` | `True` | Whether an LLM-backed Agent will serve the interactive chat UI and accept chat messages. HTTP-compatible transports make this visible at `/chat`. |
-| `a2a` | `bool` | `False` | Enable the A2A 1.0 inbound routes and outbound translation layer. Requires the exact HTTP transport. Agent-originated A2A calls accept only interfaces matching the discovered card's origin; use a dedicated `AgentClient` for an explicitly trusted split-origin deployment. |
-| `authenticator` | `Authenticator` ⎪ `None` | `None` | Optional Authenticator instance for verifying incoming requests to this agent. |
-| `credentials` | `str` ⎪ `None` | `None` | Optional credentials string used for authenticating outgoing requests. |
-| `policy` | `Policy` ⎪ `None` | `None` | Runtime action policy. Defaults to an allow-by-default `CapabilityPolicy`. |
-| `approval_handler` | `ApprovalHandlerLike` ⎪ `None` | `None` | Application callback that resolves typed `ApprovalRequest` checkpoints. |
-| `run_store` | `RunStore` ⎪ `None` | `None` | Optional durable task/run store. When provided, the default runtime records task snapshots after direct, server, and streaming execution paths. |
-| `registry_heartbeat_interval` | `float` ⎪ `None` | `None` | Optional seconds between registry heartbeat requests after successful registration. Use with a registry TTL to prune dead agents automatically. |
+### Agent
+
+<ApiReference
+  kind="class"
+  path="protolink.agents.Agent"
+  signature={`Agent(
+    card: AgentCard | dict[str, Any],
+    transport: TransportType | Transport | None = None,
+    registry: TransportType | Registry | RegistryClient | None = None,
+    registry_url: str | None = None,
+    llm: LLM | None = None,
+    system_prompt: str | None = None,
+    storage: Storage | None = None,
+    state: list[StateMode] | State | None = None,
+    telemetry: Telemetry | None = None,
+    skills: Literal["auto", "fixed"] = "auto",
+    logger: BaseLogger | None = None,
+    discovery_ttl: int = 0,
+    *,
+    override_system_prompt: bool = False,
+    verbosity: Literal[0, 1, 2] = 1,
+    expose_chat: bool = True,
+    a2a: bool = False,
+    authenticator: Authenticator | None = None,
+    credentials: str | None = None,
+    policy: Policy | None = None,
+    approval_handler: ApprovalHandlerLike | None = None,
+    run_store: Any | None = None,
+    registry_heartbeat_interval: float | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/base.py"
+>
+
+Create the stable Agent facade and wire its identity, execution engine, communication clients, server routes, state, tools, policy, and observability dependencies. Construction does not start a server or register the card; call <code>start()</code> or <code>register()</code> explicitly when those side effects are wanted.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Agent constructor parameters">
+    <ApiField name="card" type="AgentCard | dict[str, Any]" required>
+      Identity and capability metadata for this Agent. Dictionaries are normalized with <code>AgentCard.from_dict()</code>. The card URL is also used when ProtoLink must construct a transport from a short alias, so it must match the address or runtime URI at which peers can reach the Agent.
+    </ApiField>
+    <ApiField name="transport" type="TransportType | Transport | None" defaultValue="None">
+      Inbound and outbound communication layer. A registered alias such as <code>"http"</code>, <code>"runtime"</code>, <code>"websocket"</code>, or <code>"grpc"</code> creates a transport with defaults derived from <code>card.url</code>. A concrete instance preserves its TLS, retry, limits, keepalive, metrics, and ownership configuration. <code>None</code> creates a local facade with no client or server.
+    </ApiField>
+    <ApiField name="registry" type="TransportType | Registry | RegistryClient | None" defaultValue="None">
+      Optional discovery connection. A <code>Registry</code> contributes its client, a <code>RegistryClient</code> is used directly, and a transport alias creates a default client at <code>registry_url</code>. Without one, discovery returns an empty list and registration methods are no-ops.
+    </ApiField>
+    <ApiField name="registry_url" type="str | None" defaultValue="None">
+      Registry address used only when <code>registry</code> is a transport alias. Put advanced TLS and capacity settings on a configured registry transport and pass its <code>RegistryClient</code> instead.
+    </ApiField>
+    <ApiField name="llm" type="LLM | None" defaultValue="None">
+      Optional language model used for explicit <code>infer</code> parts. Assignment calls <code>llm.validate_connection()</code> and uses its result to update <code>card.capabilities.has_llm</code>. Depending on the adapter, validation may contact a provider or local server during Agent construction.
+    </ApiField>
+    <ApiField name="system_prompt" type="str | None" defaultValue="None">
+      Agent-specific role and behavior instructions appended to ProtoLink's runtime prompt. Tool, delegation, flow, and action instructions are compiled separately. Set <code>override_system_prompt=True</code> only when the supplied text should replace that built-in blueprint.
+    </ApiField>
+    <ApiField name="storage" type="Storage | None" defaultValue="None">
+      Persistence backend shared by the Agent and its <code>State</code> object. <code>None</code> creates an <code>InMemoryStorage</code> namespace based on <code>card.name</code>.
+    </ApiField>
+    <ApiField name="state" type="list[StateMode] | State | None" defaultValue="None">
+      Persistent-state configuration. A list enables selected stores such as <code>"conversation"</code>, <code>"tools"</code>, <code>"task"</code>, and <code>"flow"</code>; a <code>State</code> instance is adopted directly. <code>None</code> is intentionally stateless even though an in-memory storage object still exists.
+    </ApiField>
+    <ApiField name="telemetry" type="Telemetry | None" defaultValue="None">
+      Observer receiving task, tool, LLM, and inference events. The setter binds the telemetry object back to this Agent.
+    </ApiField>
+    <ApiField name="skills" type={'Literal["auto", "fixed"]'} defaultValue={'"auto"'}>
+      <code>"auto"</code> advertises skills inferred from registered tools while retaining card-defined skills. <code>"fixed"</code> leaves the card's declared skill list under application control.
+    </ApiField>
+    <ApiField name="logger" type="BaseLogger | None" defaultValue="None">
+      Logging implementation. When omitted, ProtoLink creates a namespaced <code>ConsoleLogger</code> whose level follows <code>verbosity</code>.
+    </ApiField>
+    <ApiField name="discovery_ttl" type="int" defaultValue="0">
+      Seconds to cache registry discovery results per filter. Zero disables caching, so every discovery request reaches the registry.
+    </ApiField>
+    <ApiField name="override_system_prompt" type="bool" defaultValue="False">
+      Replace the generated runtime prompt with <code>system_prompt</code> instead of treating it as complementary instructions. This can remove built-in action guidance, so use it only when the replacement prompt defines the complete contract.
+    </ApiField>
+    <ApiField name="verbosity" type="Literal[0, 1, 2]" defaultValue="1">
+      Default Agent log level: <code>0</code> suppresses ordinary Agent logs, <code>1</code> emits informational lifecycle messages, and <code>2</code> enables debug detail. A supplied <code>logger</code> owns its own level.
+    </ApiField>
+    <ApiField name="expose_chat" type="bool" defaultValue="True">
+      Allow the built-in chat handler and browser page when an LLM and HTTP-compatible server are available. It does not create an LLM or transport.
+    </ApiField>
+    <ApiField name="a2a" type="bool" defaultValue="False">
+      Enable the A2A 1.0 translation boundary. The current setter requires the exact HTTP transport; native ProtoLink endpoints remain available. Agent-originated A2A calls enforce same-origin advertised interfaces.
+    </ApiField>
+    <ApiField name="authenticator" type="Authenticator | None" defaultValue="None">
+      Verifier for incoming transport requests. Authentication is enforced at the server boundary before task execution.
+    </ApiField>
+    <ApiField name="credentials" type="str | None" defaultValue="None">
+      Credential value attached by the outbound client. Treat serialized configurations containing it as sensitive.
+    </ApiField>
+    <ApiField name="policy" type="Policy | None" defaultValue="None">
+      Runtime policy evaluated before tools, state mutation, history compaction, and other concrete actions. <code>None</code> installs an allow-by-default <code>CapabilityPolicy</code>, while tool- or run-level capability restrictions can still narrow access.
+    </ApiField>
+    <ApiField name="approval_handler" type="ApprovalHandlerLike | None" defaultValue="None">
+      Synchronous or asynchronous application callback used to resolve typed approval checkpoints requested by policy.
+    </ApiField>
+    <ApiField name="run_store" type="Any | None" defaultValue="None">
+      Optional object implementing the run-store protocol. The engine writes terminal and streamed task snapshots to it; the store is observational and does not replace the process-local active-task registry.
+    </ApiField>
+    <ApiField name="registry_heartbeat_interval" type="float | None" defaultValue="None">
+      Seconds between heartbeats after successful registration. <code>None</code> disables the loop. Values below <code>0.1</code> are clamped to 0.1 seconds.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Construction side effects">
+  The constructor creates default storage, logger, policy, state, and sync facades and may construct transport clients and routes. LLM connection validation can perform I/O. It does not bind Agent server ports, register the card, or begin heartbeats until lifecycle methods run.
+</ApiCallout>
+
+</ApiReference>
 
 ```python
 from protolink.agents import Agent
@@ -316,10 +409,78 @@ The built-in `SQLiteRunStore` indexes task ID, state, run ID, session ID, trace 
 
 These methods control the agent's server component lifecycle.
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `start()` | `register: bool = True`, `background: bool = False` | `None` | Starts the agent runtime. Can run in the main loop or as an isolated background thread. |
-| `stop()` | - | `None` | Stops the agent runtime and synchronously cleans up resources. |
+### Agent.start
+
+<ApiReference
+  kind="method"
+  path="protolink.agents.Agent.start"
+  signature={`start(
+    *,
+    register: bool = True,
+    background: bool = False,
+) -> None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py"
+>
+
+Start the configured server, optionally register the Agent, and keep its lifecycle alive. This is a synchronous entry point even though the underlying server and registry operations are asynchronous.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Agent start parameters">
+    <ApiField name="register" type="bool" defaultValue="True">
+      Register <code>card</code> with the configured registry after server startup. If registration fails with a connection error, the server remains running but is not discoverable. With no registry client, this flag has no effect.
+    </ApiField>
+    <ApiField name="background" type="bool" defaultValue="False">
+      When <code>False</code>, run the lifecycle with <code>asyncio.run()</code> and block the calling thread. When <code>True</code>, create a non-daemon thread and a dedicated event loop, wait for startup readiness, then return to the caller.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Agent start return value">
+    <ApiField name="None" type="None">
+      Background mode returns after readiness or the ten-second startup wait. Blocking mode returns only after shutdown.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Agent start errors">
+    <ApiField name="startup error">
+      Server startup failures—including address conflicts—propagate to the caller. Background mode captures the exception in its thread and re-raises it after readiness synchronization.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Active event loops">
+  Calling <code>start(background=False)</code> inside an already-running event loop blocks that loop. Use <code>background=True</code> from notebooks, ASGI applications, and other async hosts.
+</ApiCallout>
+
+</ApiReference>
+
+### Agent.stop
+
+<ApiReference
+  kind="method"
+  path="protolink.agents.Agent.stop"
+  signature={`stop() -> None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py"
+>
+
+Request graceful shutdown of an Agent started in background mode and synchronously wait for its lifecycle thread to exit. Cancellation of the private lifecycle task triggers registry unregistration, heartbeat cleanup, and server shutdown.
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Agent stop return value">
+    <ApiField name="None" type="None">
+      Returns after the background thread exits or after the ten-second join timeout.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Idempotent teardown">
+  Repeated calls are safe. <code>stop()</code> is designed around the background lifecycle; normal blocking mode is ordinarily stopped by interrupting the process lifecycle.
+</ApiCallout>
+
+</ApiReference>
 
 ### Execution Models & Lifecycle
 
@@ -376,35 +537,337 @@ Always use `agent.stop()` to ensure that the agent unregisters from the registry
 :::
 ## Transport Management
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `transport` (property) | `TransportType` ⎪ `Transport` | `Transport` ⎪ `None` | Gets or sets the transport used by this agent. Setting this initializes the client/server components and updates the agent card's transport and streaming capability. |
-| `a2a` (property) | - | `bool` | Read-only view of whether the A2A 1.0 boundary was enabled at construction. |
-| `client` (property) | - | `AgentClient` ⎪ `None` | Returns the client instance for sending requests to other agents, or None if no transport is set. |
-| `server` (property) | - | `AgentServer` ⎪ `None` | Returns the server instance if one is available via the transport. |
+### Agent.transport
+
+<ApiReference
+  kind="property"
+  path="protolink.agents.Agent.transport"
+  signature={`transport: Transport | None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py"
+>
+
+Read or replace the communication transport used for both outbound client calls and inbound server routes.
+
+<ApiSection title="Setter value">
+  <ApiFields ariaLabel="Agent transport setter">
+    <ApiField name="transport" type="TransportType | Transport" required>
+      A registered transport alias or configured transport instance. Setting an alias creates a transport from <code>card.url</code>. Setting a value rebuilds the associated <code>AgentClient</code> and <code>AgentServer</code>, then updates the card's transport and streaming capability metadata. Although the setter annotation includes <code>None</code>, the implementation rejects it with <code>ValueError</code>; construct the Agent without a transport instead of assigning <code>None</code>.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Lifecycle boundary">
+  Reassigning this property configures objects and routes but does not start the new server. Avoid swapping transports while an Agent is serving; stop it first so connection ownership and open ports remain deterministic.
+</ApiCallout>
+
+</ApiReference>
+
+### Agent.a2a
+
+<ApiReference
+  kind="read-only property"
+  path="protolink.agents.Agent.a2a"
+  signature={`a2a: bool`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py"
+>
+
+Report whether the optional A2A 1.0 compatibility boundary was enabled at construction. This is a configuration flag, not a live peer-capability probe.
+
+</ApiReference>
+
+### Agent.client
+
+<ApiReference
+  kind="read-only property"
+  path="protolink.agents.Agent.client"
+  signature={`client: AgentClient | None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py"
+>
+
+Return the outbound client built around the current transport. It is <code>None</code> when no transport is configured; high-level methods such as <code>call_agent()</code> raise rather than silently ignoring that condition.
+
+</ApiReference>
+
+### Agent.server
+
+<ApiReference
+  kind="read-only property"
+  path="protolink.agents.Agent.server"
+  signature={`server: AgentServer | None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py"
+>
+
+Return the inbound server facade created for the current transport, or <code>None</code> when that transport has no server implementation. Runtime and network transports can expose the same logical endpoint specifications through different backends.
+
+</ApiReference>
 
 ## Task and Message Handling
 
 ### Core Task Processing
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `run_task()` | `task: Task` | `Task` | Runs `handle_task()` inside active-task registration so it can be canceled by task ID. Server routes use this wrapper automatically. |
-| `run_task_streaming()` | `task: Task` | `AsyncIterator` | Runs the streaming handler inside active-task registration and guarantees a final canceled status event after successful cancellation. |
-| `handle_task()` | `task: Task` | `Task` | Default task handler. Interprets the Task's Parts (tool calls and inference) and executes them. Can be overridden for custom orchestration. |
-| `handle_task_streaming()` | `task: Task` | `AsyncIterator` | Streams task status, LLM inference events, tool progress, artifact updates, and final completion for streaming-capable transports. |
-| `execute_task()` | `task: Task` | `Task` | Core execution method. For `infer` parts, it delegates to `LLM.infer()`. For `tool_call` parts, it executes the tool directly. |
-| `compact_history()` | `request: HistoryCompactionRequest` ⎪ `dict[str, Any]` ⎪ `None = None` | `HistoryCompactionResult` | Control-plane method behind `POST /llm/history/compact`. Calls `llm.compact_history()` without exposing compaction to the model prompt. |
-| `describe_state()` | `request: str` ⎪ `StateOperationRequest` ⎪ `dict[str, Any]` ⎪ `None = None`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None`, `include_data: bool` ⎪ `None = None` | `StateOperationResult` | Control-plane method behind `POST /state/describe`. Reports enabled stores and optional session state. |
-| `reset_state()` | `request: str` ⎪ `StateOperationRequest` ⎪ `dict[str, Any]` ⎪ `None = None`, `session_id: str` ⎪ `None = None`, `stores: tuple[str, ...]` ⎪ `list[str]` ⎪ `None = None` | `StateOperationResult` | Control-plane method behind `POST /state/reset`. Clears a conversation session or performs a full state reset when no session is supplied. |
-| `compact_state()` | `request: str` ⎪ `StateOperationRequest` ⎪ `dict[str, Any]` ⎪ `None = None`, `session_id: str` ⎪ `None = None`, `strategy: HistoryCompactionStrategy` ⎪ `None = None`, `max_messages: int` ⎪ `None = None`, `max_tokens: int` ⎪ `None = None`, `preserve_recent: int` ⎪ `None = None`, `summary_max_tokens: int` ⎪ `None = None` | `StateOperationResult` | Control-plane method behind `POST /state/compact`. Compacts persisted conversation state through the LLM-owned compactor. |
-| `cancel_task()` | `request: str` ⎪ `TaskCancellationRequest`, `reason: str` ⎪ `None = None` | `Task` | Marks an active task and its `RunContext` canceled, then interrupts its owning coroutine. |
-| `get_cancellation_token()` | `task_id: str` | `CancellationToken` ⎪ `None` | Returns the process-local token for checkpoints in custom long-running handlers. |
-| `active_task_ids` | - | `tuple[str, ...]` | Snapshot of task IDs currently registered on this Agent. |
-| `invoke()` | `message: str`, `part_type: Literal["tool_call", "infer"] = "infer"`, `tool_name: str` ⎪ `None = None`, `tool_args: dict[str, Any]` ⎪ `None = None`, `session_id: str = "invocation_session_id"` | `str` | **Async.** Convenience method for direct agent invocation. Supports `infer` and `tool_call`. Accepts an optional `session_id` for memory. |
-| `sync.invoke()` | `message: str`, `part_type: Literal["tool_call", "infer"] = "infer"`, `tool_name: str` ⎪ `None = None`, `tool_args: dict[str, Any]` ⎪ `None = None`, `session_id: str = "invocation_session_id"` | `str` | Synchronous version of `invoke()`. Useful for testing and simple scripts. |
-| `sync.discover_agents()` | `filter_by: dict[str, Any]` ⎪ `None = None` | `list[AgentCard]` | Synchronous version of `discover_agents()`. |
-| `sync.call_agent()` | `agent_url: str`, `task: Task`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Task` | Synchronous version of `call_agent()`. |
+### Agent.run_task
+
+<ApiReference kind="async method" path="protolink.agents.Agent.run_task" signature={`async run_task(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/engine.py">
+
+Run the configured <code>handle_task()</code> implementation inside the live-execution registry. Server routes use this wrapper so even a completely overridden handler remains discoverable through <code>active_task_ids</code> and cancellable by task ID.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="run task parameters">
+  <ApiField name="task" type="Task" required>The mutable protocol task to execute. Terminal tasks are returned immediately without registering a new execution.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="run task return value">
+  <ApiField name="task" type="Task">The handler result. Successful and canceled snapshots are offered to <code>run_store</code> when configured.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Cancellation behavior">An <code>asyncio.CancelledError</code> raised by live cancellation is converted into a returned task in the <code>canceled</code> state rather than escaping to the caller.</ApiCallout>
+
+</ApiReference>
+
+### Agent.run_task_streaming
+
+<ApiReference kind="async generator" path="protolink.agents.Agent.run_task_streaming" signature={`run_task_streaming(task: Task) -> AsyncIterator[Any]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/engine.py">
+
+Stream the configured handler under the same active-task registration used by non-streaming server routes. This outer wrapper gives custom streaming handlers the runtime's cancellation and snapshot guarantees.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="run streaming task parameters">
+  <ApiField name="task" type="Task" required>Task whose status and outputs are streamed. A terminal task yields one final status event and stops.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Yields"><ApiFields ariaLabel="run streaming task events">
+  <ApiField name="event" type="Any">Typed task status, progress, LLM, artifact, or error events produced by <code>handle_task_streaming()</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Final cancellation event">A successfully canceled stream ends with a final <code>TaskStatusUpdateEvent</code> whose state is <code>canceled</code> and whose metadata includes the serialized task and reason.</ApiCallout>
+
+</ApiReference>
+
+### Agent.handle_task
+
+<ApiReference kind="async method" path="protolink.agents.Agent.handle_task" signature={`async handle_task(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/engine.py">
+
+Provide the default task-handler boundary. It normalizes a <code>RunContext</code>, notifies telemetry, and delegates deterministic execution to <code>execute_task()</code>. Override this method for application-specific routing or orchestration, not merely to add a tool or LLM.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="handle task parameters">
+  <ApiField name="task" type="Task" required>Task to process. Only explicit executable parts are acted upon; ordinary native text does not implicitly trigger inference.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="handle task return value">
+  <ApiField name="task" type="Task">Updated task returned by the execution engine or custom handler.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Subclassing">Remote cancellation wraps this method through <code>run_task()</code>. Direct callers of a fully custom handler should use that wrapper too, or call <code>execute_task()</code> inside the override to retain the standard engine.</ApiCallout>
+
+</ApiReference>
+
+### Agent.handle_task_streaming
+
+<ApiReference kind="async generator" path="protolink.agents.Agent.handle_task_streaming" signature={`handle_task_streaming(task: Task) -> AsyncIterator[Any]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/engine.py">
+
+Execute a task while emitting its lifecycle as typed events. The default stream begins with a working-state transition, relays tool and LLM progress, emits artifact updates, and finishes with a terminal status containing the complete task.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="handle streaming task parameters">
+  <ApiField name="task" type="Task" required>Task to mutate as streamed work completes.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Yields"><ApiFields ariaLabel="handle streaming task events">
+  <ApiField name="event" type="TaskStatusUpdateEvent | TaskProgressEvent | TaskLLMStreamEvent | TaskArtifactUpdateEvent | TaskErrorEvent">Provider-neutral events suitable for SSE, WebSocket, runtime, gRPC, or direct consumers.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Error contract">Execution failures are converted into a <code>TaskErrorEvent</code> followed by a final failed status event. Consumers should use the final status metadata as the authoritative task snapshot.</ApiCallout>
+
+</ApiReference>
+
+### Agent.execute_task
+
+<ApiReference kind="async method" path="protolink.agents.Agent.execute_task" signature={`async execute_task(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/engine.py">
+
+Execute one deterministic step from the most recently appended message or artifact. <code>tool_call</code> parts invoke registered tools, <code>infer</code> parts enter the LLM loop, and authenticated inbound A2A text is translated to inference by the default engine. Other part types are left inert.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="execute task parameters">
+  <ApiField name="task" type="Task" required>The same mutable Task instance receives outputs, artifacts, state transitions, and normalized run-context metadata.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="execute task return value">
+  <ApiField name="task" type="Task">The input object after execution. Success completes it, error output fails it, and an explicit input-required status pauses it.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="History isolation">The engine binds a task-local LLM history. Stateless tasks get fresh history; conversation-enabled sessions load, lock, and save their persisted history so concurrent work cannot interleave one session.</ApiCallout>
+
+</ApiReference>
+
+### Agent.compact_history
+
+<ApiReference kind="async method" path="protolink.agents.Agent.compact_history" signature={`async compact_history(
+    request: HistoryCompactionRequest | dict[str, Any] | None = None,
+) -> HistoryCompactionResult`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Compact the Agent LLM's current or persisted session history through the control plane. The operation is deliberately outside task inference, so it is never advertised to the model and consumes no inference step.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="compact history parameters">
+  <ApiField name="request" type="HistoryCompactionRequest | dict[str, Any] | None" defaultValue="None">Compaction strategy, limits, and optional session ID. <code>None</code> uses <code>HistoryCompactionRequest</code> defaults. Dictionaries are validated through <code>from_dict()</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="compact history return value">
+  <ApiField name="result" type="HistoryCompactionResult">Before/after counts, estimated tokens, strategy, and summary metadata.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="compact history errors">
+  <ApiField name="RuntimeError">The Agent has no LLM.</ApiField>
+  <ApiField name="TypeError">The request or an authorized replacement payload has the wrong shape.</ApiField>
+  <ApiField name="policy error">The <code>llm.history.compact</code> capability is denied or requires unavailable approval.</ApiField>
+</ApiFields></ApiSection>
+
+</ApiReference>
+
+### Agent.describe_state
+
+<ApiReference kind="async method" path="protolink.agents.Agent.describe_state" signature={`async describe_state(
+    request: str | StateOperationRequest | dict[str, Any] | None = None,
+    *,
+    session_id: str | None = None,
+    stores: tuple[str, ...] | list[str] | None = None,
+    include_data: bool | None = None,
+) -> StateOperationResult`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Inspect enabled persistent-state stores without mutating them. A string request is shorthand for a session ID; explicit keyword arguments override values supplied in a request object or dictionary.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="describe state parameters">
+  <ApiField name="request" type="str | StateOperationRequest | dict[str, Any] | None" defaultValue="None">Optional normalized state-operation request or session-ID shorthand.</ApiField>
+  <ApiField name="session_id" type="str | None" defaultValue="None">Limit session-aware reports, especially conversation history, to one logical session.</ApiField>
+  <ApiField name="stores" type="tuple[str, ...] | list[str] | None" defaultValue="None">Store names to report. <code>None</code> asks the State implementation for its normal scope.</ApiField>
+  <ApiField name="include_data" type="bool | None" defaultValue="None">Whether reports may include stored data in addition to existence and counts; omitted preserves any request value.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="describe state return value"><ApiField name="result" type="StateOperationResult">A structured per-store report, including disabled or missing stores rather than hiding them.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Authorization">The operation requires <code>state.describe</code>. Although read-only, policy may still redact, replace, approve, or deny the concrete request.</ApiCallout>
+
+</ApiReference>
+
+### Agent.reset_state
+
+<ApiReference kind="async method" path="protolink.agents.Agent.reset_state" signature={`async reset_state(
+    request: str | StateOperationRequest | dict[str, Any] | None = None,
+    *,
+    session_id: str | None = None,
+    stores: tuple[str, ...] | list[str] | None = None,
+) -> StateOperationResult`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Clear persistent Agent state through an authorized control-plane action. Supplying a session ID precisely clears that conversation session; omitting it performs a namespace-level reset of all enabled stores.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="reset state parameters">
+  <ApiField name="request" type="str | StateOperationRequest | dict[str, Any] | None" defaultValue="None">Request object, dictionary, session-ID shorthand, or default full-reset request.</ApiField>
+  <ApiField name="session_id" type="str | None" defaultValue="None">Conversation session to clear. This is the safer, narrower form for user-facing reset controls.</ApiField>
+  <ApiField name="stores" type="tuple[str, ...] | list[str] | None" defaultValue="None">Requested store selection. Partial namespace-wide resets may be rejected because the current storage abstraction resets by namespace.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="reset state return value"><ApiField name="result" type="StateOperationResult">Structured reset, missing-store, and error reports.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Destructive operation">The action requires <code>state.reset</code> authorization and mutates persisted data. Use a <code>session_id</code> whenever the intent is to forget one conversation rather than the Agent namespace.</ApiCallout>
+
+</ApiReference>
+
+### Agent.compact_state
+
+<ApiReference kind="async method" path="protolink.agents.Agent.compact_state" signature={`async compact_state(
+    request: str | StateOperationRequest | dict[str, Any] | None = None,
+    *,
+    session_id: str | None = None,
+    strategy: HistoryCompactionStrategy | None = None,
+    max_messages: int | None = None,
+    max_tokens: int | None = None,
+    preserve_recent: int | None = None,
+    summary_max_tokens: int | None = None,
+) -> StateOperationResult`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Load one persisted conversation, compact it with the LLM-owned history compactor, save the replacement history, and return before/after state metadata.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="compact state parameters">
+  <ApiField name="request" type="str | StateOperationRequest | dict[str, Any] | None" defaultValue="None">Base state-operation request or session shorthand.</ApiField>
+  <ApiField name="session_id" type="str | None" defaultValue="None">Required logical conversation session. If absent, the method returns a structured error result rather than raising.</ApiField>
+  <ApiField name="strategy" type="HistoryCompactionStrategy | None" defaultValue="None">Recent-message, token-budget, or summary strategy. <code>None</code> preserves the request/default strategy.</ApiField>
+  <ApiField name="max_messages" type="int | None" defaultValue="None">Maximum retained messages for message-count compaction.</ApiField>
+  <ApiField name="max_tokens" type="int | None" defaultValue="None">Estimated history-token budget for token compaction.</ApiField>
+  <ApiField name="preserve_recent" type="int | None" defaultValue="None">Recent messages protected when older context is summarized.</ApiField>
+  <ApiField name="summary_max_tokens" type="int | None" defaultValue="None">Maximum tokens requested for the generated summary.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="compact state return value"><ApiField name="result" type="StateOperationResult">A report showing whether conversation state existed, whether it was compacted, and nested compaction counts.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Requirements">Conversation state, an LLM, and an existing session are required. Missing prerequisites are reported in <code>result.errors</code>; policy denial still raises through the authorization layer.</ApiCallout>
+
+</ApiReference>
+
+### Agent.cancel_task
+
+<ApiReference kind="async method" path="protolink.agents.Agent.cancel_task" signature={`async cancel_task(
+    request: str | TaskCancellationRequest,
+    reason: str | None = None,
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Request best-effort cancellation of work currently registered on this process. The runtime marks both Task and RunContext cancellation state, signals the cooperative token, and interrupts the owning coroutine at its next await point.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="cancel task parameters">
+  <ApiField name="request" type="str | TaskCancellationRequest" required>Active task ID or typed request. A typed request can carry its own reason.</ApiField>
+  <ApiField name="reason" type="str | None" defaultValue="None">Human-readable reason. When supplied alongside a typed request, this explicit value takes precedence.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="cancel task return value"><ApiField name="task" type="Task">The active task after transition to <code>canceled</code>.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="cancel task errors">
+  <ApiField name="TaskNotFoundError">No active execution with that ID exists on this Agent.</ApiField>
+  <ApiField name="TaskNotCancelableError">The task has already reached a terminal state.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Best effort">Already-issued external side effects and synchronous CPU work cannot be forcibly undone. Custom long-running handlers should call the live token's <code>raise_if_cancelled()</code> at safe checkpoints.</ApiCallout>
+
+</ApiReference>
+
+### Agent.get_cancellation_token
+
+<ApiReference kind="method" path="protolink.agents.Agent.get_cancellation_token" signature={`get_cancellation_token(task_id: str) -> CancellationToken | None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Return the process-local cooperative token for an active task.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="get cancellation token parameters"><ApiField name="task_id" type="str" required>Task ID currently visible in <code>active_task_ids</code>.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="get cancellation token return value"><ApiField name="token" type="CancellationToken | None">Live token, or <code>None</code> after completion or before registration. Tokens are never serialized into protocol objects.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Agent.active_task_ids
+
+<ApiReference kind="read-only property" path="protolink.agents.Agent.active_task_ids" signature={`active_task_ids: tuple[str, ...]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Return an immutable snapshot of task IDs currently registered for live execution. Completed tasks disappear immediately; query a configured run store for historical snapshots.
+
+</ApiReference>
+
+### Agent.invoke
+
+<ApiReference kind="async method" path="protolink.agents.Agent.invoke" signature={`async invoke(
+    message: str,
+    part_type: Literal["tool_call", "infer"] = "infer",
+    tool_name: str | None = None,
+    tool_args: dict[str, Any] | None = None,
+    session_id: str = "invocation_session_id",
+) -> str`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Create a one-step task, process it through <code>handle_task()</code>, and return only the final part content. This convenience API is useful for direct application calls but intentionally discards the richer Task envelope.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="invoke parameters">
+  <ApiField name="message" type="str" required>User prompt for inference. In tool-call mode it is not used as the tool argument payload.</ApiField>
+  <ApiField name="part_type" type={'Literal["tool_call", "infer"]'} defaultValue={'"infer"'}>Choose an LLM inference part or an explicit registered-tool call.</ApiField>
+  <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name in tool-call mode. Omission becomes an empty name and therefore produces a normal tool-not-found output.</ApiField>
+  <ApiField name="tool_args" type="dict[str, Any] | None" defaultValue="None">Keyword arguments encoded into the tool-call part.</ApiField>
+  <ApiField name="session_id" type="str" defaultValue={'"invocation_session_id"'}>Conversation-state partition attached to task metadata. The stable default means sequential invocations share history when conversation state is enabled.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="invoke return value"><ApiField name="response" type="str">Last part content, or <code>"No response generated"</code> when the task produced none.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="invoke errors"><ApiField name="ValueError">An unsupported <code>part_type</code> was supplied.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Task details">Use <code>handle_task()</code>, <code>run_task()</code>, or the client API when callers need task state, artifacts, run context, or structured error information.</ApiCallout>
+
+</ApiReference>
 
 #### Task Lifecycle
 
@@ -523,10 +986,49 @@ writer = Agent(
 
 ### Communication Methods
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `call_agent()` | `agent_url: str`, `task: Task`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Task` | Sends a task to another agent. `"auto"` prefers ProtoLink and discovers A2A-only peers; `"protolink"` and `"a2a"` select explicitly. |
-| `send_message_to()` | `agent_url: str`, `message: Message`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Message` | Sends a message with the same protocol selection behavior. |
+### Agent.call_agent
+
+<ApiReference kind="async method" path="protolink.agents.Agent.call_agent" signature={`async call_agent(
+    agent_url: str,
+    task: Task,
+    *,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Send a complete Task to a peer through this Agent's configured client. Before dispatch, ProtoLink ensures that the task carries a RunContext and extends its agent chain for trace and delegation correlation.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="call agent parameters">
+  <ApiField name="agent_url" type="str" required>Reachable peer URL or runtime URI.</ApiField>
+  <ApiField name="task" type="Task" required>Mutable Task envelope to send. Transport serialization does not strip its native metadata when ProtoLink protocol is used.</ApiField>
+  <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}><code>"auto"</code> preserves the richer native contract and discovers A2A-only peers when A2A is enabled. The other values force one boundary.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="call agent return value"><ApiField name="task" type="Task">Peer response task with its updated lifecycle and outputs.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="call agent errors"><ApiField name="RuntimeError">This Agent has no configured transport/client.</ApiField><ApiField name="transport or protocol error">Connection, authentication, translation, and peer errors propagate from <code>AgentClient</code>.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Agent.send_message_to
+
+<ApiReference kind="async method" path="protolink.agents.Agent.send_message_to" signature={`async send_message_to(
+    agent_url: str,
+    message: Message,
+    *,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
+) -> Message`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Send a standalone Message to a peer and return its response message. Use <code>call_agent()</code> when lifecycle state, artifacts, metadata, cancellation, or structured-flow context matters.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="send message parameters">
+  <ApiField name="agent_url" type="str" required>Reachable peer address.</ApiField>
+  <ApiField name="message" type="Message" required>Role and parts to send.</ApiField>
+  <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}>Same protocol-selection rules as <code>call_agent()</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="send message return value"><ApiField name="message" type="Message">Response decoded from the peer.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="send message errors"><ApiField name="RuntimeError">No transport/client is configured.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
 
 ```python
 agent = Agent(card=card, transport="http", a2a=True)
@@ -566,11 +1068,80 @@ The synchronous API is **not thread-safe** if called from within an active event
 :::
 ### Key Sync Methods
 
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `agent.sync.invoke()` | `message: str`, `part_type: Literal["tool_call", "infer"] = "infer"`, `tool_name: str` ⎪ `None = None`, `tool_args: dict[str, Any]` ⎪ `None = None`, `session_id: str = "invocation_session_id"` | `str` | Blocking version of `invoke()`. Processes a message and returns the text result. |
-| `agent.sync.discover_agents()` | `filter_by: dict[str, Any]` ⎪ `None = None` | `list[AgentCard]` | Blocking version of `discover_agents()`. Fetches agents from the registry. |
-| `agent.sync.call_agent()` | `agent_url: str`, `task: Task`, `protocol: Literal["auto", "protolink", "a2a"] = "auto"` | `Task` | Blocking version of `call_agent()` with the same protocol selection. |
+The sync facade exposes blocking equivalents with the same parameter and return contracts:
+
+### SyncAgent.invoke
+
+<ApiReference kind="method" path="protolink.agents.SyncAgent.invoke" signature={`invoke(
+    message: str,
+    part_type: Literal["tool_call", "infer"] = "infer",
+    tool_name: str | None = None,
+    tool_args: dict[str, Any] | None = None,
+    session_id: str = "invocation_session_id",
+) -> str`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+Blocking form of <code>Agent.invoke()</code>. Every argument and the returned final-part text have the same meaning; the wrapper runs the coroutine with <code>asyncio.run()</code>.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="SyncAgent invoke parameters">
+    <ApiField name="message" type="str" required>User prompt used to create an infer Part. In tool-call mode the wrapper still forwards it, but the underlying Agent builds the tool Part from <code>tool_name</code> and <code>tool_args</code>.</ApiField>
+    <ApiField name="part_type" type={'Literal["tool_call", "infer"]'} defaultValue={'"infer"'}>Select direct inference or an explicit tool call. Other values are rejected by <code>Agent.invoke()</code>.</ApiField>
+    <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name for tool-call mode. A falsey value becomes an empty tool name and produces the Agent's normal tool-not-found result.</ApiField>
+    <ApiField name="tool_args" type="dict[str, Any] | None" defaultValue="None">Keyword arguments placed in the generated tool-call Part. <code>None</code> and an empty mapping are normalized to an empty argument mapping.</ApiField>
+    <ApiField name="session_id" type="str" defaultValue={'"invocation_session_id"'}>Session identifier written to task metadata before execution. The stable default shares conversation state across sequential invocations when conversation persistence is enabled.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### SyncAgent.discover_agents
+
+<ApiReference kind="method" path="protolink.agents.SyncAgent.discover_agents" signature={`discover_agents(
+    filter_by: dict[str, Any] | None = None,
+) -> list[AgentCard]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+Blocking registry discovery with the Agent's normal TTL cache and empty-list behavior when no registry is configured.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="sync discover parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Optional nested card-field criteria forwarded to registry discovery.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### SyncAgent.call_agent
+
+<ApiReference kind="method" path="protolink.agents.SyncAgent.call_agent" signature={`call_agent(
+    agent_url: str,
+    task: Task,
+    *,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+Blocking form of <code>Agent.call_agent()</code>, including context propagation and protocol selection.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="SyncAgent call_agent parameters">
+    <ApiField name="agent_url" type="str" required>Reachable peer URL or runtime URI forwarded unchanged to the Agent client.</ApiField>
+    <ApiField name="task" type="Task" required>Mutable task envelope sent to the peer after the Agent ensures its run context.</ApiField>
+    <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}>Keyword-only protocol selector. <code>"auto"</code> prefers the native ProtoLink contract and discovers an A2A-only boundary when configured; the other values force one protocol.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### SyncAgent.cancel_task
+
+<ApiReference kind="method" path="protolink.agents.SyncAgent.cancel_task" signature={`cancel_task(
+    task_id: str,
+    reason: str | None = None,
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+Blocking form of local live-task cancellation.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="SyncAgent cancel_task parameters">
+    <ApiField name="task_id" type="str" required>ID of an execution currently registered on the wrapped Agent. Unlike the async method, this facade does not accept a <code>TaskCancellationRequest</code>.</ApiField>
+    <ApiField name="reason" type="str | None" defaultValue="None">Optional human-readable cancellation reason propagated to the task state and serialized RunContext.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Concurrency requirement">The target task must already be running on another coroutine or the Agent's background loop. A synchronous caller cannot interrupt work while blocked inside the same call stack.</ApiCallout>
+
+</ApiReference>
 
 ### Usage Example
 
@@ -613,8 +1184,10 @@ Skills represent the capabilities that an agent can perform. Skills are stored i
 
 When using `"auto"` mode, the agent detects skills from:
 
-1. **Tools**: Each registered tool becomes a skill
-2. **Public Methods**: Optional detection of public methods (controlled by `include_public_methods` parameter)
+1. **Tools**: Each registered tool becomes a skill when it is added.
+2. **Card declarations**: Existing `AgentCard.skills` are retained.
+
+The internal detector can describe public methods, but the public `Agent(..., skills="auto")` path intentionally calls it with public-method detection disabled. This keeps infrastructure methods such as lifecycle and registry controls out of the advertised skill list.
 
 ```python
 # Auto-detect skills from tools only
@@ -653,11 +1226,96 @@ agent = Agent(card, skills="fixed")
 
 Tools give agents explicit callable capabilities. ProtoLink supports opt-in built-ins, native Python functions, custom `BaseTool` implementations, and MCP adapters.
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `add_tool()` | `tool: BaseTool` | `None` | Registers a tool with the agent and automatically adds it as a skill to the AgentCard. |
-| `tool()` | `name: str`, `description: str`, `input_schema: dict[str, Any]` ⎪ `None = None`, `output_schema: dict[str, Any]` ⎪ `None = None`, `tags: list[str]` ⎪ `None = None`, `examples: list[Any]` ⎪ `None = None`, `capabilities: list[str]` ⎪ `tuple[str, ...]` ⎪ `set[str]` ⎪ `None = None`, `action_builder: ActionBuilder` ⎪ `None = None` | `decorator` | Decorator for registering Python functions as tools (automatically adds as skills). |
-| `call_tool()` | `tool_name: str`, `**kwargs` | `Any` | Executes a registered tool by name with provided arguments. |
+### Agent.add_tool
+
+<ApiReference kind="method" path="protolink.agents.Agent.add_tool" signature={`add_tool(tool: BaseTool) -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Register or replace a runtime tool by name and synchronize its public skill advertisement.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="add tool parameters"><ApiField name="tool" type="BaseTool" required>Executable tool carrying a stable name, description, schemas, tags, and examples. Replacing an existing runtime tool also replaces its generated skill; an independently card-defined skill with the same ID is preserved on the first registration.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="No execution">Registration has no external side effect beyond mutating <code>agent.tools</code> and <code>card.skills</code>. Policy, validation, approvals, telemetry, and cancellation run only when the tool is called.</ApiCallout>
+
+</ApiReference>
+
+### Agent.tool
+
+<ApiReference kind="decorator factory" path="protolink.agents.Agent.tool" signature={`tool(
+    name: str,
+    description: str,
+    input_schema: dict[str, Any] | None = None,
+    output_schema: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
+    examples: list[Any] | None = None,
+    capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
+    action_builder: ActionBuilder | None = None,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Wrap a Python callable as a ProtoLink <code>Tool</code>, register it immediately, and return the original callable so ordinary direct Python usage remains possible.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="tool decorator parameters">
+  <ApiField name="name" type="str" required>Stable identifier exposed to models, peers, policy, and serialized configuration.</ApiField>
+  <ApiField name="description" type="str" required>Purpose statement used in prompts and skill discovery.</ApiField>
+  <ApiField name="input_schema" type="dict[str, Any] | None" defaultValue="None">Optional JSON Schema used to validate keyword arguments before authorization.</ApiField>
+  <ApiField name="output_schema" type="dict[str, Any] | None" defaultValue="None">Descriptive return schema advertised with the tool.</ApiField>
+  <ApiField name="tags" type="list[str] | None" defaultValue="None">Discovery and presentation labels.</ApiField>
+  <ApiField name="examples" type="list[Any] | None" defaultValue="None">Representative invocations copied to the generated Agent skill.</ApiField>
+  <ApiField name="capabilities" type="list[str] | tuple[str, ...] | set[str] | None" defaultValue="None">Permission capabilities that policy must authorize immediately before execution.</ApiField>
+  <ApiField name="action_builder" type="ActionBuilder | None" defaultValue="None">Hook that can enrich the concrete <code>RunAction</code> with preview artifacts or metadata before approval.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="tool decorator return value"><ApiField name="decorator" type="Callable">Decorator that registers the wrapped function and returns that same function.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Agent.call_tool
+
+<ApiReference kind="async method" path="protolink.agents.Agent.call_tool" signature={`async call_tool(
+    tool_name: str,
+    **kwargs,
+) -> Any`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Validate, authorize, and execute a registered tool with a fresh RunContext associated with this Agent.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="call tool parameters"><ApiField name="tool_name" type="str" required>Registered key in <code>agent.tools</code>.</ApiField><ApiField name="**kwargs" type="Any">Arguments validated against the tool schema, then passed to its callable after policy authorization.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="call tool return value"><ApiField name="result" type="Any">Raw tool result; unlike task execution, this method does not wrap success or failure in a <code>tool_output</code> Part.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="call tool errors"><ApiField name="ValueError">The named tool is not registered.</ApiField><ApiField name="validation, policy, approval, or tool error">Direct calls propagate these errors to the caller.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Agent.call_tool_in_context
+
+<ApiReference kind="async method" path="protolink.agents.Agent.call_tool_in_context" signature={`async call_tool_in_context(
+    tool_name: str,
+    context: RunContext,
+    **kwargs: Any,
+) -> Any`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Execute a tool while preserving an application-supplied RunContext. Use this form in deterministic flows and custom runtimes so permissions, trace IDs, budgets, workspace metadata, and cancellation state participate in authorization.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="call tool in context parameters">
+    <ApiField name="tool_name" type="str" required>Registered key in <code>agent.tools</code>. An unknown name raises <code>ValueError</code> before authorization.</ApiField>
+    <ApiField name="context" type="RunContext" required>Existing typed run context supplied unchanged to tool-action preparation and policy authorization.</ApiField>
+    <ApiField name="**kwargs" type="Any">Tool keyword arguments. The runtime validates supported schemas, authorizes the prepared action, and invokes the tool with the authorized argument mapping, which may differ from the original mapping.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### Agent.authorize_action
+
+<ApiReference kind="async method" path="protolink.agents.Agent.authorize_action" signature={`async authorize_action(
+    action: RunAction,
+    context: RunContext | None = None,
+) -> ActionAuthorization`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Evaluate a fully prepared runtime action without executing its side effect. Custom orchestration can use the same policy and approval checkpoint as built-in tools.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="authorize action parameters"><ApiField name="action" type="RunAction" required>Concrete operation, payload, capabilities, description, and preview artifacts to evaluate.</ApiField><ApiField name="context" type="RunContext | None" defaultValue="None">Active run context; omission creates a fresh context containing this Agent in its chain.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="authorize action return value"><ApiField name="authorization" type="ActionAuthorization">Approved action, potentially with policy- or approver-modified payload.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Important">Execute <code>authorization.action</code>, not an earlier copy of the action. Policies and approvers may narrow or replace arguments during authorization.</ApiCallout>
+
+</ApiReference>
 
 ```python
 # Using the decorator approach
@@ -681,24 +1339,108 @@ Built-ins are never enabled automatically. Registered built-ins follow the same 
 
 ## Registry & Discovery
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `discover_agents()` | `filter_by: dict[str, Any]` ⎪ `None = None` | `list[AgentCard]` | Discover agents in the registry matching the filter criteria. |
-| `register()` | - | `None` | Registers this agent in the global registry. |
-| `unregister()` | - | `None` | Unregisters this agent from the global registry. |
+### Agent.discover_agents
+
+<ApiReference kind="async method" path="protolink.agents.Agent.discover_agents" signature={`async discover_agents(
+    filter_by: dict[str, Any] | None = None,
+) -> list[AgentCard]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Query the configured registry for matching cards. Results are cached per stringified filter only when <code>discovery_ttl</code> is greater than zero.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="discover agents parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Optional registry-side card criteria, including nested fields such as <code>{'{"capabilities.streaming": true}'}</code>.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="discover agents return value"><ApiField name="cards" type="list[AgentCard]">Matching cards, or an empty list when no registry client is configured.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Agent.register / Agent.unregister
+
+<ApiReference kind="async methods" path="protolink.agents.Agent.register / unregister" signature={`async register() -> None
+async unregister() -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Register this Agent's current card or remove its URL from the configured registry. Both methods return silently when no registry client exists. Manual <code>register()</code> does not start the automatic heartbeat loop; lifecycle startup owns heartbeat scheduling.
+
+</ApiReference>
 
 ## Utility Methods
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `get_agent_card()` | `as_json: bool = True` | `AgentCard` ⎪ `dict[str, Any]` | Returns the agent's identity card. |
-| `get_status()` | `output_format: Literal["html", "json"] = "html"` | `str` | Returns the agent's status as HTML or JSON. HTML is a rich status page for the agent (displayed at `/status`). JSON is a machine-readable representation of the agent's status. |
-| `get_chat()` | - | `str` | Returns a self-contained chat UI as HTML. Only functional when the agent has an LLM configured (served at `/chat`). |
-| `handle_chat_message()` | `data: dict[str, Any]` | `dict[str, str]` | Processes an incoming chat message via the agent's `invoke()` method and returns the response. |
-| `llm` (property) | `LLM` ⎪ `None` | `LLM` ⎪ `None` | Gets or sets the agent's language model. Setting this validates the connection and updates `card.capabilities.has_llm` automatically. |
-| `storage` (property) | `Storage` | `Storage` | Gets or sets the agent's storage instance. Setting this automatically updates the internal `State` storage reference. |
-| `set_registry()` | `registry: TransportType` ⎪ `Registry` ⎪ `RegistryClient` ⎪ `None`, `registry_url: str` ⎪ `None = None` | `None` | Configures the agent's connection to a Protolink registry. |
-| `sync` (property) | - | `SyncAgent` | Returns a synchronous wrapper around the agent for blocking operations. |
+### Agent.get_agent_card
+
+<ApiReference kind="method" path="protolink.agents.Agent.get_agent_card" signature={`get_agent_card(*, as_json: bool = True) -> AgentCard | dict[str, Any]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Return the live identity card or its serializable dictionary representation. <code>as_json=True</code> returns a dictionary despite the historical parameter name; it does not return a JSON string.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="get agent card parameters">
+    <ApiField name="as_json" type="bool" defaultValue="True">Keyword-only representation switch. True calls <code>card.to_dict()</code>; false returns the Agent's live <code>AgentCard</code> object rather than a defensive copy.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### Agent.get_status / Agent.get_chat
+
+<ApiReference kind="methods" path="protolink.agents.Agent status renderers" signature={`get_status(
+    output_format: Literal["html", "json"] = "html",
+) -> str
+get_chat() -> str`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Render the built-in operational status or chat page. HTML mode and <code>get_chat()</code> return self-contained browser markup. Despite the <code>"json"</code> format name, the current <code>get_status("json")</code> implementation returns <code>str(card.to_dict())</code>, which is a Python dictionary representation rather than guaranteed valid JSON. The chat renderer displays a fallback when no LLM is configured, while POST chat handling requires an LLM and enabled exposure.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Agent status renderer parameters">
+    <ApiField name="output_format" type={'Literal["html", "json"]'} defaultValue={'"html"'}>Format used only by <code>get_status()</code>. HTML renders the operational page; JSON returns the string form of the card dictionary. Any other runtime value raises <code>ValueError</code>. <code>get_chat()</code> takes no arguments.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### Agent.handle_chat_message
+
+<ApiReference kind="async method" path="protolink.agents.Agent.handle_chat_message" signature={`async handle_chat_message(
+    data: dict[str, Any],
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Validate an incoming chat payload, invoke the Agent with its message and session ID, and return a response dictionary. The server route controls whether this handler is exposed.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="handle chat message parameters">
+    <ApiField name="data" type="dict[str, Any]" required>Mapping containing <code>message</code> and optionally <code>session_id</code>. A missing or falsey message returns an error mapping; the session defaults to <code>"chat_default"</code>. The handler also returns error mappings when no LLM is configured, chat exposure is disabled, or invocation raises.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+### Agent.llm / Agent.storage
+
+<ApiReference kind="properties" path="protolink.agents.Agent.llm / storage" signature={`llm: LLM | None
+storage: Storage`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+The <code>llm</code> setter calls <code>validate_connection()</code> and updates <code>card.capabilities.has_llm</code> from that result. The <code>storage</code> setter updates the existing State object's storage reference so future persistence follows the replacement backend; the annotation expects <code>Storage</code>, but the setter performs no runtime type check.
+
+<ApiCallout label="Existing data">Changing <code>storage</code> does not migrate data from the old backend. Changing <code>llm</code> does not rewrite existing conversation histories or rebuild a running server's route set.</ApiCallout>
+
+</ApiReference>
+
+### Agent.set_registry
+
+<ApiReference kind="method" path="protolink.agents.Agent.set_registry" signature={`set_registry(
+    registry: TransportType | Registry | RegistryClient | None,
+    registry_url: str | None = None,
+) -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Replace the Agent's discovery client. Passing <code>None</code> disables discovery; a Registry or RegistryClient is adopted; a transport alias constructs a client for <code>registry_url</code>.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="set registry parameters">
+    <ApiField name="registry" type="TransportType | Registry | RegistryClient | None" required>Required selection value. A Registry contributes its client, a RegistryClient is retained directly, and a transport alias constructs a new client. A falsey value clears <code>registry_client</code> and logs an error; an unsupported truthy object also clears it.</ApiField>
+    <ApiField name="registry_url" type="str | None" defaultValue="None">Registry endpoint used only when <code>registry</code> is a transport alias. If omitted for an alias, the method logs an error and returns without replacing the existing registry client.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="No automatic registration">Reconfiguration does not register the card or start heartbeats. Call <code>register()</code>, or start the Agent with lifecycle registration enabled.</ApiCallout>
+
+</ApiReference>
+
+### Agent.sync
+
+<ApiReference kind="attribute" path="protolink.agents.Agent.sync" signature={`sync: SyncAgent`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/base.py">
+Per-instance blocking facade created during Agent construction. It is an ordinary attribute rather than a class property, and it delegates to this exact Agent instance.
+
+</ApiReference>
 
 ## Storage and Persistence
 
@@ -814,6 +1556,46 @@ The `/status` page shows the agent's operational health and metadata. The `/chat
 
 Protolink supports exporting an agent's configuration (identity card, capabilities, transport, TLS file references, LLM, security/authenticator, registered tools, and non-default first-party capability policy) to a YAML file, and importing it back to reconstruct a functional `Agent` instance. TLS serialization stores certificate paths and settings, never certificate or private-key contents.
 
+### Agent serialization methods
+
+<ApiReference
+  kind="methods"
+  path="protolink.agents.Agent serialization"
+  signature={`to_dict() -> dict[str, Any]
+to_yaml_string() -> str
+to_yaml(filepath: str) -> None
+
+Agent.from_dict(data: dict[str, Any], **overrides) -> Agent
+Agent.from_yaml_string(yaml_str: str, **overrides) -> Agent
+Agent.from_yaml(filepath: str, **overrides) -> Agent`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py"
+>
+
+Export the reconstructable Agent configuration as Python data or YAML, or create a new Agent from one of those representations. Import methods are class methods: subclasses receive an instance of the subclass.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Agent serialization parameters">
+    <ApiField name="data" type="dict[str, Any]" required>
+      Parsed Agent configuration for <code>from_dict()</code>.
+    </ApiField>
+    <ApiField name="yaml_str" type="str" required>
+      YAML document for <code>from_yaml_string()</code>.
+    </ApiField>
+    <ApiField name="filepath" type="str" required>
+      Destination for <code>to_yaml()</code> or source for <code>from_yaml()</code>.
+    </ApiField>
+    <ApiField name="**overrides" type="Any">
+      Constructor values that replace serialized values during import. Use overrides for environment-specific transports, credentials, executable policies, approval handlers, or other dependencies that should not be trusted or embedded.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Serialization boundary">
+  Configuration export is not a live runtime checkpoint. Active tasks, event loops, open connections, in-memory discovery caches, cancellation tokens, approval callbacks, and arbitrary executable policy objects are not serialized.
+</ApiCallout>
+
+</ApiReference>
+
 ### Exporting an Agent
 
 To serialize and export an agent's configuration:
@@ -882,7 +1664,7 @@ class EchoAgent(Agent):
 
 The `Agent` class includes several error handling patterns:
 
-- **Missing Transport**: Raises `ValueError` if trying to start without a transport.
+- **Missing Transport**: Construction and `start()` can operate without a server transport, but outbound `call_agent()` and `send_message_to()` raise `RuntimeError`.
 - **Authentication Failures**: Returns `401` or `403` responses for invalid auth.
-- **Tool Errors**: Tool execution errors are propagated to the caller.
-- **Task Processing**: Errors in `handle_task()` are caught and returned as error messages to the sender.
+- **Tool Errors**: Direct `call_tool()` calls propagate validation, policy, approval, and tool errors. Task-based tool execution converts ordinary tool failures into an error-bearing `tool_output` part; policy failures remain raised.
+- **Task Processing**: Non-streaming engine errors mark the task failed and are re-raised through direct handler calls. The streaming engine emits a `TaskErrorEvent` and a final failed status event.

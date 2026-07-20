@@ -1,4 +1,10 @@
 import ApiSurface from '@site/src/components/ApiSurface';
+import ApiReference, {
+  ApiCallout,
+  ApiField,
+  ApiFields,
+  ApiSection,
+} from '@site/src/components/ApiReference';
 
 # Registry
 
@@ -168,10 +174,34 @@ The transport is responsible for:
 
 These methods control the registry server component lifecycle.
 
-| Name | Parameters | Returns | Description |
-|------|------------|---------|-------------|
-| `start()` | `background: bool = False` | `None` | Starts the Registry runtime. Can run in the main loop or as an isolated background thread. |
-| `stop()` | - | `None` | Stops the Registry runtime and synchronously cleans up resources. |
+### Registry.start
+
+<ApiReference kind="method" path="protolink.discovery.Registry.start" signature={`start(
+    *,
+    background: bool = False,
+) -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Start the RegistryServer and keep its transport lifecycle alive. This public entry point is synchronous even though server startup and shutdown are asynchronous.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry start parameters"><ApiField name="background" type="bool" defaultValue="False">When false, run the lifecycle with <code>asyncio.run()</code> and block the caller. When true, start a non-daemon thread with its own event loop, wait for readiness, and return.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry start return"><ApiField name="None" type="None">Background mode returns after startup readiness or the ten-second readiness wait. Blocking mode returns after shutdown.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Registry start errors"><ApiField name="startup error">Transport binding, route setup, and server failures propagate. Background failures are captured in the lifecycle thread and re-raised to the caller.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Active event loops">Blocking mode logs an error but still calls <code>asyncio.run()</code>; from an active loop that raises <code>RuntimeError</code>. Use <code>background=True</code> in async applications and notebooks.</ApiCallout>
+
+</ApiReference>
+
+### Registry.stop
+
+<ApiReference kind="method" path="protolink.discovery.Registry.stop" signature={`stop() -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Cancel the private background lifecycle task and synchronously wait up to ten seconds for its thread to exit. Lifecycle cancellation calls the server's async stop path, which closes the shared transport.
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry stop return"><ApiField name="None" type="None">Returns after the background thread exits or the join timeout elapses.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Repeated calls">The internal async stop primitive is guarded, and calling the public method again is safe.</ApiCallout>
+
+</ApiReference>
 
 ### Execution Models
 
@@ -256,39 +286,193 @@ agent = Agent(
 
 The user-facing Registry surface in `protolink.discovery.registry.Registry` includes:
 
-| Method | Purpose |
-|------|-------------|
-| `register(card)` | Send an agent card to the registry transport for registration. |
-| `heartbeat(agent_url)` | Refresh `last_seen` for a registered agent through the registry transport. |
-| `unregister(agent_url)` | Remove an agent through the registry transport. |
-| `discover(filter_by=None)` | Return matching live `AgentCard` objects through the registry transport. |
-| `list_urls()` | Return registered agent URLs from the local in-process registry store. |
-| `count()` | Return the number of live local entries after TTL pruning. |
-| `clear()` | Clear local entries, secondary indexes, and persisted registry state if storage is configured. |
-| `get_entry(agent_url)` | Return local `RegistryEntry` liveness metadata for diagnostics and tests. |
+### Registry.register
+
+<ApiReference kind="async method" path="protolink.discovery.Registry.register" signature={`async register(
+    card: AgentCard,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Send an AgentCard to this Registry's transport-backed client. This does not update the local store directly; the served request returns through <code>handle_register()</code>, even when client and server belong to the same Registry object.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry register parameters"><ApiField name="card" type="AgentCard" required>Complete identity and capability card keyed by its stable URL on the server.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry register return"><ApiField name="status" type="dict[str, str]">Server status payload. Unlike RegistryClient, this facade catches any exception, logs it, and returns <code>{'{"status": str(error)}'}</code>.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Retry contract">The built-in register request is not idempotent and is not automatically retried by transport policy.</ApiCallout>
+
+</ApiReference>
+
+### Registry.heartbeat
+
+<ApiReference kind="async method" path="protolink.discovery.Registry.heartbeat" signature={`async heartbeat(
+    agent_url: str,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Ask the running registry service to refresh one entry's liveness timestamp.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry heartbeat parameters"><ApiField name="agent_url" type="str" required>Stable URL used as the entry key.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry heartbeat return"><ApiField name="status" type="dict[str, str]">Success, not-found, or caught-error status. A heartbeat never changes the card or secondary indexes.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Registry.unregister
+
+<ApiReference kind="async method" path="protolink.discovery.Registry.unregister" signature={`async unregister(
+    agent_url: str,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Send an idempotent removal request through the configured RegistryClient.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry unregister parameters"><ApiField name="agent_url" type="str" required>Stable URL to remove.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry unregister return"><ApiField name="status" type="dict[str, str]">Server or caught-error status. Removing an unknown URL still returns the handler's success message.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Registry.discover
+
+<ApiReference kind="async method" path="protolink.discovery.Registry.discover" signature={`async discover(
+    filter_by: dict[str, Any] | None = None,
+) -> list[AgentCard]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Query the running service through RegistryClient and reconstruct matching AgentCard objects.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry discover parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Exact field filters. Name, role, and a single string tag use secondary indexes; other fields and tag lists are refined by the full matcher.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry discover return"><ApiField name="cards" type="list[AgentCard]">All live cards when no filter is supplied, otherwise exact matches after TTL pruning.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Registry discover errors"><ApiField name="transport, decoding, or model error">Unlike the three status-returning facade methods, <code>discover()</code> does not catch RegistryClient failures.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Registry.list_urls / Registry.count
+
+<ApiReference kind="methods" path="protolink.discovery.Registry local inspection" signature={`list_urls() -> list[str]
+count() -> int`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Inspect the in-process store without a transport request. Both methods first prune expired entries and persist the pruned store when storage is configured. <code>list_urls()</code> preserves dictionary insertion order; <code>count()</code> returns the number of currently live entries.
+
+</ApiReference>
+
+### Registry.get_entry
+
+<ApiReference kind="method" path="protolink.discovery.Registry.get_entry" signature={`get_entry(
+    agent_url: str,
+) -> RegistryEntry | None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Return local liveness metadata for one URL after TTL pruning.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry get entry parameters"><ApiField name="agent_url" type="str" required>Local entry key.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry get entry return"><ApiField name="entry" type="RegistryEntry | None">The stored entry object or <code>None</code>. This is the live object, not a defensive copy.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Registry.clear
+
+<ApiReference kind="method" path="protolink.discovery.Registry.clear" signature={`clear() -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Remove every local card, RegistryEntry, and secondary-index value, then persist the empty entry list when storage is configured.
+
+<ApiCallout label="Administrative mutation">This bypasses transport, authentication, and server handlers. It is intended for code that owns the in-process Registry, tests, and explicit administration.</ApiCallout>
+
+</ApiReference>
 
 The `handle_*` methods are the server-side endpoint hooks used by `RegistryServer`. They are part of the served registry implementation, but most callers should not need them unless they are writing tests, custom transports, or an alternate registry server.
 
+### Registry.handle_register
+
+<ApiReference kind="async handler" path="protolink.discovery.Registry.handle_register" signature={`async handle_register(
+    card: AgentCard,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Insert or replace a local registration. Replacement first runs unregistration cleanup, then writes a fresh RegistryEntry with <code>last_seen=time.time()</code>, updates name/role/tag indexes, and persists the full entry set.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="handle register parameters"><ApiField name="card" type="AgentCard" required>Validated card supplied by RegistryServer's request parser or a direct caller.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="handle register return"><ApiField name="status" type="dict[str, str]">Always <code>{'{"status": "agent registered successfully"}'}</code> after mutation; storage errors propagate.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Registry.handle_heartbeat
+
+<ApiReference kind="async handler" path="protolink.discovery.Registry.handle_heartbeat" signature={`async handle_heartbeat(
+    agent_url: str,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Prune stale entries, then replace one RegistryEntry with a fresh timestamp while retaining its card and metadata.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="handle heartbeat parameters"><ApiField name="agent_url" type="str" required>Stable local entry key.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="handle heartbeat return"><ApiField name="status" type="dict[str, str]"><code>"agent heartbeat recorded"</code> or <code>"agent not found"</code>. The not-found result is a normal payload, not an exception.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Registry.handle_unregister
+
+<ApiReference kind="async handler" path="protolink.discovery.Registry.handle_unregister" signature={`async handle_unregister(
+    agent_url: str,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Remove one local card and entry, clean empty secondary-index buckets, and persist the resulting store. The operation is idempotent.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="handle unregister parameters"><ApiField name="agent_url" type="str" required>Stable entry key to remove.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="handle unregister return"><ApiField name="status" type="dict[str, str]">Success status even when the URL was already absent.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### Registry.handle_discover
+
+<ApiReference kind="async handler" path="protolink.discovery.Registry.handle_discover" signature={`async handle_discover(
+    filter_by: dict[str, Any] | None = None,
+    *,
+    as_json: bool = False,
+) -> list[dict[str, Any]] | list[AgentCard]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Prune expired registrations, select indexed candidates, refine every candidate with exact field matching, and optionally serialize results.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="handle discover parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Exact AgentCard attributes. For <code>tags</code>, every requested tag must be present.</ApiField><ApiField name="as_json" type="bool" defaultValue="False">Return dictionaries for transport handlers or AgentCard objects for local callers.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="handle discover return"><ApiField name="cards" type="list[dict[str, Any]] | list[AgentCard]">Live matches in registry insertion order or candidate-set iteration order, depending on the filter path.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Fallback scan">When indexes yield no candidates while cards exist, the handler scans all cards. This preserves correctness when tests or compatibility code manipulate the public-ish <code>_agents</code> dictionary without rebuilding indexes.</ApiCallout>
+
+</ApiReference>
+
+### Registry.handle_status_html
+
+<ApiReference kind="handler" path="protolink.discovery.Registry.handle_status_html" signature={`handle_status_html() -> str`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Prune expired entries and render the current registry card set and uptime as a self-contained HTML status page.
+
+<ApiSection title="Returns"><ApiFields ariaLabel="handle status return"><ApiField name="html" type="str">Complete diagnostic page markup.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Current renderer label">The current implementation passes the literal transport label <code>"HTTP"</code> to the renderer rather than reading the configured transport type.</ApiCallout>
+
+</ApiReference>
+
 ## Constructor
 
-```python
-Registry(
+### Registry
+
+<ApiReference kind="class" path="protolink.discovery.Registry" signature={`Registry(
     transport: TransportType | Transport = "http",
     url: str | None = None,
     verbosity: Literal[0, 1, 2] = 1,
     *,
     entry_ttl_seconds: float | None = None,
     storage: Storage | None = None,
-)
-```
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
+Create an in-process indexed registry, a RegistryClient, and a RegistryServer around one resolved transport. Construction restores persisted entries and rebuilds secondary indexes, but it does not start listening.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `transport` | `TransportType ⎪ Transport` | `"http"` | Transport instance or registered transport string. |
-| `url` | `str ⎪ None` | `None` | Registry URL. Required when `transport` is a string. |
-| `verbosity` | `Literal[0, 1, 2]` | `1` | Logging verbosity: `0` = warning, `1` = info, `2` = debug. |
-| `entry_ttl_seconds` | `float ⎪ None` | `None` | Optional liveness TTL. Expired entries are pruned before discovery, status, and count/list operations. |
-| `storage` | `Storage ⎪ None` | `None` | Optional persistence for serialized registry entries. |
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry constructor parameters">
+  <ApiField name="transport" type="TransportType | Transport" defaultValue={'"http"'}>Registered transport alias or configured instance. An alias is resolved with <code>url</code>; a concrete transport is shared unchanged by the client and server.</ApiField>
+  <ApiField name="url" type="str | None" defaultValue="None">Address required when <code>transport</code> is a string. A concrete transport owns its own URL and ignores this argument.</ApiField>
+  <ApiField name="verbosity" type="Literal[0, 1, 2]" defaultValue="1">Registry logger level: warning, info, or debug.</ApiField>
+  <ApiField name="entry_ttl_seconds" type="float | None" defaultValue="None">Maximum age since <code>last_seen</code>. Expiry is lazy: pruning runs during discovery, status rendering, inspection, heartbeat, and persisted-state load rather than on a timer.</ApiField>
+  <ApiField name="storage" type="Storage | None" defaultValue="None">Optional persistence for a single dictionary containing serialized entries. Every registration, heartbeat, removal, clear, or TTL-prune rewrites that payload through <code>storage.save()</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Attributes"><ApiFields ariaLabel="Registry attributes">
+  <ApiField name="client" type="RegistryClient">Read-only outbound facade using the shared transport.</ApiField>
+  <ApiField name="start_time" type="float | None">Unix timestamp set after successful server start.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Registry constructor errors"><ApiField name="ValueError">A transport alias lacks <code>url</code>, or <code>transport</code> is neither a registered string nor a Transport instance.</ApiField><ApiField name="storage/model error">Malformed persisted entries, storage-load failures, and reconstruction errors propagate during construction.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Persisted TTL">Restored entries retain their original <code>last_seen</code> timestamps and are pruned immediately after loading when a TTL is configured.</ApiCallout>
+
+</ApiReference>
 
 Registry follows the same construction rule as Agent and AgentClient. A string alias creates a default transport for fast setup; a concrete transport carries TLS, limits, retries, keepalive, and protocol-specific settings. The Registry passes that exact instance to both `RegistryClient` and `RegistryServer`, so inbound serving and outbound registry calls share one capability, health, and metrics surface.
 
@@ -329,15 +513,133 @@ In simple terms, reading discovery results, refreshing the same heartbeat, or re
 The Registry's public URL is derived from its transport and used by agents for registration and discovery.
 
 :::
+
+## RegistryEntry API
+
+`RegistryEntry` is the persisted liveness envelope around one AgentCard. Registry users usually obtain it through `registry.get_entry()`.
+
+### RegistryEntry
+
+<ApiReference kind="dataclass" path="protolink.core.registry.RegistryEntry" signature={`RegistryEntry(
+    card: AgentCard,
+    last_seen: float,
+    metadata: dict[str, Any] = field(default_factory=dict),
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/registry.py">
+Pair a registered card with its last successful registration or heartbeat time and optional registry-owned metadata.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryEntry constructor parameters"><ApiField name="card" type="AgentCard" required>Registered identity and capabilities.</ApiField><ApiField name="last_seen" type="float" required>Unix timestamp used for TTL comparison.</ApiField><ApiField name="metadata" type="dict[str, Any]" defaultValue="{}">Per-entry metadata created through a dataclass default factory, so entries do not share one dictionary.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### RegistryEntry.is_expired
+
+<ApiReference kind="method" path="protolink.core.registry.RegistryEntry.is_expired" signature={`is_expired(
+    ttl_seconds: float | None,
+    *,
+    now: float,
+) -> bool`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/registry.py">
+Compare an explicit clock value with <code>last_seen</code>.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryEntry expiry parameters"><ApiField name="ttl_seconds" type="float | None" required><code>None</code> disables expiration. Zero or negative values make any entry with a positive age expire; the implementation does not validate positivity.</ApiField><ApiField name="now" type="float" required>Caller-supplied Unix time, which makes expiry tests deterministic.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="RegistryEntry expiry return"><ApiField name="expired" type="bool">True only when a TTL exists and <code>now - last_seen &gt; ttl_seconds</code>. Equality is still live.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### RegistryEntry.to_dict / RegistryEntry.from_dict
+
+<ApiReference kind="methods" path="protolink.core.registry.RegistryEntry serialization" signature={`to_dict() -> dict[str, Any]
+RegistryEntry.from_dict(data: dict[str, Any]) -> RegistryEntry`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/registry.py">
+Serialize an entry into card, timestamp, and metadata fields or reconstruct it from that representation. <code>from_dict()</code> requires a <code>"card"</code> mapping, converts <code>last_seen</code> to float with a zero default, and copies metadata into a new dictionary.
+
+<ApiSection title="Raises"><ApiFields ariaLabel="RegistryEntry serialization errors"><ApiField name="KeyError | TypeError | ValueError">Missing or malformed card data, a non-numeric timestamp, or invalid AgentCard fields.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+## RegistryClient API
+
+`RegistryClient` is the thin transport-facing contract used by Registry and Agent. It does not own local entries or indexes and does not catch transport failures.
+
+### RegistryClient
+
+<ApiReference kind="class" path="protolink.client.RegistryClient" signature={`RegistryClient(
+    transport: Transport,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/registry.py">
+Bind registry request specs to one configured transport.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryClient constructor parameters"><ApiField name="transport" type="Transport" required>Concrete transport owning URL, TLS, authentication, limits, retry policy, health, and metrics. No runtime type validation or cloning occurs in the constructor.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Attributes"><ApiFields ariaLabel="RegistryClient attributes"><ApiField name="transport" type="Transport">The exact supplied object.</ApiField><ApiField name="url" type="str">Read-only proxy to <code>transport.url</code>.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### RegistryClient.register
+
+<ApiReference kind="async method" path="protolink.client.RegistryClient.register" signature={`async register(
+    card: AgentCard,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/registry.py">
+Serialize the card and POST it to <code>/agents/</code> at the transport's own URL.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryClient register parameters"><ApiField name="card" type="AgentCard" required>Card converted with <code>to_dict()</code> before transport dispatch.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="RegistryClient register return"><ApiField name="status" type="dict[str, str]">Decoded handler payload.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="RegistryClient register errors"><ApiField name="transport or remote error">Connection, timeout, authentication, serialization, response, and server failures propagate.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### RegistryClient.unregister
+
+<ApiReference kind="async method" path="protolink.client.RegistryClient.unregister" signature={`async unregister(
+    agent_url: str,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/registry.py">
+Send an idempotent DELETE request with <code>agent_url</code> in its body.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryClient unregister parameters"><ApiField name="agent_url" type="str" required>Stable registry key to remove.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="RegistryClient unregister return"><ApiField name="status" type="dict[str, str]">Decoded status payload.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### RegistryClient.heartbeat
+
+<ApiReference kind="async method" path="protolink.client.RegistryClient.heartbeat" signature={`async heartbeat(
+    agent_url: str,
+) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/registry.py">
+Send an idempotent POST on the control-like liveness endpoint. The Registry request spec uses the default channel, so multiplexed transports do not automatically isolate heartbeats into <code>"control"</code>.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryClient heartbeat parameters"><ApiField name="agent_url" type="str" required>Stable URL whose entry should remain live.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="RegistryClient heartbeat return"><ApiField name="status" type="dict[str, str]">Recorded or not-found status.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+### RegistryClient.discover
+
+<ApiReference kind="async method" path="protolink.client.RegistryClient.discover" signature={`async discover(
+    filter_by: dict[str, Any] | None = None,
+) -> list[AgentCard]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/registry.py">
+Send optional filters as GET query parameters, then reconstruct every returned mapping as an AgentCard.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryClient discover parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Filter mapping or no query data.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="RegistryClient discover return"><ApiField name="cards" type="list[AgentCard]">Validated cards in server iteration order.</ApiField></ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="RegistryClient discover errors"><ApiField name="transport, shape, or AgentCard error">Request failures, a non-iterable response, or malformed card mappings propagate.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
 ## URL Handling
 
-Both Agents and the Registry expose a `url` property through their transport.
+The transport is the URL source of truth. `RegistryClient.url` exposes it directly; `Registry` exposes the client through `registry.client`, so use `registry.client.url` when code needs the resolved public address. The current `Registry` class does not define a direct `registry.url` property.
 
 ```python
 from protolink.transport import HTTPTransport
 
 transport = HTTPTransport(url="http://localhost:9000")
 registry = Registry(transport=transport)
+
+assert registry.client.url == transport.url
 ```
 
 This keeps host, port, transport, and discovery metadata consistent across agent and registry instances.

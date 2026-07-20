@@ -1,4 +1,10 @@
 import ApiSurface from '@site/src/components/ApiSurface';
+import ApiReference, {
+  ApiCallout,
+  ApiField,
+  ApiFields,
+  ApiSection,
+} from '@site/src/components/ApiReference';
 
 # Transport
 
@@ -176,21 +182,65 @@ from protolink.transport import (
 )
 ```
 
-### `TransportConfig`
+### get_transport
 
-`TransportConfig` is the single configuration object accepted by every built-in transport. It is immutable and safe to share between an `Agent`, its client, and a `Registry`.
+<ApiReference
+  kind="function"
+  path="protolink.transport.get_transport"
+  signature={`get_transport(
+    transport: str,
+    **kwargs: Any,
+) -> Transport`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/factory.py#L21"
+>
 
-It is a container for four kinds of operational policy:
+Constructs a built-in transport by its case-insensitive alias and imports optional protocol modules lazily.
 
-- `limits` controls how much work and data one transport instance may accept at once.
-- `retry` controls recovery from temporary failures, but only for explicitly safe operations.
-- Keepalive and shutdown values control the lifecycle of pooled or persistent connections.
-- Idempotency and metrics values control duplicate-response retention and local observability.
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="get_transport parameters">
+    <ApiField name="transport" type="str" required>
+      One of `"http"`, `"runtime"`, `"websocket"`, `"grpc"`, `"sse"`, `"json-rpc"`, or `"sse-json-rpc"`.
+    </ApiField>
+    <ApiField name="**kwargs" type="Any">
+      Constructor values such as `url`, `config`, `tls`, or `credentials`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-Keeping these values together avoids protocol-specific production settings scattered across application code. The object is immutable because changing limits or retry behavior halfway through active requests would make behavior timing-dependent. Create a new transport configuration when settings need to change.
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="get_transport return value">
+    <ApiField name="transport_instance" type="Transport">
+      A concrete transport instance for the selected alias.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-```python
-TransportConfig(
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="get_transport errors">
+    <ApiField name="ValueError">
+      Raised when the alias is unknown.
+    </ApiField>
+    <ApiField name="ImportError">
+      Raised when the selected optional transport dependency is not installed.
+    </ApiField>
+    <ApiField name="constructor error">
+      Validation and setup errors raised by the concrete transport are propagated.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Keyword filtering">
+  The factory inspects the selected constructor and silently drops keyword arguments it does not declare, unless that constructor accepts `**kwargs`. Construct the concrete class directly when detecting a misspelled or unsupported option is important.
+</ApiCallout>
+
+</ApiReference>
+
+### TransportConfig
+
+<ApiReference
+  kind="dataclass"
+  path="protolink.TransportConfig"
+  signature={`TransportConfig(
     limits: TransportLimits = TransportLimits(),
     retry: RetryPolicy = RetryPolicy(),
     keepalive_interval: float | None = 20.0,
@@ -199,56 +249,125 @@ TransportConfig(
     idempotency_ttl: float = 300.0,
     idempotency_cache_size: int = 1024,
     collect_metrics: bool = True,
-)
-```
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/config.py#L109"
+>
 
-| Field | Default | Applied behavior |
-|-------|---------|------------------|
-| `limits` | `TransportLimits()` | Payload and per-event-loop concurrency bounds. |
-| `retry` | `RetryPolicy()` | Bounded retry policy. The default performs one attempt only. |
-| `keepalive_interval` | `20.0` seconds | WebSocket ping interval, HTTP keep-alive expiry, and gRPC keepalive interval. Set `None` to disable periodic WebSocket/HTTP keepalive; gRPC receives a zero interval. |
-| `keepalive_timeout` | `20.0` seconds | WebSocket pong timeout, Uvicorn keep-alive timeout, and gRPC keepalive timeout. |
-| `shutdown_timeout` | `5.0` seconds | Maximum wait for each loop-owned client connection or channel to close. Also used as WebSocket close timeout. |
-| `idempotency_ttl` | `300.0` seconds | How long a completed idempotent result remains replayable. |
-| `idempotency_cache_size` | `1024` | Maximum completed results retained by each transport instance. Oldest results are evicted first. |
-| `collect_metrics` | `True` | Enables the dependency-free in-process metric recorder. When false, snapshots remain available but stay at zero. |
+`TransportConfig` is the immutable operational policy accepted by every built-in transport. Share one instance when an Agent, client, and Registry should use the same limits and retry behavior; construct a new instance to change policy.
 
-All timing and cache values must be positive, except `keepalive_interval`, which may be `None`. Invalid configurations raise `ValueError` during construction.
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="TransportConfig parameters">
+    <ApiField name="limits" type="TransportLimits" defaultValue="TransportLimits()">
+      Bounds serialized request, response, and event sizes and the number of active unary requests and streams. Concurrency semaphores are maintained per event loop.
+    </ApiField>
+    <ApiField name="retry" type="RetryPolicy" defaultValue="RetryPolicy()">
+      Controls bounded retries. The default policy performs exactly one attempt, so creating a transport never enables retries implicitly.
+    </ApiField>
+    <ApiField name="keepalive_interval" type="float | None" defaultValue="20.0">
+      Seconds between WebSocket pings, the HTTP keep-alive expiry, and the gRPC keepalive interval. `None` disables the periodic HTTP/WebSocket setting and maps to a zero gRPC interval.
+    </ApiField>
+    <ApiField name="keepalive_timeout" type="float" defaultValue="20.0">
+      Seconds allowed for WebSocket pong handling, Uvicorn idle keep-alive, and gRPC keepalive acknowledgement.
+    </ApiField>
+    <ApiField name="shutdown_timeout" type="float" defaultValue="5.0">
+      Maximum wait for each loop-owned connection or channel closer. WebSocket also uses it as the connection close timeout. This is not a request deadline.
+    </ApiField>
+    <ApiField name="idempotency_ttl" type="float" defaultValue="300.0">
+      Seconds a completed idempotent response remains eligible for replay in this process.
+    </ApiField>
+    <ApiField name="idempotency_cache_size" type="int" defaultValue="1024">
+      Maximum completed responses retained by one transport instance. Expired entries are pruned and the oldest remaining entries are evicted first.
+    </ApiField>
+    <ApiField name="collect_metrics" type="bool" defaultValue="True">
+      Enables dependency-free in-process counters. When disabled, `metrics` still returns a snapshot whose counters remain zero.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-`TransportConfig.to_dict()` returns JSON-safe nested dictionaries. `TransportConfig.from_dict(data)` restores `TransportLimits`, `RetryPolicy`, and the retryable-method `frozenset`. `Agent.to_dict()`, YAML serialization, and `Agent.from_dict()` preserve this configuration under the serialized transport block.
+<ApiSection title="Methods">
+  <ApiFields ariaLabel="TransportConfig methods">
+    <ApiField name="to_dict()" type="dict[str, Any]">
+      Returns a JSON-safe nested mapping.
+    </ApiField>
+    <ApiField name="from_dict(data)" type="TransportConfig">
+      Reconstructs nested `TransportLimits` and `RetryPolicy` values and restores `retryable_methods` as a `frozenset`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-The keepalive settings do not change how long an Agent task may run. They only determine how idle or persistent network connections are checked and retained. Similarly, `shutdown_timeout` is a cleanup grace period, not a request deadline.
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="TransportConfig errors">
+    <ApiField name="ValueError">
+      Raised when a timeout, TTL, or cache size is not positive, or when `keepalive_interval` is neither `None` nor positive.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-### `TransportLimits`
+<ApiCallout label="Serialization">
+  `Agent.to_dict()`, YAML serialization, and `Agent.from_dict()` preserve this configuration inside the serialized transport block. Certificate and transport-specific constructor settings are handled separately.
+</ApiCallout>
 
-Limits protect the process from accidental overload. They are not authentication or authorization rules: they do not decide who may call an Agent, only how much data and concurrent work the transport will accept.
+</ApiReference>
 
-There are two independent kinds of limit:
+### TransportLimits
 
-- **Byte limits** reject one request, response, or stream event that is too large. This prevents a single payload from consuming an unexpected amount of memory.
-- **Concurrency limits** bound how many operations execute at once. Extra operations wait asynchronously for a slot, which slows producers naturally without blocking the event loop or immediately rejecting ordinary bursts.
-
-```python
-TransportLimits(
-    max_request_bytes: int = 16 * 1024 * 1024,
-    max_response_bytes: int = 16 * 1024 * 1024,
-    max_event_bytes: int = 4 * 1024 * 1024,
+<ApiReference
+  kind="dataclass"
+  path="protolink.TransportLimits"
+  signature={`TransportLimits(
+    max_request_bytes: int = 16777216,
+    max_response_bytes: int = 16777216,
+    max_event_bytes: int = 4194304,
     max_concurrent_requests: int = 100,
     max_concurrent_streams: int = 100,
-)
-```
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/config.py#L32"
+>
 
-| Field | Default | Meaning |
-|-------|---------|---------|
-| `max_request_bytes` | `16 MiB` | Maximum serialized request envelope or body. |
-| `max_response_bytes` | `16 MiB` | Maximum serialized unary response. |
-| `max_event_bytes` | `4 MiB` | Maximum serialized event yielded by a stream. |
-| `max_concurrent_requests` | `100` | Per-event-loop unary request capacity. Additional work waits for a slot instead of spawning without a bound. |
-| `max_concurrent_streams` | `100` | Per-event-loop active stream capacity. Additional streams wait for a slot. |
+Limits protect the process from accidental overload; they are not authorization rules. Byte limits reject one oversized normalized JSON payload, while concurrency limits make excess work wait asynchronously instead of spawning without a bound.
 
-Payload sizes are calculated after ProtoLink recursively normalizes domain objects through its normal serializer. A payload over its byte bound raises `TransportLimitError` before it is sent or yielded. Every limit must be greater than zero. `to_dict()` returns all five integer fields.
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="TransportLimits parameters">
+    <ApiField name="max_request_bytes" type="int" defaultValue="16777216">
+      Maximum serialized request envelope or body: 16 MiB by default.
+    </ApiField>
+    <ApiField name="max_response_bytes" type="int" defaultValue="16777216">
+      Maximum serialized unary response: 16 MiB by default.
+    </ApiField>
+    <ApiField name="max_event_bytes" type="int" defaultValue="4194304">
+      Maximum serialized event yielded by a stream: 4 MiB by default.
+    </ApiField>
+    <ApiField name="max_concurrent_requests" type="int" defaultValue="100">
+      Unary request capacity per event loop. Additional work waits for a slot.
+    </ApiField>
+    <ApiField name="max_concurrent_streams" type="int" defaultValue="100">
+      Active stream capacity per event loop. Additional streams wait for a slot.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-Choose byte limits from the largest valid serialized task your application expects, with some headroom for envelope metadata. Choose concurrency limits from measured CPU, memory, downstream-service, and model-provider capacity. Higher values increase parallelism but also increase peak resource use; they do not make an individual request faster.
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="TransportLimits serialization">
+    <ApiField name="to_dict()" type="dict[str, int]">
+      Returns all five limits as integers.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="TransportLimits errors">
+    <ApiField name="ValueError">
+      Raised when any limit is zero or negative.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      Raised later by a transport when a normalized request, response, or event exceeds the corresponding byte limit.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+Choose byte limits from the largest valid serialized task your application expects, with headroom for envelope metadata. Choose concurrency limits from measured CPU, memory, downstream-service, and model-provider capacity. Higher values increase parallelism and peak resource use; they do not make an individual request faster.
 
 Protocol-specific mapping:
 
@@ -258,31 +377,66 @@ Protocol-specific mapping:
 | SSE JSON-RPC | HTTP request limits plus `max_event_bytes` for every SSE result. | HTTP concurrency plus a bounded active-stream semaphore. |
 | WebSocket | `websockets` frame size plus explicit request, response, and event checks. | Bounded frame queues, unary handler slots, and active-stream slots. |
 | gRPC | Mapped to `grpc.max_send_message_length` and `grpc.max_receive_message_length`, with explicit envelope checks. | `maximum_concurrent_rpcs` defaults to `max_concurrent_requests`; streams also use active-stream slots. |
-| Runtime | Applies the same serialized-size checks despite not opening a socket. | Both caller and target transports enforce per-loop request and stream slots. |
+| Runtime | Applies the caller transport's serialized request, response, and event checks despite not opening a socket. | Unary calls use the caller's outbound slot and the target's inbound slot. Live streams use the caller's stream slot; the target handler is not wrapped in a second stream slot. |
 
-### `RetryPolicy`
+### RetryPolicy
 
-A retry is useful when the operation is safe but the connection is temporarily unhealthy: for example, a connection reset before the client receives the response. A retry is dangerous when repeating the operation could apply a mutation twice. For that reason, ProtoLink separates **how often retrying is allowed** (`RetryPolicy`) from **whether this operation is safe to repeat** (`ClientRequestSpec.idempotent`).
-
-Retries are disabled by default. Setting `max_attempts=3` means one initial attempt and at most two retries; it does not mean three additional retries. Exponential backoff spaces attempts farther apart so a recovering service is not immediately flooded again. Jitter adds a small random offset so many clients do not retry at exactly the same moment.
-
-```python
-RetryPolicy(
+<ApiReference
+  kind="dataclass"
+  path="protolink.RetryPolicy"
+  signature={`RetryPolicy(
     max_attempts: int = 1,
     initial_backoff: float = 0.1,
     max_backoff: float = 2.0,
     jitter: float = 0.1,
     retryable_methods: frozenset[str] = frozenset({"DELETE", "GET", "POST", "PUT"}),
-)
-```
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/config.py#L67"
+>
 
-| Field | Meaning |
-|-------|---------|
-| `max_attempts` | Total attempts, including the initial request. `1` disables retries. |
-| `initial_backoff` | Base delay before the first retry. |
-| `max_backoff` | Upper bound for exponential backoff. Must be at least `initial_backoff`. |
-| `jitter` | Maximum random delay added to each retry. Set `0` for deterministic tests. |
-| `retryable_methods` | HTTP-style methods eligible for retry after the request spec also declares idempotency. |
+`RetryPolicy` controls how often a safe request may be attempted. ProtoLink separately requires the `ClientRequestSpec` to declare the operation idempotent, preventing a retry policy from blindly repeating mutations.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="RetryPolicy parameters">
+    <ApiField name="max_attempts" type="int" defaultValue="1">
+      Total attempts, including the initial call. `3` means one initial call plus at most two retries; `1` disables retries.
+    </ApiField>
+    <ApiField name="initial_backoff" type="float" defaultValue="0.1">
+      Base delay in seconds before the first retry.
+    </ApiField>
+    <ApiField name="max_backoff" type="float" defaultValue="2.0">
+      Upper bound in seconds for exponential backoff. It must be at least `initial_backoff`.
+    </ApiField>
+    <ApiField name="jitter" type="float" defaultValue="0.1">
+      Maximum random delay added to each retry. Use `0` for deterministic timing in tests.
+    </ApiField>
+    <ApiField name="retryable_methods" type="frozenset[str]" defaultValue={'frozenset({"DELETE", "GET", "POST", "PUT"})'}>
+      HTTP-style methods eligible for retry after the request spec also declares idempotency. ProtoLink uppercases the request method before membership testing, so custom policy values should normally be uppercase.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="RetryPolicy serialization">
+    <ApiField name="to_dict()" type="dict[str, Any]">
+      Returns JSON-safe values and serializes `retryable_methods` as a sorted list.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="RetryPolicy errors">
+    <ApiField name="ValueError">
+      Raised when `max_attempts` is below one, a timing value is negative, or `max_backoff` is lower than `initial_backoff`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Retry formula">
+  Before retry number `n`, ProtoLink sleeps for `min(initial_backoff * 2**(n - 1), max_backoff) + uniform(0, jitter)`.
+</ApiCallout>
+
+</ApiReference>
 
 A request is retried only when all three conditions are true:
 
@@ -290,7 +444,7 @@ A request is retried only when all three conditions are true:
 2. The request method appears in `retryable_methods`.
 3. The raised `TransportError` has `retryable=True`.
 
-The delay before retry number `n` is `min(initial_backoff * 2**(n - 1), max_backoff) + uniform(0, jitter)`. The same request ID and idempotency key are retained across every attempt; only `TransportRequestContext.attempt` increases. Streams are never automatically retried because replaying a partial event sequence requires an application checkpoint.
+The same request ID and idempotency key are retained across every attempt; only `TransportRequestContext.attempt` increases. Streams are never automatically retried because replaying a partial event sequence requires an application checkpoint.
 
 Built-in task submission, agent-card retrieval, cancellation, state description, registry discovery, registry heartbeat, and registry unregister requests declare idempotency. Mutating state compaction/reset operations and streaming requests do not.
 
@@ -305,17 +459,46 @@ Correlation and idempotency solve related but different problems:
 
 Consider a task that completes on the server, but the response connection breaks before the client receives it. The client cannot tell whether execution happened, so it retries. The repeated request keeps the same idempotency key; the server returns the stored result rather than running the task a second time. The request ID keeps both attempts connected in diagnostics.
 
-`TransportRequestContext` is an immutable request-scoped value:
+#### TransportRequestContext
 
-```python
-TransportRequestContext(
+<ApiReference
+  kind="dataclass"
+  path="protolink.transport.TransportRequestContext"
+  signature={`TransportRequestContext(
     request_id: str,
     idempotency_key: str | None = None,
     attempt: int = 1,
-)
-```
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L39"
+>
 
-`next_attempt()` returns a new context with the same IDs and `attempt + 1`. `Transport.new_request_context()` generates the initial context. For idempotent payloads it derives the operation key from `id`, `task_id`, or `agent_url` when available; otherwise it uses the generated request ID.
+Immutable metadata for one logical unary request. A retry creates a new context with a higher attempt number while preserving the identifiers needed for tracing and duplicate suppression.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="TransportRequestContext parameters">
+    <ApiField name="request_id" type="str" required>
+      Correlation identifier carried in headers, metadata, or protocol envelopes and retained across every attempt.
+    </ApiField>
+    <ApiField name="idempotency_key" type="str | None" defaultValue="None">
+      Stable operation key sent only when the request specification is idempotent.
+    </ApiField>
+    <ApiField name="attempt" type="int" defaultValue="1">
+      One-based attempt number.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Methods">
+  <ApiFields ariaLabel="TransportRequestContext methods">
+    <ApiField name="next_attempt()" type="TransportRequestContext">
+      Returns a new context with the same request and idempotency IDs and `attempt + 1`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+`Transport.new_request_context()` generates the initial context. For idempotent payloads it derives the operation key from `id`, `task_id`, or `agent_url` when available; otherwise it uses the generated request ID.
 
 | Transport | Correlation ID | Idempotency key |
 |-----------|----------------|-----------------|
@@ -328,21 +511,48 @@ Server-side keys are namespaced by method and path. The first request owns the o
 
 The TTL and cache size are memory bounds, not correctness guarantees. Once an entry expires or is evicted, the transport no longer remembers the operation. Deployments requiring long-lived exactly-once business effects should enforce a durable unique operation key in their storage layer as well.
 
-### `TransportCapabilities`
+### TransportCapabilities
 
-Every transport declares immutable class-level capabilities. Applications normally inspect `transport.capabilities`; custom transports set the class attribute.
-
-Capabilities let generic code ask what a transport can do without checking concrete class names. For example, a dashboard can show whether TLS is native, and a client can decide whether live streaming is available. They describe supported behavior, not current health: `streaming=True` means the implementation supports streams even when its server is currently stopped.
-
-```python
-TransportCapabilities(
+<ApiReference
+  kind="dataclass"
+  path="protolink.transport.TransportCapabilities"
+  signature={`TransportCapabilities(
     networked: bool = True,
     streaming: bool = False,
     tls: bool = False,
     bidirectional: bool = False,
     persistent_connections: bool = False,
-)
-```
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/config.py#L10"
+>
+
+Immutable class-level feature flags used by generic code instead of concrete-class checks. They describe what an implementation supports, not whether its server is currently healthy.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="TransportCapabilities parameters">
+    <ApiField name="networked" type="bool" defaultValue="True">
+      Whether calls cross a network boundary rather than the process-local Runtime registry.
+    </ApiField>
+    <ApiField name="streaming" type="bool" defaultValue="False">
+      Whether the transport implements `subscribe()` and can expose `/tasks/stream`.
+    </ApiField>
+    <ApiField name="tls" type="bool" defaultValue="False">
+      Whether the transport can own a native TLS-protected socket or client connection.
+    </ApiField>
+    <ApiField name="bidirectional" type="bool" defaultValue="False">
+      Whether one persistent connection supports traffic in both directions.
+    </ApiField>
+    <ApiField name="persistent_connections" type="bool" defaultValue="False">
+      Whether client-side connections or channels are pooled and reused.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Inspection">
+  Applications normally read `transport.capabilities`; custom implementations replace the class attribute. The compatibility flag `supports_streaming` matches `capabilities.streaming` on every built-in transport.
+</ApiCallout>
+
+</ApiReference>
 
 | Transport | Networked | Streaming | TLS | Bidirectional | Persistent connections |
 |-----------|-----------|-----------|-----|---------------|------------------------|
@@ -352,30 +562,191 @@ TransportCapabilities(
 | `GRPCTransport` | Yes | Yes | Yes | No | Yes |
 | `RuntimeTransport` | No | Yes | No | No | No |
 
-`supports_streaming` remains available as the compatibility flag used by `AgentClient` and `AgentServer`; it matches `capabilities.streaming` on all built-in transports.
+### Transport
 
-### `Transport` base class
+<ApiReference
+  kind="abstract class"
+  path="protolink.transport.Transport"
+  signature={`Transport(
+    *,
+    config: TransportConfig | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L61"
+>
 
-Application code usually receives a transport from `Agent.transport` or `AgentClient.transport`. The stable inspection surface is:
+The base class centralizes limits, retry decisions, metrics, correlation, duplicate suppression, and loop-aware cleanup while concrete subclasses own their wire protocol. Most applications use `AgentClient` instead of calling its low-level methods.
 
-The base class exists so reliability behavior is not reimplemented differently in every protocol. HTTP still owns HTTP requests, gRPC still owns channels and metadata, and WebSocket still owns frames and connections; the base class supplies the protocol-neutral limits, retry decisions, metrics, correlation, deduplication, and lifecycle bookkeeping around them.
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Transport constructor parameters">
+    <ApiField name="config" type="TransportConfig | None" defaultValue="None">
+      Shared operational configuration. `None` constructs a fresh default `TransportConfig`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-Most users should not call `send()` or the extension hooks directly. Use `AgentClient` for task-level operations and inspect `config`, `capabilities`, `metrics`, and `health()` when operational state is needed.
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="Transport attributes">
+    <ApiField name="transport_type" type="ClassVar[str]">
+      Factory and serialized-card identifier such as `"http"`, `"grpc"`, or `"runtime"`.
+    </ApiField>
+    <ApiField name="supports_streaming" type="ClassVar[bool]">
+      Compatibility flag used by `AgentClient` and `AgentServer`.
+    </ApiField>
+    <ApiField name="capabilities" type="ClassVar[TransportCapabilities]">
+      Declarative feature set for the concrete implementation.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig">
+      Effective immutable configuration.
+    </ApiField>
+    <ApiField name="url" type="str">
+      Abstract read-only canonical bind or identity URL.
+    </ApiField>
+    <ApiField name="metrics" type="TransportMetricsSnapshot">
+      A new immutable snapshot captured on each property access.
+    </ApiField>
+    <ApiField name="is_running" type="bool">
+      Base lifecycle flag used by health reporting.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-| Member | Type | Purpose |
-|--------|------|---------|
-| `transport_type` | `ClassVar[str]` | Factory/card identifier such as `"http"`, `"grpc"`, or `"runtime"`. |
-| `supports_streaming` | `ClassVar[bool]` | Compatibility flag used to decide whether `/tasks/stream` is registered. |
-| `capabilities` | `ClassVar[TransportCapabilities]` | Declarative transport behavior. |
-| `config` | `TransportConfig` | Effective shared configuration for this instance. |
-| `url` | `str` | Canonical bind/identity URL. |
-| `metrics` | `TransportMetricsSnapshot` | Immutable snapshot taken at property access time. |
-| `is_running` | `bool` | Whether this instance currently owns a running server endpoint. |
-| `health()` | `dict[str, Any]` | JSON-compatible readiness, capability, and metric payload. |
-| `validate_url()` | `bool` | Whether the configured URL uses a scheme accepted by the transport. |
-| `start()` / `stop()` | `Awaitable[None]` | Idempotent server and pooled-resource lifecycle. |
-| `send(...)` | `Awaitable[Any]` | Low-level unary request primitive used by clients. |
-| `subscribe(agent_url, task)` | `AsyncIterator[Any]` | Low-level streaming primitive; unsupported transports raise `NotImplementedError`. |
+<ApiSection title="Abstract lifecycle">
+  <ApiFields ariaLabel="Transport abstract lifecycle">
+    <ApiField name="setup_routes(endpoints)" type="None">
+      Binds transport-neutral `EndpointSpec` values to the server-side router.
+    </ApiField>
+    <ApiField name="start()" type="Awaitable[None]">
+      Starts the server and marks the instance ready. Built-in implementations are safe to call again while already running.
+    </ApiField>
+    <ApiField name="stop()" type="Awaitable[None]">
+      Stops the server and closes loop-owned resources. Built-in implementations tolerate repeated shutdown.
+    </ApiField>
+    <ApiField name="validate_url()" type="bool">
+      Reports whether this instance's configured URL uses a supported scheme.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### Transport.send
+
+<ApiReference
+  kind="async method"
+  path="Transport.send"
+  signature={`await transport.send(
+    request_spec: ClientRequestSpec,
+    base_url: str,
+    data: Any = None,
+    params: dict[str, Any] | None = None,
+) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L92"
+>
+
+Low-level unary primitive implemented by each transport and used by `AgentClient`.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Transport send parameters">
+    <ApiField name="request_spec" type="ClientRequestSpec" required>
+      Declares the method, path, request and response parsers, channel, and idempotency eligibility.
+    </ApiField>
+    <ApiField name="base_url" type="str" required>
+      Destination agent or Registry URL.
+    </ApiField>
+    <ApiField name="data" type="Any" defaultValue="None">
+      Optional request payload. Domain objects are normalized before size checks and wire encoding.
+    </ApiField>
+    <ApiField name="params" type="dict[str, Any] | None" defaultValue="None">
+      Optional query-style parameters carried by the selected protocol.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Transport send return value">
+    <ApiField name="result" type="Any">
+      The response produced by `request_spec.response_parser`; the concrete type depends on the operation.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Transport send errors">
+    <ApiField name="TransportError">
+      Concrete transports raise typed connection, timeout, protocol, remote, and limit subclasses. Only eligible retryable failures enter the retry loop.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### Transport.subscribe
+
+<ApiReference
+  kind="async iterator method"
+  path="Transport.subscribe"
+  signature={`transport.subscribe(
+    agent_url: str,
+    task: Any,
+) -> AsyncIterator[Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L108"
+>
+
+Low-level task-event stream. HTTP's base implementation does not support it; Runtime, SSE JSON-RPC, WebSocket, and gRPC override it.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Transport subscribe parameters">
+    <ApiField name="agent_url" type="str" required>
+      Destination agent URL.
+    </ApiField>
+    <ApiField name="task" type="Any" required>
+      Task payload submitted to the streaming endpoint.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Yields">
+  <ApiFields ariaLabel="Transport subscribe yielded values">
+    <ApiField name="event" type="Any">
+      One parsed task event at a time. Concrete transports stop after the final event.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Transport subscribe errors">
+    <ApiField name="NotImplementedError">
+      Raised by the base implementation and by transports without streaming support.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Retry behavior">
+  ProtoLink does not automatically retry or resume streams. Even when a stream failure is categorized as retryable, the exception is returned to the consumer because the transport cannot know which events were already processed.
+</ApiCallout>
+
+</ApiReference>
+
+#### Transport.health
+
+<ApiReference
+  kind="method"
+  path="Transport.health"
+  signature={`transport.health() -> dict[str, Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L163"
+>
+
+Returns a JSON-compatible point-in-time view of lifecycle state, identity, declared capabilities, and local transport metrics.
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Transport health return value">
+    <ApiField name="health" type="dict[str, Any]">
+      Contains `status`, `ready`, `transport`, `url`, `capabilities`, and `metrics`. `status` is `"ready"` while running and `"stopped"` otherwise.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 #### Custom transport contract
 
@@ -385,21 +756,64 @@ The split is intentional: the custom class implements the wire protocol, while t
 
 The base class exposes reusable extension hooks so custom transports can preserve the built-in operational contract:
 
-| Method | Intended use |
-|--------|--------------|
-| `new_request_context(request_spec, data=None)` | Generate stable correlation and optional idempotency metadata. |
-| `payload_size(payload)` | Return the normalized UTF-8 JSON size estimate. |
-| `check_payload_limit(payload, kind, url=None)` | Enforce `kind="request"`, `"response"`, or `"event"`; returns measured bytes. |
-| `request_slot()` | Async context manager for bounded outbound unary work. Pair it with `run_with_retries()`. |
-| `inbound_request_slot()` | Async context manager for bounded inbound unary work and full outcome metrics. |
-| `stream_slot()` | Async context manager for bounded streams and stream outcome metrics. |
-| `run_with_retries(request_spec, context, operation)` | Execute an async operation under retry eligibility, backoff, and request metrics. |
-| `register_loop_resource(key, closer)` | Record an async client/channel closer with the event loop that owns it. |
-| `discard_loop_resource(key)` | Remove a resource that was already invalidated or closed. |
-| `close_loop_resources()` | Close all registered resources on their owning loops under `shutdown_timeout`. |
-| `acquire_idempotent_response(key)` | Claim an operation or await/replay an existing result. Returns `(owns_operation, result)`. |
-| `complete_idempotent_response(key, response)` | Publish and cache a successful or protocol-level response. |
-| `abort_idempotent_response(key, error)` | Release waiting duplicates when execution fails before a response exists. |
+<ApiSection title="Correlation, payloads, and retries">
+  <ApiFields ariaLabel="Transport reliability extension methods">
+    <ApiField name="new_request_context(request_spec, data=None)" type="TransportRequestContext">
+      Generates a correlation ID and, for idempotent specifications, a stable operation key derived from `id`, `task_id`, `agent_url`, or the generated request ID.
+    </ApiField>
+    <ApiField name="payload_size(payload)" type="int">
+      Returns the UTF-8 byte length after ProtoLink's recursive JSON normalization.
+    </ApiField>
+    <ApiField name="check_payload_limit(payload, *, kind, url=None)" type="int">
+      Measures and enforces the configured `"request"`, `"response"`, or `"event"` limit, returning the measured byte count or raising `TransportLimitError`.
+    </ApiField>
+    <ApiField name="run_with_retries(request_spec, context, operation)" type="Awaitable[Any]">
+      Executes an async operation with request outcome metrics and the configured eligibility, backoff, and jitter rules. Ordinary application exceptions are recorded and re-raised without retry.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Concurrency">
+  <ApiFields ariaLabel="Transport concurrency extension methods">
+    <ApiField name="request_slot()" type="AsyncContextManager[None]">
+      Bounds outbound unary work and records admission. Pair it with `run_with_retries()` for complete outcome metrics.
+    </ApiField>
+    <ApiField name="inbound_request_slot()" type="AsyncContextManager[None]">
+      Bounds inbound unary handler work and records success, failure, latency, and active-request gauges.
+    </ApiField>
+    <ApiField name="stream_slot()" type="AsyncContextManager[None]">
+      Bounds a complete stream lifetime and records stream completion, failure, cancellation, and active-stream gauges.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Loop-owned resources">
+  <ApiFields ariaLabel="Transport resource extension methods">
+    <ApiField name="register_loop_resource(key, closer)" type="None">
+      Records an async closer together with the event loop that owns its client connection or channel.
+    </ApiField>
+    <ApiField name="discard_loop_resource(key)" type="None">
+      Removes a resource already invalidated or closed.
+    </ApiField>
+    <ApiField name="close_loop_resources()" type="Awaitable[None]">
+      Runs every closer on its owning live loop, applying `shutdown_timeout` to each one. Cleanup timeouts and closer failures are suppressed; resources owned by closed loops are forgotten.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Idempotency">
+  <ApiFields ariaLabel="Transport idempotency extension methods">
+    <ApiField name="acquire_idempotent_response(key)" type="Awaitable[tuple[bool, Any | None]]">
+      Claims a new operation or waits for/replays an existing one. A `None` key always returns ownership without caching.
+    </ApiField>
+    <ApiField name="complete_idempotent_response(key, response)" type="None">
+      Publishes a completed response to concurrent waiters and retains it under the configured TTL and cache size.
+    </ApiField>
+    <ApiField name="abort_idempotent_response(key, error)" type="None">
+      Releases concurrent waiters with the failure and removes the in-flight claim so a later request may try again.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
 These hooks are an extension API for transport authors. Normal agent applications should configure the transport and call `AgentClient`, not manually coordinate slots or idempotency ownership.
 
@@ -423,55 +837,146 @@ These variables are documented so transport authors can understand ownership and
 
 Do not replace or mutate these collections from application code. A custom transport should use the public helper methods above.
 
-### `TransportMetricsSnapshot`
+### TransportMetricsSnapshot
 
-`transport.metrics` returns a new immutable snapshot. Reading it does not reset counters.
+<ApiReference
+  kind="dataclass"
+  path="protolink.TransportMetricsSnapshot"
+  signature={`TransportMetricsSnapshot(
+    requests_started: int = 0,
+    requests_succeeded: int = 0,
+    requests_failed: int = 0,
+    retries: int = 0,
+    streams_started: int = 0,
+    streams_completed: int = 0,
+    streams_failed: int = 0,
+    active_requests: int = 0,
+    active_streams: int = 0,
+    bytes_sent: int = 0,
+    bytes_received: int = 0,
+    total_latency_ms: float = 0.0,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/metrics.py#L11"
+>
 
-The built-in metrics are deliberately small and dependency-free. They answer immediate questions such as “are requests failing?”, “is the concurrency limit saturated?”, and “are retries hiding an unstable connection?” without requiring Prometheus, OpenTelemetry, or another backend. Because snapshots are local to one transport instance and reset on process restart, production monitoring should periodically export them or use ProtoLink telemetry for durable analysis.
+`transport.metrics` returns a new immutable snapshot without resetting counters. Values are local to one transport instance and reset with the process.
 
-| Field | Type | Meaning |
-|-------|------|---------|
-| `requests_started` | `int` | Unary request executions admitted by this instance. |
-| `requests_succeeded` | `int` | Unary executions completed successfully. |
-| `requests_failed` | `int` | Unary executions ending with an exception or terminal transport failure. |
-| `retries` | `int` | Additional attempts started by `RetryPolicy`. |
-| `streams_started` | `int` | Streams admitted by this instance. |
-| `streams_completed` | `int` | Streams that exited normally. |
-| `streams_failed` | `int` | Streams that exited with an exception or cancellation. |
-| `active_requests` | `int` | Current unary request gauge. |
-| `active_streams` | `int` | Current stream gauge. |
-| `bytes_sent` | `int` | Estimated normalized payload bytes attempted by outbound operations. Retries add bytes again. |
-| `bytes_received` | `int` | Estimated normalized result bytes accepted by outbound operations. |
-| `total_latency_ms` | `float` | Cumulative unary latency, not an average or histogram. |
+<ApiSection title="Fields">
+  <ApiFields ariaLabel="TransportMetricsSnapshot fields">
+    <ApiField name="requests_started" type="int" defaultValue="0">
+      Unary operations admitted by this instance. Runtime calls can increment both the caller's outbound and target's inbound instance independently.
+    </ApiField>
+    <ApiField name="requests_succeeded" type="int" defaultValue="0">
+      Unary operations completed successfully.
+    </ApiField>
+    <ApiField name="requests_failed" type="int" defaultValue="0">
+      Unary operations ending in an exception or terminal transport failure.
+    </ApiField>
+    <ApiField name="retries" type="int" defaultValue="0">
+      Additional attempts started by `RetryPolicy`, excluding the initial attempt.
+    </ApiField>
+    <ApiField name="streams_started" type="int" defaultValue="0">
+      Stream lifetimes admitted by this instance.
+    </ApiField>
+    <ApiField name="streams_completed" type="int" defaultValue="0">
+      Streams that exited normally.
+    </ApiField>
+    <ApiField name="streams_failed" type="int" defaultValue="0">
+      Streams that exited with an exception or cancellation.
+    </ApiField>
+    <ApiField name="active_requests" type="int" defaultValue="0">
+      Current unary-operation gauge.
+    </ApiField>
+    <ApiField name="active_streams" type="int" defaultValue="0">
+      Current stream gauge.
+    </ApiField>
+    <ApiField name="bytes_sent" type="int" defaultValue="0">
+      Estimated normalized payload bytes attempted by outbound work. Retried wire attempts add their bytes again.
+    </ApiField>
+    <ApiField name="bytes_received" type="int" defaultValue="0">
+      Estimated normalized result bytes accepted by outbound work.
+    </ApiField>
+    <ApiField name="total_latency_ms" type="float" defaultValue="0.0">
+      Cumulative unary latency; this is neither an average nor a histogram.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-`snapshot.to_dict()` produces the exact JSON-compatible mapping embedded in health responses. Metrics are process-local operational counters, not a replacement for durable telemetry. Set `collect_metrics=False` when another layer owns all measurement.
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="TransportMetricsSnapshot methods">
+    <ApiField name="to_dict()" type="dict[str, Any]">
+      Produces the exact JSON-compatible mapping embedded in `health()`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Observability scope">
+  These counters are deliberately dependency-free and process-local. Export snapshots periodically or use ProtoLink telemetry when measurements must survive restarts. Set `collect_metrics=False` when another layer owns all measurement.
+</ApiCallout>
+
+</ApiReference>
 
 For a rough average unary latency, divide `total_latency_ms` by the number of completed requests (`requests_succeeded + requests_failed`). Do not use this value as a percentile: a cumulative total cannot show whether a small number of requests were unusually slow.
 
 ### Transport errors
 
-All transport exceptions inherit from `TransportError` and expose the same diagnostic attributes:
-
-Typed errors let application code react to failure categories without parsing human-readable messages or knowing which protocol was used. A caller can handle `TransportTimeoutError` the same way for HTTP and gRPC, while still reading the native `status_code` when protocol-specific diagnostics are useful.
-
-```python
-TransportError(
+<ApiReference
+  kind="exception"
+  path="protolink.TransportError"
+  signature={`TransportError(
     message: str,
     *,
     url: str | None = None,
     request_id: str | None = None,
     retryable: bool = False,
     status_code: int | str | None = None,
-)
-```
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/errors.py#L6"
+>
 
-| Error | Compatibility base | Raised for |
-|-------|--------------------|------------|
-| `TransportConnectionError` | `ConnectionError` | Connection establishment, retention, or peer availability failure. |
-| `TransportTimeoutError` | `TimeoutError` | Request or stream deadline expiry. |
-| `TransportProtocolError` | `RuntimeError` | Invalid JSON/envelope shape, mismatched request ID, or incompatible wire response. |
-| `TransportRemoteError` | `RuntimeError` | A reachable peer returns an HTTP/gRPC status or protocol error result. |
-| `TransportLimitError` | `ValueError` | Serialized request, response, or event exceeds its configured byte limit. |
+Base exception for protocol-neutral transport failures. Typed subclasses let callers react without parsing messages or knowing whether HTTP, gRPC, WebSocket, SSE, or Runtime carried the request.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="TransportError parameters">
+    <ApiField name="message" type="str" required>
+      Human-readable description passed to `Exception`.
+    </ApiField>
+    <ApiField name="url" type="str | None" defaultValue="None">
+      Local or remote endpoint associated with the failure.
+    </ApiField>
+    <ApiField name="request_id" type="str | None" defaultValue="None">
+      Correlation identifier for the logical request.
+    </ApiField>
+    <ApiField name="retryable" type="bool" defaultValue="False">
+      Whether the failure category permits a retry. The request specification, method, and retry policy must also allow one.
+    </ApiField>
+    <ApiField name="status_code" type="int | str | None" defaultValue="None">
+      Optional HTTP integer or protocol-native string such as a gRPC status name.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Subclasses">
+  <ApiFields ariaLabel="TransportError subclasses">
+    <ApiField name="TransportConnectionError" type="TransportError, ConnectionError">
+      Connection establishment, retention, or peer-availability failure.
+    </ApiField>
+    <ApiField name="TransportTimeoutError" type="TransportError, TimeoutError">
+      Request or stream deadline expiry.
+    </ApiField>
+    <ApiField name="TransportProtocolError" type="TransportError, RuntimeError">
+      Invalid JSON or envelope shape, a mismatched request ID, or an incompatible wire response.
+    </ApiField>
+    <ApiField name="TransportRemoteError" type="TransportError, RuntimeError">
+      A reachable peer returns an HTTP/gRPC status or protocol error result.
+    </ApiField>
+    <ApiField name="TransportLimitError" type="TransportError, ValueError">
+      A serialized request, response, or event exceeds its configured byte limit.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 `retryable` describes the failure category only; the request spec and method must still permit retries. `status_code` is an HTTP integer or protocol-native string such as a gRPC status name. `request_id` lets logs and traces correlate the exception with request headers or envelopes.
 
@@ -579,13 +1084,95 @@ The URL scheme activates encryption. The transport name does not change:
 
 `certfile` and `keyfile` form the local certificate identity. A secure server URL requires both. `cafile` supplies trusted certificate authorities; outbound clients use the operating system trust store when it is omitted. Hostname verification is enabled by default and should remain enabled in production.
 
-| `TLSConfig` field | Default | Purpose |
-|-------------------|---------|---------|
-| `certfile` | `None` | PEM certificate chain presented by this server or mTLS client. |
-| `keyfile` | `None` | PEM private key matching `certfile`; the two fields must be supplied together. |
-| `cafile` | System roots for clients | PEM CA bundle used to verify remote servers and inbound mTLS clients. |
-| `require_client_cert` | `False` | Require a trusted certificate from every inbound client. Requires `cafile`. |
-| `check_hostname` | `True` | Verify outbound certificate hostnames. Disabling this does not disable CA verification. |
+### TLSConfig
+
+<ApiReference
+  kind="dataclass"
+  path="protolink.TLSConfig"
+  signature={`TLSConfig(
+    certfile: str | os.PathLike[str] | None = None,
+    keyfile: str | os.PathLike[str] | None = None,
+    cafile: str | os.PathLike[str] | None = None,
+    require_client_cert: bool = False,
+    check_hostname: bool = True,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/security/tls.py#L20"
+>
+
+Immutable certificate configuration shared by HTTP/SSE, WebSocket, and gRPC. Path-like values are normalized with `os.fspath()` during construction; certificate contents are loaded only when a context or credential bundle is created.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="TLSConfig parameters">
+    <ApiField name="certfile" type="str | os.PathLike[str] | None" defaultValue="None">
+      PEM certificate chain presented by a secure server or an mTLS client.
+    </ApiField>
+    <ApiField name="keyfile" type="str | os.PathLike[str] | None" defaultValue="None">
+      PEM private key matching `certfile`. Identity files must be supplied together.
+    </ApiField>
+    <ApiField name="cafile" type="str | os.PathLike[str] | None" defaultValue="None">
+      PEM CA bundle used to verify peers. Client contexts use system trust roots when omitted.
+    </ApiField>
+    <ApiField name="require_client_cert" type="bool" defaultValue="False">
+      Requires every inbound TLS client to present a certificate trusted by `cafile`.
+    </ApiField>
+    <ApiField name="check_hostname" type="bool" defaultValue="True">
+      Enables outbound certificate hostname verification. Turning it off does not disable CA verification.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="TLSConfig attributes">
+    <ApiField name="has_identity" type="bool">
+      `True` when both certificate and private-key paths are present.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Methods">
+  <ApiFields ariaLabel="TLSConfig methods">
+    <ApiField name="create_server_context()" type="ssl.SSLContext">
+      Builds a TLS 1.2-or-newer server context, loads the certificate chain, and configures optional client-certificate verification.
+    </ApiField>
+    <ApiField name="create_client_context()" type="ssl.SSLContext">
+      Builds a verified client context using `cafile` or system roots, applies hostname policy, and loads the optional mTLS identity.
+    </ApiField>
+    <ApiField name="require_server_identity(url=None)" type="None">
+      Raises `ValueError` when a secure server is started without both identity files.
+    </ApiField>
+    <ApiField name="identity_paths()" type="tuple[str, str]">
+      Returns the certificate and key paths, first requiring that both exist in the configuration.
+    </ApiField>
+    <ApiField name="certificate_chain_bytes()" type="bytes | None">
+      Reads the configured certificate chain for gRPC credentials.
+    </ApiField>
+    <ApiField name="private_key_bytes()" type="bytes | None">
+      Reads the configured private key for gRPC credentials.
+    </ApiField>
+    <ApiField name="ca_bytes()" type="bytes | None">
+      Reads the configured CA bundle, or returns `None` so the client can use system roots.
+    </ApiField>
+    <ApiField name="to_dict()" type="dict[str, Any]">
+      Serializes file paths and verification flags; it never embeds certificate or private-key bytes.
+    </ApiField>
+    <ApiField name="from_dict(data)" type="TLSConfig">
+      Reconstructs the configuration from serialized paths and flags.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="TLSConfig errors">
+    <ApiField name="ValueError">
+      Raised when only one identity file is supplied, client certificates are required without a CA file, or a server context is requested without an identity.
+    </ApiField>
+    <ApiField name="OSError | ssl.SSLError">
+      Raised when configured files cannot be read or OpenSSL cannot load their contents.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 For a client that only calls a secure service, certificate trust is enough:
 
@@ -857,7 +1444,7 @@ ProtoLink's native `POST /tasks/cancel` endpoint accepts a task-ID payload such 
 | Field       | Type                                | Description                |
 |------------ |-------------------------------------|----------------------------|
 | `id`        | `str`                               | Unique message identifier. |
-| `role`      | `"user" ⎪ "agent" ⎪ "assistant" ⎪ "system"` | Sender role.               |
+| `role`      | `"user"` ⎪ `"agent"` ⎪ `"assistant"` ⎪ `"system"` | Sender role.               |
 | `parts`     | `list[Part]`                        | Content payloads.          |
 | `timestamp` | `str`                               | ISO‑8601 timestamp.        |
 
@@ -892,10 +1479,10 @@ ProtoLink's native `POST /tasks/cancel` endpoint accepts a task-ID payload such 
 | `metadata`    | `dict[str, Any]` | Artifact metadata.          |
 | `timestamp`   | `str`            | ISO‑8601 timestamp.         |
 | `kind`        | `str`            | Application-defined category (e.g. `"result"`, `"preview"`, `"diagnostic"`). |
-| `name`        | `str ⎪ null`    | Optional display or resource name. |
-| `uri`         | `str ⎪ null`    | Optional URI identifying the represented resource. |
-| `media_type`  | `str ⎪ null`    | Optional MIME type describing the artifact as a whole. |
-| `action_id`   | `str ⎪ null`    | Optional ID of the `RunAction` that produced this artifact. |
+| `name`        | `str` ⎪ `null`    | Optional display or resource name. |
+| `uri`         | `str` ⎪ `null`    | Optional URI identifying the represented resource. |
+| `media_type`  | `str` ⎪ `null`    | Optional MIME type describing the artifact as a whole. |
+| `action_id`   | `str` ⎪ `null`    | Optional ID of the `RunAction` that produced this artifact. |
 
 ### Typical Usage
 
@@ -957,41 +1544,205 @@ async def call_remote(url: str) -> None:
 
 ### HTTPTransport API Reference
 
-The most important public methods on `HTTPTransport` are summarized below.
+#### HTTPTransport
 
-#### Constructor & lifecycle
+<ApiReference
+  kind="class"
+  path="protolink.transport.HTTPTransport"
+  signature={`HTTPTransport(
+    url: str,
+    timeout: float = 360.0,
+    authenticator: Authenticator | None = None,
+    backend: Literal["starlette", "fastapi"] = "starlette",
+    *,
+    validate_schema: bool = False,
+    credentials: str | None = None,
+    tls: TLSConfig | None = None,
+    config: TransportConfig | None = None,
+    log_level: str = "info",
+    access_log: bool = True,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py#L40"
+>
 
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `backend: Literal["starlette", "fastapi"] = "starlette"`, `validate_schema: bool = False`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None`, `config: TransportConfig ⎪ None = None`, `log_level: str = "info"`, `access_log: bool = True` | `None` | Configure URL, timeout, authentication, TLS, shared production behavior, backend, validation, and Uvicorn logging. |
-| `start` | `self` | `Awaitable[None]` | Start the selected backend and create the internal `httpx.AsyncClient`. `AgentServer` or `RegistryServer` registers endpoint specs before transport startup. |
-| `stop` | `self` | `Awaitable[None]` | Stop the backend server and close the internal HTTP client. Safe to call multiple times. |
+Dual-role HTTP client/server transport. It mounts an ASGI backend for inbound endpoints and keeps a separate pooled `httpx.AsyncClient` for each event loop that performs outbound work.
 
-#### Properties
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="HTTPTransport constructor parameters">
+    <ApiField name="url" type="str" required>
+      Server identity and bind URL. Use `http://` for cleartext or `https://` for native TLS.
+    </ApiField>
+    <ApiField name="timeout" type="float" defaultValue="360.0">
+      Deadline in seconds for each outbound HTTP request.
+    </ApiField>
+    <ApiField name="authenticator" type="Authenticator | None" defaultValue="None">
+      Optional provider used by `authenticate()` to obtain an outbound security context.
+    </ApiField>
+    <ApiField name="backend" type={'Literal["starlette", "fastapi"]'} defaultValue={'"starlette"'}>
+      ASGI implementation. The current constructor selects FastAPI when `backend.lower() == "fastapi"`; every other value, including an unrecognized one, falls back to Starlette.
+    </ApiField>
+    <ApiField name="validate_schema" type="bool" defaultValue="False">
+      Enables backend request-schema validation where supported.
+    </ApiField>
+    <ApiField name="credentials" type="str | None" defaultValue="None">
+      Credentials retained for authentication headers or a later `authenticate()` call.
+    </ApiField>
+    <ApiField name="tls" type="TLSConfig | None" defaultValue="None">
+      Certificate identity and trust settings. An HTTPS server requires a local identity.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig | None" defaultValue="None">
+      Shared limits, retries, keepalive, cleanup, idempotency, and metrics policy.
+    </ApiField>
+    <ApiField name="log_level" type="str" defaultValue={'"info"'}>
+      Uvicorn log level forwarded to the selected backend.
+    </ApiField>
+    <ApiField name="access_log" type="bool" defaultValue="True">
+      Enables Uvicorn request-access logging.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-| Name | Type | Access | Description |
-| ---- | ---- | ------ | ----------- |
-| `url` | `str` | Read-only | The base URL configured for this transport. |
-| `timeout` | `float` | Read/Write | The request timeout (in seconds) for outgoing requests. This can be changed at runtime to easily adjust timeouts for subsequent requests without restarting the transport. |
-| `config` | `TransportConfig` | Read-only reference | Effective limits, retry, keepalive, shutdown, idempotency, and metric settings. |
-| `capabilities` | `TransportCapabilities` | Class-level | Networked, TLS-capable, persistent, unary-only capability declaration. |
-| `metrics` | `TransportMetricsSnapshot` | Read-only snapshot | Current request, retry, byte, stream, and latency counters. |
-| `is_running` | `bool` | Read-only | Whether the ASGI server is running. |
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="HTTPTransport attributes">
+    <ApiField name="url" type="str">
+      Read-only configured base URL.
+    </ApiField>
+    <ApiField name="timeout" type="float">
+      Read/write deadline used by future requests, including requests sent through an already-created client pool.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig">
+      Effective shared configuration.
+    </ApiField>
+    <ApiField name="capabilities" type="TransportCapabilities">
+      Networked, TLS-capable, persistent, unary-only declaration.
+    </ApiField>
+    <ApiField name="metrics" type="TransportMetricsSnapshot">
+      Current immutable counter snapshot.
+    </ApiField>
+    <ApiField name="is_running" type="bool">
+      Whether the ASGI backend is currently serving.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-#### Sending & receiving
+<ApiSection title="Lifecycle and routing">
+  <ApiFields ariaLabel="HTTPTransport lifecycle methods">
+    <ApiField name="setup_routes(endpoints)" type="None">
+      Mounts `EndpointSpec` values on the selected backend. `AgentServer` and `RegistryServer` call this before startup.
+    </ApiField>
+    <ApiField name="start()" type="Awaitable[None]">
+      Starts the backend, marks the transport running, and primes a client for the current loop. Calling it while running is a no-op.
+    </ApiField>
+    <ApiField name="stop()" type="Awaitable[None]">
+      Stops the backend, closes all loop-local clients on their owning loops, and clears lifecycle state. Repeated calls are safe.
+    </ApiField>
+    <ApiField name="validate_url()" type="bool">
+      Returns `True` for configured `http://` and `https://` URLs.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Mount transport-neutral server endpoint specs onto the selected Starlette or FastAPI backend. Called by `AgentServer` and `RegistryServer`. |
-| `send` | `request_spec: ClientRequestSpec`, `base_url: str`, `data: Any = None`, `params: dict ⎪ None = None` | `Awaitable[Any]` | Send a generic request to the agent. This is the low-level primitive used by `AgentClient`. |
+</ApiReference>
 
-#### Auth & utilities
+#### HTTPTransport.send
 
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `authenticate` | `credentials: str` | `Awaitable[None]` | Use the configured `Authenticator` to obtain an auth context (for example, exchanging an API key for a bearer token). The resulting context is automatically injected into outgoing HTTP headers. |
-| `validate_url` | `-` | `bool` | Return `True` when the configured URL uses `http://` or `https://`. |
-| `health` | `-` | `dict[str, Any]` | Return readiness, capabilities, URL, and metric snapshot. |
+<ApiReference
+  kind="async method"
+  path="HTTPTransport.send"
+  signature={`await transport.send(
+    request_spec: ClientRequestSpec,
+    base_url: str,
+    data: Any = None,
+    params: dict[str, Any] | None = None,
+) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py#L146"
+>
+
+Serializes and size-checks one unary operation, applies correlation, idempotency, and authentication headers, and parses the JSON response through the request specification.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="HTTPTransport send parameters">
+    <ApiField name="request_spec" type="ClientRequestSpec" required>
+      Supplies the HTTP method, path, parsers, and retry/idempotency metadata.
+    </ApiField>
+    <ApiField name="base_url" type="str" required>
+      Destination HTTP or HTTPS base URL.
+    </ApiField>
+    <ApiField name="data" type="Any" defaultValue="None">
+      Optional JSON body.
+    </ApiField>
+    <ApiField name="params" type="dict[str, Any] | None" defaultValue="None">
+      Optional URL query parameters.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="HTTPTransport send return value">
+    <ApiField name="result" type="Any">
+      Parsed response returned by `request_spec.response_parser`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="HTTPTransport send errors">
+    <ApiField name="TransportTimeoutError">
+      The `httpx` request exceeded `timeout`; marked retryable.
+    </ApiField>
+    <ApiField name="TransportConnectionError">
+      Connection establishment failed; marked retryable.
+    </ApiField>
+    <ApiField name="TransportProtocolError">
+      The peer disconnected at the HTTP protocol layer, returned invalid JSON, or produced another incompatible response. Remote-protocol disconnects are retryable; malformed JSON is not.
+    </ApiField>
+    <ApiField name="TransportRemoteError">
+      The peer returned an HTTP error. Status `429` and `5xx` are categorized as retryable; the request policy still decides whether another attempt occurs.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      The normalized request or response exceeds its configured limit.
+    </ApiField>
+    <ApiField name="response parser error">
+      Exceptions raised by `request_spec.response_parser` propagate unchanged.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### HTTPTransport.authenticate
+
+<ApiReference
+  kind="async method"
+  path="HTTPTransport.authenticate"
+  signature={`await transport.authenticate(
+    credentials: str,
+) -> None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py#L353"
+>
+
+Asks the configured authenticator to create an outbound security context. Future sends translate that context into protocol headers.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="HTTPTransport authenticate parameters">
+    <ApiField name="credentials" type="str" required>
+      Secret or token understood by the configured `Authenticator`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="HTTPTransport authenticate errors">
+    <ApiField name="RuntimeError">
+      Raised when no authenticator was configured.
+    </ApiField>
+    <ApiField name="authentication error">
+      Errors raised by the authenticator propagate unchanged.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 ---
 
@@ -1004,7 +1755,7 @@ The most important public methods on `HTTPTransport` are summarized below.
 Unlike network transports (HTTP, WebSocket), RuntimeTransport avoids actual TCP I/O. However, it perfectly mirrors the behavioral boundaries of `HTTPTransport` ensuring seamless interchangeability:
 
 - **Strict URL Routing** - each agent transport is initialized explicitly with a unique URL (e.g., `runtime://agent-name`).
-- **Global In-Memory Registry** - transports discover each other seamlessly through an automatic shared class-level global registry.
+- **Process-local registry** - started transports discover one another through a shared class-level dictionary. The dictionary has no locking; coordinate start/stop when multiple OS threads manage Runtime transports.
 - **Serialization Isolation** - message models natively pass through Pydantic dict boundaries, maintaining process and state safety equivalently to HTTP wire framing.
 - **Supports streaming** - agents can use generic `EndpointSpec` routing for real-time task streams.
 - **Supports cancellation** - the same `/tasks/cancel` endpoint dispatches in-process without opening a local socket.
@@ -1058,36 +1809,200 @@ async def main() -> None:
 
 ### API Reference
 
-#### Constructor & Lifecycle
+#### RuntimeTransport
 
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `__init__` | `url: str`, `config: TransportConfig ⎪ None = None` | `None` | Create an isolated in-memory transport with the same limits, retries, idempotency, and metrics contract as network transports. |
-| `start` | `self` | `Awaitable[None]` | Register the allocated `url` actively directly on the class-level registry cache. |
-| `stop` | `self` | `Awaitable[None]` | Detach registry allocations cleaning up in-memory routing bindings. |
+<ApiReference
+  kind="class"
+  path="protolink.transport.RuntimeTransport"
+  signature={`RuntimeTransport(
+    url: str,
+    *,
+    config: TransportConfig | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py#L31"
+>
 
-#### Properties
+Process-local transport that routes calls through registered Python objects while retaining the same serialization, byte-limit, concurrency, retry, idempotency, metrics, and endpoint-parser boundaries as network transports.
 
-| Name | Type | Access | Description |
-| ---- | ---- | ------ | ----------- |
-| `url` | `str` | Read-only | The unique runtime URL allocated to this transport. |
-| `is_running` | `bool` | Read-only | Whether the transport is currently registered in the global in-memory registry. |
-| `config` | `TransportConfig` | Read-only reference | Effective shared production configuration. |
-| `capabilities` | `TransportCapabilities` | Class-level | In-process, streaming, non-networked capability declaration. |
-| `metrics` | `TransportMetricsSnapshot` | Read-only snapshot | Current request, stream, retry, byte, and latency counters. |
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="RuntimeTransport constructor parameters">
+    <ApiField name="url" type="str" required>
+      Unique process-local identity, conventionally using `runtime://`. Construction stores the value but does not reject an invalid scheme.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig | None" defaultValue="None">
+      Shared operational configuration.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-#### Sending
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="RuntimeTransport attributes">
+    <ApiField name="url" type="str">
+      Read-only registry key.
+    </ApiField>
+    <ApiField name="is_running" type="bool">
+      Whether this instance is currently registered.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig">
+      Effective shared configuration.
+    </ApiField>
+    <ApiField name="capabilities" type="TransportCapabilities">
+      In-process, streaming, non-networked capability declaration.
+    </ApiField>
+    <ApiField name="metrics" type="TransportMetricsSnapshot">
+      Current immutable request, stream, retry, byte, and latency snapshot.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
 
-| Method | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Route a request via explicit parsed endpoint pathways toward registered peers. Internally utilized by `AgentClient`. |
-| `subscribe` | `base_url: str`, `task: Task` | `AsyncIterator[dict]` | Connect securely subscribing mapped events from peer endpoint definitions natively generating iterative tokens. |
+<ApiSection title="Lifecycle and lookup">
+  <ApiFields ariaLabel="RuntimeTransport lifecycle methods">
+    <ApiField name="get_transport(base_url)" type="RuntimeTransport | None">
+      Class method returning the instance registered under `base_url`.
+    </ApiField>
+    <ApiField name="setup_routes(endpoints)" type="None">
+      Adds or replaces cached endpoint specifications by uppercase method and path; entries omitted from a later call remain until `stop()` clears the cache.
+    </ApiField>
+    <ApiField name="start()" type="Awaitable[None]">
+      Registers `self` under its URL and marks it running. Calling it while already running is a no-op.
+    </ApiField>
+    <ApiField name="stop()" type="Awaitable[None]">
+      Unregisters the instance, clears every cached endpoint, and marks it stopped.
+    </ApiField>
+    <ApiField name="validate_url()" type="bool">
+      Returns `True` when the configured URL starts with `runtime://`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Restart behavior">
+  `stop()` clears the route cache. To restart the same low-level transport instance directly, call `setup_routes()` again before `start()`; the normal Agent/Registry server lifecycle performs route setup for you.
+</ApiCallout>
+
+<ApiCallout label="Threading">
+  The class registry is an ordinary dictionary, not a thread-safe coordination service. Calls and asyncio concurrency are supported, but applications that start or stop Runtime transports from several OS threads must serialize those lifecycle changes.
+</ApiCallout>
+
+</ApiReference>
+
+#### RuntimeTransport.send
+
+<ApiReference
+  kind="async method"
+  path="RuntimeTransport.send"
+  signature={`await transport.send(
+    request_spec: ClientRequestSpec,
+    base_url: str,
+    data: Any = None,
+    params: dict[str, Any] | None = None,
+) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py#L106"
+>
+
+Finds the target instance and endpoint in memory and crosses the request and response parser boundaries. The caller enforces payload limits and an outbound request slot; the target independently enforces an inbound request slot.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="RuntimeTransport send parameters">
+    <ApiField name="request_spec" type="ClientRequestSpec" required>
+      Method/path contract, parsers, and retry/idempotency declaration.
+    </ApiField>
+    <ApiField name="base_url" type="str" required>
+      URL of a started Runtime transport in this process.
+    </ApiField>
+    <ApiField name="data" type="Any" defaultValue="None">
+      Optional payload passed through the request parser.
+    </ApiField>
+    <ApiField name="params" type="dict[str, Any] | None" defaultValue="None">
+      Accepted for transport-interface symmetry. The current Runtime implementation discards this value before endpoint invocation.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="RuntimeTransport send return value">
+    <ApiField name="result" type="Any">
+      Parsed response from the matching target handler.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="RuntimeTransport send errors">
+    <ApiField name="TransportConnectionError">
+      No started target is registered at `base_url`; marked retryable.
+    </ApiField>
+    <ApiField name="TransportRemoteError">
+      No endpoint matches the method/path (`status_code=404`) or the endpoint/parser raises unexpectedly. Handler failures are wrapped as non-retryable remote errors.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      Either instance rejects the normalized request or response size.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### RuntimeTransport.subscribe
+
+<ApiReference
+  kind="async iterator method"
+  path="RuntimeTransport.subscribe"
+  signature={`transport.subscribe(
+    agent_url: str,
+    task: Task,
+) -> AsyncIterator[dict[str, Any]]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py#L278"
+>
+
+Streams task events directly from a target endpoint. If the target exposes no streaming endpoint, Runtime submits the task through its unary endpoint and yields one synthesized final event.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="RuntimeTransport subscribe parameters">
+    <ApiField name="agent_url" type="str" required>
+      URL of the started target Runtime transport.
+    </ApiField>
+    <ApiField name="task" type="Task" required>
+      Task sent to the target's streaming or unary fallback endpoint.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Yields">
+  <ApiFields ariaLabel="RuntimeTransport subscribe yielded values">
+    <ApiField name="event" type="dict[str, Any]">
+      Normalized endpoint events, each checked against `max_event_bytes`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="RuntimeTransport subscribe errors">
+    <ApiField name="TransportConnectionError">
+      The target is not registered.
+    </ApiField>
+    <ApiField name="TransportRemoteError">
+      The selected streaming handler does not return an async iterator.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      The caller's normalized task, unary fallback result, or a yielded event exceeds its limit.
+    </ApiField>
+    <ApiField name="parser or handler error">
+      Exceptions raised while parsing the task or running the live-stream handler propagate unchanged.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="No stream retries">
+  `subscribe()` is never passed through `run_with_retries()`. Consumers decide how to checkpoint and resume a failed event sequence.
+</ApiCallout>
+
+</ApiReference>
 
 ### Key Differences from HTTPTransport
 
 | Aspect | HTTPTransport | RuntimeTransport |
 |--------|---------------|------------------|
-| Network | HTTP over TCP | Direct In-memory (Global Registry) |
+| Network | HTTP over TCP | Direct in-memory calls through a process-local class registry |
 | URL prefix requirements | HTTP(s) Protocol | `runtime://` Prefix format |
 | Transport Instantiation | Multi-Process/Network | Process Local Instances |
 | Serialization Engine | Full JSON Decoding via HTTP body | Native dict structures via Pydantic serialization bridging |
@@ -1106,25 +2021,254 @@ Use it when:
 
 ### WebSocketTransport API
 
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `tls: TLSConfig ⎪ None = None`, `config: TransportConfig ⎪ None = None` | `None` | Configure URL, timeout, authentication, credentials, TLS, frame/concurrency limits, ping/pong keepalive, retry, shutdown, idempotency, and metrics. |
-| `send` | `request_spec`, `base_url`, `data=None`, `params=None` | `Awaitable[Any]` | Send one correlated JSON envelope over a loop-local persistent connection. Control-channel specs use a separate cached connection. |
-| `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a `Task` to `/tasks/stream` and receive task event payloads over a single WebSocket connection. |
-| `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Cache endpoint specs for the server-side frame router. |
-| `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the WebSocket server. |
-| `validate_url` | `-` | `bool` | Accept `ws://` and `wss://` URLs. |
-| `health` | `-` | `dict[str, Any]` | Return shared readiness, capability, and metric data. |
+#### WebSocketTransport
 
-#### Properties
+<ApiReference
+  kind="class"
+  path="protolink.transport.WebSocketTransport"
+  signature={`WebSocketTransport(
+    url: str,
+    timeout: float = 360.0,
+    authenticator: Authenticator | None = None,
+    credentials: str | None = None,
+    *,
+    tls: TLSConfig | None = None,
+    config: TransportConfig | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py#L36"
+>
 
-| Name | Type | Access | Description |
-| ---- | ---- | ------ | ----------- |
-| `url` | `str` | Read-only | The base URL configured for this transport. |
-| `timeout` | `float` | Read/Write | The timeout (in seconds) for WebSocket receive operations. This can be changed at runtime to adjust response wait times for subsequent requests. |
-| `config` | `TransportConfig` | Read-only reference | Effective limits, retry, ping/pong, shutdown, idempotency, and metric settings. |
-| `capabilities` | `TransportCapabilities` | Class-level | Networked, streaming, TLS-capable, bidirectional, persistent capability declaration. |
-| `metrics` | `TransportMetricsSnapshot` | Read-only snapshot | Current unary and stream counters, bytes, retries, and latency. |
+Bidirectional JSON-envelope transport with loop-local persistent connections. Unary requests are serialized per connection, and request specifications marked for the control channel use a separate connection so cancellation does not wait behind active default-channel work.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="WebSocketTransport constructor parameters">
+    <ApiField name="url" type="str" required>
+      Server identity and bind URL using `ws://` or `wss://`.
+    </ApiField>
+    <ApiField name="timeout" type="float" defaultValue="360.0">
+      Receive deadline in seconds for outbound unary calls and stream reads.
+    </ApiField>
+    <ApiField name="authenticator" type="Authenticator | None" defaultValue="None">
+      Optional provider used to create outbound authentication headers.
+    </ApiField>
+    <ApiField name="credentials" type="str | None" defaultValue="None">
+      Credentials retained for the authentication workflow.
+    </ApiField>
+    <ApiField name="tls" type="TLSConfig | None" defaultValue="None">
+      Certificate and trust settings. A WSS server requires a local identity; clients without an explicit configuration use the WebSocket library's default verified TLS behavior.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig | None" defaultValue="None">
+      Frame limits, slots, ping/pong keepalive, retry, shutdown, idempotency, and metrics policy.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="WebSocketTransport attributes">
+    <ApiField name="url" type="str">
+      Read-only configured URL.
+    </ApiField>
+    <ApiField name="timeout" type="float">
+      Read/write receive deadline applied to subsequent operations.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig">
+      Effective shared configuration.
+    </ApiField>
+    <ApiField name="capabilities" type="TransportCapabilities">
+      Networked, streaming, TLS-capable, bidirectional, persistent declaration.
+    </ApiField>
+    <ApiField name="metrics" type="TransportMetricsSnapshot">
+      Current immutable unary and stream counters.
+    </ApiField>
+    <ApiField name="is_running" type="bool">
+      Whether the WebSocket server is accepting connections.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Lifecycle and routing">
+  <ApiFields ariaLabel="WebSocketTransport lifecycle methods">
+    <ApiField name="setup_routes(endpoints)" type="None">
+      Caches endpoint specifications for method/path frame dispatch.
+    </ApiField>
+    <ApiField name="start()" type="Awaitable[None]">
+      Starts the server with configured frame, queue, ping, TLS, and concurrency settings. Calling it while running is a no-op.
+    </ApiField>
+    <ApiField name="stop()" type="Awaitable[None]">
+      Closes loop-local client connections, locks, and the server, then marks the transport stopped.
+    </ApiField>
+    <ApiField name="validate_url()" type="bool">
+      Returns `True` for configured `ws://` and `wss://` URLs.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="WebSocketTransport lifecycle errors">
+    <ApiField name="ImportError">
+      Importing this transport fails when the optional `websockets` dependency is unavailable.
+    </ApiField>
+    <ApiField name="ValueError">
+      `start()` requires a hostname and an explicit port. Default ports are not inferred from `ws` or `wss`; secure startup also requires a TLS identity.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### WebSocketTransport.send
+
+<ApiReference
+  kind="async method"
+  path="WebSocketTransport.send"
+  signature={`await transport.send(
+    request_spec: ClientRequestSpec,
+    base_url: str,
+    data: Any = None,
+    params: dict[str, Any] | None = None,
+) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py#L229"
+>
+
+Sends one correlated JSON request envelope and waits under the connection's lock for the matching response. The lock prevents interleaved unary responses on the same channel.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="WebSocketTransport send parameters">
+    <ApiField name="request_spec" type="ClientRequestSpec" required>
+      Supplies method, path, channel, parsers, and idempotency metadata.
+    </ApiField>
+    <ApiField name="base_url" type="str" required>
+      Destination WebSocket URL.
+    </ApiField>
+    <ApiField name="data" type="Any" defaultValue="None">
+      Optional envelope payload.
+    </ApiField>
+    <ApiField name="params" type="dict[str, Any] | None" defaultValue="None">
+      Optional envelope parameters.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="WebSocketTransport send return value">
+    <ApiField name="result" type="Any">
+      Parsed `result` from the matching successful envelope.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="WebSocketTransport send errors">
+    <ApiField name="TransportTimeoutError">
+      No response arrived before `timeout`; marked retryable.
+    </ApiField>
+    <ApiField name="TransportConnectionError">
+      The connection closed while waiting; marked retryable.
+    </ApiField>
+    <ApiField name="TransportProtocolError">
+      The response is invalid JSON, has the wrong request ID, or violates the envelope contract. The cached connection is discarded.
+    </ApiField>
+    <ApiField name="TransportRemoteError">
+      The peer returned an `ok: false` envelope.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      A request or response exceeds its configured normalized size.
+    </ApiField>
+    <ApiField name="response parser error">
+      Parser exceptions propagate unchanged.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Cancellation">
+  Cancelling the coroutine propagates `CancelledError` and discards its connection, preventing a late frame from being mistaken for the next request's response.
+</ApiCallout>
+
+</ApiReference>
+
+#### WebSocketTransport.subscribe
+
+<ApiReference
+  kind="async iterator method"
+  path="WebSocketTransport.subscribe"
+  signature={`transport.subscribe(
+    agent_url: str,
+    task: Any,
+) -> AsyncIterator[Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py#L297"
+>
+
+Submits a task to `/tasks/stream` and holds the selected connection lock until a final event arrives or the stream exits.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="WebSocketTransport subscribe parameters">
+    <ApiField name="agent_url" type="str" required>
+      Destination WebSocket URL.
+    </ApiField>
+    <ApiField name="task" type="Any" required>
+      Task payload for the stream endpoint.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Yields">
+  <ApiFields ariaLabel="WebSocketTransport subscribe yielded values">
+    <ApiField name="event" type="Any">
+      Each successful envelope's normalized result, up to and including the event marked final.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="WebSocketTransport subscribe errors">
+    <ApiField name="TransportTimeoutError | TransportConnectionError">
+      The read timed out or the connection closed. The error category may be retryable, but the stream is not retried automatically.
+    </ApiField>
+    <ApiField name="TransportProtocolError | TransportRemoteError">
+      The peer sent an invalid/mismatched envelope or an explicit remote error.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      The task or an event exceeds its configured limit.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Connection scheduling">
+  The default-channel lock is held for the complete stream, so unary calls on that same connection wait. Control-plane requests use their dedicated channel and remain independent.
+</ApiCallout>
+
+</ApiReference>
+
+#### WebSocketTransport.authenticate
+
+<ApiReference
+  kind="async method"
+  path="WebSocketTransport.authenticate"
+  signature={`await transport.authenticate(
+    credentials: str,
+) -> None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py#L516"
+>
+
+Creates an outbound authentication context whose headers are included in later WebSocket upgrade handshakes.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="WebSocketTransport authenticate parameters">
+    <ApiField name="credentials" type="str" required>
+      Secret or token understood by the configured authenticator.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="WebSocketTransport authenticate errors">
+    <ApiField name="RuntimeError">
+      Raised when no authenticator was configured.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 ---
 
@@ -1196,17 +2340,285 @@ Authentication uses gRPC metadata keys compatible with the HTTP headers Protolin
 
 ### API
 
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `__init__` | `url: str`, `timeout: float = 360.0`, `authenticator: Authenticator ⎪ None = None`, `credentials: str ⎪ None = None`, `channel_options = None`, `server_options = None`, `compression = None`, `maximum_concurrent_rpcs: int ⎪ None = None`, `graceful_shutdown_timeout: float = 3.0`, `tls: TLSConfig ⎪ None = None`, `config: TransportConfig ⎪ None = None`, `enable_health: bool = True`, `enable_reflection: bool = True` | `None` | Configure deadlines, auth, TLS/mTLS, shared limits/retries/keepalive, grpcio overrides, compression, shutdown grace, standard health, and reflection. Explicit gRPC options override values derived from `config`. |
-| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Send a unary request to the peer's `Invoke` method and parse the response through the request spec. |
-| `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | Send a task to `Stream` and yield each task event result until the stream is final. |
-| `setup_routes` | `endpoints: list[EndpointSpec]` | `None` | Cache transport-neutral endpoint specs for the generic gRPC router. |
-| `start` / `stop` | `self` | `Awaitable[None]` | Start or stop the `grpc.aio` server and loop-local client channels. |
-| `validate_url` | `-` | `bool` | Accept `grpc://` and `grpcs://` URLs. |
-| `url` / `timeout` | `str` / `float` | URL read-only; timeout read/write | Inspect the server identity URL or adjust future call deadlines. |
-| `config` / `capabilities` / `metrics` | Shared types | Read-only | Inspect effective production settings, declared behavior, and operational counters. |
-| `health` | `-` | `dict[str, Any]` | Return ProtoLink health data; standard gRPC health is exposed separately when enabled. |
+#### GRPCTransport
+
+<ApiReference
+  kind="class"
+  path="protolink.transport.GRPCTransport"
+  signature={`GRPCTransport(
+    url: str,
+    timeout: float = 360.0,
+    authenticator: Authenticator | None = None,
+    credentials: str | None = None,
+    *,
+    channel_options: list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None = None,
+    server_options: list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None = None,
+    compression: Any | None = None,
+    maximum_concurrent_rpcs: int | None = None,
+    graceful_shutdown_timeout: float = 3.0,
+    tls: TLSConfig | None = None,
+    config: TransportConfig | None = None,
+    enable_health: bool = True,
+    enable_reflection: bool = True,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py#L41"
+>
+
+Generic `grpc.aio` client/server transport. It multiplexes transport-neutral endpoint specifications over one unary `Invoke` method and one unary-stream `Stream` method and keeps outbound channels isolated per event loop.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="GRPCTransport constructor parameters">
+    <ApiField name="url" type="str" required>
+      Server identity and bind URL using `grpc://` or `grpcs://`.
+    </ApiField>
+    <ApiField name="timeout" type="float" defaultValue="360.0">
+      Deadline in seconds for future outbound RPCs.
+    </ApiField>
+    <ApiField name="authenticator" type="Authenticator | None" defaultValue="None">
+      Optional provider used for inbound metadata validation and outbound auth metadata.
+    </ApiField>
+    <ApiField name="credentials" type="str | None" defaultValue="None">
+      Raw credentials authenticated lazily before the first outbound request.
+    </ApiField>
+    <ApiField name="channel_options" type="list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None" defaultValue="None">
+      Low-level client-channel options. Explicit keys replace keepalive and message limits derived from `config`.
+    </ApiField>
+    <ApiField name="server_options" type="list[tuple[str, Any]] | tuple[tuple[str, Any], ...] | None" defaultValue="None">
+      Low-level server options. Explicit keys replace derived receive/send limits.
+    </ApiField>
+    <ApiField name="compression" type="Any | None" defaultValue="None">
+      Compression value accepted by grpcio for the server and outbound calls.
+    </ApiField>
+    <ApiField name="maximum_concurrent_rpcs" type="int | None" defaultValue="None">
+      Server-wide concurrent RPC limit. `None` uses `config.limits.max_concurrent_requests`; the current implementation also treats `0` as use-the-configured-limit.
+    </ApiField>
+    <ApiField name="graceful_shutdown_timeout" type="float" defaultValue="3.0">
+      Seconds the gRPC server gives in-flight RPCs to finish during `stop()`. This is distinct from `config.shutdown_timeout`, which bounds loop-owned channel closers.
+    </ApiField>
+    <ApiField name="tls" type="TLSConfig | None" defaultValue="None">
+      Certificate identity and trust settings. A GRPCS server requires an identity; a GRPCS client without this object uses system roots.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig | None" defaultValue="None">
+      Shared limits, retries, keepalive, cleanup, idempotency, and metrics policy.
+    </ApiField>
+    <ApiField name="enable_health" type="bool" defaultValue="True">
+      Registers the standard gRPC health service when its optional support package is importable.
+    </ApiField>
+    <ApiField name="enable_reflection" type="bool" defaultValue="True">
+      Registers server reflection when its optional support package is importable.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Attributes">
+  <ApiFields ariaLabel="GRPCTransport attributes">
+    <ApiField name="url" type="str">
+      Read-only configured identity URL.
+    </ApiField>
+    <ApiField name="timeout" type="float">
+      Read/write deadline for future calls.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig">
+      Effective shared configuration.
+    </ApiField>
+    <ApiField name="capabilities" type="TransportCapabilities">
+      Networked, streaming, TLS-capable, persistent declaration.
+    </ApiField>
+    <ApiField name="metrics" type="TransportMetricsSnapshot">
+      Current immutable request and stream snapshot.
+    </ApiField>
+    <ApiField name="is_running" type="bool">
+      Whether the `grpc.aio` server is serving.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Lifecycle and routing">
+  <ApiFields ariaLabel="GRPCTransport lifecycle methods">
+    <ApiField name="setup_routes(endpoints)" type="None">
+      Caches endpoint specifications by uppercase method and path.
+    </ApiField>
+    <ApiField name="start()" type="Awaitable[None]">
+      Starts the generic service, optional health and reflection services, and native TLS when selected. Calling it while running is a no-op.
+    </ApiField>
+    <ApiField name="stop()" type="Awaitable[None]">
+      Marks health not-serving, gives RPCs their graceful timeout, stops the server, and closes loop-local channels.
+    </ApiField>
+    <ApiField name="validate_url()" type="bool">
+      Returns `True` for configured `grpc://` and `grpcs://` URLs.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="GRPCTransport constructor and lifecycle errors">
+    <ApiField name="ImportError">
+      Construction fails when `grpcio` is not installed.
+    </ApiField>
+    <ApiField name="ValueError">
+      `start()` requires a hostname and port; secure server startup also requires a TLS identity.
+    </ApiField>
+    <ApiField name="RuntimeError">
+      Raised when grpcio cannot bind the requested server address.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Optional services">
+  Health and reflection are registered only when their support modules import successfully. The implementation imports those modules together, so if either support package is unavailable neither optional service is installed.
+</ApiCallout>
+
+</ApiReference>
+
+#### GRPCTransport.send
+
+<ApiReference
+  kind="async method"
+  path="GRPCTransport.send"
+  signature={`await transport.send(
+    request_spec: ClientRequestSpec,
+    base_url: str,
+    data: Any = None,
+    params: dict[str, Any] | None = None,
+) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py#L241"
+>
+
+Encodes one request as JSON bytes, invokes the peer's generic unary method with auth/correlation metadata and a deadline, then parses the successful envelope.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="GRPCTransport send parameters">
+    <ApiField name="request_spec" type="ClientRequestSpec" required>
+      Supplies the routed method/path, parsers, and retry/idempotency declaration.
+    </ApiField>
+    <ApiField name="base_url" type="str" required>
+      Destination gRPC or GRPCS URL.
+    </ApiField>
+    <ApiField name="data" type="Any" defaultValue="None">
+      Optional envelope payload.
+    </ApiField>
+    <ApiField name="params" type="dict[str, Any] | None" defaultValue="None">
+      Optional envelope parameters.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="GRPCTransport send return value">
+    <ApiField name="result" type="Any">
+      Parsed successful result from the response envelope.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="GRPCTransport send errors">
+    <ApiField name="TransportConnectionError">
+      grpcio returned `UNAVAILABLE`; marked retryable.
+    </ApiField>
+    <ApiField name="TransportTimeoutError">
+      grpcio returned `DEADLINE_EXCEEDED`; marked retryable.
+    </ApiField>
+    <ApiField name="TransportRemoteError">
+      Other RPC failures or an explicit remote error envelope. `RESOURCE_EXHAUSTED` and `INTERNAL` RPC statuses are categorized as retryable.
+    </ApiField>
+    <ApiField name="TransportProtocolError">
+      A decoded response carries a non-null correlation ID different from the request ID.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      The request or response exceeds an explicit or grpcio-derived limit.
+    </ApiField>
+    <ApiField name="decoder or response parser error">
+      JSON/deserializer failures and exceptions raised by `request_spec.response_parser` are not wrapped by this method unless grpcio reports them as an RPC status.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### GRPCTransport.subscribe
+
+<ApiReference
+  kind="async iterator method"
+  path="GRPCTransport.subscribe"
+  signature={`transport.subscribe(
+    agent_url: str,
+    task: Any,
+) -> AsyncIterator[Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py#L299"
+>
+
+Calls the generic `Stream` RPC and yields each parsed task event until an envelope is marked final.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="GRPCTransport subscribe parameters">
+    <ApiField name="agent_url" type="str" required>
+      Destination gRPC or GRPCS agent URL.
+    </ApiField>
+    <ApiField name="task" type="Any" required>
+      Task payload encoded into the stream request.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Yields">
+  <ApiFields ariaLabel="GRPCTransport subscribe yielded values">
+    <ApiField name="event" type="Any">
+      Each successful event result, independently checked against `max_event_bytes`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="GRPCTransport subscribe errors">
+    <ApiField name="TransportConnectionError | TransportTimeoutError | TransportRemoteError">
+      Translated grpcio stream failures. Some categories carry `retryable=True`, but the stream is not restarted.
+    </ApiField>
+    <ApiField name="TransportProtocolError | TransportLimitError">
+      A decoded event has a mismatched non-null request ID, or an event exceeds its configured limit.
+    </ApiField>
+    <ApiField name="decoder error">
+      JSON/deserializer failures are not explicitly wrapped unless grpcio reports an RPC status.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="No stream retries">
+  `subscribe()` does not use the unary retry loop. The consumer owns checkpointing and resubscription after a partial sequence.
+</ApiCallout>
+
+</ApiReference>
+
+#### GRPCTransport.authenticate
+
+<ApiReference
+  kind="async method"
+  path="GRPCTransport.authenticate"
+  signature={`await transport.authenticate(
+    credentials: str,
+) -> None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/grpc_transport.py#L355"
+>
+
+Creates the security context translated into outbound gRPC metadata.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="GRPCTransport authenticate parameters">
+    <ApiField name="credentials" type="str" required>
+      Secret or token understood by the configured authenticator.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="GRPCTransport authenticate errors">
+    <ApiField name="RuntimeError">
+      Raised when no authenticator was configured.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
 
 ---
 
@@ -1249,9 +2661,132 @@ Event results are normalized recursively before the SSE frame is encoded. For ex
 
 ### API
 
-| Name | Parameters | Returns | Description |
-| ---- | ---------- | ------- | ----------- |
-| `__init__` | Same as `HTTPTransport`, including `config: TransportConfig ⎪ None = None` | `None` | Configure the inherited HTTP unary path and SSE streaming production behavior. |
-| `subscribe` | `agent_url: str`, `task: Any` | `AsyncIterator[Any]` | POST a task to `/tasks/stream`, parse SSE JSON-RPC envelopes, and yield each `result` payload. |
-| `send` | `request_spec`, `base_url`, `data`, `params` | `Awaitable[Any]` | Inherited from `HTTPTransport` for normal request/response calls. |
-| `config` / `capabilities` / `metrics` | Shared types | Read-only | Inspect effective settings, streaming/TLS capabilities, and unary/stream counters. |
+#### SSEJSONRPCTransport
+
+<ApiReference
+  kind="class"
+  path="protolink.transport.SSEJSONRPCTransport"
+  signature={`SSEJSONRPCTransport(
+    url: str,
+    timeout: float = 360.0,
+    authenticator: Authenticator | None = None,
+    backend: Literal["starlette", "fastapi"] = "starlette",
+    *,
+    validate_schema: bool = False,
+    credentials: str | None = None,
+    tls: TLSConfig | None = None,
+    config: TransportConfig | None = None,
+    log_level: str = "info",
+    access_log: bool = True,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/sse_jsonrpc_transport.py#L23"
+>
+
+HTTPTransport subclass that keeps the inherited unary API and ASGI lifecycle while adding a one-way server-to-client task stream.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="SSEJSONRPCTransport constructor parameters">
+    <ApiField name="url" type="str" required>
+      HTTP or HTTPS server identity and bind URL.
+    </ApiField>
+    <ApiField name="timeout" type="float" defaultValue="360.0">
+      Deadline for inherited unary calls and for opening/reading an SSE response.
+    </ApiField>
+    <ApiField name="authenticator" type="Authenticator | None" defaultValue="None">
+      Optional authentication provider.
+    </ApiField>
+    <ApiField name="backend" type={'Literal["starlette", "fastapi"]'} defaultValue={'"starlette"'}>
+      Inherited ASGI backend selector.
+    </ApiField>
+    <ApiField name="validate_schema" type="bool" defaultValue="False">
+      Enables backend request-schema validation where supported.
+    </ApiField>
+    <ApiField name="credentials" type="str | None" defaultValue="None">
+      Credentials used by the inherited authentication workflow.
+    </ApiField>
+    <ApiField name="tls" type="TLSConfig | None" defaultValue="None">
+      HTTPS certificate and trust settings.
+    </ApiField>
+    <ApiField name="config" type="TransportConfig | None" defaultValue="None">
+      Shared unary and stream limits, slots, retries, cleanup, idempotency, and metrics.
+    </ApiField>
+    <ApiField name="log_level" type="str" defaultValue={'"info"'}>
+      Uvicorn log level.
+    </ApiField>
+    <ApiField name="access_log" type="bool" defaultValue="True">
+      Enables Uvicorn access logging.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Inherited surface">
+  <ApiFields ariaLabel="SSEJSONRPCTransport inherited members">
+    <ApiField name="send(...)" type="Awaitable[Any]">
+      Uses `HTTPTransport.send()` for ordinary request/response calls, including its pooling, retries, limits, authentication, and error mapping.
+    </ApiField>
+    <ApiField name="setup_routes(...) | start() | stop()" type="inherited">
+      Uses the HTTP ASGI route and lifecycle implementation. The server adds `POST /tasks/stream` from the Agent endpoint specifications.
+    </ApiField>
+    <ApiField name="config | metrics | url | timeout | is_running" type="inherited properties">
+      Exposes the same inspection surface as HTTP, with streaming enabled in `capabilities`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+</ApiReference>
+
+#### SSEJSONRPCTransport.subscribe
+
+<ApiReference
+  kind="async iterator method"
+  path="SSEJSONRPCTransport.subscribe"
+  signature={`transport.subscribe(
+    agent_url: str,
+    task: Any,
+) -> AsyncIterator[Any]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/sse_jsonrpc_transport.py#L40"
+>
+
+Posts a task to `/tasks/stream`, parses `text/event-stream` data frames as ProtoLink JSON-RPC envelopes, and yields each successful result.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="SSEJSONRPCTransport subscribe parameters">
+    <ApiField name="agent_url" type="str" required>
+      Destination HTTP or HTTPS agent URL.
+    </ApiField>
+    <ApiField name="task" type="Any" required>
+      Task encoded as the request JSON body.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Yields">
+  <ApiFields ariaLabel="SSEJSONRPCTransport subscribe yielded values">
+    <ApiField name="event" type="Any">
+      Each normalized envelope result, independently checked against `max_event_bytes`.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="SSEJSONRPCTransport subscribe errors">
+    <ApiField name="TransportTimeoutError | TransportConnectionError">
+      The HTTP stream timed out or could not remain connected.
+    </ApiField>
+    <ApiField name="TransportRemoteError">
+      The peer returned an HTTP error or an `ok: false` event envelope.
+    </ApiField>
+    <ApiField name="TransportProtocolError">
+      An event contains invalid JSON, a mismatched request ID, or an incompatible envelope.
+    </ApiField>
+    <ApiField name="TransportLimitError">
+      The task or an event exceeds its configured limit.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Stream semantics">
+  SSE is one-way and `subscribe()` does not send an idempotency key or automatically retry a partial stream. Reconnection and resume behavior belongs to the consumer.
+</ApiCallout>
+
+</ApiReference>
