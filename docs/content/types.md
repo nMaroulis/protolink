@@ -1336,9 +1336,9 @@ Use aliases for annotations and editor support. Use a validating constructor, pa
 
 ## See also
 
-- [Models](models.md) — fields that consume message, media, role, security, and transport aliases.
-- [Transports](transport.md) — built-in transport implementations and registration.
-- [Authentication](authentication.md) — authenticators and security scheme models.
-- [LLMs](llm.md) — provider adapters, LLM types, and reasoning behavior.
-- [State](state.md) — persistent state modules.
-- [Flows](flows.md) — execution semantics for `FlowTarget`.
+- [Models](models.md) - fields that consume message, media, role, security, and transport aliases.
+- [Transports](transport.md) - built-in transport implementations and registration.
+- [Authentication](authentication.md) - authenticators and security scheme models.
+- [LLMs](llm.md) - provider adapters, LLM types, and reasoning behavior.
+- [State](state.md) - persistent state modules.
+- [Flows](flows.md) - execution semantics for `FlowTarget`.

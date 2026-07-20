@@ -3876,8 +3876,8 @@ print(report.to_dict())
 
 ## See also
 
-- [LLMs](llm.md) — inference, history ownership, and compaction behavior.
-- [Agents](agent.md) — task execution and lifecycle integration.
-- [Flows](flows.md) — structured route decisions and task propagation.
-- [State](state.md) — conversation and task persistence.
-- [Transport](transport.md) — endpoint binding and model serialization across backends.
+- [LLMs](llm.md) - inference, history ownership, and compaction behavior.
+- [Agents](agent.md) - task execution and lifecycle integration.
+- [Flows](flows.md) - structured route decisions and task propagation.
+- [State](state.md) - conversation and task persistence.
+- [Transport](transport.md) - endpoint binding and model serialization across backends.

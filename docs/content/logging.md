@@ -472,7 +472,7 @@ is either conventional formatted text or one JSON object per log record.
     <ApiField name="extension" type="str | None" defaultValue="None">
       Format override. A case-insensitive <code>"json"</code> selects
       structured output; any other non-empty value selects text output.
-      This option controls formatting only—it does not rename
+      This option controls formatting only, it does not rename
       <code>filepath</code>. When omitted, the actual path suffix is used.
     </ApiField>
   </ApiFields>

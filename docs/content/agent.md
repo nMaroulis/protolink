@@ -446,7 +446,7 @@ Start the configured server, optionally register the Agent, and keep its lifecyc
 <ApiSection title="Raises">
   <ApiFields ariaLabel="Agent start errors">
     <ApiField name="startup error">
-      Server startup failures—including address conflicts—propagate to the caller. Background mode captures the exception in its thread and re-raises it after readiness synchronization.
+      Server startup failures, including address conflicts, propagate to the caller. Background mode captures the exception in its thread and re-raises it after readiness synchronization.
     </ApiField>
   </ApiFields>
 </ApiSection>

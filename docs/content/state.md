@@ -204,7 +204,7 @@ Access or replace enabled module objects and inspect their shared backend.
   <ApiField name="task" type="TaskState | None">Enabled task extension slot.</ApiField>
   <ApiField name="flow" type="FlowState | None">Enabled flow extension slot.</ApiField>
   <ApiField name="storage" type="Storage">Orchestrator backend reference.</ApiField>
-  <ApiField name="enabled_modes" type="tuple[StateMode, ...]">Enabled names in fixed registry order: conversation, tools, task, then flow—not necessarily constructor-list order.</ApiField>
+  <ApiField name="enabled_modes" type="tuple[StateMode, ...]">Enabled names in fixed registry order: conversation, tools, task, then flow, not necessarily constructor-list order.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiCallout label="Replacing storage">Assigning <code>state.storage</code> changes only the orchestrator's <code>_storage</code> reference. Existing ConversationState, ToolState, TaskState, and FlowState instances retain the Storage object they received at construction.</ApiCallout>

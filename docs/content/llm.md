@@ -58,19 +58,19 @@ The useful mental model is a progression:
 
 Most application code should begin with either `chat()` or an `Agent`. The other methods exist so provider adapters and advanced integrations can participate in the same runtime.
 
-- **One complete response — `llm.chat("...")`**<br />
+- **One complete response - `llm.chat("...")`**<br />
   Adds the user message and performs one synchronous provider call.
 
-- **Visible incremental text — `llm.chat("...", streaming=True)`**<br />
+- **Visible incremental text - `llm.chat("...", streaming=True)`**<br />
   Returns an asynchronous iterator of text chunks.
 
-- **Tools, delegation, policy, retries, budgets, and multiple steps — `Agent(..., llm=llm)`**<br />
+- **Tools, delegation, policy, retries, budgets, and multiple steps - `Agent(..., llm=llm)`**<br />
   The Agent prepares the runtime and invokes `LLM.infer()` with the appropriate services.
 
-- **A custom controlled runtime — `await llm.infer(...)`**<br />
+- **A custom controlled runtime - `await llm.infer(...)`**<br />
   Advanced integration path where the caller prepares the prompt, history, tools, callbacks, and runtime context that an Agent normally supplies.
 
-- **A provider adapter or diagnostic integration — `call()`, `call_stream()`, and `call_action()`**<br />
+- **A provider adapter or diagnostic integration - `call()`, `call_stream()`, and `call_action()`**<br />
   Works at the provider boundary with explicit `ConversationHistory` and normalized actions.
 
 `chat()` and `infer()` are intentionally different. A chat call asks the model for text. Inference asks the model for one typed decision at a time: finish with text, call a local tool, or delegate to another Agent. ProtoLink validates that decision and performs the side effect outside the model.
@@ -1718,7 +1718,7 @@ OpenAI, Anthropic, and Gemini always acquire actions through their provider-nati
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py#L25"
 >
 
-OpenAI Responses API adapter with native function tools and native streamed tool-call events. Use it for the official OpenAI service or for a custom `base_url` that implements the Responses API—not merely Chat Completions.
+OpenAI Responses API adapter with native function tools and native streamed tool-call events. Use it for the official OpenAI service or for a custom `base_url` that implements the Responses API, not merely Chat Completions.
 
 Direct calls translate `ConversationHistory` into Responses input and extract text from the returned response. In inference mode, real function declarations are sent to the provider, parallel tool calls are disabled, and returned function calls are normalized into ProtoLink actions before the runtime executes them. Streaming follows the same contract while forwarding text deltas and buffering function arguments until they form one complete action.
 
