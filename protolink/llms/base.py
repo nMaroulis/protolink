@@ -768,9 +768,7 @@ class LLM(ABC):
                     # Event observers are explicitly non-authoritative. A broken
                     # telemetry/export callback must not invalidate an already
                     # completed model or tool operation.
-                    logger.warning(
-                        f"Inference event callback failed; continuing without interrupting the run: {exc}"
-                    )
+                    logger.warning(f"Inference event callback failed; continuing without interrupting the run: {exc}")
                     observer_disabled = True
 
         def remember_action(signature: str) -> None:
