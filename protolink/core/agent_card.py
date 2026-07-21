@@ -96,9 +96,8 @@ class AgentSkill:
 class AgentInterface:
     """Describe an additional endpoint exposed by an agent.
 
-    ``AgentCard.url`` and ``AgentCard.transport`` remain the primary interface.
-    Use this type only when the same agent is reachable through more than one
-    transport, such as HTTP for broad compatibility and gRPC for internal calls.
+    ``AgentCard.url`` and ``AgentCard.transport`` remain the primary interface. Use this type only when the same agent
+    is reachable through more than one transport, such as HTTP for broad compatibility and gRPC for internal calls.
 
     Args:
         url: Absolute endpoint URL.
@@ -138,16 +137,15 @@ class AgentCard:
         description: Agent purpose/description
         url: Service endpoint URL
         version: Agent version
-        protocol_version: Legacy ProtoLink native discovery-card version. A2A
-            adapters advertise their protocol version per interface instead.
+        protocol_version: Legacy ProtoLink native discovery-card version. A2A adapters advertise their protocol version
+            per interface instead.
         capabilities: Supported features
         skills: List of skills the agent can perform
         input_formats: List of supported input formats
         output_formats: List of supported output formats
         security_schemes: Security schemes for authentication
         role: ProtoLink-native role describing the agent's responsibility in the runtime topology
-        tags: List of tags for categorization. These tags can be used for filtering
-            during ProtoLink discovery. [Optional]
+        tags: Optional List of tags for categorization. These tags can be used for filtering during ProtoLink discovery.
             E.g. "finance", "travel", "math" etc.
         interfaces: Optional additional endpoints for this same agent identity.
     """
@@ -186,8 +184,7 @@ class AgentCard:
     def to_dict(self) -> dict[str, Any]:
         """Convert to ProtoLink's native discovery-card JSON format.
 
-        Standard A2A bindings use their own versioned serializers at the wire
-        boundary; see :mod:`protolink.a2a.v1`.
+        Standard A2A bindings use their own versioned serializers at the wire boundary; see :mod:`protolink.a2a.v1`.
         """
         data = {
             "name": self.name,
@@ -261,10 +258,9 @@ class AgentCard:
     def get_prompt_format(self) -> str:
         """Generate deterministic JSON metadata for delegation prompts.
 
-        The result is a complete JSON object rather than a Python-style repr,
-        so quotes, newlines, booleans, and nested schemas cannot corrupt the
-        surrounding prompt. Capabilities are emitted as an explicit data
-        object, and skills are sorted by identifier for stable prompt caching.
+        The result is a complete JSON object rather than a Python-style repr, so quotes, newlines, booleans, and nested
+        schemas cannot corrupt the surrounding prompt. Capabilities are emitted as an explicit data object, and skills
+        are sorted by identifier for stable prompt caching.
 
         The format includes:
         - Agent name and description

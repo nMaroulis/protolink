@@ -1,8 +1,7 @@
 """Shared redaction policy for runtime observability objects.
 
-The runtime layer emits data that applications often persist: events, reports,
-approval requests, context manifests, and telemetry payloads. This module keeps
-secret masking in one small, dependency-free policy object so those surfaces can
+The runtime layer emits data that applications often persist: events, reports, approval requests, context manifests, and
+telemetry payloads. This module keeps secret masking in one small, dependency-free policy object so those surfaces can
 share the same behavior without coupling to a particular telemetry backend.
 """
 
@@ -33,14 +32,13 @@ class RedactionPolicy:
     """Recursive redaction policy for JSON-compatible runtime data.
 
     Args:
-        sensitive_keys: Case-insensitive field names treated as secrets. Keys
-            are normalized by lower-casing and replacing ``-`` with ``_``.
+        sensitive_keys: Case-insensitive field names treated as secrets. Keys are normalized by lower-casing and
+            replacing ``-`` with ``_``.
         replacement: Value written in place of secret-bearing fields.
         max_string_length: Optional maximum length for non-secret strings.
 
-    The policy also redacts keys ending in common secret suffixes such as
-    ``"_api_key"``, ``"_secret"``, ``"_token"``, ``"_password"``, and
-    ``"_credentials"``.
+    The policy also redacts keys ending in common secret suffixes such as ``"_api_key"``, ``"_secret"``, ``"_token"``,
+    ``"_password"``, and ``"_credentials"``.
     """
 
     sensitive_keys: frozenset[str] = field(default_factory=lambda: DEFAULT_SENSITIVE_KEYS)

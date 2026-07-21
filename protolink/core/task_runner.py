@@ -11,9 +11,8 @@ from protolink.core.task import Task, TaskState
 class TaskLifecycle:
     """Apply protocol-safe task state transitions.
 
-    This helper is intentionally small: it centralizes lifecycle transitions
-    for code that interprets already-produced outputs. It does not execute
-    tools, call LLMs, or perform agent dispatch.
+    This helper is intentionally small: it centralizes lifecycle transitions for code that interprets already-produced
+    outputs. It does not execute tools, call LLMs, or perform agent dispatch.
     """
 
     @staticmethod
@@ -86,11 +85,9 @@ class TaskLifecycle:
 
 class TaskRunner:
     """
-    Applies protocol-level outputs (Message / Part)
-    to a Task and advances its lifecycle.
+    Applies protocol-level outputs (Message / Part) to a Task and advances its lifecycle.
 
-    The runner never calls the agent.
-    It only interprets outputs.
+    The runner never calls the agent. It only interprets outputs.
     """
 
     def __init__(self, lifecycle: TaskLifecycle | None = None):

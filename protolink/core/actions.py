@@ -1,9 +1,8 @@
 """Domain-neutral runtime action primitives.
 
-Language-model actions describe what a model requested. ``RunAction`` instead
-describes the concrete operation that the runtime is about to authorize and
-execute. Keeping those layers separate lets non-LLM callers, deterministic
-flows, remote agents, and local applications use the same policy boundary.
+Language-model actions describe what a model requested. ``RunAction`` instead describes the concrete operation that the
+runtime is about to authorize and execute. Keeping those layers separate lets non-LLM callers, deterministic flows,
+remote agents, and local applications use the same policy boundary.
 """
 
 from __future__ import annotations
@@ -21,23 +20,20 @@ from protolink.utils.id_generator import IDGenerator
 class RunAction:
     """Concrete side-effect intent evaluated by the runtime policy layer.
 
-    A run action is created after an application or model has selected an
-    operation but before that operation executes. Policies inspect its declared
-    capabilities, payload, previews, and run context. Approval handlers receive
-    the same object, giving user interfaces a stable structure to render without
-    parsing tool-specific nested dictionaries.
+    A run action is created after an application or model has selected an operation but before that operation executes.
+    Policies inspect its declared capabilities, payload, previews, and run context. Approval handlers receive the same
+    object, giving user interfaces a stable structure to render without parsing tool-specific nested dictionaries.
 
     Attributes:
-        kind: Extensible operation category, for example ``"tool.call"`` or
-            ``"agent.call"``. Applications may define additional categories.
+        kind: Extensible operation category, for example ``"tool.call"`` or ``"agent.call"``. Applications may define
+            additional categories.
         name: Human-readable operation or target name.
-        payload: Structured operation input. Tool actions conventionally place
-            validated keyword arguments under ``"arguments"``.
-        capabilities: Permission capabilities required before execution.
-            Capability names are application-defined strings and may use dotted
-            namespaces such as ``"workspace.read"``.
-        artifacts: Immutable tuple of outputs or previews associated with the
-            action. Approval UIs can render these before execution.
+        payload: Structured operation input. Tool actions conventionally place validated keyword arguments under
+            ``"arguments"``.
+        capabilities: Permission capabilities required before execution. Capability names are application-defined
+            strings and may use dotted namespaces such as ``"workspace.read"``.
+        artifacts: Immutable tuple of outputs or previews associated with the action. Approval UIs can render these
+            before execution.
         description: Optional concise explanation for logs and approval prompts.
         metadata: Extensible runtime or application metadata.
         action_id: Stable action identifier used by events and artifacts.
@@ -67,8 +63,8 @@ class RunAction:
     def with_artifacts(self, artifacts: Iterable[Artifact]) -> RunAction:
         """Return a copy with artifacts attached and correlated to this action.
 
-        Existing artifact action IDs are preserved when they intentionally
-        reference another action. Missing IDs are filled with this action's ID.
+        Existing artifact action IDs are preserved when they intentionally reference another action. Missing IDs are
+        filled with this action's ID.
 
         Args:
             artifacts: Artifacts or previews to attach.
