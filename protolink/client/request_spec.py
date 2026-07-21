@@ -11,9 +11,8 @@ from protolink.types import ContentType, HttpMethod, RequestSourceType
 class ClientRequestSpec:
     """Transport-neutral description of one client request.
 
-    ``channel`` lets multiplexed transports isolate control-plane requests such
-    as cancellation from a long-lived streaming data channel. Request/response
-    transports may ignore it. ``idempotent`` is an explicit safety declaration:
+    ``channel`` lets multiplexed transports isolate control-plane requests such as cancellation from a long-lived
+    streaming data channel. Request/response transports may ignore it. ``idempotent`` is an explicit safety declaration:
     configured retry policies never retry a request unless it is true.
 
     Args:
@@ -21,15 +20,12 @@ class ClientRequestSpec:
         path: Transport-neutral endpoint path.
         method: HTTP-style method used consistently across transports.
         response_parser: Optional conversion from wire data to a domain model.
-        request_source: Whether input is sent as a body, query parameters, or
-            omitted.
+        request_source: Whether input is sent as a body, query parameters, or omitted.
         content_type: Optional request media type.
         accept: Optional expected response media type.
-        headers: Optional protocol-specific request headers. Transports that do
-            not use headers may ignore them.
+        headers: Optional protocol-specific request headers. Transports that do not use headers may ignore them.
         channel: Multiplexing channel used to isolate concurrent traffic.
-        idempotent: Whether retries and server-side response deduplication are
-            safe for this operation.
+        idempotent: Whether retries and server-side response deduplication are safe for this operation.
     """
 
     name: str

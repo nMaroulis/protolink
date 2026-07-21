@@ -69,10 +69,9 @@ class AgentExecutionMixin(_AgentMixinBase):
     async def run_task(self, task: Task) -> Task:
         """Run the configured task handler under live cancellation control.
 
-        ``AgentServer`` uses this wrapper rather than calling ``handle_task``
-        directly, so subclasses that override the handler still participate in
-        active-task registration and protocol cancellation. Direct callers of a
-        custom handler can use this method for the same guarantee.
+        ``AgentServer`` uses this wrapper rather than calling ``handle_task`` directly, so subclasses that override the
+        handler still participate in active-task registration and protocol cancellation. Direct callers of a custom
+        handler can use this method for the same guarantee.
         """
         if task.is_terminal:
             return task
@@ -109,9 +108,8 @@ class AgentExecutionMixin(_AgentMixinBase):
     async def run_task_streaming(self, task: Task) -> AsyncIterator[Any]:
         """Stream a task handler under live cancellation control.
 
-        A successfully canceled stream ends with one final
-        ``TaskStatusUpdateEvent`` whose state is ``canceled``. This keeps SSE,
-        WebSocket, runtime, and direct consumers aligned on the same lifecycle.
+        A successfully canceled stream ends with one final ``TaskStatusUpdateEvent`` whose state is ``canceled``. This
+        keeps SSE, WebSocket, runtime, and direct consumers aligned on the same lifecycle.
         """
         from protolink.core.events import TaskStatusUpdateEvent
 
@@ -500,8 +498,8 @@ class AgentExecutionMixin(_AgentMixinBase):
     def _finalize_task_state(self, task: Task, outputs: list[Part | Message]) -> None:
         """Set the terminal or waiting state implied by agent outputs.
 
-        Errors win over all other outputs, an explicit status part can request
-        more input, and otherwise successful execution completes the task.
+        Errors win over all other outputs, an explicit status part can request more input, and otherwise successful
+        execution completes the task.
         """
         if task.is_terminal:
             return
@@ -521,9 +519,8 @@ class AgentExecutionMixin(_AgentMixinBase):
 
     async def execute_task(self, task: Task) -> Task:
         """
-        Execute the next step of a Task by inspecting the most recently
-        appended Message or Artifact and performing the explicitly
-        requested action.
+        Execute the next step of a Task by inspecting the most recently appended Message or Artifact and performing the
+        explicitly requested action.
 
         Execution model:
         - The agent processes ONE step at a time
@@ -655,11 +652,10 @@ class AgentExecutionMixin(_AgentMixinBase):
     async def _llm_history_scope(self, task: Task, context: RunContext):
         """Bind task-local LLM history and serialize same-session updates.
 
-        Stateless runs receive a fresh isolated history object. Persistent
-        conversation runs load the requested session under a per-session lock,
-        execute against a task-local history, then save that same history back
-        after successful execution. The lock prevents concurrent tasks for the
-        same session from overwriting each other's conversation turns.
+        Stateless runs receive a fresh isolated history object. Persistent conversation runs load the requested session
+        under a per-session lock, execute against a task-local history, then save that same history back after
+        successful execution. The lock prevents concurrent tasks for the same session from overwriting each other's
+        conversation turns.
         """
         if self.llm is None:
             yield
@@ -724,10 +720,9 @@ class AgentExecutionMixin(_AgentMixinBase):
                 - args (dict)
                 - call_id (str)
             task: Optional active task supplying the propagated ``RunContext``.
-            cancellation_token: Optional live token for cooperative checks
-                before authorization and after the tool returns.
-            budget_enforcer: Optional task-scoped enforcer shared with other
-                infer and tool parts in the same task.
+            cancellation_token: Optional live token for cooperative checks before authorization and after the tool
+                returns.
+            budget_enforcer: Optional task-scoped enforcer shared with other infer and tool parts in the same task.
 
         Returns:
             A Part of type "tool_output" containing:
@@ -821,24 +816,21 @@ class AgentExecutionMixin(_AgentMixinBase):
             infer_part: A Part of type ``infer`` containing:
                 - prompt (str): The user query or instruction to process
             task: Optional Task object to retrieve topological/flow context.
-            streaming: Whether to call the underlying LLM with its streaming
-                interface and collect streamed chunks before action parsing.
-            event_callback: Optional async callback receiving provider-agnostic
-                inference events while the LLM loop runs. Used by
-                ``call_llm_stream()`` and task streaming transports.
-            cancellation_token: Optional live token checked throughout the
-                inference loop and before side-effect dispatch.
-            budget_enforcer: Optional task-scoped enforcer shared with other
-                infer and tool parts in the same task.
+            streaming: Whether to call the underlying LLM with its streaming interface and collect streamed chunks
+                before action parsing.
+            event_callback: Optional async callback receiving provider-agnostic inference events while the LLM loop
+                runs. Used by ``call_llm_stream()`` and task streaming transports.
+            cancellation_token: Optional live token checked throughout the inference loop and before side-effect
+                dispatch.
+            budget_enforcer: Optional task-scoped enforcer shared with other infer and tool parts in the same task.
 
         Returns:
             Part: A Part of type ``infer_output`` containing the LLM's final response,
                 or an ``error`` Part if no LLM is configured.
 
         Notes:
-            The inference loop continues until the LLM produces a ``final`` action.
-            Tool calls and agent delegations are executed automatically and their
-            results are injected back into the conversation for the LLM to process.
+            The inference loop continues until the LLM produces a ``final`` action. Tool calls and agent delegations are
+            executed automatically and their results are injected back into the conversation for the LLM to process.
         """
 
         active_token = cancellation_token
@@ -986,11 +978,10 @@ class AgentExecutionMixin(_AgentMixinBase):
     ) -> AsyncIterator[Any]:
         """Invoke the agent LLM in streaming mode and yield task events.
 
-        The returned iterator yields ``TaskLLMStreamEvent`` objects for
-        provider activity such as chunks, tool calls, delegated agent calls,
-        and final inference content. A private final payload is used internally
-        by ``handle_task_streaming()`` to attach the completed ``Part`` to the
-        task before the final status event is emitted.
+        The returned iterator yields ``TaskLLMStreamEvent`` objects for provider activity such as chunks, tool calls,
+        delegated agent calls, and final inference content. A private final payload is used internally by
+        ``handle_task_streaming()`` to attach the completed ``Part`` to the task before the final status event is
+        emitted.
         """
         from protolink.core.events import TaskErrorEvent, TaskLLMStreamEvent
 
@@ -1080,15 +1071,13 @@ class AgentExecutionMixin(_AgentMixinBase):
             action: The action type - either "tool_call" (execute a tool on the remote agent) or "infer" (ask the
                 remote agent to generate a response).
             payload: The full agent_call payload from the LLM, containing tool/args or prompt.
-            parent_context: Optional active context used to create a correlated
-                child run for delegated work.
+            parent_context: Optional active context used to create a correlated child run for delegated work.
 
         Returns:
             The result from the delegated agent (typically the last part content from the response task).
 
         Raises:
-            ValueError: If the target is a direct URL, would create a
-                delegation cycle, or the action type is unknown.
+            ValueError: If the target is a direct URL, would create a delegation cycle, or the action type is unknown.
             RuntimeError: If the delegation fails (propagated from call_agent).
         """
         if "://" in agent_name:
