@@ -1,6 +1,6 @@
 import asyncio
 import json
-import time
+from dataclasses import replace
 from types import SimpleNamespace
 from typing import ClassVar
 from unittest.mock import AsyncMock
@@ -236,16 +236,24 @@ async def test_infer_event_observer_failure_does_not_fail_the_run():
 
 @pytest.mark.asyncio
 async def test_infer_rechecks_runtime_budget_after_final_model_call():
-    class SlowMockLLM(MockLLM):
-        def call(self, history):
-            time.sleep(0.01)
-            return super().call(history)
-
-    llm = SlowMockLLM([json.dumps({"type": "final", "content": "too late"})])
+    llm = MockLLM([json.dumps({"type": "final", "content": "too late"})])
     context = RunContext(run_id="runtime_limit", budget=RunBudget(max_runtime_seconds=0.001))
 
+    class DeterministicRuntimeBudget(BudgetEnforcer):
+        def _usage_with_runtime(self, usage=None):
+            active_usage = usage if usage is not None else self.usage
+            runtime_seconds = 0.01 if llm.call_count else 0.0
+            return replace(active_usage, runtime_seconds=runtime_seconds)
+
+    enforcer = DeterministicRuntimeBudget(context)
+
     with pytest.raises(BudgetExceededError) as exc_info:
-        await llm.infer(query="finish slowly", tools={}, run_context=context)
+        await llm.infer(
+            query="finish slowly",
+            tools={},
+            run_context=context,
+            budget_enforcer=enforcer,
+        )
 
     assert exc_info.value.decision.limit_name == "max_runtime_seconds"
     assert llm.call_count == 1

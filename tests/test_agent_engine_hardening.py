@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -977,8 +978,10 @@ async def test_external_unary_coroutine_cancellation_is_persisted_and_reraised(t
     await asyncio.wait_for(started.wait(), timeout=1)
 
     running.cancel("runtime shutdown")
-    with pytest.raises(asyncio.CancelledError, match="runtime shutdown"):
+    with pytest.raises(asyncio.CancelledError) as exc_info:
         await running
+    if sys.version_info >= (3, 11):
+        assert str(exc_info.value) == "runtime shutdown"
 
     persisted = store.get_task(task.id)
     assert task.state is TaskState.CANCELED
@@ -1010,8 +1013,10 @@ async def test_external_stream_coroutine_cancellation_is_persisted_and_reraised(
     await asyncio.wait_for(started.wait(), timeout=1)
 
     running.cancel("stream consumer shutdown")
-    with pytest.raises(asyncio.CancelledError, match="stream consumer shutdown"):
+    with pytest.raises(asyncio.CancelledError) as exc_info:
         await running
+    if sys.version_info >= (3, 11):
+        assert str(exc_info.value) == "stream consumer shutdown"
 
     persisted = store.get_task(task.id)
     assert task.state is TaskState.CANCELED
