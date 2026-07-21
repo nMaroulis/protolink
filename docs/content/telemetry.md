@@ -66,6 +66,8 @@ on_task_end
 
 The exact middle events depend on the action loop. A simple inference can emit context, call, response, action, and final events; multi-step inference can add streamed chunks, retries, tool operations, delegated-agent operations, budget decisions, and more. `LocalTraceTelemetry` retains those detailed events. The hosted backends currently inherit the base no-op implementation of `on_llm_event()`, so Langfuse and LangSmith receive the coarse task, LLM, and explicit tool lifecycle only.
 
+Telemetry is non-authoritative when attached to an Agent. The runtime catches hook exceptions, logs the first failure for each hook name, and continues with the task, LLM, or tool result unchanged. This isolation applies to unary and streaming task lifecycles. Calling a telemetry implementation's hook directly still follows that implementation's own exception contract.
+
 :::info[Telemetry versus runtime reporting]
 
 Use telemetry for detailed traces, span hierarchy, observability export, and local debugging. Use `RunEvent`, `RunRecorder`, and `RunReport` from the [Runtime](runtime.md) layer for the stable application-facing event envelope, durable run summaries, replay, and regression assertions. An application can use both surfaces on the same Agent.
@@ -646,10 +648,10 @@ Implement the complete telemetry contract and translate it into a local trace hi
 <ApiSection title="Raises">
   <ApiFields ariaLabel="LocalTraceTelemetry lifecycle errors">
     <ApiField name="redactor error">
-      Exceptions from the custom redactor propagate from the hook.
+      Exceptions from the custom redactor propagate when the hook is called directly. Agent catches and logs them at its observability boundary.
     </ApiField>
     <ApiField name="serialization or filesystem error">
-      Task/result conversion, malformed metric values used by explicit integer conversion, directory creation, JSON encoding, and file writes may propagate. Because task-end cleanup is not wrapped in <code>finally</code>, a recorder failure occurs before the local trace and span context variables are cleared.
+      Task/result conversion, malformed metric values used by explicit integer conversion, directory creation, JSON encoding, and file writes may propagate from a direct hook call. Because task-end cleanup is not wrapped in <code>finally</code>, a recorder failure occurs before the local trace and span context variables are cleared; Agent execution still isolates that failure.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -698,7 +700,7 @@ Receive control immediately before an Agent begins executing a task. Implementat
 <ApiSection title="Raises">
   <ApiFields ariaLabel="on_task_start errors">
     <ApiField name="implementation error">
-      The base contract does not catch exceptions. Because Agent calls this hook before entering its task-execution <code>try</code> block, an exception prevents task execution and does not trigger <code>on_task_end()</code>.
+      A direct call can propagate an implementation error. Agent invokes the hook through its best-effort telemetry boundary, logs the first failure for this hook name, and continues task execution.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -746,8 +748,8 @@ Finalize the active task trace after execution. On the normal path, `result` is 
   A backend cannot infer every execution exception from <code>result.metadata</code>. In particular, the local backend marks a trace as failed only when that metadata contains a truthy <code>error</code> value. A raised execution error without that metadata can therefore produce a locally recorded trace whose status is <code>"ok"</code>.
 </ApiCallout>
 
-<ApiCallout label="Hook errors can invoke the hook twice">
-  The success-path call itself is inside Agent's task-execution <code>try</code> block. If <code>on_task_end()</code> raises there, Agent enters its exception path and calls <code>on_task_end(task, task, agent_name)</code> once more before propagating. Custom backends should make finalization idempotent or isolate their own export errors.
+<ApiCallout label="Hook failure isolation">
+  Agent calls this hook once from its task-finalization boundary. A hook failure is logged and does not replace the task result or the execution exception already in flight.
 </ApiCallout>
 
 </ApiReference>
@@ -791,6 +793,10 @@ Begin observability around one complete `LLM.infer()` cycle. This is broader tha
 
 <ApiCallout label="No matching end on inference failure">
   Agent calls <code>on_llm_end()</code> only after <code>LLM.infer()</code> returns. If inference raises, the task-end hook still runs, but an implementation must decide whether and how to close an unfinished LLM span.
+</ApiCallout>
+
+<ApiCallout label="Start-hook failure">
+  If this hook raises through Agent, the runtime logs the failure and still starts inference. The failure does not suppress the matching end-hook attempt after a successful infer result.
 </ApiCallout>
 
 </ApiReference>
@@ -864,7 +870,7 @@ Begin a span for a tool call executed from an explicit task `tool_call` Part. To
 </ApiCallout>
 
 <ApiCallout label="Start-hook errors">
-  This hook runs before Agent enters the tool-execution <code>try</code> block. If it raises, policy authorization and the tool call do not run, and Agent does not invoke the matching end hook.
+  Agent isolates this observer failure and continues through policy authorization and tool execution. Direct hook calls can still propagate according to the implementation.
 </ApiCallout>
 
 </ApiReference>
@@ -907,7 +913,7 @@ Finish an explicit task-level tool span. Agent sends the returned value on succe
 </ApiSection>
 
 <ApiCallout label="End-hook errors">
-  The success-path end hook runs inside Agent's tool <code>try</code> block. If it raises, Agent catches that telemetry exception as though tool execution failed and calls <code>on_tool_end()</code> again with <code>result=None</code> and the exception string. A second hook failure propagates; otherwise the task receives an error Part despite the tool having returned successfully.
+  Agent logs and isolates this observer failure. A successful tool result remains successful, a tool error keeps its original error, and the hook is not called a second time merely because telemetry export failed.
 </ApiCallout>
 
 </ApiReference>
@@ -943,6 +949,10 @@ Receive a provider-neutral event emitted while `LLM.infer()` is running. This op
 
 <ApiCallout label="Hosted-provider behavior">
   <code>LangfuseTelemetry</code> and <code>LangSmithTelemetry</code> do not override this method in the current implementation. Use <code>MultiTelemetry</code> with a local or custom detailed tracker when you need hosted coarse traces and complete local inference events together.
+</ApiCallout>
+
+<ApiCallout label="Observer failure">
+  Agent isolates telemetry-hook exceptions. For direct <code>LLM.infer(event_callback=...)</code> usage, the inference loop logs the first callback exception and disables that callback for the rest of the infer call.
 </ApiCallout>
 
 </ApiReference>

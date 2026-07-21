@@ -36,7 +36,7 @@ from protolink.llms.actions import LLMAction, validate_action_payload
 if TYPE_CHECKING:
     from protolink.tools import BaseTool
 
-_RAW_RESPONSE_PREVIEW_CHARS = 2_000
+_DIAGNOSTIC_PREVIEW_CHARS = 2_000
 
 
 def parse_infer_response(
@@ -91,9 +91,11 @@ def parse_infer_response(
         return validate_action_payload(data)
     except ValidationError as exc:
         diagnostics = format_validation_errors(exc)
-        raise ValueError(f"Action validation failed. Field-level errors:\n{diagnostics}\nParsed data: {data}") from exc
+        parsed_diagnostic = _format_parsed_data_diagnostic(data)
+        raise ValueError(f"Action validation failed. Field-level errors:\n{diagnostics}\n{parsed_diagnostic}") from exc
     except Exception as exc:
-        raise ValueError(f"Action validation failed: {exc}\nParsed data: {data}") from exc
+        parsed_diagnostic = _format_parsed_data_diagnostic(data)
+        raise ValueError(f"Action validation failed: {exc}\n{parsed_diagnostic}") from exc
 
 
 def repair_fallback_action_payload(
@@ -405,11 +407,43 @@ def _extract_balanced_top_level_objects(response: str) -> list[str]:
 
 def _format_raw_response_diagnostic(response: str) -> str:
     """Return a bounded response preview suitable for parse diagnostics."""
-    if len(response) <= _RAW_RESPONSE_PREVIEW_CHARS:
-        return f"Raw response: {response}"
+    return _format_bounded_diagnostic("Raw response", response)
 
-    head_chars = _RAW_RESPONSE_PREVIEW_CHARS // 2
-    tail_chars = _RAW_RESPONSE_PREVIEW_CHARS - head_chars
-    omitted_chars = len(response) - _RAW_RESPONSE_PREVIEW_CHARS
-    preview = f"{response[:head_chars]}\n... [{omitted_chars} characters omitted] ...\n{response[-tail_chars:]}"
-    return f"Raw response (truncated; {len(response)} characters total): {preview}"
+
+def _format_parsed_data_diagnostic(data: Any) -> str:
+    """Serialize parsed data deterministically and return a bounded preview.
+
+    Action validation errors are injected into conversation history so the
+    model can self-correct. Keeping the payload as stable JSON makes that
+    feedback easier to consume, while bounding it prevents a syntactically
+    valid but oversized action from flooding the next prompt or application
+    logs.
+    """
+    try:
+        serialized = json.dumps(
+            data,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=lambda value: f"<{type(value).__module__}.{type(value).__qualname__}>",
+        )
+    except (TypeError, ValueError, RecursionError):
+        # ``data`` normally comes directly from ``json.loads``. Retain a useful
+        # bounded diagnostic if a custom caller supplies a non-JSON structure.
+        try:
+            serialized = repr(data)
+        except Exception:
+            serialized = f"<{type(data).__module__}.{type(data).__qualname__}>"
+    return _format_bounded_diagnostic("Parsed data", serialized)
+
+
+def _format_bounded_diagnostic(label: str, value: str) -> str:
+    """Return a head-and-tail diagnostic with a fixed payload-size ceiling."""
+    if len(value) <= _DIAGNOSTIC_PREVIEW_CHARS:
+        return f"{label}: {value}"
+
+    head_chars = _DIAGNOSTIC_PREVIEW_CHARS // 2
+    tail_chars = _DIAGNOSTIC_PREVIEW_CHARS - head_chars
+    omitted_chars = len(value) - _DIAGNOSTIC_PREVIEW_CHARS
+    preview = f"{value[:head_chars]}\n... [{omitted_chars} characters omitted] ...\n{value[-tail_chars:]}"
+    return f"{label} (truncated; {len(value)} characters total): {preview}"

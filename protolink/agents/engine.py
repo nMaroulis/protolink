@@ -25,6 +25,10 @@ _active_task_budget: ContextVar[_TaskBudgetScope | None] = ContextVar(
     "protolink_active_task_budget",
     default=None,
 )
+_active_inference_action_receipts: ContextVar[set[str] | None] = ContextVar(
+    "protolink_active_inference_action_receipts",
+    default=None,
+)
 
 
 def _activate_task_budget(task: Task, context: RunContext) -> Token[_TaskBudgetScope | None] | None:
@@ -317,7 +321,7 @@ class AgentExecutionMixin(_AgentMixinBase):
 
             outputs: list[Part | Message] = []
 
-            async with self._llm_history_scope(task, context):
+            async with self._llm_history_scope(task, context, outputs=outputs):
                 for part in last_item.parts:
                     cancellation_token.raise_if_cancelled()
                     if part.type == "tool_call":
@@ -329,13 +333,14 @@ class AgentExecutionMixin(_AgentMixinBase):
                             message=f"Executing tool: {tool_name or 'unknown'}",
                             metadata={"agent": self.card.name, "part_type": part.type},
                         )
-                        outputs.append(
-                            await self.execute_tool(
-                                part,
-                                task=task,
-                                cancellation_token=cancellation_token,
-                            )
+                        output = await self.execute_tool(
+                            part,
+                            task=task,
+                            cancellation_token=cancellation_token,
                         )
+                        outputs.append(output)
+                        self._attach_task_output(task, output)
+                        self._persist_task_snapshot(task)
                     elif part.type == "infer":
                         async for event in self.call_llm_stream(
                             part,
@@ -343,7 +348,10 @@ class AgentExecutionMixin(_AgentMixinBase):
                             cancellation_token=cancellation_token,
                         ):
                             if isinstance(event, dict) and "__protolink_part__" in event:
-                                outputs.append(Part.from_dict(event["__protolink_part__"]))
+                                output = Part.from_dict(event["__protolink_part__"])
+                                outputs.append(output)
+                                self._attach_task_output(task, output)
+                                self._persist_task_snapshot(task)
                                 continue
                             if isinstance(event, TaskErrorEvent):
                                 previous_state = self._state_value(task.state)
@@ -362,13 +370,6 @@ class AgentExecutionMixin(_AgentMixinBase):
                             yield event
                     else:
                         self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
-
-                cancellation_token.raise_if_cancelled()
-                for out in outputs:
-                    if isinstance(out, Message):
-                        task.add_message(out)
-                    else:
-                        task.add_artifact(Artifact(parts=[out]))
 
             previous_state = self._state_value(task.state)
             self._finalize_task_state(task, outputs)
@@ -430,6 +431,71 @@ class AgentExecutionMixin(_AgentMixinBase):
                 self._telemetry_error_hooks.add(hook_name)
                 self._logger.warning(f"Telemetry hook {hook_name} failed; continuing without it: {exc}")
             return None
+
+    def _record_inference_action_result(self, task: Task | None, event: dict[str, Any]) -> None:
+        """Attach one durable receipt for a side effect completed inside inference.
+
+        Model-driven tools and delegations execute inside ``LLM.infer`` rather
+        than as top-level task parts. Recording metadata-only completion
+        receipts on the task makes partial progress visible if a later model
+        call, cancellation, or budget boundary ends inference before a final
+        response, without exposing the private result observation.
+        """
+        if task is None or event.get("type") not in {"tool_result", "agent_call_result"}:
+            return
+
+        action_id_value = event.get("action_id")
+        action_id = str(action_id_value) if action_id_value else None
+        receipt_tracker = _active_inference_action_receipts.get()
+        if action_id and any(
+            artifact.kind == "action_result" and artifact.action_id == action_id for artifact in task.artifacts
+        ):
+            if receipt_tracker is not None:
+                receipt_tracker.add(action_id)
+            return
+
+        if event["type"] == "tool_result":
+            name = str(event.get("tool") or "tool")
+            action_kind = "tool.call"
+            delegated_action = None
+        else:
+            name = str(event.get("agent") or "agent")
+            action_kind = "agent.call"
+            delegated_action = event.get("action")
+
+        # Internal observations can contain credentials, private records, or
+        # other data intended only for model context. The durable/client-visible
+        # task receipt proves completion without copying that raw result across
+        # the task boundary.
+        receipt: dict[str, Any] = {
+            "status": "completed",
+            "action_id": action_id,
+            "action_kind": action_kind,
+            "name": name,
+            "result_omitted": True,
+        }
+        if delegated_action is not None:
+            receipt["action"] = delegated_action
+        part = Part.json(receipt)
+
+        artifact = Artifact(
+            parts=[part],
+            kind="action_result",
+            name=name,
+            action_id=action_id,
+            metadata={
+                "source": "inference",
+                "action_kind": action_kind,
+                "step": event.get("step"),
+                "result_omitted": True,
+            },
+        )
+        task.add_artifact(artifact)
+        if receipt_tracker is not None:
+            receipt_tracker.add(action_id or artifact.id)
+        # Minimize the crash window between an external side effect and its
+        # durable receipt. RunStore persistence is intentionally best effort.
+        self._persist_task_snapshot(task)
 
     def _raise_if_execution_canceled(
         self,
@@ -517,6 +583,16 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         task.update_state(TaskState.COMPLETED)
 
+    @staticmethod
+    def _attach_task_output(task: Task, output: Part | Message) -> None:
+        """Attach a completed output immediately so later failures cannot erase it."""
+        if any(output is existing_part for item in (*task.messages, *task.artifacts) for existing_part in item.parts):
+            return
+        if isinstance(output, Message):
+            task.add_message(output)
+        else:
+            task.add_artifact(Artifact(parts=[output]))
+
     async def execute_task(self, task: Task) -> Task:
         """
         Execute the next step of a Task by inspecting the most recently appended Message or Artifact and performing the
@@ -598,47 +674,42 @@ class AgentExecutionMixin(_AgentMixinBase):
 
             outputs: list[Part | Message] = []
 
-            async with self._llm_history_scope(task, context):
+            async with self._llm_history_scope(task, context, outputs=outputs):
                 # ---- Inspect Parts in the last item only ----
                 for part in last_item.parts:
                     cancellation_token.raise_if_cancelled()
+                    output: Part | Message | None = None
                     if part.type == "tool_call":
-                        outputs.append(
-                            await self.execute_tool(
-                                part,
-                                task=task,
-                                cancellation_token=cancellation_token,
-                            )
+                        output = await self.execute_tool(
+                            part,
+                            task=task,
+                            cancellation_token=cancellation_token,
                         )
                     elif part.type == "infer":
-                        outputs.append(
-                            await self.call_llm(
-                                part,
-                                task=task,
-                                cancellation_token=cancellation_token,
-                            )
+                        output = await self.call_llm(
+                            part,
+                            task=task,
+                            cancellation_token=cancellation_token,
                         )
                     elif part.type == "text" and task.metadata.get("a2a_inbound") is True and self.llm is not None:
                         # Keep the canonical A2A text -> ProtoLink text mapping
                         # visible to custom handlers. Only the default engine
                         # treats authenticated adapter input as an inference
                         # instruction; ordinary local text remains inert.
-                        outputs.append(
-                            await self.call_llm(
-                                Part.infer(prompt=str(part.content)),
-                                task=task,
-                                cancellation_token=cancellation_token,
-                            )
+                        output = await self.call_llm(
+                            Part.infer(prompt=str(part.content)),
+                            task=task,
+                            cancellation_token=cancellation_token,
                         )
                     else:
                         self._logger.debug(f"Unknown part type '{part.type}'. Ignoring.")
-                cancellation_token.raise_if_cancelled()
-                # ---- Attach outputs to the Task ----
-                for out in outputs:
-                    if isinstance(out, Message):
-                        task.add_message(out)
-                    else:
-                        task.add_artifact(Artifact(parts=[out]))
+
+                    if output is not None:
+                        outputs.append(output)
+                        self._attach_task_output(task, output)
+                        # Persist each completed boundary. If a later part
+                        # fails, callers still see which operations succeeded.
+                        self._persist_task_snapshot(task)
 
             self._finalize_task_state(task, outputs)
         except Exception as exc:
@@ -649,7 +720,13 @@ class AgentExecutionMixin(_AgentMixinBase):
         return task
 
     @asynccontextmanager
-    async def _llm_history_scope(self, task: Task, context: RunContext):
+    async def _llm_history_scope(
+        self,
+        task: Task,
+        context: RunContext,
+        *,
+        outputs: list[Part | Message] | None = None,
+    ):
         """Bind task-local LLM history and serialize same-session updates.
 
         Stateless runs receive a fresh isolated history object. Persistent conversation runs load the requested session
@@ -661,24 +738,75 @@ class AgentExecutionMixin(_AgentMixinBase):
             yield
             return
 
-        session_id = context.session_id or task.id
-        if self._state.conversation:
-            lock = self._session_locks.setdefault(session_id, asyncio.Lock())
-            async with lock:
-                history = self._state.conversation.get_history(
-                    session_id,
-                    default_system_prompt=self.llm.system_prompt,
-                )
-                with self.llm.use_history(history):
-                    yield
-                    completed_history = self.llm.history
-                self._state.conversation.save_history(session_id, completed_history)
-                self.llm.history = completed_history.copy()
-            return
+        receipt_tracker: set[str] = set()
+        receipt_token = _active_inference_action_receipts.set(receipt_tracker)
 
-        with self.llm.use_history(ConversationHistory()) as history:
-            yield
-        self.llm.history = history.copy()
+        def completed_without_failure(*, completed_normally: bool) -> bool:
+            output_failed = any(
+                isinstance(output, Part) and self._part_error_message(output) for output in outputs or ()
+            )
+            return completed_normally and not output_failed and task.state not in {TaskState.FAILED, TaskState.CANCELED}
+
+        def should_commit_history(*, completed_normally: bool) -> bool:
+            if receipt_tracker:
+                return True
+            return completed_without_failure(completed_normally=completed_normally)
+
+        try:
+            session_id = context.session_id or task.id
+            if self._state.conversation:
+                lock = self._session_locks.setdefault(session_id, asyncio.Lock())
+                async with lock:
+                    history = self._state.conversation.get_history(
+                        session_id,
+                        default_system_prompt=self.llm.system_prompt,
+                    )
+                    completed_history: ConversationHistory | None = None
+                    completed_normally = False
+                    try:
+                        with self.llm.use_history(history):
+                            try:
+                                yield
+                                completed_normally = True
+                            finally:
+                                completed_history = self.llm.history.copy()
+                    finally:
+                        # Normally failed turns remain isolated. A runtime-owned
+                        # receipt is the authoritative signal that an external
+                        # side effect completed and its observation must survive.
+                        if completed_history is not None and should_commit_history(
+                            completed_normally=completed_normally
+                        ):
+                            try:
+                                self._state.conversation.save_history(session_id, completed_history)
+                                self.llm.history = completed_history.copy()
+                            except Exception as exc:
+                                if completed_without_failure(completed_normally=completed_normally):
+                                    raise
+                                # An execution/cancellation exception is already
+                                # active. Preserve its semantics instead of
+                                # replacing it with secondary persistence loss.
+                                self._logger.warning(
+                                    "Could not persist completed-action history "
+                                    f"for session '{session_id}'; preserving the original execution error: {exc}"
+                                )
+                return
+
+            history = ConversationHistory()
+            completed_history = None
+            completed_normally = False
+            try:
+                with self.llm.use_history(history):
+                    try:
+                        yield
+                        completed_normally = True
+                    finally:
+                        completed_history = self.llm.history.copy()
+            finally:
+                if completed_history is not None and should_commit_history(completed_normally=completed_normally):
+                    self.llm.history = completed_history.copy()
+        finally:
+            _active_inference_action_receipts.reset(receipt_token)
 
     def _persist_task_snapshot(self, task: Task) -> None:
         """Persist a task snapshot when this agent has a run store."""
@@ -720,8 +848,9 @@ class AgentExecutionMixin(_AgentMixinBase):
                 - args (dict)
                 - call_id (str)
             task: Optional active task supplying the propagated ``RunContext``.
-            cancellation_token: Optional live token for cooperative checks before authorization and after the tool
-                returns.
+            cancellation_token: Optional live token checked before authorization
+                and dispatch. A result that has already completed is returned
+                rather than discarded by a late cancellation request.
             budget_enforcer: Optional task-scoped enforcer shared with other infer and tool parts in the same task.
 
         Returns:
@@ -767,12 +896,70 @@ class AgentExecutionMixin(_AgentMixinBase):
             self._enforce_budget_decision(active_budget_enforcer.evaluate())
             self._enforce_budget_decision(active_budget_enforcer.check_tool_call())
             result = await tool(**call_args)
-            if active_token is not None:
-                active_token.raise_if_cancelled()
-            self._enforce_budget_decision(active_budget_enforcer.evaluate())
-            if self.telemetry:
-                await self._emit_telemetry("on_tool_end", tool_name, result)
-            return Part.tool_output(call_id=call_id, result=result)
+            post_action_decision = active_budget_enforcer.evaluate()
+            if not post_action_decision.allowed:
+                # Runtime is a dispatch boundary, not a retroactive verdict on
+                # an operation that may already have committed a side effect.
+                # Preserve the result and stop any subsequent part at its
+                # normal preflight check.
+                self._logger.warning(
+                    f"Tool '{tool_name}' completed after a run-budget boundary: {post_action_decision.message}"
+                )
+                if task is not None:
+                    overruns = task.metadata.setdefault("completed_action_budget_overruns", [])
+                    if isinstance(overruns, list):
+                        overruns.append(
+                            {
+                                "action_kind": "tool.call",
+                                "action_name": tool_name,
+                                "call_id": call_id,
+                                "decision": post_action_decision.to_dict(),
+                            }
+                        )
+            elif post_action_decision.effect == "warn":
+                self._logger.warning(post_action_decision.message or "Run budget is near a configured limit")
+
+            if active_token is not None and active_token.is_cancelled and task is not None:
+                task.metadata.setdefault(
+                    "completed_after_cancellation",
+                    {
+                        "action_kind": "tool.call",
+                        "action_name": tool_name,
+                        "call_id": call_id,
+                        "reason": active_token.reason,
+                    },
+                )
+            output = Part.tool_output(call_id=call_id, result=result)
+            if task is not None:
+                # The tool may already have committed an external side effect.
+                # Attach and snapshot its result before any nonessential
+                # post-action await (for example a slow telemetry exporter).
+                self._attach_task_output(task, output)
+                self._persist_task_snapshot(task)
+            try:
+                if self.telemetry:
+                    await self._emit_telemetry("on_tool_end", tool_name, result)
+            except asyncio.CancelledError as exc:
+                if task is not None:
+                    reason = (
+                        active_token.reason
+                        if active_token is not None and active_token.is_cancelled
+                        else str(exc.args[0])
+                        if exc.args and exc.args[0]
+                        else "Execution canceled after tool completion"
+                    )
+                    task.metadata.setdefault(
+                        "completed_after_cancellation",
+                        {
+                            "action_kind": "tool.call",
+                            "action_name": tool_name,
+                            "call_id": call_id,
+                            "reason": reason,
+                        },
+                    )
+                    self._persist_task_snapshot(task)
+                raise
+            return output
         except ActionPolicyError as e:
             if self.telemetry:
                 await self._emit_telemetry("on_tool_end", tool_name, None, error=str(e))
@@ -918,11 +1105,21 @@ class AgentExecutionMixin(_AgentMixinBase):
                 },
             )
 
+        external_observer_disabled = False
+
         async def emit_inference_event(event: dict[str, Any]) -> None:
+            nonlocal external_observer_disabled
+            self._record_inference_action_result(task, event)
             if self.telemetry:
                 await self._emit_telemetry("on_llm_event", event)
-            if event_callback:
-                await event_callback(event)
+            if event_callback and not external_observer_disabled:
+                try:
+                    await event_callback(event)
+                except Exception as exc:
+                    external_observer_disabled = True
+                    self._logger.warning(
+                        f"Inference event observer failed; continuing with runtime receipts enabled: {exc}"
+                    )
 
         async def authorize_inference_action(action: RunAction) -> ActionAuthorization:
             """Prepare tool actions and enforce this agent's runtime policy."""
@@ -950,18 +1147,30 @@ class AgentExecutionMixin(_AgentMixinBase):
                 parent_context=active_context,
             )
 
-        response: Part = await self.llm.infer(
-            query=query,
-            tools=self.tools,
-            agent_callback=handle_inference_agent_call if discovered else None,
-            agent_cards=discovered or None,
-            streaming=streaming,
-            event_callback=emit_inference_event if self.telemetry or event_callback else None,
-            action_authorizer=authorize_inference_action,
-            cancellation_token=active_token,
-            run_context=active_context,
-            budget_enforcer=budget_enforcer or _current_task_budget(task),
-        )
+        infer_kwargs: dict[str, Any] = {
+            "query": query,
+            "tools": self.tools,
+            "agent_callback": handle_inference_agent_call if discovered else None,
+            "agent_cards": discovered or None,
+            "streaming": streaming,
+            "event_callback": (emit_inference_event if task is not None or self.telemetry or event_callback else None),
+            "action_authorizer": authorize_inference_action,
+            "cancellation_token": active_token,
+            "run_context": active_context,
+        }
+        if _accepts_keyword_argument(self.llm.infer, "event_metrics"):
+            infer_kwargs["event_metrics"] = bool(self.telemetry or event_callback)
+        active_budget_enforcer = budget_enforcer or _current_task_budget(task)
+        # ``LLM.infer`` is a documented extension point. Existing adapters may
+        # override its pre-0.6.7 signature, so only pass the new shared-budget
+        # argument when the override explicitly accepts it (or ``**kwargs``).
+        if active_budget_enforcer is not None and _accepts_keyword_argument(
+            self.llm.infer,
+            "budget_enforcer",
+        ):
+            infer_kwargs["budget_enforcer"] = active_budget_enforcer
+
+        response: Part = await self.llm.infer(**infer_kwargs)
 
         if self.telemetry:
             await self._emit_telemetry("on_llm_end", response)
@@ -991,6 +1200,12 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         async def emit(payload: dict[str, Any]) -> None:
             metadata = {key: value for key, value in payload.items() if key not in {"type", "step", "content", "final"}}
+            if payload.get("type") in {"tool_result", "agent_call_result"}:
+                # Internal observations may contain credentials or private
+                # records intended only for LLM history and privileged
+                # telemetry. Client streams receive correlation, not content.
+                metadata.pop("result", None)
+                metadata["result_omitted"] = True
             await queue.put(
                 TaskLLMStreamEvent(
                     task_id=task_id,
@@ -1105,11 +1320,12 @@ class AgentExecutionMixin(_AgentMixinBase):
                 f"Self-delegation is not allowed. You are '{self.card.name}' ({self.card.url}) and cannot delegate tasks to yourself."  # noqa: E501
             )
 
-        async def call_delegated_task(task: Task) -> Task:
+        async def call_delegated_task(task: Task) -> Any:
+            request_item_ids = frozenset(item.id for item in (*task.messages, *task.artifacts))
             if parent_context is not None:
                 parent_context.child(agent_name=agent_name).attach_to_task(task)
             try:
-                return await self.call_agent(agent_url, task)
+                result_task = await self.call_agent(agent_url, task)
             except asyncio.CancelledError:
                 self._schedule_delegated_cancellation(
                     agent_url,
@@ -1117,6 +1333,11 @@ class AgentExecutionMixin(_AgentMixinBase):
                     "Parent task was canceled",
                 )
                 raise
+            return self._require_completed_delegation(
+                result_task,
+                agent_name,
+                request_item_ids=request_item_ids,
+            )
 
         if action == "tool_call":
             tool_name = payload.get("tool")
@@ -1125,17 +1346,54 @@ class AgentExecutionMixin(_AgentMixinBase):
                 raise ValueError(f"tool_call agent_call must specify 'tool' field. Received payload: {payload}")
             # Create task with tool_call part for the remote agent to execute
             task = Task.create(Message(role="agent", parts=[Part.tool_call(tool_name=tool_name, args=args)]))
-            result_task = await call_delegated_task(task)
-            return result_task.get_last_part_content()
+            return await call_delegated_task(task)
 
         elif action == "infer":
             prompt = payload.get("prompt", "")
             # Create task with infer message for the remote agent to process
             task = Task.create(Message.infer(prompt=prompt))
-            result_task = await call_delegated_task(task)
-            return result_task.get_last_part_content()
+            return await call_delegated_task(task)
 
         raise ValueError(f"Unknown agent_call action: {action}")
+
+    @staticmethod
+    def _require_completed_delegation(
+        result_task: Task,
+        agent_name: str,
+        *,
+        request_item_ids: frozenset[str],
+    ) -> Any:
+        """Return a delegated result only when the remote task truly completed."""
+        state = result_task.state
+        if not isinstance(state, TaskState):
+            try:
+                state = TaskState(str(state))
+            except ValueError as exc:
+                raise RuntimeError(f"Delegated agent '{agent_name}' returned an unknown task state: {state}") from exc
+
+        if state is TaskState.INPUT_REQUIRED:
+            raise ValueError(
+                f"Delegated agent '{agent_name}' requires additional input before it can complete the task"
+            )
+        if state is TaskState.FAILED:
+            reason = result_task.metadata.get("error") or "remote task failed without an error message"
+            raise RuntimeError(f"Delegated agent '{agent_name}' failed: {reason}")
+        if state is TaskState.CANCELED:
+            reason = result_task.metadata.get("cancel_reason") or "remote task was canceled"
+            raise RuntimeError(f"Delegated agent '{agent_name}' was canceled: {reason}")
+        if state is not TaskState.COMPLETED:
+            raise RuntimeError(f"Delegated agent '{agent_name}' returned non-terminal task state '{state.value}'")
+
+        # Some transports return the full task while others return a response-
+        # only task. Item identity distinguishes either valid shape from an
+        # unchanged request that was merely marked completed.
+        last_item = result_task.get_last_item()
+        if last_item is None or last_item.id in request_item_ids:
+            raise RuntimeError(f"Delegated agent '{agent_name}' completed without returning an output")
+        result = last_item.parts[-1].content if last_item.parts else None
+        if result is None:
+            raise RuntimeError(f"Delegated agent '{agent_name}' completed with an empty output")
+        return result
 
     def _schedule_delegated_cancellation(self, agent_url: str, task_id: str, reason: str) -> None:
         """Schedule best-effort cancellation of a delegated child task."""

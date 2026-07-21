@@ -396,6 +396,65 @@ async def test_infer_tool_call_loop():
 
 
 @pytest.mark.asyncio
+async def test_completed_circular_tool_result_gets_safe_history_observation():
+    llm = MockLLM(
+        [
+            json.dumps({"type": "tool_call", "tool": "test_tool", "args": {"input": "test_val"}}),
+            json.dumps({"type": "final", "content": "continued safely"}),
+        ]
+    )
+    tool = MockTool()
+    circular_result: dict = {}
+    circular_result["self"] = circular_result
+    tool.mock_call.return_value = circular_result
+    events = []
+
+    async def capture(event):
+        events.append(event)
+
+    result = await llm.infer(
+        query="Use tool",
+        tools={"test_tool": tool},
+        event_callback=capture,
+    )
+
+    assert result.content == "continued safely"
+    tool_result = next(event for event in events if event["type"] == "tool_result")
+    assert tool_result["result"]["serialization_fallback"] is True
+    assert "{'self': {...}}" in tool_result["result"]["representation"]
+    assert any("serialization_fallback" in str(message.get("content")) for message in llm.history.messages)
+
+
+@pytest.mark.asyncio
+async def test_completed_tool_survives_provider_observation_hook_failure():
+    class BrokenObservationLLM(MockLLM):
+        def _inject_tool_call(self, *, tool_name, tool_args, tool_result):
+            raise RuntimeError("provider history hook failed")
+
+    llm = BrokenObservationLLM(
+        [
+            json.dumps({"type": "tool_call", "tool": "test_tool", "args": {"input": "test_val"}}),
+            json.dumps({"type": "final", "content": "continued with fallback"}),
+        ]
+    )
+    events = []
+
+    async def capture(event):
+        events.append(event)
+
+    result = await llm.infer(
+        query="Use tool",
+        tools={"test_tool": MockTool()},
+        event_callback=capture,
+    )
+
+    assert result.content == "continued with fallback"
+    tool_result = next(event for event in events if event["type"] == "tool_result")
+    assert tool_result["observation_fallback"] is True
+    assert any("portable_fallback" in str(message.get("content")) for message in llm.history.messages)
+
+
+@pytest.mark.asyncio
 async def test_invalid_tool_arguments_are_recoverable_without_poisoning_dedup_or_budget():
     invalid_action = json.dumps({"type": "tool_call", "tool": "strict_integer", "args": {"count": "not-an-integer"}})
     llm = MockLLM(

@@ -50,14 +50,14 @@ Protolink exposes four state module names through `StateMode`. You can enable th
 
 :::note[Current maturity]
 
-`conversation` is the fully integrated automatic runtime path today: agents load LLM history before inference and save it afterward. `tools`, `task`, and `flow` are available as typed module slots for persistent extension work; they share the same storage backend, but only `flow` currently exposes a small `to_dict()` helper and tool/task modules intentionally stay minimal.
+`conversation` is the fully integrated automatic runtime path today: agents load LLM history before inference and save it after normal completion. A failed turn is normally isolated, but history is retained when a new `Artifact(kind="action_result")` proves that a tool or delegation side effect completed and its observation must survive a retry. `tools`, `task`, and `flow` are available as typed module slots for persistent extension work; they share the same storage backend, but only `flow` currently exposes a small `to_dict()` helper and tool/task modules intentionally stay minimal.
 
 :::
 ### 1. Conversation State (`conversation`)
 This is the most common module. It manages the `ConversationHistory` object used by LLMs.
 - **Data Saved**: All messages (user, assistant, system, tool) in a session.
 - **Key Factor**: Uses the `session_id` provided in task metadata to partition history.
-- **Automatic Sync**: The `Agent` automatically loads history *before* inference and saves it *after* the task completes.
+- **Automatic Sync**: The `Agent` loads history *before* inference and saves it after normal completion, or after a failed turn that contains a completed-action receipt.
 
 ### 2. Tool State (`tools`)
 Provides a dedicated module slot for tool-specific persistence.

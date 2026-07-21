@@ -1674,18 +1674,18 @@ card = AgentCard.from_dict(data)
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L260"
 >
 
-Generate a structured, human-readable description for an LLM system prompt. The output explains the agent's identity and, when skills are present, embeds each skill's name, description, schemas, and examples so another model can decide whether to delegate work.
+Generate deterministic JSON metadata for an LLM delegation prompt. The object contains the agent's name, description, capabilities, and a skill-sorted `tools` array with each skill's description, schemas, and examples. It deliberately omits the transport URL so model output cannot select an arbitrary destination directly.
 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="AgentCard get_prompt_format return value">
     <ApiField name="prompt_text" type="str">
-      A multi-line prompt fragment containing the card name and description plus a <code>tools</code> block for every advertised skill.
+      A valid, indented JSON object with stable key and skill ordering. Legacy Python type objects in schema metadata are rendered as strings rather than producing an invalid prompt document.
     </ApiField>
   </ApiFields>
 </ApiSection>
 
 <ApiCallout label="Prompt representation">
-  This method is intended for model context, not machine parsing or wire serialization. Use <code>to_dict()</code> when stable field names and JSON-compatible structure matter.
+  This JSON is an LLM context representation, not the native discovery-card wire schema. Treat descriptions, schemas, examples, and capability values as untrusted metadata; use <code>to_dict()</code> for card serialization.
 </ApiCallout>
 
 </ApiReference>

@@ -220,6 +220,16 @@ result = await client.send_task("http://localhost:8010", task)
 print(result.get_last_part_content())
 ```
 
+For the common case where the task contains a single inference request, use
+`send_infer_task()` to create and submit the task in one call:
+
+```python
+result = await client.send_infer_task(
+    "What's the weather in Athens?",
+    "http://localhost:8010",
+)
+```
+
 With A2A enabled, automatic selection performs discovery before task
 submission. It probes `/.well-known/agent.json` first and falls back to
 `/.well-known/agent-card.json` only after a `404` or `405`; authentication,
@@ -244,6 +254,53 @@ is used only when continuing work previously returned by the same remote peer.
 The process-local local-to-remote mapping holds at most 1,024 tasks for one hour
 and removes expired or oldest entries. Continuation and A2A cancellation require
 a live mapping in the same client process.
+
+---
+
+### `send_infer_task()`
+
+Creates a task containing one inference request, sends it to a remote agent,
+and returns the processed task.
+
+<ApiReference kind="async method" path="protolink.client.AgentClient.send_infer_task" signature={`async send_infer_task(
+    query: str,
+    agent_url: str,
+    *,
+    user: str | None = None,
+    output_schema: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/agent.py">
+Build a new <code>Task</code> through <code>Task.create_infer(prompt=query, ...)</code>, delegate it to <code>send_task()</code>, and return the complete remote task result.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="send infer task parameters">
+  <ApiField name="query" type="str" required>Prompt placed in the task's inference part.</ApiField>
+  <ApiField name="agent_url" type="str" required>Peer base URL or transport-specific URI.</ApiField>
+  <ApiField name="user" type="str | None" defaultValue="None">Optional user identifier or context included in the inference part.</ApiField>
+  <ApiField name="output_schema" type="dict[str, Any] | None" defaultValue="None">Optional schema describing the expected model output.</ApiField>
+  <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Optional metadata attached to the inference part.</ApiField>
+  <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}>Same native/A2A selection used by <code>send_task()</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="send infer task return value"><ApiField name="task" type="Task">Processed task including remote state, messages, artifacts, and metadata.</ApiField></ApiFields></ApiSection>
+
+</ApiReference>
+
+```python
+result = await client.send_infer_task(
+    query="Extract the invoice total",
+    agent_url="http://localhost:8010",
+    output_schema={
+        "type": "object",
+        "properties": {"total": {"type": "number"}},
+        "required": ["total"],
+    },
+    metadata={"document_id": "invoice-42"},
+)
+```
+
+Use `send_task()` directly when the task needs multiple messages, multiple
+parts, continuation state, or caller-defined task metadata.
 
 ---
 
@@ -618,6 +675,34 @@ Block until a remote agent finishes processing a complete Task. This is the sync
 
 </ApiReference>
 
+### SyncAgentClient.send_infer_task
+
+<ApiReference kind="method" path="protolink.client.SyncAgentClient.send_infer_task" signature={`send_infer_task(
+    query: str,
+    agent_url: str,
+    *,
+    user: str | None = None,
+    output_schema: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
+    protocol: Literal["auto", "protolink", "a2a"] = "auto",
+) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/agent.py">
+Synchronously build an inference task and submit it through the same native or A2A path as <code>AgentClient.send_infer_task()</code>.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="synchronous send infer task parameters">
+  <ApiField name="query" type="str" required>Prompt placed in the generated inference part.</ApiField>
+  <ApiField name="agent_url" type="str" required>Peer address that should receive the generated task.</ApiField>
+  <ApiField name="user" type="str | None" defaultValue="None">Optional user identifier or context for the inference request.</ApiField>
+  <ApiField name="output_schema" type="dict[str, Any] | None" defaultValue="None">Optional schema for the expected model output.</ApiField>
+  <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Optional inference-part metadata.</ApiField>
+  <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}>Same native/A2A selection used by synchronous task submission.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="synchronous send infer task return value"><ApiField name="task" type="Task">Processed remote inference task.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Event-loop boundary">This method calls <code>asyncio.run()</code>. In asynchronous code, await <code>client.send_infer_task()</code> instead.</ApiCallout>
+
+</ApiReference>
+
 ### SyncAgentClient.send_task_streaming
 
 <ApiReference kind="generator method" path="protolink.client.SyncAgentClient.send_task_streaming" signature={`send_task_streaming(
@@ -815,10 +900,9 @@ from protolink.client import AgentClient
 from protolink.models import Task
 
 client = AgentClient(transport="http", url="http://localhost:8000")
-task = Task.create_infer(prompt="Hello, agent!")
 
 # No 'await' or 'async def' needed. Use the .sync property!
-result = client.sync.send_task("http://localhost:8010", task)
+result = client.sync.send_infer_task("Hello, agent!", "http://localhost:8010")
 print(result.get_last_part_content())
 ```
 

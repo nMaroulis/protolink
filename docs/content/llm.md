@@ -269,9 +269,9 @@ The detailed [controlled inference and tool-use](#controlled-inference-and-tool-
 
 An `LLM` instance still exposes `llm.history` for direct usage and backward-compatible introspection. When the same LLM is plugged into an `Agent`, ProtoLink binds a task-local `ConversationHistory` around each run so concurrent tasks do not interleave messages on one shared mutable history object.
 
-For stateless agents, each task receives a fresh history seeded by the compiled system prompt. After the task finishes, `llm.history` points at a copy of the last completed task history for debugging and simple scripts.
+For stateless agents, each task receives a fresh history seeded by the compiled system prompt. After normal completion, `llm.history` points at a copy of that task history for debugging and simple scripts. A failed turn normally stays isolated; if an `action_result` receipt proves that a side effect completed, ProtoLink retains the history containing that observation so a retry does not behave as though the action never ran.
 
-For persistent conversation state, enable `state=["conversation"]`. The Agent loads the requested `session_id`, serializes concurrent tasks for that same session with an async lock, saves the completed history back to state, and exposes a copy as `llm.history` after completion.
+For persistent conversation state, enable `state=["conversation"]`. The Agent loads the requested `session_id`, serializes concurrent tasks for that same session with an async lock, saves normally completed history back to state, and exposes a copy as `llm.history`. Failed history is saved only when a new `action_result` receipt proves that the turn completed a tool or delegation side effect.
 
 ```python
 from protolink import Agent, AgentCard, RunContext, Task, create_llm
@@ -490,7 +490,9 @@ This is especially useful for CLIs, dashboards, and budget-aware agents that wan
 
 Model profiles are observational metadata. Run budgets are the separate enforcement mechanism.
 
-If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before the provider is invoked; `max_tool_calls` is checked before model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
+If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. When an Agent executes a task, one task-local enforcer is shared by every infer part and explicit tool-call part, so counters do not reset between parts. A nested task gets its own scope, and direct `LLM.infer()` calls still create an independent enforcer unless the advanced caller supplies `budget_enforcer=` explicitly.
+
+Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before every physical provider attempt, including transient retries. `max_tool_calls` applies before explicit and model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Provider runtime is checked again after each request, including a final response. A tool or delegated call can already have committed a side effect when it returns, so ProtoLink records and injects that result before cancellation or runtime enforcement stops the next step. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
 
 ## LLM API reference
 
@@ -997,13 +999,13 @@ The inference loop includes multiple layers of protection against unreliable mod
 
 #### 1. Deduplication detection
 
-The runtime tracks a sliding window of recent action signatures. If the model requests an identical tool or agent action with identical arguments, ProtoLink:
+The runtime tracks a sliding window of successfully completed side-effect signatures. If the model requests an identical tool or agent action with identical arguments, ProtoLink:
 
 - does not execute the duplicate;
 - injects corrective guidance into history; and
 - asks the model to use the existing observation, choose a different action, or finish.
 
-This prevents a model from repeatedly calling the same tool while expecting a different result.
+Failed validation or execution does not poison the window, delegated infer signatures include the complete prompt, and final actions are returned immediately even when their text repeats. This prevents repeated side effects without suppressing a valid answer.
 
 ```text
 You have already performed this action. The result is in your context.
@@ -1012,7 +1014,9 @@ Proceed with the task: produce a final response or choose a different action.
 
 #### 2. Parse-failure circuit breaker
 
-JSON-mode parsing failures are recoverable at first. The runtime describes the exact parsing or validation error and lets the model try again. After three consecutive failures, it raises `RuntimeError` instead of consuming the full inference-step budget.
+JSON-mode parsing failures are recoverable at first. The fallback parser accepts strict JSON directly or exactly one balanced JSON object embedded in prose or a code fence. Its linear scanner understands quoted and escaped braces and rejects multiple valid objects as ambiguous. Raw responses and parsed payloads use deterministic, 2,000-character head-and-tail previews, preventing an oversized valid or invalid action from flooding logs and the next correction prompt while preserving field-level validation errors.
+
+The runtime describes the exact parsing or validation error and lets the model try again. Correction examples mention only actions that are actually available in the current run, which keeps the prompt shorter and avoids inviting a small model to call an unavailable tool or Agent. After three consecutive failures, ProtoLink raises `RuntimeError` instead of consuming the full inference-step budget.
 
 ```text
 Your previous response could not be parsed as a valid action.
@@ -1031,11 +1035,23 @@ Many model mistakes are observations, not immediate application failures:
 | Agent not found | Reports the unavailable target and the known discovered agents. |
 | Invalid action type | Lists `final`, `tool_call`, and `agent_call`. |
 
-These failures normally remain inside `infer()` so the model can correct them. They surface as `RuntimeError` only when the correction circuit breaker or another unrecoverable boundary is reached.
+Tool arguments are validated and conservatively coerced before authorization, deduplication, or tool-budget consumption. These model mistakes normally remain inside `infer()` so the model can correct them. An exception raised by the tool body, including `TypeError`, remains an execution failure and is not relabeled as an argument mismatch.
 
-#### 4. Bounded execution
+When an Agent-owned inference tool or delegation succeeds, the Agent also attaches and immediately snapshots an `Artifact(kind="action_result")` receipt keyed by the runtime `action_id`. The receipt records completion and correlation metadata but deliberately omits the internal result, which remains in private LLM history. If a later step fails, exceeds budget, or is canceled, the Task and optional `RunStore` snapshot still show what already happened without exposing model-only observations or inviting an unsafe blind retry. Non-JSON or circular results receive a bounded serialization fallback in that private history so the completion observation cannot be lost.
+
+#### 4. Physical retry safety
+
+Transient provider failures use exponential backoff and jitter. Each physical attempt consumes the same LLM-call and input-token budget as an initial request and produces structured attempt metadata. Non-streaming calls may retry up to the configured retry limit; streaming calls may retry only before the first output chunk is exposed, preventing duplicated or discontinuous client output.
+
+#### 5. Bounded execution
 
 `MAX_INFER_STEPS` limits a run to ten model decisions. If the model never produces a final action, the method raises `RuntimeError` with diagnostic context instead of looping indefinitely.
+
+:::note[Observers do not control execution]
+
+Inference `event_callback` failures are logged and the observer is disabled for the remainder of that infer call. A telemetry or UI exporter cannot turn an otherwise successful provider or tool operation into an application failure.
+
+:::
 
 :::tip[Debugging inference loops]
 
@@ -1080,7 +1096,7 @@ The base implementation asks for JSON, validates it, and injects a provider-neut
 | Provider | Non-streaming `infer()` | Streaming `infer()` | Notes |
 |----------|-------------------------|---------------------|-------|
 | OpenAI | Native Responses function tools | Native streamed function-call events | Parallel tool calls are disabled so the runtime receives one action at a time. |
-| Anthropic | Native `tool_use` blocks | Native streamed `input_json_delta` tool input | Text deltas can reach observers while tool JSON is buffered until complete. |
+| Anthropic | Native `tool_use` blocks | Native streamed `input_json_delta` tool input | System instructions come from the task-local history; parallel tool calls are rejected. |
 | Gemini | Native function declarations | Native streamed function-call parts | Function-call parts are normalized into ProtoLink actions. |
 | DeepSeek | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Set the flag to `False` to force JSON action mode. |
 | Grok | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Set the flag to `False` to force JSON action mode. |
@@ -1179,10 +1195,12 @@ After observing the tool result, the model completes with:
     agent_cards: list[Any] | None = None,
     streaming: bool = False,
     event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    event_metrics: bool | None = None,
     action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
     cancellation_token: CancellationToken | None = None,
     run_context: RunContext | dict[str, Any] | None = None,
     budget_policy: BudgetPolicy | None = None,
+    budget_enforcer: BudgetEnforcer | None = None,
 ) -> Part`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L560"
 >
@@ -1207,7 +1225,10 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
       Acquire each model action from the streaming adapter path.
     </ApiField>
     <ApiField name="event_callback" type="Callable[[dict[str, Any]], Awaitable[None]] | None" defaultValue="None">
-      Async observer for normalized chunks, actions, tool events, delegation events, budget decisions, errors, and final output.
+      Async observer for normalized chunks, actions, tool events, delegation events, budget decisions, errors, and final output. The observer is non-authoritative; its first exception is logged and disables further callbacks for this infer call.
+    </ApiField>
+    <ApiField name="event_metrics" type="bool | None" defaultValue="None">
+      Controls whether an attached event callback activates optional per-call metrics. Direct callers retain the existing default behavior; Agent sets this to <code>false</code> when its callback exists only to maintain internal completion receipts.
     </ApiField>
     <ApiField name="action_authorizer" type="Callable[[RunAction], Awaitable[ActionAuthorization]] | None" defaultValue="None">
       Policy boundary invoked after validation and before any tool or delegated-agent side effect.
@@ -1220,6 +1241,9 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
     </ApiField>
     <ApiField name="budget_policy" type="BudgetPolicy | None" defaultValue="None">
       Allow, warn, or deny policy used by the built-in budget enforcer.
+    </ApiField>
+    <ApiField name="budget_enforcer" type="BudgetEnforcer | None" defaultValue="None">
+      Existing stateful enforcer shared across several inference or tool operations. Omit it for an independent direct call; Agent supplies its task-local enforcer when the override accepts this keyword.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1255,6 +1279,10 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
 
 <ApiCallout label="Direct-call responsibility">
   <code>Agent</code> normally rebuilds the system prompt before calling this method. A custom runtime that invokes <code>infer()</code> directly must prepare matching tool and Agent descriptions with <code>build_system_prompt()</code>; supplying <code>tools</code> here only provides executables to the loop.
+</ApiCallout>
+
+<ApiCallout label="Override compatibility">
+  The new <code>budget_enforcer</code> parameter is optional. When an Agent uses a custom <code>LLM.infer()</code> override with the pre-0.6.7 signature, it supplies the shared enforcer only if the override declares that keyword or accepts arbitrary keyword arguments.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -1545,6 +1573,8 @@ The final prompt is composed from:
     - Your domain-specific prompt, such as “You are a coding assistant.”
     - Appended to the shared runtime rules unless `override_system_prompt=True`.
 
+Tool and discovered-Agent metadata is serialized as deterministic valid JSON with stable ordering and explicit capabilities. The surrounding prompt labels those descriptions, schemas, and examples as untrusted data rather than executable instructions. This avoids Python-repr syntax and brace-escaping artifacts while keeping prompt caching and smaller-model parsing predictable.
+
 ### Reasoning versus execution
 
 When `infer()` runs, the prompt makes the LLM a reasoning and action-selection engine while ProtoLink remains the executor:
@@ -1780,9 +1810,9 @@ llm = OpenAILLM(
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py#L26"
 >
 
-Anthropic Messages API adapter with native `tool_use` actions and streamed tool-input deltas. The adapter separates the system prompt from conversational messages, converts ProtoLink tools to Anthropic tool schemas, and keeps the provider's tool-use identifier in action metadata.
+Anthropic Messages API adapter with native `tool_use` actions and streamed tool-input deltas. The adapter derives both the separated system prompt and conversational messages from the supplied task-local `ConversationHistory`, converts ProtoLink tools to Anthropic tool schemas, and keeps the provider's tool-use identifier in action metadata.
 
-After ProtoLink executes a requested tool, the adapter uses that identifier to inject the observation in the shape expected by the Messages API. Both streaming and non-streaming inference therefore share the same public `LLMActionResult` even though Anthropic's wire representation differs from OpenAI's.
+After ProtoLink executes a requested tool, the adapter uses that identifier to inject the observation in the shape expected by the Messages API. Both streaming and non-streaming inference therefore share the same public `LLMActionResult` even though Anthropic's wire representation differs from OpenAI's. The runtime accepts one action per step and rejects multiple parallel `tool_use` blocks instead of silently selecting or merging them.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="AnthropicLLM parameters">

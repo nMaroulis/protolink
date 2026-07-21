@@ -144,6 +144,7 @@ from protolink.types import LLMProvider, LLMType, ReasoningLevel
 from protolink.utils.logging import get_logger
 
 MAX_INFER_STEPS: int = 10  # safety against infinite loops
+_HISTORY_RESULT_FALLBACK_CHARS: int = 2_000
 logger = get_logger(__name__)
 
 
@@ -154,6 +155,35 @@ def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext
     if isinstance(value, dict):
         return RunContext.from_dict(value)
     return RunContext()
+
+
+def _history_safe_result(value: Any) -> Any:
+    """Return a provider-history-serializable action result.
+
+    Valid JSON-compatible values retain their structure. Circular containers
+    and unusual application objects fall back to a bounded representation so a
+    completed external side effect can always be recorded before the loop
+    reaches its next cancellation or budget boundary.
+    """
+    try:
+        json.dumps(value, default=json_history_default)
+        return value
+    except Exception:
+        try:
+            representation = repr(value)
+        except Exception:
+            representation = f"<{type(value).__module__}.{type(value).__qualname__}>"
+        if len(representation) > _HISTORY_RESULT_FALLBACK_CHARS:
+            omitted = len(representation) - _HISTORY_RESULT_FALLBACK_CHARS
+            half = _HISTORY_RESULT_FALLBACK_CHARS // 2
+            representation = (
+                f"{representation[:half]}\n... [{omitted} characters omitted] ...\n{representation[-half:]}"
+            )
+        return {
+            "serialization_fallback": True,
+            "value_type": f"{type(value).__module__}.{type(value).__qualname__}",
+            "representation": representation,
+        }
 
 
 class LLM(ABC):
@@ -571,6 +601,7 @@ class LLM(ABC):
         agent_cards: list[Any] | None = None,
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+        event_metrics: bool | None = None,
         action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
         cancellation_token: CancellationToken | None = None,
         run_context: RunContext | dict[str, Any] | None = None,
@@ -650,6 +681,11 @@ class LLM(ABC):
             LLM chunks, parsed actions, tool execution results, delegated agent
             calls, final output, and recoverable errors. The callback is for
             observability only; the inference loop still returns a final ``Part``.
+        event_metrics : bool, optional
+            Whether an attached event callback should activate optional call
+            metrics. The default preserves direct-caller behavior. Agent sets
+            this to false when its callback exists only for internal action
+            receipts, avoiding token-estimation overhead on unobserved runs.
         action_authorizer : Callable[[RunAction], Awaitable[ActionAuthorization]], optional
             Runtime callback invoked after a model action has been validated but
             before a tool or delegated agent operation executes. The callback
@@ -818,7 +854,7 @@ class LLM(ABC):
                 await emit({"type": "approval_decision", "decision": authorization.approval_decision.to_dict()})
             return authorization
 
-        metrics_active = self.metrics_enabled and event_callback is not None
+        metrics_active = self.metrics_enabled and event_callback is not None and event_metrics is not False
 
         while steps < MAX_INFER_STEPS:
             if cancellation_token is not None:
@@ -1173,9 +1209,6 @@ class LLM(ABC):
                         }
                     )
                     tool_result = await tool(**tool_args)
-                    if cancellation_token is not None:
-                        cancellation_token.raise_if_cancelled()
-                    await enforce_budget(active_budget_enforcer.evaluate())
                 except ActionPolicyError:
                     raise
                 except BudgetExceededError:
@@ -1192,21 +1225,46 @@ class LLM(ABC):
                     )
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
+                history_tool_result = _history_safe_result(tool_result)
+                observation_fallback = False
+                try:
+                    self._inject_tool_call(
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                        tool_result=history_tool_result,
+                    )
+                except Exception as exc:
+                    # The external operation already completed. A broken
+                    # provider-specific history hook must not erase that fact
+                    # and invite a duplicate retry, so retain a portable system
+                    # observation as the final fallback.
+                    observation_fallback = True
+                    logger.warning(f"Provider tool-result history injection failed; using portable observation: {exc}")
+                    self.history.add_system(
+                        json.dumps(
+                            {
+                                "type": "tool_result",
+                                "tool": tool_name,
+                                "result": history_tool_result,
+                                "observation_format": "portable_fallback",
+                            },
+                            default=json_history_default,
+                        )
+                    )
                 await emit(
                     {
                         "type": "tool_result",
                         "step": steps,
                         "tool": tool_name,
-                        "result": tool_result,
+                        "result": history_tool_result,
                         "action_id": action_id,
+                        "observation_fallback": observation_fallback,
                     }
                 )
-                self._inject_tool_call(
-                    tool_name=tool_name,
-                    tool_args=tool_args,
-                    tool_result=tool_result,
-                )
                 remember_action(action_signature)
+                # A completed tool may already have committed a side effect.
+                # Record it before honoring a cancellation or runtime overrun;
+                # the next loop preflight prevents any further dispatch.
                 continue
 
             elif isinstance(action_obj, AgentCallAction):
@@ -1261,9 +1319,6 @@ class LLM(ABC):
                         }
                     )
                     agent_result = await agent_callback(agent_name, agent_action, payload)
-                    if cancellation_token is not None:
-                        cancellation_token.raise_if_cancelled()
-                    await enforce_budget(active_budget_enforcer.evaluate())
                 except ActionPolicyError:
                     raise
                 except BudgetExceededError:
@@ -1296,22 +1351,43 @@ class LLM(ABC):
                     )
                     raise RuntimeError(f"Agent call to '{agent_name}' failed: {e}") from e
 
+                history_agent_result = _history_safe_result(agent_result)
+                observation_fallback = False
+                try:
+                    self._inject_agent_call(
+                        agent_name=agent_name,
+                        agent_action=agent_action,
+                        agent_result=history_agent_result,
+                    )
+                except Exception as exc:
+                    observation_fallback = True
+                    logger.warning(f"Provider agent-result history injection failed; using portable observation: {exc}")
+                    self.history.add_system(
+                        json.dumps(
+                            {
+                                "type": "agent_result",
+                                "agent": agent_name,
+                                "action": agent_action,
+                                "result": history_agent_result,
+                                "observation_format": "portable_fallback",
+                            },
+                            default=json_history_default,
+                        )
+                    )
                 await emit(
                     {
                         "type": "agent_call_result",
                         "step": steps,
                         "agent": agent_name,
                         "action": agent_action,
-                        "result": agent_result,
+                        "result": history_agent_result,
                         "action_id": action_id,
+                        "observation_fallback": observation_fallback,
                     }
                 )
-                self._inject_agent_call(
-                    agent_name=agent_name,
-                    agent_action=agent_action,
-                    agent_result=agent_result,
-                )
                 remember_action(action_signature)
+                # Delegation can also commit remote side effects. Preserve its
+                # receipt and enforce stop conditions at the next boundary.
                 continue
 
             else:
