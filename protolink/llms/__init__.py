@@ -4,6 +4,7 @@ import importlib
 from typing import Any
 
 __all__ = [
+    "VLLMLLM",
     "ContextItem",
     "ContextManifest",
     "HistoryCompactionRequest",
@@ -29,6 +30,7 @@ _EXPORTS = {
     "LMStudioLLM": "protolink.llms.server.openai_compatible_client.LMStudioLLM",
     "MockLLM": "protolink.llms.mock_client.MockLLM",
     "OpenAICompatibleLLM": "protolink.llms.server.openai_compatible_client.OpenAICompatibleLLM",
+    "VLLMLLM": "protolink.llms.server.vllm_client.VLLMLLM",
     "build_context_manifest": "protolink.llms.context.build_context_manifest",
     "create_llm": "protolink.llms.factory.create_llm",
 }

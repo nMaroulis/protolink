@@ -661,6 +661,7 @@ transport = get_transport(
     "ollama",
     "openai",
     "openai-compatible",
+    "vllm",
 ]`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/types/types.py#L40"
 >
@@ -683,6 +684,7 @@ Provider identifier stored on concrete LLM adapters and mirrored by the lazy LLM
 | `ollama` | `OllamaLLM`, Ollama `/api/chat` server |
 | `openai` | `OpenAILLM`, OpenAI Responses API |
 | `openai-compatible` | `OpenAICompatibleLLM`, `/v1/chat/completions` and `/v1/models` server |
+| `vllm` | `VLLMLLM`, vLLM's OpenAI-compatible server |
 
 </ApiSection>
 
@@ -737,7 +739,7 @@ Classifies where an LLM adapter executes or connects. It is adapter metadata rat
 |------|---------|----------|
 | `api` | Remote hosted provider API | OpenAI, Anthropic, Gemini, DeepSeek, Grok, Hugging Face |
 | `local` | Model executes inside the Python process | `LlamaCPPLocalLLM` |
-| `server` | Adapter connects to a model server managed separately | Ollama, llama.cpp server, LM Studio, OpenAI-compatible servers |
+| `server` | Adapter connects to a model server managed separately | Ollama, llama.cpp server, LM Studio, vLLM, OpenAI-compatible servers |
 
 </ApiSection>
 

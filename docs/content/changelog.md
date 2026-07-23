@@ -41,7 +41,7 @@ uv add --upgrade protolink
 This patch release hardens the controlled inference path from task admission through provider calls, tool execution,
 delegation, streaming finalization, and observability. It keeps the portable JSON action protocol as the default for
 local and smaller models while making malformed-output recovery, prompt metadata, budgets, retries, and task lifecycle
-behavior more deterministic.
+behavior more deterministic. Adds vLLM client support natively.
 
 :::
 
@@ -65,6 +65,8 @@ behavior more deterministic.
 - Added focused regression coverage for pre-cancellation, external coroutine cancellation, abandoned streams,
   task-wide budgets, legacy override signatures, telemetry failures, provider retries, invalid tool arguments,
   deterministic prompts, strict JSON extraction, Anthropic action handling, and parallel native tool calls.
+- Added vLLM client `VLLMLLM`, which inherits `OpenAICompatibleLLM`.
+
 
 ### Changed
 

@@ -115,6 +115,7 @@ ProtoLink groups model backends into hosted APIs, model servers, and in-process 
     - `OllamaLLM`: connects to an Ollama `/api/chat` endpoint.
     - `LlamaCPPServerLLM`: connects directly to a `llama-server`.
     - `LMStudioLLM`: connects to LM Studio's OpenAI-compatible server.
+    - `VLLMLLM`: connects to vLLM's OpenAI-compatible server.
     - `OpenAICompatibleLLM`: connects to a service exposing `/v1/chat/completions` and `/v1/models`.
 
 - **Local** - runs the model inside the Python process:
@@ -127,7 +128,7 @@ You can also use a third-party LLM client directly when your application only ne
 ### How to choose
 
 - Choose a **hosted API** when you want a managed model and accept provider credentials, network latency, and usage billing.
-- Choose a **server adapter** when the model is exposed by Ollama, llama-server, LM Studio, or another OpenAI-compatible endpoint that you control.
+- Choose a **server adapter** when the model is exposed by Ollama, llama-server, LM Studio, vLLM, or another OpenAI-compatible endpoint that you control.
 - Choose **`LlamaCPPLocalLLM`** when the GGUF model should run inside the Python process and the process can afford model-loading and inference resources.
 - Choose **`MockLLM`** for tests, examples, and runtime development.
 
@@ -212,7 +213,7 @@ Never commit API keys to version control. Read them from environment variables o
    agent = Agent(card=agent_card, transport="http", llm=llm)
    ```
 
-For local and server-style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`, `LMStudioLLM`, and `OpenAICompatibleLLM`), configuration additionally includes a model-file path or server URL. The individual class entries below describe the resolution order for those values.
+For local and server-style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`, `LMStudioLLM`, `VLLMLLM`, and `OpenAICompatibleLLM`), configuration additionally includes a model-file path or server URL. The individual class entries below describe the resolution order for those values.
 
 Generation parameters are deliberately provider-specific. `model_params` is forwarded to the selected SDK or server; ProtoLink does not translate names such as `max_tokens`, `max_output_tokens`, or provider-specific thinking controls into one synthetic schema.
 
@@ -522,6 +523,10 @@ provider_options = {
         "model": "local-model",
         "base_url": "http://localhost:1234/v1",
     },
+    "vllm": {
+        "model": "Qwen/Qwen3-8B",
+        "base_url": "http://localhost:8000/v1",
+    },
 }
 
 llm = create_llm(provider, **provider_options[provider])
@@ -537,7 +542,7 @@ print(response)
 - **`APILLM`** - base for API-hosted adapters.
 - **`ServerLLM`** - base for HTTP model servers.
 - **`LocalLLM`** - base for in-process local runtimes.
-- **Concrete implementations** - `OpenAILLM`, `AnthropicLLM`, `GeminiLLM`, `DeepSeekLLM`, `GrokLLM`, `HuggingFaceLLM`, `OllamaLLM`, `LlamaCPPServerLLM`, `LMStudioLLM`, `OpenAICompatibleLLM`, `LlamaCPPLocalLLM`, and `MockLLM`.
+- **Concrete implementations** - `OpenAILLM`, `AnthropicLLM`, `GeminiLLM`, `DeepSeekLLM`, `GrokLLM`, `HuggingFaceLLM`, `OllamaLLM`, `LlamaCPPServerLLM`, `LMStudioLLM`, `VLLMLLM`, `OpenAICompatibleLLM`, `LlamaCPPLocalLLM`, and `MockLLM`.
 
 :::
 
@@ -560,7 +565,7 @@ Create an LLM adapter without importing the selected provider until it is needed
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="create_llm parameters">
     <ApiField name="provider" type="str | LLMProvider" required>
-      Provider selector. Supported string values are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, and <code>openai-compatible</code>.
+      Provider selector. Supported string values are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, <code>openai-compatible</code>, and <code>vllm</code>.
     </ApiField>
     <ApiField name="**kwargs" type="Any">
       Forwarded to the selected adapter constructor. Two factory-only keywords are also recognized: <code>metrics_profile</code> configures model metrics after construction, and <code>metrics_enabled</code> enables or disables their emission.
@@ -989,7 +994,7 @@ Streaming JSON does not mean ProtoLink dispatches incomplete JSON fragments. The
 
 :::tip[Small-model support]
 
-Ollama, llama.cpp, LM Studio, and generic OpenAI-compatible servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model and chat-template combination that reliably emits native tool calls.
+Ollama, llama.cpp, LM Studio, vLLM, and generic OpenAI-compatible servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model and chat-template combination that reliably emits native tool calls.
 
 :::
 
@@ -1102,7 +1107,7 @@ The base implementation asks for JSON, validates it, and injects a provider-neut
 | Grok | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Set the flag to `False` to force JSON action mode. |
 | Ollama | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Keeps small/local model behavior simple unless tool support is known to work. |
 | llama.cpp server/local | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Reliability depends on the selected model and chat template. |
-| LM Studio / OpenAI-compatible | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Covers LM Studio, vLLM, LocalAI, and compatible custom servers. |
+| LM Studio / vLLM / OpenAI-compatible | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Dedicated subclasses provide conventional defaults and provider identity; the generic adapter covers LocalAI and compatible custom servers. |
 | Hugging Face | JSON fallback for non-streaming inference | Not currently usable | `call_stream()` currently yields an empty chunk, so streaming inference is unsupported. |
 
 ### Prompt selection
@@ -2189,7 +2194,7 @@ llm = LlamaCPPServerLLM(base_url="http://localhost:8080")
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L29"
 >
 
-Generic client for servers exposing `/v1/chat/completions` and `/v1/models`, including vLLM, LocalAI, and compatible custom services. Use it when the endpoint follows the Chat Completions protocol but is not the official OpenAI Responses API.
+Generic client for servers exposing `/v1/chat/completions` and `/v1/models`, including LocalAI and compatible custom services. Use it when the endpoint follows the Chat Completions protocol but is not the official OpenAI Responses API. Prefer `VLLMLLM` or `LMStudioLLM` when their conventional URL, credential environment variables, and provider identity are useful.
 
 It supports custom headers, optional bearer authentication, direct and streamed content, and opt-in native tools. The default JSON response format makes the adapter well suited to ProtoLink's portable action protocol, while `supports_tool_calling=True` switches action acquisition to provider-style tool payloads.
 
@@ -2225,6 +2230,67 @@ llm = OpenAICompatibleLLM(
     base_url="http://localhost:8000/v1",
     model="Qwen/Qwen3-8B",
 )
+```
+
+</ApiSection>
+
+</ApiReference>
+
+### VLLMLLM
+
+<ApiReference
+  kind="class"
+  path="protolink.llms.server.VLLMLLM"
+  signature={`class VLLMLLM(
+    *,
+    model: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    headers: dict[str, str] | None = None,
+    model_params: dict[str, Any] | None = None,
+    supports_tool_calling: bool = False,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/vllm_client.py#L9"
+>
+
+Convenience specialization of `OpenAICompatibleLLM` for a separately managed vLLM server. It inherits the compatible adapter's direct and streamed Chat Completions requests, portable JSON action fallback, usage normalization, connection validation, custom headers, optional bearer authentication, and opt-in native tools. The adapter itself does not install or import the `vllm` Python package.
+
+The model is required because it must match the identifier accepted by the running server: normally the model passed to `vllm serve`, or a name configured with vLLM's `--served-model-name` option. The subclass supplies vLLM's conventional port and provider-specific environment variables and reports `vllm` in events and metrics.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="VLLMLLM parameters">
+    <ApiField name="model" type="str" required>
+      Model identifier exposed by the vLLM server. It must match the served model name.
+    </ApiField>
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Resolution order is the argument, <code>VLLM_URL</code>, then <code>http://localhost:8000/v1</code>.
+    </ApiField>
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      Optional bearer token. Falls back to <code>VLLM_API_KEY</code>; no placeholder credential is added when both are absent.
+    </ApiField>
+    <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
+      Extra request headers merged with the inherited JSON defaults and optional authorization header.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Generation parameters forwarded to vLLM and merged over <code>temperature=1.0</code>.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
+      Opt into native Chat Completions tools only after the vLLM server and selected model are configured for automatic tool choice.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Native tool setup">
+  The default portable JSON action mode needs no vLLM tool parser. Before setting <code>supports_tool_calling=True</code>, start vLLM with <code>--enable-auto-tool-choice</code> and a model-appropriate <code>--tool-call-parser</code>, and ensure the selected model and chat template support tools.
+</ApiCallout>
+
+<ApiSection title="Examples">
+
+```python
+from protolink.llms.server import VLLMLLM
+
+# Start the model server separately: vllm serve Qwen/Qwen3-8B
+llm = VLLMLLM(model="Qwen/Qwen3-8B")
 ```
 
 </ApiSection>
@@ -2637,6 +2703,7 @@ LLMProvider: TypeAlias = Literal[
     "mock",
     "ollama",
     "openai-compatible",
+    "vllm",
 ]
 
 ReasoningLevel: TypeAlias = Literal["none", "low", "medium", "high"]

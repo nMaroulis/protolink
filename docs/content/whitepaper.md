@@ -417,7 +417,7 @@ event loop when useful for notebooks, tests, and multi-agent scripts.
 ProtoLink's LLM layer supports API models, server-hosted models, and local
 models behind a consistent interface. The agent runtime does not care whether a
 model is OpenAI, Anthropic, Gemini, DeepSeek, Grok, Hugging Face, Ollama,
-llama.cpp, LM Studio, OpenAI-compatible, mock, or custom.
+llama.cpp, LM Studio, vLLM, OpenAI-compatible, mock, or custom.
 
 The deeper idea is not just provider switching. It is action normalization.
 

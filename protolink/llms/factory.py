@@ -20,6 +20,7 @@ class LLMProvider(str, Enum):
     OLLAMA = "ollama"
     OPENAI = "openai"
     OPENAI_COMPATIBLE = "openai-compatible"
+    VLLM = "vllm"
     MOCK = "mock"
 
 
@@ -43,6 +44,7 @@ class LLMFactory:
         LLMProvider.OLLAMA.value: "protolink.llms.server.ollama_client.OllamaLLM",
         LLMProvider.OPENAI.value: "protolink.llms.api.openai_client.OpenAILLM",
         LLMProvider.OPENAI_COMPATIBLE.value: "protolink.llms.server.openai_compatible_client.OpenAICompatibleLLM",
+        LLMProvider.VLLM.value: "protolink.llms.server.vllm_client.VLLMLLM",
         LLMProvider.MOCK.value: "protolink.llms.mock_client.MockLLM",
     }
 
@@ -53,7 +55,7 @@ class LLMFactory:
 
         Args:
             provider (str | LLMProvider): The name of the LLM provider
-                (e.g., "openai", "ollama", "lmstudio", "openai-compatible").
+                (e.g., "openai", "ollama", "lmstudio", "vllm").
             **kwargs: Additional keyword arguments passed to the LLM constructor.
 
         Returns:

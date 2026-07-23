@@ -50,6 +50,7 @@ LLMProvider: TypeAlias = Literal[
     "ollama",
     "openai",
     "openai-compatible",
+    "vllm",
 ]
 
 LLMType: TypeAlias = Literal["api", "local", "server"]
