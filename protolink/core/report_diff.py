@@ -449,27 +449,29 @@ def _diff_values(
     differences: list[RunReportDifference],
 ) -> None:
     if isinstance(baseline, dict) and isinstance(candidate, dict):
-        keys = sorted(set(baseline).union(candidate))
+        baseline_dict = cast(dict[str, Any], baseline)
+        candidate_dict = cast(dict[str, Any], candidate)
+        keys = sorted(set(baseline_dict).union(candidate_dict))
         for key in keys:
             child_path = (*path, key)
-            if key not in baseline:
+            if key not in baseline_dict:
                 _append_difference(
                     differences,
                     path=child_path,
                     kind="added",
-                    candidate=candidate[key],
+                    candidate=candidate_dict[key],
                 )
-            elif key not in candidate:
+            elif key not in candidate_dict:
                 _append_difference(
                     differences,
                     path=child_path,
                     kind="removed",
-                    baseline=baseline[key],
+                    baseline=baseline_dict[key],
                 )
             else:
                 _diff_values(
-                    baseline[key],
-                    candidate[key],
+                    baseline_dict[key],
+                    candidate_dict[key],
                     path=child_path,
                     config=config,
                     differences=differences,

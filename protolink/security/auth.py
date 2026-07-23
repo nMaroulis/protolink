@@ -281,7 +281,7 @@ class BearerTokenAuth(Authenticator):
             expected = hmac.new(
                 self.secret.encode("utf-8"),
                 signing_input,
-                _HMAC_JWT_ALGORITHMS[alg],
+                _HMAC_JWT_ALGORITHMS[self.algorithm],
             ).digest()
             expected_segment = base64.urlsafe_b64encode(expected).rstrip(b"=")
             if not hmac.compare_digest(expected_segment, signature_segment.encode("ascii")):
