@@ -109,9 +109,8 @@ class RunReplayView:
 class RunDiffView:
     """Human-facing comparison of two stored run reports.
 
-    ``RunDiffView`` keeps store lookup state separate from the core diff
-    contract. A missing report is therefore distinguishable from a valid
-    comparison that found behavioral differences.
+    ``RunDiffView`` keeps store lookup state separate from the core diff contract. A missing report is therefore
+    distinguishable from a valid comparison that found behavioral differences.
     """
 
     baseline_run_id: str

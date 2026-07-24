@@ -1,8 +1,7 @@
 """Agent inspection actions used by the local dashboard.
 
-These helpers keep network-facing dashboard actions separate from HTML
-rendering. They intentionally use the Python standard library so the devtools
-surface remains available without adding a frontend or HTTP-client dependency.
+These helpers keep network-facing dashboard actions separate from HTML rendering. They intentionally use the Python
+standard library so the devtools surface remains available without adding a frontend or HTTP-client dependency.
 """
 
 from __future__ import annotations
@@ -24,8 +23,8 @@ def ping_agent(agent_url: str, *, timeout: float = 3.0) -> dict[str, Any]:
         timeout: HTTP timeout in seconds.
 
     Returns:
-        JSON-compatible probe details including success state, status code,
-        measured latency, and the status URL that was called.
+        JSON-compatible probe details including success state, status code, measured latency, and the status URL that
+        was called.
 
     Raises:
         ValueError: If ``agent_url`` is not an HTTP(S) URL.
@@ -75,9 +74,8 @@ def chat_with_agent(
         timeout: HTTP timeout in seconds.
 
     Returns:
-        JSON-compatible chat response. Successful Protolink chat endpoints
-        return ``{"response": "..."}``; error responses are normalized into
-        ``{"error": "..."}``.
+        JSON-compatible chat response. Successful Protolink chat endpoints return ``{"response": "..."}``; error
+        responses are normalized into ``{"error": "..."}``.
 
     Raises:
         ValueError: If ``agent_url`` is not HTTP(S) or ``message`` is empty.

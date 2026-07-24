@@ -1755,9 +1755,8 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         Args:
             yaml_str: The YAML string containing agent configuration.
-            **overrides: Override specific parameters passed to the Agent constructor.
-                An explicit ``policy`` takes precedence over serialized first-party
-                policy data; custom policies and ``approval_handler`` values are
+            **overrides: Override specific parameters passed to the Agent constructor. An explicit ``policy`` takes
+                precedence over serialized first-party policy data; custom policies and ``approval_handler`` values are
                 runtime-only.
         """
         import yaml
@@ -1773,9 +1772,8 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         Args:
             filepath: Path to the YAML file.
-            **overrides: Override specific parameters passed to the Agent constructor.
-                An explicit ``policy`` takes precedence over serialized first-party
-                policy data; custom policies and ``approval_handler`` values are
+            **overrides: Override specific parameters passed to the Agent constructor. An explicit ``policy`` takes
+                precedence over serialized first-party policy data; custom policies and ``approval_handler`` values are
                 runtime-only.
         """
         with open(filepath, encoding="utf-8") as f:

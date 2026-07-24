@@ -80,8 +80,7 @@ class SyncAgent:
     def cancel_task(self, task_id: str, reason: str | None = None) -> Task:
         """Synchronously request cancellation of an active local task.
 
-        The active task must be running on another coroutine or Agent background
-        loop; a synchronous caller cannot cancel work while blocked inside that
-        same call stack.
+        The active task must be running on another coroutine or Agent background loop; a synchronous caller cannot
+        cancel work while blocked inside that same call stack.
         """
         return asyncio.run(self._agent.cancel_task(task_id, reason))
