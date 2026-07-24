@@ -34,14 +34,14 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.6.7] - 2026-07-21
+## [0.6.7] - TBD
 
 :::note Latest release
 
 This patch release hardens the controlled inference path from task admission through provider calls, tool execution,
 delegation, streaming finalization, and observability. It keeps the portable JSON action protocol as the default for
 local and smaller models while making malformed-output recovery, prompt metadata, budgets, retries, and task lifecycle
-behavior more deterministic. Adds vLLM client support natively.
+behavior more deterministic. Adds vLLM client support natively. Also Adds the AI Courtroom Example.
 
 :::
 
@@ -66,7 +66,7 @@ behavior more deterministic. Adds vLLM client support natively.
   task-wide budgets, legacy override signatures, telemetry failures, provider retries, invalid tool arguments,
   deterministic prompts, strict JSON extraction, Anthropic action handling, and parallel native tool calls.
 - Added vLLM client `VLLMLLM`, which inherits `OpenAICompatibleLLM`.
-
+- **AI Courtroom** example. A fun and philosophical example that showcases autonomous **A2A** communication.
 
 ### Changed
 
