@@ -569,7 +569,11 @@ Create an LLM adapter without importing the selected provider until it is needed
       Provider selector. Supported string values are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, <code>openai-compatible</code>, and <code>vllm</code>.
     </ApiField>
     <ApiField name="**kwargs" type="Any">
-      Forwarded to the selected adapter constructor. Two factory-only keywords are also recognized: <code>metrics_profile</code> configures model metrics after construction, and <code>metrics_enabled</code> enables or disables their emission.
+      Forwarded to the selected adapter constructor. Three factory-only keywords are also recognized:
+      <code>metrics_profile</code> configures model metrics after construction,
+      <code>metrics_enabled</code> enables or disables their emission, and
+      <code>max_parse_failures</code> sets the validated consecutive action-parse failure limit without forwarding
+      that ProtoLink-only option to the provider.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -585,7 +589,11 @@ Create an LLM adapter without importing the selected provider until it is needed
 <ApiSection title="Raises">
   <ApiFields ariaLabel="create_llm errors">
     <ApiField name="ValueError">
-      Raised when the provider string is unknown.
+      Raised when the provider string is unknown or <code>max_parse_failures</code> is outside the supported range.
+    </ApiField>
+    <ApiField name="TypeError">
+      Raised when <code>max_parse_failures</code> is not an integer. Boolean values are not accepted as integers for
+      this option.
     </ApiField>
     <ApiField name="ImportError">
       Raised when the selected adapter requires an optional dependency that is not installed.
@@ -610,8 +618,12 @@ llm = create_llm(
     base_url="http://localhost:1234/v1",
     model="local-model",
     metrics_profile=LLMModelProfile(context_window=32_768),
+    max_parse_failures=4,
 )
 ```
+
+`max_parse_failures` defaults to `3` and accepts integers from `1` through `10`. Keep it as a top-level factory
+argument. Do not place it in `model_params`, whose entries are provider generation options.
 
 </ApiSection>
 
@@ -697,6 +709,11 @@ Abstract provider-neutral model contract. Subclasses implement text generation a
     </ApiField>
     <ApiField name="metrics_enabled" type="bool">
       Whether inference may emit metrics when an observer is attached.
+    </ApiField>
+    <ApiField name="max_parse_failures" type="int">
+      Maximum consecutive JSON-action parsing or validation failures allowed during one inference run. Defaults to
+      <code>3</code> and accepts values from <code>1</code> through the ten-step inference ceiling. This runtime
+      control is deliberately separate from provider generation parameters.
     </ApiField>
     <ApiField name="sync" type="SyncLLM">
       Blocking wrapper for <code>infer()</code>. Do not use it inside an active event loop.
@@ -1018,16 +1035,126 @@ You have already performed this action. The result is in your context.
 Proceed with the task: produce a final response or choose a different action.
 ```
 
-#### 2. Parse-failure circuit breaker
+#### 2. Action parsing and the parse-failure circuit breaker
 
-JSON-mode parsing failures are recoverable at first. The fallback parser accepts strict JSON directly or exactly one balanced JSON object embedded in prose or a code fence. Its linear scanner understands quoted and escaped braces and rejects multiple valid objects as ambiguous. Raw responses and parsed payloads use deterministic, 2,000-character head-and-tail previews, preventing an oversized valid or invalid action from flooding logs and the next correction prompt while preserving field-level validation errors.
+The parser is a security and interoperability boundary between untrusted model output and the runtime dispatcher. It
+does not execute a tool or contact an Agent while trying to understand malformed text. It first produces one typed
+`FinalAction`, `ToolCallAction`, or `AgentCallAction`; only that validated action can continue to policy, budget, and
+dispatch checks.
 
-The runtime describes the exact parsing or validation error and lets the model try again. Correction examples mention only actions that are actually available in the current run, which keeps the prompt shorter and avoids inviting a small model to call an unavailable tool or Agent. After three consecutive failures, ProtoLink raises `RuntimeError` instead of consuming the full inference-step budget.
+Provider-native tool calls and portable JSON actions enter this boundary differently:
+
+- A native-capable adapter translates the provider's structured tool event into the same Pydantic action models.
+- A JSON-mode adapter passes the complete model text through the shared prompt-fallback parser.
+
+The JSON path follows a deliberately conservative pipeline:
+
+1. **Decode the untouched whole response.** Valid JSON is never rewritten first. This preserves literal text such as
+   `"<think>keep this</think>"` inside a valid final response.
+2. **Recover syntax-only wrappers when whole-response decoding fails.** ProtoLink can unwrap a complete JSON code
+   fence, ignore one complete leading `<think>` or `<thought>` block, remove trailing commas outside JSON strings, or
+   extract exactly one balanced object embedded in surrounding prose. The balanced scanner tracks nesting, quoted
+   strings, and escapes in one pass.
+3. **Normalize only deterministic response shapes.** A structured value placed in `FinalAction.content` can be
+   serialized losslessly as JSON text. A non-empty application object that omits the outer action envelope can become
+   final content only when it contains no ProtoLink action-envelope fields. Existing legacy tool-call shorthands are
+   repaired only when the tool and optional Agent target are unambiguous and their arguments are literal data.
+4. **Validate the complete action with Pydantic.** Required fields, discriminated action types, forbidden extra fields,
+   delegated-action combinations, and content types are checked before the infer loop sees the result.
+
+Common small-model variations therefore have explicit outcomes:
+
+| Model output | Parser behavior |
+|--------------|-----------------|
+| `{"type":"final","content":{"answer":42}}` | Serializes the object to JSON text and returns a `FinalAction`. |
+| `{"answer":42,"sources":["doc-1"]}` | Wraps the application object as final JSON content because no action-envelope field is present. |
+| ```` ```json {"type":"final","content":"done"} ``` ```` | Unwraps the complete fence and validates the action. |
+| `Result: {"type":"final","content":"done"}` | Extracts and validates the single balanced object. |
+| `{"type":"final","content":"done",}` | Removes the unambiguous trailing comma outside strings, then validates. |
+| A complete leading `<think>...</think>` followed by one action | Ignores the reasoning wrapper only after untouched JSON decoding failed. |
+
+The parser intentionally refuses cases where repair would require choosing or inventing meaning:
+
+- two or more valid top-level JSON objects;
+- an incomplete leading reasoning wrapper;
+- an empty object or a non-object action payload;
+- an explicit unknown action type;
+- a tool- or Agent-shaped object with a missing action type;
+- a missing tool, target, prompt, or argument that cannot be inferred uniquely; or
+- an action found only inside a private reasoning wrapper with no public action after it.
+
+Raw responses and parsed payloads use deterministic, 2,000-character head-and-tail previews in diagnostics. This keeps
+an oversized valid or invalid response from flooding logs or the next correction prompt while retaining field paths
+and enough beginning/end context to diagnose truncation.
+
+##### Correction attempts
+
+Parsing and action-schema failures are recoverable inside `infer()`. ProtoLink emits an `llm_parse_error` event,
+describes the exact failure in conversation history, and asks the model for one corrected action. Correction examples
+mention only action kinds available in the current run, keeping the prompt smaller and avoiding suggestions that a
+small model call an unavailable tool or Agent.
 
 ```text
 Your previous response could not be parsed as a valid action.
 Correct the reported fields and return exactly one supported action.
 ```
+
+`max_parse_failures` controls the consecutive failure circuit breaker. It defaults to `3`, accepts integers from `1`
+through `10`, and resets after a successfully validated action:
+
+```python
+from protolink import create_llm
+
+llm = create_llm(
+    "ollama",
+    base_url="http://localhost:11434",
+    model="qwen3",
+    max_parse_failures=4,
+)
+```
+
+Pass this option directly to `create_llm()`, or assign `llm.max_parse_failures` after construction. Do not put it in
+`model_params`: those values are provider generation settings and are forwarded to the selected backend, while the
+parse limit is ProtoLink runtime configuration.
+
+The parse limit counts consecutive model action proposals that fail JSON decoding or action validation. It does not
+configure transient HTTP/provider retries, and it does not validate an application-specific schema inside final text.
+Those are separate boundaries whose retry budgets can multiply. Raising the limit can help a smaller model
+self-correct, but repeating a deterministic shape error is better handled by a lossless normalization or a clearer
+prompt than by unlimited retries.
+
+##### The action envelope is not the application schema
+
+`FinalAction.content` is user-facing text. ProtoLink validates the outer action but cannot know whether that text must
+also satisfy a domain-specific JSON schema. If an application expects a decision, invoice, ballot, or other structured
+result, it should validate `part.content` separately and apply only domain-safe recovery:
+
+```python
+from pydantic import BaseModel, Field
+
+class Decision(BaseModel):
+    label: str
+    confidence: float = Field(ge=0, le=1)
+
+part = await llm.infer(
+    query="Return the requested decision as JSON in final content.",
+    tools={},
+)
+decision = Decision.model_validate_json(part.content)
+```
+
+Do not infer missing high-impact fields from prose merely to make validation pass. A harmless public statement may
+permit a text fallback; a payment instruction, tool target, categorical decision, or authorization result normally
+should fail closed and request a new structured response.
+
+:::caution[Parsing validates action shape, not semantic truth or authorization]
+
+A hallucinated tool call can be perfectly valid JSON with the correct field types. Parsing proves that the requested
+action is unambiguous and structurally valid; it does not prove that the action is factually correct, appropriate, or
+authorized. Keep tools narrowly allowlisted, use strict argument schemas and capability policies, require approval for
+important operations, enforce budgets and idempotency, and validate external identifiers at the execution boundary.
+
+:::
 
 #### 3. Self-correcting error recovery
 
@@ -2647,6 +2774,12 @@ LLM failures can originate at several different boundaries:
 - **Guardrail errors**: repeated parse failures or the ten-step safety limit produces `RuntimeError`.
 
 Recoverable action mistakes are normally injected back into history so the model can self-correct. Application-level exception handling should focus on provider failures and runtime boundaries that cannot be repaired inside the loop.
+
+A direct `call_action()` or `call_action_stream()` invocation raises `ValueError` when its one response cannot become a
+valid action. `infer()` catches that validation failure, emits `llm_parse_error`, requests a correction, and raises
+`RuntimeError` only when `max_parse_failures` consecutive proposals have failed. Inspect the final field-level
+diagnostic before increasing the limit: repeated syntax drift may benefit from another attempt, while an unavailable
+tool, ambiguous action, or application-schema mismatch needs a prompt, capability, or application-layer fix.
 
 ```python
 import asyncio

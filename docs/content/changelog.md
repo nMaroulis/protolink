@@ -66,7 +66,9 @@ behavior more deterministic. Adds vLLM client support natively. Also Adds the AI
   task-wide budgets, legacy override signatures, telemetry failures, provider retries, invalid tool arguments,
   deterministic prompts, strict JSON extraction, Anthropic action handling, and parallel native tool calls.
 - Added vLLM client `VLLMLLM`, which inherits `OpenAICompatibleLLM`.
-- **AI Courtroom** example. A fun and philosophical example that showcases autonomous **A2A** communication.
+- Added validated `create_llm(..., max_parse_failures=N)` runtime configuration. The limit is kept separate from
+  provider model parameters, so ProtoLink retry controls are never forwarded to Ollama, OpenAI, or compatible servers
+  as generation options.
 
 ### Changed
 
@@ -87,6 +89,11 @@ behavior more deterministic. Adds vLLM client support natively. Also Adds the AI
 - Embedded JSON recovery now performs a linear, quote- and escape-aware scan and accepts exactly one valid top-level
   object. Ambiguous multiple objects are rejected; raw-response and parsed-payload diagnostics use deterministic,
   bounded head-and-tail previews while preserving field-level validation errors.
+- Prompt-fallback parsing now conservatively normalizes common small-model response drift: structured
+  `FinalAction.content` values are serialized losslessly, and a direct application object can become final content only
+  when it contains no ProtoLink action-envelope fields. Full JSON fences, complete leading reasoning wrappers, and
+  trailing commas receive syntax-only recovery; ambiguous objects, incomplete reasoning wrappers, and action-shaped
+  payloads with missing or unknown types still fail validation.
 - Agent discovery is now a best-effort delegation affordance: a Registry outage no longer prevents otherwise-local
   inference. Discovered ancestors are removed from the prompt, model-originated direct URL delegation is rejected, and
   delegation cycles are stopped before dispatch.
@@ -129,6 +136,8 @@ behavior more deterministic. Adds vLLM client support natively. Also Adds the AI
   by stable item ID.
 - Fixed partial-history persistence failures so they are logged without replacing an active budget, cancellation, or
   execution exception after a completed side effect.
+- Fixed repeated small-model/Ollama parse failures when an otherwise-valid final action placed the requested
+  application object directly in `content` instead of encoding it as a string.
 
 ### Compatibility Notes
 
