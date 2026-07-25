@@ -11,24 +11,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-ACTOR_LABELS = {
-    "judge": "Judge Imani Quill",
-    "manufacturer": "Rowan Hale",
-    "victim_lawyer": "Amara Bell",
-    "software_engineer": "Dr. Nia Sol",
-    "safety_regulator": "Elias Trent",
-    "insurance": "Dana Pierce",
-    "accident_investigator": "Dr. Amina Kade",
-}
-ACTOR_ROLES = {
-    "judge": "Tribunal chair",
-    "manufacturer": "Manufacturer representative",
-    "victim_lawyer": "Victim-family counsel",
-    "software_engineer": "Software engineer",
-    "safety_regulator": "Safety regulator",
-    "insurance": "Insurer",
-    "accident_investigator": "Accident investigator",
-}
+from .case_data import ACTOR_PROFILES, public_participant_profile
+
 COLORS = (
     "#56c8c8",
     "#f2b65f",
@@ -330,15 +314,19 @@ def _replay_shell() -> str:
       aria-label="Active agent-to-agent communication network"></svg>
     <div id="replay-status" class="sr-only" aria-live="polite"></div>
   </div>
-  <article class="message-card">
+  <article class="message-card" aria-labelledby="replay-route">
     <div class="message-kicker" id="replay-kicker">Select an event</div>
     <h3 id="replay-route">Sender → receiver</h3>
-    <div class="message-block"><small>PUBLIC MESSAGE</small><p id="replay-message"></p></div>
-    <div class="message-block" id="action-wrap"><small>AUTHORED ACTION / QUESTION</small>
-      <p id="replay-action"></p></div>
-    <div class="message-block" id="reply-wrap"><small>PUBLIC REPLY</small><p id="replay-reply"></p></div>
-    <div class="register-change" id="replay-change">No decision-register update</div>
-    <div class="protocol-row" id="replay-protocol"></div>
+    <p class="message-people" id="replay-people">Participant details</p>
+    <div class="message-scroll" id="replay-transcript" role="region" tabindex="0"
+      aria-label="Current replay event transcript">
+      <div class="message-block"><small>PUBLIC MESSAGE</small><p id="replay-message"></p></div>
+      <div class="message-block" id="action-wrap"><small>AUTHORED ACTION / QUESTION</small>
+        <p id="replay-action"></p></div>
+      <div class="message-block" id="reply-wrap"><small>PUBLIC REPLY</small><p id="replay-reply"></p></div>
+      <div class="register-change" id="replay-change">No decision-register update</div>
+      <div class="protocol-row" id="replay-protocol"></div>
+    </div>
   </article>
 </div>
 <div class="juror-bars" id="replay-bars" aria-label="Current juror guilt registers"></div>
@@ -361,7 +349,7 @@ def _replay_payload(result: Mapping[str, Any]) -> dict[str, Any]:
     actor_ids = list(
         dict.fromkeys(
             [
-                *ACTOR_LABELS,
+                *ACTOR_PROFILES,
                 *jurors,
                 *(_text(event.get("sender")) for event in events),
                 *(_text(event.get("receiver")) for event in events),
@@ -375,6 +363,8 @@ def _replay_payload(result: Mapping[str, Any]) -> dict[str, Any]:
             "id": actor_id,
             "label": _label(actor_id, result),
             "role": _actor_role(actor_id, result),
+            "age": _actor_age(actor_id, result),
+            "gender": _actor_gender(actor_id, result),
             "juror": actor_id in jurors,
             "color": _color(actor_id, actor_ids),
             "x": positions[actor_id][0],
@@ -586,7 +576,7 @@ def _comparison_headline(indexed: Mapping[str, Mapping[str, Any]]) -> tuple[str,
         return "Independent and mesh ended with different verdicts.", (
             f"In these seeded runs, independent ended {left_tally} {left}; mesh ended {right_tally} {right}."
         )
-    return "Mesh changed who spoke to whom—not the final verdict.", (
+    return "Mesh changed who spoke to whom, not the final verdict.", (
         f"Independent ended {left_tally}; mesh ended {right_tally}. Both were {right}."
     )
 
@@ -788,9 +778,19 @@ def _jury_rows(result: Mapping[str, Any]) -> str:
         baseline = _juror_baseline(state)
         final = _number(state.get("guilt_probability"))
         delta = final - baseline if final is not None and baseline is not None else None
+        profile = _participant_profile(juror_id, result)
+        details = " · ".join(
+            item
+            for item in (
+                _text(state.get("style") or profile.get("style")) or "Juror",
+                f"age {_integer(profile.get('age'))}" if profile.get("age") is not None else "",
+                _text(profile.get("gender")),
+            )
+            if item
+        )
         rows.append(
             f'<div class="jury-row" style="--series:{_color(juror_id, actor_ids)}"><i></i><div><strong>'
-            f"{_h(state.get('label', juror_id))}</strong><small>{_h(state.get('style', 'Juror'))}</small></div>"
+            f"{_h(state.get('label', juror_id))}</strong><small>{_h(details)}</small></div>"
             f"<b>{_format_number(baseline)} → {_format_number(final)}"
             f"<small>{_format_number(delta, signed=True)} points</small></b>"
             f'<span class="vote">{_h(_verdict_text(state.get("vote")))}</span></div>'
@@ -1024,17 +1024,45 @@ def _public_response(response: Mapping[str, Any]) -> str:
 
 def _label(agent_id: Any, result: Mapping[str, Any]) -> str:
     key = _text(agent_id)
-    if key in ACTOR_LABELS:
-        return ACTOR_LABELS[key]
+    profile = _participant_profile(key, result)
+    if profile:
+        return _text(profile.get("label")) or key
     state = _jurors(result).get(key)
     return _text(state.get("label")) if state else key.replace("_", " ").title()
 
 
 def _actor_role(agent_id: str, result: Mapping[str, Any]) -> str:
-    if agent_id in ACTOR_ROLES:
-        return ACTOR_ROLES[agent_id]
+    profile = _participant_profile(agent_id, result)
+    if profile:
+        style = _text(profile.get("style"))
+        role = _text(profile.get("role"))
+        return f"{role} · {style}" if role and style else role or style or "Agent"
     state = _jurors(result).get(agent_id)
     return _text(state.get("style")) if state else "Agent"
+
+
+def _actor_age(agent_id: str, result: Mapping[str, Any]) -> int | None:
+    value = _participant_profile(agent_id, result).get("age")
+    return _integer(value) if value is not None else None
+
+
+def _actor_gender(agent_id: str, result: Mapping[str, Any]) -> str:
+    return _text(_participant_profile(agent_id, result).get("gender"))
+
+
+def _participant_profile(agent_id: str, result: Mapping[str, Any]) -> Mapping[str, Any]:
+    profile: dict[str, Any] = {}
+    try:
+        profile.update(public_participant_profile(agent_id))
+    except KeyError:
+        pass
+    state = _jurors(result).get(agent_id)
+    if state:
+        profile.update(state)
+    recorded = _mapping(_mapping(result.get("participants")).get(agent_id))
+    if recorded:
+        profile.update(recorded)
+    return profile
 
 
 def _short_label(agent_id: str, result: Mapping[str, Any]) -> str:
@@ -1172,6 +1200,7 @@ _REPLAY_SCRIPT = r"""
   const svgNS = "http://www.w3.org/2000/svg";
   const elements = {
     svg: $("replay-network"), kicker: $("replay-kicker"), route: $("replay-route"),
+    people: $("replay-people"), transcript: $("replay-transcript"),
     message: $("replay-message"), action: $("replay-action"), actionWrap: $("action-wrap"),
     reply: $("replay-reply"), replyWrap: $("reply-wrap"), change: $("replay-change"),
     protocol: $("replay-protocol"), bars: $("replay-bars"), status: $("replay-status"),
@@ -1189,6 +1218,11 @@ _REPLAY_SCRIPT = r"""
     parent.appendChild(node);
   };
   const actor = (id) => data.actors[id] || {label: id, role: "Agent", x: 360, y: 200, color: "#b3bfce"};
+  const actorDetails = (item) => [
+    item.role,
+    Number.isFinite(item.age) ? `age ${item.age}` : "",
+    item.gender
+  ].filter(Boolean).join(" · ");
   function renderNetwork(frame, absoluteIndex) {
     elements.svg.replaceChildren();
     const previous = allFrames.slice(Math.max(0, absoluteIndex - 3), absoluteIndex);
@@ -1209,7 +1243,7 @@ _REPLAY_SCRIPT = r"""
       group.appendChild(circle);
       appendSvgText(group, item.label.split(" ")[0], {"text-anchor": "middle", y: 4});
       const title = svgElement("title");
-      title.textContent = `${item.label} · ${item.role}`;
+      title.textContent = `${item.label} · ${actorDetails(item)}`;
       group.appendChild(title);
       elements.svg.appendChild(group);
     });
@@ -1237,6 +1271,7 @@ _REPLAY_SCRIPT = r"""
       elements.status.textContent = "No replayable messages.";
       elements.kicker.textContent = "FILTERED REPLAY";
       elements.route.textContent = "No peer messages in this condition";
+      elements.people.textContent = "The current filter has no matching sender or receiver.";
       elements.message.textContent = "Turn off “Peer only” to replay the public tribunal record.";
       elements.actionWrap.hidden = true;
       elements.replyWrap.hidden = true;
@@ -1248,6 +1283,7 @@ _REPLAY_SCRIPT = r"""
       elements.prev.disabled = true;
       elements.next.disabled = true;
       elements.play.disabled = true;
+      elements.transcript.scrollTop = 0;
       return;
     }
     elements.play.disabled = false;
@@ -1257,6 +1293,7 @@ _REPLAY_SCRIPT = r"""
     const source = actor(frame.sender), target = actor(frame.receiver);
     elements.kicker.textContent = `A2A #${String(frame.sequence).padStart(3, "0")} · ${frame.phase} · ${frame.kind}`;
     elements.route.textContent = `${source.label} → ${target.label}`;
+    elements.people.textContent = `${actorDetails(source)} → ${actorDetails(target)}`;
     elements.message.textContent = frame.message || "No public message text.";
     const action = frame.authored_action;
     elements.actionWrap.hidden = !action;
@@ -1299,6 +1336,7 @@ _REPLAY_SCRIPT = r"""
     elements.status.textContent =
       `${source.label} sent message ${cursor + 1} of ${indices.length} to ${target.label}. ` +
       elements.change.textContent;
+    elements.transcript.scrollTop = 0;
     renderNetwork(frame, absoluteIndex);
     renderBars(frame.juror_states);
   }
@@ -1337,7 +1375,8 @@ _REPLAY_SCRIPT = r"""
     render();
   });
   document.addEventListener("keydown", (event) => {
-    if (event.target?.matches("input, select, textarea, button")) return;
+    if (event.target?.matches("input, select, textarea, button") ||
+        event.target?.closest?.("#replay-transcript")) return;
     if (event.key === "ArrowLeft") { stop(); cursor -= 1; render(); }
     if (event.key === "ArrowRight") { stop(); cursor += 1; render(); }
     if (event.key === " ") { event.preventDefault(); play(); }
@@ -1436,13 +1475,25 @@ a { color: inherit; }
   margin-bottom: 17px;
 }
 .section-head p { max-width: 470px; margin-bottom: 0; font-size: .82rem; }
-.replay-layout { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; }
+.replay-layout {
+  --replay-block-size: 30rem;
+  display: grid;
+  grid-template-columns: 1.2fr .8fr;
+  align-items: stretch;
+  gap: 16px;
+}
+@supports (height: 1svh) {
+  .replay-layout { --replay-block-size: clamp(26rem, 55svh, 30rem); }
+}
 .replay-stage, .message-card {
+  min-width: 0;
+  height: var(--replay-block-size);
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface2);
 }
-#replay-network { width: 100%; height: auto; min-height: 410px; }
+.replay-stage { overflow: hidden; }
+#replay-network { display: block; width: 100%; height: 100%; min-height: 0; }
 .replay-edge { stroke: var(--muted); stroke-width: 2; }
 .replay-edge.trail { opacity: .18; }
 .replay-edge.active {
@@ -1458,7 +1509,26 @@ a { color: inherit; }
   transition: r .2s;
 }
 .replay-actor text { fill: var(--ink); font-size: 10px; }
-.message-card { padding: 20px; }
+.message-card {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  overflow: hidden;
+  padding: 20px;
+}
+.message-card h3 { margin-bottom: 5px; overflow-wrap: anywhere; }
+.message-people {
+  margin: 0;
+  color: var(--muted);
+  font-size: .7rem;
+  overflow-wrap: anywhere;
+}
+.message-scroll {
+  min-height: 0;
+  padding-right: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .message-kicker, .message-block small {
   color: var(--gold);
   font-size: .68rem;
@@ -1470,14 +1540,14 @@ a { color: inherit; }
   border-left: 2px solid var(--gold);
   background: rgba(13, 17, 24, .4);
 }
-.message-block p { margin: 5px 0 0; white-space: pre-wrap; }
+.message-block p { margin: 5px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .register-change {
   padding: 12px;
   border-radius: 10px;
   background: rgba(107, 208, 168, .1);
   font-variant-numeric: tabular-nums;
 }
-.protocol-row { margin-top: 10px; color: var(--muted); font-size: .7rem; }
+.protocol-row { margin-top: 10px; color: var(--muted); font-size: .7rem; overflow-wrap: anywhere; }
 .juror-bars {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
@@ -1509,7 +1579,8 @@ a { color: inherit; }
   color: var(--ink);
 }
 .replay-controls button:hover { border-color: var(--gold); }
-button:focus-visible, select:focus-visible, input:focus-visible, .hero-actions a:focus-visible {
+button:focus-visible, select:focus-visible, input:focus-visible, .message-scroll:focus-visible,
+.hero-actions a:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
@@ -1646,6 +1717,14 @@ footer {
 }
 @media (max-width: 850px) {
   .hero, .replay-layout, .split { grid-template-columns: 1fr; }
+  .replay-stage {
+    height: auto;
+    aspect-ratio: 720 / 410;
+  }
+  .message-card { height: 30rem; }
+  @supports (height: 1svh) {
+    .message-card { height: clamp(22rem, 62svh, 30rem); }
+  }
   .metric-grid, .treatment-ladder { grid-template-columns: repeat(2, 1fr); }
   .turning-grid { grid-template-columns: 1fr; }
   .section-head { align-items: start; flex-direction: column; }

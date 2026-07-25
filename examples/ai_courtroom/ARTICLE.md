@@ -1,6 +1,6 @@
-# Can Communication Make AI Agents Smarter Than Independent Voting?
+# Five AI Jurors, One Case, Two Verdicts
 
-## An observable AI Liability Tribunal built with ProtoLink
+## Can communication make AI agents smarter than independent voting? An observable A2A experiment built with ProtoLink
 
 <!--
 FIGURE 1 SUGGESTION — Article hero
@@ -17,17 +17,33 @@ Alt text: “An AI liability case connected to a replayable network of tribunal
 agents and jurors whose public verdicts change after direct messages.”
 -->
 
-Most multi-agent demos show the answer, but hide the interesting part.
+In the deterministic seed-7 reference replay, five AI jurors heard the same
+case and the same seven exhibits.
+
+When they were not allowed to speak to one another, they voted **2–3 not
+guilty**. When the same panel could communicate directly, they voted **3–2
+guilty**.
+
+The case did not change. The evidence did not change. The juror identities did
+not change. What changed was who could talk to whom.
+
+In the direct-communication run, one public challenge preceded the only
+majority-changing vote flip. That does not prove the message caused the
+revision, and it certainly does not prove that mesh communication is generally
+better. But it creates something much more useful than a final answer: an
+observable path to a different collective outcome.
+
+That was the experiment I wanted to build:
+
+> If the same AI jurors hear the same evidence, does allowing them to talk
+> produce a different decision than asking them to vote independently?
+
+Most multi-agent demos show the answer while hiding the interesting part.
 
 A coordinator calls several models, collects their responses, and produces a
 summary. The result may be useful, yet it is hard to tell whether the agents
 actually influenced one another, who changed their mind, or whether
 “multi-agent” meant little more than running several prompts in parallel.
-
-I wanted to make communication the experiment:
-
-> If the same AI jurors hear the same evidence, does allowing them to talk
-> produce a different decision than asking them to vote independently?
 
 The result is **The Ghost in Lane Four**, a fictional AI Liability Tribunal
 built on ProtoLink. Lawyers, technical witnesses, a regulator, an insurer, an
@@ -39,13 +55,6 @@ address.
 The interface then replays those exchanges alongside the jurors’ changing
 public decision registers. Instead of merely saying that a panel deliberated,
 the demo lets you watch it happen.
-
-In the deterministic seed-7 replay, the five jurors vote **2–3 not guilty**
-when isolated from one another and **3–2 guilty** when direct mesh
-communication is enabled. One observable challenge precedes the
-majority-changing vote flip. That contrast is an intentionally designed
-fixture—not evidence that mesh is generally superior—but it gives the A2A
-system something concrete and inspectable to explain.
 
 The courtroom is the setting. The real subject is what becomes possible when
 agent-to-agent communication is a first-class, observable part of an
@@ -59,49 +68,51 @@ application.
 
 ## The case: an autonomous vehicle, a fatal collision, and no single clean cause
 
-At 21:47 on a rainy evening, an Aster Vale robotaxi struck and killed cyclist
-Lina Ortega inside a temporary crossing. The vehicle began emergency braking
-only 0.35 seconds before impact. Thirty-six hours earlier, it had received the
-company’s Orchid 4.8 software release.
+At 21:47 on a rainy evening, an Aster Vale robotaxi struck and killed
+31-year-old cyclist Lina Ortega inside a temporary crossing. The vehicle began
+emergency braking only 0.35 seconds before impact. Thirty-six hours earlier, it
+had received the company’s Orchid 4.8 software release.
 
 The fictional charge is:
 
 > **Is Aster Vale Mobility guilty of criminally negligent deployment of an
 > autonomous vehicle system that caused Lina Ortega’s death?**
 
-The admitted evidence does not point neatly in one direction:
+The case rests on seven admitted exhibits. None is a magic smoking gun:
 
-- The camera system merged Lina, her bicycle, and an illuminated lane-arrow
-  board into one static object. Radar detected motion, but braking was
-  suppressed.
-- A perception engineer had recorded late braking in 3 of 20 simulations and
-  wrote “block release.” A later calibration passed 20 of 20 reruns.
-- The crashed vehicle ran calibration C-91, while the signed safety report
-  validated C-90. A deployment bot shared the engineer’s signing credential.
-- A road contractor moved the arrow board, failed to update the digital map,
-  and removed roughly 1.1 seconds of useful observation.
-- A conditionally approved design allowed camera classification to veto
-  radar-only braking above 25 km/h.
-- A cellular outage defeated the remote-operator safeguard. Aster Vale had
-  recorded two earlier outages near the site.
-- Independent reconstruction found that both the calibration and the road
-  layout materially changed the safe-stop rate.
+| Exhibit | What the jury learns | Why it cuts both ways |
+| --- | --- | --- |
+| **E1 — Crash mechanism** | The camera merged Lina, her bicycle, and the illuminated arrow board into one static object. Radar detected motion, but emergency braking was suppressed until 0.35 seconds before impact. | It establishes a technical failure, but not who knowingly accepted the risk. |
+| **E2 — Warning and retest** | Dr. Nia Sol saw late braking in 3 of 20 simulations and wrote “block release.” Calibration C-90 then passed 20 of 20 reruns. | The warning makes the danger foreseeable; the clean rerun supports the claim that it was resolved. |
+| **E3 — Provenance gap** | The crashed vehicle ran C-91, while the signed safety report validated C-90. The deployment record bears Dr. Sol’s credential, while audit logs show the CI bot held the same deployment token. | The wrong calibration reopens the safety issue, but the credential and automation trail complicate individual attribution. |
+| **E4 — Road contractor** | The contractor moved the arrow board 2.4 metres, failed to update the map, and removed about 1.1 seconds of useful observation. | It is a serious third-party contribution, but it does not automatically excuse weak deployment safeguards. |
+| **E5 — Radar veto** | Above 25 km/h, the camera could veto radar-only braking. The rule reduced false emergency stops by 41% and received conditional approval. | It was an intentional, reviewed safety tradeoff; approval is not proof that deployment was reasonable in every condition. |
+| **E6 — Failed fallback** | A cellular outage defeated the assumed two-second remote response. Aster Vale knew of two nearby outages; the regulator had only an aggregate report. | The outage was external, but the failure of a known fallback may have been foreseeable. |
+| **E7 — Interaction test** | Safe stops were 19/20 for C-90 with the corrected map, 14/20 for C-90 with the crash map, 16/20 for C-91 with the corrected map, and 6/20 for C-91 with the crash map. | Both calibration and road state matter, and their combination is much worse than either factor alone. |
 
-This is an interacting-failures problem. The contractor, network, regulator,
-release process, perception system, and emergency-braking policy all matter.
-But the jury decides a narrower question: whether Aster Vale is guilty of the
-charged deployment decision.
+The prosecution sees a preventable organizational failure: Aster Vale owned the
+release, had warning signs, relied on a fragile remote fallback, and put an
+unvalidated calibration on the road.
 
-That distinction creates useful disagreement. A juror can believe the company
-made serious mistakes while still voting not guilty under the stated burden. A
-juror can also believe other actors contributed while finding the company
-guilty.
+The defence sees a rare compound accident: a moved road sign, an incorrect map,
+a network outage, a conditionally approved braking policy, and a safety concern
+that appeared to have passed its retest.
 
-The evaluator stores a hidden synthetic truth: in the fixture, the release
-committee saw an integrity warning identifying the C-91 mismatch and knowingly
-waived it to meet a launch date. No tribunal agent receives that fact. It
-exists only so the experiment can distinguish agreement from correctness
-against a known fictional answer.
+The jury is not asked to identify one exclusive cause. It must decide whether
+all four elements of the fictional charge are satisfied:
+
+1. Aster Vale controlled the safety-critical release.
+2. It knew or should have known that the release created a substantial risk.
+3. It deployed without reasonable safeguards.
+4. That deployment decision was a substantial cause of Lina Ortega’s death.
+
+A juror can therefore believe the company made serious mistakes while still
+voting not guilty under the stated burden. Another can accept that third
+parties contributed and still find Aster Vale guilty.
+
+Every tribunal agent receives only the public summary and admitted E1–E7
+record. The hidden evaluator fixture is discussed later; it never enters an
+agent prompt or message.
 
 <!--
 FIGURE 2 SUGGESTION — Evidence is a system, not a smoking gun
@@ -120,32 +131,92 @@ interacting software, deployment, road, regulatory, and network failures.”
 
 ---
 
+## Four conditions change one thing: who may communicate
+
+Every run follows the same procedure:
+
+```text
+orientation → 2 openings → 8 witness examinations → 2 closings
+            → optional peer deliberation → frozen ballots → judgment
+```
+
+Each public statement is delivered to every active juror. The juror then
+updates an observable guilt register, categorical vote, confidence, evidence
+citations, and short public reason. Only after the shared hearing does the
+communication condition diverge.
+
+| Condition | Decision-makers | Permitted peer communication | What it asks |
+| --- | --- | --- | --- |
+| **Solo** | Casey Morgan alone | None | What does one generalist decide? This is a descriptive product baseline, not a topology-only control. |
+| **Independent** | The same five specialist jurors used below | None | What does a diverse panel decide when its members cannot influence one another? |
+| **Star** | The five specialists, with Sofia Bell as foreperson | Per round, four jurors each address Sofia once; Sofia then chooses one juror to address | What changes when communication is concentrated through a hub? |
+| **Mesh** | The same five specialists | Per round, every juror chooses any other juror and authors one direct message | What changes when communication is decentralized and recipients are agent-selected? |
+
+Star is not an automatic broadcast. Sofia may receive four different
+arguments, then choose one panelist and one issue to address. That makes her an
+information hub and a possible bottleneck.
+
+Mesh is not a group chat. Each juror gets an explicit turn, chooses an eligible
+recipient, selects an action such as asking or challenging, cites public
+evidence, and sends one addressed ProtoLink task. Only the recipient updates
+from that peer message.
+
+The clean communication comparison is **Independent versus Star or Mesh**:
+same five jurors, same permitted evidence, and the same procedure, with
+communication topology as the treatment. Solo changes panel size, persona mix,
+and inference budget, so it is useful context rather than evidence about the
+isolated effect of communication.
+
+For a controlled result, the saved public-record hashes and control
+fingerprints must also match. The deterministic reference fixture guarantees
+that match; live-model hearings may vary and must be checked rather than
+assumed identical.
+
+<!--
+FIGURE 3 SUGGESTION — The communication ladder
+Placement: after the four conditions.
+Create one horizontal four-panel topology diagram using the same juror icons in
+every applicable panel: Solo (one isolated generalist), Independent (five
+unconnected specialist jurors), Star (five jurors with only foreperson hub
+paths), Mesh (five jurors with permitted direct paths). Use arrows to represent
+possible communication, not messages that necessarily occurred. Underline
+Independent→Star/Mesh as the controlled comparison; mark Solo “descriptive
+baseline—panel size also changes”.
+Alt text: “Four conditions progress from one isolated juror to independent
+specialists, a foreperson hub, and direct mesh communication.”
+-->
+
+---
+
 ## Give agents human roles, not benchmark labels
 
 Early versions described jurors as abstractions such as “systems thinker” or
 “probabilistic integrator.” Those are defensible experimental categories, but
 they make the project feel like a benchmark configuration file.
 
-The current jury is immediately legible:
+The current jury is immediately legible. Their professions are not decorative
+backstories; they create different error-detection lenses:
 
-- **Evelyn Brooks**, a former collision detective, reconstructs physical
-  sequences and distrusts polished narratives.
-- **Malik Thompson**, a civil-rights lawyer, watches the burden of proof,
-  institutional power, and scapegoating.
-- **Dr. Anika Rao**, a human-factors psychologist, notices automation bias,
-  hindsight bias, and hidden assumptions.
-- **Ruben Park**, a site-reliability engineer, thinks in deployment controls,
-  defence in depth, and incident ownership.
-- **Sofia Bell**, an investigative journalist and foreperson, connects
-  documents, incentives, and timelines while watching for stories that outrun
-  the evidence.
+- **Evelyn Brooks**, a 62-year-old woman and former collision detective,
+  reconstructs physical sequences and distrusts polished narratives.
+- **Malik Thompson**, a 43-year-old man and civil-rights lawyer, watches the
+  burden of proof, institutional power, and scapegoating.
+- **Dr. Anika Rao**, a 38-year-old woman and human-factors psychologist,
+  notices automation bias, hindsight bias, and hidden assumptions.
+- **Ruben Park**, a 35-year-old man and site-reliability engineer, thinks in
+  deployment controls, defence in depth, and incident ownership.
+- **Sofia Bell**, a 46-year-old woman, investigative journalist, and
+  foreperson, connects documents, incentives, and timelines while watching for
+  stories that outrun the evidence.
 
-The solo condition uses Casey Morgan, a civic generalist.
+The solo condition uses Casey Morgan, a 40-year-old woman and civic generalist.
 
-The other participants are equally concrete: Judge Imani Quill; Amara Bell,
-lawyer for Lina’s family; Rowan Hale, Aster Vale’s safety executive; perception
-engineer Dr. Nia Sol; regulator Elias Trent; insurance claims director Dana
-Pierce; and independent investigator Dr. Amina Kade.
+The other participants are equally concrete: Judge Imani Quill, a 58-year-old
+woman; Amara Bell, a 41-year-old woman and lawyer for Lina’s family; Rowan Hale,
+a 47-year-old man and Aster Vale safety executive; perception engineer Dr. Nia
+Sol, a 36-year-old woman; regulator Elias Trent, a 56-year-old man; insurance
+claims director Dana Pierce, a 50-year-old woman; and independent investigator
+Dr. Amina Kade, a 44-year-old woman.
 
 Most importantly, the juror prompts do **not** say things such as “you begin
 61/100 convinced” or “your communication strategy is `reinforce_ally`.” They
@@ -154,15 +225,27 @@ language. The application asks the agent to produce its initial position.
 
 Reference-only coefficients make the offline fixture reproducible, but they
 remain outside the human-facing prompts. A live model receives the character,
-case, admitted record, and output contract—not a prewritten opinion.
+case, admitted record, and output contract, not a prewritten opinion.
+
+Age and gender are fictional prompt metadata, not priors or explanations for a
+decision. Because models may reproduce demographic stereotypes, controlled
+provider comparisons must hold these assignments fixed or rotate them through
+a preregistered balanced design.
 
 ---
 
 ## The agents are explicit, and the communication is direct
 
 The example intentionally keeps construction simple. Every participant is
-declared as a normal ProtoLink `Agent` in the script. Here is one declaration,
-abridged only to omit secondary card metadata, telemetry, and logging options:
+declared as a normal ProtoLink `Agent` in [`run.py`](run.py). An agent needs
+three ideas:
+
+- an `AgentCard` that gives it an identity and address;
+- an LLM backend, which may differ from the backend used by other agents;
+- a system prompt describing its role, knowledge boundary, and behaviour.
+
+Here is one real declaration, abridged only to omit secondary card metadata,
+telemetry, and logging options:
 
 ```python
 software_engineer_agent = Agent(
@@ -184,8 +267,21 @@ software_engineer_agent = Agent(
 )
 ```
 
-There is no elaborate factory or hidden agent hierarchy. The composition is
-visible in one place.
+`model_for_role(...)` is a small provider selector, not an agent factory. The
+actual ProtoLink composition remains visible in one place: card, transport,
+model, and prompt.
+
+Once two agents exist, the core communication path is just as direct:
+
+```python
+task = Task.create_infer(prompt=prompt)
+result = await sender.call_agent(receiver.card.url, task)
+```
+
+The full example attaches run metadata, tracing context, validation, and bounded
+repair feedback around those two lines. But there is no hidden workflow graph
+pretending to be a conversation. One addressed agent sends a ProtoLink task to
+another addressed agent and receives a task result.
 
 The world engine acts as a procedural referee. It schedules orientation,
 openings, direct and cross-examinations, closings, deliberation, frozen
@@ -209,7 +305,7 @@ about which decisions belong to the environment and which belong to the
 agents.
 
 <!--
-FIGURE 3 SUGGESTION — What ProtoLink carries
+FIGURE 4 SUGGESTION — What ProtoLink carries
 Placement: after this architecture section.
 Use a sequence diagram, not generative imagery. Lanes: world engine, sender
 Agent, ProtoLink task/runtime, receiver Agent, event ledger/report. Show:
@@ -261,56 +357,8 @@ The receiver replies with observable state:
 
 A peer message does not silently inject the sender’s private score, vote, or
 confidence. The receiver sees only what the sender chose to say publicly. This
-keeps the communication itself—not hidden simulator metadata—as the mechanism
+keeps the communication itself, not hidden simulator metadata, as the mechanism
 of influence.
-
----
-
-## Four conditions, one communication ladder
-
-The demo runs four conditions.
-
-### 1. Solo
-
-One civic generalist hears the public tribunal record and decides without
-peers. This is the most intuitive product baseline, but not a clean scientific
-control: panel size, persona mix, and total inference budget all change.
-
-### 2. Independent
-
-The same five specialist jurors hear the same public record and cast frozen
-ballots without speaking to one another. This isolates diversity without
-deliberation.
-
-### 3. Star
-
-Juror communication goes through foreperson Sofia Bell. This is the familiar
-hub-and-spoke pattern: efficient, but vulnerable to compression and
-gatekeeping.
-
-### 4. Mesh
-
-Each juror receives a turn and may address any other juror directly. The agent
-authors the target and message. This creates more paths for correction,
-persuasion, confusion, and repetition.
-
-The meaningful communication comparison is independent versus star or mesh,
-provided the saved public-record hashes and control fingerprints match. Solo is
-useful context, not evidence about the isolated effect of communication.
-
-<!--
-FIGURE 4 SUGGESTION — The communication ladder
-Placement: after the four conditions.
-Create one horizontal four-panel topology diagram using the same juror icons in
-every applicable panel: Solo (one isolated generalist), Independent (five
-unconnected specialist jurors), Star (five jurors with only foreperson hub
-paths), Mesh (five jurors with permitted direct paths). Use arrows to represent
-possible communication, not messages that necessarily occurred. Underline
-Independent→Star/Mesh as the controlled comparison; mark Solo “descriptive
-baseline—panel size also changes”.
-Alt text: “Four conditions progress from one isolated juror to independent
-specialists, a foreperson hub, and direct mesh communication.”
--->
 
 ---
 
@@ -396,14 +444,25 @@ and her register and categorical vote before and after the exchange.”
 The repository includes a deterministic offline reference provider so anyone
 can exercise the protocol, reports, and comparisons without an API key.
 
+It also stores a hidden synthetic answer for evaluation. In that private
+fixture, the release committee saw an integrity warning identifying the C-91
+mismatch and knowingly waived it to meet a launch date. No tribunal agent
+receives that fact. It exists only so the experiment can distinguish agreement
+from correctness against a known fictional answer.
+
 For the default seed-7 fixture, the expected results are:
 
-| Condition | Group verdict | Ballots (guilty–not guilty) | Mean final guilt probability | Deliberation vote flips |
-| --- | --- | ---: | ---: | ---: |
-| Solo | Guilty | 1–0 | 78.59 | 0 |
-| Independent | Not guilty | 2–3 | 77.56 | 0 |
-| Star | Not guilty | 2–3 | 80.21 | 0 |
-| Mesh | Guilty | 3–2 | 80.54 | 1 |
+| Condition | Group verdict | Ballots (guilty–not guilty) | Mean final guilt probability | A2A events | Deliberation vote flips |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Solo | Guilty | 1–0 | 78.59 | 27 | 0 |
+| Independent | Not guilty | 2–3 | 77.56 | 83 | 0 |
+| Star | Not guilty | 2–3 | 80.21 | 93 | 0 |
+| Mesh | Guilty | 3–2 | 80.54 | 93 | 1 |
+
+With one deliberation round, running all four conditions produces **296
+observable A2A events** before any application-level repair calls. Star and
+Mesh each add five agent-authored planning events and five corresponding peer
+messages to the independent-panel procedure.
 
 Three observations are more interesting than a winner:
 
@@ -440,7 +499,70 @@ The honest claim is narrower and still useful:
 > Direct agent communication changed the outcome, and the system makes the
 > path to that change inspectable.
 
-No live-provider result is claimed in this article.
+I also ran the complete workflow against a local 8B Gemma model through Ollama.
+That successful run is an encouraging integration stress test, but I do not
+treat one local model’s verdict as a quality benchmark or publish it as evidence
+that one topology is superior.
+
+---
+
+## Running the experiment locally with Ollama
+
+One reason this example is useful is that it does not require a frontier hosted
+model to exercise the full protocol. From the example directory, I ran the Star
+condition with Ollama providing both the tribunal actors and the jurors:
+
+```bash
+cd examples/ai_courtroom
+
+python run.py \
+  --provider ollama \
+  --base-url "http://localhost:11434" \
+  --juror-provider ollama \
+  --juror-base-url "http://localhost:11434" \
+  --condition star
+```
+
+The juror flags are explicit even though they point at the same server. That
+makes an important ProtoLink capability visible: actors and jurors are separate
+agents, so their providers can be configured together or changed
+independently.
+
+For a reproducible published run, pin the exact installed Ollama tag rather
+than relying on the adapter default:
+
+```bash
+python run.py \
+  --provider ollama \
+  --model "<exact-ollama-model-tag>" \
+  --base-url "http://localhost:11434" \
+  --juror-provider ollama \
+  --juror-model "<exact-ollama-model-tag>" \
+  --juror-base-url "http://localhost:11434" \
+  --condition star \
+  --verbose
+```
+
+To run the entire live matrix, the runner requires an explicit acknowledgement
+because it creates many model calls:
+
+```bash
+python run.py \
+  --provider ollama \
+  --base-url "http://localhost:11434" \
+  --juror-provider ollama \
+  --juror-base-url "http://localhost:11434" \
+  --condition all \
+  --allow-multi-condition-live \
+  --verbose
+```
+
+At the default single deliberation round, that matrix schedules 296 observable
+A2A events. Schema-repair attempts can increase the actual number of model
+generations. Completing the matrix on an 8B local model does not prove that its
+legal conclusion is good; it demonstrates that the agent identities, direct
+calls, delegation, response contracts, bounded repair, frozen ballots, traces,
+and report generation can survive a long real workflow.
 
 ---
 
@@ -453,13 +575,14 @@ jurors, and deliberation. That can make a compelling demo, but any outcome
 difference has many possible causes.
 
 A cleaner experiment keeps the tribunal actors on the deterministic reference
-provider and changes only the juror backend:
+provider and changes only the juror backend. From the repository root:
 
 ```bash
 python examples/ai_courtroom/run.py \
   --provider reference \
-  --juror-provider anthropic \
-  --juror-model "your-model-id" \
+  --juror-provider ollama \
+  --juror-model "<exact-ollama-model-tag>" \
+  --juror-base-url "http://localhost:11434" \
   --condition mesh \
   --temperature 0 \
   --seed 17
@@ -540,65 +663,46 @@ society of agents practical.
 
 ---
 
-## The less glamorous lesson: structured output is part of the protocol
+## The less glamorous lesson: reliable communication is part of A2A
 
-Live models do not always return the shape a long-running agent experiment
-expects. A model may produce a sound courtroom statement wrapped in the wrong
-outer object, place a JSON object where text was required, add prose around the
-payload, or omit one application field. Local models can make these variations
-especially visible.
+The local-model run is interesting partly because long agent workflows expose
+small formatting mistakes quickly. A model may produce a good courtroom answer
+inside the wrong outer object, return JSON where the protocol expected text,
+surround a payload with prose, or omit an application field.
 
-Treating every failure as the same “JSON parsing error” makes recovery brittle.
-The showcase instead keeps two boundaries explicit:
+ProtoLink keeps two contracts separate:
 
-1. **ProtoLink action validation** determines whether the model is finishing,
-   calling a tool, or delegating to an agent. The
-   `--action-parse-attempts` limit bounds corrective passes at this outer
-   protocol layer.
-2. **Tribunal application validation** checks the final content against the
-   statement, decision, deliberation-action, or judgment contract. The
-   `--max-attempts` limit bounds these per-message application attempts.
+1. **Action validation** asks whether the model is finishing, calling a tool,
+   or delegating to another agent.
+2. **Application validation** asks whether the final content is a valid
+   tribunal statement, juror update, communication action, ballot, or judgment.
 
-A valid outer `FinalAction` can still contain an invalid tribunal response, so
-collapsing the two counters would hide where interoperability failed. In both
-layers, recovery is bounded and diagnostic. The system first attempts strict
-parsing and validation, then gives the model specific field-level feedback for
-self-correction.
+A valid `FinalAction` can still contain an invalid ballot. Keeping the layers
+separate makes the failure understandable and prevents a broad “retry
+everything” loop from hiding what went wrong.
 
-For the response shapes exposed by this showcase, the outer parser adds two
-narrow deterministic normalizations. If a `FinalAction` contains an object or
-list instead of a text content field, it serializes that value to JSON text. If
-a model returns the application object directly, the parser can wrap it as
-final content only when the object contains no ProtoLink action-envelope
-fields. These repairs preserve what the model actually authored. They never
-invent a vote, evidence citation, message target, tool argument, or legal
-conclusion.
+The recovery path is deliberately narrow:
 
-The application layer has one scoped last-resort recovery for public
-statements. If the final structured attempt from a lawyer, witness, or judge is
-nonempty prose rather than application JSON, the tribunal can preserve that
-prose as the `statement`, extract only exact admitted `E1`–`E7` references, and
-record a recovery warning in the event ledger. The fallback is deliberately
-unavailable to juror assessments, ballots, categorical verdict fields, and
-deliberation routing; recovering those from prose would require guessing
-decision data.
+- parse and validate strictly first;
+- give the model bounded, field-specific repair feedback;
+- normalize only unambiguous shapes, such as serializing structured final
+  content without changing it;
+- recover plain prose only for public statements, never for votes, verdicts,
+  evidence choices, or message targets.
 
-Both controls default to three attempts and accept values from one to five.
-Higher limits can make a small local model more resilient, but they also add
-latency and inference cost. The detailed runner display shows A2A calls,
-accepted application responses, and repair attempts; lower-level inference
-diagnostics can be enabled separately with `--agent-verbosity`.
+The system does not invent missing decisions to keep the demo moving. Every
+repair is bounded and recorded. `--action-parse-attempts` controls the outer
+ProtoLink layer; `--max-attempts` controls the tribunal response layer. Both
+default to three and accept one to five, while provider/network backoff remains
+a separate lower layer.
 
-Provider and network backoff form a third layer below both controls. The
-budgets can multiply, which is why the defaults are modest and why simply
-turning every retry limit to its maximum is a poor substitute for deterministic
-normalization.
+That distinction matters experimentally. A model that completes 93 messages
+cleanly is behaving differently from one that reaches the same verdict after
+frequent repair. Repair rate belongs beside grounding, outcome, latency, and
+cost.
 
-This may sound like infrastructure housekeeping, but it is part of the research
-record. A provider that reaches a verdict only after frequent schema repair is
-behaving differently from one that follows the protocol on its first attempt.
-Repair rate therefore belongs beside grounding, outcome, latency, and cost—not
-hidden in a catch-all retry loop.
+The detailed parsing and normalization contract is documented in
+[`docs/content/llm.md`](../../docs/content/llm.md).
 
 ---
 
@@ -616,6 +720,8 @@ This is a research prototype, not a benchmark result.
 - An after-message shift is temporal association, not causal attribution.
 - More agreement can mean correction, conformity, anchoring, or shared error.
 - Model personas are prompt-induced behaviors, not durable human identities.
+- Persona demographics are controlled prompt variables; models may respond to
+  them through learned stereotypes rather than authentic lived experience.
 - Legal guilt is an intentionally simplified fictional decision. The system
   should not be used to evaluate real people, products, or cases.
 - Token counts and costs vary by provider, and live services can change over
@@ -623,7 +729,7 @@ This is a research prototype, not a benchmark result.
 
 The next serious experiment would run a preregistered matrix across cases,
 seeds, providers, and topologies, then ablate individual messages. It would
-publish both successes and reversals—including cases where communication makes
+publish both successes and reversals, including cases where communication makes
 the group confidently wrong.
 
 ---
@@ -655,20 +761,6 @@ python examples/ai_courtroom/run.py \
   --provider reference \
   --condition mesh \
   --seed 17
-```
-
-For a local Ollama model, start with one condition so the full experiment
-matrix does not hide setup problems:
-
-```bash
-python examples/ai_courtroom/run.py \
-  --provider ollama \
-  --model "your-ollama-model" \
-  --base-url "http://localhost:11434" \
-  --condition mesh \
-  --action-parse-attempts 5 \
-  --max-attempts 5 \
-  --verbose
 ```
 
 The reference provider prints compact phase progress. Live providers print

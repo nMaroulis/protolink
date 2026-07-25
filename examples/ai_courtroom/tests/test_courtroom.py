@@ -10,7 +10,14 @@ from types import SimpleNamespace
 import pytest
 
 from examples.ai_courtroom.compare import build_comparison_markdown
-from examples.ai_courtroom.courtroom.case_data import JUROR_PROFILES, juror_system_prompt
+from examples.ai_courtroom.courtroom.case_data import (
+    ACTOR_PROFILES,
+    CASE,
+    JUROR_PROFILES,
+    ROLE_PROMPTS,
+    juror_system_prompt,
+    public_participant_profile,
+)
 from examples.ai_courtroom.courtroom.reference_llm import (
     REQUEST_END,
     REQUEST_START,
@@ -244,6 +251,31 @@ def test_juror_identity_prompts_do_not_assign_numeric_opinions() -> None:
         assert "reference_prior" not in prompt
 
 
+def test_all_fictional_people_have_public_demographics() -> None:
+    expected_ids = {*ACTOR_PROFILES, *JUROR_PROFILES}
+    assert len(expected_ids) == 13
+    for agent_id in expected_ids:
+        profile = public_participant_profile(agent_id)
+        assert profile["id"] == agent_id
+        assert profile["label"]
+        assert isinstance(profile["age"], int)
+        assert 18 <= profile["age"] <= 90
+        assert profile["gender"] in {"woman", "man"}
+
+    victim = CASE["victim"]
+    assert victim == {"name": "Lina Ortega", "age": 31, "gender": "woman"}
+
+    for agent_id, prompt in ROLE_PROMPTS.items():
+        profile = public_participant_profile(agent_id)
+        assert str(profile["age"]) in prompt
+        assert str(profile["gender"]) in prompt
+    for juror_id in JUROR_PROFILES:
+        profile = public_participant_profile(juror_id)
+        prompt = juror_system_prompt(juror_id)
+        assert str(profile["age"]) in prompt
+        assert str(profile["gender"]) in prompt
+
+
 def test_reference_fixture_changes_its_authored_move_across_rounds() -> None:
     model = ReferenceCourtroomLLM(role="juror_anika", seed=7)
 
@@ -325,6 +357,11 @@ def test_reference_mesh_uses_authored_direct_a2a_and_clean_reruns(tmp_path: Path
     assert result["run"]["max_attempts"] == 2
     assert result["run"]["action_parse_attempts"] == 3
     assert len(result["jurors"]) == 5
+    assert set(result["participants"]) == {*ACTOR_PROFILES, *result["jurors"]}
+    assert result["participants"]["judge"]["age"] == 58
+    assert result["participants"]["judge"]["gender"] == "woman"
+    assert result["jurors"]["juror_evelyn"]["age"] == 62
+    assert result["jurors"]["juror_evelyn"]["gender"] == "woman"
     assert len(result["record_hash"]) == 64
     assert len(result["pre_deliberation_snapshot_hash"]) == 64
 
@@ -344,6 +381,11 @@ def test_reference_mesh_uses_authored_direct_a2a_and_clean_reruns(tmp_path: Path
     assert (mesh_dir / "report.html").exists()
     report = (mesh_dir / "report.html").read_text(encoding="utf-8")
     assert 'id="replay-data"' in report
+    assert 'id="replay-transcript" role="region"' in report
+    assert 'class="message-scroll"' in report
+    assert "height: var(--replay-block-size)" in report
+    assert "elements.transcript.scrollTop = 0" in report
+    assert "Former collision detective · age 62 · woman" in report
     assert "Replay" in report
 
     trace_path = mesh_dir / "traces.jsonl"

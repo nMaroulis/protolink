@@ -17,11 +17,14 @@ from protolink import Agent, RunContext, Task
 from protolink.llms.metrics import estimate_token_count
 
 from .case_data import (
+    ACTOR_PROFILES,
     CASE,
     FOREPERSON_ID,
     JUROR_PROFILES,
     PANEL_JUROR_IDS,
     SOLO_JUROR_ID,
+    public_participant_profile,
+    public_participant_profiles,
 )
 from .reference_llm import REQUEST_END, REQUEST_START
 from .schemas import (
@@ -141,11 +144,19 @@ class CourtroomSimulation:
         self.started_at = datetime.now(timezone.utc).isoformat()
         self.public_record_entries: list[dict[str, Any]] = []
         self.deliberation_log: list[dict[str, Any]] = []
+        self.participants = public_participant_profiles(
+            [*ACTOR_PROFILES, *self.active_juror_ids],
+        )
+        self.persona_controls = public_participant_profiles(
+            [*ACTOR_PROFILES, *JUROR_PROFILES],
+        )
         self.jurors = {
             juror_id: JurorState(
                 juror_id=juror_id,
                 label=str(JUROR_PROFILES[juror_id]["label"]),
                 style=str(JUROR_PROFILES[juror_id]["style"]),
+                age=int(JUROR_PROFILES[juror_id]["age"]),
+                gender=str(JUROR_PROFILES[juror_id]["gender"]),
             )
             for juror_id in self.active_juror_ids
         }
@@ -185,6 +196,7 @@ class CourtroomSimulation:
                 "seed": self.config.seed,
                 "evidence_order": self.config.evidence_order,
                 "rounds": self.config.rounds,
+                "participant_profiles": self.persona_controls,
             }
         )
         self._progress(1, f"Public hearing complete · record hash {self.record_hash[:10]}…")
@@ -252,6 +264,7 @@ class CourtroomSimulation:
                 "post_deliberation": self.post_deliberation_snapshot,
             },
             "verdict": {**official, "announcement": judgment.get("statement", "")},
+            "participants": self.participants,
             "jurors": {juror_id: state.to_dict() for juror_id, state in self.jurors.items()},
             "events": [event.to_dict() for event in self.events],
         }
@@ -1126,12 +1139,15 @@ def summary_from_result(result: dict[str, Any]) -> dict[str, Any]:
         "baseline_snapshot_hash": result["baseline_snapshot_hash"],
         "pre_deliberation_snapshot_hash": result["pre_deliberation_snapshot_hash"],
         "control_fingerprint": result["control_fingerprint"],
+        "participants": result["participants"],
         "verdict": result["verdict"],
         "metrics": result["metrics"],
         "final_jurors": {
             juror_id: {
                 "label": state["label"],
                 "style": state["style"],
+                "age": state["age"],
+                "gender": state["gender"],
                 "baseline_guilt_probability": state["baseline_guilt_probability"],
                 "final_guilt_probability": state["guilt_probability"],
                 "baseline_vote": state["baseline_vote"],
@@ -1177,16 +1193,10 @@ def _rounded_polarization(values: list[float]) -> float | None:
 
 
 def _agent_label(agent_id: str) -> str:
-    labels = {
-        "judge": "Judge Imani Quill",
-        "victim_lawyer": "Amara Bell",
-        "manufacturer": "Rowan Hale",
-        "software_engineer": "Dr. Nia Sol",
-        "safety_regulator": "Elias Trent",
-        "insurance": "Dana Pierce",
-        "accident_investigator": "Dr. Amina Kade",
-    }
-    return labels.get(agent_id, str(JUROR_PROFILES.get(agent_id, {}).get("label", agent_id)))
+    try:
+        return str(public_participant_profile(agent_id)["label"])
+    except KeyError:
+        return agent_id
 
 
 def _short_error(error: Exception, *, limit: int = 180) -> str:

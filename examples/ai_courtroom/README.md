@@ -1,6 +1,6 @@
 # AI Liability Tribunal
 
-> **Can AI agents talk themselves into a better answer—or a worse one?**
+> **Can AI agents talk themselves into a better answer, or a worse one?**
 
 This ProtoLink showcase puts autonomous agents inside a fictional liability
 tribunal and makes their communication observable. The case is memorable, but
@@ -38,9 +38,9 @@ trajectories change in an autonomous-vehicle liability simulation.”
 ## The case: The Ghost in Lane Four
 
 At 21:47 on a rain-soaked evening, an autonomous Aster Vale robotaxi struck and
-killed cyclist Lina Ortega inside a temporary crossing. The car began emergency
-braking only 0.35 seconds before impact. Thirty-six hours earlier it received
-the Orchid 4.8 software release.
+killed 31-year-old cyclist Lina Ortega inside a temporary crossing. The car
+began emergency braking only 0.35 seconds before impact. Thirty-six hours
+earlier it received the Orchid 4.8 software release.
 
 The fictional tribunal asks:
 
@@ -66,35 +66,37 @@ Aster Vale was the only contributor.
 ## The agents
 
 The actor declarations are intentionally explicit in
-[`run.py`](run.py)—there is no factory hiding the ProtoLink composition.
+[`run.py`](run.py)-there is no factory hiding the ProtoLink composition.
 
 ### Tribunal actors
 
-| Agent | Character and incentive |
-| --- | --- |
-| Judge Imani Quill | Neutral tribunal chair; separates causal contribution from legal guilt |
-| Amara Bell | Lawyer for Lina's family; resists complexity being used to dissolve accountability |
-| Rowan Hale | Aster Vale safety executive; argues that external failures created an unforeseeable combination |
-| Dr. Nia Sol | Perception engineer; precise about calibration and the release pipeline |
-| Elias Trent | Safety regulator; candid but institutionally defensive |
-| Dana Pierce | Insurance claims director with an explicit financial interest |
-| Dr. Amina Kade | Independent accident investigator who reconstructs interacting causes |
+| Agent | Age | Gender | Character and incentive |
+| --- | ---: | --- | --- |
+| Judge Imani Quill | 58 | Woman | Neutral tribunal chair; separates causal contribution from legal guilt |
+| Amara Bell | 41 | Woman | Lawyer for Lina's family; resists complexity being used to dissolve accountability |
+| Rowan Hale | 47 | Man | Aster Vale safety executive; argues that external failures created an unforeseeable combination |
+| Dr. Nia Sol | 36 | Woman | Perception engineer; precise about calibration and the release pipeline |
+| Elias Trent | 56 | Man | Safety regulator; candid but institutionally defensive |
+| Dana Pierce | 50 | woman | Insurance claims director with an explicit financial interest |
+| Dr. Amina Kade | 44 | Woman | Independent accident investigator who reconstructs interacting causes |
 
 ### Jury
 
-| Juror | Human perspective |
-| --- | --- |
-| Evelyn Brooks | Former collision detective |
-| Malik Thompson | Civil-rights lawyer |
-| Dr. Anika Rao | Human-factors psychologist |
-| Ruben Park | Site-reliability engineer |
-| Sofia Bell | Investigative journalist and foreperson |
-
-The solo baseline uses Casey Morgan, a civic generalist.
+| Juror | Age | Gender | Human perspective |
+| --- | ---: | --- | --- |
+| Evelyn Brooks | 62 | Woman | Former collision detective |
+| Malik Thompson | 43 | Man | Civil-rights lawyer |
+| Dr. Anika Rao | 38 | Woman | Human-factors psychologist |
+| Ruben Park | 35 | Man | Site-reliability engineer |
+| Sofia Bell | 46 | Woman | Investigative journalist and foreperson |
+| Casey Morgan *(solo only)* | 40 | woman | Civic generalist |
 
 These prompts describe people, not seeded numbers. They do not say “you begin
 at 61/100” and they do not expose routing enums such as `reinforce_ally`.
 Reference-only fixture coefficients remain outside every human-facing prompt.
+Age and gender are fictional prompt metadata, not numerical priors. Hold them
+fixed across provider comparisons, or deliberately rotate the assignments, so
+demographic changes are not mistaken for model effects.
 
 ## Agent-authored communication
 
@@ -217,7 +219,7 @@ The runner reports work as it happens so a live model does not look stalled:
 - the offline `reference` provider uses compact phase and step updates;
 - live providers show each A2A exchange and its elapsed time by default;
 - `-v` or `--verbose` forces detailed message, acceptance, and repair updates;
-- `-q` or `--quiet` suppresses application progress—at the default agent log
+- `-q` or `--quiet` suppresses application progress at the default agent log
   level, only run headers and final condition summaries remain;
 - `--agent-verbosity {0,1,2}` independently controls ProtoLink's own
   per-agent logs and defaults to `0`.
@@ -399,7 +401,9 @@ python examples/ai_courtroom/run.py \
 
 For publishable comparisons:
 
-1. Freeze prompts, case, evidence order, topology, round count, and temperature.
+1. Freeze prompts, persona demographics, case, evidence order, topology, round
+   count, and temperature, or preregister a balanced rotation of demographic
+   assignments.
 2. Pair runs by seed.
 3. Verify record hashes and control fingerprints.
 4. Repeat every cell.

@@ -313,6 +313,8 @@ class JurorState:
     juror_id: str
     label: str
     style: str
+    age: int
+    gender: str
     baseline_guilt_probability: float | None = None
     baseline_vote: str | None = None
     guilt_probability: float | None = None
