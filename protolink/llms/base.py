@@ -257,6 +257,7 @@ class LLM(ABC):
         self.system_prompt: str = self.build_system_prompt(action_mode="json")
         self.metrics_enabled: bool = True
         self._metrics_profile: LLMModelProfile | None = None
+        self._max_parse_failures: int = 3
         self.sync = SyncLLM(self)
 
     def __getstate__(self) -> dict[str, Any]:
@@ -321,6 +322,25 @@ class LLM(ABC):
         """Return whether this LLM is currently using task-local history."""
         self._ensure_history_context()
         return self._active_history.get() is not None
+
+    @property
+    def max_parse_failures(self) -> int:
+        """Maximum consecutive action-parse failures before inference stops.
+
+        This is runtime behavior, not a provider generation parameter. Keeping
+        it outside ``model_params`` prevents ProtoLink-only configuration from
+        leaking into OpenAI-, Anthropic-, Ollama-, or compatible-server request
+        payloads.
+        """
+        return getattr(self, "_max_parse_failures", 3)
+
+    @max_parse_failures.setter
+    def max_parse_failures(self, value: int) -> None:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError("max_parse_failures must be an integer")
+        if value < 1 or value > MAX_INFER_STEPS:
+            raise ValueError(f"max_parse_failures must be between 1 and {MAX_INFER_STEPS}")
+        self._max_parse_failures = value
 
     @contextmanager
     def use_history(self, history: ConversationHistory):
@@ -790,7 +810,7 @@ class LLM(ABC):
 
         steps: int = 0
         parse_failures: int = 0
-        max_parse_failures: int = 3  # Circuit breaker for consecutive parse failures
+        max_parse_failures = self.max_parse_failures
         recent_actions: list[str] = []  # Track recent actions for dedup detection
         max_recent_actions: int = 5  # Window for detecting repeated actions
         observer_disabled = False

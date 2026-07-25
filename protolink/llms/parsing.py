@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
@@ -37,6 +38,28 @@ if TYPE_CHECKING:
     from protolink.tools import BaseTool
 
 _DIAGNOSTIC_PREVIEW_CHARS = 2_000
+_LEADING_REASONING_BLOCK = re.compile(
+    r"^\s*<(?P<tag>think|thought)\b[^>]*>.*?</(?P=tag)\s*>\s*",
+    flags=re.DOTALL | re.IGNORECASE,
+)
+_LEADING_REASONING_OPEN = re.compile(r"^\s*<(?:think|thought)\b", flags=re.IGNORECASE)
+_FULL_JSON_FENCE = re.compile(
+    r"^\s*```(?:json)?[ \t]*\r?\n?(?P<body>.*?)\r?\n?```\s*$",
+    flags=re.DOTALL | re.IGNORECASE,
+)
+_ACTION_ENVELOPE_FIELDS = frozenset(
+    {
+        "type",
+        "content",
+        "tool",
+        "args",
+        "agent",
+        "action",
+        "prompt",
+        "payload",
+        "thought",
+    }
+)
 
 
 def parse_infer_response(
@@ -84,7 +107,7 @@ def parse_infer_response(
             payload so the infer loop can inject useful self-correction
             feedback into conversation history.
     """
-    data = _load_response_json(response)
+    data = decode_json_response(response)
     data = repair_fallback_action_payload(data, tools=tools or {}, agent_cards=agent_cards or [])
 
     try:
@@ -115,6 +138,10 @@ def repair_fallback_action_payload(
     Supported repairs are intentionally limited:
 
     - Flatten a legacy ``payload`` dictionary into the top-level action fields.
+    - Serialize a dictionary or list placed directly in ``final.content`` as
+      JSON text, preserving the application payload without changing meaning.
+    - Wrap a non-empty application object that contains no action-envelope
+      fields as a final JSON response.
     - Convert ``{"type": "tool_call", "prompt": "tool(arg=1)"}`` into a
       canonical tool call with explicit ``tool`` and ``args`` fields.
     - Convert delegated ``agent_call`` tool shorthands into canonical
@@ -149,7 +176,20 @@ def repair_fallback_action_payload(
                 repaired[key] = payload[key]
         repaired.pop("payload", None)
 
-    if repaired.get("type") == "tool_call" and "args" not in repaired:
+    action_type = repaired.get("type")
+    if action_type == "final":
+        content = repaired.get("content")
+        if isinstance(content, (dict, list)):
+            repaired["content"] = _serialize_json_content(content)
+        return repaired
+
+    if action_type is None and repaired and _ACTION_ENVELOPE_FIELDS.isdisjoint(repaired):
+        # Some prompt-fallback models return the requested application object
+        # while omitting ProtoLink's outer final-action envelope. This repair is
+        # side-effect free only when no action protocol field is present.
+        return {"type": "final", "content": _serialize_json_content(repaired)}
+
+    if action_type == "tool_call" and "args" not in repaired:
         prompt = repaired.get("prompt")
         parsed_call = parse_function_call_shorthand(prompt) if isinstance(prompt, str) else None
         if parsed_call is not None:
@@ -313,8 +353,8 @@ def format_validation_errors(exc: Any) -> str:
     return "\n".join(lines) if lines else str(exc)
 
 
-def _load_response_json(response: str) -> Any:
-    """Load a JSON object from a raw model response.
+def decode_json_response(response: str) -> Any:
+    """Decode one JSON response using conservative, deterministic fallbacks.
 
     The primary contract is a strict JSON action object. As a practical
     fallback for smaller or less instruction-following models, this helper also
@@ -323,9 +363,17 @@ def _load_response_json(response: str) -> Any:
     string values do not terminate an object early. Multiple valid objects are
     rejected rather than selecting one ambiguously.
 
-    This function does not validate the action schema; it only decodes JSON.
-    Schema validation remains in ``parse_infer_response`` so malformed objects
-    and semantically invalid actions produce the same field-level diagnostics.
+    Two syntax-only recoveries are attempted after untouched decoding fails:
+
+    - one complete leading ``<think>`` or ``<thought>`` block may be ignored;
+    - trailing commas immediately before a closing object or array delimiter
+      may be removed by a string-aware scanner.
+
+    Neither recovery invents fields or values. This function does not validate
+    the action schema; schema validation remains in ``parse_infer_response`` so
+    malformed objects and semantically invalid actions produce the same
+    field-level diagnostics. Applications may reuse this decoder before their
+    own typed validation.
 
     Args:
         response: Raw provider text.
@@ -342,23 +390,108 @@ def _load_response_json(response: str) -> Any:
     try:
         return json.loads(response, strict=False)
     except json.JSONDecodeError as original_error:
-        objects = []
-        for candidate_text in _extract_balanced_top_level_objects(response):
-            try:
-                candidate = json.loads(candidate_text, strict=False)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(candidate, dict):
-                objects.append(candidate)
-        if len(objects) == 1:
-            return objects[0]
-        raw_diagnostic = _format_raw_response_diagnostic(response)
-        if len(objects) > 1:
+        fallback_texts: list[str] = []
+        reasoning_match = _LEADING_REASONING_BLOCK.match(response)
+        if reasoning_match is not None:
+            without_reasoning = response[reasoning_match.end() :].strip()
+            if without_reasoning:
+                fallback_texts.append(without_reasoning)
+        elif _LEADING_REASONING_OPEN.match(response):
+            raw_diagnostic = _format_raw_response_diagnostic(response)
             raise ValueError(
-                f"Invalid JSON action response: found {len(objects)} valid top-level JSON objects; "
+                f"Invalid JSON action response: unterminated leading reasoning block.\n{raw_diagnostic}"
+            ) from original_error
+        else:
+            fallback_texts.append(response)
+
+        ambiguous_count = 0
+        for fallback_text in fallback_texts:
+            wrapper_variants: list[str] = []
+            fence_match = _FULL_JSON_FENCE.match(fallback_text)
+            if fence_match is not None:
+                wrapper_variants.append(fence_match.group("body").strip())
+            wrapper_variants.append(fallback_text)
+
+            for wrapper_variant in dict.fromkeys(wrapper_variants):
+                repaired_text = _remove_trailing_json_commas(wrapper_variant)
+                for full_response_variant in dict.fromkeys((wrapper_variant, repaired_text)):
+                    try:
+                        return json.loads(full_response_variant, strict=False)
+                    except json.JSONDecodeError:
+                        continue
+
+                objects: list[dict[str, Any]] = []
+                for candidate_text in _extract_balanced_top_level_objects(wrapper_variant):
+                    candidate_variants = (candidate_text, _remove_trailing_json_commas(candidate_text))
+                    candidate = None
+                    for candidate_variant in dict.fromkeys(candidate_variants):
+                        try:
+                            candidate = json.loads(candidate_variant, strict=False)
+                            break
+                        except json.JSONDecodeError:
+                            continue
+                    if isinstance(candidate, dict):
+                        objects.append(candidate)
+                if len(objects) == 1:
+                    return objects[0]
+                ambiguous_count = max(ambiguous_count, len(objects))
+
+        raw_diagnostic = _format_raw_response_diagnostic(response)
+        if ambiguous_count > 1:
+            raise ValueError(
+                f"Invalid JSON action response: found {ambiguous_count} valid top-level JSON objects; "
                 f"expected exactly one.\n{raw_diagnostic}"
             ) from original_error
         raise ValueError(f"Invalid JSON: {original_error}\n{raw_diagnostic}") from original_error
+
+
+def _serialize_json_content(value: Any) -> str:
+    """Serialize a structured final response without lossy coercion."""
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _remove_trailing_json_commas(value: str) -> str:
+    """Remove only commas followed by an object/array close outside strings.
+
+    This is intentionally not a general JSON-repair routine. It performs one
+    deterministic syntax normalization in a single string-aware pass and
+    leaves commas inside string values untouched.
+    """
+    output: list[str] = []
+    in_string = False
+    escaped = False
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if in_string:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+
+        if char == '"':
+            in_string = True
+            output.append(char)
+            index += 1
+            continue
+
+        if char == ",":
+            next_index = index + 1
+            while next_index < len(value) and value[next_index].isspace():
+                next_index += 1
+            if next_index < len(value) and value[next_index] in "}]":
+                index += 1
+                continue
+
+        output.append(char)
+        index += 1
+
+    return "".join(output)
 
 
 def _extract_balanced_top_level_objects(response: str) -> list[str]:

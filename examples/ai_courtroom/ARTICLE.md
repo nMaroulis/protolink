@@ -2,6 +2,21 @@
 
 ## An observable AI Liability Tribunal built with ProtoLink
 
+<!--
+FIGURE 1 SUGGESTION — Article hero
+Placement: below the subtitle.
+Format: 2000×1125 editorial illustration with generous negative space.
+Prompt/composition: a fictional autonomous vehicle stopped in a rain-lit lane;
+above it, a clean constellation of seven tribunal agents and five jurors linked
+by directional message arcs. One juror’s verdict marker visibly changes from
+“not guilty” to “guilty” along a replay timeline. Serious investigative-tech
+tone, not sci-fi spectacle; no real brands, injury, gavels, or humanoid robots.
+Palette: near-black navy, paper ivory, amber evidence markers, cyan A2A links.
+Caption: “The courtroom is the setting. Communication is the experiment.”
+Alt text: “An AI liability case connected to a replayable network of tribunal
+agents and jurors whose public verdicts change after direct messages.”
+-->
+
 Most multi-agent demos show the answer, but hide the interesting part.
 
 A coordinator calls several models, collects their responses, and produces a
@@ -24,6 +39,13 @@ address.
 The interface then replays those exchanges alongside the jurors’ changing
 public decision registers. Instead of merely saying that a panel deliberated,
 the demo lets you watch it happen.
+
+In the deterministic seed-7 replay, the five jurors vote **2–3 not guilty**
+when isolated from one another and **3–2 guilty** when direct mesh
+communication is enabled. One observable challenge precedes the
+majority-changing vote flip. That contrast is an intentionally designed
+fixture—not evidence that mesh is generally superior—but it gives the A2A
+system something concrete and inspectable to explain.
 
 The courtroom is the setting. The real subject is what becomes possible when
 agent-to-agent communication is a first-class, observable part of an
@@ -81,6 +103,21 @@ waived it to meet a launch date. No tribunal agent receives that fact. It
 exists only so the experiment can distinguish agreement from correctness
 against a known fictional answer.
 
+<!--
+FIGURE 2 SUGGESTION — Evidence is a system, not a smoking gun
+Placement: after the case section.
+Prefer a designed diagram over generated art. Center node: “Fatal collision”.
+Surrounding nodes: perception merge (E1), blocked simulation/retest (E2),
+C-90/C-91 provenance gap (E3), moved arrow board (E4), radar veto policy (E5),
+remote-operator outage (E6), interaction reconstruction (E7). Use solid arrows
+only for relationships stated in case_data.py; use dashed lines for disputed
+attribution. Add a narrow bracket on the right: “Causation is distributed;
+the charge is organizational deployment.” Do not reveal the hidden synthetic
+truth in the graphic. Source all wording from case_data.py.
+Alt text: “Seven admitted exhibits converge on a fatal collision through
+interacting software, deployment, road, regulatory, and network failures.”
+-->
+
 ---
 
 ## Give agents human roles, not benchmark labels
@@ -124,29 +161,26 @@ case, admitted record, and output contract—not a prewritten opinion.
 ## The agents are explicit, and the communication is direct
 
 The example intentionally keeps construction simple. Every participant is
-declared as a normal ProtoLink `Agent` in the script:
+declared as a normal ProtoLink `Agent` in the script. Here is one declaration,
+abridged only to omit secondary card metadata, telemetry, and logging options:
 
 ```python
 software_engineer_agent = Agent(
     card=AgentCard(
         name="software_engineer",
         description="Perception engineer who filed the pre-release warning.",
-        url="runtime://ai-liability/software-engineer",
+        url=f"runtime://ai-liability/{namespace}/software-engineer",
     ),
     transport="runtime",
-    llm=software_engineer_llm,
+    llm=model_for_role(
+        args.provider,
+        role="software_engineer",
+        seed=args.seed,
+        model=args.model,
+        base_url=args.base_url,
+        temperature=args.temperature,
+    ),
     system_prompt=ROLE_PROMPTS["software_engineer"],
-)
-
-juror_ruben_agent = Agent(
-    card=AgentCard(
-        name="juror_ruben",
-        description="Site-reliability engineer serving as a juror.",
-        url="runtime://ai-liability/juror-ruben",
-    ),
-    transport="runtime",
-    llm=juror_ruben_llm,
-    system_prompt=juror_system_prompt("juror_ruben"),
 )
 ```
 
@@ -173,6 +207,22 @@ This division matters:
 Autonomy does not require an unstructured free-for-all. It requires being clear
 about which decisions belong to the environment and which belong to the
 agents.
+
+<!--
+FIGURE 3 SUGGESTION — What ProtoLink carries
+Placement: after this architecture section.
+Use a sequence diagram, not generative imagery. Lanes: world engine, sender
+Agent, ProtoLink task/runtime, receiver Agent, event ledger/report. Show:
+(1) engine schedules a turn, (2) sender creates an addressed task,
+(3) receiver produces a public application JSON response,
+(4) validator accepts or returns bounded repair feedback,
+(5) event plus before/after public state is saved,
+(6) replay reads the saved ledger. Distinguish “procedure” (gray), “agent
+authorship” (amber), and “transport/telemetry” (cyan). Explicitly label that
+private chain-of-thought is neither requested nor stored.
+Alt text: “A scheduled turn becomes a direct ProtoLink task, a validated public
+response, and a replayable event without exposing private reasoning.”
+-->
 
 ---
 
@@ -248,6 +298,20 @@ The meaningful communication comparison is independent versus star or mesh,
 provided the saved public-record hashes and control fingerprints match. Solo is
 useful context, not evidence about the isolated effect of communication.
 
+<!--
+FIGURE 4 SUGGESTION — The communication ladder
+Placement: after the four conditions.
+Create one horizontal four-panel topology diagram using the same juror icons in
+every applicable panel: Solo (one isolated generalist), Independent (five
+unconnected specialist jurors), Star (five jurors with only foreperson hub
+paths), Mesh (five jurors with permitted direct paths). Use arrows to represent
+possible communication, not messages that necessarily occurred. Underline
+Independent→Star/Mesh as the controlled comparison; mark Solo “descriptive
+baseline—panel size also changes”.
+Alt text: “Four conditions progress from one isolated juror to independent
+specialists, a foreperson hub, and direct mesh communication.”
+-->
+
 ---
 
 ## A probability is not a verdict
@@ -309,6 +373,21 @@ with that message removed or replaced.
 
 Observability here means public outputs, protocol events, and state changes. It
 does not mean exposing private chain-of-thought.
+
+<!--
+FIGURE 5 SUGGESTION — The vote-changing moment
+Placement: after “The replay is the product”.
+Best source: a cropped screenshot from mesh/report.html at the Sofia→Anika
+event, rather than an invented mock-up. If redrawing, derive exact values from
+mesh/result.json: locate the peer_message event with sender=juror_sofia and
+receiver=juror_anika, then use belief_before, belief_after, belief_delta,
+authored_action.message, response.public_reply, and evidence_ids. Pair a small
+five-line trajectory chart with the directed influence edge. Label the change
+“observed after message”, never “caused by”.
+Caption: “A direct challenge preceded the panel’s only deliberation vote flip.”
+Alt text: “Replay frame showing Sofia’s message to Anika, Anika’s public reply,
+and her register and categorical vote before and after the exchange.”
+-->
 
 ---
 
@@ -414,6 +493,19 @@ verdict?” It may be:
 That requires repeated runs and message ablations. The included fixture makes
 the experiment runnable; it does not answer the question in advance.
 
+<!--
+FIGURE 6 SUGGESTION — Provider experiment matrix
+Placement: after the provider-comparison section, once real repeated runs exist.
+Do not prefill fabricated winners. Rows: exact provider/model/version. Columns:
+independent verdict accuracy, mesh verdict accuracy, message-ablation lift,
+vote-flip rate, evidence-grounding rate, schema-repair rate, routing-fallback
+rate, latency, estimated tokens, and measured cost. Show mean plus interval and
+sample count for every cell. Put model/date/temperature/seed set in a footnote.
+An adjacent scatter plot can compare grounding rate (x) with outcome change
+after communication (y), encoding influence concentration by point size.
+Caption: “Model quality and communication quality are different axes.”
+-->
+
 ---
 
 ## What this showcase demonstrates about A2A systems
@@ -445,6 +537,68 @@ rather than silently hidden.
 This is the indirect value proposition for ProtoLink. The framework is not the
 headline painted over the demo. It is the engine that makes an inspectable
 society of agents practical.
+
+---
+
+## The less glamorous lesson: structured output is part of the protocol
+
+Live models do not always return the shape a long-running agent experiment
+expects. A model may produce a sound courtroom statement wrapped in the wrong
+outer object, place a JSON object where text was required, add prose around the
+payload, or omit one application field. Local models can make these variations
+especially visible.
+
+Treating every failure as the same “JSON parsing error” makes recovery brittle.
+The showcase instead keeps two boundaries explicit:
+
+1. **ProtoLink action validation** determines whether the model is finishing,
+   calling a tool, or delegating to an agent. The
+   `--action-parse-attempts` limit bounds corrective passes at this outer
+   protocol layer.
+2. **Tribunal application validation** checks the final content against the
+   statement, decision, deliberation-action, or judgment contract. The
+   `--max-attempts` limit bounds these per-message application attempts.
+
+A valid outer `FinalAction` can still contain an invalid tribunal response, so
+collapsing the two counters would hide where interoperability failed. In both
+layers, recovery is bounded and diagnostic. The system first attempts strict
+parsing and validation, then gives the model specific field-level feedback for
+self-correction.
+
+For the response shapes exposed by this showcase, the outer parser adds two
+narrow deterministic normalizations. If a `FinalAction` contains an object or
+list instead of a text content field, it serializes that value to JSON text. If
+a model returns the application object directly, the parser can wrap it as
+final content only when the object contains no ProtoLink action-envelope
+fields. These repairs preserve what the model actually authored. They never
+invent a vote, evidence citation, message target, tool argument, or legal
+conclusion.
+
+The application layer has one scoped last-resort recovery for public
+statements. If the final structured attempt from a lawyer, witness, or judge is
+nonempty prose rather than application JSON, the tribunal can preserve that
+prose as the `statement`, extract only exact admitted `E1`–`E7` references, and
+record a recovery warning in the event ledger. The fallback is deliberately
+unavailable to juror assessments, ballots, categorical verdict fields, and
+deliberation routing; recovering those from prose would require guessing
+decision data.
+
+Both controls default to three attempts and accept values from one to five.
+Higher limits can make a small local model more resilient, but they also add
+latency and inference cost. The detailed runner display shows A2A calls,
+accepted application responses, and repair attempts; lower-level inference
+diagnostics can be enabled separately with `--agent-verbosity`.
+
+Provider and network backoff form a third layer below both controls. The
+budgets can multiply, which is why the defaults are modest and why simply
+turning every retry limit to its maximum is a poor substitute for deterministic
+normalization.
+
+This may sound like infrastructure housekeeping, but it is part of the research
+record. A provider that reaches a verdict only after frequent schema repair is
+behaving differently from one that follows the protocol on its first attempt.
+Repair rate therefore belongs beside grounding, outcome, latency, and cost—not
+hidden in a catch-all retry loop.
 
 ---
 
@@ -502,6 +656,26 @@ python examples/ai_courtroom/run.py \
   --condition mesh \
   --seed 17
 ```
+
+For a local Ollama model, start with one condition so the full experiment
+matrix does not hide setup problems:
+
+```bash
+python examples/ai_courtroom/run.py \
+  --provider ollama \
+  --model "your-ollama-model" \
+  --base-url "http://localhost:11434" \
+  --condition mesh \
+  --action-parse-attempts 5 \
+  --max-attempts 5 \
+  --verbose
+```
+
+The reference provider prints compact phase progress. Live providers print
+per-A2A timing by default; `--verbose` forces that detail, `--quiet` suppresses
+application progress, and `--agent-verbosity {0,1,2}` independently controls
+lower-level ProtoLink logs. With quiet mode and the default agent log level,
+only headers and final summaries remain.
 
 Compare previously saved summaries:
 

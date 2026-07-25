@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import math
+import re
 from dataclasses import asdict, dataclass, field
-from json import JSONDecodeError
 from typing import Any
+
+from protolink.llms.parsing import decode_json_response
 
 from .case_data import CASE
 
@@ -28,6 +29,7 @@ _ACTION_ALIASES = {
     "persuade": "attempt_persuasion",
     "concession": "concede",
 }
+_EVIDENCE_REFERENCE = re.compile(r"(?<![A-Za-z0-9])E\d+(?![A-Za-z0-9])")
 
 
 class ResponseValidationError(ValueError):
@@ -40,43 +42,52 @@ def clamp(value: float, low: float, high: float) -> float:
 
 
 def extract_json_object(value: Any) -> dict[str, Any]:
-    """Extract the first JSON object from provider text or accept a dictionary."""
+    """Decode exactly one JSON object from provider text or accept a dictionary."""
     if isinstance(value, dict):
         return value
     if not isinstance(value, str):
         raise ResponseValidationError(f"Expected JSON text, received {type(value).__name__}")
 
     text = value.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
+    if not text:
+        raise ResponseValidationError("Response did not contain a valid JSON object")
 
-    try:
-        decoded = json.loads(text)
-        if isinstance(decoded, dict):
-            return decoded
-        if isinstance(decoded, str):
-            nested = json.loads(decoded)
-            if isinstance(nested, dict):
-                return nested
-    except (JSONDecodeError, TypeError):
-        pass
-
-    decoder = json.JSONDecoder()
-    for index, character in enumerate(text):
-        if character != "{":
-            continue
+    decoded: Any = text
+    for _ in range(2):
         try:
-            decoded, _ = decoder.raw_decode(text[index:])
-        except JSONDecodeError:
-            continue
+            decoded = decode_json_response(decoded)
+        except (TypeError, ValueError):
+            break
         if isinstance(decoded, dict):
             return decoded
+        if not isinstance(decoded, str):
+            break
+
     raise ResponseValidationError("Response did not contain a valid JSON object")
+
+
+def recover_plain_text_statement(value: Any) -> dict[str, Any]:
+    """Recover observable prose only for a public-statement contract.
+
+    Decisions and deliberation routes must never call this helper. Structured-
+    looking text is rejected so malformed JSON is repaired by the model rather
+    than published as testimony. Evidence references are limited to exact,
+    admitted identifiers found in the prose.
+    """
+    if not isinstance(value, str):
+        raise ResponseValidationError(f"Expected statement text, received {type(value).__name__}")
+    statement = value.strip()
+    if not statement:
+        raise ResponseValidationError("Plain-text statement fallback received empty text")
+    if statement.startswith(("{", "[", "```", '"', "<think", "<thought")):
+        raise ResponseValidationError("Structured-looking response is not eligible for plain-text statement recovery")
+
+    evidence_ids: list[str] = []
+    for match in _EVIDENCE_REFERENCE.findall(statement):
+        evidence_id = match.upper()
+        if evidence_id in CASE["evidence"] and evidence_id not in evidence_ids:
+            evidence_ids.append(evidence_id)
+    return {"statement": statement, "evidence_ids": evidence_ids}
 
 
 def validate_statement(payload: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:

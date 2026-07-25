@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,20 @@ CONDITION_ARTIFACTS = (
 )
 
 
+class ConsoleProgress:
+    """Small elapsed-time reporter used by long-running live experiments."""
+
+    def __init__(self, *, verbosity: int) -> None:
+        self.verbosity = verbosity
+        self.started = time.monotonic()
+
+    def __call__(self, level: int, message: str) -> None:
+        if self.verbosity < level:
+            return
+        elapsed = time.monotonic() - self.started
+        print(f"  [{elapsed:7.1f}s] {message}", flush=True)
+
+
 def _resolve_juror_backend(args: argparse.Namespace) -> tuple[str, str | None, str | None]:
     """Keep provider-specific defaults from leaking across mixed backends."""
     provider = args.juror_provider or args.provider
@@ -53,6 +68,9 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
     recorder = LocalTraceRecorder(path=condition_dir / "traces.jsonl", max_traces=1000)
     telemetry = LocalTraceTelemetry(recorder=recorder, capture_payloads=True)
     juror_provider, juror_model, juror_base_url = _resolve_juror_backend(args)
+    agent_verbosity = int(getattr(args, "agent_verbosity", 0))
+    progress_verbosity = _progress_verbosity(args, juror_provider=juror_provider)
+    progress = ConsoleProgress(verbosity=progress_verbosity)
 
     # The showcase keeps every actor visible. There is intentionally no generic
     # create_agent() factory hiding the roles or ProtoLink composition surface.
@@ -76,7 +94,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=ROLE_PROMPTS["judge"],
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     victim_lawyer_agent = Agent(
         card=AgentCard(
@@ -98,7 +116,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=ROLE_PROMPTS["victim_lawyer"],
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     manufacturer_agent = Agent(
         card=AgentCard(
@@ -120,7 +138,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=ROLE_PROMPTS["manufacturer"],
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     software_engineer_agent = Agent(
         card=AgentCard(
@@ -142,7 +160,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=ROLE_PROMPTS["software_engineer"],
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     safety_regulator_agent = Agent(
         card=AgentCard(
@@ -164,7 +182,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=ROLE_PROMPTS["safety_regulator"],
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     insurance_agent = Agent(
         card=AgentCard(
@@ -186,7 +204,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=ROLE_PROMPTS["insurance"],
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     accident_investigator_agent = Agent(
         card=AgentCard(
@@ -208,7 +226,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=ROLE_PROMPTS["accident_investigator"],
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     juror_solo_agent = Agent(
         card=AgentCard(
@@ -230,7 +248,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=juror_system_prompt("juror_solo"),
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     juror_evelyn_agent = Agent(
         card=AgentCard(
@@ -252,7 +270,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=juror_system_prompt("juror_evelyn"),
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     juror_malik_agent = Agent(
         card=AgentCard(
@@ -274,7 +292,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=juror_system_prompt("juror_malik"),
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     juror_anika_agent = Agent(
         card=AgentCard(
@@ -296,7 +314,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=juror_system_prompt("juror_anika"),
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     juror_ruben_agent = Agent(
         card=AgentCard(
@@ -318,7 +336,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=juror_system_prompt("juror_ruben"),
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
     juror_sofia_agent = Agent(
         card=AgentCard(
@@ -340,7 +358,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         system_prompt=juror_system_prompt("juror_sofia"),
         telemetry=telemetry,
         expose_chat=False,
-        verbosity=0,
+        verbosity=agent_verbosity,
     )
 
     agents = {
@@ -358,17 +376,31 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         "juror_ruben": juror_ruben_agent,
         "juror_sofia": juror_sofia_agent,
     }
+    for agent in agents.values():
+        agent.llm.max_parse_failures = args.action_parse_attempts
+
     started: list[Agent] = []
     try:
+        progress(
+            1,
+            f"Response recovery · {args.action_parse_attempts} action-envelope attempt(s), "
+            f"{args.max_attempts} application-schema attempt(s)",
+        )
+        progress(1, f"Starting {len(agents)} isolated ProtoLink runtime agents")
         for agent in agents.values():
             agent.start(background=True)
             started.append(agent)
+        progress(1, "Runtime agents ready")
 
         actual_model = str(getattr(judge_agent.llm, "model", args.model or "provider-default"))
         actual_juror_model = str(getattr(juror_evelyn_agent.llm, "model", juror_model or "provider-default"))
         provider_label = args.provider if juror_provider == args.provider else f"{args.provider}+jury:{juror_provider}"
         model_label = (
             actual_model if actual_juror_model == actual_model else f"{actual_model}+jury:{actual_juror_model}"
+        )
+        progress(
+            1,
+            f"Resolved models · tribunal={args.provider}/{actual_model} · jury={juror_provider}/{actual_juror_model}",
         )
         simulation = CourtroomSimulation(
             agents=agents,
@@ -381,13 +413,17 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
                 evidence_order=args.evidence_order,
                 rounds=args.rounds,
                 max_attempts=args.max_attempts,
+                action_parse_attempts=args.action_parse_attempts,
+                agent_verbosity=agent_verbosity,
                 primary_endpoint_mode="custom_cli" if args.base_url else "provider_default_or_environment",
                 juror_endpoint_mode="custom_cli" if juror_base_url else "provider_default_or_environment",
                 trial_id=f"{args.run_id}-{condition}",
             ),
+            progress=progress,
         )
         result = await simulation.run()
         summary = summary_from_result(result)
+        progress(1, "Writing result, transcript, trace, and interactive report artifacts")
         (condition_dir / "result.json").write_text(
             json.dumps(result, indent=2, ensure_ascii=False),
             encoding="utf-8",
@@ -397,8 +433,10 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
             encoding="utf-8",
         )
         write_condition_artifacts(result, condition_dir)
+        progress(1, f"Artifacts ready · {condition_dir}")
         return result
     finally:
+        progress(2, f"Stopping {len(started)} runtime agents")
         for agent in reversed(started):
             agent.stop()
 
@@ -414,8 +452,12 @@ async def async_main(args: argparse.Namespace) -> int:
         )
     if args.rounds < 0:
         raise SystemExit("--rounds cannot be negative")
-    if args.max_attempts not in {1, 2, 3}:
-        raise SystemExit("--max-attempts must be 1, 2, or 3")
+    if args.max_attempts < 1 or args.max_attempts > 5:
+        raise SystemExit("--max-attempts must be between 1 and 5")
+    if args.action_parse_attempts < 1 or args.action_parse_attempts > 5:
+        raise SystemExit("--action-parse-attempts must be between 1 and 5")
+    if args.agent_verbosity not in {0, 1, 2}:
+        raise SystemExit("--agent-verbosity must be 0, 1, or 2")
 
     output_root = Path(args.output_dir).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
@@ -476,7 +518,43 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=7, help="Controls the reference fixture and speaking order.")
     parser.add_argument("--evidence-order", choices=("standard", "reverse"), default="standard")
     parser.add_argument("--rounds", type=int, default=1, help="Number of star/mesh deliberation rounds.")
-    parser.add_argument("--max-attempts", type=int, default=2, help="Application-schema attempts per message (1..3).")
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=3,
+        help="Application-schema attempts per A2A message (1..5; default: 3).",
+    )
+    parser.add_argument(
+        "--action-parse-attempts",
+        type=int,
+        default=3,
+        help="ProtoLink action-envelope parse attempts per task (1..5; default: 3).",
+    )
+    progress_group = parser.add_mutually_exclusive_group()
+    progress_group.add_argument(
+        "-q",
+        "--quiet",
+        dest="verbosity",
+        action="store_const",
+        const=0,
+        help="Show only condition headers and final summaries.",
+    )
+    progress_group.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="store_const",
+        const=2,
+        help="Show every A2A call, accepted response, repair, and elapsed time.",
+    )
+    parser.set_defaults(verbosity=None)
+    parser.add_argument(
+        "--agent-verbosity",
+        type=int,
+        choices=(0, 1, 2),
+        default=0,
+        help="ProtoLink Agent log verbosity: 0=silent, 1=info, 2=debug (default: 0).",
+    )
     parser.add_argument("--output-dir", default=str(default_output))
     parser.add_argument(
         "--allow-multi-condition-live",
@@ -496,6 +574,14 @@ def main() -> None:
 
 def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9-]+", "-", value.lower()).strip("-")
+
+
+def _progress_verbosity(args: argparse.Namespace, *, juror_provider: str) -> int:
+    """Use detailed progress for slow live calls and compact progress for the fixture."""
+    configured = getattr(args, "verbosity", None)
+    if configured is not None:
+        return int(configured)
+    return 1 if args.provider == "reference" and juror_provider == "reference" else 2
 
 
 if __name__ == "__main__":

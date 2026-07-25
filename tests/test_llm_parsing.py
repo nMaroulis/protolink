@@ -46,6 +46,95 @@ def test_multiple_valid_top_level_objects_are_rejected():
         parse_infer_response(response)
 
 
+def test_structured_final_content_is_serialized_losslessly():
+    content = {
+        "statement": "Verdict reached — café",
+        "evidence_ids": ["E2"],
+        "nested": {"values": [1, True, None]},
+    }
+
+    action = parse_infer_response(json.dumps({"type": "final", "content": content}, ensure_ascii=False))
+
+    assert isinstance(action, FinalAction)
+    assert json.loads(action.content) == content
+
+
+def test_list_final_content_is_serialized_losslessly():
+    content = [{"id": "E1"}, {"id": "E7"}]
+
+    action = parse_infer_response(json.dumps({"type": "final", "content": content}))
+
+    assert isinstance(action, FinalAction)
+    assert json.loads(action.content) == content
+
+
+def test_bare_application_object_becomes_final_json_content():
+    content = {"statement": "Plain application response", "evidence_ids": ["E4"]}
+
+    action = parse_infer_response(json.dumps(content))
+
+    assert isinstance(action, FinalAction)
+    assert json.loads(action.content) == content
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"type": "unknown", "statement": "not a final action"},
+        {"tool": "search", "args": {}},
+        {"agent": "researcher", "prompt": "investigate"},
+        {"content": {"statement": "missing action type"}},
+        {},
+    ],
+)
+def test_action_shaped_or_empty_objects_are_not_silently_finalized(payload):
+    with pytest.raises(ValueError, match="Action validation failed"):
+        parse_infer_response(json.dumps(payload))
+
+
+def test_literal_reasoning_tags_inside_valid_json_are_preserved():
+    content = "Keep literal <think>{not hidden}</think> text."
+
+    action = parse_infer_response(json.dumps({"type": "final", "content": content}))
+
+    assert isinstance(action, FinalAction)
+    assert action.content == content
+
+
+def test_complete_leading_reasoning_block_is_ignored_after_strict_decode_fails():
+    response = (
+        '<think>{"type":"final","content":"analysis decoy"}</think>\n{"type":"final","content":"observable answer"}'
+    )
+
+    action = parse_infer_response(response)
+
+    assert isinstance(action, FinalAction)
+    assert action.content == "observable answer"
+
+
+def test_action_inside_reasoning_block_is_not_dispatched_without_public_output():
+    response = '<think>{"type":"tool_call","tool":"dangerous","args":{}}</think>'
+
+    with pytest.raises(ValueError, match="Invalid JSON"):
+        parse_infer_response(response)
+
+
+def test_unclosed_leading_reasoning_block_fails_safely():
+    response = '<think>unfinished analysis\n{"type":"final","content":"observable answer"}'
+
+    with pytest.raises(ValueError, match=r"unterminated leading reasoning block"):
+        parse_infer_response(response)
+
+
+def test_trailing_comma_repair_is_string_aware():
+    response = '{"type":"final","content":"literal comma before close: ,}",}'
+
+    action = parse_infer_response(response)
+
+    assert isinstance(action, FinalAction)
+    assert action.content == "literal comma before close: ,}"
+
+
 def test_invalid_json_raw_response_diagnostic_is_bounded():
     response = "invalid-start-" + ("x" * 10_000) + "-invalid-end"
 

@@ -679,6 +679,24 @@ async def test_infer_parsing_error_correction():
 
 
 @pytest.mark.asyncio
+async def test_infer_uses_configured_action_parse_attempt_limit():
+    llm = MockLLM(
+        [
+            "NOT JSON 1",
+            "NOT JSON 2",
+            "NOT JSON 3",
+            json.dumps({"type": "final", "content": "Recovered on the configured final attempt"}),
+        ]
+    )
+    llm.max_parse_failures = 4
+
+    result = await llm.infer(query="Trigger repeated parse errors", tools={})
+
+    assert result.content == "Recovered on the configured final attempt"
+    assert llm.call_count == 4
+
+
+@pytest.mark.asyncio
 async def test_infer_max_iterations():
     # Infinite loop of thoughts without final action
     responses = [json.dumps({"thought": "thinking...", "type": "tool_call", "tool": "none", "args": {}})] * 20

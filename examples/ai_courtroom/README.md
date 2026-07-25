@@ -20,6 +20,21 @@ ProtoLink traces, a public transcript, and standalone interactive HTML reports.
 Everything and everyone in this example is fictional. It is a software
 experiment, not legal analysis, legal advice, or a validated safety assessment.
 
+<!--
+FIGURE SUGGESTION — README hero / social preview
+Placement: directly below the disclaimer above.
+Format: 1600×900 PNG, readable when cropped to a GitHub social card.
+Composition: a rain-dark autonomous-vehicle test scene on the left; on the
+right, five distinct juror silhouettes connected by bright directed message
+arcs; a slim replay timeline along the bottom. Keep the tribunal fictional and
+avoid photorealistic injury, real manufacturer logos, gavels, and robot faces.
+Palette: midnight navy, warm ivory, signal amber, restrained cyan.
+Headline in image: “Can AI agents talk themselves into a different verdict?”
+Small label: “An observable A2A experiment · powered by ProtoLink”.
+Alt text: “Five specialist AI jurors exchange messages while their verdict
+trajectories change in an autonomous-vehicle liability simulation.”
+-->
+
 ## The case: The Ghost in Lane Four
 
 At 21:47 on a rain-soaked evening, an autonomous Aster Vale robotaxi struck and
@@ -195,6 +210,32 @@ When an output directory is reused, only the example's known generated files
 are replaced. `traces.jsonl` is not allowed to accumulate stale runs beside a
 new result.
 
+## Watching a run
+
+The runner reports work as it happens so a live model does not look stalled:
+
+- the offline `reference` provider uses compact phase and step updates;
+- live providers show each A2A exchange and its elapsed time by default;
+- `-v` or `--verbose` forces detailed message, acceptance, and repair updates;
+- `-q` or `--quiet` suppresses application progress—at the default agent log
+  level, only run headers and final condition summaries remain;
+- `--agent-verbosity {0,1,2}` independently controls ProtoLink's own
+  per-agent logs and defaults to `0`.
+
+For example:
+
+```bash
+python examples/ai_courtroom/run.py \
+  --condition mesh \
+  --verbose \
+  --agent-verbosity 1
+```
+
+Application progress and agent logs are separate on purpose. Start with the
+default display or `--verbose`; raise `--agent-verbosity` only when diagnosing
+the underlying agent runtime. Repair diagnostics are ordinary progress, so
+they remain visible unless `--quiet` is selected.
+
 ## The replay-first report
 
 The report opens with communication, not a wall of benchmark metrics:
@@ -231,7 +272,7 @@ solo → independent → star → mesh ladder.
 Saved metadata includes:
 
 - provider and exact resolved model for every agent;
-- seed, temperature, evidence order, rounds, and retry limit;
+- seed, temperature, evidence order, rounds, and both retry limits;
 - public-record hash;
 - baseline and pre-deliberation snapshot hashes;
 - a comparison control fingerprint;
@@ -270,6 +311,73 @@ Use `--base-url` for a local or compatible server.
 
 Running `--condition all` with a live provider requires the explicit
 `--allow-multi-condition-live` acknowledgement because it multiplies API use.
+
+### Ollama
+
+Start with one condition and name the locally installed model explicitly:
+
+```bash
+python examples/ai_courtroom/run.py \
+  --provider ollama \
+  --model "your-ollama-model" \
+  --base-url "http://localhost:11434" \
+  --condition mesh \
+  --action-parse-attempts 5 \
+  --max-attempts 5 \
+  --verbose
+```
+
+If every actor uses the same Ollama backend, the juror-specific provider flags
+are unnecessary. Use `--juror-provider ollama`, `--juror-model`, and
+`--juror-base-url` only when the jurors intentionally use a different model or
+endpoint.
+
+Live responses cross two intentionally separate validation boundaries:
+
+1. `--action-parse-attempts` controls how many times the ProtoLink inference
+   loop may ask the model to correct its outer action envelope.
+2. `--max-attempts` controls how many bounded application-contract attempts the
+   tribunal permits for each A2A message after it receives final content.
+
+Both default to `3`, accept `1..5`, and provide targeted validation feedback
+before another attempt. They are separate because a valid ProtoLink
+`FinalAction` can still contain malformed courtroom JSON. Increasing either
+limit can help a smaller local model recover, but it also increases run time.
+Accepted application repairs and failed attempts remain visible in progress
+output and saved event metadata; lower-level action-parser diagnostics are
+visible through `--agent-verbosity`.
+
+Provider/network backoff is a third, lower layer and is not controlled by
+either flag. Retry budgets can multiply, so increase them deliberately rather
+than setting every limit to its maximum.
+
+Strict parsing and model self-correction remain the primary path. The outer
+parser adds two narrow normalizations for the response shapes exposed here: it
+can serialize an object/list placed inside `FinalAction.content`, and it can
+treat a direct application object as final content only when no ProtoLink
+action-envelope fields are present. It does not guess missing votes, evidence,
+targets, or arguments.
+
+The application has one equally narrow last-resort fallback for the earlier
+“valid prose, no application JSON” failure: after the final structured attempt,
+a nonempty lawyer, witness, or judge public statement may be kept as its
+`statement`, with only exact admitted `E1`–`E7` references extracted. The event
+is marked with a recovery warning. Juror assessments, ballots, categorical
+verdict fields, and deliberation targets never use this prose fallback because
+recovering them would require inventing decision data.
+
+An all-condition live run repeats the full hearing for each condition and may
+take substantially longer:
+
+```bash
+python examples/ai_courtroom/run.py \
+  --provider ollama \
+  --model "your-ollama-model" \
+  --base-url "http://localhost:11434" \
+  --condition all \
+  --allow-multi-condition-live \
+  --verbose
+```
 
 ## Controlled juror-only model comparison
 
@@ -332,7 +440,7 @@ Sofia Bell → Dr. Anika Rao
 Observed after-message shift: +3.51
 ```
 
-It is not automatically proof that Ruben caused the full change. Causal
+It is not automatically proof that Sofia caused the full change. Causal
 language requires a matched message ablation across repeated paired runs.
 
 ## Tests

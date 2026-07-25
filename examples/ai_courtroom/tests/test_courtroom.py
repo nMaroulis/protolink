@@ -5,6 +5,7 @@ import asyncio
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,8 +21,21 @@ from examples.ai_courtroom.courtroom.schemas import (
     DeliberationAction,
     ResponseValidationError,
     extract_json_object,
+    recover_plain_text_statement,
+    validate_statement,
 )
-from examples.ai_courtroom.run import _resolve_juror_backend, run_condition
+from examples.ai_courtroom.courtroom.simulation import (
+    DECISION_CONTRACT,
+    STATEMENT_CONTRACT,
+    CourtroomSimulation,
+    SimulationConfig,
+)
+from examples.ai_courtroom.run import (
+    _progress_verbosity,
+    _resolve_juror_backend,
+    build_parser,
+    run_condition,
+)
 
 
 def _reference_args() -> argparse.Namespace:
@@ -37,6 +51,9 @@ def _reference_args() -> argparse.Namespace:
         evidence_order="standard",
         rounds=1,
         max_attempts=2,
+        action_parse_attempts=3,
+        verbosity=0,
+        agent_verbosity=0,
         run_id="pytest-ghost-lane-four",
     )
 
@@ -44,6 +61,126 @@ def _reference_args() -> argparse.Namespace:
 def test_extract_json_object_accepts_fenced_provider_text() -> None:
     payload = extract_json_object('Result:\n```json\n{"guilt_probability": 41}\n```')
     assert payload["guilt_probability"] == 41
+
+
+def test_extract_json_object_accepts_fenced_double_encoded_json() -> None:
+    nested = json.dumps(json.dumps({"guilt_probability": 42}))
+    payload = extract_json_object(f"```json\n{nested}\n```")
+    assert payload["guilt_probability"] == 42
+
+
+def test_extract_json_object_strips_thinking_tags() -> None:
+    text = (
+        "<think>\nI should assess guilt based on evidence.\nLet's format JSON as requested.\n</think>\n"
+        'Here is the result:\n```json\n{\n  "guilt_probability": 65,\n  "statement": "Line 1\\nLine 2"\n}\n```'
+    )
+    payload = extract_json_object(text)
+    assert payload["guilt_probability"] == 65
+    assert "Line 1" in payload["statement"]
+
+
+def test_extract_json_object_handles_trailing_commas() -> None:
+    payload = extract_json_object('{"guilt_probability": 50, "statement": "test",}')
+    assert payload["guilt_probability"] == 50
+
+
+def test_extract_json_object_preserves_literal_reasoning_tags() -> None:
+    payload = extract_json_object('{"statement":"keep <think>{literal}</think> text"}')
+    assert payload["statement"] == "keep <think>{literal}</think> text"
+
+
+def test_plain_text_recovery_is_explicit_and_cites_only_admitted_evidence() -> None:
+    prose = "The release record in E3 matters more than E30; E6 adds uncertainty. E3 is repeated."
+
+    with pytest.raises(ResponseValidationError):
+        extract_json_object(prose)
+
+    recovered = recover_plain_text_statement(prose)
+    assert recovered == {
+        "statement": prose,
+        "evidence_ids": ["E3", "E6"],
+    }
+
+    with pytest.raises(ResponseValidationError):
+        recover_plain_text_statement('{"statement": "malformed structured response",}')
+
+
+@pytest.mark.asyncio
+async def test_exchange_recovers_plain_prose_only_when_statement_contract_allows_it() -> None:
+    class Result:
+        id = "plain-result"
+
+        @staticmethod
+        def get_last_part_content() -> str:
+            return "The deployment evidence in E3 is material, while E30 is not admitted."
+
+    class Sender:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def call_agent(self, _url, _task):
+            self.calls += 1
+            return Result()
+
+    sender = Sender()
+    receiver = SimpleNamespace(
+        card=SimpleNamespace(url="runtime://receiver"),
+        llm=SimpleNamespace(provider="test", model="test-model"),
+    )
+    simulation = object.__new__(CourtroomSimulation)
+    simulation.sequence = 0
+    simulation.config = SimulationConfig(
+        condition="solo",
+        provider="test",
+        model="test-model",
+        max_attempts=2,
+    )
+    simulation.agents = {"sender": sender, "receiver": receiver}
+    simulation.events = []
+    simulation._progress_callback = None
+
+    normalized, event = await simulation._exchange(
+        sender_id="sender",
+        receiver_id="receiver",
+        phase="testimony",
+        kind="public_statement",
+        payload={"instruction": "Give a public statement."},
+        message="A public statement was requested.",
+        evidence_ids=[],
+        validator=validate_statement,
+        contract=STATEMENT_CONTRACT,
+        allow_plain_text_statement=True,
+    )
+
+    assert sender.calls == 2
+    assert normalized["evidence_ids"] == ["E3"]
+    assert event.attempts == 2
+    assert any("plain text" in warning for warning in event.warnings)
+
+    strict_simulation = object.__new__(CourtroomSimulation)
+    strict_simulation.sequence = 0
+    strict_simulation.config = SimulationConfig(
+        condition="solo",
+        provider="test",
+        model="test-model",
+        max_attempts=1,
+    )
+    strict_simulation.agents = {"sender": sender, "receiver": receiver}
+    strict_simulation.events = []
+    strict_simulation._progress_callback = None
+
+    with pytest.raises(RuntimeError, match="failed the application response contract"):
+        await strict_simulation._exchange(
+            sender_id="sender",
+            receiver_id="receiver",
+            phase="ballot",
+            kind="private_ballot",
+            payload={"instruction": "Cast a ballot."},
+            message="A ballot was requested.",
+            evidence_ids=[],
+            validator=CourtroomSimulation._decision_validator,
+            contract=DECISION_CONTRACT,
+        )
 
 
 def test_decision_vote_is_authored_and_evidence_is_grounded() -> None:
@@ -150,6 +287,27 @@ def test_mixed_juror_provider_does_not_inherit_another_backends_model() -> None:
     )
 
 
+def test_progress_and_agent_verbosity_flags_are_independent() -> None:
+    parser = build_parser()
+
+    reference = parser.parse_args(["--condition", "solo"])
+    assert reference.verbosity is None
+    assert reference.agent_verbosity == 0
+    assert reference.max_attempts == 3
+    assert reference.action_parse_attempts == 3
+    assert _progress_verbosity(reference, juror_provider="reference") == 1
+
+    live = parser.parse_args(["--condition", "solo", "--provider", "ollama"])
+    assert _progress_verbosity(live, juror_provider="ollama") == 2
+
+    quiet = parser.parse_args(["--condition", "solo", "--quiet", "--agent-verbosity", "2"])
+    assert _progress_verbosity(quiet, juror_provider="reference") == 0
+    assert quiet.agent_verbosity == 2
+
+    verbose = parser.parse_args(["--condition", "solo", "--verbose"])
+    assert _progress_verbosity(verbose, juror_provider="reference") == 2
+
+
 def test_reference_mesh_uses_authored_direct_a2a_and_clean_reruns(tmp_path: Path) -> None:
     args = _reference_args()
     mesh_dir = tmp_path / "mesh"
@@ -163,7 +321,9 @@ def test_reference_mesh_uses_authored_direct_a2a_and_clean_reruns(tmp_path: Path
     assert result["metrics"]["protocol_clean_first_attempt_rate"] == 1.0
     assert result["metrics"]["blocked_ballot_revision_attempts"] == 0
     assert result["run"]["temperature"] == 0.2
+    assert result["run"]["agent_verbosity"] == 0
     assert result["run"]["max_attempts"] == 2
+    assert result["run"]["action_parse_attempts"] == 3
     assert len(result["jurors"]) == 5
     assert len(result["record_hash"]) == 64
     assert len(result["pre_deliberation_snapshot_hash"]) == 64
