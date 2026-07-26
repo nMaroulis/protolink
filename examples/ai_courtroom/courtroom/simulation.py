@@ -105,7 +105,7 @@ class SimulationConfig:
     agent_verbosity: int = 0
     primary_endpoint_mode: str = "provider_default_or_environment"
     juror_endpoint_mode: str = "provider_default_or_environment"
-    trial_id: str = "ghost-in-lane-four"
+    trial_id: str = "c-91-incident"
 
 
 class CourtroomSimulation:

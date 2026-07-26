@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the Ghost in Lane Four AI Liability Tribunal showcase."""
+"""Run the C-91 Incident AI Liability Tribunal showcase."""
 
 from __future__ import annotations
 
@@ -561,7 +561,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Acknowledge the API usage of running every condition with a live provider.",
     )
-    parser.add_argument("--run-id", default=f"ghost-lane-four-{timestamp}", help=argparse.SUPPRESS)
+    parser.add_argument("--run-id", default=f"c-91-incident-{timestamp}", help=argparse.SUPPRESS)
     return parser
 
 

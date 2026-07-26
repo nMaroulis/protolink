@@ -35,7 +35,7 @@ Alt text: “Five specialist AI jurors exchange messages while their verdict
 trajectories change in an autonomous-vehicle liability simulation.”
 -->
 
-## The case: The Ghost in Lane Four
+## The case: The C-91 Incident
 
 At 21:47 on a rain-soaked evening, an autonomous Aster Vale robotaxi struck and
 killed 31-year-old cyclist Lina Ortega inside a temporary crossing. The car
@@ -205,7 +205,7 @@ The exact output location is printed at the end. To choose it:
 python examples/ai_courtroom/run.py \
   --condition all \
   --seed 17 \
-  --output-dir examples/ai_courtroom/output/ghost-lane-seed-17
+  --output-dir examples/ai_courtroom/output/c-91-incident-seed-17
 ```
 
 When an output directory is reused, only the example's known generated files

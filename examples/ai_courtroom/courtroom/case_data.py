@@ -6,8 +6,8 @@ from typing import Any
 
 CASE: dict[str, Any] = {
     "id": "people-v-aster-vale",
-    "title": "People v. Aster Vale Mobility: The Ghost in Lane Four",
-    "short_title": "The Ghost in Lane Four",
+    "title": "People v. Aster Vale Mobility: The C-91 Incident",
+    "short_title": "The C-91 Incident",
     "victim": {
         "name": "Lina Ortega",
         "age": 31,

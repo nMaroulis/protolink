@@ -45,8 +45,8 @@ summary. The result may be useful, yet it is hard to tell whether the agents
 actually influenced one another, who changed their mind, or whether
 “multi-agent” meant little more than running several prompts in parallel.
 
-The result is **The Ghost in Lane Four**, a fictional AI Liability Tribunal
-built on ProtoLink. Lawyers, technical witnesses, a regulator, an insurer, an
+The result is **The C-91 Incident**, a fictional **AI Liability Tribunal** built
+on ProtoLink. Lawyers, technical witnesses, a regulator, an insurer, an
 investigator, and jurors are autonomous, addressable agents. The jurors have
 recognizable professional backgrounds. They can ask one another questions,
 challenge claims, seek clarification, concede a point, and choose whom to
@@ -314,7 +314,7 @@ agents.
 
 ### The case is replaceable; the communication scaffold is reusable
 
-*The Ghost in Lane Four* is one configuration of the example, not its limit.
+*The C-91 Incident* is one configuration of the example, not its limit.
 The fastest extension is another binary guilty/not-guilty case using the same
 cast shape, tribunal procedure, and seven-exhibit convention:
 
@@ -870,7 +870,7 @@ python examples/ai_courtroom/run.py \
   --provider reference \
   --condition all \
   --seed 7 \
-  --output-dir examples/ai_courtroom/output/ghost-lane-seed-7
+  --output-dir examples/ai_courtroom/output/c-91-incident-seed-7
 ```
 
 Run a single mesh experiment:
