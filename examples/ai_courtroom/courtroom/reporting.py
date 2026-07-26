@@ -1476,14 +1476,14 @@ a { color: inherit; }
 }
 .section-head p { max-width: 470px; margin-bottom: 0; font-size: .82rem; }
 .replay-layout {
-  --replay-block-size: 30rem;
+  --replay-block-size: 32rem;
   display: grid;
   grid-template-columns: 1.2fr .8fr;
   align-items: stretch;
   gap: 16px;
 }
 @supports (height: 1svh) {
-  .replay-layout { --replay-block-size: clamp(26rem, 55svh, 30rem); }
+  .replay-layout { --replay-block-size: clamp(28rem, 58svh, 32rem); }
 }
 .replay-stage, .message-card {
   min-width: 0;
@@ -1721,9 +1721,9 @@ footer {
     height: auto;
     aspect-ratio: 720 / 410;
   }
-  .message-card { height: 30rem; }
+  .message-card { height: 32rem; }
   @supports (height: 1svh) {
-    .message-card { height: clamp(22rem, 62svh, 30rem); }
+    .message-card { height: clamp(24rem, 65svh, 32rem); }
   }
   .metric-grid, .treatment-ladder { grid-template-columns: repeat(2, 1fr); }
   .turning-grid { grid-template-columns: 1fr; }

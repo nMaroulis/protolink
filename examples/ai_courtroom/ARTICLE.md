@@ -90,13 +90,21 @@ The case rests on seven admitted exhibits. None is a magic smoking gun:
 | **E6 — Failed fallback** | A cellular outage defeated the assumed two-second remote response. Aster Vale knew of two nearby outages; the regulator had only an aggregate report. | The outage was external, but the failure of a known fallback may have been foreseeable. |
 | **E7 — Interaction test** | Safe stops were 19/20 for C-90 with the corrected map, 14/20 for C-90 with the crash map, 16/20 for C-91 with the corrected map, and 6/20 for C-91 with the crash map. | Both calibration and road state matter, and their combination is much worse than either factor alone. |
 
-The prosecution sees a preventable organizational failure: Aster Vale owned the
-release, had warning signs, relied on a fragile remote fallback, and put an
-unvalidated calibration on the road.
+Lina’s family argues that this was a preventable organizational failure: Aster
+Vale owned the release, had warning signs, relied on a fragile remote fallback,
+and put an unvalidated calibration on the road.
 
-The defence sees a rare compound accident: a moved road sign, an incorrect map,
-a network outage, a conditionally approved braking policy, and a safety concern
-that appeared to have passed its retest.
+Aster Vale argues that it was a rare compound accident: a moved road sign, an
+incorrect map, a network outage, a conditionally approved braking policy, and
+a safety concern that appeared to have passed its retest.
+
+The defendant is **Aster Vale Mobility**, not Rowan Hale personally. Amara Bell
+is counsel for Lina’s family. Rowan is Aster Vale’s vice president for product
+safety and designated tribunal representative; he is the current defence-side
+agent and argues for a not-guilty verdict, but he is not a defence lawyer. He
+authors the company’s opening and closing, while witnesses author their own
+testimony. An experiment specifically about legal advocacy should add a
+separate defence-counsel agent rather than silently relabel Rowan.
 
 The jury is not asked to identify one exclusive cause. It must decide whether
 all four elements of the fictional charge are satisfied:
@@ -303,6 +311,49 @@ This division matters:
 Autonomy does not require an unstructured free-for-all. It requires being clear
 about which decisions belong to the environment and which belong to the
 agents.
+
+### The case is replaceable; the communication scaffold is reusable
+
+*The Ghost in Lane Four* is one configuration of the example, not its limit.
+The fastest extension is another binary guilty/not-guilty case using the same
+cast shape, tribunal procedure, and seven-exhibit convention:
+
+1. Copy `examples/ai_courtroom` into a new example directory.
+2. Replace `CASE` in
+   [`courtroom/case_data.py`](courtroom/case_data.py): title, question, charge,
+   burden, elements, public summary, admitted evidence, and the private
+   synthetic-truth fixture used for evaluation.
+3. Rewrite `ACTOR_PROFILES`, `ROLE_PROMPTS`, and `JUROR_PROFILES` for the new
+   cast and incentives.
+4. Keep evidence identifiers in the `E1`, `E2`, … form, or update the prompt
+   contracts and evidence-reference recovery to match a different convention.
+5. Update the explicit `Agent` names, descriptions, and tags in
+   [`run.py`](run.py). Keeping the existing internal actor IDs is the
+   least-work route; changing the cast or its size also requires changing the
+   procedure in `simulation.py`.
+6. Run with a live provider. If the new example also needs a deterministic
+   offline golden path, replace the case-specific behaviour in
+   [`courtroom/reference_llm.py`](courtroom/reference_llm.py) and its expected
+   results in [`tests/test_courtroom.py`](tests/test_courtroom.py).
+
+The rest of the structure can remain: addressed agents, public-record delivery,
+Solo/Independent/Star/Mesh topology, observable juror state, frozen ballots,
+event ledger, comparison artifacts, and replay UI.
+
+For a different domain—an incident review, scientific peer review, product-risk
+council, policy committee, or negotiation—the same ProtoLink pattern still
+applies, but the courtroom vocabulary must also change:
+
+| What changes | Main module |
+| --- | --- |
+| Participants, models, and addresses | [`run.py`](run.py) |
+| Procedure, turn order, and topology | [`courtroom/simulation.py`](courtroom/simulation.py) |
+| Observable decisions and communication actions | [`courtroom/schemas.py`](courtroom/schemas.py) |
+| Replay labels and domain-specific presentation | [`courtroom/reporting.py`](courtroom/reporting.py) |
+
+This is not a generic one-file scenario loader today. It is a compact reference
+architecture whose reusable idea is clear: autonomous roles, controlled
+communication paths, explicit state changes, and replayable A2A tasks.
 
 <!--
 FIGURE 4 SUGGESTION — What ProtoLink carries
@@ -592,12 +643,78 @@ The same pattern works with the supported `openai`, `anthropic`, `gemini`,
 `ollama`, and `openai-compatible` backends. An OpenAI-compatible endpoint can
 be used for other hosted or local models.
 
+### A sharper benchmark: which model can move a fixed jury?
+
+A particularly interesting extension is to change only the defence-side model.
+Keep the case, evidence, judge, Lina’s family counsel, witnesses, juror models,
+role prompts, evidence order, topology, and inference settings fixed. Then ask:
+
+> Which model moves an otherwise fixed jury toward not guilty using only
+> admitted evidence?
+
+The current example can already test Rowan Hale as the defendant company’s
+representative. He authors Aster Vale’s opening and closing, although he is not
+a defence lawyer and the present examination turns do not ask him to author
+individual questions. A cleaner legal-advocacy benchmark would add a dedicated
+`defense_counsel_agent`, keep Rowan as the company representative or witness,
+and assign only the counsel agent’s `llm` to the candidate model. ProtoLink
+makes that separation natural because the model belongs to the individual
+`Agent`, not to a global workflow.
+
+I would start with the **Independent** condition so juror-to-juror persuasion
+cannot obscure the treatment, then repeat the experiment under Star and Mesh
+to see whether peer communication amplifies or resists the advocate.
+
+For each exact Claude, Gemini, GPT, Qwen, or local-model version, a credible
+closing-statement benchmark would:
+
+1. Freeze one public record and make the candidate defence closing the only
+   changing message.
+2. Generate several saved closings per model, then show each closing to fresh
+   copies of the same fixed jury. Ten closing samples crossed with ten jury
+   replicates gives 100 panels per model without pretending one lucky message
+   represents the model.
+3. Compare against a common reference defence closing and a no-closing
+   ablation, not just against another model’s changing prose.
+4. Report the final not-guilty verdict rate and the average change in juror
+   guilt registers after defence messages.
+5. Count categorical flips toward not guilty and how long those flips survive.
+6. Measure evidence grounding, unsupported claims, schema repair, failures,
+   latency, tokens, and cost.
+7. Publish intervals, sample counts, exact versions, and losing runs—not only
+   the most dramatic successful replay.
+
+Use provider-supported sampling seeds where available. The example’s `--seed`
+controls the deterministic fixture and procedural randomization; it does not
+force every live inference backend to sample identically. For providers
+without seeded generation, record repeated calls as stochastic replicates,
+randomize evaluation order, and save exact model versions and timestamps.
+
+If one model eventually produces not-guilty verdicts in 75 of 100 matched runs
+and another in 52, that would be a compelling result—but those numbers must be
+measured, never invented in advance. The more important question is whether
+the difference comes from evidence-based advocacy, exploitation of juror
+biases, confident unsupported rhetoric, or simple protocol reliability.
+
+“Persuasive” is not synonymous with “correct” or “good.” The hidden truth in
+this fixture favors guilt, so a stronger defence agent may be better at moving
+jurors away from the synthetic answer. Persuasive effectiveness, factual
+grounding, calibration, and verdict correctness therefore belong on separate
+axes.
+
+A serious leaderboard would also use multiple balanced fictional cases:
+some whose synthetic truth favors the defendant, some that favor liability,
+and some that remain deliberately ambiguous. Otherwise the benchmark may only
+measure which model happens to fit Aster Vale’s story.
+
 A credible comparison should:
 
 1. Freeze the case, prompts, topology, evidence order, round count, and output
    contracts.
-2. Pair runs by seed and verify matching public-record hashes and control
-   fingerprints.
+2. Match runs by recorded treatment and replicate IDs; use a seed as a matching
+   key only when the provider supports seeded inference. Verify matching public
+   records and control fingerprints wherever the experimental design requires
+   them to remain fixed.
 3. Repeat each condition; temperature zero does not guarantee determinism.
 4. Separate verdict accuracy from probability calibration, consensus, and
    stability.
@@ -617,16 +734,18 @@ That requires repeated runs and message ablations. The included fixture makes
 the experiment runnable; it does not answer the question in advance.
 
 <!--
-FIGURE 6 SUGGESTION — Provider experiment matrix
+FIGURE 6 SUGGESTION — Defence persuasion benchmark
 Placement: after the provider-comparison section, once real repeated runs exist.
-Do not prefill fabricated winners. Rows: exact provider/model/version. Columns:
-independent verdict accuracy, mesh verdict accuracy, message-ablation lift,
-vote-flip rate, evidence-grounding rate, schema-repair rate, routing-fallback
-rate, latency, estimated tokens, and measured cost. Show mean plus interval and
-sample count for every cell. Put model/date/temperature/seed set in a footnote.
-An adjacent scatter plot can compare grounding rate (x) with outcome change
-after communication (y), encoding influence concentration by point size.
-Caption: “Model quality and communication quality are different axes.”
+Do not prefill fabricated winners. Rows: exact defence provider/model/version.
+Columns: not-guilty panel rate, mean pre/post guilt-register change, vote flips
+toward not guilty, lift versus the common reference closing, evidence-grounding
+rate, unsupported-claim rate, schema-repair rate, latency, estimated tokens,
+and measured cost. Show Independent as the primary result and Star/Mesh as
+separate follow-up strata; do not pool the topologies. Give every cell an
+interval and panel count, and put model date, jury model, temperature, and
+replication design in a footnote. An adjacent scatter plot can compare
+grounding (x) with persuasion lift (y). Caption: “The most persuasive advocate
+is not necessarily the most truthful one.”
 -->
 
 ---
