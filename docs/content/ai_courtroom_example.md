@@ -11,9 +11,9 @@ keywords:
   - ProtoLink
 ---
 
-import courtroomHero from '@site/assets/ai_courtroom_article_hero.png';
+<!--import courtroomHero from '@site/assets/ai_courtroom_article_hero.png';
 import courtroomConditions from '@site/assets/ai_courtroom_conditions.png';
-import courtroomResults from '@site/assets/ai_courtroom_results.png';
+import courtroomResults from '@site/assets/ai_courtroom_results.png';-->
 
 # AI Courtroom Experiment
 
@@ -43,7 +43,7 @@ HTML reports.
 
 :::
 
-<figure className="doc-media-frame">
+<!--<figure className="doc-media-frame">
   <img
     src={courtroomHero}
     alt="A fictional autonomous vehicle in a rain-lit lane below a network of tribunal agents and jurors, with one juror's public verdict changing from not guilty to guilty"
@@ -53,7 +53,7 @@ HTML reports.
     ProtoLink makes the communication paths and observable revisions
     inspectable.
   </figcaption>
-</figure>
+</figure>-->
 
 The AI Courtroom is a flagship ProtoLink showcase built as an experiment rather
 than a scripted roleplay. Lawyers, witnesses, a judge, and jurors are separate,
@@ -150,7 +150,7 @@ Only the permitted peer communication changes:
 | `star` | The same five specialists | Four jurors address foreperson Sofia; Sofia chooses one reply target | Communication concentrated through a hub |
 | `mesh` | The same five specialists | Every juror chooses another juror and authors one direct message per round | Decentralized, agent-selected communication |
 
-<figure className="doc-media-frame">
+<!--<figure className="doc-media-frame">
   <img
     src={courtroomConditions}
     alt="Four communication conditions show one isolated generalist, five independent specialists, a foreperson star, and a decentralized direct-message mesh"
@@ -160,7 +160,7 @@ Only the permitted peer communication changes:
     Solo is useful context, but it also changes panel size, persona composition,
     and inference budget.
   </figcaption>
-</figure>
+</figure>-->
 
 Star is not an automatic broadcast. Sofia receives four independently authored
 messages, then chooses one juror and one issue to address. This makes her an
@@ -282,7 +282,7 @@ designed to make the communication treatment visible in one quick run:
 | `star` | Not guilty | 2–3 | 80.21 | 93 | 0 |
 | `mesh` | Guilty | 3–2 | 80.54 | 93 | 1 |
 
-<figure className="doc-media-frame">
+<!--<figure className="doc-media-frame">
   <img
     src={courtroomResults}
     alt="Four tribunal panels compare verdicts, ballots, mean final guilt probabilities, A2A event counts, and vote flips for Solo, Independent, Star, and Mesh"
@@ -291,7 +291,7 @@ designed to make the communication treatment visible in one quick run:
     These are deterministic fixture results, not evidence that one topology is
     generally superior.
   </figcaption>
-</figure>
+</figure>-->
 
 The independent and mesh juries receive the same public record. In the mesh
 run, Sofia challenges Anika with the interaction between the unvalidated C-91
