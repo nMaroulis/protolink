@@ -21,6 +21,7 @@ const sidebars = {
       collapsed: false,
       items: [
         'agent',
+        'authentication',
         'client',
         'flows',
         'llm',
@@ -34,7 +35,6 @@ const sidebars = {
         'telemetry',
         'tool',
         'transport',
-        'authentication',
         'types',
       ],
     },
