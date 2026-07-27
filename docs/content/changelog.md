@@ -34,14 +34,14 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.6.7] - TBD
+## [0.6.7] - 2026-07-28
 
 :::note Latest release
 
 This patch release hardens the controlled inference path from task admission through provider calls, tool execution,
 delegation, streaming finalization, and observability. It keeps the portable JSON action protocol as the default for
 local and smaller models while making malformed-output recovery, prompt metadata, budgets, retries, and task lifecycle
-behavior more deterministic. Adds vLLM client support natively. Also Adds the AI Courtroom Example.
+behavior more deterministic. Adds vLLM client support natively. Fixes Local Telemetry. Also adds the AI Courtroom Example.
 
 :::
 
