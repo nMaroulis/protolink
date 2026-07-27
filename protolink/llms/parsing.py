@@ -62,6 +62,45 @@ _ACTION_ENVELOPE_FIELDS = frozenset(
 )
 
 
+class ActionParseError(ValueError):
+    """Describe a model action that could not cross the runtime boundary.
+
+    ``parsed_data`` retains the decoded payload for capability-aware correction
+    without requiring callers to recover structure from a rendered error
+    string. ``feedback`` contains the concise validation detail that is safe to
+    return to the model; the full exception message remains available for logs
+    and telemetry. Subclassing ``ValueError`` preserves the parser's public
+    failure contract for callers that do not need the structured attributes.
+    """
+
+    def __init__(self, message: str, *, feedback: str, parsed_data: Any = None) -> None:
+        """Initialize a validation failure with separate log and retry views.
+
+        Args:
+            message: Complete bounded diagnostic for exceptions and telemetry.
+            feedback: Concise field-level detail suitable for correction
+                history. It should not repeat the full parsed payload.
+            parsed_data: Decoded and conservatively repaired response, when
+                decoding succeeded. The runtime inspects it but never dispatches
+                it unless strict action validation succeeds.
+        """
+        super().__init__(message)
+        self.feedback = feedback
+        self.parsed_data = parsed_data
+
+    @property
+    def action_type(self) -> str | None:
+        """Return the decoded outer ``type`` discriminator, when usable.
+
+        The value is observational context for retry guidance, not proof that
+        the corresponding action is valid or dispatchable.
+        """
+        if not isinstance(self.parsed_data, dict):
+            return None
+        value = self.parsed_data.get("type")
+        return value if isinstance(value, str) and value else None
+
+
 def parse_infer_response(
     response: str,
     *,
@@ -101,11 +140,11 @@ def parse_infer_response(
         ``LLMAction`` type alias.
 
     Raises:
-        ValueError: If no valid JSON object can be found or the parsed payload
-            does not satisfy the strict ``LLMAction`` contract. Validation
-            failures include field paths, Pydantic messages, and the parsed
-            payload so the infer loop can inject useful self-correction
-            feedback into conversation history.
+        ValueError: If no valid JSON object can be decoded.
+        ActionParseError: If decoding succeeds but the payload does not satisfy
+            the strict ``LLMAction`` contract. The exception separates bounded
+            log diagnostics from concise model feedback and retains the decoded
+            payload only as structured context for capability-aware correction.
     """
     data = decode_json_response(response)
     data = repair_fallback_action_payload(data, tools=tools or {}, agent_cards=agent_cards or [])
@@ -115,10 +154,20 @@ def parse_infer_response(
     except ValidationError as exc:
         diagnostics = format_validation_errors(exc)
         parsed_diagnostic = _format_parsed_data_diagnostic(data)
-        raise ValueError(f"Action validation failed. Field-level errors:\n{diagnostics}\n{parsed_diagnostic}") from exc
+        feedback = f"Action validation failed. Field-level errors:\n{diagnostics}"
+        raise ActionParseError(
+            f"{feedback}\n{parsed_diagnostic}",
+            feedback=feedback,
+            parsed_data=data,
+        ) from exc
     except Exception as exc:
         parsed_diagnostic = _format_parsed_data_diagnostic(data)
-        raise ValueError(f"Action validation failed: {exc}\n{parsed_diagnostic}") from exc
+        feedback = f"Action validation failed: {exc}"
+        raise ActionParseError(
+            f"{feedback}\n{parsed_diagnostic}",
+            feedback=feedback,
+            parsed_data=data,
+        ) from exc
 
 
 def repair_fallback_action_payload(

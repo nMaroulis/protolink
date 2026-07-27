@@ -94,6 +94,9 @@ behavior more deterministic. Adds vLLM client support natively. Fixes Local Tele
   when it contains no ProtoLink action-envelope fields. Full JSON fences, complete leading reasoning wrappers, and
   trailing commas receive syntax-only recovery; ambiguous objects, incomplete reasoning wrappers, and action-shaped
   payloads with missing or unknown types still fail validation.
+- Action-parse retries now preserve the decoded outer action type as structured error context and return
+  capability-aware correction feedback. Malformed or unavailable tool and Agent calls are explained explicitly, while
+  retry examples include only actions that the current inference can dispatch.
 - Agent discovery is now a best-effort delegation affordance: a Registry outage no longer prevents otherwise-local
   inference. Discovered ancestors are removed from the prompt, model-originated direct URL delegation is rejected, and
   delegation cycles are stopped before dispatch.

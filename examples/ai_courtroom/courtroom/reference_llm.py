@@ -489,7 +489,7 @@ class ReferenceCourtroomLLM(MockLLM):
         round_index = _round_index(request)
         move = moves[round_index % len(moves)]
         return {
-            "action": move["action"],
+            "move": move["action"],
             "target_id": target_id,
             "message": move["message"],
             "evidence_ids": list(move["evidence_ids"]),

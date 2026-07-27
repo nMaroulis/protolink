@@ -107,7 +107,7 @@ On a deliberation turn, a juror returns an observable public action:
 
 ```json
 {
-  "action": "ask_question",
+  "move": "ask_question",
   "target_id": "juror_ruben",
   "message": "Does the shared CI token make the company more accountable, or only make attribution harder?",
   "evidence_ids": ["E3"],
@@ -145,7 +145,7 @@ information hub and possible bottleneck.
 ### `mesh`
 
 Every juror receives a turn with all other jurors as permitted targets. The
-agent authors the recipient, action, message, and public intent.
+agent authors the recipient, move, message, and public intent.
 
 The primary communication comparison is `independent` versus `star` or `mesh`
 when their saved control fingerprints and public-record hashes match.

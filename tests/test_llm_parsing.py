@@ -5,7 +5,7 @@ import json
 import pytest
 
 from protolink.llms.actions import FinalAction, ToolCallAction
-from protolink.llms.parsing import parse_infer_response
+from protolink.llms.parsing import ActionParseError, parse_infer_response
 
 
 def test_embedded_object_extraction_is_string_and_escape_aware():
@@ -70,6 +70,19 @@ def test_list_final_content_is_serialized_losslessly():
 
 def test_bare_application_object_becomes_final_json_content():
     content = {"statement": "Plain application response", "evidence_ids": ["E4"]}
+
+    action = parse_infer_response(json.dumps(content))
+
+    assert isinstance(action, FinalAction)
+    assert json.loads(action.content) == content
+
+
+def test_bare_application_move_does_not_collide_with_runtime_action_fields():
+    content = {
+        "move": "attempt_persuasion",
+        "target_id": "juror_ruben",
+        "message": "Consider the deployment evidence.",
+    }
 
     action = parse_infer_response(json.dumps(content))
 
@@ -167,3 +180,20 @@ def test_schema_validation_parsed_data_diagnostic_is_stable_and_bounded():
     assert '{"alpha":"first","type":"final","zeta":"validation-start-' in diagnostic
     assert "-validation-end" in diagnostic
     assert len(diagnostic) < 2_500
+
+
+def test_action_parse_error_retains_structured_context_for_correction():
+    payload = {
+        "type": "agent_call",
+        "action": "attempt_persuasion",
+        "target_id": "juror_ruben",
+        "message": "Consider E3.",
+    }
+
+    with pytest.raises(ActionParseError) as exc_info:
+        parse_infer_response(json.dumps(payload))
+
+    assert exc_info.value.action_type == "agent_call"
+    assert exc_info.value.parsed_data == payload
+    assert "Field-level errors" in exc_info.value.feedback
+    assert "Parsed data" not in exc_info.value.feedback

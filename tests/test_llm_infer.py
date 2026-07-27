@@ -730,6 +730,102 @@ async def test_infer_validation_error_correction():
     assert any("Action validation failed" in msg["content"] for msg in llm.history.messages)
 
 
+@pytest.mark.asyncio
+async def test_infer_correction_explains_unavailable_malformed_agent_call():
+    responses = [
+        json.dumps(
+            {
+                "type": "agent_call",
+                "action": "attempt_persuasion",
+                "target_id": "juror_ruben",
+                "message": "Consider E3.",
+            }
+        ),
+        json.dumps({"type": "final", "content": "Corrected and done"}),
+    ]
+    llm = MockLLM(responses)
+
+    result = await llm.infer(query="Run", tools={})
+
+    assert result.content == "Corrected and done"
+    correction = next(
+        message["content"]
+        for message in llm.history.messages
+        if "not a dispatchable ProtoLink action" in message["content"]
+    )
+    assert "selected `agent_call`" in correction
+    assert "no agent delegation route is available" in correction
+    assert "delegated inference" not in correction
+    assert "Parsed data:" not in correction
+
+
+@pytest.mark.asyncio
+async def test_infer_correction_keeps_available_agent_call_shapes():
+    responses = [
+        json.dumps({"type": "agent_call", "agent": "helper", "action": "unsupported"}),
+        json.dumps({"type": "final", "content": "Corrected and done"}),
+    ]
+    llm = MockLLM(responses)
+    agent_callback = AsyncMock()
+
+    result = await llm.infer(query="Run", tools={}, agent_callback=agent_callback)
+
+    assert result.content == "Corrected and done"
+    correction = next(
+        message["content"]
+        for message in llm.history.messages
+        if "not a dispatchable ProtoLink action" in message["content"]
+    )
+    assert "must be either `infer` or `tool_call`" in correction
+    assert "delegated inference" in correction
+
+
+@pytest.mark.asyncio
+async def test_infer_corrects_valid_agent_call_when_delegation_is_unavailable():
+    llm = MockLLM(
+        [
+            json.dumps(
+                {
+                    "type": "agent_call",
+                    "agent": "helper",
+                    "action": "infer",
+                    "prompt": "Help with this task.",
+                }
+            ),
+            json.dumps({"type": "final", "content": "Handled directly"}),
+        ]
+    )
+
+    result = await llm.infer(query="Run", tools={})
+
+    assert result.content == "Handled directly"
+    correction = next(
+        message["content"] for message in llm.history.messages if "structurally valid" in message["content"]
+    )
+    assert "no agent delegation route is available" in correction
+    assert "Choose `final` instead" in correction
+    assert "tool_call" not in correction
+
+
+@pytest.mark.asyncio
+async def test_infer_corrects_valid_tool_call_when_no_tools_are_available():
+    llm = MockLLM(
+        [
+            json.dumps({"type": "tool_call", "tool": "invented", "args": {}}),
+            json.dumps({"type": "final", "content": "Handled without a tool"}),
+        ]
+    )
+
+    result = await llm.infer(query="Run", tools={})
+
+    assert result.content == "Handled without a tool"
+    correction = next(
+        message["content"] for message in llm.history.messages if "structurally valid" in message["content"]
+    )
+    assert "no local tools are available" in correction
+    assert "Choose another action, such as `final`" in correction
+
+
 def test_llm_schema_helpers():
     llm = MockLLM([])
 

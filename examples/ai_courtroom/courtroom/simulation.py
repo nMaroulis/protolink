@@ -70,7 +70,7 @@ The application does not derive it from a numerical threshold.
 DELIBERATION_CONTRACT = """
 JSON content contract:
 {
-  "action": "ask_question | challenge_claim | share_evidence | seek_clarification | attempt_persuasion | concede",
+  "move": "ask_question | challenge_claim | share_evidence | seek_clarification | attempt_persuasion | concede",
   "target_id": "one id from allowed_target_ids",
   "message": "the natural public message to send",
   "evidence_ids": ["only admitted E1..E7 identifiers"],

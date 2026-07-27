@@ -167,9 +167,29 @@ messages, then chooses one juror and one issue to address. This makes her an
 information hub and a possible bottleneck.
 
 Mesh is not a group chat. Each juror receives an explicit turn, selects an
-eligible recipient, chooses a human communication action, cites public
-evidence, and sends one addressed task. Only the selected receiver updates from
-that peer message.
+eligible recipient, chooses a human communication move, cites public evidence,
+and sends one addressed task. Only the selected receiver updates from that peer
+message.
+
+The juror's public application response names that choice `move`:
+
+```json
+{
+  "move": "attempt_persuasion",
+  "target_id": "juror_ruben",
+  "message": "How does E3 change your view of who controlled the deployment?",
+  "evidence_ids": ["E3"],
+  "public_intent": "Test whether deployment control changes the responsibility assessment."
+}
+```
+
+The name is deliberate. `action` already belongs to ProtoLink's outer runtime
+protocol: `final`, `tool_call`, and `agent_call` describe what the runtime
+should do, while an `agent_call` also uses its own `action` field for `infer` or
+`tool_call`. Calling the courtroom-level choice a `move` keeps application
+meaning separate from runtime intent and helps smaller JSON models avoid
+combining the two schemas. Internally, the report may still group these values
+as authored action types; the model-facing application contract uses `move`.
 
 For a valid controlled comparison, the saved public-record hashes and control
 fingerprints must also match. The deterministic reference fixture guarantees
@@ -325,7 +345,7 @@ setup is required.
 The report lets a developer:
 
 - play or step through every A2A exchange;
-- see the active sender, receiver, action, and public intent;
+- see the active sender, receiver, communication move, and public intent;
 - read the authored message and receiver's public reply;
 - inspect evidence citations and ProtoLink task metadata;
 - watch synchronized before/after guilt registers and votes;
@@ -433,7 +453,7 @@ monolithic orchestrator:
 | Operational identity | Every participant has an address, role, model, prompt, and task history |
 | Direct communication | Messages travel from one named agent to another through a ProtoLink task |
 | Configurable topology | The same agents can be isolated, hub-connected, or directly connected |
-| Agent-authored routing | Mesh jurors choose recipients and communication actions themselves |
+| Agent-authored routing | Mesh jurors choose recipients and communication moves themselves |
 | Interaction as data | Messages, citations, responses, state changes, and traces become replayable artifacts |
 | Independent models | Tribunal actors and jurors can use different providers behind one protocol |
 | Visible failure | Invalid targets, malformed outputs, repairs, and routing fallbacks are measured |

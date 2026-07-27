@@ -1084,20 +1084,40 @@ The parser intentionally refuses cases where repair would require choosing or in
 - an action found only inside a private reasoning wrapper with no public action after it.
 
 Raw responses and parsed payloads use deterministic, 2,000-character head-and-tail previews in diagnostics. This keeps
-an oversized valid or invalid response from flooding logs or the next correction prompt while retaining field paths
-and enough beginning/end context to diagnose truncation.
+an oversized valid or invalid response from flooding logs and telemetry while retaining enough beginning/end context
+to diagnose truncation. For a decoded action that fails schema validation, correction history receives the concise
+field-level feedback and detected outer action type, not another copy of the parsed-payload preview.
 
 ##### Correction attempts
 
 Parsing and action-schema failures are recoverable inside `infer()`. ProtoLink emits an `llm_parse_error` event,
-describes the exact failure in conversation history, and asks the model for one corrected action. Correction examples
-mention only action kinds available in the current run, keeping the prompt smaller and avoiding suggestions that a
-small model call an unavailable tool or Agent.
+retains bounded diagnostics for observability, and adds a correction message to conversation history. When JSON
+decoding succeeded, the parser carries the decoded outer `type` separately from the rendered error. The retry can
+therefore distinguish a malformed `agent_call`, malformed `tool_call`, invalid `final`, unknown action type, or object
+with no recognizable outer type without scraping its own diagnostic text.
+
+The correction also uses the current runtime capabilities. If the model selected `agent_call` but this inference has
+no delegation callback, ProtoLink says that the action cannot be dispatched and does not show Agent-call examples. If
+local tools or delegation are available, their canonical action shapes are included. ProtoLink does not silently
+convert an explicit malformed side-effect request into final content.
 
 ```text
-Your previous response could not be parsed as a valid action.
-Correct the reported fields and return exactly one supported action.
+Your previous response was not a dispatchable ProtoLink action.
+Validation feedback:
+Action validation failed. Field-level errors:
+  - Field 'agent_call -> action': Input should be 'tool_call' or 'infer'
+
+The response selected `agent_call`, but no agent delegation route is available
+for this inference, so that action cannot be dispatched.
+Return exactly one JSON object using a currently dispatchable action:
+- `final`: {"type":"final","content":"..."}
 ```
+
+That is representative rather than a fixed template: field details and available alternatives depend on the rejected
+payload, local tools, and delegation callback. A structurally valid `tool_call` or `agent_call` that reaches the
+dispatcher but names an unavailable capability receives similarly explicit correction. It is not counted as a parse
+failure because its action envelope was valid; the overall inference-step limit still prevents an endless correction
+loop.
 
 `max_parse_failures` controls the consecutive failure circuit breaker. It defaults to `3`, accepts integers from `1`
 through `10`, and resets after a successfully validated action:
@@ -1162,11 +1182,12 @@ Many model mistakes are observations, not immediate application failures:
 
 | Error type | Runtime response |
 |------------|------------------|
-| Unknown tool | Lists the tools that are actually available. |
+| Unknown or unavailable tool | Lists tools that are actually available, or states that this inference has none. |
 | Missing required fields | Returns field-level validation details. |
 | Wrong tool arguments | Explains the callable mismatch and asks the model to check the input schema. |
-| Agent not found | Reports the unavailable target and the known discovered agents. |
-| Invalid action type | Lists `final`, `tool_call`, and `agent_call`. |
+| Agent not found | Reports the unavailable target through the delegation callback. |
+| Agent delegation unavailable | States that no delegation route exists and suggests only dispatchable alternatives. |
+| Invalid action type | Reports the detected type and lists only action kinds available in the current inference. |
 
 Tool arguments are validated and conservatively coerced before authorization, deduplication, or tool-budget consumption. These model mistakes normally remain inside `infer()` so the model can correct them. An exception raised by the tool body, including `TypeError`, remains an execution failure and is not relabeled as an argument mismatch.
 

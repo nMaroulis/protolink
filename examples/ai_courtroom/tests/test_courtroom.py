@@ -215,7 +215,7 @@ def test_decision_vote_is_authored_and_evidence_is_grounded() -> None:
 def test_deliberation_action_must_be_authored_inside_topology() -> None:
     action, warnings = DeliberationAction.from_payload(
         {
-            "action": "ask",
+            "move": "ask",
             "target_id": "juror_ruben",
             "message": "Who controlled the C-91 deployment safeguard?",
             "evidence_ids": ["E3"],
@@ -231,7 +231,7 @@ def test_deliberation_action_must_be_authored_inside_topology() -> None:
     with pytest.raises(ResponseValidationError):
         DeliberationAction.from_payload(
             {
-                "action": "challenge_claim",
+                "move": "challenge_claim",
                 "target_id": "juror_anika",
                 "message": "Self-targeting should fail.",
                 "evidence_ids": [],
@@ -296,7 +296,7 @@ def test_reference_fixture_changes_its_authored_move_across_rounds() -> None:
     first = plan(0)
     second = plan(1)
     assert first["message"] != second["message"]
-    assert first["action"] != second["action"]
+    assert first["move"] != second["move"]
 
 
 def test_mixed_juror_provider_does_not_inherit_another_backends_model() -> None:

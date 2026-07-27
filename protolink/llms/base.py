@@ -6,8 +6,7 @@ models (LLaMA.cpp, MPT), all implementations inherit from this class.
 
 Creating a Custom LLM Wrapper
 -----------------------------
-To add support for a new LLM provider, create a subclass that implements
-the required abstract methods:
+To add support for a new LLM provider, create a subclass that implements the required abstract methods:
 
 Required Methods:
     - `call(history: ConversationHistory) -> str`: Single response generation
@@ -15,8 +14,7 @@ Required Methods:
 
 Optional Override:
     - `_inject_tool_call(...)`: Customize how tool results are injected into history.
-      Override this if your provider has specific tool-calling protocols (e.g., OpenAI
-      requires tool_call_id correlation).
+      Override this if your provider has specific tool-calling protocols (e.g. OpenAI requires tool_call_id correlation)
     - `validate_connection() -> bool`: Verify API connectivity or model availability.
 
 Example: Minimal Custom LLM
@@ -118,6 +116,7 @@ from protolink.llms.metrics import (
     profile_from_value,
 )
 from protolink.llms.parsing import (
+    ActionParseError,
     format_validation_errors,
     infer_unique_agent_for_tool,
     parse_function_call_shorthand,
@@ -148,6 +147,94 @@ _HISTORY_RESULT_FALLBACK_CHARS: int = 2_000
 logger = get_logger(__name__)
 
 
+def _action_correction_message(
+    error: ValueError,
+    *,
+    tools: dict[str, "BaseTool"],
+    agent_callback_available: bool,
+) -> str:
+    """Build concise correction feedback from validation and runtime context.
+
+    The runtime does not constrain a model's action choice in advance. After a failed response, however, it can state
+    which outer action was detected, whether that action is dispatchable in the current inference, and the canonical
+    shapes of the alternatives that are actually available.
+
+    Args:
+        error: Parser or action-schema failure from the current model response. ``ActionParseError`` supplies structured
+            decoded context; ordinary ``ValueError`` instances retain generic decoding feedback.
+        tools: Local tools dispatchable by this inference call.
+        agent_callback_available: Whether a validated ``agent_call`` can be routed by the runtime.
+
+    Returns:
+        A system-history message containing concise validation detail, the most specific capability explanation
+        supported by the failure, and only the canonical action forms available for the retry.
+    """
+    detail = error.feedback if isinstance(error, ActionParseError) else str(error)
+    action_type = error.action_type if isinstance(error, ActionParseError) else None
+    parsed_data = error.parsed_data if isinstance(error, ActionParseError) else None
+    lines = [
+        "Your previous response was not a dispatchable ProtoLink action.",
+        f"Validation feedback:\n{detail}",
+    ]
+
+    if action_type == "agent_call":
+        if agent_callback_available:
+            delegated_action = parsed_data.get("action") if isinstance(parsed_data, dict) else None
+            if delegated_action == "infer":
+                lines.append(
+                    "An `agent_call` with action `infer` requires a non-empty `agent` and `prompt`; "
+                    "it cannot contain `tool` or `args`."
+                )
+            elif delegated_action == "tool_call":
+                lines.append(
+                    "An `agent_call` with action `tool_call` requires a non-empty `agent`, "
+                    "a `tool`, and an `args` object; it cannot contain `prompt`."
+                )
+            else:
+                lines.append("The outer `agent_call.action` must be either `infer` or `tool_call`.")
+        else:
+            lines.append(
+                "The response selected `agent_call`, but no agent delegation route is available "
+                "for this inference, so that action cannot be dispatched."
+            )
+    elif action_type == "tool_call":
+        if tools:
+            lines.append("A `tool_call` requires an available `tool` name and an `args` object.")
+        else:
+            lines.append(
+                "The response selected `tool_call`, but no local tools are available "
+                "for this inference, so that action cannot be dispatched."
+            )
+    elif action_type == "final":
+        lines.append("A `final` action requires non-empty `content`.")
+    elif action_type and action_type not in {"final", "tool_call", "agent_call"}:
+        lines.append(f"The outer action type `{action_type}` is not recognized.")
+    elif action_type is None and isinstance(error, ActionParseError):
+        lines.append("No recognized outer action type could be inferred from the decoded object.")
+
+    lines.extend(
+        [
+            "Return exactly one JSON object using a currently dispatchable action:",
+            '- `final`: {"type":"final","content":"..."}',
+        ]
+    )
+    if tools:
+        available_tools = ", ".join(sorted(tools))
+        lines.append(
+            f'- `tool_call` (available tools: {available_tools}): {{"type":"tool_call","tool":"tool_name","args":{{}}}}'
+        )
+    if agent_callback_available:
+        lines.extend(
+            [
+                '- delegated inference: {"type":"agent_call","agent":"agent_name","action":"infer","prompt":"..."}',
+                "- delegated tool call: "
+                '{"type":"agent_call","agent":"agent_name","action":"tool_call",'
+                '"tool":"tool_name","args":{}}',
+            ]
+        )
+    return "\n".join(lines)
+
+
 def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext:
     """Normalize an optional run context value for direct LLM usage."""
     if isinstance(value, RunContext):
@@ -160,10 +247,9 @@ def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext
 def _history_safe_result(value: Any) -> Any:
     """Return a provider-history-serializable action result.
 
-    Valid JSON-compatible values retain their structure. Circular containers
-    and unusual application objects fall back to a bounded representation so a
-    completed external side effect can always be recorded before the loop
-    reaches its next cancellation or budget boundary.
+    Valid JSON-compatible values retain their structure. Circular containers and unusual application objects fall back
+    to a bounded representation so a completed external side effect can always be recorded before the loop reaches its
+    next cancellation or budget boundary.
     """
     try:
         json.dumps(value, default=json_history_default)
@@ -190,8 +276,8 @@ class LLM(ABC):
     """
     Abstract base class for all Large Language Model (LLM) implementations.
 
-    This class defines the core interface and shared functionality for any LLM,
-    whether it is API-based (OpenAI, Anthropic, Gemini), server-based (Ollama) or local (LLaMA, MPT, etc.).
+    This class defines the core interface and shared functionality for any LLM,  whether it is API-based (OpenAI,
+    Anthropic, Gemini), server-based (Ollama) or local (LLaMA, MPT, etc.).
 
     Subclasses are expected to define:
 
@@ -201,17 +287,16 @@ class LLM(ABC):
     Instance variables:
 
     - `model` (str): The identifier of the model to use (e.g., "gpt-4o-mini").
-    - `_model_params` (dict[str, Any]): Model-specific generation parameters. These
-      vary depending on the provider. Examples include:
-        - OpenAI: temperature, top_p, stop, max_tokens
-        - Anthropic: temperature, top_p, max_tokens
-        - Gemini: temperature, top_p, max_output_tokens
-    - `history` (ConversationHistory): Tracks conversation messages for multi-turn
-      interactions.
-    - `compactor` (HistoryCompactor): Owns provider-neutral history compaction,
-      summary generation, and isolated request-level compaction calls.
-    - `system_prompt` (str): Optional system instructions used as context for the
-      model when generating responses. Uses default prompts for agent, tool and llm calling.
+    - `_model_params` (dict[str, Any]): Model-specific generation parameters. These vary depending on the provider.
+        Examples include:
+            - OpenAI: temperature, top_p, stop, max_tokens
+            - Anthropic: temperature, top_p, max_tokens
+            - Gemini: temperature, top_p, max_output_tokens
+    - `history` (ConversationHistory): Tracks conversation messages for multi-turn interactions.
+    - `compactor` (HistoryCompactor): Owns provider-neutral history compaction, summary generation, and isolated
+      request-level compaction calls.
+    - `system_prompt` (str): Optional system instructions used as context for the model when generating responses. Uses
+      default prompts for agent, tool and llm calling.
     - `_reasoning` (ReasoningLevel): Whether to use chain of thought (CoT) for the model, adds reasoning steps to the
       response.
 
@@ -290,11 +375,9 @@ class LLM(ABC):
     def history(self) -> ConversationHistory:
         """Return the current conversation history for this execution context.
 
-        During an agent run, ProtoLink installs a task-local history with
-        :meth:`use_history`. Provider adapters and subclass hooks can keep
-        using ``self.history`` while concurrent tasks receive isolated history
-        objects. Outside a run context, this property returns the LLM's default
-        history for direct LLM usage and backward compatibility.
+        During an agent run, ProtoLink installs a task-local history with :meth:`use_history`. Provider adapters and
+        subclass hooks can keep using ``self.history`` while concurrent tasks receive isolated history objects. Outside
+        a run context, this property returns the LLM's default history for direct LLM usage and backward compatibility.
         """
         self._ensure_history_context()
         active_history = self._active_history.get()
@@ -304,10 +387,9 @@ class LLM(ABC):
     def history(self, value: ConversationHistory) -> None:
         """Set the active or default conversation history.
 
-        If a task-local history is active, assignment updates that context only.
-        Otherwise, assignment updates the LLM's default history. This preserves
-        existing direct ``llm.history = ...`` usage while preventing concurrent
-        agent runs from sharing mutable conversation state.
+        If a task-local history is active, assignment updates that context only. Otherwise, assignment updates the LLM's
+        default history. This preserves existing direct ``llm.history = ...`` usage while preventing concurrent agent
+        runs from sharing mutable conversation state.
         """
         if not isinstance(value, ConversationHistory):
             raise TypeError(f"history must be ConversationHistory, got {type(value).__name__}")
@@ -327,9 +409,8 @@ class LLM(ABC):
     def max_parse_failures(self) -> int:
         """Maximum consecutive action-parse failures before inference stops.
 
-        This is runtime behavior, not a provider generation parameter. Keeping
-        it outside ``model_params`` prevents ProtoLink-only configuration from
-        leaking into OpenAI-, Anthropic-, Ollama-, or compatible-server request
+        This is runtime behavior, not a provider generation parameter. Keeping it outside ``model_params`` prevents
+        ProtoLink-only configuration from leaking into OpenAI-, Anthropic-, Ollama-, or compatible-server request
         payloads.
         """
         return getattr(self, "_max_parse_failures", 3)
@@ -346,9 +427,8 @@ class LLM(ABC):
     def use_history(self, history: ConversationHistory):
         """Temporarily bind a task-local conversation history.
 
-        The binding is implemented with ``contextvars``, so it is isolated per
-        asyncio task and safely follows awaits. This lets one LLM instance serve
-        concurrent agent runs without interleaving their messages.
+        The binding is implemented with ``contextvars``, so it is isolated per asyncio task and safely follows awaits.
+        This lets one LLM instance serve concurrent agent runs without interleaving their messages.
 
         Args:
             history: Conversation history to use inside the context.
@@ -377,22 +457,16 @@ class LLM(ABC):
     ) -> "LLM":
         """Configure optional LLM budget metrics for this model.
 
-        Metrics are purely observational. They do not change prompt generation,
-        provider request payloads, retry behavior, or model responses. When an
-        ``event_callback`` or telemetry backend is attached, Protolink emits
-        per-call latency, usage, context-pressure, and cost events. Provider
-        token usage is preferred when available; otherwise Protolink uses local
-        estimates.
+        Metrics are purely observational. They do not change prompt generation, provider request payloads, retry
+        behavior, or model responses. When an ``event_callback`` or telemetry backend is attached, Protolink emits
+        per-call latency, usage, context-pressure, and cost events. Provider token usage is preferred when available;
+        otherwise Protolink uses local estimates.
 
         Args:
-            profile: Optional ``LLMModelProfile`` or dictionary. Pass this when
-                you already have model budget metadata.
-            context_window: Total context-window size in tokens. Used to
-                compute ``context.used_percent``.
-            input_cost_per_million: Input-token price per one million tokens.
-                Used only for estimated cost metadata.
-            output_cost_per_million: Output-token price per one million tokens.
-                Used only for estimated cost metadata.
+            profile: Optional ``LLMModelProfile`` or dictionary. Pass this when you already have model budget metadata.
+            context_window: Total context-window size in tokens. Used to compute ``context.used_percent``.
+            input_cost_per_million: Input-token price per one million tokens. Used only for estimated cost metadata.
+            output_cost_per_million: Output-token price per one million tokens. Used only for estimated cost metadata.
             currency: Currency code for cost estimates. Defaults to ``"USD"``.
             enabled: Whether to emit metrics when an observer is attached.
 
@@ -433,8 +507,8 @@ class LLM(ABC):
     ) -> HistoryCompactionResult:
         """Compact live history through this LLM's ``HistoryCompactor``.
 
-        This convenience facade preserves the direct LLM API. Applications
-        that need the component itself can call ``llm.compactor.compact()``.
+        This convenience facade preserves the direct LLM API. Applications that need the component itself can call
+        ``llm.compactor.compact()``.
 
         Args:
             strategy: ``"recent"``, ``"tokens"``, or ``"summary"``.
@@ -514,10 +588,9 @@ class LLM(ABC):
     def uses_native_action_prompt(self) -> bool:
         """Whether this LLM should receive provider-native tool instructions.
 
-        The default is ``False`` because the portable Protolink protocol is a
-        simple JSON action contract. Providers that actually send native tool
-        declarations override this so the system prompt does not ask the model
-        to emit JSON while the provider API is asking it to call tools.
+        The default is ``False`` because the portable Protolink protocol is a simple JSON action contract. Providers
+        that actually send native tool declarations override this so the system prompt does not ask the model to emit
+        JSON while the provider API is asking it to call tools.
         """
         return False
 
@@ -525,10 +598,9 @@ class LLM(ABC):
     def supports_native_action_stream(self) -> bool:
         """Whether ``streaming=True`` can acquire actions from native events.
 
-        Providers that override ``call_action_stream()`` to consume structured
-        streaming tool-call events should return ``True`` here. Providers that
-        stream plain text should keep the default ``False`` so the agent builds
-        the JSON action prompt for streaming inference.
+        Providers that override ``call_action_stream()`` to consume structured streaming tool-call events should return
+        ``True`` here. Providers that stream plain text should keep the default ``False`` so the agent builds the JSON
+        action prompt for streaming inference.
         """
         return False
 
@@ -542,28 +614,23 @@ class LLM(ABC):
     ) -> LLMActionResult:
         """Return one validated runtime action for the current conversation.
 
-        Subclasses with native tool/function-calling support should override
-        this method and normalize provider-native results into
-        :class:`~protolink.llms.actions.LLMActionResult`. The base
-        implementation is the compatibility path: call the model for text,
-        parse the prompt-defined JSON action, validate it with Pydantic, and
-        return the same typed result shape as native adapters.
+        Subclasses with native tool/function-calling support should override this method and normalize provider-native
+        results into :class:`~protolink.llms.actions.LLMActionResult`. The base implementation is the compatibility
+        path: call the model for text, parse the prompt-defined JSON action, validate it with Pydantic, and return the
+        same typed result shape as native adapters.
 
         Args:
             history: Conversation history for this inference step.
-            tools: Local tools available to this agent. Fallback adapters rely
-                on the system prompt for tool descriptions; native adapters use
-                this mapping to build provider tool declarations.
-            agent_callback_available: Whether agent delegation can be
-                dispatched by the runtime for this step.
-            agent_cards: Optional discovered agent cards. The fallback parser
-                uses this context only to repair unambiguous legacy shorthand
-                such as ``{"type":"agent_call","prompt":"list_directory(path='.')"}`
+            tools: Local tools available to this agent. Fallback adapters rely on the system prompt for tool
+                descriptions; native adapters use this mapping to build provider tool declarations.
+            agent_callback_available: Whether agent delegation can be dispatched by the runtime for this step.
+            agent_cards: Optional discovered agent cards. The fallback parser uses this context only to repair
+                unambiguous legacy shorthand such as ``{"type":"agent_call","prompt":"list_directory(path='.')"}`
                 into a fully typed ``AgentCallAction``.
 
         Returns:
-            A normalized and validated action result. The runtime dispatches
-            only this object, never raw provider payloads.
+            A normalized and validated action result. The runtime dispatches only this object, never raw provider
+                payloads.
         """
         _ = agent_callback_available
         raw_response = self.call(history)
@@ -581,11 +648,10 @@ class LLM(ABC):
     ) -> LLMActionResult:
         """Return one action from a streaming model call.
 
-        The base implementation is intentionally simple and local-model
-        friendly: stream text chunks, emit them to the optional callback, join
-        the chunks, and parse the final text as one Protolink JSON action. API
-        providers with native streaming tool-call events override this method
-        and normalize those events into the same ``LLMActionResult`` contract.
+        The base implementation is intentionally simple and local-model friendly: stream text chunks, emit them to the
+        optional callback, join the chunks, and parse the final text as one Protolink JSON action. API providers with
+        native streaming tool-call events override this method and normalize those events into the same
+        ``LLMActionResult`` contract.
         """
         _ = agent_callback_available
         chunks: list[str] = []
@@ -647,8 +713,9 @@ class LLM(ABC):
            wrapped in a transient error handler with exponential backoff and random jitter.
 
         3. **Action Validation**: The action is validated against the type-safe ``LLMAction`` union. If validation
-           fails, recursive field-level diagnostics (detailing the exact error location and type) are extracted from the
-           Pydantic validation error and injected back into history for self-correction.
+           fails, recursive field-level diagnostics are extracted from the Pydantic error. The retry message combines
+           that concise feedback with any decoded outer action type and the tools or delegation route available to the
+           current inference; the parsed-payload preview remains in bounded diagnostics rather than correction history.
 
         4. **Action Dispatch**: Based on the validated action type:
 
@@ -697,35 +764,29 @@ class LLM(ABC):
             Whether to invoke the underlying LLM in streaming mode. When True, the response is collected from an async
             generator before parsing.
         event_callback : Callable[[dict[str, Any]], Awaitable[None]], optional
-            Async observer called with normalized inference events. Events include
-            LLM chunks, parsed actions, tool execution results, delegated agent
-            calls, final output, and recoverable errors. The callback is for
+            Async observer called with normalized inference events. Events include LLM chunks, parsed actions, tool
+            execution results, delegated agent calls, final output, and recoverable errors. The callback is for
             observability only; the inference loop still returns a final ``Part``.
         event_metrics : bool, optional
-            Whether an attached event callback should activate optional call
-            metrics. The default preserves direct-caller behavior. Agent sets
-            this to false when its callback exists only for internal action
+            Whether an attached event callback should activate optional call metrics. The default preserves
+            direct-caller behavior. Agent sets this to false when its callback exists only for internal action
             receipts, avoiding token-estimation overhead on unobserved runs.
         action_authorizer : Callable[[RunAction], Awaitable[ActionAuthorization]], optional
-            Runtime callback invoked after a model action has been validated but
-            before a tool or delegated agent operation executes. The callback
-            may enrich the action, enforce capability policy, and obtain an
-            application-owned approval decision. Direct LLM usage may omit it;
-            the ``Agent`` runtime supplies its configured authorizer.
+            Runtime callback invoked after a model action has been validated but before a tool or delegated agent
+            operation executes. The callback may enrich the action, enforce capability policy, and obtain an
+            application-owned approval decision. Direct LLM usage may omit it;the ``Agent`` runtime supplies its
+            configured authorizer.
         cancellation_token : CancellationToken, optional
-            Live process-local token checked before model calls and action
-            dispatch. The owning Agent also cancels this coroutine directly so
-            awaited provider, tool, and delegation operations stop promptly.
+            Live process-local token checked before model calls and action dispatch. The owning Agent also cancels this
+            coroutine directly so awaited provider, tool, and delegation operations stop promptly.
         run_context : RunContext | dict, optional
-            Active run context used to correlate context manifests and enforce
-            ``RunBudget`` limits during the inference loop.
+            Active run context used to correlate context manifests and enforce ``RunBudget`` limits during the inference
+            loop.
         budget_policy : BudgetPolicy, optional
-            Policy used by the built-in ``BudgetEnforcer``. Omit this to use
-            the default allow/warn/deny policy.
+            Policy used by the built-in ``BudgetEnforcer``. Omit this to use the default allow/warn/deny policy.
         budget_enforcer : BudgetEnforcer, optional
-            Existing task-scoped enforcer. The Agent runtime supplies one when
-            several infer/tool parts share a task so usage, warnings, and runtime
-            accounting remain cumulative. Direct LLM callers may omit it.
+            Existing task-scoped enforcer. The Agent runtime supplies one when several infer/tool parts share a task so
+            usage, warnings, and runtime accounting remain cumulative. Direct LLM callers may omit it.
 
         Returns
         -------
@@ -778,10 +839,9 @@ class LLM(ABC):
            jitter. It retries on rate limits (429), server overloads (529), 5xx response codes, timeouts, and network
            disconnects.
 
-        3. *Granular Field-Level Self-Correction*: When Pydantic validation fails, the
-           error message returned to the model includes the exact Pydantic validation trace
-           (location, message, error type) rather than a generic parsing error, facilitating
-           precise correction of schema violations.
+        3. *Granular Field-Level Self-Correction*: When Pydantic validation fails, the model receives field locations,
+           messages, and error types plus capability-aware guidance derived from the decoded outer action. Parsed
+           payload previews remain in bounded diagnostics instead of being copied into privileged correction history.
 
         4. *Parse Failure Circuit Breaker*: After 3 consecutive JSON parse or schema validation failures, raises
            ``RuntimeError`` early rather than consuming the full step budget. Each failure injects corrective feedback.
@@ -1099,24 +1159,12 @@ class LLM(ABC):
                     raise RuntimeError(
                         f"Failed to parse LLM output after {parse_failures} consecutive attempts. Last error: {e}"
                     ) from e
-                # Keep correction prompts concise and capability-aware so small
-                # models are not invited to select unavailable action types.
-                examples = ['{"type":"final","content":"..."}']
-                if tools:
-                    examples.append('{"type":"tool_call","tool":"tool_name","args":{}}')
-                if agent_callback is not None:
-                    examples.extend(
-                        [
-                            '{"type":"agent_call","agent":"agent_name","action":"infer","prompt":"..."}',
-                            (
-                                '{"type":"agent_call","agent":"agent_name","action":"tool_call",'
-                                '"tool":"tool_name","args":{}}'
-                            ),
-                        ]
-                    )
                 self.history.add_system(
-                    f"Your previous response could not be parsed or validated. Error:\n{e}\n"
-                    "Return exactly one JSON action object, for example:\n" + "\n".join(examples)
+                    _action_correction_message(
+                        e,
+                        tools=tools,
+                        agent_callback_available=agent_callback is not None,
+                    )
                 )
                 continue
 
@@ -1175,7 +1223,15 @@ class LLM(ABC):
                             "phase": "validation",
                         }
                     )
-                    self.history.add_system(f"Unknown tool: '{tool_name}'. Available tools: {available}")
+                    if available:
+                        self.history.add_system(
+                            f"The `tool_call` selected unknown tool '{tool_name}'. Available tools: {available}"
+                        )
+                    else:
+                        self.history.add_system(
+                            "The `tool_call` was structurally valid, but no local tools are available "
+                            "for this inference. Choose another action, such as `final`."
+                        )
                     continue
 
                 tool = tools[tool_name]
@@ -1300,9 +1356,12 @@ class LLM(ABC):
                             "phase": "validation",
                         }
                     )
+                    alternatives = "`final`"
+                    if tools:
+                        alternatives += " or `tool_call` with an available local tool"
                     self.history.add_system(
-                        "agent_call is not available in this context. "
-                        "Please use 'tool_call' for local tools or produce a 'final' response."
+                        "The `agent_call` was structurally valid, but no agent delegation route is available "
+                        f"for this inference. Choose {alternatives} instead."
                     )
                     continue
 
@@ -1467,11 +1526,9 @@ class LLM(ABC):
     def _validate_tool_arguments(tool: "BaseTool", arguments: dict[str, Any] | None) -> dict[str, Any]:
         """Validate and lightly coerce model-proposed arguments before execution.
 
-        Native :class:`Tool` instances own richer validation that includes
-        resolved annotations. Protocol-compatible custom tools still receive
-        schema and callable-signature validation here, which keeps malformed
-        small-model calls recoverable without mistaking a ``TypeError`` raised
-        by the tool body for a bad argument list.
+        Native :class:`Tool` instances own richer validation that includes resolved annotations. Protocol-compatible
+        custom tools still receive schema and callable-signature validation here, which keeps malformed small-model
+        calls recoverable without mistaking a ``TypeError`` raised by the tool body for a bad argument list.
         """
         validate_args = getattr(tool, "validate_args", None)
         if getattr(tool, "_protolink_validates_args", False) and callable(validate_args):
@@ -1538,11 +1595,11 @@ class LLM(ABC):
         - HTTP 5xx (server errors)
         - Connection timeouts and network errors
 
-        Non-transient errors (e.g. authentication failures, invalid requests) are raised
-        immediately without consuming the retry budget.
+        Non-transient errors (e.g. authentication failures, invalid requests) are raised immediately without consuming
+        the retry budget.
 
-        The backoff schedule uses exponential delay with random jitter to prevent the
-        "thundering herd" problem when multiple agents hit rate limits simultaneously.
+        The backoff schedule uses exponential delay with random jitter to prevent the "thundering herd" problem when
+        multiple agents hit rate limits simultaneously.
 
         Parameters
         ----------
@@ -1551,11 +1608,9 @@ class LLM(ABC):
         *args : Any
             Positional arguments forwarded to ``fn``.
         **kwargs : Any
-            Keyword arguments forwarded to ``fn``. The retry controls
-            ``max_retries``, ``base_delay``, and ``max_delay`` may be provided
-            as keyword-only values and are consumed before calling ``fn``.
-            Private runtime hooks ``_before_attempt``, ``_on_retry``, and
-            ``_retry_predicate`` are likewise consumed by this wrapper.
+            Keyword arguments forwarded to ``fn``. The retry controls ``max_retries``, ``base_delay``, and ``max_delay``
+            may be provided as keyword-only values and are consumed before calling ``fn``. Private runtime hooks
+            ``_before_attempt``, ``_on_retry``, and ``_retry_predicate`` are likewise consumed by this wrapper.
         max_retries : int
             Maximum number of retry attempts. Defaults to 3.
         base_delay : float
@@ -1571,8 +1626,7 @@ class LLM(ABC):
         Raises
         ------
         Exception
-            The last exception encountered if all retries are exhausted, or immediately
-            for non-transient errors.
+            The last exception encountered if all retries are exhausted, or immediately for non-transient errors.
         """
         import asyncio
         import random
@@ -1706,9 +1760,8 @@ class LLM(ABC):
     def get_prompt_action_schema(self) -> dict[str, Any]:
         """Get the root-object JSON schema used by prompt fallback adapters.
 
-        Native tool-capable providers should expose each real tool as a native
-        function/tool declaration instead of using this schema for every action.
-        The schema exists for JSON-mode fallbacks that can constrain a single
+        Native tool-capable providers should expose each real tool as a native function/tool declaration instead of
+        using this schema for every action. The schema exists for JSON-mode fallbacks that can constrain a single
         response object but cannot represent provider-native tool calls.
         """
         return prompt_action_schema()
@@ -1716,9 +1769,8 @@ class LLM(ABC):
     def get_openai_action_schema(self) -> dict[str, Any]:
         """Compatibility alias for the prompt fallback action schema.
 
-        OpenAI-native action acquisition no longer uses this method because a
-        generic action schema cannot safely express dynamic tool arguments under
-        strict structured outputs. Use provider tools instead.
+        OpenAI-native action acquisition no longer uses this method because a generic action schema cannot safely
+        express dynamic tool arguments under strict structured outputs. Use provider tools instead.
         """
         return self.get_prompt_action_schema()
 
@@ -1868,11 +1920,9 @@ class LLM(ABC):
             user_instructions: Optional instructions from the user to customize behavior.
             agent_cards: JSON/text describing available agents for delegation.
             tools: JSON/text describing available tools for this agent.
-            action_mode: Explicit prompt protocol. ``"json"`` uses the simple
-                Protolink JSON action contract. ``"native"`` uses provider tool
-                instructions and leaves tool-call syntax to the backend. When
-                omitted, the LLM's ``uses_native_action_prompt`` property is
-                used.
+            action_mode: Explicit prompt protocol. ``"json"`` uses the simple Protolink JSON action contract.
+                ``"native"`` uses provider tool instructions and leaves tool-call syntax to the backend. When
+                omitted, the LLM's ``uses_native_action_prompt`` property is used.
             flow_instructions: Optional flow context instructions (e.g. pipeline step awareness).
             override_system_prompt: Whether to override completely the system prompt with the user defined prompt.
             persist: If True, updates the system prompt in history without wiping conversation turns.
@@ -1998,8 +2048,7 @@ class LLM(ABC):
 class SyncLLM:
     """Synchronous wrapper around LLM.
 
-    This class provides blocking equivalents of async methods
-    for use in:
+    This class provides blocking equivalents of async methods for use in:
     - scripts
     - CLI tools
     - notebooks without async support
@@ -2007,8 +2056,7 @@ class SyncLLM:
     Internally uses `asyncio.run()` to execute async operations.
 
     Warning:
-        This API should NOT be used inside an active event loop
-        (e.g., FastAPI, Jupyter async cells).
+        This API should NOT be used inside an active event loop (e.g., FastAPI, Jupyter async cells).
     """
 
     def __init__(self, llm: "LLM"):

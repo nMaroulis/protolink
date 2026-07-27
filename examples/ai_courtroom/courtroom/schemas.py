@@ -128,13 +128,13 @@ class DeliberationAction:
     ) -> tuple[DeliberationAction, list[str]]:
         """Validate an authored move against the communication topology."""
         warnings: list[str] = []
-        raw_action = str(payload.get("action", "")).strip().lower().replace("-", "_").replace(" ", "_")
-        action = _ACTION_ALIASES.get(raw_action, raw_action)
-        if action != raw_action:
-            warnings.append(f"Action `{raw_action}` normalized to `{action}`")
+        raw_move = str(payload.get("move", "")).strip().lower().replace("-", "_").replace(" ", "_")
+        action = _ACTION_ALIASES.get(raw_move, raw_move)
+        if action != raw_move:
+            warnings.append(f"Move `{raw_move}` normalized to `{action}`")
         if action not in DELIBERATION_ACTIONS:
             allowed = ", ".join(sorted(DELIBERATION_ACTIONS))
-            raise ResponseValidationError(f"Unknown deliberation action `{raw_action}`; choose one of: {allowed}")
+            raise ResponseValidationError(f"Unknown deliberation move `{raw_move}`; choose one of: {allowed}")
 
         target_id = str(payload.get("target_id", payload.get("target", ""))).strip()
         allowed_targets = tuple(
