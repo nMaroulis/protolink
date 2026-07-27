@@ -9,7 +9,19 @@ keywords:
   - approval-gated diffs
 ---
 
+import ExampleArticle from '@site/src/components/ExampleArticle';
+
 # ProtoAgent Case Study
+
+
+<ExampleArticle
+  source="Level Up Coding"
+  title="Building My Own Local “Claude Code”: What I Learned Demystifying Agentic Coding under the Hood"
+  description="When tools like Claude Code, Aider, Codex, Antigravity, Devin and more started popping up, my initial reaction as an AI engineer wasn’t just “Wow, this is cool” (which it is), it was “How does this actually work under the hood, and where does it fall apart?” especially for small models."
+  href="https://levelup.gitconnected.com/building-my-own-local-claude-code-what-i-learned-demystifying-agentic-coding-under-the-hood-8772874b91b8"
+  image="https://github.com/nMaroulis/protoagent/raw/main/misc/assets/banner.jpeg"
+  imageAlt="Building My Own Local “Claude Code”"
+/>
 
 :::tip[ProtoLink in production]
 

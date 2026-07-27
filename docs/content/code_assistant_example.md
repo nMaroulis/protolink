@@ -1,10 +1,16 @@
+import ExampleArticle from '@site/src/components/ExampleArticle';
+
 # Code Assistant Example
 
-:::info[Article]
+<ExampleArticle
+  source="Level Up Coding"
+  title="Build Easily Your Own Claude Code with Three Agents: Brain, Hands, and Coordinator"
+  description="Learn how to build a Claude Code-like system using a multi-agent architecture with specialized agents for planning, execution, and coordination."
+  href="https://levelup.gitconnected.com/build-easily-your-own-claude-code-with-three-agents-brain-hands-and-coordinator-5236b392ddf0"
+  image="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*MFPkOOnI5KY4V3_t7roF4A.jpeg"
+  imageAlt="Build Easily Your Own Claude Code with Three Agents"
+/>
 
-The article on [Level Up Coding](https://levelup.gitconnected.com/build-easily-your-own-claude-code-with-three-agents-brain-hands-and-coordinator-5236b392ddf0) gives an overview of this example.
-
-:::
 The directory containing the example files can be found [here](https://github.com/nMaroulis/protolink/tree/main/examples/code_assistant).
 
 This example builds a simplified **"Claude Code"** - a terminal coding assistant powered by a mesh of three autonomous agents. It demonstrates how to compose specialized agents into a system where a **brain reasons**, **hands execute**, and a **coordinator orchestrates** - just like a real AI coding assistant.

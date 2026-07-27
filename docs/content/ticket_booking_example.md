@@ -1,10 +1,17 @@
+import ExampleArticle from '@site/src/components/ExampleArticle';
+
 # Ticket Booking Example
 
-:::info[Article]
+<ExampleArticle
+  source="Level Up Coding"
+  title="Your First Autonomous Agent Mesh - Easier Than You Think"
+  description="In this guide we’ll build a Decentralized, Autonomous Vacation Booking System in Python using the Protolink library."
+  href="https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a"
+  image="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*P769Rh7y_C2hTRcydU4PWA.png"
+  imageAlt="Your First Autonomous Agent Mesh - Easier Than You Think"
+/>
 
-The article posted on Medium at [Level Up Coding](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) gives a an overview of this example and the rational behind it.
 
-:::
 The source files live in [`examples/ticket_booking`](https://github.com/nMaroulis/protolink/tree/main/examples/ticket_booking).
 
 This example demonstrates a practical multi-agent vacation planning workflow. A user asks for a relaxing Greek island trip, and a coordinator agent delegates to specialist agents for advice, weather validation, and hotel booking.
