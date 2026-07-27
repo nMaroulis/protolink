@@ -10,15 +10,13 @@ class ToolCall:
     """
     Standardized tool/capability invocation.
 
-    This mirrors A2A semantics where an agent requests another agent
-    to execute a specific capability.
+    This mirrors A2A semantics where an agent requests another agent to execute a specific capability.
 
     Attributes:
         tool_name: Canonical name of the tool or capability to invoke.
                    Example: "weather.get_temperature"
         args: Arguments passed to the tool.
-        call_id: Optional correlation ID used to match tool_call with
-                 the corresponding tool_output.
+        call_id: Optional correlation ID used to match tool_call with the corresponding tool_output.
     """
 
     tool_name: str
@@ -237,12 +235,10 @@ class Part:
         """
         Create a tool invocation part.
 
-        In A2A terms, this represents a request to execute a specific
-        agent capability (tool) along with its arguments.
+        In A2A terms, this represents a request to execute a specific agent capability (tool) along with its arguments.
 
-        This part is sent inside a Message and is interpreted by the
-        receiving agent, which routes the call to the appropriate
-        internal handler.
+        This part is sent inside a Message and is interpreted by the receiving agent, which routes the call to the
+        appropriate internal handler.
 
         Args:
             tool_name: Canonical name of the tool or capability to invoke.
@@ -275,11 +271,10 @@ class Part:
         """
         Create a tool result part.
 
-        This part is used to return the outcome of a previously issued
-        tool_call. It completes the tool invocation lifecycle.
+        This part is used to return the outcome of a previously issued tool_call. It completes the tool invocation
+        lifecycle.
 
-        In A2A, this corresponds to emitting the execution result of
-        a capability back to the requesting agent.
+        In A2A, this corresponds to emitting the execution result of a capability back to the requesting agent.
 
         Args:
             call_id: Correlation ID matching the original tool_call.

@@ -1,6 +1,8 @@
 """Tests for the AgentCard class."""
 
-from protolink.core.agent_card import AgentCapabilities, AgentCard
+import json
+
+from protolink.core.agent_card import AgentCapabilities, AgentCard, AgentSkill
 
 
 def test_agent_card_initialization():
@@ -95,3 +97,32 @@ def test_from_dict_missing_fields():
     assert isinstance(card.capabilities, AgentCapabilities)
     assert card.capabilities.streaming is False  # Default value
     assert card.security_schemes == {}  # Default empty dict
+
+
+def test_prompt_format_is_deterministic_json_metadata():
+    card = AgentCard(
+        name="prompt-agent",
+        description='Handles "quoted" requests\nwithout breaking JSON.',
+        url="http://prompt.local",
+        capabilities=AgentCapabilities(streaming=True, tool_calling=True),
+        skills=[
+            AgentSkill(id="zeta", description="Last", input_schema={"type": "object"}),
+            AgentSkill(
+                id="alpha",
+                description="First",
+                input_schema={"required": ["query"], "type": "object"},
+                output_schema={"type": "string"},
+                examples=[{"query": "hello"}],
+            ),
+        ],
+    )
+
+    prompt = card.get_prompt_format()
+    assert prompt == card.get_prompt_format()
+
+    metadata = json.loads(prompt)
+    assert metadata["name"] == "prompt-agent"
+    assert metadata["description"] == 'Handles "quoted" requests\nwithout breaking JSON.'
+    assert metadata["capabilities"]["streaming"] is True
+    assert metadata["capabilities"]["tool_calling"] is True
+    assert [tool["name"] for tool in metadata["tools"]] == ["alpha", "zeta"]

@@ -57,10 +57,8 @@ class _RemoteTask:
 class A2AJSONRPCClientAdapter:
     """Use an existing HTTP transport to call A2A 1.0 JSON-RPC agents.
 
-    The adapter deliberately has no dependency on the official SDK. It reuses
-    the configured ProtoLink transport so TLS, authentication, connection
-    pooling, limits, and telemetry keep working exactly as they do for native
-    requests.
+    The adapter deliberately has no dependency on the official SDK. It reuses the configured ProtoLink transport so TLS,
+    authentication, connection pooling, limits, and telemetry keep working exactly as they do for native requests.
     """
 
     _HEADERS: ClassVar[dict[str, str]] = {"A2A-Version": A2A_PROTOCOL_VERSION}

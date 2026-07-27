@@ -21,10 +21,9 @@ Welcome to the Protolink documentation.
 
 This site provides an overview of the framework, its concepts, and how to use it in your projects.
 
-_Current release: **0.6.6** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
+_Current release: **0.6.7** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
 
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Current Version](https://img.shields.io/badge/current-0.6.6-0A84FF)](https://pypi.org/project/protolink/)
 [![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)
 [![GitHub stars](https://img.shields.io/github/stars/nMaroulis/protolink?style=flat&logo=github)](https://github.com/nMaroulis/protolink/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/nMaroulis/protolink?style=flat&logo=github)](https://github.com/nMaroulis/protolink/forks)
@@ -44,7 +43,7 @@ These Python models are ergonomic runtime forms of A2A's core primitives, not co
 
 The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, built-in, native, or [**MCP**](https://modelcontextprotocol.io/docs/getting-started/intro) tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
-ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
+ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, vLLM, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
 
 The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hosted model SDKs, MCP, telemetry providers, and other integrations are installed only when you choose them.
 

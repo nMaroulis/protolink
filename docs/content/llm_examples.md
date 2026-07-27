@@ -24,6 +24,7 @@ Common parameters for all wrappers include:
 - `LlamaCPPServerLLM`
 - `LlamaCPPLocalLLM`
 - `LMStudioLLM`
+- `VLLMLLM`
 - `OpenAICompatibleLLM`
 
 :::

@@ -1,11 +1,9 @@
 """Normalized run-report comparison for regression testing.
 
-The helpers in this module compare two :class:`RunReport` objects, typically
-captured after their runs finish.
-They do not execute agents, models, tools, transports, or side effects. Runtime
-generated identifiers and timestamps are normalized inside known ProtoLink
-envelopes so a fresh candidate run can be compared with a stored baseline
-without hiding application-owned identifiers in tool payloads.
+The helpers in this module compare two :class:`RunReport` objects, typically captured after their runs finish. They do
+not execute agents, models, tools, transports, or side effects. Runtime generated identifiers and timestamps are
+normalized inside known ProtoLink envelopes so a fresh candidate run can be compared with a stored baseline without
+hiding application-owned identifiers in tool payloads.
 """
 
 from __future__ import annotations
@@ -62,17 +60,14 @@ _SKIP = object()
 class RunReportTolerance:
     """Numeric tolerance applied to values at one report path.
 
-    ``path`` is an RFC 6901 JSON Pointer pattern. The ``*`` segment extension
-    matches exactly one dictionary key or list index, for example
-    ``/events/*/payload/latency_ms``. Rules are evaluated in declaration order
-    and the first matching rule wins.
+    ``path`` is an RFC 6901 JSON Pointer pattern. The ``*`` segment extension matches exactly one dictionary key or list
+    index, for example ``/events/*/payload/latency_ms``. Rules are evaluated in declaration order and the first matching
+    rule wins.
 
     Args:
         path: JSON Pointer pattern identifying numeric values.
-        absolute_tolerance: Maximum absolute difference accepted by
-            :func:`math.isclose`.
-        relative_tolerance: Maximum relative difference accepted by
-            :func:`math.isclose`.
+        absolute_tolerance: Maximum absolute difference accepted by :func:`math.isclose`.
+        relative_tolerance: Maximum relative difference accepted by :func:`math.isclose`.
     """
 
     path: str
@@ -98,14 +93,11 @@ class RunReportDiffConfig:
 
     Args:
         sections: Report sections to compare.
-        normalize_volatile: Canonicalize known runtime-generated identifiers
-            and timestamps. Application-owned values inside tool payloads and
-            report metadata remain exact.
-        ignore_paths: Additional RFC 6901 JSON Pointer patterns to omit. A
-            ``*`` segment matches exactly one key or index. Ignoring a
-            container omits its complete subtree.
-        tolerances: Ordered numeric tolerance rules. Booleans are never treated
-            as numbers.
+        normalize_volatile: Canonicalize known runtime-generated identifiers and timestamps. Application-owned values
+            inside tool payloads and report metadata remain exact.
+        ignore_paths: Additional RFC 6901 JSON Pointer patterns to omit. A ``*`` segment matches exactly one key or
+            index. Ignoring a container omits its complete subtree.
+        tolerances: Ordered numeric tolerance rules. Booleans are never treated as numbers.
     """
 
     sections: tuple[RunReportSection, ...] = ALL_RUN_REPORT_SECTIONS
@@ -234,9 +226,8 @@ def normalize_run_report(
 ) -> dict[str, Any]:
     """Return a deterministic report projection suitable for comparison.
 
-    The source is never mutated. Known runtime identifiers are canonicalized
-    per report so their relationships remain visible while freshly generated
-    values do not create false regressions.
+    The source is never mutated. Known runtime identifiers are canonicalized per report so their relationships remain
+    visible while freshly generated values do not create false regressions.
     """
     active_config = config or RunReportDiffConfig()
     report = _coerce_report(source)
@@ -458,27 +449,29 @@ def _diff_values(
     differences: list[RunReportDifference],
 ) -> None:
     if isinstance(baseline, dict) and isinstance(candidate, dict):
-        keys = sorted(set(baseline).union(candidate))
+        baseline_dict = cast(dict[str, Any], baseline)
+        candidate_dict = cast(dict[str, Any], candidate)
+        keys = sorted(set(baseline_dict).union(candidate_dict))
         for key in keys:
             child_path = (*path, key)
-            if key not in baseline:
+            if key not in baseline_dict:
                 _append_difference(
                     differences,
                     path=child_path,
                     kind="added",
-                    candidate=candidate[key],
+                    candidate=candidate_dict[key],
                 )
-            elif key not in candidate:
+            elif key not in candidate_dict:
                 _append_difference(
                     differences,
                     path=child_path,
                     kind="removed",
-                    baseline=baseline[key],
+                    baseline=baseline_dict[key],
                 )
             else:
                 _diff_values(
-                    baseline[key],
-                    candidate[key],
+                    baseline_dict[key],
+                    candidate_dict[key],
                     path=child_path,
                     config=config,
                     differences=differences,

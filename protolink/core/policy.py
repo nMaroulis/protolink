@@ -107,8 +107,7 @@ class ApprovalRequest:
         """Serialize the request into a JSON-compatible dictionary.
 
         Args:
-            redaction_policy: Optional policy used to mask secrets before the
-                dictionary is returned.
+            redaction_policy: Optional policy used to mask secrets before the dictionary is returned.
         """
         data = {
             "request_id": self.request_id,
@@ -277,17 +276,13 @@ class ActionDeniedError(ActionPolicyError):
 class CapabilityPolicy:
     """Evaluate actions using extensible capability rules.
 
-    Rules map capability names to ``allow``, ``deny``, or
-    ``require_approval``. Exact names and namespace wildcards such as
-    ``"workspace.*"`` are supported. Runtime rules and compatible values from
-    ``RunContext.permissions`` are combined using the most restrictive effect,
-    so task metadata can narrow but cannot weaken runtime-owned policy.
+    Rules map capability names to ``allow``, ``deny``, or  ``require_approval``. Exact names and namespace wildcards
+    such as ``"workspace.*"`` are supported. Runtime rules and compatible values from ``RunContext.permissions`` are
+    combined using the most restrictive effect, so task metadata can narrow but cannot weaken runtime-owned policy.
 
-    Permission values may be effects, booleans, or mappings. ``True`` means
-    allow, ``False`` means deny, and a mapping without an explicit ``effect``
-    is treated as a scoped grant. Applications needing path-, row-, account-,
-    or resource-level checks should implement the ``Policy`` protocol and
-    inspect the full action payload.
+    Permission values may be effects, booleans, or mappings. ``True`` means allow, ``False`` means deny, and a mapping
+    without an explicit ``effect`` is treated as a scoped grant. Applications needing path-, row-, account-, or
+    resource-level checks should implement the ``Policy`` protocol and inspect the full action payload.
     """
 
     def __init__(
@@ -300,8 +295,7 @@ class CapabilityPolicy:
         """Initialize a capability policy.
 
         Args:
-            rules: Runtime-owned capability rules. Exact and ``.*`` wildcard
-                keys are supported.
+            rules: Runtime-owned capability rules. Exact and ``.*`` wildcard keys are supported.
             default_effect: Result when neither runtime nor context rules match.
             name: Stable policy name included in decisions and traces.
         """
@@ -312,17 +306,14 @@ class CapabilityPolicy:
     def to_dict(self) -> dict[str, Any]:
         """Serialize this first-party policy as safe declarative configuration.
 
-        Only JSON-compatible rule data is accepted. Policy implementations and
-        approval callbacks are executable application objects and are therefore
-        intentionally outside this format.
+        Only JSON-compatible rule data is accepted. Policy implementations and approval callbacks are executable
+        application objects and are therefore intentionally outside this format.
 
         Returns:
-            A dictionary containing the stable policy type, rules, default
-            effect, and name.
+            A dictionary containing the stable policy type, rules, default effect, and name.
 
         Raises:
-            TypeError: A capability name or nested rule value is not safe
-                declarative data.
+            TypeError: A capability name or nested rule value is not safe declarative data.
         """
         rules: dict[str, Any] = {}
         for capability, value in self.rules.items():
@@ -385,9 +376,8 @@ class CapabilityPolicy:
     async def evaluate(self, action: RunAction, context: RunContext) -> PolicyDecision:
         """Evaluate all capabilities required by an action.
 
-        The strongest effect wins across capabilities: deny outranks approval,
-        which outranks allow. A canceled run is always denied before capability
-        rules are considered.
+        The strongest effect wins across capabilities: deny outranks approval, which outranks allow. A canceled run is
+        always denied before capability rules are considered.
         """
         if context.canceled:
             return PolicyDecision(
@@ -477,10 +467,9 @@ def _policy_config_value(value: Any) -> Any:
 class ActionAuthorizer:
     """Coordinate policy evaluation and optional application approval.
 
-    The authorizer is the only component that turns a policy decision into an
-    execution authorization. It fails closed when approval is required and no
-    handler is installed, and it preserves every decision as typed data for
-    events, traces, tests, and user interfaces.
+    The authorizer is the only component that turns a policy decision into an execution authorization. It fails closed
+    when approval is required and no handler is installed, and it preserves every decision as typed data for events,
+    traces, tests, and user interfaces.
     """
 
     def __init__(

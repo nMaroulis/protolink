@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.6.6"
+version = "0.6.7"
 description = "A lightweight Python runtime for local and distributed agent meshes."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -112,7 +112,7 @@ test = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.1",
     "ruff==0.14.4",
-    "ty>=0.0.60",
+    "ty>=0.0.62",
     "pre-commit>=4.4.0",
     "protolink[grpc]", # For testing gRPC transport
     "protolink[http]", # For testing HTTP transport

@@ -24,8 +24,7 @@ from protolink.utils.renderers.status import to_registry_status_html
 class Registry:
     """Centralized Registry with server and client components.
 
-    The registry maintains secondary indexes for agent names, roles, and tags
-    to optimize discovery performance.
+    The registry maintains secondary indexes for agent names, roles, and tags to optimize discovery performance.
 
     Time Complexity:
         - handle_register: O(T) where T is the number of tags (index updates are O(1))
@@ -57,14 +56,12 @@ class Registry:
             transport: Transport instance
             url: Registry URL
             verbosity: Verbosity level [0: Warning, 1: Info, 2: Debug]
-            entry_ttl_seconds: Optional liveness TTL. Entries whose heartbeat
-                is older than this value are pruned before discovery/status.
-            storage: Optional generic storage used to persist registry entries
-                across process restarts.
+            entry_ttl_seconds: Optional liveness TTL. Entries whose heartbeat is older than this value are pruned before
+                discovery/status.
+            storage: Optional generic storage used to persist registry entries across process restarts.
 
         A transport name creates a default transport for rapid prototyping.
-        Pass a concrete transport instance to configure TLS, limits, retries,
-        keepalive, or protocol-specific behavior.
+        Pass a concrete transport instance to configure TLS, limits, retries, keepalive, or protocol-specific behavior.
         """
         self.logger = get_logger(__name__, verbosity)
 
@@ -157,26 +154,24 @@ class Registry:
     def start(self, *, background: bool = False) -> None:
         """Start the registry runtime and initialize the discovery server.
 
-        This is the primary public entrypoint for running the registry. It is designed to be
-        environment-agnostic, working seamlessly in:
+        This is the primary public entrypoint for running the registry. It is designed to be environment-agnostic,
+        working seamlessly in:
         - standard scripts
         - async applications
         - background threads
         - Jupyter notebooks (interactive environments)
 
         **Technical Note on Lifecycle Orchestration:**
-        Protolink handles the transition between synchronous and asynchronous contexts using
-        a dual-mode execution strategy:
+        Protolink handles the transition between synchronous and asynchronous contexts usinga dual-mode execution
+        strategy:
 
-        1. **Deterministic Background Mode (``background=True``):** Starts a dedicated thread
-           with its own ``asyncio`` event loop. To prevent race conditions, this method
-           utilizes a ``threading.Event`` to block the caller until the background registry is
-           fully initialized and ready to receive traffic. Any startup failures (e.g., port
-           collisions) are captured and re-raised in the caller thread.
+        1. **Deterministic Background Mode (``background=True``):** Starts a dedicated thread with its own ``asyncio``
+            event loop. To prevent race conditions, this method utilizes a ``threading.Event`` to block the caller until
+            the background registry is fully initialized and ready to receive traffic. Any startup failures (e.g., port
+            collisions) are captured and re-raised in the caller thread.
 
-        2. **Blocking Mode (``background=False``):** Utilizes ``asyncio.run()`` to take over
-           the main thread's execution. This is the recommended pattern for standalone
-           registry scripts.
+        2. **Blocking Mode (``background=False``):** Utilizes ``asyncio.run()`` to take over the main thread's
+            execution. This is the recommended pattern for standalone registry scripts.
 
         Args:
             background: Controls execution mode. If True, returns immediately after startup.
@@ -259,22 +254,20 @@ class Registry:
     def stop(self) -> None:
         """Stop the registry runtime and orchestrate a graceful teardown.
 
-        This method handles shutdown across all supported execution environments (scripts,
-        async loops, background threads, and notebooks). It is specifically designed to
-        safely terminate registries started with ``background=True``.
+        This method handles shutdown across all supported execution environments (scripts, async loops, background
+        threads, and notebooks). It is specifically designed to safely terminate registries started with
+        ``background=True``.
 
         **Technical Note on Thread-Safe Teardown:**
-        When the registry is running in a background thread, its lifecycle is managed by a private
-        event loop. To stop it from the main thread, we utilize ``call_soon_threadsafe`` to
-        inject a cancellation request into the background loop. This triggers a
-        ``CancelledError`` within the ``_lifecycle()`` coroutine, allowing it to execute its
-        ``finally`` blocks, which perform critical cleanup like closing the transport and
-        stopping the ASGI server.
+        When the registry is running in a background thread, its lifecycle is managed by a private event loop. To stop
+        it from the main thread, we utilize ``call_soon_threadsafe`` to inject a cancellation request into the
+        background loop. This triggers a ``CancelledError`` within the ``_lifecycle()`` coroutine, allowing it to
+        execute its ``finally`` blocks, which perform critical cleanup like closing the transport and stopping the ASGI
+        server.
 
-        The subsequent ``join(timeout=10)`` synchronizes the main thread with the background
-        thread's exit. This ensures that the caller doesn't proceed (or the process doesn't
-        exit) while the background server is still in the middle of a graceful port release
-        or connection drain.
+        The subsequent ``join(timeout=10)`` synchronizes the main thread with the background thread's exit. This ensures
+        that the caller doesn't proceed (or the process doesn't exit) while the background server is still in the middle
+        of a graceful port release or connection drain.
 
         Notes:
             - Safe to call multiple times.
@@ -375,8 +368,8 @@ class Registry:
     async def handle_heartbeat(self, agent_url: str) -> dict[str, str]:
         """Refresh liveness metadata for one registered agent.
 
-        Heartbeats are intentionally small: they do not mutate the card or
-        indexes, only the ``last_seen`` timestamp used by TTL pruning.
+        Heartbeats are intentionally small: they do not mutate the card or indexes, only the ``last_seen`` timestamp
+        used by TTL pruning.
         """
         self._prune_expired()
         entry = self._entries.get(agent_url)
@@ -426,7 +419,6 @@ class Registry:
             as_json: If True, returns dicts instead of AgentCard objects.
 
         Time: O(K) where K is the number of potential candidates in the intersected sets.
-        Improved from O(N) linear scan.
         """
         self._prune_expired()
         if not filter_by:

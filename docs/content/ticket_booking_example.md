@@ -2,7 +2,7 @@
 
 :::info[Article]
 
-The article on [Level Up Coding](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) gives a hands-on overview of this example.
+The article posted on Medium at [Level Up Coding](https://levelup.gitconnected.com/your-first-autonomous-agent-mesh-easier-than-you-think-ce697b3dd87a) gives a an overview of this example and the rational behind it.
 
 :::
 The source files live in [`examples/ticket_booking`](https://github.com/nMaroulis/protolink/tree/main/examples/ticket_booking).

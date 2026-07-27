@@ -1,8 +1,7 @@
 """Run reports, replay helpers, and golden-run assertions.
 
-``RunEvent`` is the live application-facing stream. ``RunReport`` is the
-durable summary built from that stream: compact enough for JSONL or SQLite, but
-structured enough for trace UIs, replay tools, and integration tests.
+``RunEvent`` is the live application-facing stream. ``RunReport`` is the durable summary built from that stream: compact
+enough for JSONL or SQLite, but structured enough for trace UIs, replay tools, and integration tests.
 """
 
 from __future__ import annotations
@@ -107,8 +106,7 @@ class RunReport:
         """Serialize the report into a JSON-compatible dictionary.
 
         Args:
-            redaction_policy: Optional policy used to mask secrets before the
-                dictionary is returned.
+            redaction_policy: Optional policy used to mask secrets before the dictionary is returned.
         """
         data = {
             "context": self.context.to_dict() if self.context else None,
@@ -152,9 +150,8 @@ class RunReport:
 class RunRecorder:
     """In-memory recorder for building ``RunReport`` objects from run events.
 
-    ``RunRecorder`` intentionally mirrors ``InMemoryEventSink`` while adding the
-    report-building API. It is suitable for tests, command-line apps, and local
-    traces that need a durable summary after streaming has finished.
+    ``RunRecorder`` intentionally mirrors ``InMemoryEventSink`` while adding the report-building API. It is suitable for
+    tests, command-line apps, and local traces that need a durable summary after streaming has finished.
     """
 
     def __init__(self, *, context: RunContext | dict[str, Any] | None = None) -> None:
@@ -222,9 +219,8 @@ class RunRecorder:
 class RunReplay:
     """Read-only replay view over a ``RunReport``.
 
-    Replay helpers do not execute tools or model calls. They provide a stable
-    way to iterate over recorded events, filter by event type, and run the same
-    assertion helpers used by golden tests.
+    Replay helpers do not execute tools or model calls. They provide a stable way to iterate over recorded events,
+    filter by event type, and run the same assertion helpers used by golden tests.
     """
 
     def __init__(self, report: RunReport | dict[str, Any] | Iterable[RunEvent | dict[str, Any]]) -> None:
@@ -276,9 +272,8 @@ def assert_run_events(
 ) -> None:
     """Assert that a report, replay, or event stream contains event types.
 
-    By default, ``expected_types`` must appear in order as a subsequence, which
-    keeps golden tests resilient to additive events. Set ``allow_extra=False``
-    for exact ordered matching.
+    By default, ``expected_types`` must appear in order as a subsequence, which keeps golden tests resilient to additive
+    events. Set ``allow_extra=False`` for exact ordered matching.
     """
     observed = tuple(event.type for event in _events_from_source(source))
     expected = tuple(expected_types)
@@ -337,9 +332,8 @@ def assert_budget_under(
     """Assert aggregate usage stays under supplied limits.
 
     Returns:
-        A usage summary with ``input_tokens``, ``output_tokens``,
-        ``total_tokens``, and ``runtime_seconds`` for additional test
-        assertions or reporting.
+        A usage summary with ``input_tokens``, ``output_tokens``, ``total_tokens``, and ``runtime_seconds`` for
+        additional test assertions or reporting.
     """
     report = _report_from_source(source)
     usage = _aggregate_budget_usage(report)

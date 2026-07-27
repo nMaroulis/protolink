@@ -98,7 +98,7 @@ This lifecycle is not limited to LLM-selected tool calls. The same `RunAction` a
 
 Protolink does not define a universal permission taxonomy, approval screen, or domain-specific action type. Applications choose capability names, build meaningful preview artifacts, and decide whether approval appears in a terminal, desktop UI, web application, editor, or external service. The runtime only guarantees that the decision occurs before execution and that the result is represented consistently.
 
-`RunBudget` is enforced by the default LLM inference loop through `BudgetEnforcer`. The built-in policy allows work under budget, emits warning events near limits, and raises before model or tool execution when a hard limit would be exceeded. Applications can still provide their own policy when they want compaction, truncation, approval, or domain-specific accounting.
+`RunBudget` is enforced by the default Agent and LLM inference paths through `BudgetEnforcer`. The built-in policy allows work under budget, emits warning events near limits, and raises before model or tool execution when a hard limit would be exceeded. The Agent shares one enforcer across the executable parts of a task, including physical provider retries, while nested tasks receive independent scopes. Applications can still provide their own policy when they want compaction, truncation, approval, or domain-specific accounting.
 
 ## Runtime Context
 
@@ -555,18 +555,18 @@ Builds the manifest used immediately before an LLM call without changing convers
 
 </ApiReference>
 
-`BudgetEnforcer` applies `RunBudget` during inference:
+`BudgetEnforcer` applies `RunBudget` during task execution and inference:
 
 | Limit | Enforcement point |
 |------|-------------|
-| `max_steps` | Before each inference step begins. |
-| `max_llm_calls` | Before a model call starts. |
-| `max_tool_calls` | Before a model-selected tool executes. |
-| `max_input_tokens` | Before a model call, using the current `ContextManifest`. |
+| `max_steps` | Before each explicit tool part and each inference step begins. |
+| `max_llm_calls` | Before every physical provider attempt, including transient retries. |
+| `max_tool_calls` | Before an explicit or model-selected tool executes. |
+| `max_input_tokens` | Before every provider attempt, using the current `ContextManifest`. |
 | `max_output_tokens` | After provider usage or local output estimates are available. |
-| `max_runtime_seconds` | On every budget check. |
+| `max_runtime_seconds` | At every preflight and after provider calls; completed tool/delegation results are recorded before the next preflight. |
 
-Warnings are emitted as `budget.warning`; hard denials are emitted as `budget.exceeded` and raise `BudgetExceededError` before the protected operation proceeds.
+Warnings are emitted as `budget.warning`; hard denials are emitted as `budget.exceeded` and raise `BudgetExceededError` before the protected operation proceeds. A provider-call runtime or output-token denial can occur after the request completes. Tool and delegation side effects are not treated as reversible: after they return, their result is recorded and the next preflight prevents additional work.
 
 ### BudgetUsage
 
@@ -589,7 +589,7 @@ Immutable usage snapshot evaluated against a `RunBudget`.
 
 <ApiSection title="Fields">
   <ApiFields ariaLabel="BudgetUsage fields">
-    <ApiField name="steps" type="int" defaultValue="0">Current logical step.</ApiField>
+    <ApiField name="steps" type="int" defaultValue="0">Cumulative admitted runtime steps for this enforcer.</ApiField>
     <ApiField name="llm_calls" type="int" defaultValue="0">Model calls admitted by this enforcer.</ApiField>
     <ApiField name="tool_calls" type="int" defaultValue="0">Tool calls admitted by this enforcer.</ApiField>
     <ApiField name="input_tokens" type="int" defaultValue="0">Aggregate pre-call input tokens.</ApiField>
@@ -728,7 +728,7 @@ Deterministic comparison policy for configured hard limits.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/budget.py#L181"
 >
 
-Stateful per-run counter and wall-clock tracker used by the inference loop.
+Stateful counter and wall-clock tracker used by task execution and the inference loop. Direct callers normally create one per run; Agent binds one per task ID and restores an outer scope after inline nested work.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="BudgetEnforcer parameters">
@@ -756,6 +756,9 @@ Stateful per-run counter and wall-clock tracker used by the inference loop.
   <ApiFields ariaLabel="BudgetEnforcer methods">
     <ApiField name="check_step(step)" type="BudgetDecision">
       Projects `steps=step`, measures elapsed runtime, and commits the snapshot only when the decision is allowed.
+    </ApiField>
+    <ApiField name="check_next_step()" type="BudgetDecision">
+      Increments from the currently committed step count. Use this when several infer or tool operations share one enforcer and no caller-local step number is authoritative.
     </ApiField>
     <ApiField name="check_llm_call(*, input_tokens=0)" type="BudgetDecision">
       Projects one additional model call and non-negative input tokens before execution.
@@ -886,9 +889,11 @@ The default runtime checks the token:
 
 - before each task part;
 - before inference starts and at every inference step;
-- before and after model-selected tools and delegated agent calls;
-- before authorization and after an awaited tool returns;
-- before outputs are attached or the task is completed.
+- before model-selected tools and delegated-agent calls;
+- before authorization and dispatch; and
+- before every physical provider attempt, including a retry.
+
+If cancellation interrupts an awaited operation, normal coroutine cancellation applies. If the operation wins the race and returns first, ProtoLink records its result rather than discarding evidence of a potentially committed side effect; cancellation is honored before any subsequent work.
 
 The registry also calls `asyncio.Task.cancel()`, so an async model request, async tool, retry sleep, or delegated call normally stops immediately at its current `await` point. Custom handlers can retrieve the live token with `agent.get_cancellation_token(task.id)` and call `token.raise_if_cancelled()` inside CPU loops or between application-defined stages.
 
@@ -903,6 +908,10 @@ Successful cancellation synchronizes all application-visible surfaces:
 - Streaming finishes with one final `task.status` / `TaskStatusUpdateEvent` whose state is `canceled`.
 - Cancellation is not emitted as `task.error` and is not converted to `failed`.
 - The active registry entry is removed in `finally`, including after errors and cancellation.
+
+A protocol cancellation requested through `Agent.cancel_task()` is consumed by the execution wrapper and returned as the canceled task or final canceled stream event. If the owning coroutine is canceled externally, ProtoLink still marks and persists the task but re-raises `asyncio.CancelledError` so normal asyncio cancellation semantics are preserved. Closing a task stream before its terminal event also marks and persists unfinished work as canceled rather than leaving an orphaned `working` task.
+
+Cancellation does not erase an operation that already returned. Explicit tool results are preserved; late cancellation is described by `task.metadata["completed_after_cancellation"]`, and runtime overruns are appended to `task.metadata["completed_action_budget_overruns"]`. Successful model-selected tools and delegations receive immediately snapshotted `Artifact(kind="action_result")` JSON receipts carrying completion status, `action_id`, `source="inference"`, action kind, and inference step. The internal result is intentionally omitted from this client-visible receipt and remains in private LLM history. Each completed top-level task part is attached and snapshotted immediately, so a later part failure retains earlier progress.
 
 Requests for unknown active IDs raise `TaskNotFoundError`. This includes a cancellation request that arrives before task registration or after cleanup, so applications should wait for task acceptance or the first streamed status before enabling a cancel control. A task still registered but already terminal raises `TaskNotCancelableError`. The registry contains active execution only; durable lookup of completed tasks belongs in application storage.
 

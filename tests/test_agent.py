@@ -1,6 +1,7 @@
 """Tests for the Agent class."""
 
 import asyncio
+import json
 from typing import Any, ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -125,6 +126,23 @@ class TestAgent:
     def test_get_agent_card(self, agent, agent_card):
         """Test get_agent_card returns the correct card."""
         assert agent.get_agent_card(as_json=False) == agent_card
+
+    def test_tools_prompt_is_deterministic_json_metadata(self, agent):
+        first = DummyTool(name="zeta", description='Quoted "description"\nline')
+        first.capabilities = frozenset({"workspace.write", "network.read"})
+        first.output_schema = dict[str, str]
+        second = DummyTool(name="alpha")
+        second.capabilities = ()
+        agent.tools = {"zeta": first, "alpha": second}
+
+        prompt = agent._build_tools_prompt()
+        assert prompt == agent._build_tools_prompt()
+
+        metadata = json.loads(prompt)
+        assert [tool["name"] for tool in metadata] == ["alpha", "zeta"]
+        assert metadata[1]["description"] == 'Quoted "description"\nline'
+        assert metadata[1]["capabilities"] == ["network.read", "workspace.write"]
+        assert metadata[1]["output_schema"] == "dict[str, str]"
 
     # @pytest.mark.asyncio
     # async def test_handle_task_not_implemented(self, agent):

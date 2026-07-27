@@ -58,19 +58,19 @@ The useful mental model is a progression:
 
 Most application code should begin with either `chat()` or an `Agent`. The other methods exist so provider adapters and advanced integrations can participate in the same runtime.
 
-- **One complete response — `llm.chat("...")`**<br />
+- **One complete response - `llm.chat("...")`**<br />
   Adds the user message and performs one synchronous provider call.
 
-- **Visible incremental text — `llm.chat("...", streaming=True)`**<br />
+- **Visible incremental text - `llm.chat("...", streaming=True)`**<br />
   Returns an asynchronous iterator of text chunks.
 
-- **Tools, delegation, policy, retries, budgets, and multiple steps — `Agent(..., llm=llm)`**<br />
+- **Tools, delegation, policy, retries, budgets, and multiple steps - `Agent(..., llm=llm)`**<br />
   The Agent prepares the runtime and invokes `LLM.infer()` with the appropriate services.
 
-- **A custom controlled runtime — `await llm.infer(...)`**<br />
+- **A custom controlled runtime - `await llm.infer(...)`**<br />
   Advanced integration path where the caller prepares the prompt, history, tools, callbacks, and runtime context that an Agent normally supplies.
 
-- **A provider adapter or diagnostic integration — `call()`, `call_stream()`, and `call_action()`**<br />
+- **A provider adapter or diagnostic integration - `call()`, `call_stream()`, and `call_action()`**<br />
   Works at the provider boundary with explicit `ConversationHistory` and normalized actions.
 
 `chat()` and `infer()` are intentionally different. A chat call asks the model for text. Inference asks the model for one typed decision at a time: finish with text, call a local tool, or delegate to another Agent. ProtoLink validates that decision and performs the side effect outside the model.
@@ -100,6 +100,7 @@ ProtoLink groups model backends into hosted APIs, model servers, and in-process 
   <img src="https://raw.githubusercontent.com/pheralb/svgl/476aabb842086433647755b0963640c6a0775f79/static/library/grok-light.svg" width="55" className="hover-icon" />
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/deepseek.svg" width="55" className="hover-icon" />
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/ollama_light.svg" width="55" className="hover-icon" />
+  <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/light/vllm-color.png" width="55" className="hover-icon" />
   <img src="https://raw.githubusercontent.com/abetlen/llama-cpp-python/main/docs/icon.svg" width="55" className="hover-icon" />
 </div>
 
@@ -115,6 +116,7 @@ ProtoLink groups model backends into hosted APIs, model servers, and in-process 
     - `OllamaLLM`: connects to an Ollama `/api/chat` endpoint.
     - `LlamaCPPServerLLM`: connects directly to a `llama-server`.
     - `LMStudioLLM`: connects to LM Studio's OpenAI-compatible server.
+    - `VLLMLLM`: connects to vLLM's OpenAI-compatible server.
     - `OpenAICompatibleLLM`: connects to a service exposing `/v1/chat/completions` and `/v1/models`.
 
 - **Local** - runs the model inside the Python process:
@@ -127,7 +129,7 @@ You can also use a third-party LLM client directly when your application only ne
 ### How to choose
 
 - Choose a **hosted API** when you want a managed model and accept provider credentials, network latency, and usage billing.
-- Choose a **server adapter** when the model is exposed by Ollama, llama-server, LM Studio, or another OpenAI-compatible endpoint that you control.
+- Choose a **server adapter** when the model is exposed by Ollama, llama-server, LM Studio, vLLM, or another OpenAI-compatible endpoint that you control.
 - Choose **`LlamaCPPLocalLLM`** when the GGUF model should run inside the Python process and the process can afford model-loading and inference resources.
 - Choose **`MockLLM`** for tests, examples, and runtime development.
 
@@ -212,7 +214,7 @@ Never commit API keys to version control. Read them from environment variables o
    agent = Agent(card=agent_card, transport="http", llm=llm)
    ```
 
-For local and server-style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`, `LMStudioLLM`, and `OpenAICompatibleLLM`), configuration additionally includes a model-file path or server URL. The individual class entries below describe the resolution order for those values.
+For local and server-style LLMs (`LlamaCPPLocalLLM`, `LlamaCPPServerLLM`, `OllamaLLM`, `LMStudioLLM`, `VLLMLLM`, and `OpenAICompatibleLLM`), configuration additionally includes a model-file path or server URL. The individual class entries below describe the resolution order for those values.
 
 Generation parameters are deliberately provider-specific. `model_params` is forwarded to the selected SDK or server; ProtoLink does not translate names such as `max_tokens`, `max_output_tokens`, or provider-specific thinking controls into one synthetic schema.
 
@@ -269,9 +271,9 @@ The detailed [controlled inference and tool-use](#controlled-inference-and-tool-
 
 An `LLM` instance still exposes `llm.history` for direct usage and backward-compatible introspection. When the same LLM is plugged into an `Agent`, ProtoLink binds a task-local `ConversationHistory` around each run so concurrent tasks do not interleave messages on one shared mutable history object.
 
-For stateless agents, each task receives a fresh history seeded by the compiled system prompt. After the task finishes, `llm.history` points at a copy of the last completed task history for debugging and simple scripts.
+For stateless agents, each task receives a fresh history seeded by the compiled system prompt. After normal completion, `llm.history` points at a copy of that task history for debugging and simple scripts. A failed turn normally stays isolated; if an `action_result` receipt proves that a side effect completed, ProtoLink retains the history containing that observation so a retry does not behave as though the action never ran.
 
-For persistent conversation state, enable `state=["conversation"]`. The Agent loads the requested `session_id`, serializes concurrent tasks for that same session with an async lock, saves the completed history back to state, and exposes a copy as `llm.history` after completion.
+For persistent conversation state, enable `state=["conversation"]`. The Agent loads the requested `session_id`, serializes concurrent tasks for that same session with an async lock, saves normally completed history back to state, and exposes a copy as `llm.history`. Failed history is saved only when a new `action_result` receipt proves that the turn completed a tool or delegation side effect.
 
 ```python
 from protolink import Agent, AgentCard, RunContext, Task, create_llm
@@ -490,7 +492,9 @@ This is especially useful for CLIs, dashboards, and budget-aware agents that wan
 
 Model profiles are observational metadata. Run budgets are the separate enforcement mechanism.
 
-If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before the provider is invoked; `max_tool_calls` is checked before model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
+If a `RunContext` carries a `RunBudget`, `LLM.infer()` enforces it through the default `BudgetEnforcer`. When an Agent executes a task, one task-local enforcer is shared by every infer part and explicit tool-call part, so counters do not reset between parts. A nested task gets its own scope, and direct `LLM.infer()` calls still create an independent enforcer unless the advanced caller supplies `budget_enforcer=` explicitly.
+
+Pre-call limits such as `max_llm_calls` and `max_input_tokens` are checked before every physical provider attempt, including transient retries. `max_tool_calls` applies before explicit and model-selected tools execute; `max_output_tokens` is checked after provider usage or local estimates are available. Provider runtime is checked again after each request, including a final response. A tool or delegated call can already have committed a side effect when it returns, so ProtoLink records and injects that result before cancellation or runtime enforcement stops the next step. Warnings appear as `budget_warning` events and hard denials appear as `budget_exceeded` events.
 
 ## LLM API reference
 
@@ -520,6 +524,10 @@ provider_options = {
         "model": "local-model",
         "base_url": "http://localhost:1234/v1",
     },
+    "vllm": {
+        "model": "Qwen/Qwen3-8B",
+        "base_url": "http://localhost:8000/v1",
+    },
 }
 
 llm = create_llm(provider, **provider_options[provider])
@@ -535,7 +543,7 @@ print(response)
 - **`APILLM`** - base for API-hosted adapters.
 - **`ServerLLM`** - base for HTTP model servers.
 - **`LocalLLM`** - base for in-process local runtimes.
-- **Concrete implementations** - `OpenAILLM`, `AnthropicLLM`, `GeminiLLM`, `DeepSeekLLM`, `GrokLLM`, `HuggingFaceLLM`, `OllamaLLM`, `LlamaCPPServerLLM`, `LMStudioLLM`, `OpenAICompatibleLLM`, `LlamaCPPLocalLLM`, and `MockLLM`.
+- **Concrete implementations** - `OpenAILLM`, `AnthropicLLM`, `GeminiLLM`, `DeepSeekLLM`, `GrokLLM`, `HuggingFaceLLM`, `OllamaLLM`, `LlamaCPPServerLLM`, `LMStudioLLM`, `VLLMLLM`, `OpenAICompatibleLLM`, `LlamaCPPLocalLLM`, and `MockLLM`.
 
 :::
 
@@ -558,10 +566,14 @@ Create an LLM adapter without importing the selected provider until it is needed
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="create_llm parameters">
     <ApiField name="provider" type="str | LLMProvider" required>
-      Provider selector. Supported string values are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, and <code>openai-compatible</code>.
+      Provider selector. Supported string values are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, <code>openai-compatible</code>, and <code>vllm</code>.
     </ApiField>
     <ApiField name="**kwargs" type="Any">
-      Forwarded to the selected adapter constructor. Two factory-only keywords are also recognized: <code>metrics_profile</code> configures model metrics after construction, and <code>metrics_enabled</code> enables or disables their emission.
+      Forwarded to the selected adapter constructor. Three factory-only keywords are also recognized:
+      <code>metrics_profile</code> configures model metrics after construction,
+      <code>metrics_enabled</code> enables or disables their emission, and
+      <code>max_parse_failures</code> sets the validated consecutive action-parse failure limit without forwarding
+      that ProtoLink-only option to the provider.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -577,7 +589,11 @@ Create an LLM adapter without importing the selected provider until it is needed
 <ApiSection title="Raises">
   <ApiFields ariaLabel="create_llm errors">
     <ApiField name="ValueError">
-      Raised when the provider string is unknown.
+      Raised when the provider string is unknown or <code>max_parse_failures</code> is outside the supported range.
+    </ApiField>
+    <ApiField name="TypeError">
+      Raised when <code>max_parse_failures</code> is not an integer. Boolean values are not accepted as integers for
+      this option.
     </ApiField>
     <ApiField name="ImportError">
       Raised when the selected adapter requires an optional dependency that is not installed.
@@ -602,8 +618,12 @@ llm = create_llm(
     base_url="http://localhost:1234/v1",
     model="local-model",
     metrics_profile=LLMModelProfile(context_window=32_768),
+    max_parse_failures=4,
 )
 ```
+
+`max_parse_failures` defaults to `3` and accepts integers from `1` through `10`. Keep it as a top-level factory
+argument. Do not place it in `model_params`, whose entries are provider generation options.
 
 </ApiSection>
 
@@ -689,6 +709,11 @@ Abstract provider-neutral model contract. Subclasses implement text generation a
     </ApiField>
     <ApiField name="metrics_enabled" type="bool">
       Whether inference may emit metrics when an observer is attached.
+    </ApiField>
+    <ApiField name="max_parse_failures" type="int">
+      Maximum consecutive JSON-action parsing or validation failures allowed during one inference run. Defaults to
+      <code>3</code> and accepts values from <code>1</code> through the ten-step inference ceiling. This runtime
+      control is deliberately separate from provider generation parameters.
     </ApiField>
     <ApiField name="sync" type="SyncLLM">
       Blocking wrapper for <code>infer()</code>. Do not use it inside an active event loop.
@@ -987,7 +1012,7 @@ Streaming JSON does not mean ProtoLink dispatches incomplete JSON fragments. The
 
 :::tip[Small-model support]
 
-Ollama, llama.cpp, LM Studio, and generic OpenAI-compatible servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model and chat-template combination that reliably emits native tool calls.
+Ollama, llama.cpp, LM Studio, vLLM, and generic OpenAI-compatible servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model and chat-template combination that reliably emits native tool calls.
 
 :::
 
@@ -997,27 +1022,159 @@ The inference loop includes multiple layers of protection against unreliable mod
 
 #### 1. Deduplication detection
 
-The runtime tracks a sliding window of recent action signatures. If the model requests an identical tool or agent action with identical arguments, ProtoLink:
+The runtime tracks a sliding window of successfully completed side-effect signatures. If the model requests an identical tool or agent action with identical arguments, ProtoLink:
 
 - does not execute the duplicate;
 - injects corrective guidance into history; and
 - asks the model to use the existing observation, choose a different action, or finish.
 
-This prevents a model from repeatedly calling the same tool while expecting a different result.
+Failed validation or execution does not poison the window, delegated infer signatures include the complete prompt, and final actions are returned immediately even when their text repeats. This prevents repeated side effects without suppressing a valid answer.
 
 ```text
 You have already performed this action. The result is in your context.
 Proceed with the task: produce a final response or choose a different action.
 ```
 
-#### 2. Parse-failure circuit breaker
+#### 2. Action parsing and the parse-failure circuit breaker
 
-JSON-mode parsing failures are recoverable at first. The runtime describes the exact parsing or validation error and lets the model try again. After three consecutive failures, it raises `RuntimeError` instead of consuming the full inference-step budget.
+The parser is a security and interoperability boundary between untrusted model output and the runtime dispatcher. It
+does not execute a tool or contact an Agent while trying to understand malformed text. It first produces one typed
+`FinalAction`, `ToolCallAction`, or `AgentCallAction`; only that validated action can continue to policy, budget, and
+dispatch checks.
+
+Provider-native tool calls and portable JSON actions enter this boundary differently:
+
+- A native-capable adapter translates the provider's structured tool event into the same Pydantic action models.
+- A JSON-mode adapter passes the complete model text through the shared prompt-fallback parser.
+
+The JSON path follows a deliberately conservative pipeline:
+
+1. **Decode the untouched whole response.** Valid JSON is never rewritten first. This preserves literal text such as
+   `"<think>keep this</think>"` inside a valid final response.
+2. **Recover syntax-only wrappers when whole-response decoding fails.** ProtoLink can unwrap a complete JSON code
+   fence, ignore one complete leading `<think>` or `<thought>` block, remove trailing commas outside JSON strings, or
+   extract exactly one balanced object embedded in surrounding prose. The balanced scanner tracks nesting, quoted
+   strings, and escapes in one pass.
+3. **Normalize only deterministic response shapes.** A structured value placed in `FinalAction.content` can be
+   serialized losslessly as JSON text. A non-empty application object that omits the outer action envelope can become
+   final content only when it contains no ProtoLink action-envelope fields. Existing legacy tool-call shorthands are
+   repaired only when the tool and optional Agent target are unambiguous and their arguments are literal data.
+4. **Validate the complete action with Pydantic.** Required fields, discriminated action types, forbidden extra fields,
+   delegated-action combinations, and content types are checked before the infer loop sees the result.
+
+Common small-model variations therefore have explicit outcomes:
+
+| Model output | Parser behavior |
+|--------------|-----------------|
+| `{"type":"final","content":{"answer":42}}` | Serializes the object to JSON text and returns a `FinalAction`. |
+| `{"answer":42,"sources":["doc-1"]}` | Wraps the application object as final JSON content because no action-envelope field is present. |
+| ```` ```json {"type":"final","content":"done"} ``` ```` | Unwraps the complete fence and validates the action. |
+| `Result: {"type":"final","content":"done"}` | Extracts and validates the single balanced object. |
+| `{"type":"final","content":"done",}` | Removes the unambiguous trailing comma outside strings, then validates. |
+| A complete leading `<think>...</think>` followed by one action | Ignores the reasoning wrapper only after untouched JSON decoding failed. |
+
+The parser intentionally refuses cases where repair would require choosing or inventing meaning:
+
+- two or more valid top-level JSON objects;
+- an incomplete leading reasoning wrapper;
+- an empty object or a non-object action payload;
+- an explicit unknown action type;
+- a tool- or Agent-shaped object with a missing action type;
+- a missing tool, target, prompt, or argument that cannot be inferred uniquely; or
+- an action found only inside a private reasoning wrapper with no public action after it.
+
+Raw responses and parsed payloads use deterministic, 2,000-character head-and-tail previews in diagnostics. This keeps
+an oversized valid or invalid response from flooding logs and telemetry while retaining enough beginning/end context
+to diagnose truncation. For a decoded action that fails schema validation, correction history receives the concise
+field-level feedback and detected outer action type, not another copy of the parsed-payload preview.
+
+##### Correction attempts
+
+Parsing and action-schema failures are recoverable inside `infer()`. ProtoLink emits an `llm_parse_error` event,
+retains bounded diagnostics for observability, and adds a correction message to conversation history. When JSON
+decoding succeeded, the parser carries the decoded outer `type` separately from the rendered error. The retry can
+therefore distinguish a malformed `agent_call`, malformed `tool_call`, invalid `final`, unknown action type, or object
+with no recognizable outer type without scraping its own diagnostic text.
+
+The correction also uses the current runtime capabilities. If the model selected `agent_call` but this inference has
+no delegation callback, ProtoLink says that the action cannot be dispatched and does not show Agent-call examples. If
+local tools or delegation are available, their canonical action shapes are included. ProtoLink does not silently
+convert an explicit malformed side-effect request into final content.
 
 ```text
-Your previous response could not be parsed as a valid action.
-Correct the reported fields and return exactly one supported action.
+Your previous response was not a dispatchable ProtoLink action.
+Validation feedback:
+Action validation failed. Field-level errors:
+  - Field 'agent_call -> action': Input should be 'tool_call' or 'infer'
+
+The response selected `agent_call`, but no agent delegation route is available
+for this inference, so that action cannot be dispatched.
+Return exactly one JSON object using a currently dispatchable action:
+- `final`: {"type":"final","content":"..."}
 ```
+
+That is representative rather than a fixed template: field details and available alternatives depend on the rejected
+payload, local tools, and delegation callback. A structurally valid `tool_call` or `agent_call` that reaches the
+dispatcher but names an unavailable capability receives similarly explicit correction. It is not counted as a parse
+failure because its action envelope was valid; the overall inference-step limit still prevents an endless correction
+loop.
+
+`max_parse_failures` controls the consecutive failure circuit breaker. It defaults to `3`, accepts integers from `1`
+through `10`, and resets after a successfully validated action:
+
+```python
+from protolink import create_llm
+
+llm = create_llm(
+    "ollama",
+    base_url="http://localhost:11434",
+    model="qwen3",
+    max_parse_failures=4,
+)
+```
+
+Pass this option directly to `create_llm()`, or assign `llm.max_parse_failures` after construction. Do not put it in
+`model_params`: those values are provider generation settings and are forwarded to the selected backend, while the
+parse limit is ProtoLink runtime configuration.
+
+The parse limit counts consecutive model action proposals that fail JSON decoding or action validation. It does not
+configure transient HTTP/provider retries, and it does not validate an application-specific schema inside final text.
+Those are separate boundaries whose retry budgets can multiply. Raising the limit can help a smaller model
+self-correct, but repeating a deterministic shape error is better handled by a lossless normalization or a clearer
+prompt than by unlimited retries.
+
+##### The action envelope is not the application schema
+
+`FinalAction.content` is user-facing text. ProtoLink validates the outer action but cannot know whether that text must
+also satisfy a domain-specific JSON schema. If an application expects a decision, invoice, ballot, or other structured
+result, it should validate `part.content` separately and apply only domain-safe recovery:
+
+```python
+from pydantic import BaseModel, Field
+
+class Decision(BaseModel):
+    label: str
+    confidence: float = Field(ge=0, le=1)
+
+part = await llm.infer(
+    query="Return the requested decision as JSON in final content.",
+    tools={},
+)
+decision = Decision.model_validate_json(part.content)
+```
+
+Do not infer missing high-impact fields from prose merely to make validation pass. A harmless public statement may
+permit a text fallback; a payment instruction, tool target, categorical decision, or authorization result normally
+should fail closed and request a new structured response.
+
+:::caution[Parsing validates action shape, not semantic truth or authorization]
+
+A hallucinated tool call can be perfectly valid JSON with the correct field types. Parsing proves that the requested
+action is unambiguous and structurally valid; it does not prove that the action is factually correct, appropriate, or
+authorized. Keep tools narrowly allowlisted, use strict argument schemas and capability policies, require approval for
+important operations, enforce budgets and idempotency, and validate external identifiers at the execution boundary.
+
+:::
 
 #### 3. Self-correcting error recovery
 
@@ -1025,17 +1182,30 @@ Many model mistakes are observations, not immediate application failures:
 
 | Error type | Runtime response |
 |------------|------------------|
-| Unknown tool | Lists the tools that are actually available. |
+| Unknown or unavailable tool | Lists tools that are actually available, or states that this inference has none. |
 | Missing required fields | Returns field-level validation details. |
 | Wrong tool arguments | Explains the callable mismatch and asks the model to check the input schema. |
-| Agent not found | Reports the unavailable target and the known discovered agents. |
-| Invalid action type | Lists `final`, `tool_call`, and `agent_call`. |
+| Agent not found | Reports the unavailable target through the delegation callback. |
+| Agent delegation unavailable | States that no delegation route exists and suggests only dispatchable alternatives. |
+| Invalid action type | Reports the detected type and lists only action kinds available in the current inference. |
 
-These failures normally remain inside `infer()` so the model can correct them. They surface as `RuntimeError` only when the correction circuit breaker or another unrecoverable boundary is reached.
+Tool arguments are validated and conservatively coerced before authorization, deduplication, or tool-budget consumption. These model mistakes normally remain inside `infer()` so the model can correct them. An exception raised by the tool body, including `TypeError`, remains an execution failure and is not relabeled as an argument mismatch.
 
-#### 4. Bounded execution
+When an Agent-owned inference tool or delegation succeeds, the Agent also attaches and immediately snapshots an `Artifact(kind="action_result")` receipt keyed by the runtime `action_id`. The receipt records completion and correlation metadata but deliberately omits the internal result, which remains in private LLM history. If a later step fails, exceeds budget, or is canceled, the Task and optional `RunStore` snapshot still show what already happened without exposing model-only observations or inviting an unsafe blind retry. Non-JSON or circular results receive a bounded serialization fallback in that private history so the completion observation cannot be lost.
+
+#### 4. Physical retry safety
+
+Transient provider failures use exponential backoff and jitter. Each physical attempt consumes the same LLM-call and input-token budget as an initial request and produces structured attempt metadata. Non-streaming calls may retry up to the configured retry limit; streaming calls may retry only before the first output chunk is exposed, preventing duplicated or discontinuous client output.
+
+#### 5. Bounded execution
 
 `MAX_INFER_STEPS` limits a run to ten model decisions. If the model never produces a final action, the method raises `RuntimeError` with diagnostic context instead of looping indefinitely.
+
+:::note[Observers do not control execution]
+
+Inference `event_callback` failures are logged and the observer is disabled for the remainder of that infer call. A telemetry or UI exporter cannot turn an otherwise successful provider or tool operation into an application failure.
+
+:::
 
 :::tip[Debugging inference loops]
 
@@ -1080,13 +1250,13 @@ The base implementation asks for JSON, validates it, and injects a provider-neut
 | Provider | Non-streaming `infer()` | Streaming `infer()` | Notes |
 |----------|-------------------------|---------------------|-------|
 | OpenAI | Native Responses function tools | Native streamed function-call events | Parallel tool calls are disabled so the runtime receives one action at a time. |
-| Anthropic | Native `tool_use` blocks | Native streamed `input_json_delta` tool input | Text deltas can reach observers while tool JSON is buffered until complete. |
+| Anthropic | Native `tool_use` blocks | Native streamed `input_json_delta` tool input | System instructions come from the task-local history; parallel tool calls are rejected. |
 | Gemini | Native function declarations | Native streamed function-call parts | Function-call parts are normalized into ProtoLink actions. |
 | DeepSeek | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Set the flag to `False` to force JSON action mode. |
 | Grok | Native Chat Completions tools when `supports_tool_calling=True` | Native streamed tool deltas when enabled | Set the flag to `False` to force JSON action mode. |
 | Ollama | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Keeps small/local model behavior simple unless tool support is known to work. |
 | llama.cpp server/local | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Reliability depends on the selected model and chat template. |
-| LM Studio / OpenAI-compatible | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Covers LM Studio, vLLM, LocalAI, and compatible custom servers. |
+| LM Studio / vLLM / OpenAI-compatible | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Dedicated subclasses provide conventional defaults and provider identity; the generic adapter covers LocalAI and compatible custom servers. |
 | Hugging Face | JSON fallback for non-streaming inference | Not currently usable | `call_stream()` currently yields an empty chunk, so streaming inference is unsupported. |
 
 ### Prompt selection
@@ -1179,10 +1349,12 @@ After observing the tool result, the model completes with:
     agent_cards: list[Any] | None = None,
     streaming: bool = False,
     event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    event_metrics: bool | None = None,
     action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
     cancellation_token: CancellationToken | None = None,
     run_context: RunContext | dict[str, Any] | None = None,
     budget_policy: BudgetPolicy | None = None,
+    budget_enforcer: BudgetEnforcer | None = None,
 ) -> Part`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L560"
 >
@@ -1207,7 +1379,10 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
       Acquire each model action from the streaming adapter path.
     </ApiField>
     <ApiField name="event_callback" type="Callable[[dict[str, Any]], Awaitable[None]] | None" defaultValue="None">
-      Async observer for normalized chunks, actions, tool events, delegation events, budget decisions, errors, and final output.
+      Async observer for normalized chunks, actions, tool events, delegation events, budget decisions, errors, and final output. The observer is non-authoritative; its first exception is logged and disables further callbacks for this infer call.
+    </ApiField>
+    <ApiField name="event_metrics" type="bool | None" defaultValue="None">
+      Controls whether an attached event callback activates optional per-call metrics. Direct callers retain the existing default behavior; Agent sets this to <code>false</code> when its callback exists only to maintain internal completion receipts.
     </ApiField>
     <ApiField name="action_authorizer" type="Callable[[RunAction], Awaitable[ActionAuthorization]] | None" defaultValue="None">
       Policy boundary invoked after validation and before any tool or delegated-agent side effect.
@@ -1220,6 +1395,9 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
     </ApiField>
     <ApiField name="budget_policy" type="BudgetPolicy | None" defaultValue="None">
       Allow, warn, or deny policy used by the built-in budget enforcer.
+    </ApiField>
+    <ApiField name="budget_enforcer" type="BudgetEnforcer | None" defaultValue="None">
+      Existing stateful enforcer shared across several inference or tool operations. Omit it for an independent direct call; Agent supplies its task-local enforcer when the override accepts this keyword.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1255,6 +1433,10 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
 
 <ApiCallout label="Direct-call responsibility">
   <code>Agent</code> normally rebuilds the system prompt before calling this method. A custom runtime that invokes <code>infer()</code> directly must prepare matching tool and Agent descriptions with <code>build_system_prompt()</code>; supplying <code>tools</code> here only provides executables to the loop.
+</ApiCallout>
+
+<ApiCallout label="Override compatibility">
+  The new <code>budget_enforcer</code> parameter is optional. When an Agent uses a custom <code>LLM.infer()</code> override with the pre-0.6.7 signature, it supplies the shared enforcer only if the override declares that keyword or accepts arbitrary keyword arguments.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -1545,6 +1727,8 @@ The final prompt is composed from:
     - Your domain-specific prompt, such as “You are a coding assistant.”
     - Appended to the shared runtime rules unless `override_system_prompt=True`.
 
+Tool and discovered-Agent metadata is serialized as deterministic valid JSON with stable ordering and explicit capabilities. The surrounding prompt labels those descriptions, schemas, and examples as untrusted data rather than executable instructions. This avoids Python-repr syntax and brace-escaping artifacts while keeping prompt caching and smaller-model parsing predictable.
+
 ### Reasoning versus execution
 
 When `infer()` runs, the prompt makes the LLM a reasoning and action-selection engine while ProtoLink remains the executor:
@@ -1718,7 +1902,7 @@ OpenAI, Anthropic, and Gemini always acquire actions through their provider-nati
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py#L25"
 >
 
-OpenAI Responses API adapter with native function tools and native streamed tool-call events. Use it for the official OpenAI service or for a custom `base_url` that implements the Responses API—not merely Chat Completions.
+OpenAI Responses API adapter with native function tools and native streamed tool-call events. Use it for the official OpenAI service or for a custom `base_url` that implements the Responses API, not merely Chat Completions.
 
 Direct calls translate `ConversationHistory` into Responses input and extract text from the returned response. In inference mode, real function declarations are sent to the provider, parallel tool calls are disabled, and returned function calls are normalized into ProtoLink actions before the runtime executes them. Streaming follows the same contract while forwarding text deltas and buffering function arguments until they form one complete action.
 
@@ -1780,9 +1964,9 @@ llm = OpenAILLM(
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py#L26"
 >
 
-Anthropic Messages API adapter with native `tool_use` actions and streamed tool-input deltas. The adapter separates the system prompt from conversational messages, converts ProtoLink tools to Anthropic tool schemas, and keeps the provider's tool-use identifier in action metadata.
+Anthropic Messages API adapter with native `tool_use` actions and streamed tool-input deltas. The adapter derives both the separated system prompt and conversational messages from the supplied task-local `ConversationHistory`, converts ProtoLink tools to Anthropic tool schemas, and keeps the provider's tool-use identifier in action metadata.
 
-After ProtoLink executes a requested tool, the adapter uses that identifier to inject the observation in the shape expected by the Messages API. Both streaming and non-streaming inference therefore share the same public `LLMActionResult` even though Anthropic's wire representation differs from OpenAI's.
+After ProtoLink executes a requested tool, the adapter uses that identifier to inject the observation in the shape expected by the Messages API. Both streaming and non-streaming inference therefore share the same public `LLMActionResult` even though Anthropic's wire representation differs from OpenAI's. The runtime accepts one action per step and rejects multiple parallel `tool_use` blocks instead of silently selecting or merging them.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="AnthropicLLM parameters">
@@ -2159,7 +2343,7 @@ llm = LlamaCPPServerLLM(base_url="http://localhost:8080")
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L29"
 >
 
-Generic client for servers exposing `/v1/chat/completions` and `/v1/models`, including vLLM, LocalAI, and compatible custom services. Use it when the endpoint follows the Chat Completions protocol but is not the official OpenAI Responses API.
+Generic client for servers exposing `/v1/chat/completions` and `/v1/models`, including LocalAI and compatible custom services. Use it when the endpoint follows the Chat Completions protocol but is not the official OpenAI Responses API. Prefer `VLLMLLM` or `LMStudioLLM` when their conventional URL, credential environment variables, and provider identity are useful.
 
 It supports custom headers, optional bearer authentication, direct and streamed content, and opt-in native tools. The default JSON response format makes the adapter well suited to ProtoLink's portable action protocol, while `supports_tool_calling=True` switches action acquisition to provider-style tool payloads.
 
@@ -2195,6 +2379,67 @@ llm = OpenAICompatibleLLM(
     base_url="http://localhost:8000/v1",
     model="Qwen/Qwen3-8B",
 )
+```
+
+</ApiSection>
+
+</ApiReference>
+
+### VLLMLLM
+
+<ApiReference
+  kind="class"
+  path="protolink.llms.server.VLLMLLM"
+  signature={`class VLLMLLM(
+    *,
+    model: str,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    headers: dict[str, str] | None = None,
+    model_params: dict[str, Any] | None = None,
+    supports_tool_calling: bool = False,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/vllm_client.py#L9"
+>
+
+Convenience specialization of `OpenAICompatibleLLM` for a separately managed vLLM server. It inherits the compatible adapter's direct and streamed Chat Completions requests, portable JSON action fallback, usage normalization, connection validation, custom headers, optional bearer authentication, and opt-in native tools. The adapter itself does not install or import the `vllm` Python package.
+
+The model is required because it must match the identifier accepted by the running server: normally the model passed to `vllm serve`, or a name configured with vLLM's `--served-model-name` option. The subclass supplies vLLM's conventional port and provider-specific environment variables and reports `vllm` in events and metrics.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="VLLMLLM parameters">
+    <ApiField name="model" type="str" required>
+      Model identifier exposed by the vLLM server. It must match the served model name.
+    </ApiField>
+    <ApiField name="base_url" type="str | None" defaultValue="None">
+      Resolution order is the argument, <code>VLLM_URL</code>, then <code>http://localhost:8000/v1</code>.
+    </ApiField>
+    <ApiField name="api_key" type="str | None" defaultValue="None">
+      Optional bearer token. Falls back to <code>VLLM_API_KEY</code>; no placeholder credential is added when both are absent.
+    </ApiField>
+    <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
+      Extra request headers merged with the inherited JSON defaults and optional authorization header.
+    </ApiField>
+    <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
+      Generation parameters forwarded to vLLM and merged over <code>temperature=1.0</code>.
+    </ApiField>
+    <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
+      Opt into native Chat Completions tools only after the vLLM server and selected model are configured for automatic tool choice.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Native tool setup">
+  The default portable JSON action mode needs no vLLM tool parser. Before setting <code>supports_tool_calling=True</code>, start vLLM with <code>--enable-auto-tool-choice</code> and a model-appropriate <code>--tool-call-parser</code>, and ensure the selected model and chat template support tools.
+</ApiCallout>
+
+<ApiSection title="Examples">
+
+```python
+from protolink.llms.server import VLLMLLM
+
+# Start the model server separately: vllm serve Qwen/Qwen3-8B
+llm = VLLMLLM(model="Qwen/Qwen3-8B")
 ```
 
 </ApiSection>
@@ -2551,6 +2796,12 @@ LLM failures can originate at several different boundaries:
 
 Recoverable action mistakes are normally injected back into history so the model can self-correct. Application-level exception handling should focus on provider failures and runtime boundaries that cannot be repaired inside the loop.
 
+A direct `call_action()` or `call_action_stream()` invocation raises `ValueError` when its one response cannot become a
+valid action. `infer()` catches that validation failure, emits `llm_parse_error`, requests a correction, and raises
+`RuntimeError` only when `max_parse_failures` consecutive proposals have failed. Inspect the final field-level
+diagnostic before increasing the limit: repeated syntax drift may benefit from another attempt, while an unavailable
+tool, ambiguous action, or application-schema mismatch needs a prompt, capability, or application-layer fix.
+
 ```python
 import asyncio
 
@@ -2607,6 +2858,7 @@ LLMProvider: TypeAlias = Literal[
     "mock",
     "ollama",
     "openai-compatible",
+    "vllm",
 ]
 
 ReasoningLevel: TypeAlias = Literal["none", "low", "medium", "high"]

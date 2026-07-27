@@ -20,6 +20,7 @@ class LLMProvider(str, Enum):
     OLLAMA = "ollama"
     OPENAI = "openai"
     OPENAI_COMPATIBLE = "openai-compatible"
+    VLLM = "vllm"
     MOCK = "mock"
 
 
@@ -43,6 +44,7 @@ class LLMFactory:
         LLMProvider.OLLAMA.value: "protolink.llms.server.ollama_client.OllamaLLM",
         LLMProvider.OPENAI.value: "protolink.llms.api.openai_client.OpenAILLM",
         LLMProvider.OPENAI_COMPATIBLE.value: "protolink.llms.server.openai_compatible_client.OpenAICompatibleLLM",
+        LLMProvider.VLLM.value: "protolink.llms.server.vllm_client.VLLMLLM",
         LLMProvider.MOCK.value: "protolink.llms.mock_client.MockLLM",
     }
 
@@ -53,8 +55,11 @@ class LLMFactory:
 
         Args:
             provider (str | LLMProvider): The name of the LLM provider
-                (e.g., "openai", "ollama", "lmstudio", "openai-compatible").
-            **kwargs: Additional keyword arguments passed to the LLM constructor.
+                (e.g., "openai", "ollama", "lmstudio", "vllm").
+            **kwargs: Additional provider constructor arguments. ProtoLink
+                runtime options such as ``metrics_profile``,
+                ``metrics_enabled``, and ``max_parse_failures`` are consumed by
+                the factory and are not forwarded to provider request options.
 
         Returns:
             LLM: An instance of the requested LLM client.
@@ -64,6 +69,7 @@ class LLMFactory:
         """
         metrics_profile: LLMModelProfile | dict[str, Any] | None = kwargs.pop("metrics_profile", None)
         metrics_enabled: bool | None = kwargs.pop("metrics_enabled", None)
+        max_parse_failures: int | None = kwargs.pop("max_parse_failures", None)
 
         try:
             provider_key = str(provider).lower()
@@ -72,6 +78,8 @@ class LLMFactory:
 
         client_class = cls._resolve_client(provider_key)
         llm = client_class(**kwargs)
+        if max_parse_failures is not None:
+            llm.max_parse_failures = max_parse_failures
         if metrics_profile is not None:
             llm.configure_metrics(metrics_profile)
         if metrics_enabled is not None:

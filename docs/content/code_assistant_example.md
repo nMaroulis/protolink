@@ -2,7 +2,7 @@
 
 :::info[Article]
 
-The article on [Level Up Coding](https://levelup.gitconnected.com/build-easily-your-own-claude-code-with-three-agents-brain-hands-and-coordinator-5236b392ddf0) gives a hands-on overview of this example.
+The article on [Level Up Coding](https://levelup.gitconnected.com/build-easily-your-own-claude-code-with-three-agents-brain-hands-and-coordinator-5236b392ddf0) gives an overview of this example.
 
 :::
 The directory containing the example files can be found [here](https://github.com/nMaroulis/protolink/tree/main/examples/code_assistant).

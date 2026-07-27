@@ -25,12 +25,6 @@ from protolink.utils.id_generator import IDGenerator
 
 Redactor = Callable[[Any], Any]
 
-_current_trace: contextvars.ContextVar[Any] = contextvars.ContextVar("protolink_local_trace", default=None)
-_current_span_stack: contextvars.ContextVar[tuple[str, ...]] = contextvars.ContextVar(
-    "protolink_local_span_stack",
-    default=(),
-)
-
 
 def _utc_now() -> str:
     """Return a timezone-aware ISO-8601 timestamp for trace records."""
@@ -190,6 +184,14 @@ class TraceRecord:
         return data
 
 
+@dataclass(frozen=True)
+class _TraceFrame:
+    """One active task trace and its task-local span stack."""
+
+    trace: TraceRecord
+    span_stack: tuple[str, ...] = ()
+
+
 class LocalTraceRecorder:
     """In-process recorder for local trace replay and debugging.
 
@@ -295,6 +297,10 @@ class LocalTraceTelemetry(Telemetry):
         self.recorder = recorder or LocalTraceRecorder(path=path, max_traces=max_traces)
         self.redactor = redactor
         self.capture_payloads = capture_payloads
+        self._trace_frames: contextvars.ContextVar[tuple[_TraceFrame, ...]] = contextvars.ContextVar(
+            "protolink_local_trace_frames",
+            default=(),
+        )
 
     def _redact(self, value: Any) -> Any:
         """Apply default and user-provided redaction to trace payload data."""
@@ -305,7 +311,20 @@ class LocalTraceTelemetry(Telemetry):
 
     def _trace(self) -> TraceRecord | None:
         """Return the active task trace bound to the current context."""
-        return _current_trace.get()
+        frames = self._trace_frames.get()
+        return frames[-1].trace if frames else None
+
+    def _span_stack(self) -> tuple[str, ...]:
+        """Return the span stack for the innermost active task."""
+        frames = self._trace_frames.get()
+        return frames[-1].span_stack if frames else ()
+
+    def _set_span_stack(self, span_stack: tuple[str, ...]) -> None:
+        """Replace only the innermost task's span stack."""
+        frames = self._trace_frames.get()
+        if not frames:
+            return
+        self._trace_frames.set((*frames[:-1], _TraceFrame(trace=frames[-1].trace, span_stack=span_stack)))
 
     def _span_by_id(self, span_id: str) -> TraceSpan | None:
         """Resolve a span from the active trace by ID."""
@@ -319,7 +338,7 @@ class LocalTraceTelemetry(Telemetry):
 
     def _current_span(self) -> TraceSpan | None:
         """Return the top-most active span for the current task context."""
-        stack: tuple[str, ...] = _current_span_stack.get()
+        stack = self._span_stack()
         if not stack:
             return None
         return self._span_by_id(stack[-1])
@@ -429,7 +448,7 @@ class LocalTraceTelemetry(Telemetry):
         if not trace:
             return None
 
-        stack: tuple[str, ...] = _current_span_stack.get()
+        stack = self._span_stack()
         span = TraceSpan(
             id=IDGenerator.generate_uuid(),
             trace_id=trace.trace_id,
@@ -440,7 +459,7 @@ class LocalTraceTelemetry(Telemetry):
             metadata=self._redact(metadata or {}),
         )
         trace.spans.append(span)
-        _current_span_stack.set((*stack, span.id))
+        self._set_span_stack((*stack, span.id))
         return span
 
     def _end_span(
@@ -460,7 +479,7 @@ class LocalTraceTelemetry(Telemetry):
         if not trace:
             return
 
-        stack: tuple[str, ...] = _current_span_stack.get()
+        stack = self._span_stack()
         target_idx: int | None = None
         target_span: TraceSpan | None = None
         for idx in range(len(stack) - 1, -1, -1):
@@ -481,7 +500,7 @@ class LocalTraceTelemetry(Telemetry):
         if metadata:
             target_span.metadata.update(self._redact(metadata))
 
-        _current_span_stack.set(stack[:target_idx] + stack[target_idx + 1 :])
+        self._set_span_stack(stack[:target_idx] + stack[target_idx + 1 :])
 
     async def on_task_start(self, task: Task, agent_name: str) -> Any:
         """Start a trace and root task span for an agent task."""
@@ -497,34 +516,43 @@ class LocalTraceTelemetry(Telemetry):
                 "task_state": task.state.value if hasattr(task.state, "value") else str(task.state),
             },
         )
-        _current_trace.set(trace)
-        _current_span_stack.set(())
-        self._start_span(
-            name=f"Task: {agent_name}",
-            kind="task",
-            span_input=task.to_dict(),
-            metadata={"task_id": task.id, "trace_id": trace_id},
-        )
+        frames = self._trace_frames.get()
+        token = self._trace_frames.set((*frames, _TraceFrame(trace=trace)))
+        try:
+            self._start_span(
+                name=f"Task: {agent_name}",
+                kind="task",
+                span_input=task.to_dict(),
+                metadata={"task_id": task.id, "trace_id": trace_id},
+            )
+        except BaseException:
+            self._trace_frames.reset(token)
+            raise
 
     async def on_task_end(self, task: Task, result: Task, agent_name: str) -> Any:
         """Finalize the root task span and commit the completed trace."""
         trace = self._trace()
         if not trace:
             return
-        error = result.metadata.get("error") if isinstance(result.metadata, dict) else None
-        self._end_span(
-            kind="task",
-            output=result.to_dict(),
-            error=str(error) if error else None,
-            metadata={"final_state": result.state.value if hasattr(result.state, "value") else str(result.state)},
-        )
-        trace.ended_at = _utc_now()
-        trace.status = "error" if error else "ok"
-        trace.metadata["final_state"] = result.state.value if hasattr(result.state, "value") else str(result.state)
-        trace.metadata["retry_count"] = trace.metadata.get("retry_count", 0)
-        self.recorder.record(trace)
-        _current_trace.set(None)
-        _current_span_stack.set(())
+        if trace.task_id != task.id:
+            raise RuntimeError(f"Cannot end local trace for task `{task.id}` while `{trace.task_id}` is active")
+        try:
+            error = result.metadata.get("error") if isinstance(result.metadata, dict) else None
+            self._end_span(
+                kind="task",
+                output=result.to_dict(),
+                error=str(error) if error else None,
+                metadata={"final_state": result.state.value if hasattr(result.state, "value") else str(result.state)},
+            )
+            trace.ended_at = _utc_now()
+            trace.status = "error" if error else "ok"
+            trace.metadata["final_state"] = result.state.value if hasattr(result.state, "value") else str(result.state)
+            trace.metadata["retry_count"] = trace.metadata.get("retry_count", 0)
+            self.recorder.record(trace)
+        finally:
+            frames = self._trace_frames.get()
+            if frames and frames[-1].trace is trace:
+                self._trace_frames.set(frames[:-1])
 
     async def on_llm_start(
         self,

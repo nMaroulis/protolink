@@ -1,8 +1,7 @@
 """Translate between ProtoLink runtime objects and canonical A2A 1.0 JSON.
 
-The conversion deliberately lives outside the core models.  ProtoLink's local
-runtime can evolve independently while this module keeps the public A2A wire
-contract precise and testable.
+The conversion deliberately lives outside the core models.  ProtoLink's local runtime can evolve independently while
+this module keeps the public A2A wire contract precise and testable.
 """
 
 from __future__ import annotations
@@ -57,9 +56,8 @@ def agent_card_to_a2a(
 ) -> dict[str, Any]:
     """Serialize an AgentCard using the A2A 1.0 Agent Card shape.
 
-    Only interfaces implemented by this adapter are advertised.  ProtoLink's
-    native ``card.interfaces`` remain part of its own discovery contract and
-    must not be mistaken for standard A2A bindings.
+    Only interfaces implemented by this adapter are advertised.  ProtoLink's native ``card.interfaces`` remain part of
+    its own discovery contract and must not be mistaken for standard A2A bindings.
     """
 
     capabilities: dict[str, Any] = {
@@ -213,9 +211,8 @@ def _skill_to_a2a(skill: AgentSkill) -> dict[str, Any]:
 def message_from_a2a(data: Mapping[str, Any]) -> Message:
     """Create an internal Message from an A2A 1.0 Message object.
 
-    Validation of required fields is handled by the adapter before conversion.
-    Unknown structured content remains available as a JSON part rather than
-    being discarded.
+    Validation of required fields is handled by the adapter before conversion. Unknown structured content remains
+    available as a JSON part rather than being discarded.
     """
 
     role = "user" if data.get("role") == "ROLE_USER" else "agent"
@@ -361,9 +358,8 @@ def task_from_a2a(
 ) -> Task:
     """Translate an A2A task result while preserving a caller's local task ID.
 
-    A2A servers assign their own task IDs. When ``original`` is supplied, the
-    returned ProtoLink task keeps that local ID and records the remote ID and
-    context in metadata for continuation and cancellation.
+    A2A servers assign their own task IDs. When ``original`` is supplied, the returned ProtoLink task keeps that local
+    ID and records the remote ID and context in metadata for continuation and cancellation.
     """
 
     status = data.get("status")
@@ -429,9 +425,8 @@ def task_to_a2a(
 ) -> dict[str, Any]:
     """Serialize a Task as the canonical A2A 1.0 Task object.
 
-    ``ListTasks`` defaults ``includeArtifacts`` to false, while direct task
-    operations return artifacts normally. Keeping that choice explicit here
-    prevents the list adapter from constructing a second task serializer.
+    ``ListTasks`` defaults ``includeArtifacts`` to false, while direct task operations return artifacts normally.
+    Keeping that choice explicit here prevents the list adapter from constructing a second task serializer.
     """
 
     context_id = str(task.metadata.get("a2a_context_id") or task.id)

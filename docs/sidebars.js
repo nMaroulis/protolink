@@ -21,6 +21,7 @@ const sidebars = {
       collapsed: false,
       items: [
         'agent',
+        'authentication',
         'client',
         'flows',
         'llm',
@@ -34,7 +35,6 @@ const sidebars = {
         'telemetry',
         'tool',
         'transport',
-        'authentication',
         'types',
       ],
     },
@@ -47,6 +47,7 @@ const sidebars = {
         'llm_examples',
         'ticket_booking_example',
         'code_assistant_example',
+        'ai_courtroom_example',
         'protoagent_case_study',
       ],
     },

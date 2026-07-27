@@ -13,8 +13,8 @@ class TaskState(Enum):
     """Lifecycle states for a task as it moves through agent execution.
 
     The default lifecycle is:
-    ``submitted`` -> ``working`` -> one of ``completed``, ``input-required``,
-    ``failed``, or ``canceled``. Terminal states cannot transition further.
+    ``submitted`` -> ``working`` -> one of ``completed``, ``input-required``, ``failed``, or ``canceled``.
+    Terminal states cannot transition further.
     """
 
     SUBMITTED = "submitted"
@@ -43,9 +43,8 @@ _TERMINAL_STATES: set[TaskState] = {TaskState.COMPLETED, TaskState.CANCELED, Tas
 def _coerce_task_state(state: TaskState | str) -> TaskState:
     """Normalize a state value to ``TaskState``.
 
-    Serialized tasks carry states as strings, while in-memory tasks store the
-    enum. Accepting both keeps deserialization and direct construction
-    ergonomic while preserving a single internal representation.
+    Serialized tasks carry states as strings, while in-memory tasks store the enum. Accepting both keeps deserialization
+    and direct construction ergonomic while preserving a single internal representation.
     """
     if isinstance(state, TaskState):
         return state
@@ -150,9 +149,8 @@ class Task:
     def update_state(self, state: TaskState | str) -> "Task":
         """Transition the task to a new state.
 
-        The transition must be allowed by the task lifecycle graph. Repeating
-        the current state is treated as a no-op. Successful transitions are
-        recorded in ``metadata['state_history']``.
+        The transition must be allowed by the task lifecycle graph. Repeating the current state is treated as a no-op.
+        Successful transitions are recorded in ``metadata['state_history']``.
 
         Time: O(1)
         """
@@ -176,8 +174,7 @@ class Task:
     def require_input(self, message: Message | None = None) -> "Task":
         """Mark the task as waiting for additional input.
 
-        If the task has not started yet, it is first moved through
-        ``WORKING`` so the lifecycle history remains valid.
+        If the task has not started yet, it is first moved through ``WORKING`` so the lifecycle history remains valid.
         """
         if self.state in {TaskState.SUBMITTED, TaskState.INPUT_REQUIRED}:
             self.begin()
@@ -189,9 +186,8 @@ class Task:
     def complete(self, response_text: str) -> "Task":
         """Mark the task as completed and append a final agent message.
 
-        If the task is still ``SUBMITTED`` or ``INPUT_REQUIRED``, it is first
-        moved through ``WORKING`` so callers can use this convenience method
-        directly without manually managing intermediate states.
+        If the task is still ``SUBMITTED`` or ``INPUT_REQUIRED``, it is first moved through ``WORKING`` so callers can
+        use this convenience method directly without manually managing intermediate states.
 
         Time: O(1)
         """
@@ -236,8 +232,8 @@ class Task:
     def from_dict(cls, data: dict[str, Any]) -> "Task":
         """Create a Task instance from a dictionary.
 
-        This method also reconstructs the `_last_item` cache by comparing
-        the timestamps of the last message and artifact.
+        This method also reconstructs the `_last_item` cache by comparing the timestamps of the last message and
+        artifact.
 
         Time: O(M + A)
         """

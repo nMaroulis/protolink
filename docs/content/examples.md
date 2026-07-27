@@ -118,6 +118,17 @@ The 0.6.3 examples are small, provider-free scripts intended for application int
 
 ProtoAgent is a full local-first coding assistant built on ProtoLink. Read the case study to see how the runtime engine powers its Architect, Explorer, and Coder agent deck, approval-gated diffs, completion validation, Context Loom evidence, cancellation, history control, and run reports.
 
+### Flagship experiment: [AI Courtroom](ai_courtroom_example.md)
+
+The AI Courtroom is a replayable multi-agent experiment built around a
+fictional autonomous-vehicle liability case. It compares one generalist, five
+independent specialists, a foreperson-star topology, and a direct
+agent-selected mesh while keeping public evidence and observable decision
+contracts controlled. Read the example page to see how jurors author direct
+ProtoLink messages, how one communication topology produces a different
+deterministic verdict, and how every run automatically generates standalone
+interactive HTML reports for replay and comparison.
+
 ### 🛠️ [`devtools_dashboard.py`](https://github.com/nMaroulis/protolink/blob/main/examples/devtools_dashboard.py)
 **Purpose**: Local devtools, run replay, registry snapshot, and dashboard
 

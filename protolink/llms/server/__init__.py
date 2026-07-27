@@ -3,13 +3,14 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-__all__ = ["LMStudioLLM", "LlamaCPPServerLLM", "OllamaLLM", "OpenAICompatibleLLM"]
+__all__ = ["VLLMLLM", "LMStudioLLM", "LlamaCPPServerLLM", "OllamaLLM", "OpenAICompatibleLLM"]
 
 _EXPORTS = {
     "LMStudioLLM": "protolink.llms.server.openai_compatible_client.LMStudioLLM",
     "LlamaCPPServerLLM": "protolink.llms.server.llamacpp_client.LlamaCPPServerLLM",
     "OllamaLLM": "protolink.llms.server.ollama_client.OllamaLLM",
     "OpenAICompatibleLLM": "protolink.llms.server.openai_compatible_client.OpenAICompatibleLLM",
+    "VLLMLLM": "protolink.llms.server.vllm_client.VLLMLLM",
 }
 
 

@@ -243,6 +243,54 @@ class AgentClient:
         assert self._a2a is not None
         return await self._a2a.send_task(agent_url, task, interface=interface)
 
+    # ----------------------------------------------------------------------
+    # Infer Task Convenience
+    # ----------------------------------------------------------------------
+
+    async def send_infer_task(
+        self,
+        query: str,
+        agent_url: str,
+        *,
+        user: str | None = None,
+        output_schema: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task:
+        """Create and send an inference task to a remote agent.
+
+        This convenience method builds a :class:`Task` with
+        :meth:`Task.create_infer` and delegates submission to :meth:`send_task`.
+
+        Args:
+            query: Prompt to send to the remote agent's LLM.
+            agent_url: Target agent endpoint URL.
+            user: Optional user identifier or context for the inference request.
+            output_schema: Optional schema describing the expected LLM output.
+            metadata: Optional metadata attached to the inference part.
+            protocol: Native/A2A protocol selection passed to :meth:`send_task`.
+
+        Returns:
+            Task: Updated task containing the remote agent's result.
+
+        Example:
+            >>> result = await client.send_infer_task(
+            ...     "What is AI?",
+            ...     "http://agent:8001",
+            ... )
+        """
+        task = Task.create_infer(
+            prompt=query,
+            user=user,
+            output_schema=output_schema,
+            metadata=metadata,
+        )
+        return await self.send_task(agent_url, task, protocol=protocol)
+
+    # ----------------------------------------------------------------------
+    # Protocol Selection
+    # ----------------------------------------------------------------------
+
     async def _select_protocol(
         self,
         agent_url: str,
@@ -620,6 +668,56 @@ class SyncAgentClient:
             ... )
         """
         return asyncio.run(self._client.send_task(agent_url, task, protocol=protocol))
+
+    # ----------------------------------------------------------------------
+    # Infer Task Convenience
+    # ----------------------------------------------------------------------
+
+    def send_infer_task(
+        self,
+        query: str,
+        agent_url: str,
+        *,
+        user: str | None = None,
+        output_schema: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> Task:
+        """Synchronously create and send an inference task.
+
+        This is the blocking version of :meth:`AgentClient.send_infer_task`.
+
+        Args:
+            query: Prompt to send to the remote agent's LLM.
+            agent_url: Target agent endpoint URL.
+            user: Optional user identifier or context for the inference request.
+            output_schema: Optional schema describing the expected LLM output.
+            metadata: Optional metadata attached to the inference part.
+            protocol: Native/A2A protocol selection passed to ``send_task()``.
+
+        Returns:
+            Task: Updated task containing the remote agent's result.
+
+        Example:
+            >>> result = client.sync.send_infer_task(
+            ...     "What is AI?",
+            ...     "http://agent:8001",
+            ... )
+        """
+        return asyncio.run(
+            self._client.send_infer_task(
+                query,
+                agent_url,
+                user=user,
+                output_schema=output_schema,
+                metadata=metadata,
+                protocol=protocol,
+            )
+        )
+
+    # ----------------------------------------------------------------------
+    # Task Streaming
+    # ----------------------------------------------------------------------
 
     def send_task_streaming(self, agent_url: str, task: Task) -> Iterator[Any]:
         """Synchronously stream events from a remote agent.

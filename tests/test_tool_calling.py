@@ -50,6 +50,15 @@ def test_build_runtime_tool_schemas_includes_agent_synthetic_tools():
     assert schemas[AGENT_TOOL_CALL_TOOL_NAME]["properties"]["args_json"]["type"] == "string"
 
 
+@pytest.mark.parametrize("reserved_name", [AGENT_INFER_TOOL_NAME, AGENT_TOOL_CALL_TOOL_NAME])
+def test_build_runtime_tool_schemas_rejects_reserved_local_tool_names(reserved_name):
+    tool = DummyTool()
+    tool.name = reserved_name
+
+    with pytest.raises(ValueError, match="reserved by the Protolink runtime"):
+        build_runtime_tool_schemas({reserved_name: tool}, include_agent_tools=True)
+
+
 def test_agent_tool_exposure_requires_callback_and_discovered_agents():
     assert should_include_agent_tools(agent_callback_available=False, agent_cards=[object()]) is False
     assert should_include_agent_tools(agent_callback_available=True, agent_cards=None) is False
@@ -115,3 +124,23 @@ def test_chat_completion_stream_helpers_collect_tool_call_deltas():
     assert isinstance(action, ToolCallAction)
     assert action.tool == "book"
     assert action.args == {"location": "Athens"}
+
+
+def test_chat_completion_stream_accumulator_rejects_parallel_tool_calls():
+    accumulator = ChatCompletionStreamAccumulator()
+    accumulator.add_delta(
+        {
+            "index": 0,
+            "id": "call_1",
+            "function": {"name": "book", "arguments": '{"location":"Athens"}'},
+        }
+    )
+
+    with pytest.raises(ValueError, match="Multiple parallel tool calls"):
+        accumulator.add_delta(
+            {
+                "index": 1,
+                "id": "call_2",
+                "function": {"name": "cancel", "arguments": "{}"},
+            }
+        )

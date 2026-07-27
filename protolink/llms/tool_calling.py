@@ -38,13 +38,32 @@ class ChatCompletionStreamAccumulator:
 
     name: str | None = None
     arguments: list[str] = field(default_factory=list)
+    index: str | None = None
+    call_id: str | None = None
 
     def add_delta(self, tool_call_delta: Any) -> None:
         """Record one provider ``delta.tool_calls`` item."""
+        index = _field(tool_call_delta, "index")
+        if index is not None:
+            normalized_index = str(index)
+            if self.index is not None and normalized_index != self.index:
+                raise ValueError("Multiple parallel tool calls are not supported in one inference step")
+            self.index = normalized_index
+
+        call_id = _field(tool_call_delta, "id")
+        if call_id:
+            normalized_id = str(call_id)
+            if self.call_id is not None and normalized_id != self.call_id:
+                raise ValueError("Multiple parallel tool calls are not supported in one inference step")
+            self.call_id = normalized_id
+
         function = _field(tool_call_delta, "function", {}) or {}
         name = _field(function, "name")
         if name:
-            self.name = str(name)
+            normalized_name = str(name)
+            if self.name is not None and normalized_name != self.name:
+                raise ValueError("Streamed tool call changed function names within one inference step")
+            self.name = normalized_name
         arguments = _field(function, "arguments")
         if arguments:
             self.arguments.append(str(arguments))
@@ -138,6 +157,12 @@ def build_runtime_tool_schemas(
     ``AgentCallAction`` objects so the normal Agent transport layer can resolve
     and dispatch the target agent.
     """
+    reserved_names = {AGENT_INFER_TOOL_NAME, AGENT_TOOL_CALL_TOOL_NAME}
+    collisions = sorted(reserved_names.intersection(tools))
+    if collisions:
+        names = ", ".join(collisions)
+        raise ValueError(f"Tool name(s) reserved by the Protolink runtime: {names}")
+
     schemas: dict[str, dict[str, Any]] = {
         name: normalize_tool_parameters(tool.input_schema or {}) for name, tool in tools.items()
     }

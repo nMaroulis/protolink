@@ -6,8 +6,7 @@ models (LLaMA.cpp, MPT), all implementations inherit from this class.
 
 Creating a Custom LLM Wrapper
 -----------------------------
-To add support for a new LLM provider, create a subclass that implements
-the required abstract methods:
+To add support for a new LLM provider, create a subclass that implements the required abstract methods:
 
 Required Methods:
     - `call(history: ConversationHistory) -> str`: Single response generation
@@ -15,8 +14,7 @@ Required Methods:
 
 Optional Override:
     - `_inject_tool_call(...)`: Customize how tool results are injected into history.
-      Override this if your provider has specific tool-calling protocols (e.g., OpenAI
-      requires tool_call_id correlation).
+      Override this if your provider has specific tool-calling protocols (e.g. OpenAI requires tool_call_id correlation)
     - `validate_connection() -> bool`: Verify API connectivity or model availability.
 
 Example: Minimal Custom LLM
@@ -71,7 +69,9 @@ See Also:
 """
 
 import asyncio
+import inspect
 import json
+import re
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import contextmanager
@@ -116,6 +116,7 @@ from protolink.llms.metrics import (
     profile_from_value,
 )
 from protolink.llms.parsing import (
+    ActionParseError,
     format_validation_errors,
     infer_unique_agent_for_tool,
     parse_function_call_shorthand,
@@ -137,9 +138,101 @@ from protolink.llms.prompts import (
 )
 from protolink.llms.serialization import json_history_default
 from protolink.tools import BaseTool
+from protolink.tools.schema import validate_tool_args
 from protolink.types import LLMProvider, LLMType, ReasoningLevel
+from protolink.utils.logging import get_logger
 
 MAX_INFER_STEPS: int = 10  # safety against infinite loops
+_HISTORY_RESULT_FALLBACK_CHARS: int = 2_000
+logger = get_logger(__name__)
+
+
+def _action_correction_message(
+    error: ValueError,
+    *,
+    tools: dict[str, "BaseTool"],
+    agent_callback_available: bool,
+) -> str:
+    """Build concise correction feedback from validation and runtime context.
+
+    The runtime does not constrain a model's action choice in advance. After a failed response, however, it can state
+    which outer action was detected, whether that action is dispatchable in the current inference, and the canonical
+    shapes of the alternatives that are actually available.
+
+    Args:
+        error: Parser or action-schema failure from the current model response. ``ActionParseError`` supplies structured
+            decoded context; ordinary ``ValueError`` instances retain generic decoding feedback.
+        tools: Local tools dispatchable by this inference call.
+        agent_callback_available: Whether a validated ``agent_call`` can be routed by the runtime.
+
+    Returns:
+        A system-history message containing concise validation detail, the most specific capability explanation
+        supported by the failure, and only the canonical action forms available for the retry.
+    """
+    detail = error.feedback if isinstance(error, ActionParseError) else str(error)
+    action_type = error.action_type if isinstance(error, ActionParseError) else None
+    parsed_data = error.parsed_data if isinstance(error, ActionParseError) else None
+    lines = [
+        "Your previous response was not a dispatchable ProtoLink action.",
+        f"Validation feedback:\n{detail}",
+    ]
+
+    if action_type == "agent_call":
+        if agent_callback_available:
+            delegated_action = parsed_data.get("action") if isinstance(parsed_data, dict) else None
+            if delegated_action == "infer":
+                lines.append(
+                    "An `agent_call` with action `infer` requires a non-empty `agent` and `prompt`; "
+                    "it cannot contain `tool` or `args`."
+                )
+            elif delegated_action == "tool_call":
+                lines.append(
+                    "An `agent_call` with action `tool_call` requires a non-empty `agent`, "
+                    "a `tool`, and an `args` object; it cannot contain `prompt`."
+                )
+            else:
+                lines.append("The outer `agent_call.action` must be either `infer` or `tool_call`.")
+        else:
+            lines.append(
+                "The response selected `agent_call`, but no agent delegation route is available "
+                "for this inference, so that action cannot be dispatched."
+            )
+    elif action_type == "tool_call":
+        if tools:
+            lines.append("A `tool_call` requires an available `tool` name and an `args` object.")
+        else:
+            lines.append(
+                "The response selected `tool_call`, but no local tools are available "
+                "for this inference, so that action cannot be dispatched."
+            )
+    elif action_type == "final":
+        lines.append("A `final` action requires non-empty `content`.")
+    elif action_type and action_type not in {"final", "tool_call", "agent_call"}:
+        lines.append(f"The outer action type `{action_type}` is not recognized.")
+    elif action_type is None and isinstance(error, ActionParseError):
+        lines.append("No recognized outer action type could be inferred from the decoded object.")
+
+    lines.extend(
+        [
+            "Return exactly one JSON object using a currently dispatchable action:",
+            '- `final`: {"type":"final","content":"..."}',
+        ]
+    )
+    if tools:
+        available_tools = ", ".join(sorted(tools))
+        lines.append(
+            f'- `tool_call` (available tools: {available_tools}): {{"type":"tool_call","tool":"tool_name","args":{{}}}}'
+        )
+    if agent_callback_available:
+        lines.extend(
+            [
+                '- delegated inference: {"type":"agent_call","agent":"agent_name","action":"infer","prompt":"..."}',
+                "- delegated tool call: "
+                '{"type":"agent_call","agent":"agent_name","action":"tool_call",'
+                '"tool":"tool_name","args":{}}',
+            ]
+        )
+    return "\n".join(lines)
 
 
 def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext:
@@ -151,12 +244,40 @@ def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext
     return RunContext()
 
 
+def _history_safe_result(value: Any) -> Any:
+    """Return a provider-history-serializable action result.
+
+    Valid JSON-compatible values retain their structure. Circular containers and unusual application objects fall back
+    to a bounded representation so a completed external side effect can always be recorded before the loop reaches its
+    next cancellation or budget boundary.
+    """
+    try:
+        json.dumps(value, default=json_history_default)
+        return value
+    except Exception:
+        try:
+            representation = repr(value)
+        except Exception:
+            representation = f"<{type(value).__module__}.{type(value).__qualname__}>"
+        if len(representation) > _HISTORY_RESULT_FALLBACK_CHARS:
+            omitted = len(representation) - _HISTORY_RESULT_FALLBACK_CHARS
+            half = _HISTORY_RESULT_FALLBACK_CHARS // 2
+            representation = (
+                f"{representation[:half]}\n... [{omitted} characters omitted] ...\n{representation[-half:]}"
+            )
+        return {
+            "serialization_fallback": True,
+            "value_type": f"{type(value).__module__}.{type(value).__qualname__}",
+            "representation": representation,
+        }
+
+
 class LLM(ABC):
     """
     Abstract base class for all Large Language Model (LLM) implementations.
 
-    This class defines the core interface and shared functionality for any LLM,
-    whether it is API-based (OpenAI, Anthropic, Gemini), server-based (Ollama) or local (LLaMA, MPT, etc.).
+    This class defines the core interface and shared functionality for any LLM,  whether it is API-based (OpenAI,
+    Anthropic, Gemini), server-based (Ollama) or local (LLaMA, MPT, etc.).
 
     Subclasses are expected to define:
 
@@ -166,17 +287,16 @@ class LLM(ABC):
     Instance variables:
 
     - `model` (str): The identifier of the model to use (e.g., "gpt-4o-mini").
-    - `_model_params` (dict[str, Any]): Model-specific generation parameters. These
-      vary depending on the provider. Examples include:
-        - OpenAI: temperature, top_p, stop, max_tokens
-        - Anthropic: temperature, top_p, max_tokens
-        - Gemini: temperature, top_p, max_output_tokens
-    - `history` (ConversationHistory): Tracks conversation messages for multi-turn
-      interactions.
-    - `compactor` (HistoryCompactor): Owns provider-neutral history compaction,
-      summary generation, and isolated request-level compaction calls.
-    - `system_prompt` (str): Optional system instructions used as context for the
-      model when generating responses. Uses default prompts for agent, tool and llm calling.
+    - `_model_params` (dict[str, Any]): Model-specific generation parameters. These vary depending on the provider.
+        Examples include:
+            - OpenAI: temperature, top_p, stop, max_tokens
+            - Anthropic: temperature, top_p, max_tokens
+            - Gemini: temperature, top_p, max_output_tokens
+    - `history` (ConversationHistory): Tracks conversation messages for multi-turn interactions.
+    - `compactor` (HistoryCompactor): Owns provider-neutral history compaction, summary generation, and isolated
+      request-level compaction calls.
+    - `system_prompt` (str): Optional system instructions used as context for the model when generating responses. Uses
+      default prompts for agent, tool and llm calling.
     - `_reasoning` (ReasoningLevel): Whether to use chain of thought (CoT) for the model, adds reasoning steps to the
       response.
 
@@ -222,6 +342,7 @@ class LLM(ABC):
         self.system_prompt: str = self.build_system_prompt(action_mode="json")
         self.metrics_enabled: bool = True
         self._metrics_profile: LLMModelProfile | None = None
+        self._max_parse_failures: int = 3
         self.sync = SyncLLM(self)
 
     def __getstate__(self) -> dict[str, Any]:
@@ -254,11 +375,9 @@ class LLM(ABC):
     def history(self) -> ConversationHistory:
         """Return the current conversation history for this execution context.
 
-        During an agent run, ProtoLink installs a task-local history with
-        :meth:`use_history`. Provider adapters and subclass hooks can keep
-        using ``self.history`` while concurrent tasks receive isolated history
-        objects. Outside a run context, this property returns the LLM's default
-        history for direct LLM usage and backward compatibility.
+        During an agent run, ProtoLink installs a task-local history with :meth:`use_history`. Provider adapters and
+        subclass hooks can keep using ``self.history`` while concurrent tasks receive isolated history objects. Outside
+        a run context, this property returns the LLM's default history for direct LLM usage and backward compatibility.
         """
         self._ensure_history_context()
         active_history = self._active_history.get()
@@ -268,10 +387,9 @@ class LLM(ABC):
     def history(self, value: ConversationHistory) -> None:
         """Set the active or default conversation history.
 
-        If a task-local history is active, assignment updates that context only.
-        Otherwise, assignment updates the LLM's default history. This preserves
-        existing direct ``llm.history = ...`` usage while preventing concurrent
-        agent runs from sharing mutable conversation state.
+        If a task-local history is active, assignment updates that context only. Otherwise, assignment updates the LLM's
+        default history. This preserves existing direct ``llm.history = ...`` usage while preventing concurrent agent
+        runs from sharing mutable conversation state.
         """
         if not isinstance(value, ConversationHistory):
             raise TypeError(f"history must be ConversationHistory, got {type(value).__name__}")
@@ -287,13 +405,30 @@ class LLM(ABC):
         self._ensure_history_context()
         return self._active_history.get() is not None
 
+    @property
+    def max_parse_failures(self) -> int:
+        """Maximum consecutive action-parse failures before inference stops.
+
+        This is runtime behavior, not a provider generation parameter. Keeping it outside ``model_params`` prevents
+        ProtoLink-only configuration from leaking into OpenAI-, Anthropic-, Ollama-, or compatible-server request
+        payloads.
+        """
+        return getattr(self, "_max_parse_failures", 3)
+
+    @max_parse_failures.setter
+    def max_parse_failures(self, value: int) -> None:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError("max_parse_failures must be an integer")
+        if value < 1 or value > MAX_INFER_STEPS:
+            raise ValueError(f"max_parse_failures must be between 1 and {MAX_INFER_STEPS}")
+        self._max_parse_failures = value
+
     @contextmanager
     def use_history(self, history: ConversationHistory):
         """Temporarily bind a task-local conversation history.
 
-        The binding is implemented with ``contextvars``, so it is isolated per
-        asyncio task and safely follows awaits. This lets one LLM instance serve
-        concurrent agent runs without interleaving their messages.
+        The binding is implemented with ``contextvars``, so it is isolated per asyncio task and safely follows awaits.
+        This lets one LLM instance serve concurrent agent runs without interleaving their messages.
 
         Args:
             history: Conversation history to use inside the context.
@@ -322,22 +457,16 @@ class LLM(ABC):
     ) -> "LLM":
         """Configure optional LLM budget metrics for this model.
 
-        Metrics are purely observational. They do not change prompt generation,
-        provider request payloads, retry behavior, or model responses. When an
-        ``event_callback`` or telemetry backend is attached, Protolink emits
-        per-call latency, usage, context-pressure, and cost events. Provider
-        token usage is preferred when available; otherwise Protolink uses local
-        estimates.
+        Metrics are purely observational. They do not change prompt generation, provider request payloads, retry
+        behavior, or model responses. When an ``event_callback`` or telemetry backend is attached, Protolink emits
+        per-call latency, usage, context-pressure, and cost events. Provider token usage is preferred when available;
+        otherwise Protolink uses local estimates.
 
         Args:
-            profile: Optional ``LLMModelProfile`` or dictionary. Pass this when
-                you already have model budget metadata.
-            context_window: Total context-window size in tokens. Used to
-                compute ``context.used_percent``.
-            input_cost_per_million: Input-token price per one million tokens.
-                Used only for estimated cost metadata.
-            output_cost_per_million: Output-token price per one million tokens.
-                Used only for estimated cost metadata.
+            profile: Optional ``LLMModelProfile`` or dictionary. Pass this when you already have model budget metadata.
+            context_window: Total context-window size in tokens. Used to compute ``context.used_percent``.
+            input_cost_per_million: Input-token price per one million tokens. Used only for estimated cost metadata.
+            output_cost_per_million: Output-token price per one million tokens. Used only for estimated cost metadata.
             currency: Currency code for cost estimates. Defaults to ``"USD"``.
             enabled: Whether to emit metrics when an observer is attached.
 
@@ -378,8 +507,8 @@ class LLM(ABC):
     ) -> HistoryCompactionResult:
         """Compact live history through this LLM's ``HistoryCompactor``.
 
-        This convenience facade preserves the direct LLM API. Applications
-        that need the component itself can call ``llm.compactor.compact()``.
+        This convenience facade preserves the direct LLM API. Applications that need the component itself can call
+        ``llm.compactor.compact()``.
 
         Args:
             strategy: ``"recent"``, ``"tokens"``, or ``"summary"``.
@@ -459,10 +588,9 @@ class LLM(ABC):
     def uses_native_action_prompt(self) -> bool:
         """Whether this LLM should receive provider-native tool instructions.
 
-        The default is ``False`` because the portable Protolink protocol is a
-        simple JSON action contract. Providers that actually send native tool
-        declarations override this so the system prompt does not ask the model
-        to emit JSON while the provider API is asking it to call tools.
+        The default is ``False`` because the portable Protolink protocol is a simple JSON action contract. Providers
+        that actually send native tool declarations override this so the system prompt does not ask the model to emit
+        JSON while the provider API is asking it to call tools.
         """
         return False
 
@@ -470,10 +598,9 @@ class LLM(ABC):
     def supports_native_action_stream(self) -> bool:
         """Whether ``streaming=True`` can acquire actions from native events.
 
-        Providers that override ``call_action_stream()`` to consume structured
-        streaming tool-call events should return ``True`` here. Providers that
-        stream plain text should keep the default ``False`` so the agent builds
-        the JSON action prompt for streaming inference.
+        Providers that override ``call_action_stream()`` to consume structured streaming tool-call events should return
+        ``True`` here. Providers that stream plain text should keep the default ``False`` so the agent builds the JSON
+        action prompt for streaming inference.
         """
         return False
 
@@ -487,28 +614,23 @@ class LLM(ABC):
     ) -> LLMActionResult:
         """Return one validated runtime action for the current conversation.
 
-        Subclasses with native tool/function-calling support should override
-        this method and normalize provider-native results into
-        :class:`~protolink.llms.actions.LLMActionResult`. The base
-        implementation is the compatibility path: call the model for text,
-        parse the prompt-defined JSON action, validate it with Pydantic, and
-        return the same typed result shape as native adapters.
+        Subclasses with native tool/function-calling support should override this method and normalize provider-native
+        results into :class:`~protolink.llms.actions.LLMActionResult`. The base implementation is the compatibility
+        path: call the model for text, parse the prompt-defined JSON action, validate it with Pydantic, and return the
+        same typed result shape as native adapters.
 
         Args:
             history: Conversation history for this inference step.
-            tools: Local tools available to this agent. Fallback adapters rely
-                on the system prompt for tool descriptions; native adapters use
-                this mapping to build provider tool declarations.
-            agent_callback_available: Whether agent delegation can be
-                dispatched by the runtime for this step.
-            agent_cards: Optional discovered agent cards. The fallback parser
-                uses this context only to repair unambiguous legacy shorthand
-                such as ``{"type":"agent_call","prompt":"list_directory(path='.')"}`
+            tools: Local tools available to this agent. Fallback adapters rely on the system prompt for tool
+                descriptions; native adapters use this mapping to build provider tool declarations.
+            agent_callback_available: Whether agent delegation can be dispatched by the runtime for this step.
+            agent_cards: Optional discovered agent cards. The fallback parser uses this context only to repair
+                unambiguous legacy shorthand such as ``{"type":"agent_call","prompt":"list_directory(path='.')"}`
                 into a fully typed ``AgentCallAction``.
 
         Returns:
-            A normalized and validated action result. The runtime dispatches
-            only this object, never raw provider payloads.
+            A normalized and validated action result. The runtime dispatches only this object, never raw provider
+                payloads.
         """
         _ = agent_callback_available
         raw_response = self.call(history)
@@ -526,11 +648,10 @@ class LLM(ABC):
     ) -> LLMActionResult:
         """Return one action from a streaming model call.
 
-        The base implementation is intentionally simple and local-model
-        friendly: stream text chunks, emit them to the optional callback, join
-        the chunks, and parse the final text as one Protolink JSON action. API
-        providers with native streaming tool-call events override this method
-        and normalize those events into the same ``LLMActionResult`` contract.
+        The base implementation is intentionally simple and local-model friendly: stream text chunks, emit them to the
+        optional callback, join the chunks, and parse the final text as one Protolink JSON action. API providers with
+        native streaming tool-call events override this method and normalize those events into the same
+        ``LLMActionResult`` contract.
         """
         _ = agent_callback_available
         chunks: list[str] = []
@@ -566,10 +687,12 @@ class LLM(ABC):
         agent_cards: list[Any] | None = None,
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+        event_metrics: bool | None = None,
         action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
         cancellation_token: CancellationToken | None = None,
         run_context: RunContext | dict[str, Any] | None = None,
         budget_policy: BudgetPolicy | None = None,
+        budget_enforcer: BudgetEnforcer | None = None,
     ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -590,8 +713,9 @@ class LLM(ABC):
            wrapped in a transient error handler with exponential backoff and random jitter.
 
         3. **Action Validation**: The action is validated against the type-safe ``LLMAction`` union. If validation
-           fails, recursive field-level diagnostics (detailing the exact error location and type) are extracted from the
-           Pydantic validation error and injected back into history for self-correction.
+           fails, recursive field-level diagnostics are extracted from the Pydantic error. The retry message combines
+           that concise feedback with any decoded outer action type and the tools or delegation route available to the
+           current inference; the parsed-payload preview remains in bounded diagnostics rather than correction history.
 
         4. **Action Dispatch**: Based on the validated action type:
 
@@ -640,26 +764,29 @@ class LLM(ABC):
             Whether to invoke the underlying LLM in streaming mode. When True, the response is collected from an async
             generator before parsing.
         event_callback : Callable[[dict[str, Any]], Awaitable[None]], optional
-            Async observer called with normalized inference events. Events include
-            LLM chunks, parsed actions, tool execution results, delegated agent
-            calls, final output, and recoverable errors. The callback is for
+            Async observer called with normalized inference events. Events include LLM chunks, parsed actions, tool
+            execution results, delegated agent calls, final output, and recoverable errors. The callback is for
             observability only; the inference loop still returns a final ``Part``.
+        event_metrics : bool, optional
+            Whether an attached event callback should activate optional call metrics. The default preserves
+            direct-caller behavior. Agent sets this to false when its callback exists only for internal action
+            receipts, avoiding token-estimation overhead on unobserved runs.
         action_authorizer : Callable[[RunAction], Awaitable[ActionAuthorization]], optional
-            Runtime callback invoked after a model action has been validated but
-            before a tool or delegated agent operation executes. The callback
-            may enrich the action, enforce capability policy, and obtain an
-            application-owned approval decision. Direct LLM usage may omit it;
-            the ``Agent`` runtime supplies its configured authorizer.
+            Runtime callback invoked after a model action has been validated but before a tool or delegated agent
+            operation executes. The callback may enrich the action, enforce capability policy, and obtain an
+            application-owned approval decision. Direct LLM usage may omit it;the ``Agent`` runtime supplies its
+            configured authorizer.
         cancellation_token : CancellationToken, optional
-            Live process-local token checked before model calls and action
-            dispatch. The owning Agent also cancels this coroutine directly so
-            awaited provider, tool, and delegation operations stop promptly.
+            Live process-local token checked before model calls and action dispatch. The owning Agent also cancels this
+            coroutine directly so awaited provider, tool, and delegation operations stop promptly.
         run_context : RunContext | dict, optional
-            Active run context used to correlate context manifests and enforce
-            ``RunBudget`` limits during the inference loop.
+            Active run context used to correlate context manifests and enforce ``RunBudget`` limits during the inference
+            loop.
         budget_policy : BudgetPolicy, optional
-            Policy used by the built-in ``BudgetEnforcer``. Omit this to use
-            the default allow/warn/deny policy.
+            Policy used by the built-in ``BudgetEnforcer``. Omit this to use the default allow/warn/deny policy.
+        budget_enforcer : BudgetEnforcer, optional
+            Existing task-scoped enforcer. The Agent runtime supplies one when several infer/tool parts share a task so
+            usage, warnings, and runtime accounting remain cumulative. Direct LLM callers may omit it.
 
         Returns
         -------
@@ -712,10 +839,9 @@ class LLM(ABC):
            jitter. It retries on rate limits (429), server overloads (529), 5xx response codes, timeouts, and network
            disconnects.
 
-        3. *Granular Field-Level Self-Correction*: When Pydantic validation fails, the
-           error message returned to the model includes the exact Pydantic validation trace
-           (location, message, error type) rather than a generic parsing error, facilitating
-           precise correction of schema violations.
+        3. *Granular Field-Level Self-Correction*: When Pydantic validation fails, the model receives field locations,
+           messages, and error types plus capability-aware guidance derived from the decoded outer action. Parsed
+           payload previews remain in bounded diagnostics instead of being copied into privileged correction history.
 
         4. *Parse Failure Circuit Breaker*: After 3 consecutive JSON parse or schema validation failures, raises
            ``RuntimeError`` early rather than consuming the full step budget. Each failure injects corrective feedback.
@@ -733,22 +859,39 @@ class LLM(ABC):
         build_system_prompt : Constructs the system prompt with tools and agents.
         """
 
+        active_context = _coerce_run_context(run_context)
+        if active_context.canceled:
+            raise asyncio.CancelledError(active_context.cancel_reason or "Run context was canceled before inference")
         if cancellation_token is not None:
             cancellation_token.raise_if_cancelled()
 
-        active_context = _coerce_run_context(run_context)
-        budget_enforcer = BudgetEnforcer(active_context, policy=budget_policy)
+        active_budget_enforcer = budget_enforcer or BudgetEnforcer(active_context, policy=budget_policy)
         self.history.add_user(query)
 
         steps: int = 0
         parse_failures: int = 0
-        max_parse_failures: int = 3  # Circuit breaker for consecutive parse failures
+        max_parse_failures = self.max_parse_failures
         recent_actions: list[str] = []  # Track recent actions for dedup detection
         max_recent_actions: int = 5  # Window for detecting repeated actions
+        observer_disabled = False
 
         async def emit(event: dict[str, Any]) -> None:
-            if event_callback is not None:
-                await event_callback(event)
+            nonlocal observer_disabled
+            if event_callback is not None and not observer_disabled:
+                try:
+                    await event_callback(event)
+                except Exception as exc:
+                    # Event observers are explicitly non-authoritative. A broken
+                    # telemetry/export callback must not invalidate an already
+                    # completed model or tool operation.
+                    logger.warning(f"Inference event callback failed; continuing without interrupting the run: {exc}")
+                    observer_disabled = True
+
+        def remember_action(signature: str) -> None:
+            """Remember only actions that completed successfully."""
+            recent_actions.append(signature)
+            if len(recent_actions) > max_recent_actions:
+                recent_actions.pop(0)
 
         async def emit_budget_decision(decision: BudgetDecision) -> None:
             if decision.effect == "warn":
@@ -791,13 +934,13 @@ class LLM(ABC):
                 await emit({"type": "approval_decision", "decision": authorization.approval_decision.to_dict()})
             return authorization
 
-        metrics_active = self.metrics_enabled and event_callback is not None
+        metrics_active = self.metrics_enabled and event_callback is not None and event_metrics is not False
 
         while steps < MAX_INFER_STEPS:
             if cancellation_token is not None:
                 cancellation_token.raise_if_cancelled()
             steps += 1
-            await enforce_budget(budget_enforcer.check_step(steps))
+            await enforce_budget(active_budget_enforcer.check_next_step())
             await emit({"type": "llm_step", "step": steps})
             action_error: ValueError | None = None
             action_result: LLMActionResult | None = None
@@ -814,7 +957,7 @@ class LLM(ABC):
             )
             manifest_payload = manifest.to_dict()
             await emit({"type": "context_prepared", "step": steps, "manifest": manifest_payload})
-            await enforce_budget(budget_enforcer.check_llm_call(input_tokens=manifest.total_estimated_tokens))
+            await enforce_budget(active_budget_enforcer.check_llm_call(input_tokens=manifest.total_estimated_tokens))
 
             if metrics_active:
                 context_usage: LLMContextUsage = context_usage_from_tokens(
@@ -836,24 +979,62 @@ class LLM(ABC):
             # ─────────────────────────────────────────────────────────────────
             # Step 1: Ask the LLM adapter for one typed action
             # ─────────────────────────────────────────────────────────────────
-            try:
-                import time
+            attempt_count = 0
+            stream_state = {"output_exposed": False}
 
+            async def before_llm_attempt(
+                attempt: int,
+                current_step: int = steps,
+                input_tokens: int = manifest.total_estimated_tokens,
+                current_manifest: dict[str, Any] = manifest_payload,
+            ) -> None:
+                nonlocal attempt_count
+                if cancellation_token is not None:
+                    cancellation_token.raise_if_cancelled()
+                if attempt > 1:
+                    await enforce_budget(active_budget_enforcer.evaluate())
+                    await enforce_budget(active_budget_enforcer.check_llm_call(input_tokens=input_tokens))
+                attempt_count = attempt
                 await emit(
                     {
                         "type": "llm_call_started",
-                        "step": steps,
+                        "step": current_step,
+                        "attempt": attempt,
                         "provider": self.provider,
                         "model": self.model,
                         "streaming": streaming,
-                        "manifest": manifest_payload,
+                        "manifest": current_manifest,
                     }
                 )
+
+            async def on_llm_retry(
+                failed_attempt: int,
+                exc: Exception,
+                delay: float,
+                current_step: int = steps,
+            ) -> None:
+                await emit(
+                    {
+                        "type": "llm_retry",
+                        "step": current_step,
+                        "reason": "transient_error",
+                        "attempt": failed_attempt,
+                        "next_attempt": failed_attempt + 1,
+                        "retry_in_seconds": round(delay, 3),
+                        "error_type": type(exc).__name__,
+                        "message": str(exc),
+                    }
+                )
+
+            try:
+                import time
+
                 call_started_at = time.perf_counter()
                 if streaming:
 
-                    async def stream_action(current_step=steps):
+                    async def stream_action(current_step=steps, current_stream_state=stream_state):
                         async def emit_chunk(chunk: str) -> None:
+                            current_stream_state["output_exposed"] = True
                             await emit({"type": "llm_chunk", "step": current_step, "content": chunk})
 
                         return await self.call_action_stream(
@@ -864,7 +1045,15 @@ class LLM(ABC):
                             chunk_callback=emit_chunk,
                         )
 
-                    action_result = await self._call_with_retry(stream_action)
+                    def allow_stream_retry(_exc: Exception, current_stream_state=stream_state) -> bool:
+                        return not current_stream_state["output_exposed"]
+
+                    action_result = await self._call_with_retry(
+                        stream_action,
+                        _before_attempt=before_llm_attempt,
+                        _on_retry=on_llm_retry,
+                        _retry_predicate=allow_stream_retry,
+                    )
                     raw_response = action_result.raw_response
                 else:
                     action_result = await self._call_with_retry(
@@ -873,13 +1062,16 @@ class LLM(ABC):
                         tools=tools,
                         agent_callback_available=agent_callback is not None,
                         agent_cards=agent_cards,
+                        _before_attempt=before_llm_attempt,
+                        _on_retry=on_llm_retry,
                     )
                     raw_response = action_result.raw_response
-                    action_obj = action_result.action
                 latency_ms = round((time.perf_counter() - call_started_at) * 1000, 3)
                 response_metadata = dict(action_result.metadata if action_result is not None else {})
+                response_metadata["attempts"] = attempt_count
+                response_metadata["retry_attempts"] = max(attempt_count - 1, 0)
                 needs_call_metrics = (
-                    metrics_active or budget_enforcer.has_output_token_limit
+                    metrics_active or active_budget_enforcer.has_output_token_limit
                 ) and action_result is not None
                 if needs_call_metrics and action_result is not None:
                     call_metrics = build_call_metrics(
@@ -898,7 +1090,7 @@ class LLM(ABC):
                     response_metadata["metrics"] = metrics_payload
                     if metrics_active:
                         await emit({"type": "llm_call_metrics", **metrics_payload})
-                    await enforce_budget(budget_enforcer.record_output_tokens(call_metrics.usage.output_tokens))
+                    await enforce_budget(active_budget_enforcer.record_output_tokens(call_metrics.usage.output_tokens))
                 await emit(
                     {
                         "type": "llm_call_completed",
@@ -906,10 +1098,11 @@ class LLM(ABC):
                         "provider": self.provider,
                         "model": self.model,
                         "latency_ms": latency_ms,
+                        "attempts": attempt_count,
                         "streaming": streaming,
                         "native": action_result.native if action_result is not None else False,
                         "metrics": call_metrics.to_dict() if call_metrics else None,
-                        "budget": budget_enforcer.usage.to_dict(),
+                        "budget": active_budget_enforcer.usage.to_dict(),
                     }
                 )
                 await emit(
@@ -922,6 +1115,11 @@ class LLM(ABC):
                         "metrics": call_metrics.to_dict() if call_metrics else None,
                     }
                 )
+                # Runtime budgets are checked after every physical operation as
+                # well as before the next step. This catches a call that itself
+                # crossed the configured wall-clock limit, including final calls
+                # that would otherwise return immediately.
+                await enforce_budget(active_budget_enforcer.evaluate())
             except ValueError as e:
                 action_error = e
             except BudgetExceededError:
@@ -961,14 +1159,12 @@ class LLM(ABC):
                     raise RuntimeError(
                         f"Failed to parse LLM output after {parse_failures} consecutive attempts. Last error: {e}"
                     ) from e
-                # Inject error feedback to help LLM self-correct
                 self.history.add_system(
-                    f"Your previous response could not be parsed or validated. Error:\n{e}\n"
-                    f"Return exactly one JSON action object, for example:\n"
-                    f'{{"type":"final","content":"..."}}\n'
-                    f'{{"type":"tool_call","tool":"tool_name","args":{{}}}}\n'
-                    f'{{"type":"agent_call","agent":"agent_name","action":"infer","prompt":"..."}}\n'
-                    f'{{"type":"agent_call","agent":"agent_name","action":"tool_call","tool":"tool_name","args":{{}}}}'
+                    _action_correction_message(
+                        e,
+                        tools=tools,
+                        agent_callback_available=agent_callback is not None,
+                    )
                 )
                 continue
 
@@ -976,6 +1172,15 @@ class LLM(ABC):
             # Step 3: Deduplication detection for repeated actions
             # ─────────────────────────────────────────────────────────────────
             await emit({"type": "llm_action", "step": steps, "action": action, "payload": payload})
+
+            # Final actions have no side effect to deduplicate and should be
+            # returned immediately even if their content repeats earlier text.
+            if isinstance(action_obj, FinalAction):
+                content = action_obj.content
+                self.history.add_assistant(raw_response)
+                await emit({"type": "llm_final", "step": steps, "content": content, "final": True})
+                return Part("infer_output", content)
+
             action_signature = self._compute_action_signature(action_obj)
             if action_signature in recent_actions:
                 # Detected repeated action - inject guidance to prevent infinite loop
@@ -995,22 +1200,10 @@ class LLM(ABC):
                 )
                 continue
 
-            # Track recent actions (sliding window)
-            recent_actions.append(action_signature)
-            if len(recent_actions) > max_recent_actions:
-                recent_actions.pop(0)
-
             # ─────────────────────────────────────────────────────────────────
             # Step 4: Handle action types
             # ─────────────────────────────────────────────────────────────────
-            if isinstance(action_obj, FinalAction):
-                content = action_obj.content
-                # Add final response to history
-                self.history.add_assistant(raw_response)
-                await emit({"type": "llm_final", "step": steps, "content": content, "final": True})
-                return Part("infer_output", content)
-
-            elif isinstance(action_obj, ToolCallAction):
+            if isinstance(action_obj, ToolCallAction):
                 # Add assistant call to history before result
                 self.history.add_assistant(raw_response)
 
@@ -1020,15 +1213,50 @@ class LLM(ABC):
 
                 if tool_name not in tools:
                     available = list(tools.keys())
-                    self.history.add_system(f"Unknown tool: '{tool_name}'. Available tools: {available}")
+                    await emit(
+                        {
+                            "type": "tool_error",
+                            "step": steps,
+                            "tool": tool_name,
+                            "message": f"Unknown tool: {tool_name}",
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
+                    if available:
+                        self.history.add_system(
+                            f"The `tool_call` selected unknown tool '{tool_name}'. Available tools: {available}"
+                        )
+                    else:
+                        self.history.add_system(
+                            "The `tool_call` was structurally valid, but no local tools are available "
+                            "for this inference. Choose another action, such as `final`."
+                        )
                     continue
 
                 tool = tools[tool_name]
 
                 try:
+                    tool_args = self._validate_tool_arguments(tool, tool_args)
+                except (TypeError, ValueError) as e:
+                    await emit(
+                        {
+                            "type": "tool_error",
+                            "step": steps,
+                            "tool": tool_name,
+                            "message": str(e),
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
+                    self.history.add_system(
+                        f"Tool '{tool_name}' arguments were invalid: {e}. Check the tool's input schema and try again."
+                    )
+                    continue
+
+                try:
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
-                    await enforce_budget(budget_enforcer.check_tool_call())
                     runtime_action = RunAction(
                         kind="tool.call",
                         name=tool_name,
@@ -1041,10 +1269,12 @@ class LLM(ABC):
                         authorized_arguments = authorization.action.payload.get("arguments", tool_args)
                         if not isinstance(authorized_arguments, dict):
                             raise TypeError("Authorized tool action payload.arguments must be a dictionary")
-                        tool_args = authorized_arguments
+                        tool_args = self._validate_tool_arguments(tool, authorized_arguments)
                         action_id = authorization.action.action_id
                     else:
                         action_id = runtime_action.action_id
+                    await enforce_budget(active_budget_enforcer.evaluate())
+                    await enforce_budget(active_budget_enforcer.check_tool_call())
                     await emit(
                         {
                             "type": "tool_start",
@@ -1055,19 +1285,10 @@ class LLM(ABC):
                         }
                     )
                     tool_result = await tool(**tool_args)
-                    if cancellation_token is not None:
-                        cancellation_token.raise_if_cancelled()
                 except ActionPolicyError:
                     raise
                 except BudgetExceededError:
                     raise
-                except TypeError as e:
-                    # Likely wrong arguments - help LLM correct
-                    self.history.add_system(
-                        f"Tool '{tool_name}' call failed due to argument error: {e}. "
-                        f"Please check the tool's input_schema and try again."
-                    )
-                    continue
                 except Exception as e:
                     await emit(
                         {
@@ -1080,27 +1301,67 @@ class LLM(ABC):
                     )
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
+                history_tool_result = _history_safe_result(tool_result)
+                observation_fallback = False
+                try:
+                    self._inject_tool_call(
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                        tool_result=history_tool_result,
+                    )
+                except Exception as exc:
+                    # The external operation already completed. A broken
+                    # provider-specific history hook must not erase that fact
+                    # and invite a duplicate retry, so retain a portable system
+                    # observation as the final fallback.
+                    observation_fallback = True
+                    logger.warning(f"Provider tool-result history injection failed; using portable observation: {exc}")
+                    self.history.add_system(
+                        json.dumps(
+                            {
+                                "type": "tool_result",
+                                "tool": tool_name,
+                                "result": history_tool_result,
+                                "observation_format": "portable_fallback",
+                            },
+                            default=json_history_default,
+                        )
+                    )
                 await emit(
                     {
                         "type": "tool_result",
                         "step": steps,
                         "tool": tool_name,
-                        "result": tool_result,
+                        "result": history_tool_result,
                         "action_id": action_id,
+                        "observation_fallback": observation_fallback,
                     }
                 )
-                self._inject_tool_call(
-                    tool_name=tool_name,
-                    tool_args=tool_args,
-                    tool_result=tool_result,
-                )
+                remember_action(action_signature)
+                # A completed tool may already have committed a side effect.
+                # Record it before honoring a cancellation or runtime overrun;
+                # the next loop preflight prevents any further dispatch.
                 continue
 
             elif isinstance(action_obj, AgentCallAction):
                 if not agent_callback:
+                    await emit(
+                        {
+                            "type": "agent_call_error",
+                            "step": steps,
+                            "agent": action_obj.agent,
+                            "action": action_obj.action,
+                            "message": "Agent delegation is unavailable in this context",
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
+                    alternatives = "`final`"
+                    if tools:
+                        alternatives += " or `tool_call` with an available local tool"
                     self.history.add_system(
-                        "agent_call is not available in this context. "
-                        "Please use 'tool_call' for local tools or produce a 'final' response."
+                        "The `agent_call` was structurally valid, but no agent delegation route is available "
+                        f"for this inference. Choose {alternatives} instead."
                     )
                     continue
 
@@ -1125,6 +1386,7 @@ class LLM(ABC):
                     action_id = (
                         authorization.action.action_id if authorization is not None else runtime_action.action_id
                     )
+                    await enforce_budget(active_budget_enforcer.evaluate())
                     await emit(
                         {
                             "type": "agent_call_start",
@@ -1136,14 +1398,23 @@ class LLM(ABC):
                         }
                     )
                     agent_result = await agent_callback(agent_name, agent_action, payload)
-                    if cancellation_token is not None:
-                        cancellation_token.raise_if_cancelled()
                 except ActionPolicyError:
                     raise
                 except BudgetExceededError:
                     raise
                 except ValueError as e:
                     # Agent not found or validation error - help LLM correct
+                    await emit(
+                        {
+                            "type": "agent_call_error",
+                            "step": steps,
+                            "agent": agent_name,
+                            "action": agent_action,
+                            "message": str(e),
+                            "recoverable": True,
+                            "phase": "validation",
+                        }
+                    )
                     self.history.add_system(f"Agent call failed: {e}")
                     continue
                 except Exception as e:
@@ -1159,21 +1430,43 @@ class LLM(ABC):
                     )
                     raise RuntimeError(f"Agent call to '{agent_name}' failed: {e}") from e
 
+                history_agent_result = _history_safe_result(agent_result)
+                observation_fallback = False
+                try:
+                    self._inject_agent_call(
+                        agent_name=agent_name,
+                        agent_action=agent_action,
+                        agent_result=history_agent_result,
+                    )
+                except Exception as exc:
+                    observation_fallback = True
+                    logger.warning(f"Provider agent-result history injection failed; using portable observation: {exc}")
+                    self.history.add_system(
+                        json.dumps(
+                            {
+                                "type": "agent_result",
+                                "agent": agent_name,
+                                "action": agent_action,
+                                "result": history_agent_result,
+                                "observation_format": "portable_fallback",
+                            },
+                            default=json_history_default,
+                        )
+                    )
                 await emit(
                     {
                         "type": "agent_call_result",
                         "step": steps,
                         "agent": agent_name,
                         "action": agent_action,
-                        "result": agent_result,
+                        "result": history_agent_result,
                         "action_id": action_id,
+                        "observation_fallback": observation_fallback,
                     }
                 )
-                self._inject_agent_call(
-                    agent_name=agent_name,
-                    agent_action=agent_action,
-                    agent_result=agent_result,
-                )
+                remember_action(action_signature)
+                # Delegation can also commit remote side effects. Preserve its
+                # receipt and enforce stop conditions at the next boundary.
                 continue
 
             else:
@@ -1219,13 +1512,39 @@ class LLM(ABC):
             if action.action == "tool_call":
                 key = f"agent_call:{action.agent}:tool_call:{action.tool}:{canonical(action.args or {})}"
             else:
-                key = f"agent_call:{action.agent}:infer:{action.prompt[:50] if action.prompt else ''}"
+                key = f"agent_call:{action.agent}:infer:{action.prompt or ''}"
         else:
-            # For final or other actions, use content hash
+            # For final or other actions, use content as the source material.
             content = getattr(action, "content", "")
-            key = f"final:{hashlib.md5(content.encode()).hexdigest()[:8]}"
+            key = f"final:{content}"
 
-        return key
+        # Keep the deduplication window bounded even when model arguments or
+        # delegated prompts are very large.
+        return hashlib.sha256(key.encode()).hexdigest()
+
+    @staticmethod
+    def _validate_tool_arguments(tool: "BaseTool", arguments: dict[str, Any] | None) -> dict[str, Any]:
+        """Validate and lightly coerce model-proposed arguments before execution.
+
+        Native :class:`Tool` instances own richer validation that includes resolved annotations. Protocol-compatible
+        custom tools still receive schema and callable-signature validation here, which keeps malformed small-model
+        calls recoverable without mistaking a ``TypeError`` raised by the tool body for a bad argument list.
+        """
+        validate_args = getattr(tool, "validate_args", None)
+        if getattr(tool, "_protolink_validates_args", False) and callable(validate_args):
+            return validate_args(arguments)
+
+        signature: inspect.Signature | None = None
+        if callable(tool):
+            try:
+                signature = inspect.signature(tool)
+            except (TypeError, ValueError):
+                signature = None
+        return validate_tool_args(
+            arguments,
+            getattr(tool, "input_schema", None),
+            signature=signature,
+        )
 
     def _parse_infer_response(
         self,
@@ -1276,11 +1595,11 @@ class LLM(ABC):
         - HTTP 5xx (server errors)
         - Connection timeouts and network errors
 
-        Non-transient errors (e.g. authentication failures, invalid requests) are raised
-        immediately without consuming the retry budget.
+        Non-transient errors (e.g. authentication failures, invalid requests) are raised immediately without consuming
+        the retry budget.
 
-        The backoff schedule uses exponential delay with random jitter to prevent the
-        "thundering herd" problem when multiple agents hit rate limits simultaneously.
+        The backoff schedule uses exponential delay with random jitter to prevent the "thundering herd" problem when
+        multiple agents hit rate limits simultaneously.
 
         Parameters
         ----------
@@ -1289,9 +1608,9 @@ class LLM(ABC):
         *args : Any
             Positional arguments forwarded to ``fn``.
         **kwargs : Any
-            Keyword arguments forwarded to ``fn``. The retry controls
-            ``max_retries``, ``base_delay``, and ``max_delay`` may be provided
-            as keyword-only values and are consumed before calling ``fn``.
+            Keyword arguments forwarded to ``fn``. The retry controls ``max_retries``, ``base_delay``, and ``max_delay``
+            may be provided as keyword-only values and are consumed before calling ``fn``. Private runtime hooks
+            ``_before_attempt``, ``_on_retry``, and ``_retry_predicate`` are likewise consumed by this wrapper.
         max_retries : int
             Maximum number of retry attempts. Defaults to 3.
         base_delay : float
@@ -1307,8 +1626,7 @@ class LLM(ABC):
         Raises
         ------
         Exception
-            The last exception encountered if all retries are exhausted, or immediately
-            for non-transient errors.
+            The last exception encountered if all retries are exhausted, or immediately for non-transient errors.
         """
         import asyncio
         import random
@@ -1316,13 +1634,23 @@ class LLM(ABC):
         max_retries = int(kwargs.pop("max_retries", 3))
         base_delay = float(kwargs.pop("base_delay", 1.0))
         max_delay = float(kwargs.pop("max_delay", 30.0))
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+        if base_delay < 0 or max_delay < 0:
+            raise ValueError("base_delay and max_delay must be non-negative")
+        before_attempt = kwargs.pop("_before_attempt", None)
+        on_retry = kwargs.pop("_on_retry", None)
+        retry_predicate = kwargs.pop("_retry_predicate", None)
         last_exception: Exception | None = None
 
         for attempt in range(max_retries + 1):
             try:
+                if before_attempt is not None:
+                    hook_result = before_attempt(attempt + 1)
+                    if inspect.isawaitable(hook_result):
+                        await hook_result
                 result = fn(*args, **kwargs)
-                # If the callable returned a coroutine, await it
-                if asyncio.iscoroutine(result):
+                if inspect.isawaitable(result):
                     return await result
                 return result
             except Exception as e:
@@ -1331,6 +1659,8 @@ class LLM(ABC):
                 # Determine if this is a retryable (transient) error
                 if not self._is_transient_error(e):
                     raise
+                if retry_predicate is not None and not retry_predicate(e):
+                    raise
 
                 if attempt >= max_retries:
                     raise
@@ -1338,7 +1668,12 @@ class LLM(ABC):
                 # Exponential backoff with jitter
                 delay = min(base_delay * (2**attempt), max_delay)
                 jitter = random.uniform(0, delay * 0.5)
-                await asyncio.sleep(delay + jitter)
+                retry_delay = delay + jitter
+                if on_retry is not None:
+                    hook_result = on_retry(attempt + 1, e, retry_delay)
+                    if inspect.isawaitable(hook_result):
+                        await hook_result
+                await asyncio.sleep(retry_delay)
 
         # Should never reach here, but satisfy the type checker
         if last_exception is None:
@@ -1361,16 +1696,35 @@ class LLM(ABC):
         Returns:
             True if the error is transient and the call should be retried.
         """
-        # Check for HTTP status code on the exception object (common across providers)
-        status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
-        if isinstance(status, int):
-            if status == 429 or status == 529 or 500 <= status < 600:
+        # Check common direct and response-wrapped HTTP status fields used by
+        # provider SDKs (OpenAI, Anthropic, httpx, requests, and compatibles).
+        response = getattr(exc, "response", None)
+        status_candidates = (
+            getattr(exc, "status_code", None),
+            getattr(exc, "status", None),
+            getattr(exc, "code", None),
+            getattr(response, "status_code", None),
+            getattr(response, "status", None),
+        )
+        for raw_status in status_candidates:
+            if isinstance(raw_status, bool):
+                continue
+            if isinstance(raw_status, str) and raw_status.isdigit():
+                raw_status = int(raw_status)
+            if isinstance(raw_status, int) and (raw_status in {429, 529} or 500 <= raw_status < 600):
                 return True
 
         # Check exception class name for provider-specific rate limit types
         exc_name = type(exc).__name__.lower()
-        transient_names = {"ratelimiterror", "ratelimit", "overloaded", "overloadederror", "apitimeouterror"}
-        if exc_name in transient_names:
+        transient_name_fragments = (
+            "ratelimit",
+            "overloaded",
+            "timeout",
+            "connectionerror",
+            "serviceunavailable",
+            "internalservererror",
+        )
+        if any(fragment in exc_name for fragment in transient_name_fragments):
             return True
 
         # Check for connection-level errors
@@ -1379,7 +1733,20 @@ class LLM(ABC):
 
         # Check the string representation as a last resort
         msg = str(exc).lower()
-        if any(keyword in msg for keyword in ("rate limit", "429", "overloaded", "timeout", "timed out", "connection")):
+        if any(
+            keyword in msg
+            for keyword in (
+                "rate limit",
+                "overloaded",
+                "timeout",
+                "timed out",
+                "connection",
+                "service unavailable",
+                "temporarily unavailable",
+            )
+        ):
+            return True
+        if re.search(r"\b(?:429|529|5\d{2})\b", msg):
             return True
 
         return False
@@ -1393,9 +1760,8 @@ class LLM(ABC):
     def get_prompt_action_schema(self) -> dict[str, Any]:
         """Get the root-object JSON schema used by prompt fallback adapters.
 
-        Native tool-capable providers should expose each real tool as a native
-        function/tool declaration instead of using this schema for every action.
-        The schema exists for JSON-mode fallbacks that can constrain a single
+        Native tool-capable providers should expose each real tool as a native function/tool declaration instead of
+        using this schema for every action. The schema exists for JSON-mode fallbacks that can constrain a single
         response object but cannot represent provider-native tool calls.
         """
         return prompt_action_schema()
@@ -1403,9 +1769,8 @@ class LLM(ABC):
     def get_openai_action_schema(self) -> dict[str, Any]:
         """Compatibility alias for the prompt fallback action schema.
 
-        OpenAI-native action acquisition no longer uses this method because a
-        generic action schema cannot safely express dynamic tool arguments under
-        strict structured outputs. Use provider tools instead.
+        OpenAI-native action acquisition no longer uses this method because a generic action schema cannot safely
+        express dynamic tool arguments under strict structured outputs. Use provider tools instead.
         """
         return self.get_prompt_action_schema()
 
@@ -1555,11 +1920,9 @@ class LLM(ABC):
             user_instructions: Optional instructions from the user to customize behavior.
             agent_cards: JSON/text describing available agents for delegation.
             tools: JSON/text describing available tools for this agent.
-            action_mode: Explicit prompt protocol. ``"json"`` uses the simple
-                Protolink JSON action contract. ``"native"`` uses provider tool
-                instructions and leaves tool-call syntax to the backend. When
-                omitted, the LLM's ``uses_native_action_prompt`` property is
-                used.
+            action_mode: Explicit prompt protocol. ``"json"`` uses the simple Protolink JSON action contract.
+                ``"native"`` uses provider tool instructions and leaves tool-call syntax to the backend. When
+                omitted, the LLM's ``uses_native_action_prompt`` property is used.
             flow_instructions: Optional flow context instructions (e.g. pipeline step awareness).
             override_system_prompt: Whether to override completely the system prompt with the user defined prompt.
             persist: If True, updates the system prompt in history without wiping conversation turns.
@@ -1685,8 +2048,7 @@ class LLM(ABC):
 class SyncLLM:
     """Synchronous wrapper around LLM.
 
-    This class provides blocking equivalents of async methods
-    for use in:
+    This class provides blocking equivalents of async methods for use in:
     - scripts
     - CLI tools
     - notebooks without async support
@@ -1694,8 +2056,7 @@ class SyncLLM:
     Internally uses `asyncio.run()` to execute async operations.
 
     Warning:
-        This API should NOT be used inside an active event loop
-        (e.g., FastAPI, Jupyter async cells).
+        This API should NOT be used inside an active event loop (e.g., FastAPI, Jupyter async cells).
     """
 
     def __init__(self, llm: "LLM"):

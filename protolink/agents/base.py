@@ -1,8 +1,7 @@
 """Public Agent class for the Protolink framework.
 
-The :class:`Agent` type is intentionally kept as the stable public façade. Its
-constructor owns identity and dependency wiring; reusable runtime behavior lives
-in mixins and the task execution engine lives in :mod:`protolink.agents.engine`.
+The :class:`Agent` type is intentionally kept as the stable public façade. Its constructor owns identity and dependency
+wiring; reusable runtime behavior lives in mixins and the task execution engine lives in :mod:`protolink.agents.engine`.
 """
 
 from __future__ import annotations
@@ -52,10 +51,9 @@ class Agent(
 ):
     """Base class for creating local or distributed ProtoLink agents.
 
-    Users should subclass this and implement the handle_task method only when
-    they need custom orchestration. The default implementation executes explicit
-    tool and inference parts, supports streaming, cancellation, persistent state,
-    delegation, policy checks, telemetry, and serialization.
+    Users should subclass this and implement the handle_task method only when they need custom orchestration. The
+    default implementation executes explicit tool and inference parts, supports streaming, cancellation, persistent
+    state, delegation, policy checks, telemetry, and serialization.
     """
 
     def __init__(
@@ -141,6 +139,7 @@ class Agent(
         self.storage = storage if storage is not None else InMemoryStorage(namespace=self.card.name)
         # Telemetry
         self._telemetry: Telemetry | None = None
+        self._telemetry_error_hooks: set[str] = set()
         self.telemetry = telemetry
         # Tools & skills
         self.tools: dict[str, BaseTool] = {}

@@ -1,14 +1,11 @@
 """Runtime budget policy and enforcement primitives.
 
-This module turns :class:`~protolink.core.run_context.RunBudget` from a typed
-metadata carrier into an enforceable runtime contract. The default policy is
-small and deterministic: it allows work under budget, emits warning decisions
+This module turns :class:`~protolink.core.run_context.RunBudget` from a typed metadata carrier into an enforceable
+runtime contract. The default policy is small and deterministic: it allows work under budget, emits warning decisions
 near configured limits, and denies work that would exceed hard limits.
 
-Applications can subclass ``BudgetPolicy`` or provide their own policy object
-with the same ``evaluate()`` method when they want compaction, truncation,
-approval, or custom callback behavior instead of the default allow/warn/deny
-semantics.
+Applications can subclass ``BudgetPolicy`` or provide their own policy object with the same ``evaluate()`` method when
+they want compaction, truncation, approval, or custom callback behavior instead of the default allow/warn/deny semantics
 """
 
 from __future__ import annotations
@@ -23,10 +20,9 @@ from protolink.utils import utc_now
 BudgetDecisionEffect = Literal["allow", "warn", "deny", "compact", "truncate", "require_approval"]
 """Supported budget decision effects.
 
-The default policy emits only ``"allow"``, ``"warn"``, and ``"deny"``.
-Additional effects are reserved for application policies that want to handle
-context pressure through compaction, truncation, approval, or another callback
-before a model call proceeds.
+The default policy emits only ``"allow"``, ``"warn"``, and ``"deny"``. Additional effects are reserved for application
+policies that want to handle context pressure through compaction, truncation, approval, or another callback before a
+model call proceeds.
 """
 
 
@@ -132,11 +128,9 @@ class BudgetExceededError(RuntimeError):
 class BudgetPolicy:
     """Default deterministic policy for ``RunBudget`` enforcement.
 
-    The policy compares a usage snapshot to the configured hard limits. It
-    denies when any observed value exceeds its limit and warns when usage is at
-    or above ``warning_ratio`` of a configured limit. Warnings are decisions,
-    not failures; ``BudgetEnforcer`` suppresses repeated warning events for the
-    same limit.
+    The policy compares a usage snapshot to the configured hard limits. It denies when any observed value exceeds its
+    limit and warns when usage is at or above ``warning_ratio`` of a configured limit. Warnings are decisions, not
+    failures; ``BudgetEnforcer`` suppresses repeated warning events for the same limit.
     """
 
     def __init__(self, *, warning_ratio: float = 0.8) -> None:
@@ -207,6 +201,15 @@ class BudgetEnforcer:
     def check_step(self, step: int) -> BudgetDecision:
         """Record and evaluate the current runtime step."""
         return self._evaluate_candidate(replace(self.usage, steps=step), commit=True)
+
+    def check_next_step(self) -> BudgetDecision:
+        """Increment and evaluate the task-wide runtime step counter.
+
+        ``LLM.infer()`` can be invoked more than once while one task is being processed (for example, when the latest
+        message contains multiple infer parts).  A caller-provided enforcer must therefore advance from its current
+        usage rather than overwrite the counter with an infer-local step number.
+        """
+        return self.check_step(self.usage.steps + 1)
 
     def check_llm_call(self, *, input_tokens: int = 0) -> BudgetDecision:
         """Record and evaluate a model call before it starts."""

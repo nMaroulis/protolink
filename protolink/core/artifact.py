@@ -10,24 +10,20 @@ from protolink.utils.id_generator import IDGenerator
 class Artifact:
     """Structured output or preview produced during a run.
 
-    Artifacts represent task results, generated resources, diagnostics, action
-    previews, or any other durable output. The original ``parts`` and
-    ``metadata`` fields remain the content boundary; the optional descriptive
-    fields make common runtime relationships explicit without prescribing a
-    domain-specific artifact taxonomy.
+    Artifacts represent task results, generated resources, diagnostics, action previews, or any other durable output.
+    The original ``parts`` and ``metadata`` fields remain the content boundary; the optional descriptive fields make
+    common runtime relationships explicit without prescribing a domain-specific artifact taxonomy.
 
     Attributes:
         id: Unique artifact identifier.
         parts: Ordered content parts carried by the artifact.
         metadata: Extensible application metadata.
         timestamp: ISO timestamp recording artifact creation.
-        kind: Stable application-defined category such as ``"result"``,
-            ``"preview"``, or ``"diagnostic"``.
+        kind: Stable application-defined category such as ``"result"``, ``"preview"``, or ``"diagnostic"``.
         name: Optional display or resource name.
         uri: Optional URI identifying the represented resource.
         media_type: Optional MIME type describing the artifact as a whole.
-        action_id: Optional ID of the ``RunAction`` that produced or proposes
-            this artifact.
+        action_id: Optional ID of the ``RunAction`` that produced or proposes this artifact.
     """
 
     id: str = field(default_factory=lambda: IDGenerator.generate_artifact_id())
@@ -53,9 +49,8 @@ class Artifact:
     def for_action(self, action_id: str) -> "Artifact":
         """Associate this artifact with a runtime action.
 
-        The method mutates the artifact consistently with ``add_part`` and
-        ``add_text``. It is useful when an application builds a preview before
-        the final ``RunAction`` identifier is known.
+        The method mutates the artifact consistently with ``add_part`` and ``add_text``. It is useful when an
+        application builds a preview before the final ``RunAction`` identifier is known.
 
         Args:
             action_id: Identifier of the related runtime action.
@@ -84,8 +79,8 @@ class Artifact:
     def from_dict(cls, data: dict[str, Any]) -> "Artifact":
         """Create an artifact from serialized data.
 
-        Payloads emitted before the structured descriptor fields were added
-        remain valid and default to a generic ``"result"`` artifact.
+        Payloads emitted before the structured descriptor fields were added remain valid and default to a generic
+        ``"result"`` artifact.
         """
         parts = [Part.from_dict(p) for p in data.get("parts", [])]
         return cls(

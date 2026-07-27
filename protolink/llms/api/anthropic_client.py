@@ -82,11 +82,12 @@ class AnthropicLLM(APILLM):
     def call(self, history: ConversationHistory) -> str:
         """Generate a single response from the model."""
         params = dict(self._model_params)
+        system_prompt, messages = self._to_anthropic_request_parts(history)
 
         response = self._client.messages.create(
             model=self.model,
-            system=self.system_prompt,
-            messages=self._to_anthropic_messages(history),
+            system=system_prompt,
+            messages=messages,
             stream=False,
             **params,
         )
@@ -96,11 +97,12 @@ class AnthropicLLM(APILLM):
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response using Anthropic Messages API."""
         params = dict(self._model_params)
+        system_prompt, messages = self._to_anthropic_request_parts(history)
 
         with self._client.messages.stream(
             model=self.model,
-            system=self.system_prompt,
-            messages=self._to_anthropic_messages(history),
+            system=system_prompt,
+            messages=messages,
             **params,
         ) as stream:
             for event in stream:
@@ -136,10 +138,11 @@ class AnthropicLLM(APILLM):
                 agent_cards=agent_cards,
             ),
         )
+        system_prompt, messages = self._to_anthropic_request_parts(history)
         request: dict[str, Any] = {
             "model": self.model,
-            "system": self.system_prompt,
-            "messages": self._to_anthropic_messages(history),
+            "system": system_prompt,
+            "messages": messages,
             "stream": False,
             **params,
         }
@@ -174,10 +177,11 @@ class AnthropicLLM(APILLM):
                 agent_cards=agent_cards,
             ),
         )
+        system_prompt, messages = self._to_anthropic_request_parts(history)
         request: dict[str, Any] = {
             "model": self.model,
-            "system": self.system_prompt,
-            "messages": self._to_anthropic_messages(history),
+            "system": system_prompt,
+            "messages": messages,
             **params,
         }
         if tool_specs:
@@ -186,6 +190,7 @@ class AnthropicLLM(APILLM):
         output_text: list[str] = []
         tool_name: str | None = None
         tool_use_id: str | None = None
+        tool_use_count = 0
         tool_input_chunks: list[str] = []
         tool_input_obj: dict[str, Any] | None = None
 
@@ -195,6 +200,11 @@ class AnthropicLLM(APILLM):
                 if event_type == "content_block_start":
                     block = getattr(event, "content_block", None)
                     if getattr(block, "type", None) == "tool_use":
+                        tool_use_count += 1
+                        if tool_use_count > 1:
+                            raise ValueError(
+                                "Anthropic stream returned multiple parallel tool calls; expected exactly one"
+                            )
                         tool_name = str(getattr(block, "name", "") or "")
                         tool_use_id = getattr(block, "id", None)
                         initial_input = getattr(block, "input", None)
@@ -219,7 +229,7 @@ class AnthropicLLM(APILLM):
                         tool_input_chunks.append(partial)
 
         if tool_name:
-            args = tool_input_obj if tool_input_obj is not None else parse_json_arguments("".join(tool_input_chunks))
+            args = parse_json_arguments("".join(tool_input_chunks)) if tool_input_chunks else (tool_input_obj or {})
             action = native_tool_call_to_action(tool_name, args)
             return LLMActionResult(
                 action=action,
@@ -314,16 +324,23 @@ class AnthropicLLM(APILLM):
     # Utils
     # ----------------------------------------------------------------------
 
-    def _to_anthropic_messages(self, history: ConversationHistory) -> list[dict[str, Any]]:
-        """
-        Convert ConversationHistory to Anthropic message format.
+    def _to_anthropic_request_parts(
+        self,
+        history: ConversationHistory,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Build one consistent Anthropic request snapshot from ``history``.
 
-        Anthropic does NOT want system messages inside messages[].
+        Anthropic accepts system instructions separately from ``messages``.
+        Keeping both parts derived from the supplied history preserves
+        task-local prompts and any correction messages added by the inference
+        loop without consulting mutable adapter-wide prompt state.
         """
+        system_parts: list[str] = []
         messages: list[dict[str, Any]] = []
 
         for msg in history.messages:
             if msg["role"] == "system":
+                system_parts.append(msg["content"])
                 continue
 
             messages.append(
@@ -333,6 +350,15 @@ class AnthropicLLM(APILLM):
                 }
             )
 
+        return "\n\n".join(system_parts), messages
+
+    def _to_anthropic_messages(self, history: ConversationHistory) -> list[dict[str, Any]]:
+        """
+        Convert ConversationHistory to Anthropic message format.
+
+        Anthropic does NOT want system messages inside messages[].
+        """
+        _, messages = self._to_anthropic_request_parts(history)
         return messages
 
     def _parse_output(self, response: Any) -> str:
@@ -346,22 +372,24 @@ class AnthropicLLM(APILLM):
 
     def _action_from_response(self, response: Any) -> LLMActionResult:
         """Normalize Anthropic text/tool blocks into one Protolink action."""
-        output_text = ""
-        for block in response.content:
-            if block.type == "tool_use":
-                action = native_tool_call_to_action(str(block.name), dict(block.input or {}))
-                metadata = usage_metadata(
-                    {"provider": "anthropic", "tool_use_id": getattr(block, "id", None)},
-                    response,
-                )
-                return LLMActionResult(
-                    action=action,
-                    raw_response=action_to_json(action),
-                    native=True,
-                    metadata=metadata,
-                )
-            if block.type == "text":
-                output_text += block.text
+        tool_blocks = [block for block in response.content if block.type == "tool_use"]
+        if len(tool_blocks) > 1:
+            raise ValueError("Anthropic response returned multiple parallel tool calls; expected exactly one")
+        if tool_blocks:
+            block = tool_blocks[0]
+            action = native_tool_call_to_action(str(block.name), dict(block.input or {}))
+            metadata = usage_metadata(
+                {"provider": "anthropic", "tool_use_id": getattr(block, "id", None)},
+                response,
+            )
+            return LLMActionResult(
+                action=action,
+                raw_response=action_to_json(action),
+                native=True,
+                metadata=metadata,
+            )
+
+        output_text = "".join(block.text for block in response.content if block.type == "text")
 
         text = output_text.strip()
         if not text:

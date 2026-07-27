@@ -1,5 +1,7 @@
 """Transport-neutral client operations for the ProtoLink Agent Registry."""
 
+from collections.abc import Mapping
+from copy import deepcopy
 from typing import Any
 
 from protolink.client.request_spec import ClientRequestSpec
@@ -14,9 +16,8 @@ from protolink.transport import Transport
 class RegistryClient:
     """Call Registry endpoints through an already configured transport.
 
-    The transport owns its URL, TLS, authentication, limits, and retry policy.
-    Registry operations declare idempotency individually so transports can
-    retry only those calls whose semantics are safe to repeat.
+    The transport owns its URL, TLS, authentication, limits, and retry policy. Registry operations declare idempotency
+    individually so transports can retry only those calls whose semantics are safe to repeat.
 
     Args:
         transport: Concrete transport used for every Registry request.
@@ -114,7 +115,23 @@ class RegistryClient:
         response = await self.transport.send(
             request_spec=self.DISCOVER_REQUEST, base_url=self.transport.url, data=filter_by
         )
-        return [AgentCard.from_dict(c) for c in response]
+        # Serialized transports return mappings, while in-process transports
+        # may preserve the already-materialized endpoint result. Normalize
+        # both representations at this transport-neutral boundary.
+        cards: list[AgentCard] = []
+        for index, card in enumerate(response):
+            if isinstance(card, AgentCard):
+                # Keep the in-process path consistent with network transports:
+                # callers receive a detached, validated card rather than a
+                # mutable object owned by the Registry.
+                cards.append(AgentCard.from_dict(deepcopy(card.to_dict())))
+            elif isinstance(card, Mapping):
+                cards.append(AgentCard.from_dict(deepcopy(dict(card))))
+            else:
+                raise TypeError(
+                    f"Registry discovery item {index} must be an AgentCard or mapping, got {type(card).__name__}"
+                )
+        return cards
 
     @property
     def url(self) -> str:

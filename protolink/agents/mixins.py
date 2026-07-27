@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import threading
 import time
 from typing import Any, Literal, TypeVar
@@ -1126,6 +1127,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
             telemetry: Telemetry instance for observability
         """
         self._telemetry = telemetry
+        self._telemetry_error_hooks.clear()
 
     @property
     def storage(self) -> Storage:
@@ -1214,33 +1216,46 @@ class AgentConfigurationMixin(_AgentMixinBase):
             return {"error": str(e)}
 
     def _build_tools_prompt(self) -> str | None:
-        """Return a string with a list of the agent's tools to be used in  LLM prompts.
+        """Return deterministic JSON metadata for tools exposed to the LLM.
 
         Example:
-                Tool 1:
-                    "name": book_hotel,
-                    "description": Book a hotel for a vacation. Returns booking confirmation with details.,
-                    "input_schema": {
-                        "location": {"type": "string", "required": True},
-                        "check_in": {"type": "string", "required": True},
-                        "check_out": {"type": "string", "required": True},
-                        "guests": {"type": "integer", "default": 2, "required": False}
-                    }
-                    "output_schema": dict[str, str]
+            [
+              {
+                "capabilities": ["network.read"],
+                "description": "Read weather data.",
+                "input_schema": {"type": "object"},
+                "name": "get_weather",
+                "output_schema": {"type": "object"}
+              }
+            ]
+
+        Tool names and capability labels are sorted so equivalent tool maps
+        produce byte-for-byte identical prompts. ``default=str`` retains
+        compatibility with custom tools that still expose legacy Python type
+        objects as schema metadata while keeping the emitted document valid
+        JSON.
         """
         if not self.tools:
             return ""
 
-        tool_prompts = []
-        for i, (name, tool) in enumerate(self.tools.items(), start=1):
-            tool_prompts.append(
-                f"Tool {i}:\n"
-                f'    "name": {name},\n'
-                f'    "description": {tool.description},\n'
-                f'    "input_schema": {tool.input_schema},\n'
-                f'    "output_schema": {tool.output_schema}'
+        tool_metadata = []
+        for name in sorted(self.tools):
+            tool = self.tools[name]
+            raw_capabilities = getattr(tool, "capabilities", None) or ()
+            if isinstance(raw_capabilities, str):
+                raw_capabilities = (raw_capabilities,)
+            capability_labels = {str(item) for item in raw_capabilities}
+            capabilities = sorted(label for label in capability_labels if label)
+            tool_metadata.append(
+                {
+                    "name": name,
+                    "description": tool.description,
+                    "input_schema": tool.input_schema,
+                    "output_schema": tool.output_schema,
+                    "capabilities": capabilities,
+                }
             )
-        return "\n".join(tool_prompts)
+        return json.dumps(tool_metadata, ensure_ascii=False, indent=2, sort_keys=True, default=str)
 
     def set_registry(
         self, registry: TransportType | Registry | RegistryClient | None, registry_url: str | None = None
@@ -1740,9 +1755,8 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         Args:
             yaml_str: The YAML string containing agent configuration.
-            **overrides: Override specific parameters passed to the Agent constructor.
-                An explicit ``policy`` takes precedence over serialized first-party
-                policy data; custom policies and ``approval_handler`` values are
+            **overrides: Override specific parameters passed to the Agent constructor. An explicit ``policy`` takes
+                precedence over serialized first-party policy data; custom policies and ``approval_handler`` values are
                 runtime-only.
         """
         import yaml
@@ -1758,9 +1772,8 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         Args:
             filepath: Path to the YAML file.
-            **overrides: Override specific parameters passed to the Agent constructor.
-                An explicit ``policy`` takes precedence over serialized first-party
-                policy data; custom policies and ``approval_handler`` values are
+            **overrides: Override specific parameters passed to the Agent constructor. An explicit ``policy`` takes
+                precedence over serialized first-party policy data; custom policies and ``approval_handler`` values are
                 runtime-only.
         """
         with open(filepath, encoding="utf-8") as f:

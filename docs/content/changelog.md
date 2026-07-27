@@ -34,9 +34,136 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.6.6] - 2026-07-17
+## [0.6.7] - 2026-07-28
 
 :::note Latest release
+
+This patch release hardens the controlled inference path from task admission through provider calls, tool execution,
+delegation, streaming finalization, and observability. It keeps the portable JSON action protocol as the default for
+local and smaller models while making malformed-output recovery, prompt metadata, budgets, retries, and task lifecycle
+behavior more deterministic. Adds vLLM client support natively. Fixes Local Telemetry. Also adds the AI Courtroom Example.
+
+:::
+
+### Added
+
+- Added `AgentClient.send_infer_task()` and its `client.sync` counterpart. The helper requires a query and agent URL,
+  creates the request with `Task.create_infer()`, supports optional user context, output schema, inference metadata, and
+  native/A2A protocol selection, then returns the complete task from `send_task()`.
+- Added task-scoped budget accounting across every executable part in one task. Multiple `infer` parts, explicit
+  `tool_call` parts, and physical provider retry attempts now consume one cumulative `BudgetEnforcer`; inline nested
+  tasks receive an isolated budget scope.
+- Added `BudgetEnforcer.check_next_step()` and the optional advanced-runtime
+  `LLM.infer(..., budget_enforcer=...)` integration point for callers that need to share accounting across several
+  inference invocations.
+- Added structured physical-attempt metadata to LLM lifecycle events. Transient retries report the failed and next
+  attempt, delay, exception type, and message; completed calls report total attempts and current budget usage.
+- Added durable `Artifact(kind="action_result")` receipts for model-selected tools and delegated-agent calls. Receipts
+  carry the runtime `action_id`, inference source/kind/step metadata, and completion status without copying internal
+  tool or delegation results into client-visible task data. A later model failure, cancellation, or budget boundary no
+  longer hides a side effect that already completed, while private conversation history retains the full observation.
+- Added focused regression coverage for pre-cancellation, external coroutine cancellation, abandoned streams,
+  task-wide budgets, legacy override signatures, telemetry failures, provider retries, invalid tool arguments,
+  deterministic prompts, strict JSON extraction, Anthropic action handling, and parallel native tool calls.
+- Added vLLM client `VLLMLLM`, which inherits `OpenAICompatibleLLM`.
+- Added validated `create_llm(..., max_parse_failures=N)` runtime configuration. The limit is kept separate from
+  provider model parameters, so ProtoLink retry controls are never forwarded to Ollama, OpenAI, or compatible servers
+  as generation options.
+
+### Changed
+
+- Provider retries now count each actual request against LLM-call and input-token budgets. Provider runtime is checked
+  again after every request, including a final model call. Completed tool and delegated-agent side effects are recorded
+  before cancellation or runtime limits stop the next step, rather than being retroactively reported as if they never
+  ran. A streaming provider call may retry only before any output chunk has been exposed to a consumer.
+- Transient-error classification now recognizes common direct and response-wrapped provider status fields, numeric
+  string statuses, provider exception names, HTTP 429/529/5xx messages, timeouts, overloads, and connection failures.
+- Model-proposed tool arguments are validated and conservatively coerced before authorization, budget consumption, or
+  execution. Invalid arguments remain recoverable model feedback; a `TypeError` raised inside tool business logic is
+  treated as an execution failure rather than an argument mistake.
+- Duplicate-action protection now records only successful tool and Agent side effects, hashes bounded canonical
+  signatures, includes the complete delegated prompt, and never suppresses a repeated final answer.
+- Portable JSON prompts now use valid single-brace examples, deterministic JSON tool/Agent metadata, explicit
+  capabilities, and clear instructions that metadata is untrusted data. Parse-repair examples advertise only actions
+  available in the current run, keeping correction prompts concise for smaller models.
+- Embedded JSON recovery now performs a linear, quote- and escape-aware scan and accepts exactly one valid top-level
+  object. Ambiguous multiple objects are rejected; raw-response and parsed-payload diagnostics use deterministic,
+  bounded head-and-tail previews while preserving field-level validation errors.
+- Prompt-fallback parsing now conservatively normalizes common small-model response drift: structured
+  `FinalAction.content` values are serialized losslessly, and a direct application object can become final content only
+  when it contains no ProtoLink action-envelope fields. Full JSON fences, complete leading reasoning wrappers, and
+  trailing commas receive syntax-only recovery; ambiguous objects, incomplete reasoning wrappers, and action-shaped
+  payloads with missing or unknown types still fail validation.
+- Action-parse retries now preserve the decoded outer action type as structured error context and return
+  capability-aware correction feedback. Malformed or unavailable tool and Agent calls are explained explicitly, while
+  retry examples include only actions that the current inference can dispatch.
+- Agent discovery is now a best-effort delegation affordance: a Registry outage no longer prevents otherwise-local
+  inference. Discovered ancestors are removed from the prompt, model-originated direct URL delegation is rejected, and
+  delegation cycles are stopped before dispatch.
+- Agent and direct-inference telemetry observers are non-authoritative. Hook/export failures are logged and isolated so
+  they cannot change a successful model or tool result; streaming tasks now receive the same task start/end telemetry
+  boundary as unary tasks.
+- Anthropic action parsing and the shared streamed Chat Completions normalizer reject ambiguous parallel tool calls
+  instead of merging fragments. The synthetic delegation tool names `protolink_call_agent` and
+  `protolink_call_agent_tool` are reserved and cannot be shadowed by a local tool.
+
+### Fixed
+
+- Fixed pre-canceled `RunContext` values so task, LLM, tool, and streaming paths stop before mutating history or
+  starting work.
+- Fixed failed unary tasks so their failed snapshots are persisted before the original exception is re-raised.
+- Fixed multi-part tasks so each completed output is attached and snapshotted immediately. A later part failure keeps
+  the earlier output visible instead of losing all partial progress.
+- Fixed cancellation during post-tool telemetry so an already-returned explicit tool result is attached exactly once,
+  persisted, and correlated through `completed_after_cancellation` metadata before cancellation completes.
+- Fixed external `asyncio` cancellation so task state and snapshots are updated while the cancellation still
+  propagates to the caller; protocol-requested cancellation continues to return the canceled task/event contract.
+- Fixed early streaming-consumer closure so an unfinished task is marked canceled and persisted instead of remaining
+  orphaned in `working` state.
+- Fixed Anthropic requests so system instructions come from the task-local `ConversationHistory`, multiple system
+  entries are preserved, streamed `partial_json` arguments take precedence over an initial empty input object, and
+  parallel `tool_use` blocks fail explicitly.
+- Fixed prompt serialization for quotes, newlines, booleans, nested schemas, unordered tools/skills, and legacy Python
+  type metadata.
+- Fixed failed conversation turns so they remain isolated by default, while a failed turn with a completed
+  `action_result` receipt retains the matching observation for safe resume and retry behavior.
+- Fixed non-JSON/circular action results so history receives a bounded serialization fallback rather than losing the
+  observation after an external side effect has completed.
+- Fixed streamed tool/delegation result events so client-visible metadata keeps correlation but omits private internal
+  result data. A failing external event observer is disabled without disabling runtime-owned action receipts.
+- Fixed internal receipt callbacks so they do not implicitly activate optional call-metrics/token-estimation work on
+  otherwise unobserved Agent inference.
+- Fixed delegated task handling so only a remote `completed` task with a real output produces a successful
+  `agent_call_result`; failed, canceled, input-required, non-terminal, and empty completions are propagated explicitly.
+  Full-task and response-only transports are both accepted by distinguishing returned output from the outbound request
+  by stable item ID.
+- Fixed partial-history persistence failures so they are logged without replacing an active budget, cancellation, or
+  execution exception after a completed side effect.
+- Fixed repeated small-model/Ollama parse failures when an otherwise-valid final action placed the requested
+  application object directly in `content` instead of encoding it as a string.
+- Fixed Registry discovery for both serialized and in-process `AgentCard` responses.
+- Fixed nested local telemetry so parent and child task traces are both preserved.
+
+### Compatibility Notes
+
+- No provider or model integration was removed. JSON action mode remains the default compatibility path for Ollama,
+  llama.cpp, LM Studio, and generic OpenAI-compatible backends, and correction prompts are smaller when tools or
+  delegation are unavailable.
+- The new budget parameters are optional. Agent preserves custom pre-0.6.7 `call_llm()`, `call_llm_stream()`,
+  `execute_tool()`, and `LLM.infer()` override signatures; the shared enforcer is passed to an `infer()` override only
+  when that callable declares the keyword or accepts `**kwargs`.
+- Budget limits now apply cumulatively to a complete task and to physical retry attempts. A multi-part or retrying task
+  that previously reset counters between calls can therefore stop earlier when it reaches its configured limit.
+- Model-produced Agent targets must be Registry-advertised names, not URLs. Anthropic and streamed Chat Completions
+  paths reject multiple tool actions in one inference step, and portable responses containing multiple valid JSON
+  objects are now rejected as ambiguous.
+- Cancellation remains best effort for synchronous provider/tool code and already-issued external side effects. The
+  runtime cannot forcibly interrupt synchronous work running on the event-loop thread. If a tool or delegation has
+  already returned, ProtoLink preserves its result and stops subsequent work at the next execution boundary.
+
+## [0.6.6] - 2026-07-17
+
+:::note Release summary
 
 This release adds normalized run-report regression diffing, a small opt-in built-in tool set, and an explicit
 description of ProtoLink's A2A architecture without replacing its small Python runtime API.

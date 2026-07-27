@@ -446,7 +446,7 @@ Start the configured server, optionally register the Agent, and keep its lifecyc
 <ApiSection title="Raises">
   <ApiFields ariaLabel="Agent start errors">
     <ApiField name="startup error">
-      Server startup failures—including address conflicts—propagate to the caller. Background mode captures the exception in its thread and re-raises it after readiness synchronization.
+      Server startup failures, including address conflicts, propagate to the caller. Background mode captures the exception in its thread and re-raises it after readiness synchronization.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -616,10 +616,10 @@ Run the configured <code>handle_task()</code> implementation inside the live-exe
 </ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="run task return value">
-  <ApiField name="task" type="Task">The handler result. Successful and canceled snapshots are offered to <code>run_store</code> when configured.</ApiField>
+  <ApiField name="task" type="Task">The handler result. Successful, failed, and canceled snapshots are offered to <code>run_store</code> when configured.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiCallout label="Cancellation behavior">An <code>asyncio.CancelledError</code> raised by live cancellation is converted into a returned task in the <code>canceled</code> state rather than escaping to the caller.</ApiCallout>
+<ApiCallout label="Cancellation behavior">Protocol cancellation requested through <code>cancel_task()</code> is converted into a returned task in the <code>canceled</code> state. External coroutine cancellation is also persisted as canceled but <code>asyncio.CancelledError</code> is re-raised to its caller.</ApiCallout>
 
 </ApiReference>
 
@@ -639,13 +639,15 @@ Stream the configured handler under the same active-task registration used by no
 
 <ApiCallout label="Final cancellation event">A successfully canceled stream ends with a final <code>TaskStatusUpdateEvent</code> whose state is <code>canceled</code> and whose metadata includes the serialized task and reason.</ApiCallout>
 
+<ApiCallout label="Abandoned consumers">If a consumer closes the iterator before a terminal event, unfinished work is marked canceled with a stream-closure reason and persisted before cleanup.</ApiCallout>
+
 </ApiReference>
 
 ### Agent.handle_task
 
 <ApiReference kind="async method" path="protolink.agents.Agent.handle_task" signature={`async handle_task(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/engine.py">
 
-Provide the default task-handler boundary. It normalizes a <code>RunContext</code>, notifies telemetry, and delegates deterministic execution to <code>execute_task()</code>. Override this method for application-specific routing or orchestration, not merely to add a tool or LLM.
+Provide the default task-handler boundary. It normalizes a <code>RunContext</code>, emits best-effort telemetry start/end hooks, and delegates deterministic execution to <code>execute_task()</code>. Telemetry failures are logged once per hook and cannot alter the task outcome. Override this method for application-specific routing or orchestration, not merely to add a tool or LLM.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="handle task parameters">
   <ApiField name="task" type="Task" required>Task to process. Only explicit executable parts are acted upon; ordinary native text does not implicitly trigger inference.</ApiField>
@@ -675,6 +677,8 @@ Execute a task while emitting its lifecycle as typed events. The default stream 
 
 <ApiCallout label="Error contract">Execution failures are converted into a <code>TaskErrorEvent</code> followed by a final failed status event. Consumers should use the final status metadata as the authoritative task snapshot.</ApiCallout>
 
+<ApiCallout label="Internal-result privacy">For <code>tool_result</code> and <code>agent_call_result</code> events, client-visible <code>TaskLLMStreamEvent.metadata</code> retains correlation fields and sets <code>result_omitted=true</code> but does not carry the internal result. The private LLM history and explicitly configured privileged telemetry can retain that observation.</ApiCallout>
+
 </ApiReference>
 
 ### Agent.execute_task
@@ -691,7 +695,11 @@ Execute one deterministic step from the most recently appended message or artifa
   <ApiField name="task" type="Task">The input object after execution. Success completes it, error output fails it, and an explicit input-required status pauses it.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiCallout label="History isolation">The engine binds a task-local LLM history. Stateless tasks get fresh history; conversation-enabled sessions load, lock, and save their persisted history so concurrent work cannot interleave one session.</ApiCallout>
+<ApiCallout label="History isolation">The engine binds a task-local LLM history. Stateless tasks get fresh history; conversation-enabled sessions load and lock persisted history so concurrent work cannot interleave one session. Normally failed turns are discarded, but a failed turn with a new <code>action_result</code> receipt is retained because it contains the observation of a completed side effect.</ApiCallout>
+
+<ApiCallout label="Task-wide budgets">One task-scoped <code>BudgetEnforcer</code> is shared by explicit tool parts and every iteration or retry inside all infer parts. Inline nested tasks use their own scope and restore the parent budget afterward.</ApiCallout>
+
+<ApiCallout label="Completed-action receipts">Outputs are attached and offered to <code>run_store</code> after each completed top-level part. Successful tools or delegations selected inside <code>LLM.infer()</code> additionally create and immediately snapshot an <code>Artifact(kind="action_result")</code> JSON receipt with completion status, action ID, and source/kind/step metadata. Internal tool and delegation results are deliberately omitted from this client-visible artifact; the full observation remains in private LLM history. Later failure, cancellation, or budget exhaustion therefore preserves evidence of completed side effects without exposing internal result data.</ApiCallout>
 
 </ApiReference>
 
@@ -908,24 +916,36 @@ When `execute_task()` encounters an `infer` part, it delegates to `LLM.infer()` 
 
 1. **The query**: Extracted from the task's message content
 2. **The agent's tools**: All registered tools passed as a dictionary
-3. **An agent callback**: Enables the LLM to delegate work to other agents
-4. **Optional stream observers**: Used by `handle_task_streaming()` to emit `task_llm_stream` events while the final `infer_output` part is produced
+3. **Validated discovered Agents**: Registry-advertised targets, excluding this Agent and names already in the ancestor chain
+4. **An agent callback**: Enables delegation only when at least one valid target was discovered
+5. **Runtime controls**: Policy authorization, cancellation, the normalized `RunContext`, and the task-scoped budget enforcer
+6. **Optional stream observers**: Used by `handle_task_streaming()` to emit `task_llm_stream` events while the final `infer_output` part is produced
 
 ```python
 # Simplified view of what happens inside execute_task()
 result = await self.llm.infer(
     query=query,
     tools=self.tools,
-    agent_callback=self._handle_agent_call  # Enables agent delegation
+    agent_callback=dispatch_discovered_agent,
+    cancellation_token=token,
+    run_context=context,
+    budget_enforcer=task_budget,
 )
 ```
 
+Registry discovery is a best-effort prompt affordance. If discovery fails, local LLM and tool work continues without delegation targets. Existing custom `LLM.infer()` overrides keep working: Agent supplies `budget_enforcer` only when the override explicitly accepts it or `**kwargs`.
+
 The **agent callback** (`_handle_agent_call`) is invoked when the LLM produces an `agent_call` action. It:
 
-1. **Resolves the agent name to URL** by querying the registry
-2. **Creates a Task** with the appropriate message/tool call
-3. **Sends the task** to the target agent via `call_agent()`
-4. **Returns the result** to the inference loop
+1. **Requires a Registry-advertised name** and rejects a model-produced URL
+2. **Rejects self-delegation and ancestor-cycle targets** before dispatch
+3. **Resolves the agent name to URL** by querying the registry
+4. **Creates a child Task and RunContext** with the appropriate infer or tool-call part
+5. **Sends the task** to the target agent via `call_agent()`
+6. **Validates the remote Task state** and returns output only from a genuinely <code>completed</code> task. Item IDs
+   distinguish new output from the outbound request, supporting both full-task and response-only transport shapes.
+   Remote <code>failed</code>, <code>canceled</code>, non-terminal, empty-completion, and <code>input-required</code>
+   responses are propagated explicitly instead of echoing the child request as a successful result.
 
 This enables a coordinator agent to delegate work to specialized agents without manual orchestration.
 

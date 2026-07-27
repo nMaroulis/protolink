@@ -174,12 +174,13 @@ const surfaces = [
     title: 'Runnable systems and structured flow patterns',
     accent: '#2563eb',
     summary:
-      'Examples show the same primitives in motion, from basic agents and registries to ticket booking, code assistant, runtime policies, and structured flows.',
-    modules: ['examples', 'examples/ticket_booking', 'examples/code_assistant', 'examples/structured_flows'],
+      'Examples show the same primitives in motion, from basic agents and registries to ticket booking, code assistants, replayable communication experiments, runtime policies, and structured flows.',
+    modules: ['examples', 'examples/ticket_booking', 'examples/code_assistant', 'examples/ai_courtroom', 'examples/structured_flows'],
     responsibilities: [
       'Demonstrates registry-backed multi-agent systems',
       'Shows graph, pipeline, router, parallel, and tool-call flows',
       'Provides focused examples for runtime agents, WebSocket, MCP, and cancellation',
+      'Studies how direct communication and topology affect observable group decisions',
       'Gives practical project shapes to adapt',
     ],
     boundaries: [
@@ -192,6 +193,7 @@ const surfaces = [
       ['Flows', '/docs/flows'],
       ['Ticket Booking', '/docs/ticket_booking_example'],
       ['Code Assistant', '/docs/code_assistant_example'],
+      ['AI Courtroom', '/docs/ai_courtroom_example'],
     ],
   },
 ];

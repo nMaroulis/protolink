@@ -80,9 +80,8 @@ def build_run_diff_view(
 ) -> RunDiffView:
     """Compare two stored run reports after applying diff normalization.
 
-    Unlike replay, report diffing never falls back to task snapshots. A task
-    snapshot does not contain the event, action, approval, metric, or context
-    sections needed for a meaningful behavioral comparison.
+    Unlike replay, report diffing never falls back to task snapshots. A task snapshot does not contain the event,
+    action, approval, metric, or context sections needed for a meaningful behavioral comparison.
     """
     store = SQLiteRunStore(store_path)
     baseline = store.get_report(baseline_run_id)

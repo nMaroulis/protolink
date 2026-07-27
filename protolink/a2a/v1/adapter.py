@@ -1,8 +1,7 @@
 """A2A 1.0 JSON-RPC adapter for a ProtoLink Agent.
 
-The adapter owns protocol validation, wire translation, and the minimal task
-index required by A2A task operations.  Agent authors still implement the same
-``handle_task(Task)`` method and do not need A2A-specific business logic.
+The adapter owns protocol validation, wire translation, and the minimal task index required by A2A task operations.
+Agent authors still implement the same ``handle_task(Task)`` method and do not need A2A-specific business logic.
 """
 
 from __future__ import annotations
@@ -105,8 +104,8 @@ class A2AJSONRPCAdapter:
     def _prune_tasks_locked(self, *, reserve: int = 0) -> bool:
         """Expire and size-bound inactive tasks while preserving live work.
 
-        ``reserve`` requests free slots for an imminent insertion.  ``False``
-        means every remaining slot is protected by an active operation.
+        ``reserve`` requests free slots for an imminent insertion.  ``False`` means every remaining slot is protected by
+        an active operation.
         """
 
         now = self._clock()

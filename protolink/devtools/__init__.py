@@ -1,9 +1,8 @@
 """Developer tooling helpers for Protolink.
 
-The devtools package powers the ``protolink`` CLI inspection commands and the
-local dashboard. It intentionally depends on Protolink's public runtime
-contracts rather than private agent internals, so applications can reuse the
-collectors and renderers in their own CLIs or notebooks.
+The devtools package powers the ``protolink`` CLI inspection commands and the local dashboard. It intentionally depends
+on Protolink's public runtime contracts rather than private agent internals, so applications can reuse the collectors
+and renderers in their own CLIs or notebooks.
 """
 
 from .agents import chat_with_agent, ping_agent

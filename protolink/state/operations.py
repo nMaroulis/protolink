@@ -8,7 +8,7 @@ the same objects for remote request specs.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from protolink.llms.compaction import HistoryCompactionStrategy
 
@@ -90,7 +90,7 @@ class StateOperationRequest:
             session_id=_optional_str(data.get("session_id")),
             stores=tuple(str(store) for store in stores),
             include_data=bool(data.get("include_data", False)),
-            strategy=cast(HistoryCompactionStrategy, strategy),
+            strategy=strategy,
             max_messages=int(data.get("max_messages", 20)),
             max_tokens=int(data.get("max_tokens", 4_000)),
             preserve_recent=int(data.get("preserve_recent", 6)),
@@ -168,7 +168,7 @@ class StateOperationResult:
         if operation not in {"describe", "reset", "compact"}:
             raise ValueError("operation must be one of: describe, reset, compact")
         return cls(
-            operation=cast(StateOperation, operation),
+            operation=operation,
             session_id=_optional_str(data.get("session_id")),
             stores=tuple(StateStoreReport.from_dict(store) for store in data.get("stores") or []),
             cleared=tuple(str(item) for item in data.get("cleared") or []),

@@ -1,13 +1,11 @@
 """Cooperative cancellation primitives for active Protolink task runs.
 
-Task lifecycle state and live execution control are deliberately separate.
-``Task.cancel()`` and ``RunContext.canceled`` are serializable facts about a
-run, while ``CancellationToken`` and ``TaskExecutionRegistry`` are process-local
-runtime objects used to interrupt work that is currently executing.
+Task lifecycle state and live execution control are deliberately separate. ``Task.cancel()`` and ``RunContext.canceled``
+are serializable facts about a run, while ``CancellationToken`` and ``TaskExecutionRegistry`` are process-local runtime
+objects used to interrupt work that is currently executing.
 
-Cancellation is best-effort. Async model calls, tools, and agent delegation can
-usually be interrupted at an await point. Synchronous functions and remote
-systems may not be immediately stoppable and must provide their own cooperative
+Cancellation is best-effort. Async model calls, tools, and agent delegation can usually be interrupted at an await
+point. Synchronous functions and remote systems may not be immediately stoppable and must provide their own cooperative
 or process-level cancellation when stronger guarantees are required.
 """
 
@@ -45,9 +43,8 @@ class TaskAlreadyRunningError(TaskCancellationError):
 class TaskCancellationRequest:
     """Serializable request to cancel one active task.
 
-    The wire shape follows the A2A ``TaskIdParams`` convention by using ``id``
-    and an extensible metadata object. ``reason`` is exposed as a convenience
-    field and is also mirrored into metadata during serialization.
+    The wire shape follows the A2A ``TaskIdParams`` convention by using ``id`` and an extensible metadata object.
+    ``reason`` is exposed as a convenience field and is also mirrored into metadata during serialization.
 
     Attributes:
         id: Identifier of the task to cancel.
@@ -90,12 +87,10 @@ class TaskCancellationRequest:
 class CancellationToken:
     """Thread-safe, process-local signal for cooperative task cancellation.
 
-    The token uses ``threading.Event`` rather than ``asyncio.Event`` because an
-    Agent may serve work on a background event-loop thread while a direct caller
-    requests cancellation from another thread. Consumers normally call
-    ``raise_if_cancelled()`` at safe execution boundaries; the active-task
-    registry also cancels the owning ``asyncio.Task`` for prompt interruption at
-    await points.
+    The token uses ``threading.Event`` rather than ``asyncio.Event`` because an Agent may serve work on a background
+    event-loop thread while a direct caller requests cancellation from another thread. Consumers normally call
+    ``raise_if_cancelled()`` at safe execution boundaries; the active-task registry also cancels the owning
+    ``asyncio.Task`` for prompt interruption at await points.
     """
 
     def __init__(self) -> None:
@@ -125,8 +120,8 @@ class CancellationToken:
     def cancel(self, reason: str | None = None) -> bool:
         """Signal cancellation and return whether this was the first request.
 
-        Repeated calls are idempotent and preserve the first reason so traces
-        and final task metadata remain deterministic.
+        Repeated calls are idempotent and preserve the first reason so traces and final task metadata remain
+        deterministic.
         """
         with self._lock:
             if self._event.is_set():
@@ -195,9 +190,8 @@ class ActiveTaskExecution:
 class TaskExecutionRegistry:
     """Thread-safe registry of tasks currently executing on one Agent.
 
-    The registry is intentionally in-memory and bounded by active execution.
-    Durable task history remains the responsibility of Protolink storage and
-    application state; this object only provides the live control plane needed
+    The registry is intentionally in-memory and bounded by active execution. Durable task history remains the
+    responsibility of Protolink storage and application state; this object only provides the live control plane needed
     to locate a coroutine for cancellation.
     """
 
@@ -215,9 +209,8 @@ class TaskExecutionRegistry:
     def register(self, task: Task) -> tuple[ActiveTaskExecution, bool]:
         """Register the current coroutine as owner of ``task`` execution.
 
-        Nested default runtime layers may register the same task from the same
-        coroutine; those registrations reuse the existing entry and return
-        ``owner=False``. A second coroutine using the same task ID is rejected.
+        Nested default runtime layers may register the same task from the same coroutine; those registrations reuse the
+        existing entry and return ``owner=False``. A second coroutine using the same task ID is rejected.
 
         Returns:
             ``(entry, owner)`` where ``owner`` controls cleanup responsibility.
@@ -271,8 +264,7 @@ class TaskExecutionRegistry:
 def mark_task_canceled(task: Task, reason: str | None = None) -> None:
     """Synchronize cancellation state across ``Task`` and ``RunContext``.
 
-    The helper is idempotent for an already canceled task and intentionally does
-    not overwrite other terminal states.
+    The helper is idempotent for an already canceled task and intentionally does not overwrite other terminal states.
     """
     from protolink.core.task import TaskState
 

@@ -44,6 +44,23 @@ def test_create_llm_accepts_optional_metrics_profile():
     assert llm.metrics_profile.model == "mock-gpt"
 
 
+def test_create_llm_keeps_parse_limit_out_of_provider_model_params():
+    llm = create_llm(
+        "mock",
+        model_params={"temperature": 0.2},
+        max_parse_failures=5,
+    )
+
+    assert llm.max_parse_failures == 5
+    assert llm._model_params == {"temperature": 0.2}
+
+
+@pytest.mark.parametrize("value", [0, 11, True, 2.5, "3"])
+def test_parse_failure_limit_is_validated(value):
+    with pytest.raises((TypeError, ValueError)):
+        create_llm("mock", max_parse_failures=value)
+
+
 @pytest.mark.asyncio
 async def test_infer_emits_live_llm_metrics_events():
     llm = MetricsMockLLM([json.dumps({"type": "final", "content": "done"})])

@@ -48,11 +48,10 @@ _RUNTIME_LLM_EVENT_TYPE_MAP = {
 class RunEvent:
     """Versioned runtime event emitted by a Protolink run.
 
-    ``RunEvent`` is the stable application-facing envelope for task execution
-    streams. Existing task stream events remain available for wire/backward
-    compatibility; this type gives applications one normalized event shape with
-    sequence numbers, severity, summaries, run IDs, task IDs, agent names, step
-    numbers, payloads, and final-result markers.
+    ``RunEvent`` is the stable application-facing envelope for task execution streams. Existing task stream events
+    remain available for wire/backward compatibility; this type gives applications one normalized event shape with
+    sequence numbers, severity, summaries, run IDs, task IDs, agent names, step numbers, payloads, and final-result
+    markers.
 
     Attributes:
         type: Stable event type such as ``"task.status"`` or ``"llm.stream"``.
@@ -100,8 +99,7 @@ class RunEvent:
         """Serialize the event into a JSON-compatible dictionary.
 
         Args:
-            redaction_policy: Optional policy used to mask secrets before the
-                dictionary is returned.
+            redaction_policy: Optional policy used to mask secrets before the dictionary is returned.
         """
         data = {
             "event_id": self.event_id,
@@ -164,15 +162,13 @@ class RunEvent:
         """Normalize an existing task-stream event into a ``RunEvent``.
 
         Args:
-            event: A task event object with ``to_dict()`` or a dictionary event
-                emitted by a transport.
-            context: Optional run context. If omitted, the method attempts to
-                read ``run_context`` from the event's final-task payload.
+            event: A task event object with ``to_dict()`` or a dictionary event emitted by a transport.
+            context: Optional run context. If omitted, the method attempts toread ``run_context`` from the event's
+                final-task payload.
             sequence: Optional sequence number assigned by the caller.
 
         Returns:
-            A normalized run event that preserves the original event dictionary
-            in ``payload``.
+            A normalized run event that preserves the original event dictionary in ``payload``.
         """
         payload = _event_to_dict(event)
         source_type = str(payload.get("type") or "run.event")
@@ -212,10 +208,9 @@ class EventSink(Protocol):
 class InMemoryEventSink:
     """Simple event sink that records run events in memory.
 
-    The sink is intentionally small and dependency-free so tests, CLIs, and
-    local applications can capture a canonical event stream without a telemetry
-    backend. It assigns monotonic sequence numbers when incoming events do not
-    already have one.
+    The sink is intentionally small and dependency-free so tests, CLIs, and local applications can capture a canonical
+    event stream without a telemetry backend. It assigns monotonic sequence numbers when incoming events do not already
+    have one.
     """
 
     def __init__(self) -> None:
@@ -516,8 +511,8 @@ def _optional_int(value: Any) -> int | None:
 class TaskStatusUpdateEvent:
     """Task state transition event for streaming updates.
 
-    Emitted when a task changes state (e.g., submitted → working → completed).
-    Can be streamed to clients via SSE for real-time progress visibility.
+    Emitted when a task changes state (e.g., submitted → working → completed). Can be streamed to clients via SSE for
+    real-time progress visibility.
 
     Attributes:
         event_id: Unique event identifier
@@ -568,8 +563,8 @@ class TaskStatusUpdateEvent:
 class TaskArtifactUpdateEvent:
     """New artifact available event.
 
-    Emitted when a task produces an output artifact (file, result, etc.).
-    Allows progressive delivery of results in streaming scenarios.
+    Emitted when a task produces an output artifact (file, result, etc.). Allows progressive delivery of results in
+    streaming scenarios.
 
     Attributes:
         event_id: Unique event identifier
@@ -616,8 +611,8 @@ class TaskArtifactUpdateEvent:
 class TaskProgressEvent:
     """Task progress update event.
 
-    Emitted to report incremental progress (e.g., 50% complete).
-    Useful for long-running tasks that want to signal advancement.
+    Emitted to report incremental progress (e.g., 50% complete). Useful for long-running tasks that want to signal
+    advancement.
 
     Attributes:
         event_id: Unique event identifier
@@ -664,9 +659,8 @@ class TaskProgressEvent:
 class TaskLLMStreamEvent:
     """LLM inference event emitted while an agent is processing a task.
 
-    This event carries provider-agnostic inference activity such as streamed
-    chunks, parsed actions, tool starts/results, delegated agent calls, and
-    final inference content.
+    This event carries provider-agnostic inference activity such as streamed chunks, parsed actions, tool
+    starts/results, delegated agent calls, and final inference content.
     """
 
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -714,8 +708,7 @@ class TaskLLMStreamEvent:
 class TaskErrorEvent:
     """Task error event.
 
-    Emitted when a task encounters an error.
-    Allows streaming of error details without closing connection.
+    Emitted when a task encounters an error. Allows streaming of error details without closing connection.
 
     Attributes:
         event_id: Unique event identifier

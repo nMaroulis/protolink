@@ -37,6 +37,8 @@ class OpenAICompatibleLLM(ServerLLM):
     provider: ClassVar[LLMProvider] = "openai-compatible"
     DEFAULT_MODEL: ClassVar[str] = "local-model"
     DEFAULT_BASE_URL: ClassVar[str] = "http://localhost:1234/v1"
+    BASE_URL_ENV: ClassVar[str] = "OPENAI_COMPATIBLE_BASE_URL"
+    API_KEY_ENV: ClassVar[str] = "OPENAI_COMPATIBLE_API_KEY"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 1.0,
     }
@@ -68,7 +70,7 @@ class OpenAICompatibleLLM(ServerLLM):
         """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
-        resolved_base_url = (base_url or os.getenv("OPENAI_COMPATIBLE_BASE_URL") or self.DEFAULT_BASE_URL).rstrip("/")
+        resolved_base_url = (base_url or os.getenv(self.BASE_URL_ENV) or self.DEFAULT_BASE_URL).rstrip("/")
 
         super().__init__(
             model=resolved_model,
@@ -78,7 +80,7 @@ class OpenAICompatibleLLM(ServerLLM):
         )
 
         self.base_url = resolved_base_url
-        self.api_key = api_key or os.getenv("OPENAI_COMPATIBLE_API_KEY")
+        self.api_key = api_key or os.getenv(self.API_KEY_ENV)
         self.headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
@@ -277,7 +279,7 @@ class OpenAICompatibleLLM(ServerLLM):
 
     def validate_connection(self) -> bool:
         """Validate that the configured server exposes a models endpoint."""
-        request = urllib.request.Request(self._models_url, headers={"Accept": "application/json"})
+        request = urllib.request.Request(self._models_url, headers=self.headers)
         try:
             with urllib.request.urlopen(request, timeout=3) as response:
                 return 200 <= response.status < 300

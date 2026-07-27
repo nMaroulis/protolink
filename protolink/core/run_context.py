@@ -1,8 +1,7 @@
 """Runtime context primitives for Protolink task execution.
 
-The context model in this module gives applications a typed place for runtime
-metadata that used to drift into ad hoc ``Task.metadata`` keys. It intentionally
-stays domain-neutral: a workspace may be a local directory, browser profile,
+The context model in this module gives applications a typed place for runtime metadata that used to drift into ad hoc
+``Task.metadata`` keys. It intentionally stays domain-neutral: a workspace may be a local directory, browser profile,
 dataset URI, ticket collection, or any other application boundary.
 """
 
@@ -22,9 +21,8 @@ RUN_CONTEXT_METADATA_KEY = "run_context"
 class RunBudget:
     """Optional execution limits carried with a run.
 
-    Budgets are advisory runtime metadata. They provide a stable typed container
-    that applications and custom policies can read, render, or enforce without
-    inventing their own task metadata shape.
+    Budgets are advisory runtime metadata. They provide a stable typed container that applications and custom policies
+    can read, render, or enforce without inventing their own task metadata shape.
 
     Attributes:
         max_steps: Maximum logical runtime steps allowed for the run.
@@ -93,22 +91,19 @@ class RunBudget:
 class RunContext:
     """Typed runtime metadata propagated through Protolink task execution.
 
-    ``RunContext`` is the generic execution envelope for a task run. It keeps
-    product/application concerns out of core models while still giving local
-    CLIs, servers, tests, and multi-agent systems a stable contract for session
-    continuity, trace correlation, parent/child execution, budgets, permissions,
-    and cancellation state.
+    ``RunContext`` is the generic execution envelope for a task run. It keeps product/application concerns out of core
+    models while still giving local CLIs, servers, tests, and multi-agent systems a stable contract for session
+    continuity, trace correlation, parent/child execution, budgets, permissions, and cancellation state.
 
-    The context is serialized into ``Task.metadata["run_context"]`` and mirrors
-    common legacy keys such as ``session_id`` and ``trace_id`` for compatibility
-    with existing Protolink integrations.
+    The context is serialized into ``Task.metadata["run_context"]`` and mirrors common legacy keys such as
+    ``session_id`` and ``trace_id`` for compatibility with existing Protolink integrations.
 
     Attributes:
         run_id: Stable identifier for one logical execution run.
         session_id: Optional conversation/session identifier shared across runs.
         trace_id: Optional observability trace identifier.
-        workspace_uri: Optional URI for the run boundary, such as a directory,
-            browser profile, dataset, project, account, or ticket collection.
+        workspace_uri: Optional URI for the run boundary, such as a directory, browser profile, dataset, project,
+            account, or ticket collection.
         parent_run_id: Optional parent run for nested agent or tool execution.
         agent_chain: Ordered list of agents that have handled this run.
         permissions: Domain-neutral capability rules or scoped policy metadata.
@@ -178,9 +173,8 @@ class RunContext:
     def from_task(cls, task: Any, *, default_session_id: str | None = None) -> RunContext:
         """Read a context from a task and merge compatible legacy metadata.
 
-        Existing applications may already store ``session_id``, ``trace_id``,
-        ``workspace`` or ``workspace_uri`` directly in ``Task.metadata``. This
-        method accepts that shape, builds a typed context, and prefers explicit
+        Existing applications may already store ``session_id``, ``trace_id``, ``workspace`` or ``workspace_uri``
+        directly in ``Task.metadata``. This method accepts that shape, builds a typed context, and prefers explicit
         context fields when both representations exist.
         """
         metadata = getattr(task, "metadata", {}) or {}
@@ -224,10 +218,8 @@ class RunContext:
         """Return a task context and persist it back to ``Task.metadata``.
 
         Args:
-            task: Any object with a mutable ``metadata`` dictionary, typically a
-                ``Task``.
-            default_session_id: Fallback session ID when neither the context nor
-                legacy metadata defines one.
+            task: Any object with a mutable ``metadata`` dictionary, typically a ``Task``.
+            default_session_id: Fallback session ID when neither the context nor legacy metadata defines one.
             agent_name: Optional agent name to append to the execution chain.
 
         Returns:
@@ -242,9 +234,8 @@ class RunContext:
     def attach_to_task(self, task: Any) -> None:
         """Persist this context into a task's metadata.
 
-        The serialized context is stored under ``run_context``. Frequently used
-        correlation keys are mirrored at the top level for compatibility with
-        older code paths and telemetry integrations.
+        The serialized context is stored under ``run_context``. Frequently used correlation keys are mirrored at the
+        top level for compatibility with older code paths and telemetry integrations.
         """
         metadata = getattr(task, "metadata", None)
         if metadata is None:
@@ -276,8 +267,8 @@ class RunContext:
     def child(self, *, run_id: str | None = None, agent_name: str | None = None) -> RunContext:
         """Create a child context for delegated work.
 
-        The child keeps the same session, trace, workspace, permissions, budget,
-        and metadata, while setting ``parent_run_id`` to the current ``run_id``.
+        The child keeps the same session, trace, workspace, permissions, budget, and metadata, while setting
+        ``parent_run_id`` to the current ``run_id``.
         """
         child_context = self.copy(
             run_id=run_id or IDGenerator.generate_context_id(prefix="run_"),
