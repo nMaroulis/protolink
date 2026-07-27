@@ -138,6 +138,8 @@ behavior more deterministic. Adds vLLM client support natively. Also Adds the AI
   execution exception after a completed side effect.
 - Fixed repeated small-model/Ollama parse failures when an otherwise-valid final action placed the requested
   application object directly in `content` instead of encoding it as a string.
+- Fixed Registry discovery for both serialized and in-process `AgentCard` responses.
+- Fixed nested local telemetry so parent and child task traces are both preserved.
 
 ### Compatibility Notes
 

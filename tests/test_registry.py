@@ -219,6 +219,28 @@ class TestRegistry:
         registry._client.discover.assert_called_once_with(filter_by)
 
     @pytest.mark.asyncio
+    async def test_registry_client_discover_accepts_materialized_cards(self, dummy_transport, agent_card, agent_card2):
+        """In-process transports may return AgentCard objects without serialization."""
+        dummy_transport.send = AsyncMock(return_value=[agent_card, agent_card2.to_dict()])
+        client = RegistryClient(dummy_transport)
+
+        result = await client.discover()
+
+        assert result == [agent_card, agent_card2]
+        assert result[0] is not agent_card
+        result[0].tags.append("client-only")
+        assert "client-only" not in agent_card.tags
+
+    @pytest.mark.asyncio
+    async def test_registry_client_discover_rejects_unknown_item_shape(self, dummy_transport):
+        """Malformed transport payloads should fail with a bounded diagnostic."""
+        dummy_transport.send = AsyncMock(return_value=[42])
+        client = RegistryClient(dummy_transport)
+
+        with pytest.raises(TypeError, match=r"item 0.*AgentCard or mapping.*int"):
+            await client.discover()
+
+    @pytest.mark.asyncio
     async def test_handle_register(self, dummy_transport, agent_card):
         """Test server-side register handler."""
         registry = Registry(transport=dummy_transport)
