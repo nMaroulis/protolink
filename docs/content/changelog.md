@@ -34,6 +34,12 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.6.8] - Unreleased
+
+### Added
+
+- Added the infer-loop benchmark for correctness, reliability, timing, baseline comparisons, and CSV/JSON results.
+
 ## [0.6.7] - 2026-07-28
 
 :::note Latest release
