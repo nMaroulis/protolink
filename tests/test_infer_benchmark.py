@@ -16,6 +16,7 @@ from benchmarks.infer_loop.runner import (
     _trace_metrics,
     _validate_attempt,
     _write_csv,
+    _write_html_report,
     compare_with_baseline,
     generate_cases,
     run_attempt,
@@ -239,6 +240,11 @@ async def test_run_writes_csv_summary_and_supports_baseline(tmp_path):
     assert (run.output_dir / "failures.csv").read_text(encoding="utf-8").startswith("case_id,")
     assert json.loads((run.output_dir / "summary.json").read_text(encoding="utf-8"))["scores"]["strict"] == 1
     assert (run.output_dir / "traces.jsonl").is_file()
+    report = (run.output_dir / "report.html").read_text(encoding="utf-8")
+    assert report.startswith("<!doctype html>")
+    assert "Correctness by category" in report
+    assert "Latency distributions" in report
+    assert "No external assets or requests" in report
 
     comparison = compare_with_baseline(
         current_cases=run.cases,
@@ -435,3 +441,84 @@ def test_empty_llm_call_csv_still_has_a_stable_header(tmp_path):
     _write_csv(path, [], fieldnames=_llm_call_fieldnames())
 
     assert path.read_text(encoding="utf-8").startswith("case_id,category,repetition,")
+
+
+def test_html_report_escapes_dynamic_content_and_has_no_external_dependencies(tmp_path):
+    path = tmp_path / "report.html"
+    _write_html_report(
+        path,
+        {
+            "run_id": "<script>alert('run')</script>",
+            "created_at": "2026-07-28T00:00:00Z",
+            "protolink_version": "test",
+            "provider": {
+                "name": "mock",
+                "model": "<img src=x onerror=alert(1)>",
+                "model_params": {},
+                "action_mode": "json_prompt",
+            },
+            "suite": {
+                "id": "smoke",
+                "selected_count": 1,
+                "repetitions": 1,
+                "max_fresh_attempts": 1,
+                "seed": 1,
+                "hash": "suite",
+            },
+            "scores": {
+                "total": 1,
+                "strict": 0,
+                "strict_percent": 0,
+                "functional": 0,
+                "functional_percent": 0,
+                "first_attempt_strict": 0,
+                "first_attempt_strict_percent": 0,
+                "attempts_executed": 1,
+                "categories": {},
+            },
+            "timing": {},
+            "baseline_comparison": {
+                "delta": -1,
+                "fixed": [],
+                "regressed": ["<case>"],
+                "stable_pass": [],
+                "stable_fail": [],
+                "performance": {
+                    "warning": "<b>settings differ</b>",
+                    "e2e": {
+                        "matched_pairs": 1,
+                        "median_paired_speedup_percent": -2.5,
+                    },
+                },
+            },
+            "case_results": [
+                {
+                    "key": "<svg/onload=alert(2)>",
+                    "case_id": "case",
+                    "category": "direct_final",
+                    "strict_pass": False,
+                    "functional_pass": False,
+                    "attempts_used": 1,
+                    "selected_attempt": 1,
+                    "attempts": [
+                        {
+                            "attempt": 1,
+                            "latency_ms": 5,
+                            "failure_codes": ["<b>bad</b>"],
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+
+    report = path.read_text(encoding="utf-8")
+    assert "<script>alert" not in report
+    assert "<img src=x" not in report
+    assert "<svg/onload" not in report
+    assert "&lt;script&gt;" in report
+    assert "&lt;img src=x onerror=alert(1)&gt;" in report
+    assert "&lt;b&gt;settings differ&lt;/b&gt;" in report
+    assert "Regressed" in report
+    assert "https://" not in report
+    assert "http://" not in report

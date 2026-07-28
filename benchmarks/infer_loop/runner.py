@@ -80,6 +80,7 @@ from .reporting import (
     _llm_call_rows,
     _redact_config,
     _timing_summary,
+    _write_html_report,
 )
 from .reporting import (
     _cache_probe as _cache_probe,
@@ -404,6 +405,7 @@ async def run_benchmark(config: BenchmarkConfig, *, llm: LLM | None = None) -> B
         json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True),
         encoding="utf-8",
     )
+    _write_html_report(output_dir / "report.html", summary)
     return BenchmarkRun(
         output_dir=output_dir,
         summary=summary,

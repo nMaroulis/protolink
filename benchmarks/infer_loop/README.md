@@ -193,6 +193,7 @@ instead of the timestamped default.
 
 ```text
 benchmark_results/<run-name>/
+├── report.html
 ├── summary.json
 ├── results.csv
 ├── failures.csv
@@ -200,6 +201,11 @@ benchmark_results/<run-name>/
 └── traces.jsonl
 ```
 
+- `report.html` is a self-contained visual report with headline scores,
+  per-category correctness, reliability diagnostics, latency charts,
+  repetition/cache-sensitive metrics, optional baseline comparison, strict
+  failure details, and run configuration. Open it directly in a browser; it
+  needs no server or external assets.
 - `summary.json` contains provider settings, suite identity and hash, prompt
   hashes, git metadata, aggregate and per-category scores, and every logical
   case result.

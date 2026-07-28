@@ -1,9 +1,12 @@
 """Scoring, timing, metadata, and artifact helpers for the infer-loop benchmark."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import csv
 import hashlib
+import html
 import json
 import math
 import re
@@ -12,6 +15,7 @@ import subprocess
 from dataclasses import fields as dataclass_fields
 from datetime import datetime, timezone
 from pathlib import Path
+from string import Template
 from typing import Any
 
 from .models import (
@@ -716,3 +720,663 @@ def compare_with_baseline(
         "performance": performance,
         **transitions,
     }
+
+
+def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
+    """Write a self-contained visual report for one completed benchmark run."""
+
+    def mapping(value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    def items(value: Any) -> list[dict[str, Any]]:
+        return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+    def escape(value: Any, *, fallback: str = "—") -> str:
+        text = fallback if value is None or value == "" else str(value)
+        return html.escape(text, quote=True)
+
+    def finite(value: Any) -> float | None:
+        number = _numeric(value)
+        return number if number is not None and math.isfinite(number) else None
+
+    def percent(value: Any) -> str:
+        number = finite(value)
+        return "—" if number is None else f"{number:.1f}%"
+
+    def width(value: Any, *, scale: float = 100.0) -> str:
+        number = finite(value)
+        if number is None or scale <= 0:
+            return "0"
+        return f"{max(0.0, min(number / scale * 100.0, 100.0)):.3f}"
+
+    def duration(value: Any) -> str:
+        number = finite(value)
+        if number is None:
+            return "—"
+        if number >= 1000:
+            return f"{number / 1000:.2f}s"
+        return f"{number:.1f}ms"
+
+    def selected_attempt(case: dict[str, Any]) -> dict[str, Any]:
+        attempts = items(case.get("attempts"))
+        selected_number = _integer(case.get("selected_attempt"))
+        if selected_number is not None:
+            for attempt in attempts:
+                if _integer(attempt.get("attempt")) == selected_number:
+                    return attempt
+        return attempts[-1] if attempts else {}
+
+    def status_for(case: dict[str, Any]) -> tuple[str, str]:
+        if bool(case.get("strict_pass")):
+            return "Strict", "strict"
+        if bool(case.get("functional_pass")):
+            return "Functional", "functional"
+        return "Failed", "failed"
+
+    scores = mapping(summary.get("scores"))
+    timing = mapping(summary.get("timing"))
+    provider = mapping(summary.get("provider"))
+    suite = mapping(summary.get("suite"))
+    git = mapping(summary.get("git"))
+    case_results = items(summary.get("case_results"))
+    total = _integer(scores.get("total")) or 0
+
+    score_specs = (
+        (
+            "Strict",
+            scores.get("strict"),
+            scores.get("strict_percent"),
+            "Exact result, actions, and clean protocol",
+            "strict",
+        ),
+        (
+            "Functional",
+            scores.get("functional"),
+            scores.get("functional_percent"),
+            "Correct after possible self-correction",
+            "functional",
+        ),
+        (
+            "First try",
+            scores.get("first_attempt_strict"),
+            scores.get("first_attempt_strict_percent"),
+            "Strict on the first fresh attempt",
+            "first",
+        ),
+    )
+    score_cards = []
+    for label, count, rate, description, css_class in score_specs:
+        count_text = "—" if total == 0 else f"{_integer(count) or 0} / {total}"
+        rate_text = "—" if total == 0 else percent(rate)
+        score_cards.append(
+            f"""
+            <article class="metric metric--{css_class}">
+              <div class="metric-label">{escape(label)}</div>
+              <div class="metric-value">{escape(count_text)}</div>
+              <div class="metric-rate">{escape(rate_text)}</div>
+              <div class="meter" role="img" aria-label="{escape(label)} {escape(rate_text)}">
+                <span style="width:{width(rate) if total else "0"}%"></span>
+              </div>
+              <p>{escape(description)}</p>
+            </article>
+            """
+        )
+
+    strict_latency = mapping(timing.get("strict_first_attempt_e2e_ms"))
+    score_cards.append(
+        f"""
+        <article class="metric metric--time">
+          <div class="metric-label">Strict first-try latency</div>
+          <div class="metric-value">{escape(duration(strict_latency.get("median_ms")))}</div>
+          <div class="metric-rate">p95 {escape(duration(strict_latency.get("p95_ms")))}</div>
+          <div class="metric-rule"></div>
+          <p>Scored wall time {escape(duration(timing.get("scored_wall_ms")))}</p>
+        </article>
+        """
+    )
+
+    category_rows = []
+    categories = mapping(scores.get("categories"))
+    for category, raw_values in categories.items():
+        values = mapping(raw_values)
+        category_total = _integer(values.get("total")) or 0
+        strict_count = _integer(values.get("strict")) or 0
+        functional_count = _integer(values.get("functional")) or 0
+        strict_rate = values.get("strict_percent")
+        functional_rate = values.get("functional_percent")
+        label = str(category).replace("_", " ")
+        aria = f"{label}: strict {strict_count} of {category_total}, functional {functional_count} of {category_total}"
+        category_rows.append(
+            f"""
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>{escape(label)}</strong>
+                <span>{strict_count}/{category_total} strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="{escape(aria)}">
+                <div class="bar bar--functional"><span style="width:{width(functional_rate)}%"></span></div>
+                <div class="bar bar--strict"><span style="width:{width(strict_rate)}%"></span></div>
+              </div>
+              <div class="chart-value">{escape(percent(strict_rate))}</div>
+            </div>
+            """
+        )
+    category_content = (
+        "".join(category_rows)
+        if category_rows
+        else '<p class="empty">No category results are available for this run.</p>'
+    )
+
+    attempts_executed = _integer(scores.get("attempts_executed")) or 0
+    diagnostic_specs = (
+        ("Hallucinated action", scores.get("hallucinated_action_attempts")),
+        ("Parse recovery", scores.get("parse_recovery_attempts")),
+        ("Provider retry", scores.get("provider_retry_attempts")),
+        ("Crashed", scores.get("crashed_attempts")),
+        ("Timed out", scores.get("timed_out_attempts")),
+    )
+    diagnostic_rows = []
+    for label, raw_count in diagnostic_specs:
+        count = _integer(raw_count) or 0
+        rate = count / attempts_executed * 100.0 if attempts_executed else 0.0
+        diagnostic_rows.append(
+            f"""
+            <div class="diagnostic-row">
+              <span>{escape(label)}</span>
+              <div class="diagnostic-track" role="img"
+                   aria-label="{escape(label)}: {count} of {attempts_executed} attempts">
+                <span style="width:{width(rate)}%"></span>
+              </div>
+              <strong>{count}</strong>
+            </div>
+            """
+        )
+
+    latency_specs = (
+        ("First attempt end-to-end", mapping(timing.get("first_attempt_e2e_ms"))),
+        ("Selected attempt end-to-end", mapping(timing.get("selected_attempt_e2e_ms"))),
+        ("LLM per attempt", mapping(timing.get("llm_per_attempt_ms"))),
+        ("Non-LLM per attempt", mapping(timing.get("non_llm_per_attempt_ms"))),
+        ("Individual LLM call", mapping(mapping(timing.get("llm_calls")).get("latency_ms"))),
+    )
+    latency_scale = max(
+        (finite(values.get("p95_ms")) or 0.0 for _, values in latency_specs),
+        default=0.0,
+    )
+    latency_rows = []
+    for label, values in latency_specs:
+        count = _integer(values.get("count")) or 0
+        median = finite(values.get("median_ms"))
+        p95 = finite(values.get("p95_ms"))
+        if count == 0:
+            latency_rows.append(
+                f"""
+                <div class="latency-row">
+                  <div><strong>{escape(label)}</strong><span>No samples</span></div>
+                  <div class="latency-empty">—</div>
+                </div>
+                """
+            )
+            continue
+        latency_rows.append(
+            f"""
+            <div class="latency-row">
+              <div><strong>{escape(label)}</strong><span>{count} sample{"s" if count != 1 else ""}</span></div>
+              <div class="latency-bars">
+                <div class="latency-line">
+                  <span>median</span>
+                  <div><i style="width:{width(median, scale=latency_scale)}%"></i></div>
+                  <b>{escape(duration(median))}</b>
+                </div>
+                <div class="latency-line latency-line--p95">
+                  <span>p95</span>
+                  <div><i style="width:{width(p95, scale=latency_scale)}%"></i></div>
+                  <b>{escape(duration(p95))}</b>
+                </div>
+              </div>
+            </div>
+            """
+        )
+
+    case_bars = []
+    case_latencies: list[float] = []
+    for case in case_results:
+        attempt = selected_attempt(case)
+        latency = finite(attempt.get("latency_ms"))
+        if latency is not None:
+            case_latencies.append(latency)
+    case_ceiling = max(case_latencies, default=0.0)
+    for case in case_results:
+        attempt = selected_attempt(case)
+        latency = finite(attempt.get("latency_ms"))
+        label, css_class = status_for(case)
+        bar_height = max(3.0, min((latency or 0.0) / case_ceiling * 100.0, 100.0)) if case_ceiling else 3.0
+        aria = f"{case.get('key') or case.get('case_id')}: {label}, latency {duration(latency)}"
+        case_bars.append(
+            f'<span class="case-bar case-bar--{css_class}" style="height:{bar_height:.3f}%" '
+            f'aria-label="{escape(aria)}"></span>'
+        )
+    case_chart = (
+        f"""
+        <div class="case-chart-scale"><span>{escape(duration(case_ceiling))}</span><span>0</span></div>
+        <div class="case-chart" role="img"
+             aria-label="Selected attempt latency for {len(case_results)} logical case results">
+          {"".join(case_bars)}
+        </div>
+        <div class="legend">
+          <span><i class="legend-strict"></i>Strict</span>
+          <span><i class="legend-functional"></i>Functional</span>
+          <span><i class="legend-failed"></i>Failed</span>
+        </div>
+        """
+        if case_bars
+        else '<p class="empty">No case latency data is available.</p>'
+    )
+
+    repetitions = items(timing.get("by_repetition"))
+    repetition_rows = []
+    for repetition in repetitions:
+        e2e = mapping(repetition.get("first_attempt_e2e_ms"))
+        llm = mapping(repetition.get("first_attempt_llm_ms"))
+        repetition_rows.append(
+            f"""
+            <tr>
+              <td>{escape(repetition.get("repetition"))}</td>
+              <td>{escape(repetition.get("strict_first_attempts"), fallback="0")}</td>
+              <td>{escape(duration(e2e.get("median_ms")))}</td>
+              <td>{escape(duration(llm.get("median_ms")))}</td>
+            </tr>
+            """
+        )
+    repetition_content = (
+        f"""
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Repetition</th><th>Strict first attempts</th><th>Median E2E</th><th>Median LLM</th></tr></thead>
+            <tbody>{"".join(repetition_rows)}</tbody>
+          </table>
+        </div>
+        """
+        if repetition_rows
+        else '<p class="empty">No repetition data is available.</p>'
+    )
+
+    cache_probe = mapping(timing.get("cache_probe"))
+    eligible_pairs = _integer(cache_probe.get("eligible_strict_pairs")) or 0
+
+    def speedup(value: Any) -> str:
+        number = finite(value)
+        if number is None:
+            return "—"
+        direction = "faster" if number > 0 else "slower" if number < 0 else "unchanged"
+        return f"{number:+.1f}% {direction}"
+
+    cache_metrics = (
+        ("End-to-end", cache_probe.get("median_e2e_speedup_percent")),
+        ("First LLM call", cache_probe.get("median_first_llm_speedup_percent")),
+        ("First prompt eval", cache_probe.get("median_first_prompt_eval_speedup_percent")),
+    )
+    cache_cards = "".join(
+        f"""
+        <div class="mini-stat">
+          <span>{escape(label)}</span>
+          <strong>{escape(speedup(value))}</strong>
+        </div>
+        """
+        for label, value in cache_metrics
+    )
+    cache_note = (
+        f"{eligible_pairs} eligible strict adjacent pair{'s' if eligible_pairs != 1 else ''}. "
+        "This is a cache-sensitive repeat signal, not proof of a cache hit."
+        if eligible_pairs
+        else (
+            "No eligible pairs. Use at least two repetitions; both adjacent first attempts must be strict, "
+            "retry-free, timing-complete, and use the same LLM call count."
+        )
+    )
+
+    comparison = mapping(summary.get("baseline_comparison"))
+    if comparison:
+        performance = mapping(comparison.get("performance"))
+        e2e = mapping(performance.get("e2e"))
+        delta = _integer(comparison.get("delta")) or 0
+        warning = performance.get("warning")
+        transition_specs = (
+            ("Fixed", len(comparison.get("fixed") or []), "good"),
+            ("Regressed", len(comparison.get("regressed") or []), "bad"),
+            ("Stable pass", len(comparison.get("stable_pass") or []), "neutral"),
+            ("Stable fail", len(comparison.get("stable_fail") or []), "neutral"),
+        )
+        transitions = "".join(
+            f'<div class="mini-stat mini-stat--{css_class}"><span>{escape(label)}</span><strong>{count}</strong></div>'
+            for label, count, css_class in transition_specs
+        )
+        warning_html = f'<p class="warning">{escape(warning)}</p>' if warning else ""
+        baseline_content = f"""
+        <div class="baseline-head">
+          <div>
+            <span>Strict score delta</span>
+            <strong class="delta {"positive" if delta > 0 else "negative" if delta < 0 else ""}">{delta:+d}</strong>
+          </div>
+          <div>
+            <span>Matched timing pairs</span>
+            <strong>{_integer(e2e.get("matched_pairs")) or 0}</strong>
+          </div>
+          <div>
+            <span>Median paired E2E</span>
+            <strong>{escape(speedup(e2e.get("median_paired_speedup_percent")))}</strong>
+          </div>
+        </div>
+        <div class="mini-grid">{transitions}</div>
+        {warning_html}
+        """
+    else:
+        baseline_content = (
+            '<p class="empty">No baseline was supplied for this run. '
+            "Use <code>--baseline &lt;previous-summary.json&gt;</code> to add a before/after comparison.</p>"
+        )
+
+    failures = [case for case in case_results if not bool(case.get("strict_pass"))]
+    failure_rows = []
+    for case in failures:
+        attempt = selected_attempt(case)
+        label, css_class = status_for(case)
+        codes = attempt.get("failure_codes")
+        code_text = ", ".join(str(code) for code in codes) if isinstance(codes, list) and codes else "No code"
+        failure_rows.append(
+            f"""
+            <tr>
+              <td><code>{escape(case.get("key") or case.get("case_id"))}</code></td>
+              <td>{escape(str(case.get("category") or "").replace("_", " "))}</td>
+              <td><span class="status status--{css_class}">{escape(label)}</span></td>
+              <td>{escape(case.get("attempts_used"), fallback="0")}</td>
+              <td>{escape(duration(attempt.get("latency_ms")))}</td>
+              <td>{escape(code_text)}</td>
+            </tr>
+            """
+        )
+    failures_content = (
+        f"""
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Logical case</th><th>Category</th><th>Result</th><th>Attempts</th><th>Latency</th><th>Diagnostics</th></tr></thead>
+            <tbody>{"".join(failure_rows)}</tbody>
+          </table>
+        </div>
+        """
+        if failure_rows
+        else '<p class="success">All logical cases passed strictly.</p>'
+    )
+
+    provider_params = json.dumps(
+        mapping(provider.get("model_params")),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(", ", ": "),
+    )
+    git_commit = git.get("commit")
+    commit_text = str(git_commit)[:12] if git_commit else "unavailable"
+    details = (
+        ("Run", summary.get("run_id")),
+        ("Created", summary.get("created_at")),
+        ("ProtoLink", summary.get("protolink_version")),
+        ("Provider", provider.get("name")),
+        ("Model", provider.get("model")),
+        ("Action mode", provider.get("action_mode")),
+        ("Model parameters", provider_params),
+        ("Suite", suite.get("id")),
+        ("Selected cases", suite.get("selected_count")),
+        ("Repetitions", suite.get("repetitions")),
+        ("Fresh attempts", suite.get("max_fresh_attempts")),
+        ("Seed", suite.get("seed")),
+        ("Suite hash", suite.get("hash")),
+        ("Prompt hash", summary.get("prompt_hash")),
+        ("Benchmark prompt hash", summary.get("benchmark_system_prompt_hash")),
+        ("Git commit", commit_text),
+        ("Git dirty", git.get("dirty")),
+    )
+    detail_rows = "".join(f"<dt>{escape(label)}</dt><dd><code>{escape(value)}</code></dd>" for label, value in details)
+
+    strict_rate = finite(scores.get("strict_percent"))
+    if total == 0:
+        badge_class, badge_text = "warn", "No cases"
+    elif strict_rate == 100:
+        badge_class, badge_text = "good", "All strict"
+    elif strict_rate is not None and strict_rate >= 90:
+        badge_class, badge_text = "warn", "Review failures"
+    else:
+        badge_class, badge_text = "bad", "Review failures"
+    title = f"Infer-loop benchmark · {summary.get('run_id') or 'run'}"
+    template = Template(
+        """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <title>$title</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg:#f4f7fb; --surface:#fff; --surface-soft:#f8fafc; --ink:#172033; --muted:#617087;
+      --border:#dbe3ee; --grid:#e9eef5; --blue:#1677ff; --blue-soft:#dcecff; --teal:#0f9f8f;
+      --teal-soft:#d8f4ef; --purple:#7c5ce5; --amber:#d78a08; --red:#d64545; --red-soft:#fce5e5;
+      --green:#16835b; --green-soft:#ddf5e9; --shadow:0 18px 52px rgba(32,51,79,.08);
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1180px,calc(100% - 32px)); margin:32px auto 64px; }
+    header { display:flex; justify-content:space-between; gap:24px; align-items:flex-start; padding:28px; border:1px solid var(--border); border-radius:18px; background:linear-gradient(135deg,rgba(22,119,255,.12),rgba(15,159,143,.07)),var(--surface); box-shadow:var(--shadow); }
+    .eyebrow { color:var(--blue); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { margin:7px 0 8px; font-size:clamp(28px,4vw,44px); line-height:1.05; letter-spacing:-.035em; }
+    header p { margin:0; color:var(--muted); }
+    .run-badge { flex:0 0 auto; padding:8px 12px; border-radius:999px; font-size:13px; font-weight:800; }
+    .run-badge.good { color:var(--green); background:var(--green-soft); }
+    .run-badge.warn { color:var(--amber); background:rgba(215,138,8,.13); }
+    .run-badge.bad { color:var(--red); background:var(--red-soft); }
+    section { margin-top:28px; }
+    h2 { margin:0 0 14px; font-size:21px; letter-spacing:-.015em; }
+    .section-intro { margin:-6px 0 16px; color:var(--muted); font-size:14px; }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
+    .metric,.panel { border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:0 8px 28px rgba(32,51,79,.045); }
+    .metric { min-width:0; padding:18px; }
+    .metric-label { color:var(--muted); font-size:13px; font-weight:700; }
+    .metric-value { margin-top:7px; font-size:27px; font-weight:850; letter-spacing:-.03em; }
+    .metric-rate { margin-top:2px; color:var(--muted); font-size:13px; }
+    .metric p { min-height:38px; margin:10px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .meter,.metric-rule { height:7px; margin-top:13px; overflow:hidden; border-radius:999px; background:var(--grid); }
+    .meter span { display:block; height:100%; border-radius:inherit; background:var(--blue); }
+    .metric--functional .meter span { background:var(--teal); }
+    .metric--first .meter span { background:var(--purple); }
+    .metric-rule { background:linear-gradient(90deg,var(--blue),var(--teal)); }
+    .two-col { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); gap:14px; }
+    .panel { min-width:0; padding:20px; }
+    .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:12px; color:var(--muted); font-size:12px; }
+    .legend span { display:inline-flex; align-items:center; gap:6px; }
+    .legend i { width:10px; height:10px; border-radius:3px; background:var(--blue); }
+    .legend .legend-functional { background:var(--teal); }
+    .legend .legend-failed { background:var(--red); }
+    .chart-row { display:grid; grid-template-columns:minmax(130px,.42fr) minmax(160px,1fr) 56px; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--grid); }
+    .chart-row:last-child { border-bottom:0; }
+    .chart-label { display:flex; flex-direction:column; min-width:0; }
+    .chart-label strong { overflow:hidden; text-overflow:ellipsis; text-transform:capitalize; }
+    .chart-label span,.latency-row span { color:var(--muted); font-size:11px; }
+    .paired-bars { display:grid; gap:4px; }
+    .bar,.diagnostic-track,.latency-line div { height:8px; overflow:hidden; border-radius:999px; background:var(--grid); }
+    .bar span,.diagnostic-track span,.latency-line i { display:block; height:100%; border-radius:inherit; }
+    .bar--functional span { background:var(--teal); }
+    .bar--strict span { background:var(--blue); }
+    .chart-value { text-align:right; font-variant-numeric:tabular-nums; font-weight:750; }
+    .diagnostic-row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(90px,1.4fr) 28px; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--grid); font-size:13px; }
+    .diagnostic-row:last-child { border-bottom:0; }
+    .diagnostic-track span { background:var(--red); }
+    .diagnostic-row strong { text-align:right; }
+    .latency-row { display:grid; grid-template-columns:minmax(150px,.45fr) minmax(260px,1fr); gap:18px; align-items:center; padding:12px 0; border-bottom:1px solid var(--grid); }
+    .latency-row:last-child { border-bottom:0; }
+    .latency-row > div:first-child { display:flex; flex-direction:column; }
+    .latency-bars { display:grid; gap:5px; }
+    .latency-line { display:grid; grid-template-columns:48px 1fr 68px; gap:8px; align-items:center; }
+    .latency-line i { background:var(--blue); }
+    .latency-line--p95 i { background:var(--purple); }
+    .latency-line b { text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
+    .latency-empty,.empty { color:var(--muted); }
+    .case-chart-scale { display:flex; justify-content:space-between; margin:0 0 6px; color:var(--muted); font-size:11px; }
+    .case-chart { display:flex; align-items:flex-end; gap:max(1px,.15vw); height:190px; padding:10px 8px 0; border-bottom:1px solid var(--border); background:linear-gradient(to top,var(--grid) 1px,transparent 1px) 0 50%/100% 50%; }
+    .case-bar { flex:1 1 1px; min-width:1px; max-width:34px; border-radius:3px 3px 0 0; background:var(--blue); }
+    .case-bar--functional { background:var(--teal); }
+    .case-bar--failed { background:var(--red); }
+    .mini-grid,.baseline-head { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+    .mini-stat { padding:13px; border-radius:10px; background:var(--surface-soft); }
+    .mini-stat span,.baseline-head span { display:block; color:var(--muted); font-size:11px; }
+    .mini-stat strong,.baseline-head strong { display:block; margin-top:4px; font-size:16px; overflow-wrap:anywhere; }
+    .baseline-head { margin-bottom:12px; }
+    .baseline-head > div { padding:13px; border:1px solid var(--border); border-radius:10px; }
+    .delta.positive { color:var(--green); }
+    .delta.negative { color:var(--red); }
+    .warning,.success,.empty { margin:12px 0 0; padding:12px 14px; border-radius:10px; background:var(--surface-soft); line-height:1.55; }
+    .warning { color:var(--amber); background:rgba(215,138,8,.12); }
+    .success { color:var(--green); background:var(--green-soft); }
+    .table-wrap { width:100%; overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { padding:10px 11px; border-bottom:1px solid var(--grid); text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+    td { overflow-wrap:anywhere; }
+    code { color:inherit; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.92em; }
+    .status { display:inline-flex; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; }
+    .status--strict { color:var(--blue); background:var(--blue-soft); }
+    .status--functional { color:var(--teal); background:var(--teal-soft); }
+    .status--failed { color:var(--red); background:var(--red-soft); }
+    details.panel summary { cursor:pointer; font-weight:800; }
+    dl { display:grid; grid-template-columns:minmax(130px,.28fr) minmax(0,1fr); gap:0; margin:16px 0 0; }
+    dt,dd { min-width:0; margin:0; padding:9px 0; border-bottom:1px solid var(--grid); }
+    dt { color:var(--muted); }
+    dd { overflow-wrap:anywhere; }
+    footer { margin-top:26px; color:var(--muted); font-size:12px; text-align:center; }
+    @media (prefers-color-scheme:dark) {
+      :root { --bg:#0b1220; --surface:#111b2d; --surface-soft:#162238; --ink:#edf4ff; --muted:#a3b2c8; --border:#2b3a52; --grid:#24334a; --blue:#58a6ff; --blue-soft:#173c65; --teal:#42d7c5; --teal-soft:#164c48; --purple:#aa91ff; --amber:#ffbd52; --red:#ff7272; --red-soft:#542a34; --green:#55d49b; --green-soft:#153f35; --shadow:0 18px 52px rgba(0,0,0,.25); }
+    }
+    @media (max-width:800px) {
+      main { width:min(100% - 20px,1180px); margin-top:10px; }
+      header { padding:20px; border-radius:14px; }
+      .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .two-col { grid-template-columns:1fr; }
+    }
+    @media (max-width:520px) {
+      header { flex-direction:column; }
+      .metrics { grid-template-columns:1fr; }
+      .chart-row { grid-template-columns:110px 1fr 48px; gap:8px; }
+      .latency-row { grid-template-columns:1fr; gap:8px; }
+      dl { grid-template-columns:1fr; }
+      dd { padding-top:0; }
+    }
+    @media print {
+      :root { --bg:#fff; --surface:#fff; --surface-soft:#f6f7f8; --ink:#111; --muted:#555; --border:#ccc; --grid:#ddd; }
+      body { background:#fff; }
+      main { width:100%; margin:0; }
+      .metric,.panel,header { box-shadow:none; break-inside:avoid; }
+      details { display:block; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">ProtoLink · infer-loop benchmark</div>
+      <h1>$run_id</h1>
+      <p>$provider_model · $suite_label · generated $created_at</p>
+    </div>
+    <span class="run-badge $badge_class">$badge_text</span>
+  </header>
+
+  <div class="metrics">$score_cards</div>
+
+  <section class="two-col">
+    <div class="panel">
+      <h2>Correctness by category</h2>
+      <p class="section-intro">Functional success is shown above strict, clean success.</p>
+      $category_content
+      <div class="legend"><span><i class="legend-functional"></i>Functional</span><span><i></i>Strict</span></div>
+    </div>
+    <div class="panel">
+      <h2>Attempt diagnostics</h2>
+      <p class="section-intro">$attempts_executed executed fresh attempts.</p>
+      $diagnostic_content
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Latency distributions</h2>
+    <p class="section-intro">Bars share one p95 scale; medians and tails stay separate from correctness.</p>
+    $latency_content
+  </section>
+
+  <section class="panel">
+    <h2>Case latency and outcome</h2>
+    <p class="section-intro">Each bar is the selected attempt for one logical case repetition.</p>
+    $case_chart
+  </section>
+
+  <section class="two-col">
+    <div class="panel">
+      <h2>Repetitions</h2>
+      $repetition_content
+    </div>
+    <div class="panel">
+      <h2>Cache-sensitive repeat probe</h2>
+      <div class="mini-grid">$cache_cards</div>
+      <p class="section-intro cache-note">$cache_note</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Baseline comparison</h2>
+    $baseline_content
+  </section>
+
+  <section class="panel">
+    <h2>Strict failures</h2>
+    <p class="section-intro">$failure_count logical case results need review.</p>
+    $failures_content
+  </section>
+
+  <section>
+    <details class="panel">
+      <summary>Run configuration and identity</summary>
+      <dl>$detail_rows</dl>
+    </details>
+  </section>
+
+  <footer>Generated locally by the ProtoLink infer-loop benchmark. No external assets or requests.</footer>
+</main>
+</body>
+</html>
+"""
+    )
+    document = template.substitute(
+        title=escape(title),
+        run_id=escape(summary.get("run_id"), fallback="Benchmark run"),
+        provider_model=escape(f"{provider.get('name') or 'provider'} / {provider.get('model') or 'default'}"),
+        suite_label=escape(
+            f"{suite.get('id') or 'suite'} · {suite.get('selected_count') or total} cases · "
+            f"{suite.get('repetitions') or 1} repetition(s)"
+        ),
+        created_at=escape(summary.get("created_at"), fallback="unknown time"),
+        badge_class=badge_class,
+        badge_text=escape(badge_text),
+        score_cards="".join(score_cards),
+        category_content=category_content,
+        attempts_executed=attempts_executed,
+        diagnostic_content="".join(diagnostic_rows),
+        latency_content="".join(latency_rows),
+        case_chart=case_chart,
+        repetition_content=repetition_content,
+        cache_cards=cache_cards,
+        cache_note=escape(cache_note),
+        baseline_content=baseline_content,
+        failure_count=len(failures),
+        failures_content=failures_content,
+        detail_rows=detail_rows,
+    )
+    path.write_text(document, encoding="utf-8")

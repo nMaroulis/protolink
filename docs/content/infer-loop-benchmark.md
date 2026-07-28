@@ -202,6 +202,10 @@ RESULTS    benchmark_results/20260728-143000
 - `REPEAT PROBE` appears when eligible adjacent repetitions exist.
 - `RESULTS` points to the directory containing the detailed evidence.
 
+Open `report.html` inside the results directory for the same run as a visual
+dashboard. It is a single self-contained file, so it opens directly in a
+browser without a server or external assets.
+
 ### Choose a suite
 
 | Suite | Default cases | Best use |
@@ -440,6 +444,7 @@ instead of the timestamped default.
 
 ```text
 benchmark_results/<run-name>/
+├── report.html
 ├── summary.json
 ├── results.csv
 ├── failures.csv
@@ -449,6 +454,7 @@ benchmark_results/<run-name>/
 
 | Open this file when you want to… | File |
 | --- | --- |
+| View headline strict/functional/first-try scores, category bars, reliability and timing charts, repetition/cache-sensitive metrics, optional baseline comparison, strict failures, and run configuration | `report.html` |
 | Read the headline, configuration, hashes, score distributions, repeat signal, or baseline comparison | `summary.json` |
 | Triage cases that never achieved a strict pass | `failures.csv` |
 | Analyze every executed fresh attempt, including later rescue attempts | `results.csv` |
