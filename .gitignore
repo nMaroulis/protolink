@@ -139,3 +139,6 @@ examples/code_assistant/traces.json
 
 # devtools
 runs.db
+
+# Infer-loop benchmark output
+benchmark_results/

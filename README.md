@@ -172,6 +172,20 @@ local_agent = Agent(
 
 Swap `"ollama"` for another built-in or custom `LLM`; the agent, tools, tasks, and flows do not change.
 
+## Infer-loop benchmark
+
+The ProtoLink repository includes a closed-world regression benchmark for prompt and infer-loop changes. It exercises
+direct answers, local tools, agent delegation, dependent multi-step work, and grounding traps, then reports strict and
+recovered functional scores plus end-to-end, model-call, provider, and repeat/cache-sensitive timing.
+
+```bash
+python -m benchmarks.infer_loop --provider ollama --model gemma4:e4b --suite smoke
+```
+
+The benchmark is source-checkout tooling under `benchmarks/`, not part of the installable package. See the
+[infer-loop benchmark guide](benchmarks/infer_loop/README.md) for suite sizes, scoring, Ollama configuration, timing,
+baseline comparison, filtering, and CI thresholds.
+
 ## A2A primitives, standard wire compatibility
 
 ProtoLink uses A2A's core `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` concepts as first-class Python runtime primitives. Delegation, lifecycle transitions, structured flows, tool results, telemetry, and replay all operate on those explicit objects rather than escaping into a separate orchestration format.

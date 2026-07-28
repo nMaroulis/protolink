@@ -55,7 +55,7 @@ const sidebars = {
       type: 'category',
       label: 'Project',
       collapsed: false,
-      items: ['development', 'changelog', 'relevant'],
+      items: ['development', 'infer-loop-benchmark', 'changelog', 'relevant'],
     },
   ],
 };

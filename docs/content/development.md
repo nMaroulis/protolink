@@ -27,11 +27,15 @@ cd protolink
 
 # Install in development mode
 uv pip install -e ".[dev]"
+cd docs
 npm install
+cd ..
 
 # Or with pip
 pip install -e ".[dev]"
+cd docs
 npm install
+cd ..
 ```
 
 This installs Protolink in editable mode with all development dependencies.
@@ -75,13 +79,18 @@ ruff format .
 ruff check . --fix
 
 # Type checking
-ty check protolink
+ty check .
 
 # Run tests
 python -m pytest -v tests
 
+# Benchmark prompt or infer-loop changes
+python -m benchmarks.infer_loop --provider ollama --model <model> --suite smoke
+
 # Validate docs
+cd docs
 npm run build
+cd ..
 ```
 
 ### 5. Commit and Push
@@ -128,7 +137,7 @@ Protolink uses **ty** for static type checking.
 
 ```bash
 # Run type checks
-ty check protolink
+ty check .
 
 # Check one package area
 ty check protolink/agents
@@ -223,10 +232,35 @@ protolink/
 │   ├── types/          # Type aliases
 │   └── utils/          # Utilities
 ├── tests/              # Test suite
+├── benchmarks/         # Repository-only regression and performance benchmarks
 ├── docs/               # Documentation
 ├── examples/           # Example scripts
 └── README.md          # Project overview
 ```
+
+---
+
+## Infer-loop Benchmark
+
+Prompt, parsing, action-selection, retry, and delegation changes should be
+checked with the repository-local infer-loop benchmark. It reports strict and
+functional correctness, failures and traces, task and model-call latency,
+Ollama prompt/load/generation timing, and cache-sensitive repeat comparisons.
+
+Run it from the repository root:
+
+```bash
+python -m benchmarks.infer_loop \
+  --provider ollama \
+  --model <model> \
+  --suite core \
+  --repetitions 2
+```
+
+Keep the provider, exact model and parameters, suite, seed, warm-up, attempts,
+repetitions, hardware, and host load controlled in before-and-after runs. See
+the [Infer-loop Benchmark](infer-loop-benchmark.md) guide for scoring, timing,
+baseline comparison, and artifacts.
 
 ---
 

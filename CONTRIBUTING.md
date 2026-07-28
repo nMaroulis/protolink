@@ -148,6 +148,54 @@ If your change requires additional test fixtures or helper utilities, place them
 
 ---
 
+## Infer-loop Benchmark
+
+Changes to `protolink/llms/prompts/`, infer-loop parsing, action selection, retry behavior, tools, or agent delegation
+should include a controlled before-and-after benchmark run. The benchmark is repository tooling under `benchmarks/`,
+outside the installable `protolink` package.
+
+Run a fast check while developing:
+
+```bash
+python -m benchmarks.infer_loop \
+  --provider ollama \
+  --model <model> \
+  --suite smoke
+```
+
+For a reviewable comparison, record a baseline before the change and run the same core suite afterward:
+
+```bash
+python -m benchmarks.infer_loop \
+  --provider ollama \
+  --model <model> \
+  --suite core \
+  --seed 1337 \
+  --repetitions 2 \
+  --run-name infer-before
+
+python -m benchmarks.infer_loop \
+  --provider ollama \
+  --model <model> \
+  --suite core \
+  --seed 1337 \
+  --repetitions 2 \
+  --run-name infer-after \
+  --baseline benchmark_results/infer-before/summary.json
+```
+
+Keep the provider, exact model build, model parameters, action mode, suite selection, seed, attempts, repetitions,
+warm-up, hardware, and host load as consistent as practical. In the pull request, report the strict score before and
+after, fixed or regressed cases, strict-first-attempt median and p95 latency, paired timing delta, and the
+cache-sensitive repeat signal. Timing is diagnostic and does not replace correctness.
+
+See the [infer-loop benchmark documentation](https://nmaroulis.github.io/protolink/docs/infer-loop-benchmark/) and
+the repository's [`benchmarks/infer_loop/README.md`](benchmarks/infer_loop/README.md) for scoring, artifacts, timing
+semantics, filters, and limitations. Generated `benchmark_results/` artifacts are ignored by Git; attach or summarize
+the relevant results in the pull request instead of committing them.
+
+---
+
 ## Documentation
 
 - User-facing changes should be reflected in the docs under `docs/`.

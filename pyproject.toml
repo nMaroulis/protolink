@@ -22,7 +22,7 @@ include = ["protolink*"]
 
 # Type Checking - ty setup
 [tool.ty.src]
-include = ["protolink"]
+include = ["protolink", "benchmarks"]
 exclude = ["build", "tests"]
 
 [tool.ty.rules]
@@ -143,6 +143,7 @@ build = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 python_files = "test_*.py"
 addopts = "-v"
 asyncio_default_test_loop_scope = "module"
