@@ -195,5 +195,17 @@ def test_action_parse_error_retains_structured_context_for_correction():
 
     assert exc_info.value.action_type == "agent_call"
     assert exc_info.value.parsed_data == payload
+    assert exc_info.value.raw_response == json.dumps(payload)
     assert "Field-level errors" in exc_info.value.feedback
     assert "Parsed data" not in exc_info.value.feedback
+
+
+def test_json_decode_error_retains_exact_empty_response():
+    with pytest.raises(ActionParseError) as exc_info:
+        parse_infer_response("")
+
+    assert exc_info.value.raw_response == ""
+    assert exc_info.value.parsed_data is None
+    assert exc_info.value.feedback.startswith("Invalid JSON:")
+    assert "Raw response" not in exc_info.value.feedback
+    assert "Raw response: <empty>" in str(exc_info.value)

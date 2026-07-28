@@ -106,6 +106,7 @@ from protolink.llms.compaction import (
     HistoryCompactor,
 )
 from protolink.llms.context import ContextManifest, build_context_manifest
+from protolink.llms.errors import InferParseError
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import (
     LLMCallMetrics,
@@ -210,7 +211,10 @@ def _action_correction_message(
     elif action_type and action_type not in {"final", "tool_call", "agent_call"}:
         lines.append(f"The outer action type `{action_type}` is not recognized.")
     elif action_type is None and isinstance(error, ActionParseError):
-        lines.append("No recognized outer action type could be inferred from the decoded object.")
+        if parsed_data is None:
+            lines.append("No valid JSON action object could be decoded.")
+        else:
+            lines.append("No recognized outer action type could be inferred from the decoded object.")
 
     lines.extend(
         [
@@ -795,13 +799,16 @@ class LLM(ABC):
 
         Raises
         ------
+        InferParseError
+            Raised when the configured number of consecutive model responses
+            cannot be decoded or validated as ProtoLink actions. The exception
+            preserves the final raw model response and parser cause.
         RuntimeError
             Raised in the following scenarios:
 
             - **LLM call failure**: Network error, API error, or provider-specific issue that persists after retries.
             - **Unrecoverable tool error**: Tool execution raises an exception other than ``TypeError`` (which triggers
               self-correction).
-            - **Parse circuit breaker**: 3 consecutive JSON parse or validation failures.
             - **Step limit exceeded**: ``MAX_INFER_STEPS`` reached without ``final``.
 
         Notes
@@ -843,8 +850,9 @@ class LLM(ABC):
            messages, and error types plus capability-aware guidance derived from the decoded outer action. Parsed
            payload previews remain in bounded diagnostics instead of being copied into privileged correction history.
 
-        4. *Parse Failure Circuit Breaker*: After 3 consecutive JSON parse or schema validation failures, raises
-           ``RuntimeError`` early rather than consuming the full step budget. Each failure injects corrective feedback.
+        4. *Parse Failure Circuit Breaker*: After the configured number of consecutive JSON parse or schema validation
+           failures, raises ``InferParseError`` early rather than consuming the full step budget. Each failure injects
+           corrective feedback.
 
         5. *Bounded Execution*: Hard limit of ``MAX_INFER_STEPS`` (default: 10) prevents runaway execution. If exceeded,
            raises ``RuntimeError``.
@@ -1156,8 +1164,11 @@ class LLM(ABC):
                     }
                 )
                 if parse_failures >= max_parse_failures:
-                    raise RuntimeError(
-                        f"Failed to parse LLM output after {parse_failures} consecutive attempts. Last error: {e}"
+                    raise InferParseError(
+                        attempts=parse_failures,
+                        step=steps,
+                        raw_response=e.raw_response if isinstance(e, ActionParseError) else None,
+                        last_error=e,
                     ) from e
                 self.history.add_system(
                     _action_correction_message(

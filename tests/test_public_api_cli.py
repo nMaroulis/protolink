@@ -3,6 +3,7 @@ from pathlib import Path
 from protolink import (
     Agent,
     AgentCard,
+    InferParseError,
     LocalTraceRecorder,
     LocalTraceTelemetry,
     Pipeline,
@@ -17,6 +18,7 @@ from protolink.cli import main as cli_main
 def test_top_level_happy_path_exports():
     assert Agent is not None
     assert AgentCard is not None
+    assert issubclass(InferParseError, RuntimeError)
     assert LocalTraceRecorder is not None
     assert LocalTraceTelemetry is not None
     assert Pipeline is not None

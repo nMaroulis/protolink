@@ -39,6 +39,7 @@ uv add --upgrade protolink
 ### Added
 
 - Added the infer-loop benchmark for correctness, reliability, timing, baseline comparisons, and CSV/JSON results.
+- Added `InferParseError` with the failed response, attempt count, parser cause, and a concise explanation.
 
 ## [0.6.7] - 2026-07-28
 

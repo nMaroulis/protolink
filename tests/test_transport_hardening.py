@@ -14,11 +14,13 @@ from protolink import (
     Agent,
     AgentCard,
     AgentInterface,
+    InferParseError,
     RetryPolicy,
     TransportConfig,
     TransportConnectionError,
     TransportLimitError,
     TransportLimits,
+    TransportRemoteError,
     TransportTimeoutError,
 )
 from protolink.client import AgentClient, RegistryClient
@@ -157,6 +159,45 @@ async def test_runtime_transport_caches_idempotent_responses() -> None:
         await client.stop()
 
     assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_transport_preserves_typed_infer_failure_as_cause() -> None:
+    server = RuntimeTransport("runtime://infer-failure-server")
+    client = RuntimeTransport("runtime://infer-failure-client")
+    parser_error = ValueError("invalid action")
+    infer_error = InferParseError(
+        attempts=3,
+        step=3,
+        raw_response="not json",
+        last_error=parser_error,
+    )
+
+    async def handler(_payload: dict[str, Any]) -> None:
+        raise infer_error
+
+    server.setup_routes(
+        [
+            EndpointSpec(
+                name="infer",
+                path="/infer",
+                method="POST",
+                handler=handler,
+                request_source="body",
+            )
+        ]
+    )
+    await server.start()
+    spec = ClientRequestSpec(name="infer", path="/infer", method="POST")
+
+    try:
+        with pytest.raises(TransportRemoteError) as exc_info:
+            await client.send(spec, server.url, {})
+    finally:
+        await server.stop()
+        await client.stop()
+
+    assert exc_info.value.__cause__ is infer_error
 
 
 @pytest.mark.asyncio

@@ -1243,7 +1243,7 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
     th { color:var(--muted); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
     td { overflow-wrap:anywhere; }
     code { color:inherit; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.92em; }
-    .status { display:inline-flex; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; }
+    .status { display:inline-flex; padding:4px 5px; border-radius:999px; font-size:11px; font-weight:800; }
     .status--strict { color:var(--blue); background:var(--blue-soft); }
     .status--functional { color:var(--teal); background:var(--teal-soft); }
     .status--failed { color:var(--red); background:var(--red-soft); }
