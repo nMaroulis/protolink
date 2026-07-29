@@ -466,9 +466,7 @@ def _routing_choice_case(index: int, ordinal: int, seed: int, rng: random.Random
                 "product=<reported product>;receipt=<reported receipt>."
             ),
             expected_final=f"product={output['product']};receipt={output['receipt']}",
-            expected_actions=(
-                ExpectedAction("local_tool", "benchmark_coordinator", "multiply_numbers", args),
-            ),
+            expected_actions=(ExpectedAction("local_tool", "benchmark_coordinator", "multiply_numbers", args),),
         )
     if variant == 2:
         token = _stable_receipt("ROUTE-FINAL", {"request_id": request_id})

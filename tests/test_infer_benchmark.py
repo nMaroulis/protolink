@@ -106,10 +106,7 @@ def test_routing_choice_variants_omit_target_identifiers_and_cover_every_action_
     assert modes == {"direct", "local_tool", "agent_tool", "agent_infer"}
 
     core_routing = [case for case in generate_cases(40, seed=1337) if case.category == "routing_choice"]
-    core_modes = {
-        case.expected_actions[0].kind if case.expected_actions else "direct"
-        for case in core_routing
-    }
+    core_modes = {case.expected_actions[0].kind if case.expected_actions else "direct" for case in core_routing}
     assert core_modes == {"direct", "local_tool", "agent_tool", "agent_infer"}
 
 
