@@ -45,9 +45,8 @@ _IGNORED_DIRECTORY_NAMES = {".git", ".hg", ".svn", "__pycache__", "node_modules"
 class AutoLoader:
     """Load common local, inline, and HTTP sources with safe defaults.
 
-    Local directories are traversed recursively. Text-like files are decoded
-    as UTF-8 with replacement for malformed bytes; HTML is reduced to visible
-    text; PDFs use the optional ``pypdf`` package. Unsupported binary files are
+    Local directories are traversed recursively. Text-like files are decoded as UTF-8 with replacement for malformed
+    bytes; HTML is reduced to visible text; PDFs use the optional ``pypdf`` package. Unsupported binary files are
     rejected instead of being silently embedded as corrupted text.
 
     Args:
@@ -82,8 +81,8 @@ class AutoLoader:
     ) -> list[Document]:
         """Normalize one source into documents.
 
-        ``source`` may be a :class:`Document`, ``Path``, local path string,
-        HTTP(S) URL, bytes value, or inline text string.
+        ``source`` may be a :class:`Document`, ``Path``, local path string, HTTP(S) URL, bytes value, or inline text
+        string.
         """
         common_metadata = dict(metadata or {})
         if isinstance(source, Document):

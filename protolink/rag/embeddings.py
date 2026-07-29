@@ -17,11 +17,10 @@ _TOKEN_RE = re.compile(r"[\w'-]+", re.UNICODE)
 class HashEmbedder:
     """Create deterministic lexical vectors without a model dependency.
 
-    This embedder is intended for local development, examples, tests, and
-    modest knowledge bases. It hashes normalized word and adjacent-word
-    features into a fixed-size vector and L2-normalizes the result. It is not a
-    neural semantic embedding model; production applications can replace it
-    with any object implementing :class:`~protolink.rag.Embedder`.
+    This embedder is intended for local development, examples, tests, and modest knowledge bases. It hashes normalized
+    word and adjacent-word features into a fixed-size vector and L2-normalizes the result. It is not a neural semantic
+    embedding model. Production applications can replace it with any object implementing
+    :class:`~protolink.rag.Embedder`.
 
     Args:
         dimensions: Number of output vector dimensions.
@@ -73,8 +72,8 @@ class CallableEmbedder:
 
     Args:
         embed_documents: Batch function accepting a sequence of strings.
-        embed_query: Optional query-specific function. When omitted, the batch
-            function is called with a single-item sequence.
+        embed_query: Optional query-specific function. When omitted, the batch function is called with a single-item
+            sequence.
     """
 
     def __init__(
@@ -110,9 +109,8 @@ class CallableEmbedder:
 class OpenAIEmbedder:
     """Use an OpenAI-compatible embeddings client through a small adapter.
 
-    The adapter accepts an already configured client, keeping authentication
-    and lifecycle ownership in the application. Both synchronous and
-    asynchronous clients are supported as long as they expose
+    The adapter accepts an already configured client, keeping authentication and lifecycle ownership in the application.
+    Both synchronous and asynchronous clients are supported as long as they expose
     ``client.embeddings.create(model=..., input=...)``.
 
     Args:

@@ -10,9 +10,8 @@ from .models import Chunk, Document
 class RecursiveCharacterSplitter:
     """Split text along natural boundaries before falling back to characters.
 
-    The splitter prefers paragraphs, then lines, sentences, words, and finally
-    hard character boundaries. Adjacent chunks overlap by ``chunk_overlap``
-    characters so facts near a boundary remain retrievable with their context.
+    The splitter prefers paragraphs, then lines, sentences, words, and finally hard character boundaries. Adjacent
+    chunks overlap by ``chunk_overlap`` characters so facts near a boundary remain retrievable with their context.
 
     Args:
         chunk_size: Maximum number of characters in one chunk.

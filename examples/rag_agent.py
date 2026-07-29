@@ -1,8 +1,7 @@
 """Run a dependency-free Agent that chooses when to search local knowledge.
 
-The in-memory knowledge base, lexical embedder, runtime transport, and MockLLM
-all ship with ProtoLink. The scripted model still follows the real inference
-loop: it calls the automatically registered ``search_handbook`` tool, reads the
+The in-memory knowledge base, lexical embedder, runtime transport, and MockLLM all ship with ProtoLink. The scripted
+model still follows the real inference loop: it calls the automatically registered ``search_handbook`` tool, reads the
 tool result, and then answers with the returned citation label.
 
 Run it from the repository root:

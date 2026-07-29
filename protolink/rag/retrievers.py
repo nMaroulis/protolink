@@ -16,10 +16,9 @@ RetrieverFunction = Callable[..., Sequence[Any] | Awaitable[Sequence[Any]]]
 class CallableRetriever:
     """Adapt an application search function to the ProtoLink retriever contract.
 
-    The callable may be synchronous or asynchronous. ProtoLink passes ``query``
-    and, when accepted by the signature, ``k`` and ``where``. Results may be
-    :class:`SearchHit`, :class:`Document`, :class:`Chunk`, mapping, or string
-    values and are normalized immediately.
+    The callable may be synchronous or asynchronous. ProtoLink passes ``query`` and, when accepted by the signature,
+    ``k`` and ``where``. Results may be :class:`SearchHit`, :class:`Document`, :class:`Chunk`, mapping, or string values
+    and are normalized immediately.
     """
 
     def __init__(self, function: RetrieverFunction) -> None:
@@ -113,8 +112,8 @@ class ChromaRetriever:
 
     Args:
         collection: User-created Chroma collection.
-        embedder: Optional query embedder. Omit it when the collection has its
-            own embedding function and accepts ``query_texts``.
+        embedder: Optional query embedder. Omit it when the collection has its own embedding function and accepts
+            ``query_texts``.
         source_key: Metadata field containing a displayable source.
     """
 

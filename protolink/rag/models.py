@@ -1,9 +1,8 @@
 """Typed data models shared by ProtoLink retrieval components.
 
-The RAG module keeps its values deliberately provider-neutral. Loaders,
-splitters, vector databases, custom retrievers, agent tools, and citations all
-exchange these small dataclasses instead of leaking a vendor SDK's response
-types through the public API.
+The RAG module keeps its values deliberately provider-neutral. Loaders, splitters, vector databases, custom retrievers,
+agent tools, and citations all exchange these small dataclasses instead of leaking a vendor SDK's response types through
+the public API.
 """
 
 from __future__ import annotations
@@ -31,8 +30,7 @@ class Document:
         text: Plain-text document content.
         source: Optional path, URL, database key, or human-readable origin.
         metadata: Application metadata retained through chunking and search.
-        id: Stable document identifier. When omitted, ProtoLink derives one
-            from ``source`` and ``text``.
+        id: Stable document identifier. When omitted, ProtoLink derives one from ``source`` and ``text``.
         media_type: MIME type describing the original source.
     """
 
@@ -133,9 +131,8 @@ class VectorRecord:
 class SearchHit:
     """One normalized retrieval result.
 
-    ``SearchHit`` is the only result shape the Agent integration needs. A
-    custom store may therefore participate in ProtoLink RAG by returning these
-    values without implementing ingestion, embeddings, or vector persistence.
+    ``SearchHit`` is the only result shape the Agent integration needs. A custom store may therefore participate in
+    ProtoLink RAG by returning these values without implementing ingestion, embeddings, or vector persistence.
     """
 
     text: str

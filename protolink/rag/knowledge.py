@@ -25,25 +25,22 @@ class Knowledge:
 
     A ``Knowledge`` object has two valid configurations:
 
-    - **Retrieval-only**: pass ``retriever`` for an existing vector database,
-      search service, or custom application function.
-    - **Managed**: pass ``store`` and ``embedder`` plus optional loader and
-      splitter components. ProtoLink can then ingest and synchronize sources.
+    - **Retrieval-only**: pass ``retriever`` for an existing vector database, search service, or custom application
+      function.
+    - **Managed**: pass ``store`` and ``embedder`` plus optional loader and splitter components. ProtoLink can then
+      ingest and synchronize sources.
 
     Args:
         retriever: Existing retriever object or sync/async search callable.
-        name: Stable name used to generate the Agent tool
-            ``search_<name>``.
-        description: Plain-language description telling the model what the
-            knowledge contains and when it is useful.
+        name: Stable name used to generate the Agent tool ``search_<name>``.
+        description: Plain-language description telling the model what the knowledge contains and when it is useful.
         default_k: Default maximum number of results.
         reranker: Optional query-aware result reranker.
         loader: Source loader for managed knowledge.
         splitter: Document splitter for managed knowledge.
         embedder: Embedding implementation for managed knowledge.
         store: Vector store for managed knowledge.
-        context_max_chars: Maximum retrieved text included in one tool result or
-            deterministic answer context.
+        context_max_chars: Maximum retrieved text included in one tool result or deterministic answer context.
         pending_sources: Optional sources indexed lazily before first search.
     """
 
@@ -270,9 +267,8 @@ class Knowledge:
     ) -> IndexReport:
         """Reindex sources and optionally remove previously indexed omissions.
 
-        ``delete_missing`` compares the loaded source identifiers with all
-        sources currently present in this managed store. Use it only when the
-        supplied sources represent the complete desired corpus.
+        ``delete_missing`` compares the loaded source identifiers with all sources currently present in this managed
+        store. Use it only when the supplied sources represent the complete desired corpus.
         """
         self._require_managed()
         await self.ready()
@@ -299,9 +295,8 @@ class Knowledge:
     def as_tool(self) -> Tool:
         """Return the typed read-only tool registered on an Agent.
 
-        The result deliberately contains only bounded, JSON-safe fields. Tool
-        metadata tells the LLM when to search and reminds it that retrieved text
-        is evidence rather than trusted instructions.
+        The result deliberately contains only bounded, JSON-safe fields. Tool metadata tells the LLM when to search and
+        reminds it that retrieved text is evidence rather than trusted instructions.
         """
 
         async def search_knowledge(

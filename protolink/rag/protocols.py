@@ -1,7 +1,7 @@
 """Structural extension contracts for ProtoLink retrieval.
 
-Applications do not need to inherit from framework base classes. Any object
-that implements the relevant protocol can be supplied to :class:`Knowledge`.
+Applications do not need to inherit from framework base classes. Any object that implements the relevant protocol can be
+supplied to :class:`Knowledge`.
 """
 
 from __future__ import annotations

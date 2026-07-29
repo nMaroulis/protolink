@@ -1,8 +1,7 @@
 """First-party Retrieval-Augmented Generation for ProtoLink agents.
 
-The package offers one high-level :class:`Knowledge` façade while keeping every
-internal boundary replaceable. Applications can use the dependency-free local
-stack, connect an existing vector database, or implement only the small
+The package offers one high-level :class:`Knowledge` façade while keeping every internal boundary replaceable.
+Applications can use the dependency-free local stack, connect an existing vector database, or implement only the small
 :class:`Retriever` protocol.
 """
 

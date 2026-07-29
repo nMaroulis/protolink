@@ -44,8 +44,7 @@ def create_knowledge(
     - ``"vector"``: caller-supplied ``store`` and ``embedder``.
     - ``"chroma"``: existing Chroma ``collection``.
     - ``"pinecone"``: existing Pinecone ``index`` and matching ``embedder``.
-    - ``"qdrant"``: existing Qdrant ``client``, ``collection_name``, and
-      matching ``embedder``.
+    - ``"qdrant"``: existing Qdrant ``client``, ``collection_name``, and matching ``embedder``.
 
     A retriever object or callable may be passed directly instead of an alias.
     Staged ``sources`` are indexed lazily on the first search or explicitly via
