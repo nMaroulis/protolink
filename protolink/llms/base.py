@@ -107,7 +107,7 @@ from protolink.llms.compaction import (
 )
 from protolink.llms.context import ContextManifest, build_context_manifest
 from protolink.llms.errors import InferParseError
-from protolink.llms.history import ConversationHistory
+from protolink.llms.history import EPHEMERAL_TOOL_OBSERVATION_KEY, ConversationHistory
 from protolink.llms.metrics import (
     LLMCallMetrics,
     LLMContextUsage,
@@ -1314,6 +1314,7 @@ class LLM(ABC):
 
                 history_tool_result = _history_safe_result(tool_result)
                 observation_fallback = False
+                observation_start = len(self.history)
                 try:
                     self._inject_tool_call(
                         tool_name=tool_name,
@@ -1338,6 +1339,13 @@ class LLM(ABC):
                             default=json_history_default,
                         )
                     )
+                if getattr(tool, "_protolink_ephemeral_result", False):
+                    marker = {
+                        "tool": tool_name,
+                        "knowledge": getattr(tool, "_protolink_knowledge_name", None),
+                    }
+                    for message in self.history.messages_raw()[observation_start:]:
+                        message.metadata[EPHEMERAL_TOOL_OBSERVATION_KEY] = marker
                 await emit(
                     {
                         "type": "tool_result",

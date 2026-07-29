@@ -16,7 +16,7 @@ Agents are the core building blocks in Protolink.
 ## Concepts
 
 An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**.
-It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
+It is the **core building block** of Protolink, responsible for managing identity, capabilities, and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **knowledge and RAG**, **transport**, **state**, **storage**, **telemetry**, and **logging**.
 
 `Agent(..., transport="http", a2a=True)` adds [A2A 1.0](https://a2a-protocol.org/latest/specification/) inbound and outbound translation without changing `handle_task(Task)` or removing the native ProtoLink endpoints. The default `a2a=False` preserves the previous native-only behavior.
 
@@ -177,11 +177,12 @@ Protolink's `Agent` combines client and server functionality in a single class. 
   eyebrow="Core runtime module"
   title="Agent"
   path="protolink.agents.Agent"
-  description="The public facade for identity, lifecycle, transport wiring, task execution, tools, LLM inference, state, policy, telemetry, and registry discovery."
+  description="The public facade for identity, lifecycle, transport wiring, task execution, tools, knowledge retrieval, LLM inference, state, policy, telemetry, and registry discovery."
   pills={[
     "Unified client and server",
     "Async and sync facades",
     "Task, message, and stream APIs",
+    "Automatic knowledge tools",
     "Policy and approval checkpoints",
     "Pluggable modules",
   ]}
@@ -198,7 +199,7 @@ Protolink's `Agent` combines client and server functionality in a single class. 
     },
     {
       title: "Execute",
-      text: "Handle incoming tasks, invoke tools, run inference loops, stream events, and emit durable run snapshots.",
+      text: "Handle incoming tasks, retrieve knowledge, invoke tools, run inference loops, stream events, and emit durable run snapshots.",
       code: "handle_task()",
     },
     {
@@ -244,6 +245,8 @@ Protolink's `Agent` combines client and server functionality in a single class. 
     approval_handler: ApprovalHandlerLike | None = None,
     run_store: Any | None = None,
     registry_heartbeat_interval: float | None = None,
+    knowledge: Knowledge | Retriever | Sequence[Knowledge | Retriever] | None = None,
+    retrieval: Literal["auto", "always", "required"] = "auto",
 )`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/base.py"
 >
@@ -318,11 +321,26 @@ Create the stable Agent facade and wire its identity, execution engine, communic
     <ApiField name="registry_heartbeat_interval" type="float | None" defaultValue="None">
       Seconds between heartbeats after successful registration. <code>None</code> disables the loop. Values below <code>0.1</code> are clamped to 0.1 seconds.
     </ApiField>
+    <ApiField name="knowledge" type="Knowledge | Retriever | Sequence[Knowledge | Retriever] | None" defaultValue="None">
+      One knowledge source, a structural retriever, or a sequence of sources.
+      Each source becomes a typed <code>search_&lt;name&gt;</code> tool available
+      to the inference loop. Plain retrievers are wrapped as knowledge named
+      <code>"knowledge"</code>; wrap them in <code>Knowledge</code> to provide a
+      specific name, description, result limit, or reranker.
+    </ApiField>
+    <ApiField name="retrieval" type={'Literal["auto", "always", "required"]'} defaultValue={'"auto"'}>
+      Default retrieval behavior for infer tasks. <code>"auto"</code> lets the
+      model choose a knowledge tool, <code>"always"</code> retrieves before the
+      first model call, and <code>"required"</code> additionally raises
+      <code>KnowledgeNotFoundError</code> when no selected source can provide a
+      usable passage inside the bounded model context. Per-task metadata may
+      strengthen this mode but cannot weaken it.
+    </ApiField>
   </ApiFields>
 </ApiSection>
 
 <ApiCallout label="Construction side effects">
-  The constructor creates default storage, logger, policy, state, and sync facades and may construct transport clients and routes. LLM connection validation can perform I/O. It does not bind Agent server ports, register the card, or begin heartbeats until lifecycle methods run.
+  The constructor creates default storage, logger, policy, state, and sync facades and may construct transport clients and routes. LLM connection validation can perform I/O. Attaching knowledge creates retrieval tools and capability metadata, but staged knowledge sources remain lazy until <code>ready()</code> or the first search. Construction does not bind Agent server ports, register the card, or begin heartbeats until lifecycle methods run.
 </ApiCallout>
 
 </ApiReference>
@@ -683,7 +701,7 @@ Execute a task while emitting its lifecycle as typed events. The default stream 
 
 <ApiCallout label="Error contract">Execution failures are converted into a <code>TaskErrorEvent</code> followed by a final failed status event. Consumers should use the final status metadata as the authoritative task snapshot.</ApiCallout>
 
-<ApiCallout label="Internal-result privacy">For <code>tool_result</code> and <code>agent_call_result</code> events, client-visible <code>TaskLLMStreamEvent.metadata</code> retains correlation fields and sets <code>result_omitted=true</code> but does not carry the internal result. The private LLM history and explicitly configured privileged telemetry can retain that observation.</ApiCallout>
+<ApiCallout label="Internal-result privacy">For <code>tool_result</code> and <code>agent_call_result</code> events, client-visible <code>TaskLLMStreamEvent.metadata</code> retains correlation fields and sets <code>result_omitted=true</code> but does not carry the internal result. Ordinary tool observations can remain in private LLM history and configured telemetry. Generated knowledge-tool passages are stricter: raw evidence is available only to the active model loop, then replaced in persistent history and observability with an omission receipt and bounded search statistics.</ApiCallout>
 
 </ApiReference>
 
@@ -705,7 +723,7 @@ Execute one deterministic step from the most recently appended message or artifa
 
 <ApiCallout label="Task-wide budgets">One task-scoped <code>BudgetEnforcer</code> is shared by explicit tool parts and every iteration or retry inside all infer parts. Inline nested tasks use their own scope and restore the parent budget afterward.</ApiCallout>
 
-<ApiCallout label="Completed-action receipts">Outputs are attached and offered to <code>run_store</code> after each completed top-level part. Successful tools or delegations selected inside <code>LLM.infer()</code> additionally create and immediately snapshot an <code>Artifact(kind="action_result")</code> JSON receipt with completion status, action ID, and source/kind/step metadata. Internal tool and delegation results are deliberately omitted from this client-visible artifact; the full observation remains in private LLM history. Later failure, cancellation, or budget exhaustion therefore preserves evidence of completed side effects without exposing internal result data.</ApiCallout>
+<ApiCallout label="Completed-action receipts">Outputs are attached and offered to <code>run_store</code> after each completed top-level part. Successful tools or delegations selected inside <code>LLM.infer()</code> additionally create and immediately snapshot an <code>Artifact(kind="action_result")</code> JSON receipt with completion status, action ID, and source/kind/step metadata. Internal results are deliberately omitted from this client-visible artifact. Ordinary tool observations remain private to model history; generated knowledge evidence is also scrubbed from persistent history and telemetry after the active loop. Later failure, cancellation, or budget exhaustion therefore preserves evidence of completed side effects without exposing internal result data.</ApiCallout>
 
 </ApiReference>
 
@@ -883,6 +901,46 @@ Create a one-step task, process it through <code>handle_task()</code>, and retur
 
 </ApiReference>
 
+### Agent.ask
+
+<ApiReference kind="async method" path="protolink.agents.Agent.ask" signature={`async ask(
+    question: str,
+    *,
+    knowledge: str | list[str] | tuple[str, ...] | None = None,
+    k: int | None = None,
+    where: dict[str, Any] | None = None,
+    citations: bool = True,
+    session_id: str = "ask_session_id",
+) -> RAGAnswer`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Run deterministic retrieve-then-answer through the Agent's normal task,
+policy, cancellation, telemetry, history, budget, and inference boundaries.
+Unlike <code>invoke()</code> in automatic mode, this method always searches
+before the first model call.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="ask parameters">
+  <ApiField name="question" type="str" required>Non-empty user question used as both the retrieval query and original inference request.</ApiField>
+  <ApiField name="knowledge" type="str | list[str] | tuple[str, ...] | None" defaultValue="None">Attached knowledge name or names. Omission searches every attached source.</ApiField>
+  <ApiField name="k" type="int | None" defaultValue="None">Maximum hits per selected source. Omission uses each source's <code>default_k</code>.</ApiField>
+  <ApiField name="where" type="dict[str, Any] | None" defaultValue="None">Metadata filter passed to every selected source.</ApiField>
+  <ApiField name="citations" type="bool" defaultValue="True">Request bracketed evidence labels and retain structured Citation values. When false, hits are still returned but <code>RAGAnswer.citations</code> is empty.</ApiField>
+  <ApiField name="session_id" type="str" defaultValue={'"ask_session_id"'}>Conversation-state partition attached to the generated task.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="ask return value">
+  <ApiField name="answer" type="RAGAnswer">Final model text together with the original query, normalized hits, and optional structured citations.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="ask errors">
+  <ApiField name="RuntimeError">No knowledge source is attached.</ApiField>
+  <ApiField name="ValueError | TypeError">The question, selected names, result count, or filters are invalid.</ApiField>
+  <ApiField name="retrieval or inference error">Search, policy, budget, provider, and task failures propagate through their normal typed errors.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Complete RAG guide">See <a href="rag">Retrieval-Augmented Generation</a> for managed indexes, existing vector databases, custom retrievers, retrieval modes, citations, and lifecycle operations.</ApiCallout>
+
+</ApiReference>
+
 #### Task Lifecycle
 
 The default `Agent` implementation manages `Task.state` for you:
@@ -921,11 +979,12 @@ Only active runs appear in `active_task_ids`. Wait until task acceptance or a fi
 When `execute_task()` encounters an `infer` part, it delegates to `LLM.infer()` with:
 
 1. **The query**: Extracted from the task's message content
-2. **The agent's tools**: All registered tools passed as a dictionary
-3. **Validated discovered Agents**: Registry-advertised targets, excluding this Agent and names already in the ancestor chain
-4. **An agent callback**: Enables delegation only when at least one valid target was discovered
-5. **Runtime controls**: Policy authorization, cancellation, the normalized `RunContext`, and the task-scoped budget enforcer
-6. **Optional stream observers**: Used by `handle_task_streaming()` to emit `task_llm_stream` events while the final `infer_output` part is produced
+2. **Knowledge retrieval**: Deterministic pre-retrieval for `"always"` or `"required"` (with knowledge tools suppressed afterward to avoid duplicate reads), while `"auto"` exposes each source as an ordinary search tool
+3. **The agent's tools**: All registered tools passed as a dictionary
+4. **Validated discovered Agents**: Registry-advertised targets, excluding this Agent and names already in the ancestor chain
+5. **An agent callback**: Enables delegation only when at least one valid target was discovered
+6. **Runtime controls**: Policy authorization, cancellation, the normalized `RunContext`, and the task-scoped budget enforcer
+7. **Optional stream observers**: Used by `handle_task_streaming()` to emit `task_llm_stream` events while the final `infer_output` part is produced
 
 ```python
 # Simplified view of what happens inside execute_task()
@@ -1119,6 +1178,24 @@ Blocking form of <code>Agent.invoke()</code>. Every argument and the returned fi
 
 </ApiReference>
 
+### SyncAgent.ask
+
+<ApiReference kind="method" path="protolink.agents.SyncAgent.ask" signature={`ask(
+    question: str,
+    *,
+    knowledge: str | list[str] | tuple[str, ...] | None = None,
+    k: int | None = None,
+    where: dict[str, Any] | None = None,
+    citations: bool = True,
+    session_id: str = "ask_session_id",
+) -> RAGAnswer`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+
+Blocking form of <code>Agent.ask()</code> with the same retrieval, filter,
+citation, and return contract. The wrapper uses <code>asyncio.run()</code> and
+must not be called from an active event loop.
+
+</ApiReference>
+
 ### SyncAgent.discover_agents
 
 <ApiReference kind="method" path="protolink.agents.SyncAgent.discover_agents" signature={`discover_agents(
@@ -1247,6 +1324,53 @@ card = AgentCard(
 # Use fixed mode to only use these skills
 agent = Agent(card, skills="fixed")
 ```
+
+## Knowledge Management
+
+Knowledge sources are specialized read-only tools. Attaching one keeps
+`agent.knowledge`, `agent.tools`, advertised skills, and Agent Card capability
+metadata synchronized. See the complete
+[Retrieval-Augmented Generation guide](rag.md) for ingestion and retrieval.
+
+### Agent.add_knowledge
+
+<ApiReference kind="method" path="protolink.agents.Agent.add_knowledge" signature={`add_knowledge(
+    knowledge: Knowledge | Retriever,
+) -> Knowledge`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Attach one knowledge source and register its generated
+<code>search_&lt;name&gt;</code> tool.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="add knowledge parameters">
+  <ApiField name="knowledge" type="Knowledge | Retriever" required>A configured facade or structural retriever. A plain retriever is wrapped with the default name <code>"knowledge"</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="add knowledge return value">
+  <ApiField name="knowledge" type="Knowledge">The normalized attached facade.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="add knowledge errors">
+  <ApiField name="ValueError">The knowledge name is already attached or its generated tool name conflicts with an existing tool.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Capability metadata">Successful attachment sets both <code>card.capabilities.rag</code> and <code>card.capabilities.tool_calling</code> to true.</ApiCallout>
+
+</ApiReference>
+
+### Agent.retriever
+
+<ApiReference kind="decorator factory" path="protolink.agents.Agent.retriever" signature={`retriever(
+    *,
+    name: str = "knowledge",
+    description: str | None = None,
+    default_k: int = 5,
+)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+
+Adapt and attach a synchronous or asynchronous application search function as
+retrieval-only knowledge. The callable receives <code>query</code> and, when
+its signature accepts them, <code>k</code> and <code>where</code>.
+
+</ApiReference>
 
 ## Tool Management
 

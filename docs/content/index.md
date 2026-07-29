@@ -41,7 +41,7 @@ ProtoLink is a lightweight Python framework for building **pluggable agents** an
 
 These Python models are ergonomic runtime forms of A2A's core primitives, not copies of the canonical wire schema. An HTTP agent opts into the versioned [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary with `Agent(..., a2a=True)`. The flag adds standard inbound routes and outbound translation without removing ProtoLink's native API. Its exact scope, pinned TCK instructions, and current verification result are documented on the [A2A compatibility page](a2a.md).
 
-The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, built-in, native, or [**MCP**](https://modelcontextprotocol.io/docs/getting-started/intro) tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
+The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, application knowledge for **RAG**, built-in, native, or [**MCP**](https://modelcontextprotocol.io/docs/getting-started/intro) tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
 ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, vLLM, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
 
@@ -103,8 +103,8 @@ ProtoLink provides a higher-level runtime that unifies client, server, transport
 - **Choose your transport**  
   Explore [Transports](transport.md) to switch between HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports with minimal code changes.
 
-- **Plug in LLMs & tools**  
-  Use [LLMs](llm.md) and [Tools](tool.md) to wire in language models and opt-in built-in, native, or MCP tools as agent modules.
+- **Plug in LLMs, knowledge, and tools**
+  Use [LLMs](llm.md), [Retrieval-Augmented Generation](rag.md), and [Tools](tool.md) to wire in language models, private knowledge, and opt-in built-in, native, or MCP tools as agent modules.
 
 
 ## Key ideas
@@ -113,7 +113,7 @@ ProtoLink provides a higher-level runtime that unifies client, server, transport
 - **Unified Agent model**: a single autonomous `AI Agent` instance handles both client and server responsibilities, incorporating LLMs and tools.
 - **Flexible transports**: HTTP, SSE JSON-RPC streaming, WebSocket, gRPC, and in-process runtime transports.
 - **LLM‑ready architecture**: first‑class integration with API, local, and server‑hosted LLMs.
-- **Tools as modules**: native Python tools and MCP tools plugged directly into agents. Import tools from thousands of existing MCP servers instantly.
+- **Knowledge and tools as modules**: managed or existing retrieval sources, native Python tools, and MCP tools plugged directly into agents.
 - **Resilience by design**: by decoupling the Brain (LLM) from the Body (Agent), you are immune to provider outages or pricing changes.
 - **State Management**: Unified persistence for conversation history, tool state, task metadata, and flow context across multiple sessions.
 - **Developer freedom**: the pluggable architecture means you own your stack. No vendor lock-in, no framework constraints, just clean, composable components.

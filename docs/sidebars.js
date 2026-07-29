@@ -25,6 +25,7 @@ const sidebars = {
         'client',
         'flows',
         'llm',
+        'rag',
         'logging',
         'models',
         'registry',

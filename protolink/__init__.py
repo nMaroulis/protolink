@@ -67,6 +67,14 @@ from protolink.llms import (
     create_llm,
 )
 from protolink.models import AgentCard, AgentInterface, AgentSkill, Artifact, Message, Part, Task, TaskState
+from protolink.rag import (
+    Citation,
+    Document,
+    Knowledge,
+    RAGAnswer,
+    SearchHit,
+    create_knowledge,
+)
 from protolink.security import TLSConfig
 from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import RunReportRecord, RunStore, SQLiteRunStore, TaskRecord
@@ -110,8 +118,10 @@ __all__ = [
     "BudgetUsage",
     "CancellationToken",
     "CapabilityPolicy",
+    "Citation",
     "ContextItem",
     "ContextManifest",
+    "Document",
     "EventSink",
     "Flow",
     "Graph",
@@ -121,6 +131,7 @@ __all__ = [
     "HistoryCompactor",
     "InMemoryEventSink",
     "InferParseError",
+    "Knowledge",
     "LLMModelProfile",
     "LocalTraceRecorder",
     "LocalTraceTelemetry",
@@ -131,6 +142,7 @@ __all__ = [
     "Policy",
     "PolicyDecision",
     "PolicyEffect",
+    "RAGAnswer",
     "RedactionPolicy",
     "RetryPolicy",
     "Router",
@@ -151,6 +163,7 @@ __all__ = [
     "RunReportTolerance",
     "RunStore",
     "SQLiteRunStore",
+    "SearchHit",
     "StateOperationRequest",
     "StateOperationResult",
     "StateStoreReport",
@@ -179,6 +192,7 @@ __all__ = [
     "assert_run_events",
     "assert_run_matches",
     "build_context_manifest",
+    "create_knowledge",
     "create_llm",
     "diff_run_reports",
     "normalize_run_report",

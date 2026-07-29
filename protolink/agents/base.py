@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from typing import Any, Literal
+from collections.abc import Sequence
+from typing import Any, Literal, cast
 
 from protolink.client import RegistryClient
 from protolink.core.cancellation import TaskExecutionRegistry
@@ -17,6 +18,7 @@ from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.logging import BaseLogger, ConsoleLogger
 from protolink.models import AgentCard
+from protolink.rag import Knowledge, RetrievalMode, Retriever
 from protolink.security.auth import Authenticator
 from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
@@ -81,6 +83,8 @@ class Agent(
         approval_handler: ApprovalHandlerLike | None = None,
         run_store: Any | None = None,
         registry_heartbeat_interval: float | None = None,
+        knowledge: Knowledge | Retriever | Sequence[Knowledge | Retriever] | None = None,
+        retrieval: RetrievalMode = "auto",
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -127,6 +131,13 @@ class Agent(
                 server, and streaming execution paths.
             registry_heartbeat_interval: Optional seconds between registry heartbeat requests after successful
                 registration. Leave ``None`` to disable automatic heartbeats.
+            knowledge: One knowledge source, retriever, or sequence of sources.
+                Each source becomes a typed ``search_<name>`` tool available to
+                the infer loop.
+            retrieval: Default retrieval behavior for infer tasks:
+                ``"auto"`` lets the model choose the knowledge tool,
+                ``"always"`` retrieves before inference, and ``"required"``
+                additionally fails when retrieval finds no passages.
         """
 
         # Field Validation is handled by the AgentCard dataclass.
@@ -144,6 +155,10 @@ class Agent(
         # Tools & skills
         self.tools: dict[str, BaseTool] = {}
         self.skills: Literal["auto", "fixed"] = skills
+        if retrieval not in {"auto", "always", "required"}:
+            raise ValueError("retrieval must be 'auto', 'always', or 'required'")
+        self.retrieval: RetrievalMode = retrieval
+        self.knowledge: dict[str, Knowledge] = {}
         # Runtime action authorization
         self.action_authorizer = ActionAuthorizer(
             policy=policy or CapabilityPolicy(),
@@ -204,6 +219,17 @@ class Agent(
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         # Resolve and add necessary skills
+        if knowledge is not None:
+            knowledge_items = cast(
+                list[Knowledge | Retriever],
+                (
+                    list(knowledge)
+                    if isinstance(knowledge, Sequence) and not isinstance(knowledge, (str, bytes))
+                    else [knowledge]
+                ),
+            )
+            for item in knowledge_items:
+                self.add_knowledge(item)
         self._resolve_skills(skills)
         # Uptime
         self.start_time: float | None = None

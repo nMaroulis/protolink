@@ -38,6 +38,26 @@ uv add --upgrade protolink
 
 ### Added
 
+- Added first-party Retrieval-Augmented Generation through the `Knowledge`
+  facade and `create_knowledge()`: dependency-free in-memory and persistent
+  SQLite indexes, automatic loading/chunking/embedding, vector, keyword, and
+  hybrid search, metadata filters, MMR, reranking, managed index lifecycle,
+  normalized hits, structured citations, and async/blocking APIs.
+- Added retrieval-only adapters for user-owned Chroma collections, Pinecone
+  indexes, Qdrant collections, arbitrary `Retriever` implementations, and sync
+  or async search functions. External clients, credentials, embedding
+  compatibility, and index ownership remain with the application.
+- Added `Agent(..., knowledge=..., retrieval="auto"|"always"|"required")`,
+  generated `search_<name>` tools, `Agent.add_knowledge()`,
+  `@agent.retriever`, and deterministic `Agent.ask()` / `agent.sync.ask()`
+  returning `RAGAnswer` text, hits, and citations. Knowledge reads participate
+  in policy, approvals, cancellation, budgets, telemetry, task metadata, and
+  the existing native/JSON-fallback inference loop. Raw knowledge passages are
+  ephemeral to the active authorized model loop and are omitted from
+  persistent conversation history, task boundaries, and telemetry.
+- Added the dependency-free `examples/rag_agent.py` and a complete RAG guide
+  covering managed indexes, existing vector databases, custom retrievers,
+  retrieval modes, citations, source lifecycle, and operational safety.
 - Added the infer-loop benchmark for correctness, reliability, timing, baseline comparisons, and CSV/JSON results.
 - Added `InferParseError` with the failed response, attempt count, parser cause, and a concise explanation.
 - Added a local dashboard Telemetry explorer for `traces.jsonl`, with CLI or browser-file loading, bounded recent-first paging, lazy trace detail, span waterfalls, grouped task records, and playable event replay.
