@@ -10,6 +10,7 @@ keywords:
 ---
 
 import ApiSurface from '@site/src/components/ApiSurface';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Infer-loop benchmark
 
@@ -205,6 +206,32 @@ RESULTS    benchmark_results/20260728-143000
 Open `report.html` inside the results directory for the same run as a visual
 dashboard. It is a single self-contained file, so it opens directly in a
 browser without a server or external assets.
+
+### Example generated report
+
+The report below is a generated snapshot from an example local run. It is
+embedded here as produced by the benchmark, rather than being maintained as
+hand-written documentation:
+
+```bash
+python -m benchmarks.infer_loop \
+  --provider ollama \
+  --model gemma4:e4b \
+  --suite core \
+  --attempts 2 \
+  --repetitions 2
+```
+
+<div className="generated-report-embed">
+  <iframe
+    src={useBaseUrl('/html/benchmark-report.html')}
+    title="Generated infer-loop benchmark report for Ollama with gemma4:e4b"
+    loading="lazy"
+    sandbox=""
+  />
+</div>
+
+<p>If the embedded report is too narrow for detailed inspection, <a href={useBaseUrl('/html/benchmark-report.html')} target="_blank" rel="noreferrer">open the generated report in a new tab</a>.</p>
 
 ### Choose a suite
 

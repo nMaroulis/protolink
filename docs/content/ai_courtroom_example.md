@@ -13,6 +13,7 @@ keywords:
 
 
 import ExampleArticle from '@site/src/components/ExampleArticle';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # AI Courtroom Experiment
 
@@ -334,15 +335,31 @@ for each condition and prints the exact path to open. No web server or frontend
 setup is required.
 
 
-<figure className="doc-media-frame">
-  <img
-    src="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*e34uCp2QFe4fsZweBJMxag.gif"
-    alt="Part of the HTML UI that is generated automatically after the simulation script (run.py) has finished."
+The embedded report below is the generated artifact from a local Mesh run using
+Ollama and `gemma4:e4b`. The replay UI and recorded A2A events are contained in
+the report itself; this is a saved example run, not a live simulation:
+
+```bash
+python examples/ai_courtroom/run.py \
+  --provider ollama \
+  --base-url "http://localhost:11434" \
+  --model gemma4:e4b \
+  --juror-provider ollama \
+  --juror-base-url "http://localhost:11434" \
+  --condition mesh \
+  --seed 7
+```
+
+<div className="generated-report-embed">
+  <iframe
+    src={useBaseUrl('/html/courtroom-mesh-report.html')}
+    title="Generated AI Courtroom Mesh replay using Ollama with gemma4:e4b"
+    loading="lazy"
+    sandbox="allow-scripts"
   />
-  <figcaption>
-      Part of the HTML UI that is generated automatically after the simulation script (run.py) has finished.
-  </figcaption>
-</figure>
+</div>
+
+<p>If the embedded replay is too narrow for detailed inspection, <a href={useBaseUrl('/html/courtroom-mesh-report.html')} target="_blank" rel="noreferrer">open the generated Mesh report in a new tab</a>.</p>
 
 
 The report lets a developer:

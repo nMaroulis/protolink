@@ -49,6 +49,22 @@ html {
   scroll-padding-top: 5rem;
 }
 
+.generated-report-embed {
+  overflow: hidden;
+  margin: 1.25rem 0 0.75rem;
+  border: 1px solid var(--protolink-border);
+  border-radius: 14px;
+  background: var(--protolink-surface-soft);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
+}
+
+.generated-report-embed iframe {
+  display: block;
+  width: 100%;
+  min-height: 900px;
+  border: 0;
+}
+
 .navbar__inner,
 .navbar__items {
   min-width: 0;

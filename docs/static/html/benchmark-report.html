@@ -93,7 +93,7 @@
     th { color:var(--muted); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
     td { overflow-wrap:anywhere; }
     code { color:inherit; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.92em; }
-    .status { display:inline-flex; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; }
+    .status { display:inline-flex; padding:4px 5px; border-radius:999px; font-size:11px; font-weight:800; }
     .status--strict { color:var(--blue); background:var(--blue-soft); }
     .status--functional { color:var(--teal); background:var(--teal-soft); }
     .status--failed { color:var(--red); background:var(--red-soft); }
@@ -150,7 +150,7 @@
               </div>
               <p>Exact result, actions, and clean protocol</p>
             </article>
-            
+
             <article class="metric metric--functional">
               <div class="metric-label">Functional</div>
               <div class="metric-value">76 / 80</div>
@@ -160,7 +160,7 @@
               </div>
               <p>Correct after possible self-correction</p>
             </article>
-            
+
             <article class="metric metric--first">
               <div class="metric-label">First try</div>
               <div class="metric-value">76 / 80</div>
@@ -170,7 +170,7 @@
               </div>
               <p>Strict on the first fresh attempt</p>
             </article>
-            
+
         <article class="metric metric--time">
           <div class="metric-label">Strict first-try latency</div>
           <div class="metric-value">13.51s</div>
@@ -184,7 +184,7 @@
     <div class="panel">
       <h2>Correctness by category</h2>
       <p class="section-intro">Functional success is shown above strict, clean success.</p>
-      
+
             <div class="chart-row">
               <div class="chart-label">
                 <strong>direct final</strong>
@@ -196,7 +196,7 @@
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-            
+
             <div class="chart-row">
               <div class="chart-label">
                 <strong>local tool</strong>
@@ -208,7 +208,7 @@
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-            
+
             <div class="chart-row">
               <div class="chart-label">
                 <strong>delegated tool</strong>
@@ -220,7 +220,7 @@
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-            
+
             <div class="chart-row">
               <div class="chart-label">
                 <strong>delegated infer</strong>
@@ -232,7 +232,7 @@
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-            
+
             <div class="chart-row">
               <div class="chart-label">
                 <strong>multi step</strong>
@@ -244,7 +244,7 @@
               </div>
               <div class="chart-value">66.7%</div>
             </div>
-            
+
             <div class="chart-row">
               <div class="chart-label">
                 <strong>grounding trap</strong>
@@ -256,13 +256,13 @@
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-            
+
       <div class="legend"><span><i class="legend-functional"></i>Functional</span><span><i></i>Strict</span></div>
     </div>
     <div class="panel">
       <h2>Attempt diagnostics</h2>
       <p class="section-intro">84 executed fresh attempts.</p>
-      
+
             <div class="diagnostic-row">
               <span>Hallucinated action</span>
               <div class="diagnostic-track" role="img"
@@ -271,7 +271,7 @@
               </div>
               <strong>8</strong>
             </div>
-            
+
             <div class="diagnostic-row">
               <span>Parse recovery</span>
               <div class="diagnostic-track" role="img"
@@ -280,7 +280,7 @@
               </div>
               <strong>0</strong>
             </div>
-            
+
             <div class="diagnostic-row">
               <span>Provider retry</span>
               <div class="diagnostic-track" role="img"
@@ -289,7 +289,7 @@
               </div>
               <strong>0</strong>
             </div>
-            
+
             <div class="diagnostic-row">
               <span>Crashed</span>
               <div class="diagnostic-track" role="img"
@@ -298,7 +298,7 @@
               </div>
               <strong>8</strong>
             </div>
-            
+
             <div class="diagnostic-row">
               <span>Timed out</span>
               <div class="diagnostic-track" role="img"
@@ -307,14 +307,14 @@
               </div>
               <strong>0</strong>
             </div>
-            
+
     </div>
   </section>
 
   <section class="panel">
     <h2>Latency distributions</h2>
     <p class="section-intro">Bars share one p95 scale; medians and tails stay separate from correctness.</p>
-    
+
             <div class="latency-row">
               <div><strong>First attempt end-to-end</strong><span>80 samples</span></div>
               <div class="latency-bars">
@@ -330,7 +330,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="latency-row">
               <div><strong>Selected attempt end-to-end</strong><span>80 samples</span></div>
               <div class="latency-bars">
@@ -346,7 +346,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="latency-row">
               <div><strong>LLM per attempt</strong><span>84 samples</span></div>
               <div class="latency-bars">
@@ -362,7 +362,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="latency-row">
               <div><strong>Non-LLM per attempt</strong><span>76 samples</span></div>
               <div class="latency-bars">
@@ -378,7 +378,7 @@
                 </div>
               </div>
             </div>
-            
+
             <div class="latency-row">
               <div><strong>Individual LLM call</strong><span>162 samples</span></div>
               <div class="latency-bars">
@@ -394,13 +394,13 @@
                 </div>
               </div>
             </div>
-            
+
   </section>
 
   <section class="panel">
     <h2>Case latency and outcome</h2>
     <p class="section-intro">Each bar is the selected attempt for one logical case repetition.</p>
-    
+
         <div class="case-chart-scale"><span>44.88s</span><span>0</span></div>
         <div class="case-chart" role="img"
              aria-label="Selected attempt latency for 80 logical case results">
@@ -411,13 +411,13 @@
           <span><i class="legend-functional"></i>Functional</span>
           <span><i class="legend-failed"></i>Failed</span>
         </div>
-        
+
   </section>
 
   <section class="two-col">
     <div class="panel">
       <h2>Repetitions</h2>
-      
+
         <div class="table-wrap">
           <table>
             <thead><tr><th>Repetition</th><th>Strict first attempts</th><th>Median E2E</th><th>Median LLM</th></tr></thead>
@@ -428,7 +428,7 @@
               <td>14.01s</td>
               <td>14.00s</td>
             </tr>
-            
+
             <tr>
               <td>2</td>
               <td>38</td>
@@ -438,7 +438,7 @@
             </tbody>
           </table>
         </div>
-        
+
     </div>
     <div class="panel">
       <h2>Cache-sensitive repeat probe</h2>
@@ -447,12 +447,12 @@
           <span>End-to-end</span>
           <strong>+3.6% faster</strong>
         </div>
-        
+
         <div class="mini-stat">
           <span>First LLM call</span>
           <strong>+3.8% faster</strong>
         </div>
-        
+
         <div class="mini-stat">
           <span>First prompt eval</span>
           <strong>+0.5% faster</strong>
@@ -470,7 +470,7 @@
   <section class="panel">
     <h2>Strict failures</h2>
     <p class="section-intro">4 logical case results need review.</p>
-    
+
         <div class="table-wrap">
           <table>
             <thead><tr><th>Logical case</th><th>Category</th><th>Result</th><th>Attempts</th><th>Latency</th><th>Diagnostics</th></tr></thead>
@@ -483,7 +483,7 @@
               <td>17.37s</td>
               <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
             </tr>
-            
+
             <tr>
               <td><code>multi-step-0003#r2</code></td>
               <td>multi step</td>
@@ -492,7 +492,7 @@
               <td>17.31s</td>
               <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
             </tr>
-            
+
             <tr>
               <td><code>multi-step-0006#r1</code></td>
               <td>multi step</td>
@@ -501,7 +501,7 @@
               <td>14.61s</td>
               <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
             </tr>
-            
+
             <tr>
               <td><code>multi-step-0006#r2</code></td>
               <td>multi step</td>
@@ -513,7 +513,7 @@
             </tbody>
           </table>
         </div>
-        
+
   </section>
 
   <section>
