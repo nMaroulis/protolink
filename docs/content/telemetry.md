@@ -127,11 +127,15 @@ result = await agent.handle_task(Task.create_tool_call(tool_name="add", args={"a
 records = telemetry.recorder.replay()
 ```
 
-Inspect the persisted file in the local dashboard:
+:::tip[View traces in Devtools]
+
+Open the persisted telemetry file as a timeline and span waterfall:
 
 ```bash
 protolink dashboard --traces traces.jsonl --open
 ```
+
+:::
 
 `--telemetry` is an alias for `--traces`, and the dashboard Telemetry view also accepts a JSONL file selected locally in the browser. It pages recent task records, rolls a bounded summary window through older history, and loads detail payloads lazily rather than reading the entire file into the initial page. See [Developer Tools](devtools.md#telemetry-jsonl) for shared `trace_id` grouping, scan and detail safeguards, partial-line handling, and local-data security guidance.
 
