@@ -230,20 +230,20 @@ protolink dashboard --store runs.db --output dashboard.html
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif" alt="Protolink Dashboard UI" />
 </figure>
 
-The dashboard is deliberately small: no build step and no frontend dependencies. It serves a local page with branded navigation, top-level runtime cards, registry agents, agent health probes, a chat panel for HTTP LLM agents, run replay, a Telemetry trace explorer, and a disabled Studio preview tab. The JSON endpoint at `/api/snapshot` uses the same collector as static rendering.
+The dashboard is deliberately small: no build step and no frontend dependencies. It serves a local page with branded navigation, top-level runtime cards, registry agents, agent health probes, a chat panel for HTTP LLM agents, run replay, a Telemetry trace explorer, and a disabled Studio preview tab. The sidebar shows the active Protolink version. The JSON endpoint at `/api/snapshot` uses the same collector as static rendering.
 
 Use the served dashboard when you want live refresh against a local registry or run store, or bounded access to the trace file supplied with `--traces`. Use `--output` when you want a portable snapshot for a demo, issue, notebook, or support handoff. The Telemetry view also has an **Open JSONL** control, so either served or static HTML can inspect a file selected in the browser without first configuring a CLI path.
 
 The distinction between served and static mode matters:
 
-- Served mode can refresh `/api/snapshot`, replay runs through `/api/runs/{run_id}`, page through the configured telemetry file, load selected trace details lazily, ping HTTP agents through `/api/agents/ping`, and proxy chat messages through `/api/agents/chat`.
+- Served mode can refresh `/api/snapshot`, connect a registry URL or existing SQLite run store for the current process, replay runs through `/api/runs/{run_id}`, page through the configured telemetry file, load selected trace details lazily, ping HTTP agents through `/api/agents/ping`, and proxy chat messages through `/api/agents/chat`.
 - Static mode embeds the current snapshot in the HTML file. It is excellent for demos and handoffs, and its browser file picker can still inspect local JSONL. Server-backed refresh, ping, chat, run replay, and CLI-configured telemetry paging need the local dashboard server.
 
 The dashboard currently focuses on:
 
 - High-level counts for agents, task snapshots, reports, loaded telemetry records, and store availability.
 - A registry-first dashboard body and second-position Registry tab, because discovery and live agent health are usually the most important development questions.
-- Task/report tables in the Runs tab, where they sit next to replay controls instead of competing with registry health.
+- A searchable Runs workspace with compact report/task cards, loaded-window metrics, correlation details, and a vertical replay timeline.
 - Registry card summaries with selected-agent details, transport badges, capability badges, schemas, and security metadata.
 - Ping controls for HTTP agents with latency/status feedback.
 - A chat panel for agents that advertise `capabilities.has_llm=true` and expose the standard `POST /chat` endpoint.
@@ -254,6 +254,12 @@ The dashboard currently focuses on:
 - A disabled Studio preview for the future topology canvas.
 
 It intentionally avoids provider-specific visualizations. Provider details belong in the structured run events and reports; the dashboard should remain generic enough for any Protolink agent system.
+
+### Connecting dashboard sources
+
+The served Registry and Runs pages include source controls when a source was not supplied on the command line, and they can also change an existing source. Without `--store`, the CLI uses an existing `./runs.db` but does not create one when it is absent. Registry input accepts an HTTP(S) base URL. Runs input accepts the path to an existing Protolink SQLite database on the dashboard machine; inspection is read-only and a typo does not create a new database. These selections live only for the dashboard process.
+
+Source-changing requests retain the dashboard's Host, same-origin JSON, and request-size checks and are additionally limited to loopback clients. A dashboard exposed with `--host 0.0.0.0` can display CLI-configured data to allowed clients, but remote clients cannot make the server connect to another registry or local file. Static HTML keeps the controls disabled because it has no local server process.
 
 ### Telemetry JSONL
 

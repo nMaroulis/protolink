@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from protolink.core.report import RunReplay
+from protolink.core.report import RunReplay, RunReport
 from protolink.core.report_diff import RunReportDiffConfig, diff_run_reports
 from protolink.devtools.models import RunDiffView, RunReplayItem, RunReplayView
 from protolink.storage import SQLiteRunStore
@@ -15,35 +15,53 @@ def list_run_store_records(
     store_path: str | Path,
     *,
     limit: int = 20,
+    read_only: bool = False,
+    compact: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
     """List recent task and run-report records from a SQLite run store."""
-    store = SQLiteRunStore(store_path)
+    store = SQLiteRunStore(store_path, read_only=read_only)
+    if compact:
+        tasks = store.list_task_record_summaries(limit=limit)
+        reports = store.list_report_record_summaries(limit=limit)
+    else:
+        tasks = [record.to_dict() for record in store.list_task_records(limit=limit)]
+        reports = [record.to_dict() for record in store.list_report_records(limit=limit)]
     return {
-        "tasks": [record.to_dict() for record in store.list_task_records(limit=limit)],
-        "reports": [record.to_dict() for record in store.list_report_records(limit=limit)],
+        "tasks": tasks,
+        "reports": reports,
     }
 
 
-def build_run_replay_view(store_path: str | Path, run_id: str) -> RunReplayView:
+def build_run_replay_view(
+    store_path: str | Path,
+    run_id: str,
+    *,
+    read_only: bool = False,
+    kind: Literal["report", "task"] | None = None,
+) -> RunReplayView:
     """Build a replay projection from a stored report or task snapshot."""
-    store = SQLiteRunStore(store_path)
-    report_record = store.get_report_record(run_id)
-    if report_record is not None:
-        report = store.get_report(run_id)
-        if report is None:
+    if kind not in {None, "report", "task"}:
+        raise ValueError("Run replay kind must be 'report' or 'task'")
+
+    store = SQLiteRunStore(store_path, read_only=read_only)
+    if kind != "task":
+        report_record = store.get_report_record(run_id)
+        if report_record is not None:
+            report = RunReport.from_dict(report_record.report)
+            replay = RunReplay(report)
+            items = tuple(_event_to_item(event.to_dict()) for event in replay.events)
+            context = report.context
+            return RunReplayView(
+                run_id=run_id,
+                session_id=context.session_id if context else report_record.session_id,
+                trace_id=context.trace_id if context else report_record.trace_id,
+                agent_name=report_record.agent_name,
+                final_task=report.final_task,
+                items=items,
+                source="report",
+            )
+        if kind == "report":
             return RunReplayView(run_id=run_id, source="missing")
-        replay = RunReplay(report)
-        items = tuple(_event_to_item(event.to_dict()) for event in replay.events)
-        context = report.context
-        return RunReplayView(
-            run_id=run_id,
-            session_id=context.session_id if context else report_record.session_id,
-            trace_id=context.trace_id if context else report_record.trace_id,
-            agent_name=report_record.agent_name,
-            final_task=report.final_task,
-            items=items,
-            source="report",
-        )
 
     task_record = store.get_task_record(run_id)
     if task_record is None:

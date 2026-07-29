@@ -7,6 +7,8 @@ from typing import Any
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+_MAX_REGISTRY_RESPONSE_BYTES = 4 * 1024 * 1024
+
 
 def fetch_registry_agents(
     registry_url: str,
@@ -35,7 +37,17 @@ def fetch_registry_agents(
     url = registry_url.rstrip("/") + "/agents/" + query
     request = Request(url, headers={"Accept": "application/json"})
     with urlopen(request, timeout=timeout) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+        declared_size = getattr(response, "headers", {}).get("Content-Length")
+        if declared_size:
+            try:
+                if int(declared_size) > _MAX_REGISTRY_RESPONSE_BYTES:
+                    raise RuntimeError("Registry response exceeds the 4 MB inspection limit")
+            except ValueError:
+                pass
+        body = response.read(_MAX_REGISTRY_RESPONSE_BYTES + 1)
+        if len(body) > _MAX_REGISTRY_RESPONSE_BYTES:
+            raise RuntimeError("Registry response exceeds the 4 MB inspection limit")
+        payload = json.loads(body.decode("utf-8"))
 
     if not isinstance(payload, list):
         raise RuntimeError(f"Registry returned {type(payload).__name__}, expected list")

@@ -1,14 +1,21 @@
 import json
+import sqlite3
 import threading
 from pathlib import Path
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
 
+from protolink import RunContext, RunReport, SQLiteRunStore, Task
 from protolink.devtools.server import (
+    _dashboard_error_message,
     _dashboard_host_allowed,
     _dashboard_origin_allowed,
+    _dashboard_source_mutation_allowed,
+    _normalize_registry_url,
+    _validate_run_store_path,
     build_dashboard_snapshot,
     serve_dashboard,
 )
@@ -322,9 +329,106 @@ def test_trace_source_and_snapshot_handle_missing_files(tmp_path: Path):
     assert build_dashboard_snapshot()["telemetry"]["configured"] is False
 
 
+def test_dashboard_source_validation_is_local_and_run_store_is_read_only(tmp_path: Path):
+    store_path = tmp_path / "runs.db"
+    SQLiteRunStore(store_path)
+    modified_at = store_path.stat().st_mtime_ns
+
+    assert _normalize_registry_url(" http://127.0.0.1:9000/ ") == "http://127.0.0.1:9000"
+    assert _validate_run_store_path(str(store_path)) == store_path.resolve()
+    assert _dashboard_source_mutation_allowed("127.0.0.1") is True
+    assert _dashboard_source_mutation_allowed("::1") is True
+    assert _dashboard_source_mutation_allowed("192.168.1.20") is False
+
+    snapshot = build_dashboard_snapshot(store_path=store_path)
+
+    assert snapshot["runs"]["configured"] is True
+    assert snapshot["runs"]["error"] is None
+    assert store_path.stat().st_mtime_ns == modified_at
+
+
+def test_dashboard_error_messages_are_bounded():
+    message = _dashboard_error_message(ValueError("x" * 2_000))
+
+    assert len(message) == 500
+    assert message.endswith("…")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ftp://127.0.0.1:9000",
+        "http://user:secret@127.0.0.1:9000",
+        "http://127.0.0.1:9000?token=secret",
+        "http://127.0.0.1:9000/#fragment",
+    ],
+)
+def test_dashboard_registry_source_rejects_unsafe_urls(url: str):
+    with pytest.raises(ValueError):
+        _normalize_registry_url(url)
+
+
+def test_dashboard_run_store_validation_rejects_missing_and_non_sqlite_files(tmp_path: Path):
+    missing = tmp_path / "missing.db"
+    plain = tmp_path / "plain.db"
+    plain.write_text("not sqlite", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not found"):
+        _validate_run_store_path(str(missing))
+    with pytest.raises(ValueError, match="not a SQLite"):
+        _validate_run_store_path(str(plain))
+    with pytest.raises(FileNotFoundError):
+        SQLiteRunStore(missing, read_only=True)
+    assert not missing.exists()
+
+
+def test_read_only_run_store_rejects_sqlite_without_protolink_tables(tmp_path: Path):
+    database = tmp_path / "other.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
+    modified_at = database.stat().st_mtime_ns
+
+    with pytest.raises(ValueError, match="expected protolink_tasks schema"):
+        _validate_run_store_path(str(database))
+    snapshot = build_dashboard_snapshot(store_path=database)
+
+    assert "no such table" in snapshot["runs"]["error"]
+    assert snapshot["runs"]["tasks"] == []
+    assert database.stat().st_mtime_ns == modified_at
+
+
 def test_dashboard_trace_endpoints_page_detail_and_disable_caching(tmp_path: Path, monkeypatch):
     trace_path = tmp_path / "traces.jsonl"
+    store_path = tmp_path / "runs.db"
     _write_records(trace_path, [_trace_record(1), _trace_record(2)])
+    store = SQLiteRunStore(store_path)
+    shared_id = "shared_run_and_task_id"
+    task = Task(id=shared_id)
+    task_context = RunContext(run_id="task_only_run")
+    task_context.attach_to_task(task)
+    task.complete("task result")
+    store.save_task(task, context=task_context, agent_name="task_agent")
+    report_task = Task.create_infer(prompt="report result")
+    report_context = RunContext(run_id=shared_id)
+    report_context.attach_to_task(report_task)
+    report_task.complete("report result")
+    store.save_report(
+        RunReport.from_events([], context=report_context, final_task=report_task.to_dict()),
+        agent_name="report_agent",
+    )
+    with sqlite3.connect(store_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO protolink_run_reports
+            (run_id, report_json, metadata_json, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            ("malformed_report", "[]", "{}", "2026-07-29T00:00:00+00:00"),
+        )
+    monkeypatch.setattr(
+        "protolink.devtools.server.fetch_registry_agents",
+        lambda url, timeout: [{"name": "connected-agent", "url": f"{url}/agent"}],
+    )
     server, thread = _start_dashboard_server(monkeypatch, trace_path)
     base_url = f"http://127.0.0.1:{server.server_port}"
 
@@ -391,9 +495,114 @@ def test_dashboard_trace_endpoints_page_detail_and_disable_caching(tmp_path: Pat
         with urlopen(invalid_utf8_post, timeout=3) as response:
             invalid_utf8_result = json.loads(response.read())
         assert invalid_utf8_result["ok"] is False
+
+        registry_connect = Request(
+            f"{base_url}/api/sources/registry",
+            data=json.dumps({"url": "http://127.0.0.1:9100"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(registry_connect, timeout=3) as response:
+            registry_source = json.loads(response.read())
+        assert registry_source["registry"]["configured"] is True
+        assert registry_source["registry"]["agents"][0]["name"] == "connected-agent"
+
+        runs_connect = Request(
+            f"{base_url}/api/sources/runs",
+            data=json.dumps({"path": str(store_path)}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(runs_connect, timeout=3) as response:
+            runs_source = json.loads(response.read())
+        assert runs_source["runs"]["configured"] is True
+        assert runs_source["runs"]["store"] == str(store_path.resolve())
+
+        with urlopen(f"{base_url}/api/runs/{shared_id}?kind=task", timeout=3) as response:
+            task_replay = json.loads(response.read())
+        assert task_replay["source"] == "task"
+        assert task_replay["agent_name"] == "task_agent"
+
+        with urlopen(f"{base_url}/api/runs/{shared_id}?kind=report", timeout=3) as response:
+            report_replay = json.loads(response.read())
+        assert report_replay["source"] == "report"
+        assert report_replay["agent_name"] == "report_agent"
+
+        with pytest.raises(HTTPError) as invalid_replay_kind:
+            urlopen(f"{base_url}/api/runs/{shared_id}?kind=unknown", timeout=3)
+        assert invalid_replay_kind.value.code == 400
+
+        with pytest.raises(HTTPError) as malformed_replay:
+            urlopen(f"{base_url}/api/runs/malformed_report?kind=report", timeout=3)
+        malformed_error = json.loads(malformed_replay.value.read())
+        assert malformed_replay.value.code == 422
+        assert "must be a JSON object" in malformed_error["error"]
+        assert len(malformed_error["error"]) <= 500
+
+        with urlopen(f"{base_url}/api/snapshot", timeout=3) as response:
+            connected_snapshot = json.loads(response.read())
+        assert connected_snapshot["registry"]["url"] == "http://127.0.0.1:9100"
+        assert connected_snapshot["runs"]["store"] == str(store_path.resolve())
+        assert connected_snapshot["source_revision"] == 2
     finally:
         server.shutdown()
         thread.join(timeout=3)
+
+
+def test_invalid_registry_request_does_not_supersede_valid_inflight_connection(tmp_path: Path, monkeypatch):
+    trace_path = tmp_path / "traces.jsonl"
+    _write_records(trace_path, [_trace_record(1)])
+    fetch_started = threading.Event()
+    release_fetch = threading.Event()
+
+    def slow_registry_fetch(url: str, timeout: float):
+        fetch_started.set()
+        assert release_fetch.wait(timeout=3)
+        return [{"name": "connected-agent", "url": f"{url}/agent"}]
+
+    monkeypatch.setattr("protolink.devtools.server.fetch_registry_agents", slow_registry_fetch)
+    server, server_thread = _start_dashboard_server(monkeypatch, trace_path)
+    base_url = f"http://127.0.0.1:{server.server_port}"
+    result: dict[str, Any] = {}
+
+    def connect_valid_registry() -> None:
+        request = Request(
+            f"{base_url}/api/sources/registry",
+            data=json.dumps({"url": "http://127.0.0.1:9100"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=5) as response:
+                result["payload"] = json.loads(response.read())
+        except Exception as exc:  # pragma: no cover - assertion reports the captured error
+            result["error"] = exc
+
+    connect_thread = threading.Thread(target=connect_valid_registry, daemon=True)
+    connect_thread.start()
+    try:
+        assert fetch_started.wait(timeout=3)
+        invalid_request = Request(
+            f"{base_url}/api/sources/registry",
+            data=json.dumps({"url": "ftp://invalid.example"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(HTTPError) as invalid_source:
+            urlopen(invalid_request, timeout=3)
+        assert invalid_source.value.code == 400
+
+        release_fetch.set()
+        connect_thread.join(timeout=3)
+        assert not connect_thread.is_alive()
+        assert "error" not in result
+        assert result["payload"]["revision"] == 1
+        assert result["payload"]["registry"]["url"] == "http://127.0.0.1:9100"
+    finally:
+        release_fetch.set()
+        connect_thread.join(timeout=3)
+        server.shutdown()
+        server_thread.join(timeout=3)
 
 
 @pytest.mark.parametrize(

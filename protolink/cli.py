@@ -13,6 +13,7 @@ import json
 import sys
 from pathlib import Path
 
+from protolink.__version__ import __version__
 from protolink.devtools import (
     build_doctor_report,
     build_run_diff_view,
@@ -37,6 +38,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="protolink",
         description="Developer utilities for Protolink projects.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -108,7 +114,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     dashboard_parser = subparsers.add_parser("dashboard", help="Open the local Protolink dashboard.")
     dashboard_parser.add_argument("--registry-url", help="Optional HTTP registry URL.")
-    dashboard_parser.add_argument("--store", default="runs.db", help="SQLite run-store path.")
+    dashboard_parser.add_argument(
+        "--store",
+        help="Optional SQLite run-store path; an existing ./runs.db is discovered automatically.",
+    )
     dashboard_parser.add_argument(
         "--traces",
         "--telemetry",
@@ -249,10 +258,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "dashboard":
         html_renderer = DevtoolsHtmlRenderer()
+        dashboard_store: str | Path | None = args.store
+        default_store = Path("runs.db")
+        if dashboard_store is None and default_store.is_file():
+            dashboard_store = default_store
         if args.output:
             snapshot = build_dashboard_snapshot(
                 registry_url=args.registry_url,
-                store_path=args.store,
+                store_path=dashboard_store,
                 trace_path=args.traces,
             )
             return _write_text(args.output, html_renderer.render_dashboard(snapshot), label="dashboard")
@@ -260,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
             host=args.host,
             port=args.port,
             registry_url=args.registry_url,
-            store_path=args.store,
+            store_path=dashboard_store,
             trace_path=args.traces,
             open_browser=args.open,
         )

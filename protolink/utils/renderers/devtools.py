@@ -218,7 +218,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .nav button:hover { background: rgba(255,255,255,.08); }
 .nav button.active { color: #fff; background: rgba(15,159,146,.26); box-shadow: inset 3px 0 0 var(--teal); }
 .soon-mini { font-size: 10px; color: #fff; background: rgba(189,125,17,.95); border-radius: 999px; padding: 2px 6px; }
-.side-foot { margin-top: auto; color: #bac5d4; font-size: 12px; line-height: 1.5; }
+.side-foot { margin-top: auto; color: #bac5d4; font-size: 12px; line-height: 1.5; display: grid; gap: 8px; }
+.side-version { color: #8795a8; font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .03em; }
 .main { padding: 24px; overflow: auto; min-width: 0; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
 .kicker { margin: 0 0 4px; color: var(--teal); font-size: 12px; font-weight: 760; text-transform: uppercase; letter-spacing: .06em; }
@@ -369,12 +370,70 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 .field { display: grid; gap: 5px; }
 .field label { color: var(--muted); font-size: 12px; }
 .field input, .field select { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: #fff; min-width: 0; }
-.replay-list { display: grid; gap: 8px; }
-.timeline-item { display: grid; grid-template-columns: 140px 1fr; gap: 10px; border-left: 3px solid var(--indigo); padding: 8px 0 8px 12px; }
-.timeline-item.error { border-left-color: var(--coral); }
-.timeline-item.warn { border-left-color: var(--amber); }
-.timeline-time { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.timeline-main { display: grid; gap: 2px; }
+.source-connect {
+  margin-bottom: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 13px 14px;
+  background: linear-gradient(110deg, rgba(255,255,255,.96), rgba(223,246,242,.58), rgba(232,235,255,.52));
+  box-shadow: var(--shadow-soft); display: grid; grid-template-columns: minmax(230px, .8fr) minmax(320px, 1.2fr); gap: 14px; align-items: center;
+}
+.source-connect-copy { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.source-connect-mark { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; flex: 0 0 auto; color: var(--teal); background: #fff; border: 1px solid rgba(15,159,146,.20); }
+.source-connect-text { display: grid; gap: 2px; min-width: 0; }
+.source-connect-text strong, .source-connect-text span { overflow-wrap: anywhere; }
+.source-connect-text span { color: var(--muted); font-size: 12px; }
+.source-connect-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.source-connect-form input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; background: rgba(255,255,255,.96); }
+.source-feedback { grid-column: 1 / -1; min-height: 15px; color: var(--muted); font-size: 11px; }
+.source-feedback.error { color: var(--coral); }
+.source-feedback.ok { color: var(--green); }
+.runs-overview { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.run-overview-card { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; padding: 12px 13px; background: rgba(255,255,255,.94); box-shadow: var(--shadow-soft); }
+.run-overview-card::after { content: ""; position: absolute; inset: auto -22px -30px auto; width: 74px; height: 74px; border-radius: 999px; background: rgba(86,101,216,.08); }
+.run-overview-card:nth-child(2)::after { background: rgba(15,159,146,.09); }
+.run-overview-card:nth-child(3)::after { background: rgba(189,125,17,.10); }
+.run-overview-card:nth-child(4)::after { background: rgba(214,91,72,.09); }
+.run-overview-card span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .045em; }
+.run-overview-card strong { display: block; margin-top: 3px; font-size: 23px; line-height: 1.1; }
+.runs-layout { display: grid; grid-template-columns: minmax(300px, 370px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.run-browser { min-height: 610px; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.run-browser-head { padding: 12px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) 105px; gap: 8px; background: linear-gradient(180deg, #fff, #f8fbfe); }
+.run-browser-head input, .run-browser-head select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px 9px; }
+.run-record-list { overflow: auto; max-height: 690px; padding: 7px; display: grid; align-content: start; gap: 6px; }
+.run-record {
+  appearance: none; width: 100%; border: 1px solid transparent; border-left: 3px solid transparent; border-radius: 8px; padding: 10px;
+  background: transparent; color: var(--ink); text-align: left; cursor: pointer; display: grid; gap: 7px; transition: background .14s ease, border-color .14s ease;
+}
+.run-record:hover { background: #f7fafc; border-color: #e4eaf2; }
+.run-record.active { background: linear-gradient(90deg, rgba(232,235,255,.68), rgba(223,246,242,.38)); border-color: rgba(86,101,216,.18); border-left-color: var(--indigo); }
+.run-record-top, .run-record-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.run-record-id { font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 720; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-record-meta { color: var(--muted); font-size: 11px; }
+.run-record-agent { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-record-agent .agent-avatar { width: 25px; height: 25px; border-radius: 7px; font-size: 9px; box-shadow: none; }
+.run-replay-shell { min-height: 610px; }
+.run-replay-empty { min-height: 430px; display: grid; place-items: center; padding: 40px 24px; text-align: center; background: radial-gradient(circle at 20% 20%, rgba(86,101,216,.08), transparent 30%), radial-gradient(circle at 85% 80%, rgba(15,159,146,.08), transparent 30%); }
+.run-replay-empty > div { max-width: 440px; }
+.run-replay-empty h3 { margin: 8px 0 5px; font-size: 20px; }
+.run-replay-empty p { margin: 0; color: var(--muted); }
+.run-replay-hero { padding: 15px 16px; border-bottom: 1px solid var(--line); background: linear-gradient(120deg, #fff, #f3f5ff 55%, #f0fbf8); display: grid; gap: 12px; }
+.run-replay-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.run-replay-title h3 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.run-replay-title p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.run-replay-facts { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 8px; }
+.run-replay-fact { border: 1px solid rgba(86,101,216,.13); border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,.78); min-width: 0; }
+.run-replay-fact strong { display: block; margin-top: 2px; overflow-wrap: anywhere; }
+.run-timeline { padding: 14px 16px 18px; display: grid; gap: 0; }
+.run-event { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding-bottom: 14px; }
+.run-event:last-child { padding-bottom: 0; }
+.run-event-rail { position: relative; display: flex; justify-content: center; }
+.run-event-rail::after { content: ""; position: absolute; top: 22px; bottom: -14px; width: 1px; background: #dbe2ec; }
+.run-event:last-child .run-event-rail::after { display: none; }
+.run-event-dot { width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; background: var(--indigo-soft); border: 1px solid rgba(86,101,216,.24); color: var(--indigo); font-size: 9px; font-weight: 800; z-index: 1; }
+.run-event.error .run-event-dot { color: var(--coral); background: var(--coral-soft); border-color: rgba(214,91,72,.24); }
+.run-event.warn .run-event-dot { color: var(--amber); background: var(--amber-soft); border-color: rgba(189,125,17,.24); }
+.run-event-card { border: 1px solid #e3e9f2; border-radius: 8px; padding: 10px 11px; background: #fff; min-width: 0; }
+.run-event-card strong { display: block; overflow-wrap: anywhere; }
+.run-event-card p { margin: 3px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.run-event-meta { margin-top: 7px; color: var(--muted); font-size: 11px; display: flex; flex-wrap: wrap; gap: 8px; }
 .telemetry-drop {
   margin-bottom: 14px; border: 1px dashed #b9c6d8; border-radius: 10px; padding: 12px 14px;
   background: linear-gradient(110deg, rgba(223,246,242,.74), rgba(232,235,255,.64), rgba(255,255,255,.92));
@@ -435,24 +494,36 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 .trace-stat { padding: 11px 13px; border-right: 1px solid #edf1f6; background: rgba(255,255,255,.82); }
 .trace-stat:last-child { border-right: 0; }
 .trace-stat strong { display: block; margin-top: 2px; font-size: 15px; overflow-wrap: anywhere; }
-.trace-waterfall { padding: 14px 16px 16px; overflow: auto; }
-.waterfall-scale { margin: 0 5px 8px 190px; display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; }
-.span-row { min-width: 650px; display: grid; grid-template-columns: 180px minmax(360px, 1fr); gap: 10px; align-items: center; padding: 5px; border-radius: 7px; }
-.span-row:hover, .span-row.active { background: #f4f8fb; }
+.trace-waterfall { padding: 12px 14px 15px; overflow-x: auto; }
+.waterfall-inner { --span-label-column: 210px; min-width: 720px; }
+.waterfall-scale, .span-row { display: grid; grid-template-columns: var(--span-label-column) minmax(460px, 1fr); gap: 12px; }
+.waterfall-scale { align-items: end; padding: 0 8px 7px; border: 1px solid transparent; color: var(--muted); font-size: 10px; }
+.waterfall-scale-ticks { grid-column: 2; display: flex; justify-content: space-between; min-width: 0; font-variant-numeric: tabular-nums; }
+.span-row {
+  appearance: none; position: relative; width: 100%; align-items: center; padding: 6px 8px; border: 1px solid transparent;
+  border-radius: 7px; background: transparent; color: inherit; text-align: left; cursor: pointer;
+  transition: background .13s ease, border-color .13s ease;
+}
+.span-row::before { content: ""; position: absolute; left: 2px; top: 7px; bottom: 7px; width: 3px; border-radius: 999px; background: var(--teal); opacity: 0; }
+.span-row:hover { background: #f6f9fc; border-color: #e6ebf2; }
+.span-row.active { background: linear-gradient(90deg, rgba(223,246,242,.72), rgba(232,235,255,.34)); border-color: rgba(15,159,146,.18); }
+.span-row.active::before { opacity: 1; }
+.span-row.active .span-name { color: #116d65; }
 .span-label { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; padding-left: calc(var(--depth, 0) * 10px); }
-.span-kind-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--teal); box-shadow: 0 0 0 3px rgba(15,159,146,.12); }
-.span-kind-dot.llm { background: var(--indigo); box-shadow: 0 0 0 3px rgba(86,101,216,.12); }
-.span-kind-dot.tool { background: var(--amber); box-shadow: 0 0 0 3px rgba(189,125,17,.13); }
-.span-kind-dot.agent-call { background: var(--coral); box-shadow: 0 0 0 3px rgba(214,91,72,.12); }
+.span-kind-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--teal); }
+.span-kind-dot.llm { background: var(--indigo); }
+.span-kind-dot.tool { background: var(--amber); }
+.span-kind-dot.agent-call { background: var(--coral); }
 .span-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 12px; }
 .span-duration { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
 .span-track { position: relative; height: 21px; border-radius: 6px; background:
   linear-gradient(90deg, rgba(215,222,234,.48) 1px, transparent 1px); background-size: 25% 100%; overflow: hidden; }
-.span-bar { position: absolute; min-width: 4px; height: 11px; top: 5px; border-radius: 999px; background: linear-gradient(90deg, var(--teal), #2cc6b9); box-shadow: 0 3px 8px rgba(15,159,146,.24); }
-.span-bar.llm { background: linear-gradient(90deg, var(--indigo), #8c96ef); box-shadow: 0 3px 8px rgba(86,101,216,.24); }
-.span-bar.tool { background: linear-gradient(90deg, var(--amber), #e9af42); box-shadow: 0 3px 8px rgba(189,125,17,.22); }
-.span-bar.agent-call { background: linear-gradient(90deg, var(--coral), #ef8e7d); box-shadow: 0 3px 8px rgba(214,91,72,.22); }
+.span-bar { position: absolute; min-width: 4px; height: 11px; top: 5px; border-radius: 999px; background: linear-gradient(90deg, var(--teal), #2cc6b9); }
+.span-bar.llm { background: linear-gradient(90deg, var(--indigo), #8c96ef); }
+.span-bar.tool { background: linear-gradient(90deg, var(--amber), #e9af42); }
+.span-bar.agent-call { background: linear-gradient(90deg, var(--coral), #ef8e7d); }
 .span-bar.error { background: repeating-linear-gradient(135deg, var(--coral), var(--coral) 5px, #f69b8d 5px, #f69b8d 9px); }
+.span-bar.open { border: 1px dashed rgba(189,125,17,.9); background: rgba(255,243,207,.92); }
 .trace-limit-note { margin-top: 9px; color: var(--muted); font-size: 11px; }
 .replay-controls { padding: 11px 13px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: auto auto auto minmax(120px, 1fr) auto auto; align-items: center; gap: 8px; background: linear-gradient(90deg, #fbfcfe, #f3faf9); }
 .replay-controls input[type="range"] { width: 100%; accent-color: var(--teal); }
@@ -501,7 +572,9 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 1180px) {
   .shell { grid-template-columns: 1fr; }
   .side { position: sticky; top: 0; z-index: 5; padding: 12px 16px; gap: 10px; box-shadow: 0 10px 28px rgba(17,24,39,.18); }
-  .side-meta, .side-foot { display: none; }
+  .side-meta, .side-foot > span:not(.side-version) { display: none; }
+  .side-foot { display: block; position: absolute; top: 18px; right: 16px; margin: 0; }
+  .side-version { color: #bac5d4; }
   .brand-card { width: auto; align-self: flex-start; }
   .brand-logo { width: 32px; height: 32px; }
   .brand-logo img { width: 28px; height: 28px; }
@@ -512,13 +585,15 @@ td { font-size: 13px; overflow-wrap: anywhere; }
   .nav::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
   .nav::-webkit-scrollbar-thumb { background: rgba(186,197,212,.42); border-radius: 999px; }
   .nav button { flex: 0 0 auto; min-height: 34px; padding: 7px 10px; white-space: nowrap; }
-  .grid, .bands, .studio-layout, .chat-layout, .telemetry-grid { grid-template-columns: 1fr; }
+  .grid, .bands, .studio-layout, .chat-layout, .telemetry-grid, .runs-layout, .source-connect { grid-template-columns: 1fr; }
   .agent-hero { grid-template-columns: 1fr; }
   .agent-hero-actions { justify-content: flex-start; }
   .agent-stat-grid, .schema-grid { grid-template-columns: 1fr; }
   .debug-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
   .trace-browser { min-height: 0; }
   .trace-list { max-height: 430px; }
+  .run-browser { min-height: 0; }
+  .run-record-list { max-height: 430px; }
   .event-stage { grid-template-columns: 1fr; }
   .event-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -528,6 +603,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
   .telemetry-drop, .trace-hero-head { grid-template-columns: 1fr; display: grid; }
   .telemetry-source-meta, .trace-hero-badges { justify-content: flex-start; }
   .trace-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .runs-overview, .run-replay-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .trace-stat { border-bottom: 1px solid #edf1f6; }
   .replay-controls { grid-template-columns: repeat(3, auto); }
   .replay-controls input[type="range"] { grid-column: 1 / -1; }
@@ -555,7 +631,10 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       <button id="nav-chat" onclick="showView('chat')"><span class="nav-label" data-icon="chat">Chat</span></button>
       <button id="nav-studio" onclick="showView('studio')"><span class="nav-label" data-icon="studio">Studio</span> <span class="soon-mini">Soon</span></button>
     </nav>
-    <div class="side-foot">Local devtools over registry cards, run reports, telemetry traces, agent status, and chat.</div>
+    <div class="side-foot">
+      <span>Local devtools over registry cards, run reports, telemetry traces, agent status, and chat.</span>
+      <span class="side-version" id="side-version">Protolink</span>
+    </div>
   </aside>
   <main class="main">
     <section id="view-dashboard" class="view">
@@ -572,9 +651,32 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       <div class="dashboard-stack"><div class="panel"><h2>Registry <span class="online-summary" id="dashboard-registry-summary"></span></h2><div class="panel-note">For full agent details, schemas, transports, and security metadata, open the Registry tab.</div><div id="health-table"></div></div></div>
     </section>
     <section id="view-runs" class="view">
-      <div class="top"><div><p class="kicker">Replay substrate</p><h1>Runs</h1><p class="lede">Task snapshots and run reports from the configured SQLite run store.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
-      <div class="panel"><h2>Run store</h2><div id="runs-table"></div></div>
-      <div class="panel"><h2>Replay</h2><div class="panel-body" id="replay-panel">Select a run or task to replay it from the live dashboard server.</div></div>
+      <div class="top"><div><p class="kicker">Execution archive</p><h1>Runs</h1><p class="lede">Search recent task snapshots and reports, then replay their event history from a read-only SQLite source.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
+      <div class="source-connect" id="runs-source-card">
+        <div class="source-connect-copy">
+          <span class="source-connect-mark" data-icon="timeline"></span>
+          <div class="source-connect-text"><strong id="runs-source-name">No run store connected</strong><span id="runs-source-detail">Connect an existing Protolink SQLite database.</span></div>
+        </div>
+        <form class="source-connect-form" onsubmit="connectRunStore(event)">
+          <input id="runs-source-input" type="text" autocomplete="off" spellcheck="false" placeholder="/path/to/runs.db" aria-label="SQLite run-store path" />
+          <button class="btn primary" id="runs-source-button" data-icon="plug" type="submit">Connect store</button>
+          <span class="source-feedback" id="runs-source-feedback" role="status" aria-live="polite"></span>
+        </form>
+      </div>
+      <div class="runs-overview" id="runs-overview"></div>
+      <div class="runs-layout">
+        <aside class="panel run-browser">
+          <div class="run-browser-head">
+            <input id="run-search" type="search" placeholder="Run, session, agent…" oninput="renderRuns()" aria-label="Filter runs" />
+            <select id="run-kind-filter" onchange="renderRuns()" aria-label="Filter run record type"><option value="">All records</option><option value="report">Reports</option><option value="task">Tasks</option></select>
+          </div>
+          <div class="run-record-list" id="runs-list"></div>
+        </aside>
+        <section class="panel run-replay-shell">
+          <h2>Replay <span class="online-summary" id="run-replay-summary" role="status" aria-live="polite">Select a record</span></h2>
+          <div id="replay-panel" class="run-replay-empty" aria-busy="false"><div><span class="trace-empty-icon" data-icon="timeline"></span><h3>Choose a run</h3><p>Select a report or task snapshot to inspect its correlation details and event timeline.</p></div></div>
+        </section>
+      </div>
     </section>
     <section id="view-telemetry" class="view">
       <div class="top">
@@ -625,6 +727,17 @@ td { font-size: 13px; overflow-wrap: anywhere; }
     </section>
     <section id="view-registry" class="view">
       <div class="top"><div><p class="kicker">Discovery</p><h1>Registry</h1><p class="lede">Agent cards currently visible to the dashboard snapshot, with status probes and chat entry points for HTTP agents.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button><button class="btn" data-icon="ping" onclick="pingAll()">Ping all</button></div></div>
+      <div class="source-connect" id="registry-source-card">
+        <div class="source-connect-copy">
+          <span class="source-connect-mark" data-icon="registry"></span>
+          <div class="source-connect-text"><strong id="registry-source-name">No registry connected</strong><span id="registry-source-detail">Connect a local HTTP registry to discover agents.</span></div>
+        </div>
+        <form class="source-connect-form" onsubmit="connectRegistry(event)">
+          <input id="registry-source-input" type="url" autocomplete="url" spellcheck="false" placeholder="http://127.0.0.1:9000" aria-label="Registry URL" />
+          <button class="btn primary" id="registry-source-button" data-icon="plug" type="submit">Connect registry</button>
+          <span class="source-feedback" id="registry-source-feedback" role="status" aria-live="polite"></span>
+        </form>
+      </div>
       <div class="panel"><h2>Agents</h2><div id="registry-table"></div></div>
       <div class="panel"><h2>Selected agent</h2><div class="panel-body" id="agent-detail"></div></div>
     </section>
@@ -633,7 +746,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       <div class="chat-layout">
         <aside class="chat-sidebar">
           <div class="field"><label>Agent</label><select id="chat-agent-select" onchange="selectChatAgent(this.value)"></select></div>
-          <div class="field"><label>Session</label><input id="chat-session" oninput="chatSessionId = this.value || chatSessionId; renderDebugPanel()" /></div>
+          <div class="field"><label>Session</label><input id="chat-session" oninput="chatRequestGeneration += 1; chatPending = false; chatSessionId = this.value || chatSessionId; renderChat()" /></div>
           <div id="chat-agent-detail"></div>
         </aside>
         <div class="chat-box">
@@ -708,6 +821,13 @@ let chatSessionId = newChatSessionId();
 let chatPending = false;
 let chatDebugOpen = false;
 let chatDebugStats = {sent: 0, latencies: [], lastLatency: null, lastError: null};
+let selectedRunKey = null;
+let runReplayGeneration = 0;
+let chatRequestGeneration = 0;
+let sourceConnectGeneration = {registry: 0, runs: 0};
+let sourceConnectionBusy = {registry: false, runs: false};
+let sourceConnectionFeedback = {registry: null, runs: null};
+let sourceInputDraft = {registry: null, runs: null};
 const TELEMETRY_PAGE_SIZE = 50;
 const TELEMETRY_SUMMARY_CAP = 500;
 const TELEMETRY_SPAN_RENDER_CAP = 240;
@@ -773,8 +893,33 @@ async function refresh() {
     try {
       const res = await fetch('/api/snapshot', {cache: 'no-store'});
       const refreshedSnapshot = res.ok ? await res.json() : null;
-      if (refreshedSnapshot && refreshGeneration === telemetryState.refreshGeneration) {
+      const refreshedRevision = Number(refreshedSnapshot?.source_revision || 0);
+      const currentRevision = Number(snapshot.source_revision || 0);
+      if (
+        refreshedSnapshot
+        && refreshGeneration === telemetryState.refreshGeneration
+        && refreshedRevision >= currentRevision
+      ) {
+        const previousRegistryUrl = snapshot.registry?.url || null;
+        const previousStore = snapshot.runs?.store || null;
+        chatRequestGeneration += 1;
+        chatPending = false;
         snapshot = refreshedSnapshot;
+        if (previousRegistryUrl !== (snapshot.registry?.url || null)) {
+          sourceInputDraft.registry = null;
+          sourceConnectionFeedback.registry = null;
+          health = {};
+          selectedAgentIndex = 0;
+          chatMessages = [];
+          chatPending = false;
+        }
+        if (previousStore !== (snapshot.runs?.store || null)) {
+          sourceInputDraft.runs = null;
+          sourceConnectionFeedback.runs = null;
+        }
+        selectedRunKey = null;
+        runReplayGeneration += 1;
+        resetRunReplayPanel();
         if (
           telemetryState.mode !== 'upload'
           && sourceGeneration === telemetryState.sourceGeneration
@@ -800,6 +945,7 @@ function render() {
   if (snapshot.runs?.error) alerts.push('Run store: ' + snapshot.runs.error);
   if (telemetryState.error) alerts.push('Telemetry: ' + telemetryState.error);
   document.getElementById('alerts').innerHTML = alerts.map(message => `<div class="alert">${esc(message)}</div>`).join('');
+  document.getElementById('side-version').textContent = 'Protolink v' + boundedDisplayText(snapshot.version, 'unknown', 48);
   document.getElementById('side-store').textContent = 'Store: ' + (snapshot.runs?.store || 'not configured');
   document.getElementById('side-traces').textContent = 'Telemetry: ' + telemetrySourceShortLabel();
   document.getElementById('metrics').innerHTML = [
@@ -812,16 +958,256 @@ function render() {
   const registrySummary = document.getElementById('dashboard-registry-summary');
   if (registrySummary) registrySummary.innerHTML = `${statusDotHtml(onlineCount ? 'online' : agents.length ? 'unknown' : 'runtime')} ${esc(agents.length ? `${agents.length} visible` : 'no agents')}`;
   document.getElementById('health-table').innerHTML = table(['Agent', 'URL', 'Health', 'Actions'], agents.slice(0, 8).map((a, index) => agentHealthRow(a, index)));
-  document.getElementById('runs-table').innerHTML = table(['Kind', 'ID', 'Session', 'Agent', 'Time'], [
-    ...reports.map(r => ['report', replayButton(r.run_id), r.session_id || '-', r.agent_name || '-', r.created_at || '-']),
-    ...tasks.map(t => ['task', replayButton(t.run_id || t.task_id), t.session_id || '-', t.agent_name || '-', t.updated_at || '-'])
-  ]);
   document.getElementById('registry-table').innerHTML = table(['Agent', 'Transport', 'URL', 'Capabilities', 'Health', 'Actions'], agents.map((a, index) => registryRow(a, index)));
+  renderSourceControls();
+  renderRuns();
   renderAgentDetail();
   renderTelemetry();
   renderChat();
   renderStudio();
   hydrateIcons();
+}
+
+function renderSourceControls() {
+  const registry = snapshot.registry || {};
+  const runs = snapshot.runs || {};
+  updateSourceControl({
+    kind: 'registry',
+    configured: registry.configured ?? Boolean(registry.url),
+    value: registry.url || '',
+    connectedName: registry.url || 'Registry connected',
+    emptyName: 'No registry connected',
+    connectedDetail: registry.error
+      ? 'Connected, but the registry is currently unavailable.'
+      : `${(registry.agents || []).length} agent card${(registry.agents || []).length === 1 ? '' : 's'} discovered`,
+    emptyDetail: 'Connect a local HTTP registry to discover agents.',
+  });
+  updateSourceControl({
+    kind: 'runs',
+    configured: runs.configured ?? Boolean(runs.store),
+    value: runs.store || '',
+    connectedName: runs.store || 'Run store connected',
+    emptyName: 'No run store connected',
+    connectedDetail: runs.error
+      ? 'The configured store could not be read.'
+      : `${(runs.reports || []).length} reports · ${(runs.tasks || []).length} task snapshots loaded`,
+    emptyDetail: 'Connect an existing Protolink SQLite database.',
+  });
+}
+
+function updateSourceControl(config) {
+  const input = document.getElementById(`${config.kind}-source-input`);
+  const button = document.getElementById(`${config.kind}-source-button`);
+  const name = document.getElementById(`${config.kind}-source-name`);
+  const detail = document.getElementById(`${config.kind}-source-detail`);
+  const feedback = document.getElementById(`${config.kind}-source-feedback`);
+  if (!input || !button || !name || !detail || !feedback) return;
+  if (document.activeElement !== input) input.value = sourceInputDraft[config.kind] ?? config.value;
+  name.textContent = config.configured ? config.connectedName : config.emptyName;
+  detail.textContent = config.configured ? config.connectedDetail : config.emptyDetail;
+  const busy = Boolean(sourceConnectionBusy[config.kind]);
+  input.disabled = !window.__PROTOLINK_LIVE__ || busy;
+  button.disabled = !window.__PROTOLINK_LIVE__ || busy;
+  const state = sourceConnectionFeedback[config.kind];
+  feedback.className = `source-feedback ${state?.kind || ''}`;
+  feedback.textContent = !window.__PROTOLINK_LIVE__
+    ? 'Serve the dashboard locally to connect or change this source.'
+    : state?.message || (config.configured ? 'Connection is session-only and resets when the dashboard stops.' : '');
+}
+
+async function connectRegistry(event) {
+  event.preventDefault();
+  const input = document.getElementById('registry-source-input');
+  sourceInputDraft.registry = input?.value || '';
+  await connectDashboardSource('registry', {url: sourceInputDraft.registry});
+}
+
+async function connectRunStore(event) {
+  event.preventDefault();
+  const input = document.getElementById('runs-source-input');
+  sourceInputDraft.runs = input?.value || '';
+  await connectDashboardSource('runs', {path: sourceInputDraft.runs});
+}
+
+async function connectDashboardSource(kind, body) {
+  if (!window.__PROTOLINK_LIVE__) {
+    sourceConnectionFeedback[kind] = {kind: 'error', message: 'Serve the dashboard locally to connect a source.'};
+    renderSourceControls();
+    return;
+  }
+  const generation = ++sourceConnectGeneration[kind];
+  sourceConnectionBusy[kind] = true;
+  sourceConnectionFeedback[kind] = {kind: '', message: kind === 'registry' ? 'Connecting registry…' : 'Opening store read-only…'};
+  renderSourceControls();
+  try {
+    const endpoint = kind === 'registry' ? '/api/sources/registry' : '/api/sources/runs';
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json();
+    if (generation !== sourceConnectGeneration[kind]) return;
+    if (!response.ok || payload.error) throw new Error(payload.error || `Source request failed (${response.status})`);
+    const revision = Number(payload.revision || 0);
+    snapshot.source_revision = Math.max(revision, Number(snapshot.source_revision || 0));
+    if (kind === 'registry') {
+      chatRequestGeneration += 1;
+      snapshot.registry = payload.registry;
+      sourceInputDraft.registry = null;
+      health = {};
+      selectedAgentIndex = 0;
+      chatMessages = [];
+      chatPending = false;
+      sourceConnectionFeedback.registry = payload.registry?.error
+        ? {kind: 'error', message: `Source saved, but connection failed: ${payload.registry.error}`}
+        : {kind: 'ok', message: payload.registry?.configured ? 'Registry connected.' : 'Registry disconnected.'};
+    } else {
+      snapshot.runs = payload.runs;
+      sourceInputDraft.runs = null;
+      selectedRunKey = null;
+      runReplayGeneration += 1;
+      resetRunReplayPanel();
+      sourceConnectionFeedback.runs = {kind: 'ok', message: payload.runs?.configured ? 'Run store connected read-only.' : 'Run store disconnected.'};
+    }
+  } catch (error) {
+    if (generation !== sourceConnectGeneration[kind]) return;
+    sourceConnectionFeedback[kind] = {kind: 'error', message: error?.message || String(error)};
+  } finally {
+    if (generation !== sourceConnectGeneration[kind]) return;
+    sourceConnectionBusy[kind] = false;
+    render();
+  }
+}
+
+function runIndexRecords() {
+  const reports = Array.isArray(snapshot.runs?.reports) ? snapshot.runs.reports : [];
+  const tasks = Array.isArray(snapshot.runs?.tasks) ? snapshot.runs.tasks : [];
+  const records = [
+    ...reports.map((record, sourceIndex) => ({
+      kind: 'report',
+      key: `report:${boundedSummaryText(record.run_id, 512)}`,
+      id: record.run_id,
+      correlationId: record.run_id,
+      sessionId: record.session_id,
+      traceId: record.trace_id,
+      agentName: record.agent_name,
+      timestamp: record.created_at,
+      state: record.state,
+      eventCount: record.event_count,
+      sourceIndex,
+    })),
+    ...tasks.map((record, sourceIndex) => ({
+      kind: 'task',
+      key: `task:${boundedSummaryText(record.task_id, 512)}`,
+      id: record.task_id,
+      correlationId: record.run_id || record.task_id,
+      sessionId: record.session_id,
+      traceId: record.trace_id,
+      agentName: record.agent_name,
+      timestamp: record.updated_at || record.created_at,
+      state: record.state,
+      eventCount: null,
+      sourceIndex,
+    })),
+  ];
+  records.sort((left, right) => {
+    const leftTime = timestampMs(left.timestamp);
+    const rightTime = timestampMs(right.timestamp);
+    if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) return rightTime - leftTime;
+    if (Number.isFinite(leftTime) !== Number.isFinite(rightTime)) return Number.isFinite(leftTime) ? -1 : 1;
+    if (left.kind !== right.kind) return left.kind === 'report' ? -1 : 1;
+    return left.sourceIndex - right.sourceIndex;
+  });
+  return records;
+}
+
+function runLifecycle(value) {
+  const state = boundedSummaryText(value || 'unknown', 64).toLowerCase();
+  if (['failed', 'error', 'rejected'].includes(state)) return {label: state, cls: 'error'};
+  if (['running', 'pending', 'submitted', 'working'].includes(state)) return {label: state, cls: 'warn'};
+  if (['completed', 'ok', 'success'].includes(state)) return {label: state, cls: 'ok'};
+  return {label: state, cls: 'idle'};
+}
+
+function renderRuns() {
+  const overview = document.getElementById('runs-overview');
+  const list = document.getElementById('runs-list');
+  if (!overview || !list) return;
+  const allRecords = runIndexRecords();
+  if (selectedRunKey && !allRecords.some(record => record.key === selectedRunKey)) {
+    selectedRunKey = null;
+    runReplayGeneration += 1;
+    resetRunReplayPanel();
+  }
+  const reportCount = allRecords.filter(record => record.kind === 'report').length;
+  const taskCount = allRecords.length - reportCount;
+  const sessions = new Set(allRecords.map(record => record.sessionId).filter(Boolean)).size;
+  const attention = allRecords.filter(record => ['error', 'warn'].includes(runLifecycle(record.state).cls)).length;
+  overview.innerHTML = [
+    runOverviewCard('Reports', reportCount, 'bounded recent index'),
+    runOverviewCard('Tasks', taskCount, 'persisted snapshots'),
+    runOverviewCard('Sessions', sessions, 'loaded correlations'),
+    runOverviewCard('Attention', attention, 'running or failed'),
+  ].join('');
+  const search = boundedSummaryText(document.getElementById('run-search')?.value || '', 256).trim().toLowerCase();
+  const kind = document.getElementById('run-kind-filter')?.value || '';
+  const records = allRecords.filter(record => {
+    if (kind && record.kind !== kind) return false;
+    if (!search) return true;
+    return [
+      record.id,
+      record.correlationId,
+      record.sessionId,
+      record.traceId,
+      record.agentName,
+      record.state,
+    ].some(value => boundedSummaryText(value, 512).toLowerCase().includes(search));
+  });
+  if (!records.length) {
+    const configured = snapshot.runs?.configured ?? Boolean(snapshot.runs?.store);
+    const message = snapshot.runs?.error
+      ? `Run store unavailable: ${snapshot.runs.error}`
+      : configured
+        ? (allRecords.length ? 'No run records match this filter.' : 'This store has no recent Protolink run records.')
+        : 'Connect a run store above to browse reports and task snapshots.';
+    list.innerHTML = `<div class="empty-muted">${esc(message)}</div>`;
+  } else {
+    list.innerHTML = records.map(renderRunRecord).join('');
+  }
+  hydrateIcons(list);
+}
+
+function runOverviewCard(label, value, hint) {
+  return `<div class="run-overview-card"><span>${esc(label)}</span><strong>${esc(formatCompactNumber(value))}</strong><div class="agent-meta">${esc(hint)}</div></div>`;
+}
+
+function renderRunRecord(record) {
+  const lifecycle = runLifecycle(record.state);
+  const active = record.key === selectedRunKey;
+  const detail = record.kind === 'report' && record.eventCount != null && Number.isFinite(Number(record.eventCount))
+    ? `${formatCompactNumber(record.eventCount)} events`
+    : `session ${shortId(record.sessionId || '-', 18)}`;
+  return `
+    <button type="button" class="run-record ${active ? 'active' : ''}" aria-pressed="${active ? 'true' : 'false'}" onclick="replayRun(${jsStringAttr(record.id)}, ${jsStringAttr(record.key)})">
+      <span class="run-record-top"><span class="pill ${record.kind === 'report' ? 'capability-badge' : 'idle'}">${esc(record.kind)}</span><span class="pill ${lifecycle.cls}">${esc(lifecycle.label)}</span></span>
+      <span class="run-record-id" title="${htmlAttr(record.id || '-')}">${esc(shortId(record.id || '-', 44))}</span>
+      <span class="run-record-meta"><span class="run-record-agent"><span class="agent-avatar">${esc(initials(record.agentName || record.kind))}</span>${esc(boundedDisplayText(record.agentName, 'unassigned', 80))}</span><span>${esc(relativeTime(record.timestamp) || detail)}</span></span>
+      <span class="run-record-meta"><span>${esc(detail)}</span><span>trace ${esc(shortId(record.traceId || '-', 14))}</span></span>
+    </button>
+  `;
+}
+
+function resetRunReplayPanel() {
+  const panel = document.getElementById('replay-panel');
+  const summary = document.getElementById('run-replay-summary');
+  if (summary) summary.textContent = 'Select a record';
+  if (panel) {
+    panel.setAttribute('aria-busy', 'false');
+    panel.className = 'run-replay-empty';
+    panel.innerHTML = '<div><span class="trace-empty-icon" data-icon="timeline"></span><h3>Choose a run</h3><p>Select a report or task snapshot to inspect its correlation details and event timeline.</p></div>';
+    hydrateIcons(panel);
+  }
 }
 
 function createTelemetryState(source) {
@@ -834,7 +1220,7 @@ function createTelemetryState(source) {
     nextCursor: meta.next_cursor ?? null,
     selectedRecordId: null,
     selectedTrace: null,
-    selectedSpanId: null,
+    selectedSpanKey: null,
     loadingDetail: false,
     loadingPage: false,
     error: meta.error || null,
@@ -866,7 +1252,7 @@ function syncTelemetryFromSnapshot(source) {
   if (!telemetryState.records.some(record => record.record_id === telemetryState.selectedRecordId)) {
     telemetryState.selectedRecordId = null;
     telemetryState.selectedTrace = null;
-    telemetryState.selectedSpanId = null;
+    telemetryState.selectedSpanKey = null;
   }
 }
 
@@ -1129,67 +1515,115 @@ function traceStat(label, value) {
   return `<div class="trace-stat"><span class="detail-label">${esc(label)}</span><strong>${esc(value)}</strong></div>`;
 }
 
+function collectRenderableSpans(trace) {
+  const rawSpans = Array.isArray(trace.spans) ? trace.spans : [];
+  const entries = [];
+  const spanScanLimit = Math.min(rawSpans.length, TELEMETRY_SPAN_RENDER_CAP * 20);
+  for (let index = 0; index < spanScanLimit && entries.length < TELEMETRY_SPAN_RENDER_CAP; index += 1) {
+    const span = rawSpans[index];
+    if (span && typeof span === 'object' && !Array.isArray(span)) {
+      entries.push({span, sourceIndex: index, key: `span:${index}`});
+    }
+  }
+  return entries;
+}
+
 function renderSpanWaterfall(trace) {
   const rawSpans = Array.isArray(trace.spans) ? trace.spans : [];
-  const sourceSpans = [];
-  const spanScanLimit = Math.min(rawSpans.length, TELEMETRY_SPAN_RENDER_CAP * 20);
-  for (let index = 0; index < spanScanLimit && sourceSpans.length < TELEMETRY_SPAN_RENDER_CAP; index += 1) {
-    const span = rawSpans[index];
-    if (span && typeof span === 'object' && !Array.isArray(span)) sourceSpans.push(span);
-  }
-  if (!sourceSpans.length) return '<div class="panel-body"><div class="empty-muted">No spans were recorded for this task.</div></div>';
-  const spans = [...sourceSpans];
-  spans.sort((a, b) => timestampMs(a.started_at) - timestampMs(b.started_at));
-  const spanStarts = spans.map(span => timestampMs(span.started_at)).filter(Number.isFinite);
-  const spanEnds = spans.map(span => timestampMs(span.ended_at || span.started_at)).filter(Number.isFinite);
+  const entries = collectRenderableSpans(trace);
+  if (!entries.length) return '<div class="panel-body"><div class="empty-muted">No spans were recorded for this task.</div></div>';
+  entries.sort((left, right) => {
+    const leftStart = timestampMs(left.span.started_at);
+    const rightStart = timestampMs(right.span.started_at);
+    if (Number.isFinite(leftStart) && Number.isFinite(rightStart) && leftStart !== rightStart) return leftStart - rightStart;
+    if (Number.isFinite(leftStart) !== Number.isFinite(rightStart)) return Number.isFinite(leftStart) ? -1 : 1;
+    return left.sourceIndex - right.sourceIndex;
+  });
+  const spanStarts = entries.map(entry => timestampMs(entry.span.started_at)).filter(Number.isFinite);
+  const spanEnds = entries.map(entry => {
+    const startedAt = timestampMs(entry.span.started_at);
+    const endedAt = timestampMs(entry.span.ended_at);
+    const duration = entry.span.duration_ms == null || entry.span.duration_ms === ''
+      ? Number.NaN
+      : Number(entry.span.duration_ms);
+    if (Number.isFinite(endedAt)) return endedAt;
+    if (Number.isFinite(startedAt) && Number.isFinite(duration) && duration >= 0) return startedAt + duration;
+    return Number.NaN;
+  }).filter(Number.isFinite);
   const recordStart = timestampMs(trace.started_at);
   const recordEnd = timestampMs(trace.ended_at);
-  const traceStart = Number.isFinite(recordStart) ? recordStart : spanStarts.length ? Math.min(...spanStarts) : 0;
-  const traceEnd = Number.isFinite(recordEnd) ? recordEnd : spanEnds.length ? Math.max(...spanEnds) : traceStart;
-  const recordDuration = Number(trace.duration_ms);
-  const total = Math.max(1, traceEnd - traceStart, Number.isFinite(recordDuration) ? recordDuration : 0);
-  const spanMap = new Map(
-    spans
-      .filter(span => span.id != null)
-      .map(span => [boundedSummaryText(span.id), span])
-  );
+  const recordDuration = trace.duration_ms == null || trace.duration_ms === '' ? Number.NaN : Number(trace.duration_ms);
+  const startCandidates = [...spanStarts];
+  if (Number.isFinite(recordStart)) startCandidates.push(recordStart);
+  const traceStart = startCandidates.length ? Math.min(...startCandidates) : 0;
+  const endCandidates = [...spanEnds, ...spanStarts];
+  if (Number.isFinite(recordEnd)) endCandidates.push(recordEnd);
+  if (Number.isFinite(recordStart) && Number.isFinite(recordDuration) && recordDuration >= 0) {
+    endCandidates.push(recordStart + recordDuration);
+  }
+  const traceEnd = Math.max(traceStart + 1, ...(endCandidates.length ? endCandidates : [traceStart + 1]));
+  const total = Math.max(1, traceEnd - traceStart);
+  const idCounts = new Map();
+  for (const entry of entries) {
+    const id = entry.span.id == null ? '' : boundedSummaryText(entry.span.id, 4096);
+    if (id) idCounts.set(id, (idCounts.get(id) || 0) + 1);
+  }
+  const spanMap = new Map();
+  for (const entry of entries) {
+    const id = entry.span.id == null ? '' : boundedSummaryText(entry.span.id, 4096);
+    if (id && idCounts.get(id) === 1) spanMap.set(id, entry);
+  }
   const depthMemo = new Map();
-  function spanDepth(span, seen = new Set()) {
-    const spanId = boundedSummaryText(span?.id);
-    const parentId = boundedSummaryText(span?.parent_id);
-    if (!parentId || !spanMap.has(parentId) || seen.has(spanId)) return 0;
-    if (depthMemo.has(spanId)) return depthMemo.get(spanId);
-    seen.add(spanId);
-    const depth = Math.min(8, 1 + spanDepth(spanMap.get(parentId), seen));
-    depthMemo.set(spanId, depth);
+  function spanDepth(entry) {
+    if (depthMemo.has(entry.key)) return depthMemo.get(entry.key);
+    const seen = new Set([entry.key]);
+    let current = entry;
+    let depth = 0;
+    while (depth < 8) {
+      const parentId = current.span.parent_id == null ? '' : boundedSummaryText(current.span.parent_id, 4096);
+      const parent = parentId ? spanMap.get(parentId) : null;
+      if (!parent || seen.has(parent.key)) break;
+      seen.add(parent.key);
+      current = parent;
+      depth += 1;
+    }
+    depthMemo.set(entry.key, depth);
     return depth;
   }
-  const rows = spans.map(span => {
-    const spanId = boundedSummaryText(span.id);
+  const hasSelection = entries.some(entry => entry.key === telemetryState.selectedSpanKey);
+  const rows = entries.map((entry, rowIndex) => {
+    const span = entry.span;
     const spanName = boundedDisplayText(span.name || span.kind, 'span', 180);
     const rawStart = timestampMs(span.started_at);
     const rawEnd = timestampMs(span.ended_at);
+    const rawDuration = span.duration_ms == null || span.duration_ms === '' ? Number.NaN : Number(span.duration_ms);
     const start = Number.isFinite(rawStart) ? rawStart : traceStart;
-    const end = Number.isFinite(rawEnd) ? rawEnd : traceEnd;
+    const durationEnd = Number.isFinite(rawDuration) && rawDuration >= 0 ? start + rawDuration : Number.NaN;
+    const resolvedEnd = Number.isFinite(rawEnd) ? rawEnd : durationEnd;
+    const end = Number.isFinite(resolvedEnd) ? resolvedEnd : traceEnd;
     const left = Math.max(0, Math.min(99, ((start - traceStart) / total) * 100));
     const width = Math.max(0.8, Math.min(100 - left, ((Math.max(end, start) - start) / total) * 100));
     const kind = traceKindClass(span.kind);
-    const incomplete = !span.ended_at;
-    const error = span.status === 'error' || Boolean(span.error) || incomplete;
+    const incomplete = !Number.isFinite(resolvedEnd);
+    const error = boundedSummaryText(span.status, 64).toLowerCase() === 'error' || Boolean(span.error);
+    const active = entry.key === telemetryState.selectedSpanKey;
+    const durationLabel = incomplete ? 'open' : formatMilliseconds(Number.isFinite(rawDuration) && rawDuration >= 0 ? rawDuration : Math.max(0, end - start));
+    const stateLabel = error ? 'error' : incomplete ? 'open' : boundedDisplayText(span.status, 'complete', 48);
+    const startOffsetLabel = formatMilliseconds(Math.max(0, start - traceStart));
     return `
-      <button type="button" class="span-row ${spanId === String(telemetryState.selectedSpanId ?? '') ? 'active' : ''}" data-span-id="${htmlAttr(spanId)}" aria-pressed="${spanId === String(telemetryState.selectedSpanId ?? '') ? 'true' : 'false'}" onclick="selectTelemetrySpan(${jsStringAttr(spanId)})" style="border:0;width:100%;text-align:left;color:inherit;">
-        <span class="span-label" style="--depth:${spanDepth(span)}">
+      <button type="button" role="option" class="span-row ${active ? 'active' : ''}" data-span-key="${htmlAttr(entry.key)}" aria-selected="${active ? 'true' : 'false'}" tabindex="${active || (!hasSelection && rowIndex === 0) ? '0' : '-1'}" aria-label="${htmlAttr(`${spanName}, ${boundedDisplayText(span.kind, 'span', 48)}, starts ${startOffsetLabel} from trace start, ${durationLabel}, ${stateLabel}`)}" onclick="selectTelemetrySpan(${jsStringAttr(entry.key)})">
+        <span class="span-label" style="--depth:${spanDepth(entry)}">
           <span class="span-kind-dot ${kind}"></span><span class="span-name" title="${htmlAttr(spanName)}">${esc(spanName)}</span>
-          <span class="span-duration">${esc(incomplete ? 'open' : formatMilliseconds(span.duration_ms ?? end - start))}</span>
+          <span class="span-duration">${esc(durationLabel)}</span>
         </span>
-        <span class="span-track"><span class="span-bar ${kind} ${error ? 'error' : ''}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></span></span>
+        <span class="span-track"><span class="span-bar ${kind} ${error ? 'error' : incomplete ? 'open' : ''}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></span></span>
       </button>
     `;
   }).join('');
-  const capNote = rawSpans.length > spans.length
-    ? `<div class="trace-limit-note">Showing ${spans.length} of ${rawSpans.length} span entries to keep rendering responsive; invalid entries are ignored.</div>`
+  const capNote = rawSpans.length > entries.length
+    ? `<div class="trace-limit-note">Showing ${entries.length} of ${rawSpans.length} span entries to keep rendering responsive; invalid entries are ignored.</div>`
     : '';
-  return `<div class="trace-waterfall"><div class="waterfall-scale"><span>0 ms</span><span>${esc(formatMilliseconds(total / 2))}</span><span>${esc(formatMilliseconds(total))}</span></div>${rows}${capNote}</div>`;
+  return `<div class="trace-waterfall"><div class="waterfall-inner" id="telemetry-span-waterfall" role="listbox" aria-label="Trace spans" onkeydown="handleTelemetrySpanKeydown(event)"><div class="waterfall-scale"><span class="waterfall-scale-ticks"><span>0 ms</span><span>${esc(formatMilliseconds(total / 2))}</span><span>${esc(formatMilliseconds(total))}</span></span></div>${rows}${capNote}</div></div>`;
 }
 
 function telemetryTimelineEvents(trace) {
@@ -1284,14 +1718,8 @@ function renderTelemetryInspector(trace, events) {
 
 function telemetryInspectorBody(trace, events) {
   const event = events[telemetryState.eventIndex]?.event || null;
-  const inspectableSpans = [];
-  const rawSpans = Array.isArray(trace.spans) ? trace.spans : [];
-  const scanLimit = Math.min(rawSpans.length, TELEMETRY_SPAN_RENDER_CAP * 20);
-  for (let index = 0; index < scanLimit && inspectableSpans.length < TELEMETRY_SPAN_RENDER_CAP; index += 1) {
-    const item = rawSpans[index];
-    if (item && typeof item === 'object' && !Array.isArray(item)) inspectableSpans.push(item);
-  }
-  const span = inspectableSpans.find(item => boundedSummaryText(item.id) === telemetryState.selectedSpanId) || inspectableSpans[0] || null;
+  const selectedSpan = collectRenderableSpans(trace).find(entry => entry.key === telemetryState.selectedSpanKey);
+  const span = selectedSpan?.span || null;
   let body = '';
   if (telemetryState.inspectorTab === 'payload') {
     body = inspectorJson(event?.payload ?? {}, 'No event payload is available.');
@@ -1459,7 +1887,7 @@ async function selectTelemetryRecord(recordId) {
   const detailGeneration = ++telemetryState.detailGeneration;
   telemetryState.selectedRecordId = recordId;
   telemetryState.selectedTrace = null;
-  telemetryState.selectedSpanId = null;
+  telemetryState.selectedSpanKey = null;
   telemetryState.error = null;
   telemetryState.eventIndex = 0;
   telemetryState.inspectorTab = 'summary';
@@ -1497,10 +1925,7 @@ async function selectTelemetryRecord(recordId) {
     ) return;
     if (!trace || typeof trace !== 'object' || Array.isArray(trace)) throw new Error('The selected JSONL record is not a trace object.');
     telemetryState.selectedTrace = trace;
-    const firstSpan = Array.isArray(trace.spans)
-      ? trace.spans.find(item => item && typeof item === 'object' && !Array.isArray(item))
-      : null;
-    telemetryState.selectedSpanId = firstSpan?.id == null ? null : boundedSummaryText(firstSpan.id);
+    telemetryState.selectedSpanKey = null;
   } catch (error) {
     if (
       sourceGeneration !== telemetryState.sourceGeneration
@@ -1517,15 +1942,33 @@ async function selectTelemetryRecord(recordId) {
   }
 }
 
-function selectTelemetrySpan(spanId) {
-  telemetryState.selectedSpanId = boundedSummaryText(spanId);
+function selectTelemetrySpan(spanKey) {
+  telemetryState.selectedSpanKey = boundedSummaryText(spanKey, 64);
   telemetryState.inspectorTab = 'span';
-  for (const button of document.querySelectorAll('.span-row[data-span-id]')) {
-    const active = button.dataset.spanId === telemetryState.selectedSpanId;
+  const waterfall = document.getElementById('telemetry-span-waterfall');
+  for (const button of waterfall?.querySelectorAll('.span-row[data-span-key]') || []) {
+    const active = button.dataset.spanKey === telemetryState.selectedSpanKey;
     button.classList.toggle('active', active);
-    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    button.tabIndex = active ? 0 : -1;
   }
   updateTelemetryInspectorDom();
+}
+
+function handleTelemetrySpanKeydown(event) {
+  if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+  const buttons = [...event.currentTarget.querySelectorAll('.span-row[data-span-key]')];
+  if (!buttons.length) return;
+  const current = Math.max(0, buttons.indexOf(document.activeElement));
+  const next = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? buttons.length - 1
+      : Math.max(0, Math.min(buttons.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)));
+  event.preventDefault();
+  const button = buttons[next];
+  selectTelemetrySpan(button.dataset.spanKey);
+  button.focus();
 }
 
 function setTelemetryInspectorTab(tab) {
@@ -1609,7 +2052,7 @@ async function reloadTelemetry() {
   telemetryState.error = null;
   telemetryState.selectedRecordId = null;
   telemetryState.selectedTrace = null;
-  telemetryState.selectedSpanId = null;
+  telemetryState.selectedSpanKey = null;
   telemetryState.loadingDetail = false;
   telemetryState.windowShifted = false;
   if (telemetryState.mode === 'upload' && telemetryState.uploadFile) {
@@ -1707,7 +2150,7 @@ function applyTelemetryPage(page, replace) {
     telemetryState.detailGeneration += 1;
     telemetryState.selectedRecordId = null;
     telemetryState.selectedTrace = null;
-    telemetryState.selectedSpanId = null;
+    telemetryState.selectedSpanKey = null;
     telemetryState.loadingDetail = false;
   }
   telemetryState.nextCursor = page.next_cursor ?? null;
@@ -1767,7 +2210,7 @@ async function handleTelemetryFile(file) {
   telemetryState.nextCursor = null;
   telemetryState.selectedRecordId = null;
   telemetryState.selectedTrace = null;
-  telemetryState.selectedSpanId = null;
+  telemetryState.selectedSpanKey = null;
   telemetryState.loadingDetail = false;
   telemetryState.error = null;
   telemetryState.loadingPage = true;
@@ -2080,7 +2523,7 @@ function traceKindClass(kind) {
 }
 
 function timestampMs(value) {
-  if (!value) return Number.NaN;
+  if (value == null || value === '') return Number.NaN;
   const text = typeof value === 'string' ? boundedSummaryText(value) : String(value);
   const numeric = Number(text);
   if (Number.isFinite(numeric) && text.trim() !== '') return numeric < 1e12 ? numeric * 1000 : numeric;
@@ -2148,7 +2591,7 @@ function storeStateHtml(isOn, error) {
   const dot = isOn && !error ? 'online' : 'offline';
   return `<span class="store-state ${state}">${statusDotHtml(dot)}${esc(state)}</span>`;
 }
-function agentKey(agent) { return agent.url || agent.name || 'agent'; }
+function agentKey(agent) { return agent?.url || agent?.name || 'agent'; }
 function isHttpAgent(agent) { return /^https?:\\/\\//.test(String(agent.url || '')); }
 function hasChat(agent) { return Boolean(agent.capabilities?.has_llm); }
 function endpoint(agent, path) { return String(agent.url || '').replace(/\\/+$/, '') + path; }
@@ -2184,10 +2627,10 @@ function formatDuration(seconds) {
   return `${secs}s`;
 }
 function timestampLabel(value) {
-  if (!value) return '-';
+  if (value == null || value === '') return '-';
   const text = typeof value === 'string' ? boundedSummaryText(value) : String(value);
-  const numeric = Number(text);
-  const date = Number.isFinite(numeric) ? new Date(numeric * 1000) : new Date(text);
+  const parsed = timestampMs(value);
+  const date = Number.isFinite(parsed) ? new Date(parsed) : new Date(text);
   if (Number.isNaN(date.getTime())) return text;
   return date.toLocaleString();
 }
@@ -2305,10 +2748,6 @@ function dashboardAgentActions(agent, index) { return agentActionButtons(agent, 
 function agentHealthRow(agent, index) { return [agentCell(agent), agent.url || '-', agentHealth(agent), dashboardAgentActions(agent, index)]; }
 function registryRow(agent, index) {
   return [agentCell(agent), transportBadge(agent.transport), agent.url || '-', capabilityBadges(agent.capabilities || {}), agentHealth(agent), agentActions(agent, index)];
-}
-function replayButton(id) {
-  if (!id) return '-';
-  return raw(`<button class="mini-btn" data-icon="play" onclick="replayRun(${jsStringAttr(id)})">${esc(id)}</button>`);
 }
 function pill(value) { const cls = value === 'completed' ? 'ok' : value === 'failed' ? 'error' : value === 'canceled' ? 'warn' : ''; return raw(`<span class="pill ${cls}">${esc(value || '-')}</span>`); }
 function table(headers, rows) {
@@ -2434,12 +2873,18 @@ function openChat(index) {
 
 function selectChatAgent(index) {
   const agents = snapshot.registry?.agents || [];
-  selectedAgentIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(agents.length - 1, 0)));
+  const nextIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(agents.length - 1, 0)));
+  if (nextIndex !== selectedAgentIndex) {
+    chatRequestGeneration += 1;
+    chatPending = false;
+  }
+  selectedAgentIndex = nextIndex;
   renderAgentDetail();
   renderChat();
 }
 
 function resetChat() {
+  chatRequestGeneration += 1;
   chatMessages = [];
   chatPending = false;
   chatDebugStats = {sent: 0, latencies: [], lastLatency: null, lastError: null};
@@ -2589,6 +3034,9 @@ async function sendChat() {
   input.value = '';
   handleChatInput();
   chatSessionId = document.getElementById('chat-session').value || chatSessionId;
+  const generation = ++chatRequestGeneration;
+  const requestedAgentKey = agentKey(agent);
+  const requestedSessionId = chatSessionId;
   chatMessages.push({role: 'user', text, time: timeLabel()});
   chatPending = true;
   renderChat();
@@ -2600,10 +3048,19 @@ async function sendChat() {
       body: JSON.stringify({url: agent.url, message: text, session_id: chatSessionId})
     });
     const data = await res.json();
+    const activeAgent = (snapshot.registry?.agents || [])[selectedAgentIndex];
+    const activeSessionId = document.getElementById('chat-session')?.value || chatSessionId;
+    if (
+      generation !== chatRequestGeneration
+      || !activeAgent
+      || agentKey(activeAgent) !== requestedAgentKey
+      || activeSessionId !== requestedSessionId
+    ) return;
     const latencyMs = Math.round(performance.now() - started);
     recordChatDebug(latencyMs, data.error || null);
     chatMessages.push({role: data.error ? 'system' : 'agent', text: data.response || data.error || 'No response', time: timeLabel(), latencyMs});
   } catch (err) {
+    if (generation !== chatRequestGeneration) return;
     const latencyMs = Math.round(performance.now() - started);
     recordChatDebug(latencyMs, 'Serve the dashboard locally to use chat actions.');
     chatMessages.push({role: 'system', text: 'Serve the dashboard locally to use chat actions.', time: timeLabel(), latencyMs});
@@ -2612,24 +3069,78 @@ async function sendChat() {
   renderChat();
 }
 
-async function replayRun(id) {
+async function replayRun(id, recordKey) {
   if (!id) return;
+  const generation = ++runReplayGeneration;
+  const activeKey = recordKey || `report:${boundedSummaryText(id, 512)}`;
+  selectedRunKey = activeKey;
+  renderRuns();
   const panel = document.getElementById('replay-panel');
-  panel.innerHTML = '<span class="pill warn">loading</span>';
+  const summary = document.getElementById('run-replay-summary');
+  if (!panel) return;
+  panel.setAttribute('aria-busy', 'true');
+  if (summary) summary.textContent = 'Loading replay…';
+  panel.className = 'run-replay-empty';
+  panel.innerHTML = '<div><span class="trace-empty-icon" data-icon="refresh"></span><h3>Loading replay</h3><p>Reading the selected record from the connected store.</p></div>';
+  hydrateIcons(panel);
+  if (!window.__PROTOLINK_LIVE__) {
+    if (summary) summary.textContent = 'Live dashboard required';
+    panel.innerHTML = '<div><span class="trace-empty-icon" data-icon="timeline"></span><h3>Replay unavailable in a static snapshot</h3><p>Serve the dashboard locally and reconnect this store to load full replay events.</p></div>';
+    panel.setAttribute('aria-busy', 'false');
+    hydrateIcons(panel);
+    return;
+  }
   try {
-    const res = await fetch('/api/runs/' + encodeURIComponent(id));
+    const recordKind = activeKey.startsWith('task:') ? 'task' : 'report';
+    const replayUrl = '/api/runs/' + encodeURIComponent(id) + '?kind=' + encodeURIComponent(recordKind);
+    const res = await fetch(replayUrl, {cache: 'no-store'});
     const view = await res.json();
+    if (generation !== runReplayGeneration || selectedRunKey !== activeKey) return;
+    if (!res.ok || view.error) throw new Error(view.error || `Replay request failed (${res.status})`);
+    if (!view || view.source === 'missing') throw new Error('Run record not found in the connected store.');
+    panel.className = '';
     panel.innerHTML = renderReplay(view);
+    panel.setAttribute('aria-busy', 'false');
+    if (summary) summary.textContent = `${(view.items || []).length} event${(view.items || []).length === 1 ? '' : 's'}`;
+    hydrateIcons(panel);
   } catch (err) {
-    panel.innerHTML = '<span class="pill error">Serve the dashboard to replay stored runs.</span>';
+    if (generation !== runReplayGeneration) return;
+    if (summary) summary.textContent = 'Replay unavailable';
+    panel.className = 'run-replay-empty';
+    panel.innerHTML = `<div><span class="trace-empty-icon" data-icon="status"></span><h3>Could not load replay</h3><p>${esc(err?.message || String(err))}</p></div>`;
+    panel.setAttribute('aria-busy', 'false');
+    hydrateIcons(panel);
   }
 }
 
 function renderReplay(view) {
-  if (!view || view.source === 'missing') return '<span class="pill error">Run not found</span>';
-  const items = view.items || [];
-  if (!items.length) return '<span class="pill idle">No replay events</span>';
-  return `<div class="replay-list">${items.map(item => `<div class="timeline-item ${esc(item.severity || '')}"><div class="timeline-time">${esc(item.timestamp || '-')}</div><div class="timeline-main"><strong>${esc(item.event_type || '-')}</strong><span>${esc(item.summary || '')}</span><span class="msg-meta">${esc(item.agent_name || view.agent_name || '-')}</span></div></div>`).join('')}</div>`;
+  const allItems = Array.isArray(view.items) ? view.items : [];
+  const items = allItems.slice(0, 500);
+  const omitted = Math.max(0, allItems.length - items.length);
+  const lifecycle = runLifecycle(view.final_task?.state || (items.some(item => item.severity === 'error') ? 'error' : 'completed'));
+  const timeline = items.length
+    ? `<div class="run-timeline">${items.map((item, index) => {
+        const severity = ['error', 'warn'].includes(item.severity) ? item.severity : '';
+        return `<div class="run-event ${severity}"><div class="run-event-rail"><span class="run-event-dot">${index + 1}</span></div><div class="run-event-card"><strong>${esc(boundedDisplayText(item.event_type, 'event', 160))}</strong><p>${esc(boundedDisplayText(item.summary, 'No summary', 1200))}</p><div class="run-event-meta"><span>${esc(timestampLabel(item.timestamp))}</span><span>${esc(boundedDisplayText(item.agent_name || view.agent_name, 'unassigned', 120))}</span>${item.task_id ? `<span>task ${esc(shortId(item.task_id, 26))}</span>` : ''}</div></div></div>`;
+      }).join('')}</div>`
+    : '<div class="panel-body"><div class="empty-muted">This record contains no replay events.</div></div>';
+  return `
+    <div class="run-replay-hero">
+      <div class="run-replay-title"><div><h3>${esc(shortId(view.run_id || '-', 72))}</h3><p>${esc(boundedDisplayText(view.source, 'run', 40))} replay from the connected read-only store</p></div><span class="pill ${lifecycle.cls}">${esc(lifecycle.label)}</span></div>
+      <div class="run-replay-facts">
+        ${runReplayFact('Agent', boundedDisplayText(view.agent_name, 'unassigned', 120))}
+        ${runReplayFact('Session', shortId(view.session_id || '-', 30))}
+        ${runReplayFact('Trace', shortId(view.trace_id || '-', 30))}
+        ${runReplayFact('Events', (view.items || []).length)}
+      </div>
+    </div>
+    ${omitted ? `<div class="trace-limit-note">Showing the first ${formatCompactNumber(items.length)} of ${formatCompactNumber(allItems.length)} replay events to keep the timeline responsive.</div>` : ''}
+    ${timeline}
+  `;
+}
+
+function runReplayFact(label, value) {
+  return `<div class="run-replay-fact"><span class="detail-label">${esc(label)}</span><strong>${esc(value)}</strong></div>`;
 }
 
 function timeLabel() { return new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); }

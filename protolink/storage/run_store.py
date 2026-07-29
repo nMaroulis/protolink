@@ -163,13 +163,21 @@ class SQLiteRunStore:
     storage, or an application database.
     """
 
-    def __init__(self, db_path: str | Path = "runs.db", *, table_prefix: str = "protolink") -> None:
+    def __init__(
+        self,
+        db_path: str | Path = "runs.db",
+        *,
+        table_prefix: str = "protolink",
+        read_only: bool = False,
+    ) -> None:
         """Initialize a SQLite run store.
 
         Args:
             db_path: SQLite database path.
             table_prefix: Prefix for task/report tables. Must be a valid
                 identifier so table names cannot inject SQL.
+            read_only: Open an existing database without creating tables or
+                permitting writes. Intended for inspection surfaces.
         """
         if not table_prefix.isidentifier():
             raise ValueError(f"Invalid table_prefix: {table_prefix!r}")
@@ -177,11 +185,22 @@ class SQLiteRunStore:
         self.table_prefix = table_prefix
         self.tasks_table = f"{table_prefix}_tasks"
         self.reports_table = f"{table_prefix}_run_reports"
-        self._init_db()
+        self.read_only = bool(read_only)
+        if self.read_only:
+            path = Path(self.db_path).expanduser()
+            if not path.is_file():
+                raise FileNotFoundError(f"Run store not found: {path}")
+            self.db_path = str(path.resolve())
+        else:
+            self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
         """Open a SQLite connection with row dictionaries enabled."""
-        conn = sqlite3.connect(self.db_path)
+        if self.read_only:
+            uri = Path(self.db_path).as_uri() + "?mode=ro"
+            conn = sqlite3.connect(uri, uri=True, timeout=2.0)
+        else:
+            conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -320,6 +339,20 @@ class SQLiteRunStore:
             ).fetchall()
         return [_task_record_from_row(row) for row in rows]
 
+    def list_task_record_summaries(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        """List task index columns without loading task or metadata JSON."""
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                f"""
+                SELECT task_id, state, run_id, session_id, trace_id, agent_name, created_at, updated_at
+                FROM {self.tasks_table}
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def save_report(
         self,
         report: RunReport,
@@ -400,6 +433,20 @@ class SQLiteRunStore:
             ).fetchall()
         return [_report_record_from_row(row) for row in rows]
 
+    def list_report_record_summaries(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        """List compact report metadata without materializing report JSON."""
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                f"""
+                SELECT run_id, session_id, trace_id, agent_name, created_at
+                FROM {self.reports_table}
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [{**dict(row), "state": None, "event_count": None} for row in rows]
+
     def delete_task(self, task_id: str) -> None:
         """Delete one task snapshot by task ID."""
         with closing(self._connect()) as conn:
@@ -422,8 +469,8 @@ def _task_record_from_row(row: sqlite3.Row) -> TaskRecord:
         session_id=row["session_id"],
         trace_id=row["trace_id"],
         agent_name=row["agent_name"],
-        task=json.loads(row["task_json"]),
-        metadata=json.loads(row["metadata_json"]),
+        task=_load_json_object(row["task_json"], label="task payload"),
+        metadata=_load_json_object(row["metadata_json"], label="task metadata"),
         created_at=row["created_at"],
         updated_at=str(row["updated_at"]),
     )
@@ -436,7 +483,18 @@ def _report_record_from_row(row: sqlite3.Row) -> RunReportRecord:
         session_id=row["session_id"],
         trace_id=row["trace_id"],
         agent_name=row["agent_name"],
-        report=json.loads(row["report_json"]),
-        metadata=json.loads(row["metadata_json"]),
+        report=_load_json_object(row["report_json"], label="run-report payload"),
+        metadata=_load_json_object(row["metadata_json"], label="run-report metadata"),
         created_at=str(row["created_at"]),
     )
+
+
+def _load_json_object(value: str | bytes | bytearray, *, label: str) -> dict[str, Any]:
+    """Decode one stored JSON object with a stable, payload-free error."""
+    try:
+        payload = json.loads(value)
+    except (ValueError, UnicodeDecodeError, RecursionError, TypeError) as exc:
+        raise ValueError(f"Stored {label} is not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"Stored {label} must be a JSON object")
+    return payload

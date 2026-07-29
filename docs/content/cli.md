@@ -221,6 +221,8 @@ protolink dashboard \
 
 The dashboard is a local, dependency-free HTML surface over the same collectors used by the CLI. It is useful when a run has enough events that a table is easier to scan than terminal output, or when you want to show registered agents, health probes, agent chat, stored run reports, and local telemetry side by side.
 
+`--store` is optional for the dashboard. When it is omitted, an existing `./runs.db` is discovered automatically; no database is created when that file is absent. In a served dashboard, the Registry and Runs pages can connect or change their sources for the lifetime of that dashboard process. Registry URLs are fetched by the local dashboard server; run stores must already exist and are opened read-only. Source changes are accepted only from a loopback client and are not written to project configuration. Static snapshots show the source controls but cannot connect server-side sources.
+
 Write a static dashboard snapshot:
 
 ```bash
@@ -232,6 +234,8 @@ Static output is useful for demos, bug reports, and notebooks because the genera
 When the dashboard is served, it can call the local JSON endpoints behind the page:
 
 - `/api/snapshot` refreshes registry and run-store data.
+- `/api/sources/registry` connects or changes the session-only registry URL.
+- `/api/sources/runs` connects or changes an existing SQLite run store in read-only mode.
 - `/api/runs/{run_id}` loads the same replay projection used by `protolink run replay`.
 - `/api/traces?limit=...&cursor=...` returns a bounded recent-first page of telemetry summaries.
 - `/api/traces/{record_id}` lazily loads one selected telemetry record.
@@ -246,7 +250,7 @@ Each JSONL line is a completed task record. Related or delegated tasks can share
 
 Trace payloads remain local, but local does not automatically mean non-sensitive. The browser file picker reads the selected file in the page rather than uploading it to a hosted service. The dashboard server binds to `127.0.0.1` by default, rejects unexpected HTTP `Host` names, and accepts action POSTs only as same-origin JSON requests. If you set `--host` to `0.0.0.0` or another non-loopback address, other network clients may be able to reach trace details, registry data, agent probes, and the chat proxy; use an IP address with wildcard binds, and only broaden the binding on a trusted network with appropriate access controls.
 
-The dashboard landing view puts five cards at the top: Agents, Tasks, Reports, Telemetry, and Store. Agents opens the registry view; Telemetry opens the bounded trace explorer; and Tasks, Reports, and Store route to Runs, where persisted task snapshots and run reports can be inspected and replayed. Under the cards, the dashboard keeps Registry as the primary table so agent discovery and health stay immediately visible. The sidebar places Registry directly after Dashboard, and the dashboard overview intentionally keeps only quick actions there; use the Registry tab for the full agent card, schemas, transport badge, capability badges, and security metadata.
+The dashboard landing view puts five cards at the top: Agents, Tasks, Reports, Telemetry, and Store. Agents opens the registry view; Telemetry opens the bounded trace explorer; and Tasks, Reports, and Store route to Runs. Runs uses a compact, searchable recent-record browser beside a detailed correlation hero and event timeline. Only compact task/report indexes are embedded in the snapshot; full replay data is loaded after selection. Under the cards, the dashboard keeps Registry as the primary table so agent discovery and health stay immediately visible. The sidebar places Registry directly after Dashboard and shows the running Protolink version at the bottom.
 
 The dashboard chat view also includes a Debug toggle for local agent probing. It tracks the last chat latency, average latency for the current dashboard session, sent-message count, current session ID, and the last proxy or agent error. This mirrors the standalone chat renderer's debugging affordance while keeping the dashboard centered on registry-driven agent discovery. Enter sends the active chat prompt; Shift+Enter preserves a newline. Use Reset when you want to clear the current local conversation and start a fresh dashboard session.
 
@@ -259,6 +263,7 @@ See [Developer Tools](devtools.md) for the architecture, renderer APIs, and prov
 ## Command Reference
 
 ```bash
+protolink --version
 protolink init agent [path] [--template basic|tool] [--force]
 protolink doctor [--agent-url URL] [--registry-url URL] [--store PATH] [--json]
 protolink registry list --url URL [--name NAME] [--role ROLE] [--tag TAG] [--json]
@@ -275,4 +280,5 @@ protolink dashboard [--store PATH] [--traces PATH] [--registry-url URL] [--host 
 | `--template` | Starter template to use. Defaults to `basic`. |
 | `--force` | Overwrite the output file if it already exists. |
 | `--traces PATH`, `--telemetry PATH` | Local telemetry JSONL source for the dashboard. The two option names are aliases. |
+| `--store PATH` | Optional SQLite source for the dashboard. When omitted, an existing `./runs.db` is used or a store can be connected from the served Runs page. |
 | `--host` | Dashboard bind host. Defaults to loopback (`127.0.0.1`); a non-loopback value can expose local debug data to the network. |
