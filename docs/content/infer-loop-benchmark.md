@@ -5,6 +5,8 @@ description: Measure whether a ProtoLink prompt or infer-loop change improves co
 keywords:
   - infer loop
   - benchmark
+  - agent routing
+  - delegation
   - Ollama
   - prompt regression
 ---
@@ -20,8 +22,10 @@ complete more tasks correctly—and whether they do it faster.
 
 The infer loop turns each model response into one validated next action: **finish
 with an answer**, **call a local tool**, or **delegate work to another Agent**.
-This repository benchmark lets you change that loop or its prompts and answer a
-practical question with comparable evidence:
+It must also decide which of those action modes fits the request, which
+capability to use, and—when delegation is appropriate—which discovered Agent
+should receive the work. This repository benchmark lets you change that loop or
+its prompts and answer a practical question with comparable evidence:
 
 > Did the model complete more tasks correctly, recover less often, and finish
 > faster than it did before?
@@ -36,6 +40,7 @@ practical question with comparable evidence:
     "12-case smoke",
     "40-case core",
     "200-case full",
+    "semantic routing",
     "Ollama-first",
     "JSON + CSV evidence",
   ]}
@@ -75,7 +80,10 @@ practical question with comparable evidence:
 Use `smoke` while editing, `core` for routine before/after comparisons, and
 `full` for a fixed 200-case baseline. Treat `STRICT` as the headline
 correctness score and compare timing only between controlled runs on the same
-machine.
+machine. Use the `routing_choice` category when you specifically want to test
+whether the model can choose between a direct answer, a local tool, delegated
+tool execution, and delegated inference without being told implementation
+names.
 
 :::
 
@@ -93,9 +101,12 @@ flowchart LR
     C --> D{"LLM proposes<br/>a typed action"}
     D -->|"final"| E["Task result"]
     D -->|"local tool"| F["Deterministic<br/>local tool"]
-    D -->|"delegate"| G["Synthetic<br/>specialist Agent"]
+    D -->|"delegate"| G{"Choose a discovered<br/>specialist Agent"}
+    G --> H1["Authoritative<br/>specialist"]
+    G --> H2["Plausible<br/>decoy specialist"]
     F --> H["Observation<br/>+ opaque receipt"]
-    G --> H
+    H1 --> H
+    H2 --> H
     H --> C
     C -. "action evidence" .-> I["Independent ledger<br/>+ local trace"]
     E --> J["Validator"]
@@ -110,6 +121,7 @@ jobs:
 | --- | --- |
 | **Real runtime path** | `AgentClient`, `Task`, coordinator `Agent`, provider adapter, LLM infer loop, tool registry, delegation, runtime events, and telemetry execute normally. |
 | **Controlled specialists** | `workspace_agent`, `travel_agent`, and `oracle_agent` return deterministic closed-world values. |
+| **Overlapping decoys** | `workspace_archive_agent` and `travel_planning_agent` advertise overlapping tool names and schemas. They make the model identify the authoritative target instead of relying on unique-tool inference. |
 | **Controlled tools** | Coordinator and specialist tools do no external work; they return repeatable results and opaque `BENCH-...` receipts. |
 | **In-process transport** | `RuntimeTransport` exercises task serialization, registry discovery, Agents, and tools without adding network variability. |
 | **Independent judge** | A hidden oracle knows the exact final text and expected action sequence. The execution ledger and local trace prove what actually ran. |
@@ -139,6 +151,65 @@ the receipt that the specialist will generate.
 
 Inventing a plausible answer, fabricating a receipt, or merely claiming that an
 Agent was called cannot pass these checks.
+
+### A routing-choice case proves the decision itself
+
+Directed delegation cases deliberately tell the coordinator which Agent and
+tool to call. They isolate action formatting, typed arguments, dispatch, result
+handling, and exact final output. Routing-choice cases ask a harder and
+different question: can the model infer the correct route from the task and
+the discovered capability descriptions?
+
+For example, a routing-choice request has this shape:
+
+<div className="doc-quote-card">
+  <div className="quote-mark">?</div>
+  <div className="quote-body">
+    For <code>REQ-...</code>, obtain the authoritative current source digest
+    for <code>router.py</code> using the available specialists. An archived
+    snapshot is not acceptable. Return exactly
+    <code>digest=&lt;reported digest&gt;;receipt=&lt;reported receipt&gt;</code>.
+  </div>
+  <div className="quote-source">Representative semantic-routing instruction</div>
+</div>
+
+The request does not contain `workspace_agent` or `read_file`. The coordinator
+must derive both from the runtime affordances. It also sees
+`workspace_archive_agent`, which advertises the same tool name and compatible
+arguments but describes archived, non-authoritative data.
+
+The decoy is intentionally stronger than a tool that simply throws an error.
+For the controlled benchmark inputs it can return the same deterministic value
+and receipt as the authoritative specialist. Consequently, checking only the
+final answer would incorrectly award a pass to the wrong route. ProtoLink's
+independent ledger and trace still record the selected Agent name, so the
+attempt fails the routing proof even when its final text is indistinguishable
+from the oracle:
+
+```text
+Expected target: workspace_agent
+Observed target: workspace_archive_agent
+Final text:      exactly correct
+Outcome:         failed — execution ledger and trace do not match
+```
+
+This design separates **answer correctness** from **decision correctness**. A
+routing-choice pass demonstrates all of the following:
+
+1. The model chose the appropriate action mode: `final`, local `tool_call`, or
+   delegated `agent_call`.
+2. For delegated work, it selected the authoritative specialist rather than a
+   plausible overlapping decoy.
+3. It selected the correct tool or inference action and supplied the required
+   typed arguments or evidence fields.
+4. It used the returned observation to produce the exact requested final text.
+5. The ledger and trace independently confirmed the same route and execution.
+
+The routing catalog includes direct completion, both coordinator-owned tools,
+authoritative workspace and travel tools, and inference delegation to the
+deterministic reference analyst. The routine `core` suite includes at least one
+routing case for every action mode; the `full` suite exercises all routing
+variants with different deterministic inputs.
 
 ## Quick start
 
@@ -207,6 +278,27 @@ Open `report.html` inside the results directory for the same run as a visual
 dashboard. It is a single self-contained file, so it opens directly in a
 browser without a server or external assets.
 
+The report is designed for both overview and diagnosis:
+
+- **Correctness by category** separates routing decisions from directed local,
+  delegated, multi-step, and grounding work.
+- **Case latency and outcome** shows one selected-attempt bar per logical case
+  repetition. When a run has hundreds or thousands of entries, the chart
+  scrolls inside its own panel instead of widening the entire page.
+- **Attempt review** includes every logical case that had a non-strict fresh
+  attempt—not only cases that ultimately failed. A case that passes on a later
+  fresh attempt is marked `Rescued`, while a case with no strict attempt remains
+  unresolved.
+- Each review card shows the original request, the expected final output and
+  actions, the actual final output, normalized model decisions, successful
+  ledger actions, diagnostics, and the runtime error for every fresh attempt.
+
+This distinction is useful when the visible answer is not the real failure.
+For example, a decoy specialist can return the same value as the authoritative
+Agent. The review card then shows a correct-looking `Actual final output`
+alongside a `Model decisions` entry naming the wrong Agent and an
+`execution_ledger_mismatch` or `trace_action_mismatch` diagnostic.
+
 ### Example generated report
 
 The report below is a generated snapshot from an example local run. It is
@@ -235,15 +327,18 @@ python -m benchmarks.infer_loop \
 
 ### Choose a suite
 
-| Suite | Default cases | Best use |
-| --- | ---: | --- |
-| `smoke` | 12 | Fast feedback while editing a prompt or the infer loop |
-| `core` | 40 | Routine before/after development comparison |
-| `full` | 200 | Slower release check or long-lived regression baseline |
+| Suite | Default cases | Routing-choice cases | Best use |
+| --- | ---: | ---: | --- |
+| `smoke` | 12 | 2 | Fast feedback while editing a prompt or the infer loop |
+| `core` | 40 | 4 | Routine comparison, including direct/local/tool-delegation/inference routing modes |
+| `full` | 200 | 20 | Slower release check covering every routing variant and the broadest deterministic input set |
 
 `full` produces a denominator of 200 only with one repetition and without
 filters, `--limit`, or a `--count` override. The catalog and order are generated
-deterministically from `--seed`.
+deterministically from `--seed`. In the default full catalog, each of the six
+directed categories contributes 30 cases and `routing_choice` contributes 20.
+This keeps the total fixed at 200 while avoiding unnecessary repetition in the
+explicitly directed categories.
 
 ## What the catalog tests
 
@@ -253,15 +348,18 @@ Each case asks the coordinator to demonstrate one or more infer-loop skills.
 | --- | --- | --- |
 | `direct_final` | Finish without unnecessary actions and match exact output | The model called a tool, delegated, or changed the requested answer |
 | `local_tool` | Select a coordinator-owned tool and provide typed arguments | Wrong tool, invalid arguments, or invented output |
-| `delegated_tool` | Select the correct Agent, remote tool, and arguments | Hallucinated Agent/tool, bad routing, or mismatched arguments |
-| `delegated_infer` | Delegate inference with all required prompt evidence | Missing evidence, wrong specialist, or fabricated result |
+| `delegated_tool` | Execute an explicitly requested Agent tool with exact typed arguments | Wrong target/tool, malformed arguments, or invented output |
+| `delegated_infer` | Execute explicitly requested inference delegation with all required prompt evidence | Missing evidence, wrong specialist, or fabricated result |
 | `multi_step` | Use one action's receipt in a later dependent action | Wrong order or failure to carry authoritative evidence forward |
 | `grounding_trap` | Reject stale/untrusted prompt values in favor of an observation | The model repeated the trap instead of using the tool or Agent result |
+| `routing_choice` | Infer the action mode, capability, and authoritative Agent without implementation names | Unnecessary action, wrong local/remote mode, decoy selection, or otherwise incorrect semantic routing |
 
 Here, a **hallucinated action** has a narrow, testable meaning: an invalid or
 unexpected tool/Agent attempt, an action absent from the expected ledger, a
 fabricated receipt, or a grounding-trap mismatch. The benchmark does not judge
-the truth or writing quality of arbitrary open-domain prose.
+the truth or writing quality of arbitrary open-domain prose. In particular, a
+decoy call counts as an unexpected action even when it returns the same value
+as the expected specialist: the tested mistake is the route, not the data.
 
 ## Read the score correctly
 
@@ -307,6 +405,23 @@ A strict pass requires all four gates:
 | **Runtime trace** | The local trace independently contains the same successful actions and targets. |
 | **Clean protocol** | There was no parse recovery, duplicate action, invalid tool, or invalid Agent attempt. |
 
+:::info[Why exact output alone is insufficient]
+
+Suppose a routing-choice case asks for authoritative workspace data. The model
+calls `workspace_archive_agent.read_file`, and that decoy happens to return the
+same digest and receipt as `workspace_agent.read_file`.
+
+- **Task result gate:** passes, because the final text matches.
+- **Execution ledger gate:** fails, because the observed Agent is the decoy.
+- **Runtime trace gate:** fails for the same target mismatch.
+- **Functional and strict result:** both fail, because all proof gates are
+  required.
+
+This is what makes `routing_choice` a routing benchmark rather than an
+answer-only benchmark.
+
+:::
+
 :::info[Worked recovery example]
 
 Suppose the model first delegates to an Agent that does not exist. The infer
@@ -343,6 +458,11 @@ attempts and provider calls can be higher.
 Use one attempt when measuring pure pass-at-one reliability. Use multiple
 attempts when you also want to know whether failures are recoverable. Use at
 least two repetitions for the repeat/cache probe.
+
+When multiple fresh attempts are enabled, the HTML attempt-review section keeps
+the failed attempts visible even if a later attempt passes. This prevents an
+eventual strict result from hiding the exact request, output, or action that
+failed first.
 
 ## Timing and prompt-cache signals
 
@@ -481,15 +601,44 @@ benchmark_results/<run-name>/
 
 | Open this file when you want to… | File |
 | --- | --- |
-| View headline strict/functional/first-try scores, category bars, reliability and timing charts, repetition/cache-sensitive metrics, optional baseline comparison, strict failures, and run configuration | `report.html` |
-| Read the headline, configuration, hashes, score distributions, repeat signal, or baseline comparison | `summary.json` |
+| View headline strict/functional/first-try scores, category bars, contained latency charts, repetition/cache-sensitive metrics, optional baseline comparison, unresolved and rescued attempt diagnostics, and run configuration | `report.html` |
+| Read the configuration, generated case definitions, hashes, score distributions, model decisions, repeat signal, or baseline comparison | `summary.json` |
 | Triage cases that never achieved a strict pass | `failures.csv` |
-| Analyze every executed fresh attempt, including later rescue attempts | `results.csv` |
+| Analyze every executed fresh attempt, including later rescue attempts and normalized model-action decisions | `results.csv` |
 | Inspect per-call latency, physical attempts, tokens, and provider timing/cache fields | `llm_calls.csv` |
 | Audit the redacted runtime evidence used for validation | `traces.jsonl` |
 
 The default `benchmark_results/` directory is ignored by Git so local model
 runs do not pollute commits.
+
+### How diagnostic data is organized
+
+`summary.json` keeps case definitions separate from attempt outcomes:
+
+- `case_definitions` records each selected case once, including its prompt,
+  expected final output, expected action sequence, forbidden values, and action
+  ordering rule.
+- `case_results` records every logical case repetition and all fresh attempts.
+- Each attempt includes `final_output`, `expected_actions`,
+  `observed_actions`, `trace_actions`, and `model_actions`.
+
+These fields answer different questions:
+
+| Field | Question it answers |
+| --- | --- |
+| `final_output` | What final text did the task actually produce? |
+| `expected_actions` | Which exact successful route and operations did the oracle require? |
+| `observed_actions` | Which operations actually reached the independent benchmark ledger successfully? |
+| `trace_actions` | Which successful operations did runtime telemetry independently observe? |
+| `model_actions` | Which normalized actions did the model propose, including an action that was parsed successfully but failed during dispatch? |
+
+`model_actions` is especially important for crashes before final output. A
+failed delegated call may never appear in `observed_actions`, because that list
+contains successful benchmark operations. The model-decision record still
+shows the target, action type, tool, arguments, or inference prompt that caused
+the failure. Parse-recovery entries record the parse error and whether it was
+recoverable; they do not claim that malformed provider text was a successfully
+parsed action.
 
 ## Filtering and CI
 
@@ -506,10 +655,18 @@ Select categories or case-ID patterns with repeatable flags:
 ```bash
 python -m benchmarks.infer_loop \
   --suite full \
-  --category delegated_tool \
-  --category multi_step \
-  --case 'multi-step-*' \
+  --category routing_choice \
+  --case 'routing-choice-*' \
   --limit 20
+```
+
+The default full suite contains 20 routing-choice cases, so the following runs
+that complete category without contacting the other templates:
+
+```bash
+python -m benchmarks.infer_loop \
+  --suite full \
+  --category routing_choice
 ```
 
 `--shuffle` changes the selected order deterministically with `--seed`. Record
@@ -528,6 +685,15 @@ see the repository's
 
 - The benchmark validates closed-world action correctness, not open-domain
   factuality or prose quality.
+- Routing-choice prompts are synthetic and intentionally unambiguous. They test
+  action-mode selection and routing among a small, controlled set of
+  specialists with plausible overlapping decoys. They do not measure
+  open-ended organizational planning, negotiation among Agents, or discovery
+  in a large and continuously changing marketplace.
+- Decoy specialists can deliberately return the same controlled result as the
+  authoritative specialist. This makes target selection independently
+  measurable, but it should not be interpreted as a realism claim about stale
+  archives or generic planning systems.
 - Runtime `output_schema` metadata is carried through the task but is not
   currently enforced by the infer loop; the benchmark therefore uses its own
   exact deterministic oracle.
