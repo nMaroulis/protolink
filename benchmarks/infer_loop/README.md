@@ -94,6 +94,16 @@ categories:
 - `multi_step`: consume one receipt in a later dependent action.
 - `grounding_trap`: ignore untrusted or stale values and use the authoritative
   observation.
+- `routing_choice`: decide whether to finish directly, use a local capability,
+  delegate a tool, or delegate inference without being given implementation
+  names. Tool-routing cases include specialists with overlapping schemas and
+  identical outputs, so only the correct target passes the ledger and trace
+  checks.
+
+The 40- and 200-case suites keep their existing total sizes. The generated
+schedule replaces a small number of repetitive directed cases with routing
+choices: 4 in `core` and 20 in `full`. The 12-case smoke suite includes two
+routing choices.
 
 `--count` overrides a suite's generated size. Changing the seed, count, or
 selected cases changes the suite hash and therefore creates a different
@@ -203,12 +213,16 @@ benchmark_results/<run-name>/
 
 - `report.html` is a self-contained visual report with headline scores,
   per-category correctness, reliability diagnostics, latency charts,
-  repetition/cache-sensitive metrics, optional baseline comparison, strict
-  failure details, and run configuration. Open it directly in a browser; it
-  needs no server or external assets.
+  repetition/cache-sensitive metrics, optional baseline comparison,
+  attempt-review details, and run configuration. Review cards include both
+  unresolved cases and first attempts rescued by a later fresh attempt. They
+  show the original request, expected output/actions, every parsed model
+  decision, successful actions, actual final output, and runtime error for each
+  attempt. Open it directly in a browser; it needs no server or external
+  assets.
 - `summary.json` contains provider settings, suite identity and hash, prompt
-  hashes, git metadata, aggregate and per-category scores, and every logical
-  case result.
+  hashes, git metadata, generated case definitions, aggregate and per-category
+  scores, and every logical case result.
 - `results.csv` contains one row per executed fresh attempt.
 - `failures.csv` contains attempts belonging to logical cases that never
   achieved a strict pass.
@@ -338,6 +352,10 @@ that scores transfer between machines or model builds.
   unexpected actions, incorrect routing, fabricated receipts, and failures to
   use authoritative synthetic observations. It does not judge the truth or
   quality of arbitrary open-domain prose.
+- Routing choices are synthetic and deliberately unambiguous. They verify
+  modality and specialist selection against plausible overlapping decoys, but
+  they do not represent open-ended organizational planning or a large,
+  continuously changing agent marketplace.
 - Infer-part `output_schema` metadata is currently carried through the task but
   is not enforced by the infer loop. The benchmark therefore validates every
   final answer with its own deterministic oracle.

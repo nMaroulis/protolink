@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 
 import pytest
 
@@ -74,6 +75,42 @@ def test_generated_suites_are_stable_unique_and_closed_world():
     receipt = local_case.expected_final.rsplit("=", 1)[-1]
     assert receipt.startswith("BENCH-")
     assert receipt not in local_case.prompt
+
+    assert Counter(case.category for case in smoke)["routing_choice"] == 2
+    assert Counter(case.category for case in full) == {
+        "direct_final": 30,
+        "local_tool": 30,
+        "delegated_tool": 30,
+        "delegated_infer": 30,
+        "multi_step": 30,
+        "grounding_trap": 30,
+        "routing_choice": 20,
+    }
+
+
+def test_routing_choice_variants_omit_target_identifiers_and_cover_every_action_mode():
+    routing_cases = [case for case in generate_cases(200, seed=1337) if case.category == "routing_choice"][:8]
+
+    assert len(routing_cases) == 8
+    modes = set()
+    for case in routing_cases:
+        if not case.expected_actions:
+            modes.add("direct")
+            continue
+        action = case.expected_actions[0]
+        modes.add(action.kind)
+        assert action.agent not in case.prompt
+        if action.tool:
+            assert action.tool not in case.prompt
+
+    assert modes == {"direct", "local_tool", "agent_tool", "agent_infer"}
+
+    core_routing = [case for case in generate_cases(40, seed=1337) if case.category == "routing_choice"]
+    core_modes = {
+        case.expected_actions[0].kind if case.expected_actions else "direct"
+        for case in core_routing
+    }
+    assert core_modes == {"direct", "local_tool", "agent_tool", "agent_infer"}
 
 
 def test_repository_local_runner_hashes_package_prompt_sources():
@@ -207,6 +244,70 @@ async def test_all_generated_action_variants_pass_with_a_perfect_script():
 
 
 @pytest.mark.asyncio
+async def test_all_routing_choice_variants_pass_with_a_perfect_script():
+    cases = [case for case in generate_cases(200, seed=2026) if case.category == "routing_choice"][:8]
+    llm = MockLLM(sequential_responses=_scripted_responses(cases))
+    recorder = LocalTraceRecorder()
+    mesh = BenchmarkMesh(llm=llm, recorder=recorder, namespace="test-routing-choice-variants")
+    await mesh.start()
+    try:
+        results = [
+            await run_attempt(
+                mesh=mesh,
+                recorder=recorder,
+                case=case,
+                repetition=1,
+                attempt=1,
+                timeout=5,
+            )
+            for case in cases
+        ]
+    finally:
+        mesh.stop()
+
+    assert [(result.case_id, result.failure_codes) for result in results if not result.strict_pass] == []
+
+
+@pytest.mark.asyncio
+async def test_routing_choice_scores_the_selected_agent_even_when_decoy_output_matches():
+    case = next(case for case in generate_cases(12, seed=1337) if case.category == "routing_choice")
+    expected = case.expected_actions[0]
+    llm = MockLLM(
+        sequential_responses=[
+            {
+                "type": "agent_call",
+                "agent": "workspace_archive_agent",
+                "action": "tool_call",
+                "tool": expected.tool,
+                "args": expected.args,
+            },
+            {"type": "final", "content": case.expected_final},
+        ]
+    )
+    recorder = LocalTraceRecorder()
+    mesh = BenchmarkMesh(llm=llm, recorder=recorder, namespace="test-routing-choice-decoy")
+    await mesh.start()
+    try:
+        result = await run_attempt(
+            mesh=mesh,
+            recorder=recorder,
+            case=case,
+            repetition=1,
+            attempt=1,
+            timeout=5,
+        )
+    finally:
+        mesh.stop()
+
+    assert result.output_match is True
+    assert result.ledger_match is False
+    assert result.trace_match is False
+    assert result.functional_pass is False
+    assert result.observed_actions[0]["agent"] == "workspace_archive_agent"
+    assert result.model_actions[0]["payload"]["agent"] == "workspace_archive_agent"
+
+
+@pytest.mark.asyncio
 async def test_run_writes_csv_summary_and_supports_baseline(tmp_path):
     case = generate_cases(1, seed=44)[0]
     config = BenchmarkConfig(
@@ -230,7 +331,8 @@ async def test_run_writes_csv_summary_and_supports_baseline(tmp_path):
     )
 
     assert run.summary["scores"]["strict"] == 1
-    assert run.summary["schema_version"] == 2
+    assert run.summary["schema_version"] == 3
+    assert run.summary["case_definitions"][0]["prompt"] == case.prompt
     assert run.summary["timing"]["warmup"]["completed"] == 1
     assert run.summary["performance_fingerprint"]["warmup_completed"] == 1
     assert run.summary["performance_fingerprint"]["warmup_failed"] == 0
@@ -504,10 +606,53 @@ def test_html_report_escapes_dynamic_content_and_has_no_external_dependencies(tm
                         {
                             "attempt": 1,
                             "latency_ms": 5,
+                            "final_output": "<wrong final>",
+                            "model_actions": [{"payload": {"prompt": "<wrong action>"}}],
                             "failure_codes": ["<b>bad</b>"],
                         }
                     ],
-                }
+                },
+                {
+                    "key": "rescued#r1",
+                    "case_id": "rescued",
+                    "category": "routing_choice",
+                    "strict_pass": True,
+                    "functional_pass": True,
+                    "attempts_used": 2,
+                    "selected_attempt": 2,
+                    "attempts": [
+                        {
+                            "attempt": 1,
+                            "strict_pass": False,
+                            "latency_ms": 6,
+                            "final_output": "<rescued wrong>",
+                            "model_actions": [{"payload": {"agent": "wrong-agent"}}],
+                            "failure_codes": ["final_output_mismatch"],
+                        },
+                        {
+                            "attempt": 2,
+                            "strict_pass": True,
+                            "latency_ms": 4,
+                            "final_output": "expected",
+                            "model_actions": [{"payload": {"content": "expected"}}],
+                            "failure_codes": [],
+                        },
+                    ],
+                },
+            ],
+            "case_definitions": [
+                {
+                    "id": "case",
+                    "prompt": "<hostile request>",
+                    "expected_final": "<expected answer>",
+                    "expected_actions": [],
+                },
+                {
+                    "id": "rescued",
+                    "prompt": "rescue this",
+                    "expected_final": "expected",
+                    "expected_actions": [],
+                },
             ],
         },
     )
@@ -519,6 +664,15 @@ def test_html_report_escapes_dynamic_content_and_has_no_external_dependencies(tm
     assert "&lt;script&gt;" in report
     assert "&lt;img src=x onerror=alert(1)&gt;" in report
     assert "&lt;b&gt;settings differ&lt;/b&gt;" in report
+    assert "&lt;hostile request&gt;" in report
+    assert "&lt;wrong final&gt;" in report
+    assert "&lt;wrong action&gt;" in report
+    assert "&lt;rescued wrong&gt;" in report
+    assert "Rescued" in report
+    assert "Attempt review" in report
+    assert "Expected final output" in report
+    assert "Model decisions" in report
+    assert "case-chart-scroll" in report
     assert "Regressed" in report
     assert "https://" not in report
     assert "http://" not in report

@@ -6,9 +6,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-SUITE_VERSION = "infer-loop-v1"
+SUITE_VERSION = "infer-loop-v2"
 SUITE_SIZES = {"smoke": 12, "core": 40, "full": 200}
-CATEGORIES = (
+CORE_CATEGORIES = (
     "direct_final",
     "local_tool",
     "delegated_tool",
@@ -16,6 +16,7 @@ CATEGORIES = (
     "multi_step",
     "grounding_trap",
 )
+CATEGORIES = (*CORE_CATEGORIES, "routing_choice")
 DEFAULT_SYSTEM_PROMPT = """You are ProtoLink's infer-loop benchmark coordinator.
 
 Follow each request literally. Execute every requested tool or agent action exactly once and in the stated order.
@@ -171,6 +172,7 @@ class AttemptResult:
     expected_actions: list[dict[str, Any]] = field(default_factory=list)
     observed_actions: list[dict[str, Any]] = field(default_factory=list)
     trace_actions: list[dict[str, Any]] = field(default_factory=list)
+    model_actions: list[dict[str, Any]] = field(default_factory=list)
     llm_call_timings: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

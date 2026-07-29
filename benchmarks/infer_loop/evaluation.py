@@ -267,6 +267,34 @@ def _successful_trace_actions(trace: TraceRecord | None) -> list[dict[str, Any]]
     return successful
 
 
+def _model_actions(trace: TraceRecord | None) -> list[dict[str, Any]]:
+    """Return every normalized model decision, including actions that later failed."""
+    if trace is None:
+        return []
+    decisions: list[dict[str, Any]] = []
+    for event in trace.events:
+        payload = _event_payload(event)
+        if event.type == "llm_action":
+            decisions.append(
+                {
+                    "step": _integer(payload.get("step")),
+                    "type": "action",
+                    "action": payload.get("action"),
+                    "payload": payload.get("payload"),
+                }
+            )
+        elif event.type == "llm_parse_error":
+            decisions.append(
+                {
+                    "step": _integer(payload.get("step")),
+                    "type": "parse_error",
+                    "message": payload.get("message"),
+                    "recoverable": bool(payload.get("recoverable")),
+                }
+            )
+    return decisions
+
+
 def _action_matches(expected: ExpectedAction, observed: dict[str, Any]) -> bool:
     if expected.kind != observed.get("kind") or expected.agent != observed.get("agent"):
         return False
@@ -350,6 +378,7 @@ def _validate_attempt(
     )
     observed_actions = [entry.action_dict() for entry in ledger_entries]
     trace_actions = _successful_trace_actions(trace)
+    model_actions = _model_actions(trace)
     ledger_match = _action_list_matches(case.expected_actions, observed_actions, ordered=case.ordered_actions)
     trace_match = _action_list_matches(case.expected_actions, trace_actions, ordered=case.ordered_actions)
     metrics, call_timings = _trace_metrics(trace)
@@ -443,6 +472,7 @@ def _validate_attempt(
         expected_actions=[action.to_dict() for action in case.expected_actions],
         observed_actions=observed_actions,
         trace_actions=trace_actions,
+        model_actions=model_actions,
         llm_call_timings=[call.to_dict() for call in call_timings],
         **metrics,
     )

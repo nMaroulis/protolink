@@ -217,7 +217,7 @@ def _delegated_tool_case(index: int, ordinal: int, seed: int, rng: random.Random
         output = _search_symbol_result(**args)
         expected = f"matches={len(output['matches'])};receipt={output['receipt']}"
         prompt = (
-            f"For {request_id}, use the source-code specialist to call search_symbol exactly once with query={query}, "
+            f"For {request_id}, delegate workspace_agent.search_symbol exactly once with query={query}, "
             f"request_id={request_id}, source_receipt=NONE. Then return exactly "
             "matches=<number of reported matches>;receipt=<reported receipt>."
         )
@@ -229,7 +229,7 @@ def _delegated_tool_case(index: int, ordinal: int, seed: int, rng: random.Random
         output = _weather_result(**args)
         expected = f"temperature_c={output['temperature_c']};receipt={output['receipt']}"
         prompt = (
-            f"For {request_id}, delegate to the travel data agent and call get_weather exactly once with "
+            f"For {request_id}, delegate travel_agent.get_weather exactly once with "
             f"location={location}, travel_date={travel_date}, request_id={request_id}. Then return exactly "
             "temperature_c=<reported temperature_c>;receipt=<reported receipt>."
         )
@@ -433,6 +433,149 @@ def _grounding_case(index: int, ordinal: int, seed: int, rng: random.Random) -> 
     )
 
 
+def _routing_choice_case(index: int, ordinal: int, seed: int, rng: random.Random) -> BenchmarkCase:
+    """Exercise action and target selection without naming the implementation."""
+    request_id = _request_id(seed, index)
+    variant = ordinal % 8
+    if variant == 0:
+        path = rng.choice(sorted(_SOURCE_FILES))
+        args = {"path": path, "request_id": request_id}
+        output = _read_file_result(**args)
+        return BenchmarkCase(
+            id=f"routing-choice-{ordinal + 1:04d}",
+            category="routing_choice",
+            prompt=(
+                f"For {request_id}, obtain the authoritative current source digest for {path} using the available "
+                "specialists. An archived snapshot is not acceptable. Return exactly "
+                "digest=<reported digest>;receipt=<reported receipt>."
+            ),
+            expected_final=f"digest={output['digest']};receipt={output['receipt']}",
+            expected_actions=(ExpectedAction("agent_tool", "workspace_agent", "read_file", args),),
+        )
+    if variant == 1:
+        a = rng.randint(11, 70)
+        b = rng.randint(3, 29)
+        args = {"a": a, "b": b, "request_id": request_id}
+        output = _multiply_result(**args)
+        return BenchmarkCase(
+            id=f"routing-choice-{ordinal + 1:04d}",
+            category="routing_choice",
+            prompt=(
+                f"For {request_id}, use an available coordinator-owned capability to calculate {a} multiplied by "
+                f"{b} and obtain its opaque execution receipt. Return exactly "
+                "product=<reported product>;receipt=<reported receipt>."
+            ),
+            expected_final=f"product={output['product']};receipt={output['receipt']}",
+            expected_actions=(
+                ExpectedAction("local_tool", "benchmark_coordinator", "multiply_numbers", args),
+            ),
+        )
+    if variant == 2:
+        token = _stable_receipt("ROUTE-FINAL", {"request_id": request_id})
+        return BenchmarkCase(
+            id=f"routing-choice-{ordinal + 1:04d}",
+            category="routing_choice",
+            prompt=(
+                f"The complete answer for {request_id} is the token {token}. "
+                "Respond with that exact token and nothing else."
+            ),
+            expected_final=token,
+        )
+    if variant == 3:
+        reference = rng.choice(sorted(_ORACLE_VERDICTS))
+        output = _oracle_result(reference=reference, request_id=request_id, evidence_receipt="NONE")
+        return BenchmarkCase(
+            id=f"routing-choice-{ordinal + 1:04d}",
+            category="routing_choice",
+            prompt=(
+                f"For {request_id}, ask the available deterministic reference analyst to resolve this assessment. "
+                f"The request must contain REFERENCE={reference}, REQUEST_ID={request_id}, and EVIDENCE=NONE. "
+                "Return exactly verdict=<reported verdict>;receipt=<reported receipt>."
+            ),
+            expected_final=f"verdict={output['verdict']};receipt={output['receipt']}",
+            expected_actions=(
+                ExpectedAction(
+                    "agent_infer",
+                    "oracle_agent",
+                    prompt_contains=(f"REFERENCE={reference}", f"REQUEST_ID={request_id}", "EVIDENCE=NONE"),
+                ),
+            ),
+        )
+    if variant == 4:
+        location = rng.choice(sorted(_WEATHER))
+        travel_date = f"2029-{rng.randint(1, 12):02d}-{rng.randint(1, 28):02d}"
+        args = {"location": location, "travel_date": travel_date, "request_id": request_id}
+        output = _weather_result(**args)
+        return BenchmarkCase(
+            id=f"routing-choice-{ordinal + 1:04d}",
+            category="routing_choice",
+            prompt=(
+                f"For {request_id}, obtain the authoritative benchmark weather for {location} on {travel_date} "
+                "using the available specialists. Do not use archived weather. Return exactly "
+                "temperature_c=<reported temperature_c>;receipt=<reported receipt>."
+            ),
+            expected_final=f"temperature_c={output['temperature_c']};receipt={output['receipt']}",
+            expected_actions=(ExpectedAction("agent_tool", "travel_agent", "get_weather", args),),
+        )
+    if variant == 5:
+        query = rng.choice(sorted(_SEARCH_INDEX))
+        args = {"query": query, "request_id": request_id, "source_receipt": "NONE"}
+        output = _search_symbol_result(**args)
+        return BenchmarkCase(
+            id=f"routing-choice-{ordinal + 1:04d}",
+            category="routing_choice",
+            prompt=(
+                f"For {request_id}, use the authoritative current source index to find {query}; no archived index "
+                f"is acceptable. Supply request_id={request_id} and source_receipt=NONE. Return exactly "
+                "matches=<number of reported matches>;receipt=<reported receipt>."
+            ),
+            expected_final=f"matches={len(output['matches'])};receipt={output['receipt']}",
+            expected_actions=(ExpectedAction("agent_tool", "workspace_agent", "search_symbol", args),),
+        )
+    if variant == 6:
+        location = rng.choice(sorted(_WEATHER))
+        nights = rng.randint(2, 8)
+        guests = rng.randint(1, 4)
+        tier = rng.choice(sorted(_HOTEL_BASE_PRICE))
+        args = {
+            "location": location,
+            "nights": nights,
+            "guests": guests,
+            "tier": tier,
+            "request_id": request_id,
+            "weather_receipt": "NONE",
+        }
+        output = _hotel_result(**args)
+        return BenchmarkCase(
+            id=f"routing-choice-{ordinal + 1:04d}",
+            category="routing_choice",
+            prompt=(
+                f"For {request_id}, obtain the authoritative benchmark hotel quote for {location}, {nights} nights, "
+                f"{guests} guests, tier={tier}, with weather_receipt=NONE. Generic planning estimates are not "
+                "acceptable. Return exactly total_eur=<reported total_eur>;receipt=<reported receipt>."
+            ),
+            expected_final=f"total_eur={output['total_eur']};receipt={output['receipt']}",
+            expected_actions=(ExpectedAction("agent_tool", "travel_agent", "quote_hotel", args),),
+        )
+
+    left = rng.choice(["AURORA", "CEDAR", "MICA", "POLARIS"])
+    right = rng.choice(["DELTA", "HARBOR", "ONYX", "VECTOR"])
+    separator = rng.choice(["::", "/", "_"])
+    args = {"left": left, "right": right, "separator": separator, "request_id": request_id}
+    output = _join_result(**args)
+    return BenchmarkCase(
+        id=f"routing-choice-{ordinal + 1:04d}",
+        category="routing_choice",
+        prompt=(
+            f"For {request_id}, use the appropriate coordinator-owned capability to combine {left} and {right} "
+            f"with {separator} between them and obtain its opaque execution receipt. Return exactly "
+            "joined=<reported joined>;receipt=<reported receipt>."
+        ),
+        expected_final=f"joined={output['joined']};receipt={output['receipt']}",
+        expected_actions=(ExpectedAction("local_tool", "benchmark_coordinator", "join_tokens", args),),
+    )
+
+
 _CASE_FACTORIES = {
     "direct_final": _direct_case,
     "local_tool": _local_tool_case,
@@ -440,7 +583,32 @@ _CASE_FACTORIES = {
     "delegated_infer": _delegated_infer_case,
     "multi_step": _multi_step_case,
     "grounding_trap": _grounding_case,
+    "routing_choice": _routing_choice_case,
 }
+
+
+_CATEGORY_SCHEDULE = (
+    "direct_final",
+    "local_tool",
+    "delegated_tool",
+    "routing_choice",
+    "delegated_infer",
+    "multi_step",
+    "grounding_trap",
+    "direct_final",
+    "local_tool",
+    "delegated_tool",
+    "routing_choice",
+    "delegated_infer",
+    "multi_step",
+    "grounding_trap",
+    "direct_final",
+    "local_tool",
+    "delegated_tool",
+    "delegated_infer",
+    "multi_step",
+    "grounding_trap",
+)
 
 
 def generate_cases(count: int, *, seed: int = 1337) -> list[BenchmarkCase]:
@@ -451,7 +619,7 @@ def generate_cases(count: int, *, seed: int = 1337) -> list[BenchmarkCase]:
     ordinals = dict.fromkeys(CATEGORIES, 0)
     cases: list[BenchmarkCase] = []
     for index in range(count):
-        category = CATEGORIES[index % len(CATEGORIES)]
+        category = _CATEGORY_SCHEDULE[index % len(_CATEGORY_SCHEDULE)]
         ordinal = ordinals[category]
         ordinals[category] += 1
         cases.append(_CASE_FACTORIES[category](index, ordinal, seed, rng))

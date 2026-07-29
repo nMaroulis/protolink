@@ -492,6 +492,11 @@ def _attempt_row(
                 ensure_ascii=False,
                 sort_keys=True,
             ),
+            "model_actions": json.dumps(
+                result.model_actions,
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
             "llm_call_timings": json.dumps(
                 result.llm_call_timings,
                 ensure_ascii=False,
@@ -757,6 +762,13 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
             return f"{number / 1000:.2f}s"
         return f"{number:.1f}ms"
 
+    def pretty(value: Any, *, fallback: str = "—") -> str:
+        if value is None or value == "" or value == []:
+            return fallback
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+
     def selected_attempt(case: dict[str, Any]) -> dict[str, Any]:
         attempts = items(case.get("attempts"))
         selected_number = _integer(case.get("selected_attempt"))
@@ -779,6 +791,11 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
     suite = mapping(summary.get("suite"))
     git = mapping(summary.get("git"))
     case_results = items(summary.get("case_results"))
+    case_definitions = {
+        str(definition.get("id")): definition
+        for definition in items(summary.get("case_definitions"))
+        if definition.get("id")
+    }
     total = _integer(scores.get("total")) or 0
 
     score_specs = (
@@ -956,12 +973,18 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
             f'<span class="case-bar case-bar--{css_class}" style="height:{bar_height:.3f}%" '
             f'aria-label="{escape(aria)}"></span>'
         )
+    chart_min_width = len(case_results) + 16
     case_chart = (
         f"""
-        <div class="case-chart-scale"><span>{escape(duration(case_ceiling))}</span><span>0</span></div>
-        <div class="case-chart" role="img"
-             aria-label="Selected attempt latency for {len(case_results)} logical case results">
-          {"".join(case_bars)}
+        <div class="case-chart-scroll" role="region" tabindex="0"
+             aria-label="Scrollable selected-attempt latency chart">
+          <div class="case-chart-canvas" style="min-width:max(100%,{chart_min_width}px)">
+            <div class="case-chart-scale"><span>{escape(duration(case_ceiling))}</span><span>0</span></div>
+            <div class="case-chart" role="img"
+                 aria-label="Selected attempt latency for {len(case_results)} logical case results">
+              {"".join(case_bars)}
+            </div>
+          </div>
         </div>
         <div class="legend">
           <span><i class="legend-strict"></i>Strict</span>
@@ -1076,36 +1099,110 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
             "Use <code>--baseline &lt;previous-summary.json&gt;</code> to add a before/after comparison.</p>"
         )
 
-    failures = [case for case in case_results if not bool(case.get("strict_pass"))]
-    failure_rows = []
-    for case in failures:
-        attempt = selected_attempt(case)
-        label, css_class = status_for(case)
-        codes = attempt.get("failure_codes")
+    review_cases = [
+        case
+        for case in case_results
+        if any(not bool(attempt.get("strict_pass")) for attempt in items(case.get("attempts")))
+    ]
+    unresolved_count = sum(not bool(case.get("strict_pass")) for case in review_cases)
+    rescued_count = len(review_cases) - unresolved_count
+    review_cards = []
+    for case in review_cases:
+        selected = selected_attempt(case)
+        non_strict_attempts = [
+            attempt for attempt in items(case.get("attempts")) if not bool(attempt.get("strict_pass"))
+        ]
+        headline_attempt = non_strict_attempts[-1] if non_strict_attempts else selected
+        if bool(case.get("strict_pass")):
+            label, css_class = "Rescued", "functional"
+        else:
+            label, css_class = status_for(case)
+        codes = headline_attempt.get("failure_codes")
         code_text = ", ".join(str(code) for code in codes) if isinstance(codes, list) and codes else "No code"
-        failure_rows.append(
+        definition = case_definitions.get(str(case.get("case_id")), {})
+        expected_actions = definition.get("expected_actions") or selected.get("expected_actions")
+        attempt_blocks = []
+        selected_number = _integer(case.get("selected_attempt"))
+        for attempt in items(case.get("attempts")):
+            attempt_number = _integer(attempt.get("attempt"))
+            attempt_codes = attempt.get("failure_codes")
+            attempt_code_text = (
+                ", ".join(str(code) for code in attempt_codes)
+                if isinstance(attempt_codes, list) and attempt_codes
+                else "No diagnostics"
+            )
+            error_type = attempt.get("error_type")
+            error_message = attempt.get("error_message")
+            error_text = (
+                f"{error_type}: {error_message}"
+                if error_type and error_message
+                else str(error_message or error_type or "No runtime error")
+            )
+            attempt_blocks.append(
+                f"""
+                <article class="failure-attempt">
+                  <h3>Attempt {escape(attempt_number, fallback="?")}
+                    {"<span>selected</span>" if attempt_number == selected_number else ""}
+                  </h3>
+                  <p class="failure-diagnostics">{escape(attempt_code_text)}</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>{escape(pretty(attempt.get("final_output"), fallback="(no final output)"))}</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>{escape(pretty(attempt.get("model_actions"), fallback="(no parsed model action recorded)"))}</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>{escape(pretty(attempt.get("observed_actions"), fallback="(no successful action recorded)"))}</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>{escape(error_text)}</code></pre>
+                    </div>
+                  </div>
+                </article>
+                """
+            )
+        review_cards.append(
             f"""
-            <tr>
-              <td><code>{escape(case.get("key") or case.get("case_id"))}</code></td>
-              <td>{escape(str(case.get("category") or "").replace("_", " "))}</td>
-              <td><span class="status status--{css_class}">{escape(label)}</span></td>
-              <td>{escape(case.get("attempts_used"), fallback="0")}</td>
-              <td>{escape(duration(attempt.get("latency_ms")))}</td>
-              <td>{escape(code_text)}</td>
-            </tr>
+            <details class="failure-card">
+              <summary>
+                <code>{escape(case.get("key") or case.get("case_id"))}</code>
+                <span>{escape(str(case.get("category") or "").replace("_", " "))}</span>
+                <span class="status status--{css_class}">{escape(label)}</span>
+                <span>{escape(case.get("attempts_used"), fallback="0")} attempt(s)</span>
+                <span>{escape(duration(headline_attempt.get("latency_ms")))}</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">{escape(code_text)}</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>{escape(pretty(definition.get("prompt"), fallback="(request unavailable in legacy summary)"))}</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>{escape(pretty(definition.get("expected_final"), fallback="(expected output unavailable in legacy summary)"))}</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>{escape(pretty(expected_actions, fallback="(no action expected)"))}</code></pre>
+                  </div>
+                </div>
+                {"".join(attempt_blocks)}
+              </div>
+            </details>
             """
         )
-    failures_content = (
+    review_content = (
         f"""
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Logical case</th><th>Category</th><th>Result</th><th>Attempts</th><th>Latency</th><th>Diagnostics</th></tr></thead>
-            <tbody>{"".join(failure_rows)}</tbody>
-          </table>
-        </div>
+        <div class="failure-list">{"".join(review_cards)}</div>
         """
-        if failure_rows
-        else '<p class="success">All logical cases passed strictly.</p>'
+        if review_cards
+        else '<p class="success">Every executed attempt passed strictly.</p>'
     )
 
     provider_params = json.dumps(
@@ -1221,8 +1318,10 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
     .latency-line--p95 i { background:var(--purple); }
     .latency-line b { text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
     .latency-empty,.empty { color:var(--muted); }
+    .case-chart-scroll { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-inline:contain; }
+    .case-chart-canvas { width:100%; }
     .case-chart-scale { display:flex; justify-content:space-between; margin:0 0 6px; color:var(--muted); font-size:11px; }
-    .case-chart { display:flex; align-items:flex-end; gap:max(1px,.15vw); height:190px; padding:10px 8px 0; border-bottom:1px solid var(--border); background:linear-gradient(to top,var(--grid) 1px,transparent 1px) 0 50%/100% 50%; }
+    .case-chart { display:flex; align-items:flex-end; gap:0; height:190px; padding:10px 8px 0; border-bottom:1px solid var(--border); background:linear-gradient(to top,var(--grid) 1px,transparent 1px) 0 50%/100% 50%; }
     .case-bar { flex:1 1 1px; min-width:1px; max-width:34px; border-radius:3px 3px 0 0; background:var(--blue); }
     .case-bar--functional { background:var(--teal); }
     .case-bar--failed { background:var(--red); }
@@ -1247,6 +1346,24 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
     .status--strict { color:var(--blue); background:var(--blue-soft); }
     .status--functional { color:var(--teal); background:var(--teal-soft); }
     .status--failed { color:var(--red); background:var(--red-soft); }
+    .failure-list { display:grid; gap:10px; }
+    .failure-card { overflow:hidden; border:1px solid var(--border); border-radius:11px; background:var(--surface-soft); }
+    .failure-card > summary { position:relative; display:grid; grid-template-columns:minmax(190px,1.2fr) minmax(100px,.65fr) auto auto auto; gap:12px; align-items:center; padding:12px 38px 12px 14px; cursor:pointer; list-style:none; }
+    .failure-card > summary::after { content:">"; position:absolute; top:50%; right:14px; color:var(--muted); font-size:20px; transform:translateY(-50%); transition:transform .15s ease; }
+    .failure-card[open] > summary::after { transform:translateY(-50%) rotate(90deg); }
+    .failure-card > summary > code { min-width:0; overflow-wrap:anywhere; font-weight:800; }
+    .failure-card > summary > span:not(.status) { color:var(--muted); font-size:12px; }
+    .failure-body { padding:0 14px 14px; border-top:1px solid var(--border); }
+    .failure-overview,.failure-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .failure-overview { margin-top:12px; }
+    .failure-overview > div:first-child { grid-column:1/-1; }
+    .failure-overview > div,.failure-grid > div { min-width:0; }
+    .failure-attempt { margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+    .failure-attempt h3 { display:flex; gap:8px; align-items:center; margin:0 0 4px; font-size:15px; }
+    .failure-attempt h3 span { padding:2px 6px; border-radius:999px; color:var(--blue); background:var(--blue-soft); font-size:10px; text-transform:uppercase; }
+    .failure-body h3,.failure-body h4 { margin:0 0 6px; font-size:12px; color:var(--muted); letter-spacing:.03em; text-transform:uppercase; }
+    .failure-diagnostics { margin:8px 0; color:var(--red); font-size:12px; overflow-wrap:anywhere; }
+    pre { max-height:260px; margin:0; padding:10px; overflow:auto; border:1px solid var(--grid); border-radius:8px; background:var(--surface-soft); white-space:pre-wrap; overflow-wrap:anywhere; }
     details.panel summary { cursor:pointer; font-weight:800; }
     dl { display:grid; grid-template-columns:minmax(130px,.28fr) minmax(0,1fr); gap:0; margin:16px 0 0; }
     dt,dd { min-width:0; margin:0; padding:9px 0; border-bottom:1px solid var(--grid); }
@@ -1267,6 +1384,10 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
       .metrics { grid-template-columns:1fr; }
       .chart-row { grid-template-columns:110px 1fr 48px; gap:8px; }
       .latency-row { grid-template-columns:1fr; gap:8px; }
+      .failure-card > summary { grid-template-columns:1fr auto; }
+      .failure-card > summary > span:not(.status) { display:none; }
+      .failure-overview,.failure-grid { grid-template-columns:1fr; }
+      .failure-overview > div:first-child { grid-column:auto; }
       dl { grid-template-columns:1fr; }
       dd { padding-top:0; }
     }
@@ -1336,9 +1457,10 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
   </section>
 
   <section class="panel">
-    <h2>Strict failures</h2>
-    <p class="section-intro">$failure_count logical case results need review.</p>
-    $failures_content
+    <h2>Attempt review</h2>
+    <p class="section-intro">$review_count logical case result(s) had a non-strict attempt:
+      $unresolved_count unresolved, $rescued_count rescued by a later fresh attempt.</p>
+    $review_content
   </section>
 
   <section>
@@ -1375,8 +1497,10 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
         cache_cards=cache_cards,
         cache_note=escape(cache_note),
         baseline_content=baseline_content,
-        failure_count=len(failures),
-        failures_content=failures_content,
+        review_count=len(review_cases),
+        unresolved_count=unresolved_count,
+        rescued_count=rescued_count,
+        review_content=review_content,
         detail_rows=detail_rows,
     )
     path.write_text(document, encoding="utf-8")

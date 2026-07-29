@@ -331,7 +331,7 @@ async def run_benchmark(config: BenchmarkConfig, *, llm: LLM | None = None) -> B
         "verbosity": config.verbosity,
     }
     summary: dict[str, Any] = {
-        "schema_version": 2,
+        "schema_version": 3,
         "run_id": run_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "protolink_version": __version__,
@@ -356,6 +356,7 @@ async def run_benchmark(config: BenchmarkConfig, *, llm: LLM | None = None) -> B
         "scores": scores,
         "timing": timing,
         "performance_fingerprint": performance_fingerprint,
+        "case_definitions": [case.to_dict() for case in cases],
         "case_results": [result.to_dict() for result in case_results],
     }
     if config.baseline is not None:

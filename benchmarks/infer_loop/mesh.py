@@ -118,6 +118,14 @@ class BenchmarkMesh:
             url=f"{prefix}/travel",
             verbosity=verbosity,
         )
+        self.workspace_archive_agent = self._build_workspace_archive_agent(
+            url=f"{prefix}/workspace-archive",
+            verbosity=verbosity,
+        )
+        self.travel_planning_agent = self._build_travel_planning_agent(
+            url=f"{prefix}/travel-planning",
+            verbosity=verbosity,
+        )
         self.oracle_agent = _OracleAgent(
             card=AgentCard(
                 name="oracle_agent",
@@ -253,6 +261,112 @@ class BenchmarkMesh:
 
         return agent
 
+    def _build_workspace_archive_agent(self, *, url: str, verbosity: Literal[0, 1, 2]) -> Agent:
+        agent = Agent(
+            card=AgentCard(
+                name="workspace_archive_agent",
+                description=(
+                    "Historical source snapshot reader and index. Its data is archived and non-authoritative; "
+                    "use only when a request explicitly asks for historical workspace information."
+                ),
+                url=url,
+                capabilities=AgentCapabilities(delegation=False, tool_calling=True),
+            ),
+            transport="runtime",
+            registry=self.registry,
+            verbosity=verbosity,
+        )
+
+        @agent.tool(
+            name="read_file",
+            description="Read stale archived source metadata, never the authoritative current workspace.",
+        )
+        def read_file(path: str, request_id: str) -> dict[str, Any]:
+            if path not in _SOURCE_FILES:
+                raise ValueError(f"Unknown benchmark source path: {path}")
+            args = {"path": path, "request_id": request_id}
+            result = _read_file_result(**args)
+            self.ledger.record(LedgerEntry("agent_tool", agent.card.name, "read_file", args, result))
+            return result
+
+        @agent.tool(
+            name="search_symbol",
+            description="Search the archived source index, never the authoritative current workspace index.",
+        )
+        def search_symbol(query: str, request_id: str, source_receipt: str) -> dict[str, Any]:
+            args = {
+                "query": query,
+                "request_id": request_id,
+                "source_receipt": source_receipt,
+            }
+            result = _search_symbol_result(**args)
+            self.ledger.record(LedgerEntry("agent_tool", agent.card.name, "search_symbol", args, result))
+            return result
+
+        return agent
+
+    def _build_travel_planning_agent(self, *, url: str, verbosity: Literal[0, 1, 2]) -> Agent:
+        agent = Agent(
+            card=AgentCard(
+                name="travel_planning_agent",
+                description=(
+                    "Generic travel scenario planner that offers non-authoritative estimates. "
+                    "Do not use when a request requires authoritative benchmark travel data."
+                ),
+                url=url,
+                capabilities=AgentCapabilities(delegation=False, tool_calling=True),
+            ),
+            transport="runtime",
+            registry=self.registry,
+            verbosity=verbosity,
+        )
+
+        @agent.tool(
+            name="get_weather",
+            description="Return a generic planning estimate, not authoritative benchmark weather.",
+        )
+        def get_weather(location: str, travel_date: str, request_id: str) -> dict[str, Any]:
+            if location not in _WEATHER:
+                raise ValueError(f"Unknown benchmark location: {location}")
+            args = {
+                "location": location,
+                "travel_date": travel_date,
+                "request_id": request_id,
+            }
+            result = _weather_result(**args)
+            self.ledger.record(LedgerEntry("agent_tool", agent.card.name, "get_weather", args, result))
+            return result
+
+        @agent.tool(
+            name="quote_hotel",
+            description="Return a generic planning estimate, not an authoritative benchmark hotel quote.",
+        )
+        def quote_hotel(
+            location: str,
+            nights: int,
+            guests: int,
+            tier: str,
+            request_id: str,
+            weather_receipt: str,
+        ) -> dict[str, Any]:
+            if location not in _WEATHER:
+                raise ValueError(f"Unknown benchmark location: {location}")
+            if tier not in _HOTEL_BASE_PRICE:
+                raise ValueError(f"Unknown benchmark hotel tier: {tier}")
+            args = {
+                "location": location,
+                "nights": nights,
+                "guests": guests,
+                "tier": tier,
+                "request_id": request_id,
+                "weather_receipt": weather_receipt,
+            }
+            result = _hotel_result(**args)
+            self.ledger.record(LedgerEntry("agent_tool", agent.card.name, "quote_hotel", args, result))
+            return result
+
+        return agent
+
     def _add_coordinator_tools(self) -> None:
         agent = self.coordinator
 
@@ -289,6 +403,8 @@ class BenchmarkMesh:
             for agent in (
                 self.workspace_agent,
                 self.travel_agent,
+                self.workspace_archive_agent,
+                self.travel_planning_agent,
                 self.oracle_agent,
                 self.coordinator,
             ):
@@ -296,7 +412,13 @@ class BenchmarkMesh:
                 self._started.append(agent)
             discovered = await self.coordinator.discover_agents()
             names = {card.name for card in discovered}
-            required = {"workspace_agent", "travel_agent", "oracle_agent"}
+            required = {
+                "workspace_agent",
+                "travel_agent",
+                "workspace_archive_agent",
+                "travel_planning_agent",
+                "oracle_agent",
+            }
             missing = sorted(required - names)
             if missing:
                 raise RuntimeError(f"Benchmark discovery preflight failed; missing agents: {missing}")
