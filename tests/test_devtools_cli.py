@@ -186,6 +186,8 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
 
     assert "Protolink Dashboard" in dashboard_html
     assert "window.__PROTOLINK_SNAPSHOT__" in dashboard_html
+    assert "window.__PROTOLINK_LIVE__ = false;" in dashboard_html
+    assert "window.location.protocol" not in dashboard_html
     assert "/api/agents/ping" in dashboard_html
     assert "/api/agents/chat" in dashboard_html
     assert "Ping all" in dashboard_html
@@ -213,6 +215,58 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
     assert "Protolink Studio" in dashboard_html
     assert "Protolink Studio is coming soon" in dashboard_html
     assert "studio-canvas" in dashboard_html
+    assert 'id="nav-telemetry"' in dashboard_html
+    assert 'id="view-telemetry"' in dashboard_html
+    assert "Open JSONL" in dashboard_html
+    assert "Span waterfall" in dashboard_html
+    assert "Event replay" in dashboard_html
+    assert "readUploadTracePage" in dashboard_html
+    assert "const maxScannedLines = 5000;" in dashboard_html
+    assert "result.line_scan_exhausted" in dashboard_html
+    assert "/api/traces/" in dashboard_html
+    assert "TELEMETRY_SUMMARY_CAP" in dashboard_html
+
+
+@pytest.mark.parametrize("trace_flag", ["--traces", "--telemetry"])
+def test_dashboard_cli_embeds_bounded_telemetry_summary(tmp_path: Path, trace_flag: str):
+    trace_path = tmp_path / "traces.jsonl"
+    dashboard_path = tmp_path / f"dashboard-{trace_flag.removeprefix('--')}.html"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "trace_id": "trace_dashboard",
+                "task_id": "task_dashboard",
+                "agent_name": "dashboard_agent",
+                "status": "ok",
+                "metadata": {"llm_metrics": {"total_tokens": 42}},
+                "spans": [],
+                "events": [],
+                "private_payload": "must stay lazy",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        cli_main(
+            [
+                "dashboard",
+                "--store",
+                str(tmp_path / "runs.db"),
+                trace_flag,
+                str(trace_path),
+                "--output",
+                str(dashboard_path),
+            ]
+        )
+        == 0
+    )
+
+    dashboard_html = dashboard_path.read_text(encoding="utf-8")
+    assert "task_dashboard" in dashboard_html
+    assert str(trace_path) in dashboard_html
+    assert "must stay lazy" not in dashboard_html
 
 
 def test_cli_studio_command_is_not_public():

@@ -2,7 +2,7 @@ import ApiSurface from '@site/src/components/ApiSurface';
 
 # Developer Tools
 
-Protolink includes local devtools for the same runtime contracts that power agents in production: `RunContext`, `RunEvent`, `RunReport`, registry discovery, and the SQLite `RunStore`. The tools are intentionally dependency-light and application-neutral. They inspect what your agents already emit instead of inventing a separate tracing format.
+Protolink includes local devtools for the same runtime contracts that power agents in production: `RunContext`, `RunEvent`, `RunReport`, local `TraceRecord` JSONL, registry discovery, and the SQLite `RunStore`. The tools are intentionally dependency-light and application-neutral. They inspect what your agents already emit instead of inventing a separate tracing format.
 
 The important idea is that devtools are not a separate observability product bolted onto the framework. They are a small projection layer over Protolink's core design: an agent is an autonomous runtime entity, and its execution can be described through typed context, events, reports, registry cards, and stored task state.
 
@@ -11,7 +11,7 @@ The current surface has four command groups plus one disabled dashboard preview:
 - `protolink doctor` checks local installation, optional extras, run-store readability, and optional agent/registry endpoints.
 - `protolink registry list` and `protolink registry inspect` inspect a running HTTP registry.
 - `protolink run list`, `protolink run replay`, and `protolink run diff` inspect durable task snapshots and run reports.
-- `protolink dashboard` serves or writes a local HTML dashboard for runs and registry state, with a disabled Studio preview tab.
+- `protolink dashboard` serves or writes a local HTML dashboard for runs, local telemetry, and registry state, with a disabled Studio preview tab.
 
 ## When To Use Each Tool
 
@@ -23,7 +23,7 @@ The current surface has four command groups plus one disabled dashboard preview:
 | `run list` | You need recent task snapshots and run-report IDs. | `SQLiteRunStore`. | No |
 | `run replay` | You need a readable timeline for a stored run. | `SQLiteRunStore`. | No |
 | `run diff` | You need a normalized regression comparison between two stored reports. | `SQLiteRunStore`. | No |
-| `dashboard` | You want a local visual summary of registry and run-store state. | Registry and/or `SQLiteRunStore`. | No |
+| `dashboard` | You want a local visual summary of registry, run-store, and local telemetry state. | Registry, `SQLiteRunStore`, and/or local trace JSONL. | No |
 | Dashboard Studio preview | You want to see where the future topology canvas will live. | Starter blueprint preview. | No |
 
 Because these commands do not execute stored runs, they are safe to use while debugging production-like traces, copied SQLite files, or CI artifacts. They inspect runtime records; they do not re-call tools, re-run prompts, or contact model providers.
@@ -39,8 +39,11 @@ flowchart LR
     Events --> Report["RunReport"]
     Context --> Store["SQLiteRunStore"]
     Report --> Store
+    Agent --> Telemetry["LocalTraceTelemetry"]
+    Telemetry --> TraceFile["Trace JSONL"]
     Registry["HTTP registry"] --> Collectors["Devtool collectors"]
     Store --> Collectors
+    TraceFile --> Collectors
     Collectors --> Text["DevtoolsTextRenderer"]
     Collectors --> HTML["DevtoolsHtmlRenderer"]
     Text --> CLI["protolink CLI"]
@@ -58,6 +61,7 @@ The devtools become useful because Protolink separates runtime facts into stable
 - `RunContext` describes one logical execution boundary: run ID, session ID, trace ID, workspace URI, parent run, agent chain, permissions, budgets, and cancellation state.
 - `RunEvent` describes one point in execution: task status, context preparation, LLM call start/completion, tool action, policy decision, approval, artifact, delegation, budget warning, or final result.
 - `RunReport` turns a sequence of `RunEvent` objects into a durable summary suitable for replay, tests, dashboards, and support bundles.
+- `TraceRecord`, `TraceSpan`, and `TraceEvent` describe the detailed local telemetry hierarchy for completed Agent tasks. `LocalTraceTelemetry` can append one task record per line to JSONL.
 - `SQLiteRunStore` persists task snapshots and run reports in a local database with searchable indexes.
 
 The CLI and dashboard sit above these layers. They do not need to know whether the agent used OpenAI, Anthropic, Ollama, a mock model, runtime transport, HTTP, WebSocket, or a custom tool implementation. As long as the runtime emits and stores the public contracts, devtools can inspect the result.
@@ -207,8 +211,14 @@ The command exits `0` when the normalized reports match, `1` when they changed, 
 Serve the local dashboard:
 
 ```bash
-protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
+protolink dashboard \
+  --store runs.db \
+  --traces traces.jsonl \
+  --registry-url http://127.0.0.1:9010 \
+  --open
 ```
+
+`--telemetry traces.jsonl` is an alias for `--traces traces.jsonl`.
 
 Write a static HTML snapshot instead:
 
@@ -220,18 +230,18 @@ protolink dashboard --store runs.db --output dashboard.html
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif" alt="Protolink Dashboard UI" />
 </figure>
 
-The dashboard is deliberately small: no build step, no frontend dependencies, and no telemetry upload. It serves a local page with branded navigation, top-level cards for agents/tasks/reports/store state, registry agents, agent health probes, a chat panel for HTTP LLM agents, run replay, and a disabled Studio preview tab. The JSON endpoint at `/api/snapshot` uses the same collector as static rendering.
+The dashboard is deliberately small: no build step and no frontend dependencies. It serves a local page with branded navigation, top-level runtime cards, registry agents, agent health probes, a chat panel for HTTP LLM agents, run replay, a Telemetry trace explorer, and a disabled Studio preview tab. The JSON endpoint at `/api/snapshot` uses the same collector as static rendering.
 
-Use the served dashboard when you want live refresh against a local registry or run store. Use `--output` when you want a portable snapshot for a demo, issue, notebook, or support handoff.
+Use the served dashboard when you want live refresh against a local registry or run store, or bounded access to the trace file supplied with `--traces`. Use `--output` when you want a portable snapshot for a demo, issue, notebook, or support handoff. The Telemetry view also has an **Open JSONL** control, so either served or static HTML can inspect a file selected in the browser without first configuring a CLI path.
 
 The distinction between served and static mode matters:
 
-- Served mode can refresh `/api/snapshot`, replay runs through `/api/runs/{run_id}`, ping HTTP agents through `/api/agents/ping`, and proxy chat messages through `/api/agents/chat`.
-- Static mode embeds the current snapshot in the HTML file. It is excellent for demos and handoffs, but live actions such as ping, chat, and replay need the local dashboard server.
+- Served mode can refresh `/api/snapshot`, replay runs through `/api/runs/{run_id}`, page through the configured telemetry file, load selected trace details lazily, ping HTTP agents through `/api/agents/ping`, and proxy chat messages through `/api/agents/chat`.
+- Static mode embeds the current snapshot in the HTML file. It is excellent for demos and handoffs, and its browser file picker can still inspect local JSONL. Server-backed refresh, ping, chat, run replay, and CLI-configured telemetry paging need the local dashboard server.
 
 The dashboard currently focuses on:
 
-- High-level counts for agents, task snapshots, reports, and store availability.
+- High-level counts for agents, task snapshots, reports, loaded telemetry records, and store availability.
 - A registry-first dashboard body and second-position Registry tab, because discovery and live agent health are usually the most important development questions.
 - Task/report tables in the Runs tab, where they sit next to replay controls instead of competing with registry health.
 - Registry card summaries with selected-agent details, transport badges, capability badges, schemas, and security metadata.
@@ -240,9 +250,32 @@ The dashboard currently focuses on:
 - Chat-side diagnostics for served dashboards: last response latency, average latency, message count, active session ID, and last proxy/agent error.
 - A chat reset control that clears the visible conversation, starts a fresh dashboard session ID, and resets the local latency/debug counters.
 - Run replay buttons that load the same replay projection used by `protolink run replay`.
+- A Telemetry view for filtering completed task records, inspecting nested task/LLM/tool/agent-call spans, replaying chronological events, and opening redacted inputs, outputs, metadata, and raw JSON only when selected.
 - A disabled Studio preview for the future topology canvas.
 
 It intentionally avoids provider-specific visualizations. Provider details belong in the structured run events and reports; the dashboard should remain generic enough for any Protolink agent system.
+
+### Telemetry JSONL
+
+Start the dashboard with a local telemetry file:
+
+```bash
+protolink dashboard --traces traces.jsonl --open
+```
+
+The Telemetry view reads recent records first and keeps its working set bounded. Summary pages contain compact task and span counts; the full record and potentially large payload fields are loaded only when you select a record. Moving to older pages therefore does not require embedding the entire file in the initial dashboard snapshot or creating one DOM row for every trace ever recorded. Once the 500-summary browser window is full, loading older pages rolls newer summaries out of that window; **Latest** returns to the head of the file. The browser file picker follows the same bounded, lazy-detail model for a locally selected file.
+
+One JSONL line represents one completed Agent task record. A `trace_id` is a correlation key, not a unique line ID: nested or delegated tasks can share it, and an application can deliberately assign the same trace ID to several related tasks. The dashboard groups those task records under the shared trace ID while retaining task ID and record position as the distinct record identity.
+
+Trace files can be observed while another process is appending to them. Blank or malformed lines are reported and skipped instead of making the whole source unreadable. An incomplete final line is treated as a partial write; it is ignored for the current page and can become visible after the writer completes it and the dashboard refreshes.
+
+Each server page has a byte and line scan budget, each detail record has a 16 MB safety limit, and span/event/JSON rendering is separately capped. If one physical line is larger than a scan page, the reader returns an opaque continuation cursor and skips across that line over bounded requests, so an unusually large payload cannot make every older record unreachable. The source diagnostics show malformed lines, oversized records, partial tails, and pages that reached a scan budget.
+
+:::caution[Local traces can contain application data]
+
+Default redaction masks common secret-bearing fields, but captured prompts, tool arguments, outputs, and custom metadata can still be sensitive. A file chosen with **Open JSONL** is read locally by the page and is not uploaded to a hosted service. The served dashboard binds to `127.0.0.1` by default, rejects unexpected HTTP `Host` names, and limits browser action POSTs to same-origin JSON requests. Changing `--host` to a non-loopback interface can still expose trace details, registry data, and dashboard proxy actions to other network clients. With a wildcard bind, open the dashboard through an IP address; arbitrary DNS hostnames are rejected. Only broaden the binding on a trusted network with controls appropriate for the data.
+
+:::
 
 The chat panel is meant for fast local probing, not for becoming a production chat product. Select an HTTP LLM agent from the registry, keep or edit the session ID, and send a message through the dashboard proxy. Pressing Enter submits the message, while Shift+Enter keeps editing a multi-line prompt. The Debug toggle opens a small live diagnostics strip so you can see whether a slow response is coming from the dashboard proxy, the agent endpoint, or the model/tool path behind that agent.
 
@@ -280,13 +313,14 @@ The UI pieces live in `protolink.utils.renderers.devtools`:
   eyebrow="Developer tooling module"
   title="Devtools Collectors And Renderers"
   path="protolink.devtools"
-  description="The collector and renderer API for local dashboards, run replay and comparison, registry inspection, chat probes, terminal summaries, and application-specific debug panels."
+  description="The collector and renderer API for local dashboards, telemetry exploration, run replay and comparison, registry inspection, chat probes, terminal summaries, and application-specific debug panels."
   pills={[
     "Dashboard snapshots",
     "HTML renderer",
     "Text renderer",
     "Run replay",
     "Run diff",
+    "Telemetry JSONL",
     "Agent probes",
   ]}
   cards={[
@@ -333,7 +367,7 @@ The collectors and renderers are separate on purpose:
 - Collectors such as `build_dashboard_snapshot()`, `list_run_store_records()`, `build_run_replay_view()`, and `build_run_diff_view()` return plain dictionaries or small dataclasses.
 - Agent actions such as `ping_agent()` and `chat_with_agent()` call public HTTP agent endpoints. They are deliberately separate from the renderer so applications can reuse them in their own debug panels.
 - Text renderers turn those structures into terminal-friendly tables.
-- HTML renderers turn those structures into standalone dashboard pages with registry health, chat, run replay, and the disabled Studio preview included.
+- HTML renderers turn those structures into standalone dashboard pages with registry health, chat, run replay, local telemetry inspection, and the disabled Studio preview included.
 
 This separation keeps the public API simple. You can replace the renderer without replacing the collectors, or use the collectors inside your own app while keeping Protolink's CLI behavior unchanged.
 

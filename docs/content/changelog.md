@@ -40,6 +40,7 @@ uv add --upgrade protolink
 
 - Added the infer-loop benchmark for correctness, reliability, timing, baseline comparisons, and CSV/JSON results.
 - Added `InferParseError` with the failed response, attempt count, parser cause, and a concise explanation.
+- Added a local dashboard Telemetry explorer for `traces.jsonl`, with CLI or browser-file loading, bounded recent-first paging, lazy trace detail, span waterfalls, grouped task records, and playable event replay.
 
 ## [0.6.7] - 2026-07-28
 

@@ -109,6 +109,12 @@ def _build_parser() -> argparse.ArgumentParser:
     dashboard_parser = subparsers.add_parser("dashboard", help="Open the local Protolink dashboard.")
     dashboard_parser.add_argument("--registry-url", help="Optional HTTP registry URL.")
     dashboard_parser.add_argument("--store", default="runs.db", help="SQLite run-store path.")
+    dashboard_parser.add_argument(
+        "--traces",
+        "--telemetry",
+        dest="traces",
+        help="Optional local telemetry traces.jsonl path.",
+    )
     dashboard_parser.add_argument("--host", default="127.0.0.1", help="Dashboard bind host.")
     dashboard_parser.add_argument("--port", type=int, default=8765, help="Dashboard bind port.")
     dashboard_parser.add_argument("--open", action="store_true", help="Open the dashboard in a browser.")
@@ -244,13 +250,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "dashboard":
         html_renderer = DevtoolsHtmlRenderer()
         if args.output:
-            snapshot = build_dashboard_snapshot(registry_url=args.registry_url, store_path=args.store)
+            snapshot = build_dashboard_snapshot(
+                registry_url=args.registry_url,
+                store_path=args.store,
+                trace_path=args.traces,
+            )
             return _write_text(args.output, html_renderer.render_dashboard(snapshot), label="dashboard")
         serve_dashboard(
             host=args.host,
             port=args.port,
             registry_url=args.registry_url,
             store_path=args.store,
+            trace_path=args.traces,
             open_browser=args.open,
         )
         return 0

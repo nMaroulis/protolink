@@ -10,6 +10,7 @@ from .doctor import build_doctor_report
 from .models import CheckResult, DoctorReport, RunDiffView, RunReplayItem, RunReplayView
 from .registry import fetch_registry_agents, inspect_registry_agent
 from .runs import build_run_diff_view, build_run_replay_view, list_run_store_records
+from .traces import TraceJsonlReader, list_trace_records, load_trace_record
 
 __all__ = [
     "CheckResult",
@@ -17,6 +18,7 @@ __all__ = [
     "RunDiffView",
     "RunReplayItem",
     "RunReplayView",
+    "TraceJsonlReader",
     "build_doctor_report",
     "build_run_diff_view",
     "build_run_replay_view",
@@ -24,5 +26,7 @@ __all__ = [
     "fetch_registry_agents",
     "inspect_registry_agent",
     "list_run_store_records",
+    "list_trace_records",
+    "load_trace_record",
     "ping_agent",
 ]

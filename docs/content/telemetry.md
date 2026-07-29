@@ -127,6 +127,14 @@ result = await agent.handle_task(Task.create_tool_call(tool_name="add", args={"a
 records = telemetry.recorder.replay()
 ```
 
+Inspect the persisted file in the local dashboard:
+
+```bash
+protolink dashboard --traces traces.jsonl --open
+```
+
+`--telemetry` is an alias for `--traces`, and the dashboard Telemetry view also accepts a JSONL file selected locally in the browser. It pages recent task records, rolls a bounded summary window through older history, and loads detail payloads lazily rather than reading the entire file into the initial page. See [Developer Tools](devtools.md#telemetry-jsonl) for shared `trace_id` grouping, scan and detail safeguards, partial-line handling, and local-data security guidance.
+
 ### LLM Metrics and Context Usage
 
 When an agent has both an LLM and telemetry, Protolink records live context and budget metadata for every model call inside `LLM.infer()`. This includes the pre-call context manifest, latency, token usage, context-window pressure, and estimated cost. Provider-reported usage is used when available; otherwise Protolink estimates usage without requiring extra dependencies.
@@ -651,7 +659,7 @@ Implement the complete telemetry contract and translate it into a local trace hi
       Exceptions from the custom redactor propagate when the hook is called directly. Agent catches and logs them at its observability boundary.
     </ApiField>
     <ApiField name="serialization or filesystem error">
-      Task/result conversion, malformed metric values used by explicit integer conversion, directory creation, JSON encoding, and file writes may propagate from a direct hook call. Because task-end cleanup is not wrapped in <code>finally</code>, a recorder failure occurs before the local trace and span context variables are cleared; Agent execution still isolates that failure.
+      Task/result conversion, malformed metric values used by explicit integer conversion, directory creation, JSON encoding, and file writes may propagate from a direct hook call. Task-end cleanup runs in <code>finally</code>, so the active local trace frame is still cleared when recording fails; Agent execution also isolates that failure.
     </ApiField>
   </ApiFields>
 </ApiSection>

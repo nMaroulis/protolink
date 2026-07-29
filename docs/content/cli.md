@@ -1,14 +1,14 @@
 # CLI
 
-Protolink ships with a command-line interface for project scaffolding, local health checks, registry inspection, run replay and regression diffing, and the local dashboard developer tools.
+Protolink ships with a command-line interface for project scaffolding, local health checks, registry inspection, run replay and regression diffing, and local dashboard access to runtime and telemetry data.
 
 The CLI is meant to be the shortest path from "I have a Protolink project" to "I can see what is installed, what agents are registered, what happened during a run, and how my agent topology is shaped." It does not replace the Python API. Instead, it sits on top of the same public runtime contracts that applications use directly: `AgentCard`, `RunContext`, `RunEvent`, `RunReport`, `SQLiteRunStore`, and registry discovery.
 
 Use the CLI in three common moments:
 
 - **First setup**: create a starter agent and confirm optional dependencies with `protolink doctor`.
-- **Local debugging and regression checks**: inspect registry entries, list stored runs, replay a timeline, and compare stored reports without writing custom scripts.
-- **Developer presentation**: open the dashboard when you want a visual view of runs, agents, and the future Studio preview.
+- **Local debugging and regression checks**: inspect registry entries, list stored runs, replay a timeline, compare stored reports, and explore local trace JSONL without writing custom scripts.
+- **Developer presentation**: open the dashboard when you want a visual view of runs, agents, telemetry, and the future Studio preview.
 
 Most inspection commands support both human-readable terminal output and JSON. Use text while working interactively; use `--json` when integrating with CI, shell scripts, notebooks, or another application.
 
@@ -210,10 +210,16 @@ Use `--json` for a structured result containing the baseline and candidate selec
 Open the local dashboard:
 
 ```bash
-protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
+protolink dashboard \
+  --store runs.db \
+  --traces traces.jsonl \
+  --registry-url http://127.0.0.1:9010 \
+  --open
 ```
 
-The dashboard is a local, dependency-free HTML surface over the same collectors used by the CLI. It is useful when a run has enough events that a table is easier to scan than terminal output, or when you want to show registered agents, health probes, agent chat, and stored run reports side by side.
+`--telemetry traces.jsonl` is an alias for `--traces traces.jsonl`.
+
+The dashboard is a local, dependency-free HTML surface over the same collectors used by the CLI. It is useful when a run has enough events that a table is easier to scan than terminal output, or when you want to show registered agents, health probes, agent chat, stored run reports, and local telemetry side by side.
 
 Write a static dashboard snapshot:
 
@@ -221,18 +227,26 @@ Write a static dashboard snapshot:
 protolink dashboard --store runs.db --output dashboard.html
 ```
 
-Static output is useful for demos, bug reports, and notebooks because the generated file embeds the current snapshot. It will not live-refresh, but it can be opened without starting a server.
+Static output is useful for demos, bug reports, and notebooks because the generated file embeds the current snapshot. It will not live-refresh, but it can be opened without starting a server. Its Telemetry view can still inspect a JSONL file chosen with **Open JSONL** in the browser.
 
 When the dashboard is served, it can call the local JSON endpoints behind the page:
 
 - `/api/snapshot` refreshes registry and run-store data.
 - `/api/runs/{run_id}` loads the same replay projection used by `protolink run replay`.
+- `/api/traces?limit=...&cursor=...` returns a bounded recent-first page of telemetry summaries.
+- `/api/traces/{record_id}` lazily loads one selected telemetry record.
 - `/api/agents/ping` probes an HTTP agent's `/status` endpoint and returns latency/status data.
 - `/api/agents/chat` proxies a message to an HTTP LLM agent's `POST /chat` endpoint.
 
 Those actions require HTTP agent URLs from the registry. Runtime-only demo agents still appear in the registry and Studio preview, but they are marked as runtime agents because there is no network endpoint for the browser dashboard to ping.
 
-The dashboard landing view puts four cards at the top: Agents, Tasks, Reports, and Store. Agents opens the registry view, while Tasks, Reports, and Store route to the Runs view where persisted task snapshots and run reports can be inspected and replayed. Under the cards, the dashboard keeps Registry as the primary table so agent discovery and health stay immediately visible. The sidebar places Registry directly after Dashboard, and the dashboard overview intentionally keeps only quick actions there; use the Registry tab for the full agent card, schemas, transport badge, capability badges, and security metadata.
+The Telemetry view uses the path supplied by `--traces` for server-backed inspection. It pages completed task records in recent-first order, keeps a rolling window of at most 500 summaries, and loads the selected record's spans, events, inputs, outputs, metadata, and raw JSON only on demand. This avoids placing a long-lived system's complete trace file in `/api/snapshot` or rendering every historical record at once while still allowing continued navigation into older history. The browser's **Open JSONL** control provides the same bounded, lazy-detail workflow for a file selected locally instead of a CLI-configured path.
+
+Each JSONL line is a completed task record. Related or delegated tasks can share a `trace_id`, so the dashboard treats that field as a correlation key and groups the distinct task records beneath it; it does not assume that a trace ID uniquely identifies one line. Blank or malformed records are skipped and reported. An incomplete final line from an active writer is tolerated as a partial write and can appear after a later refresh once it is complete. A 16 MB per-record detail limit and bounded reverse scans protect the dashboard from pathological payloads; opaque continuation cursors let the server move past a physical line that is itself larger than one scan page.
+
+Trace payloads remain local, but local does not automatically mean non-sensitive. The browser file picker reads the selected file in the page rather than uploading it to a hosted service. The dashboard server binds to `127.0.0.1` by default, rejects unexpected HTTP `Host` names, and accepts action POSTs only as same-origin JSON requests. If you set `--host` to `0.0.0.0` or another non-loopback address, other network clients may be able to reach trace details, registry data, agent probes, and the chat proxy; use an IP address with wildcard binds, and only broaden the binding on a trusted network with appropriate access controls.
+
+The dashboard landing view puts five cards at the top: Agents, Tasks, Reports, Telemetry, and Store. Agents opens the registry view; Telemetry opens the bounded trace explorer; and Tasks, Reports, and Store route to Runs, where persisted task snapshots and run reports can be inspected and replayed. Under the cards, the dashboard keeps Registry as the primary table so agent discovery and health stay immediately visible. The sidebar places Registry directly after Dashboard, and the dashboard overview intentionally keeps only quick actions there; use the Registry tab for the full agent card, schemas, transport badge, capability badges, and security metadata.
 
 The dashboard chat view also includes a Debug toggle for local agent probing. It tracks the last chat latency, average latency for the current dashboard session, sent-message count, current session ID, and the last proxy or agent error. This mirrors the standalone chat renderer's debugging affordance while keeping the dashboard centered on registry-driven agent discovery. Enter sends the active chat prompt; Shift+Enter preserves a newline. Use Reset when you want to clear the current local conversation and start a fresh dashboard session.
 
@@ -252,7 +266,7 @@ protolink registry inspect SELECTOR --url URL [--json]
 protolink run list [--store PATH] [--limit N] [--json]
 protolink run replay RUN_ID [--store PATH] [--json]
 protolink run diff BASELINE CANDIDATE [--store PATH] [--json]
-protolink dashboard [--store PATH] [--registry-url URL] [--host HOST] [--port PORT] [--open] [--output PATH]
+protolink dashboard [--store PATH] [--traces PATH] [--registry-url URL] [--host HOST] [--port PORT] [--open] [--output PATH]
 ```
 
 | Argument | Description |
@@ -260,3 +274,5 @@ protolink dashboard [--store PATH] [--registry-url URL] [--host HOST] [--port PO
 | `path` | Output file path. Defaults to `agent.py`. |
 | `--template` | Starter template to use. Defaults to `basic`. |
 | `--force` | Overwrite the output file if it already exists. |
+| `--traces PATH`, `--telemetry PATH` | Local telemetry JSONL source for the dashboard. The two option names are aliases. |
+| `--host` | Dashboard bind host. Defaults to loopback (`127.0.0.1`); a non-loopback value can expose local debug data to the network. |

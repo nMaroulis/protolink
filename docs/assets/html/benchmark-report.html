@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <title>Infer-loop benchmark · 20260728T184629Z-ollama-gemma4-e4b</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg:#f4f7fb; --surface:#fff; --surface-soft:#f8fafc; --ink:#172033; --muted:#617087;
+      --border:#dbe3ee; --grid:#e9eef5; --blue:#1677ff; --blue-soft:#dcecff; --teal:#0f9f8f;
+      --teal-soft:#d8f4ef; --purple:#7c5ce5; --amber:#d78a08; --red:#d64545; --red-soft:#fce5e5;
+      --green:#16835b; --green-soft:#ddf5e9; --shadow:0 18px 52px rgba(32,51,79,.08);
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1180px,calc(100% - 32px)); margin:32px auto 64px; }
+    header { display:flex; justify-content:space-between; gap:24px; align-items:flex-start; padding:28px; border:1px solid var(--border); border-radius:18px; background:linear-gradient(135deg,rgba(22,119,255,.12),rgba(15,159,143,.07)),var(--surface); box-shadow:var(--shadow); }
+    .eyebrow { color:var(--blue); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { margin:7px 0 8px; font-size:clamp(28px,4vw,44px); line-height:1.05; letter-spacing:-.035em; }
+    header p { margin:0; color:var(--muted); }
+    .run-badge { flex:0 0 auto; padding:8px 12px; border-radius:999px; font-size:13px; font-weight:800; }
+    .run-badge.good { color:var(--green); background:var(--green-soft); }
+    .run-badge.warn { color:var(--amber); background:rgba(215,138,8,.13); }
+    .run-badge.bad { color:var(--red); background:var(--red-soft); }
+    section { margin-top:28px; }
+    h2 { margin:0 0 14px; font-size:21px; letter-spacing:-.015em; }
+    .section-intro { margin:-6px 0 16px; color:var(--muted); font-size:14px; }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
+    .metric,.panel { border:1px solid var(--border); border-radius:14px; background:var(--surface); box-shadow:0 8px 28px rgba(32,51,79,.045); }
+    .metric { min-width:0; padding:18px; }
+    .metric-label { color:var(--muted); font-size:13px; font-weight:700; }
+    .metric-value { margin-top:7px; font-size:27px; font-weight:850; letter-spacing:-.03em; }
+    .metric-rate { margin-top:2px; color:var(--muted); font-size:13px; }
+    .metric p { min-height:38px; margin:10px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .meter,.metric-rule { height:7px; margin-top:13px; overflow:hidden; border-radius:999px; background:var(--grid); }
+    .meter span { display:block; height:100%; border-radius:inherit; background:var(--blue); }
+    .metric--functional .meter span { background:var(--teal); }
+    .metric--first .meter span { background:var(--purple); }
+    .metric-rule { background:linear-gradient(90deg,var(--blue),var(--teal)); }
+    .two-col { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); gap:14px; }
+    .panel { min-width:0; padding:20px; }
+    .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:12px; color:var(--muted); font-size:12px; }
+    .legend span { display:inline-flex; align-items:center; gap:6px; }
+    .legend i { width:10px; height:10px; border-radius:3px; background:var(--blue); }
+    .legend .legend-functional { background:var(--teal); }
+    .legend .legend-failed { background:var(--red); }
+    .chart-row { display:grid; grid-template-columns:minmax(130px,.42fr) minmax(160px,1fr) 56px; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--grid); }
+    .chart-row:last-child { border-bottom:0; }
+    .chart-label { display:flex; flex-direction:column; min-width:0; }
+    .chart-label strong { overflow:hidden; text-overflow:ellipsis; text-transform:capitalize; }
+    .chart-label span,.latency-row span { color:var(--muted); font-size:11px; }
+    .paired-bars { display:grid; gap:4px; }
+    .bar,.diagnostic-track,.latency-line div { height:8px; overflow:hidden; border-radius:999px; background:var(--grid); }
+    .bar span,.diagnostic-track span,.latency-line i { display:block; height:100%; border-radius:inherit; }
+    .bar--functional span { background:var(--teal); }
+    .bar--strict span { background:var(--blue); }
+    .chart-value { text-align:right; font-variant-numeric:tabular-nums; font-weight:750; }
+    .diagnostic-row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(90px,1.4fr) 28px; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--grid); font-size:13px; }
+    .diagnostic-row:last-child { border-bottom:0; }
+    .diagnostic-track span { background:var(--red); }
+    .diagnostic-row strong { text-align:right; }
+    .latency-row { display:grid; grid-template-columns:minmax(150px,.45fr) minmax(260px,1fr); gap:18px; align-items:center; padding:12px 0; border-bottom:1px solid var(--grid); }
+    .latency-row:last-child { border-bottom:0; }
+    .latency-row > div:first-child { display:flex; flex-direction:column; }
+    .latency-bars { display:grid; gap:5px; }
+    .latency-line { display:grid; grid-template-columns:48px 1fr 68px; gap:8px; align-items:center; }
+    .latency-line i { background:var(--blue); }
+    .latency-line--p95 i { background:var(--purple); }
+    .latency-line b { text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
+    .latency-empty,.empty { color:var(--muted); }
+    .case-chart-scale { display:flex; justify-content:space-between; margin:0 0 6px; color:var(--muted); font-size:11px; }
+    .case-chart { display:flex; align-items:flex-end; gap:max(1px,.15vw); height:190px; padding:10px 8px 0; border-bottom:1px solid var(--border); background:linear-gradient(to top,var(--grid) 1px,transparent 1px) 0 50%/100% 50%; }
+    .case-bar { flex:1 1 1px; min-width:1px; max-width:34px; border-radius:3px 3px 0 0; background:var(--blue); }
+    .case-bar--functional { background:var(--teal); }
+    .case-bar--failed { background:var(--red); }
+    .mini-grid,.baseline-head { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+    .mini-stat { padding:13px; border-radius:10px; background:var(--surface-soft); }
+    .mini-stat span,.baseline-head span { display:block; color:var(--muted); font-size:11px; }
+    .mini-stat strong,.baseline-head strong { display:block; margin-top:4px; font-size:16px; overflow-wrap:anywhere; }
+    .baseline-head { margin-bottom:12px; }
+    .baseline-head > div { padding:13px; border:1px solid var(--border); border-radius:10px; }
+    .delta.positive { color:var(--green); }
+    .delta.negative { color:var(--red); }
+    .warning,.success,.empty { margin:12px 0 0; padding:12px 14px; border-radius:10px; background:var(--surface-soft); line-height:1.55; }
+    .warning { color:var(--amber); background:rgba(215,138,8,.12); }
+    .success { color:var(--green); background:var(--green-soft); }
+    .table-wrap { width:100%; overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { padding:10px 11px; border-bottom:1px solid var(--grid); text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+    td { overflow-wrap:anywhere; }
+    code { color:inherit; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.92em; }
+    .status { display:inline-flex; padding:3px 7px; border-radius:999px; font-size:11px; font-weight:800; }
+    .status--strict { color:var(--blue); background:var(--blue-soft); }
+    .status--functional { color:var(--teal); background:var(--teal-soft); }
+    .status--failed { color:var(--red); background:var(--red-soft); }
+    details.panel summary { cursor:pointer; font-weight:800; }
+    dl { display:grid; grid-template-columns:minmax(130px,.28fr) minmax(0,1fr); gap:0; margin:16px 0 0; }
+    dt,dd { min-width:0; margin:0; padding:9px 0; border-bottom:1px solid var(--grid); }
+    dt { color:var(--muted); }
+    dd { overflow-wrap:anywhere; }
+    footer { margin-top:26px; color:var(--muted); font-size:12px; text-align:center; }
+    @media (prefers-color-scheme:dark) {
+      :root { --bg:#0b1220; --surface:#111b2d; --surface-soft:#162238; --ink:#edf4ff; --muted:#a3b2c8; --border:#2b3a52; --grid:#24334a; --blue:#58a6ff; --blue-soft:#173c65; --teal:#42d7c5; --teal-soft:#164c48; --purple:#aa91ff; --amber:#ffbd52; --red:#ff7272; --red-soft:#542a34; --green:#55d49b; --green-soft:#153f35; --shadow:0 18px 52px rgba(0,0,0,.25); }
+    }
+    @media (max-width:800px) {
+      main { width:min(100% - 20px,1180px); margin-top:10px; }
+      header { padding:20px; border-radius:14px; }
+      .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .two-col { grid-template-columns:1fr; }
+    }
+    @media (max-width:520px) {
+      header { flex-direction:column; }
+      .metrics { grid-template-columns:1fr; }
+      .chart-row { grid-template-columns:110px 1fr 48px; gap:8px; }
+      .latency-row { grid-template-columns:1fr; gap:8px; }
+      dl { grid-template-columns:1fr; }
+      dd { padding-top:0; }
+    }
+    @media print {
+      :root { --bg:#fff; --surface:#fff; --surface-soft:#f6f7f8; --ink:#111; --muted:#555; --border:#ccc; --grid:#ddd; }
+      body { background:#fff; }
+      main { width:100%; margin:0; }
+      .metric,.panel,header { box-shadow:none; break-inside:avoid; }
+      details { display:block; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">ProtoLink · infer-loop benchmark</div>
+      <h1>20260728T184629Z-ollama-gemma4-e4b</h1>
+      <p>ollama / gemma4:e4b · core · 40 cases · 2 repetition(s) · generated 2026-07-28T19:07:49.278136+00:00</p>
+    </div>
+    <span class="run-badge warn">Review failures</span>
+  </header>
+
+  <div class="metrics">
+            <article class="metric metric--strict">
+              <div class="metric-label">Strict</div>
+              <div class="metric-value">76 / 80</div>
+              <div class="metric-rate">95.0%</div>
+              <div class="meter" role="img" aria-label="Strict 95.0%">
+                <span style="width:95.000%"></span>
+              </div>
+              <p>Exact result, actions, and clean protocol</p>
+            </article>
+            
+            <article class="metric metric--functional">
+              <div class="metric-label">Functional</div>
+              <div class="metric-value">76 / 80</div>
+              <div class="metric-rate">95.0%</div>
+              <div class="meter" role="img" aria-label="Functional 95.0%">
+                <span style="width:95.000%"></span>
+              </div>
+              <p>Correct after possible self-correction</p>
+            </article>
+            
+            <article class="metric metric--first">
+              <div class="metric-label">First try</div>
+              <div class="metric-value">76 / 80</div>
+              <div class="metric-rate">95.0%</div>
+              <div class="meter" role="img" aria-label="First try 95.0%">
+                <span style="width:95.000%"></span>
+              </div>
+              <p>Strict on the first fresh attempt</p>
+            </article>
+            
+        <article class="metric metric--time">
+          <div class="metric-label">Strict first-try latency</div>
+          <div class="metric-value">13.51s</div>
+          <div class="metric-rate">p95 36.75s</div>
+          <div class="metric-rule"></div>
+          <p>Scored wall time 1252.15s</p>
+        </article>
+        </div>
+
+  <section class="two-col">
+    <div class="panel">
+      <h2>Correctness by category</h2>
+      <p class="section-intro">Functional success is shown above strict, clean success.</p>
+      
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>direct final</strong>
+                <span>14/14 strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="direct final: strict 14 of 14, functional 14 of 14">
+                <div class="bar bar--functional"><span style="width:100.000%"></span></div>
+                <div class="bar bar--strict"><span style="width:100.000%"></span></div>
+              </div>
+              <div class="chart-value">100.0%</div>
+            </div>
+            
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>local tool</strong>
+                <span>14/14 strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="local tool: strict 14 of 14, functional 14 of 14">
+                <div class="bar bar--functional"><span style="width:100.000%"></span></div>
+                <div class="bar bar--strict"><span style="width:100.000%"></span></div>
+              </div>
+              <div class="chart-value">100.0%</div>
+            </div>
+            
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>delegated tool</strong>
+                <span>14/14 strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="delegated tool: strict 14 of 14, functional 14 of 14">
+                <div class="bar bar--functional"><span style="width:100.000%"></span></div>
+                <div class="bar bar--strict"><span style="width:100.000%"></span></div>
+              </div>
+              <div class="chart-value">100.0%</div>
+            </div>
+            
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>delegated infer</strong>
+                <span>14/14 strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="delegated infer: strict 14 of 14, functional 14 of 14">
+                <div class="bar bar--functional"><span style="width:100.000%"></span></div>
+                <div class="bar bar--strict"><span style="width:100.000%"></span></div>
+              </div>
+              <div class="chart-value">100.0%</div>
+            </div>
+            
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>multi step</strong>
+                <span>8/12 strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="multi step: strict 8 of 12, functional 8 of 12">
+                <div class="bar bar--functional"><span style="width:66.667%"></span></div>
+                <div class="bar bar--strict"><span style="width:66.667%"></span></div>
+              </div>
+              <div class="chart-value">66.7%</div>
+            </div>
+            
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>grounding trap</strong>
+                <span>12/12 strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="grounding trap: strict 12 of 12, functional 12 of 12">
+                <div class="bar bar--functional"><span style="width:100.000%"></span></div>
+                <div class="bar bar--strict"><span style="width:100.000%"></span></div>
+              </div>
+              <div class="chart-value">100.0%</div>
+            </div>
+            
+      <div class="legend"><span><i class="legend-functional"></i>Functional</span><span><i></i>Strict</span></div>
+    </div>
+    <div class="panel">
+      <h2>Attempt diagnostics</h2>
+      <p class="section-intro">84 executed fresh attempts.</p>
+      
+            <div class="diagnostic-row">
+              <span>Hallucinated action</span>
+              <div class="diagnostic-track" role="img"
+                   aria-label="Hallucinated action: 8 of 84 attempts">
+                <span style="width:9.524%"></span>
+              </div>
+              <strong>8</strong>
+            </div>
+            
+            <div class="diagnostic-row">
+              <span>Parse recovery</span>
+              <div class="diagnostic-track" role="img"
+                   aria-label="Parse recovery: 0 of 84 attempts">
+                <span style="width:0.000%"></span>
+              </div>
+              <strong>0</strong>
+            </div>
+            
+            <div class="diagnostic-row">
+              <span>Provider retry</span>
+              <div class="diagnostic-track" role="img"
+                   aria-label="Provider retry: 0 of 84 attempts">
+                <span style="width:0.000%"></span>
+              </div>
+              <strong>0</strong>
+            </div>
+            
+            <div class="diagnostic-row">
+              <span>Crashed</span>
+              <div class="diagnostic-track" role="img"
+                   aria-label="Crashed: 8 of 84 attempts">
+                <span style="width:9.524%"></span>
+              </div>
+              <strong>8</strong>
+            </div>
+            
+            <div class="diagnostic-row">
+              <span>Timed out</span>
+              <div class="diagnostic-track" role="img"
+                   aria-label="Timed out: 0 of 84 attempts">
+                <span style="width:0.000%"></span>
+              </div>
+              <strong>0</strong>
+            </div>
+            
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Latency distributions</h2>
+    <p class="section-intro">Bars share one p95 scale; medians and tails stay separate from correctness.</p>
+    
+            <div class="latency-row">
+              <div><strong>First attempt end-to-end</strong><span>80 samples</span></div>
+              <div class="latency-bars">
+                <div class="latency-line">
+                  <span>median</span>
+                  <div><i style="width:52.153%"></i></div>
+                  <b>13.69s</b>
+                </div>
+                <div class="latency-line latency-line--p95">
+                  <span>p95</span>
+                  <div><i style="width:100.000%"></i></div>
+                  <b>26.25s</b>
+                </div>
+              </div>
+            </div>
+            
+            <div class="latency-row">
+              <div><strong>Selected attempt end-to-end</strong><span>80 samples</span></div>
+              <div class="latency-bars">
+                <div class="latency-line">
+                  <span>median</span>
+                  <div><i style="width:52.153%"></i></div>
+                  <b>13.69s</b>
+                </div>
+                <div class="latency-line latency-line--p95">
+                  <span>p95</span>
+                  <div><i style="width:100.000%"></i></div>
+                  <b>26.25s</b>
+                </div>
+              </div>
+            </div>
+            
+            <div class="latency-row">
+              <div><strong>LLM per attempt</strong><span>84 samples</span></div>
+              <div class="latency-bars">
+                <div class="latency-line">
+                  <span>median</span>
+                  <div><i style="width:53.552%"></i></div>
+                  <b>14.06s</b>
+                </div>
+                <div class="latency-line latency-line--p95">
+                  <span>p95</span>
+                  <div><i style="width:99.911%"></i></div>
+                  <b>26.22s</b>
+                </div>
+              </div>
+            </div>
+            
+            <div class="latency-row">
+              <div><strong>Non-LLM per attempt</strong><span>76 samples</span></div>
+              <div class="latency-bars">
+                <div class="latency-line">
+                  <span>median</span>
+                  <div><i style="width:0.028%"></i></div>
+                  <b>7.4ms</b>
+                </div>
+                <div class="latency-line latency-line--p95">
+                  <span>p95</span>
+                  <div><i style="width:0.050%"></i></div>
+                  <b>13.1ms</b>
+                </div>
+              </div>
+            </div>
+            
+            <div class="latency-row">
+              <div><strong>Individual LLM call</strong><span>162 samples</span></div>
+              <div class="latency-bars">
+                <div class="latency-line">
+                  <span>median</span>
+                  <div><i style="width:21.256%"></i></div>
+                  <b>5.58s</b>
+                </div>
+                <div class="latency-line latency-line--p95">
+                  <span>p95</span>
+                  <div><i style="width:61.128%"></i></div>
+                  <b>16.04s</b>
+                </div>
+              </div>
+            </div>
+            
+  </section>
+
+  <section class="panel">
+    <h2>Case latency and outcome</h2>
+    <p class="section-intro">Each bar is the selected attempt for one logical case repetition.</p>
+    
+        <div class="case-chart-scale"><span>44.88s</span><span>0</span></div>
+        <div class="case-chart" role="img"
+             aria-label="Selected attempt latency for 80 logical case results">
+          <span class="case-bar case-bar--strict" style="height:12.752%" aria-label="direct-final-0001#r1: Strict, latency 5.72s"></span><span class="case-bar case-bar--strict" style="height:11.713%" aria-label="direct-final-0001#r2: Strict, latency 5.26s"></span><span class="case-bar case-bar--strict" style="height:27.228%" aria-label="local-tool-0001#r1: Strict, latency 12.22s"></span><span class="case-bar case-bar--strict" style="height:26.236%" aria-label="local-tool-0001#r2: Strict, latency 11.78s"></span><span class="case-bar case-bar--strict" style="height:24.798%" aria-label="delegated-tool-0001#r1: Strict, latency 11.13s"></span><span class="case-bar case-bar--strict" style="height:24.145%" aria-label="delegated-tool-0001#r2: Strict, latency 10.84s"></span><span class="case-bar case-bar--strict" style="height:33.594%" aria-label="delegated-infer-0001#r1: Strict, latency 15.08s"></span><span class="case-bar case-bar--strict" style="height:31.017%" aria-label="delegated-infer-0001#r2: Strict, latency 13.92s"></span><span class="case-bar case-bar--strict" style="height:98.606%" aria-label="multi-step-0001#r1: Strict, latency 44.26s"></span><span class="case-bar case-bar--strict" style="height:92.211%" aria-label="multi-step-0001#r2: Strict, latency 41.39s"></span><span class="case-bar case-bar--strict" style="height:41.856%" aria-label="grounding-trap-0001#r1: Strict, latency 18.79s"></span><span class="case-bar case-bar--strict" style="height:37.094%" aria-label="grounding-trap-0001#r2: Strict, latency 16.65s"></span><span class="case-bar case-bar--strict" style="height:12.496%" aria-label="direct-final-0002#r1: Strict, latency 5.61s"></span><span class="case-bar case-bar--strict" style="height:11.752%" aria-label="direct-final-0002#r2: Strict, latency 5.27s"></span><span class="case-bar case-bar--strict" style="height:27.787%" aria-label="local-tool-0002#r1: Strict, latency 12.47s"></span><span class="case-bar case-bar--strict" style="height:29.993%" aria-label="local-tool-0002#r2: Strict, latency 13.46s"></span><span class="case-bar case-bar--strict" style="height:31.647%" aria-label="delegated-tool-0002#r1: Strict, latency 14.20s"></span><span class="case-bar case-bar--strict" style="height:29.295%" aria-label="delegated-tool-0002#r2: Strict, latency 13.15s"></span><span class="case-bar case-bar--strict" style="height:30.209%" aria-label="delegated-infer-0002#r1: Strict, latency 13.56s"></span><span class="case-bar case-bar--strict" style="height:29.540%" aria-label="delegated-infer-0002#r2: Strict, latency 13.26s"></span><span class="case-bar case-bar--strict" style="height:47.753%" aria-label="multi-step-0002#r1: Strict, latency 21.43s"></span><span class="case-bar case-bar--strict" style="height:52.968%" aria-label="multi-step-0002#r2: Strict, latency 23.77s"></span><span class="case-bar case-bar--strict" style="height:41.539%" aria-label="grounding-trap-0002#r1: Strict, latency 18.64s"></span><span class="case-bar case-bar--strict" style="height:36.508%" aria-label="grounding-trap-0002#r2: Strict, latency 16.39s"></span><span class="case-bar case-bar--strict" style="height:15.086%" aria-label="direct-final-0003#r1: Strict, latency 6.77s"></span><span class="case-bar case-bar--strict" style="height:14.938%" aria-label="direct-final-0003#r2: Strict, latency 6.70s"></span><span class="case-bar case-bar--strict" style="height:29.887%" aria-label="local-tool-0003#r1: Strict, latency 13.41s"></span><span class="case-bar case-bar--strict" style="height:27.257%" aria-label="local-tool-0003#r2: Strict, latency 12.23s"></span><span class="case-bar case-bar--strict" style="height:37.878%" aria-label="delegated-tool-0003#r1: Strict, latency 17.00s"></span><span class="case-bar case-bar--strict" style="height:36.162%" aria-label="delegated-tool-0003#r2: Strict, latency 16.23s"></span><span class="case-bar case-bar--strict" style="height:31.672%" aria-label="delegated-infer-0003#r1: Strict, latency 14.22s"></span><span class="case-bar case-bar--strict" style="height:32.599%" aria-label="delegated-infer-0003#r2: Strict, latency 14.63s"></span><span class="case-bar case-bar--failed" style="height:38.698%" aria-label="multi-step-0003#r1: Failed, latency 17.37s"></span><span class="case-bar case-bar--failed" style="height:38.567%" aria-label="multi-step-0003#r2: Failed, latency 17.31s"></span><span class="case-bar case-bar--strict" style="height:42.805%" aria-label="grounding-trap-0003#r1: Strict, latency 19.21s"></span><span class="case-bar case-bar--strict" style="height:36.387%" aria-label="grounding-trap-0003#r2: Strict, latency 16.33s"></span><span class="case-bar case-bar--strict" style="height:12.377%" aria-label="direct-final-0004#r1: Strict, latency 5.56s"></span><span class="case-bar case-bar--strict" style="height:12.172%" aria-label="direct-final-0004#r2: Strict, latency 5.46s"></span><span class="case-bar case-bar--strict" style="height:27.675%" aria-label="local-tool-0004#r1: Strict, latency 12.42s"></span><span class="case-bar case-bar--strict" style="height:26.667%" aria-label="local-tool-0004#r2: Strict, latency 11.97s"></span><span class="case-bar case-bar--strict" style="height:40.572%" aria-label="delegated-tool-0004#r1: Strict, latency 18.21s"></span><span class="case-bar case-bar--strict" style="height:38.294%" aria-label="delegated-tool-0004#r2: Strict, latency 17.19s"></span><span class="case-bar case-bar--strict" style="height:30.006%" aria-label="delegated-infer-0004#r1: Strict, latency 13.47s"></span><span class="case-bar case-bar--strict" style="height:29.406%" aria-label="delegated-infer-0004#r2: Strict, latency 13.20s"></span><span class="case-bar case-bar--strict" style="height:100.000%" aria-label="multi-step-0004#r1: Strict, latency 44.88s"></span><span class="case-bar case-bar--strict" style="height:81.878%" aria-label="multi-step-0004#r2: Strict, latency 36.75s"></span><span class="case-bar case-bar--strict" style="height:37.911%" aria-label="grounding-trap-0004#r1: Strict, latency 17.02s"></span><span class="case-bar case-bar--strict" style="height:32.961%" aria-label="grounding-trap-0004#r2: Strict, latency 14.79s"></span><span class="case-bar case-bar--strict" style="height:12.367%" aria-label="direct-final-0005#r1: Strict, latency 5.55s"></span><span class="case-bar case-bar--strict" style="height:11.811%" aria-label="direct-final-0005#r2: Strict, latency 5.30s"></span><span class="case-bar case-bar--strict" style="height:28.133%" aria-label="local-tool-0005#r1: Strict, latency 12.63s"></span><span class="case-bar case-bar--strict" style="height:27.328%" aria-label="local-tool-0005#r2: Strict, latency 12.27s"></span><span class="case-bar case-bar--strict" style="height:28.938%" aria-label="delegated-tool-0005#r1: Strict, latency 12.99s"></span><span class="case-bar case-bar--strict" style="height:28.648%" aria-label="delegated-tool-0005#r2: Strict, latency 12.86s"></span><span class="case-bar case-bar--strict" style="height:30.789%" aria-label="delegated-infer-0005#r1: Strict, latency 13.82s"></span><span class="case-bar case-bar--strict" style="height:29.277%" aria-label="delegated-infer-0005#r2: Strict, latency 13.14s"></span><span class="case-bar case-bar--strict" style="height:51.486%" aria-label="multi-step-0005#r1: Strict, latency 23.11s"></span><span class="case-bar case-bar--strict" style="height:58.480%" aria-label="multi-step-0005#r2: Strict, latency 26.25s"></span><span class="case-bar case-bar--strict" style="height:40.892%" aria-label="grounding-trap-0005#r1: Strict, latency 18.35s"></span><span class="case-bar case-bar--strict" style="height:37.630%" aria-label="grounding-trap-0005#r2: Strict, latency 16.89s"></span><span class="case-bar case-bar--strict" style="height:11.981%" aria-label="direct-final-0006#r1: Strict, latency 5.38s"></span><span class="case-bar case-bar--strict" style="height:11.655%" aria-label="direct-final-0006#r2: Strict, latency 5.23s"></span><span class="case-bar case-bar--strict" style="height:29.170%" aria-label="local-tool-0006#r1: Strict, latency 13.09s"></span><span class="case-bar case-bar--strict" style="height:28.165%" aria-label="local-tool-0006#r2: Strict, latency 12.64s"></span><span class="case-bar case-bar--strict" style="height:35.948%" aria-label="delegated-tool-0006#r1: Strict, latency 16.13s"></span><span class="case-bar case-bar--strict" style="height:35.571%" aria-label="delegated-tool-0006#r2: Strict, latency 15.97s"></span><span class="case-bar case-bar--strict" style="height:30.197%" aria-label="delegated-infer-0006#r1: Strict, latency 13.55s"></span><span class="case-bar case-bar--strict" style="height:29.551%" aria-label="delegated-infer-0006#r2: Strict, latency 13.26s"></span><span class="case-bar case-bar--failed" style="height:32.560%" aria-label="multi-step-0006#r1: Failed, latency 14.61s"></span><span class="case-bar case-bar--failed" style="height:32.495%" aria-label="multi-step-0006#r2: Failed, latency 14.59s"></span><span class="case-bar case-bar--strict" style="height:34.926%" aria-label="grounding-trap-0006#r1: Strict, latency 15.68s"></span><span class="case-bar case-bar--strict" style="height:34.973%" aria-label="grounding-trap-0006#r2: Strict, latency 15.70s"></span><span class="case-bar case-bar--strict" style="height:12.120%" aria-label="direct-final-0007#r1: Strict, latency 5.44s"></span><span class="case-bar case-bar--strict" style="height:11.535%" aria-label="direct-final-0007#r2: Strict, latency 5.18s"></span><span class="case-bar case-bar--strict" style="height:28.174%" aria-label="local-tool-0007#r1: Strict, latency 12.65s"></span><span class="case-bar case-bar--strict" style="height:26.658%" aria-label="local-tool-0007#r2: Strict, latency 11.97s"></span><span class="case-bar case-bar--strict" style="height:35.823%" aria-label="delegated-tool-0007#r1: Strict, latency 16.08s"></span><span class="case-bar case-bar--strict" style="height:35.723%" aria-label="delegated-tool-0007#r2: Strict, latency 16.03s"></span><span class="case-bar case-bar--strict" style="height:33.007%" aria-label="delegated-infer-0007#r1: Strict, latency 14.81s"></span><span class="case-bar case-bar--strict" style="height:32.128%" aria-label="delegated-infer-0007#r2: Strict, latency 14.42s"></span>
+        </div>
+        <div class="legend">
+          <span><i class="legend-strict"></i>Strict</span>
+          <span><i class="legend-functional"></i>Functional</span>
+          <span><i class="legend-failed"></i>Failed</span>
+        </div>
+        
+  </section>
+
+  <section class="two-col">
+    <div class="panel">
+      <h2>Repetitions</h2>
+      
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Repetition</th><th>Strict first attempts</th><th>Median E2E</th><th>Median LLM</th></tr></thead>
+            <tbody>
+            <tr>
+              <td>1</td>
+              <td>38</td>
+              <td>14.01s</td>
+              <td>14.00s</td>
+            </tr>
+            
+            <tr>
+              <td>2</td>
+              <td>38</td>
+              <td>13.36s</td>
+              <td>13.35s</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        
+    </div>
+    <div class="panel">
+      <h2>Cache-sensitive repeat probe</h2>
+      <div class="mini-grid">
+        <div class="mini-stat">
+          <span>End-to-end</span>
+          <strong>+3.6% faster</strong>
+        </div>
+        
+        <div class="mini-stat">
+          <span>First LLM call</span>
+          <strong>+3.8% faster</strong>
+        </div>
+        
+        <div class="mini-stat">
+          <span>First prompt eval</span>
+          <strong>+0.5% faster</strong>
+        </div>
+        </div>
+      <p class="section-intro cache-note">38 eligible strict adjacent pairs. This is a cache-sensitive repeat signal, not proof of a cache hit.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Baseline comparison</h2>
+    <p class="empty">No baseline was supplied for this run. Use <code>--baseline &lt;previous-summary.json&gt;</code> to add a before/after comparison.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Strict failures</h2>
+    <p class="section-intro">4 logical case results need review.</p>
+    
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Logical case</th><th>Category</th><th>Result</th><th>Attempts</th><th>Latency</th><th>Diagnostics</th></tr></thead>
+            <tbody>
+            <tr>
+              <td><code>multi-step-0003#r1</code></td>
+              <td>multi step</td>
+              <td><span class="status status--failed">Failed</span></td>
+              <td>2</td>
+              <td>17.37s</td>
+              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
+            </tr>
+            
+            <tr>
+              <td><code>multi-step-0003#r2</code></td>
+              <td>multi step</td>
+              <td><span class="status status--failed">Failed</span></td>
+              <td>2</td>
+              <td>17.31s</td>
+              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
+            </tr>
+            
+            <tr>
+              <td><code>multi-step-0006#r1</code></td>
+              <td>multi step</td>
+              <td><span class="status status--failed">Failed</span></td>
+              <td>2</td>
+              <td>14.61s</td>
+              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
+            </tr>
+            
+            <tr>
+              <td><code>multi-step-0006#r2</code></td>
+              <td>multi step</td>
+              <td><span class="status status--failed">Failed</span></td>
+              <td>2</td>
+              <td>14.59s</td>
+              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        
+  </section>
+
+  <section>
+    <details class="panel">
+      <summary>Run configuration and identity</summary>
+      <dl><dt>Run</dt><dd><code>20260728T184629Z-ollama-gemma4-e4b</code></dd><dt>Created</dt><dd><code>2026-07-28T19:07:49.278136+00:00</code></dd><dt>ProtoLink</dt><dd><code>0.6.7</code></dd><dt>Provider</dt><dd><code>ollama</code></dd><dt>Model</dt><dd><code>gemma4:e4b</code></dd><dt>Action mode</dt><dd><code>json_prompt</code></dd><dt>Model parameters</dt><dd><code>{&quot;num_ctx&quot;: 8192, &quot;num_predict&quot;: 2048, &quot;seed&quot;: 1337, &quot;temperature&quot;: 0.0}</code></dd><dt>Suite</dt><dd><code>core</code></dd><dt>Selected cases</dt><dd><code>40</code></dd><dt>Repetitions</dt><dd><code>2</code></dd><dt>Fresh attempts</dt><dd><code>2</code></dd><dt>Seed</dt><dd><code>1337</code></dd><dt>Suite hash</dt><dd><code>1ff42bf7154120d61153b7440976ad987c5a9cd06ba7d817e9ac753f8e8e8fdc</code></dd><dt>Prompt hash</dt><dd><code>b80047206caf36f31e47a46c43a33cfff5c705fcd8494ea5ee4adb55638937f8</code></dd><dt>Benchmark prompt hash</dt><dd><code>8ff5126cdd4162f961f87b90ceac1b1510d8bd6c599e53ab66d7e2a300074e9c</code></dd><dt>Git commit</dt><dd><code>a9479318b3a6</code></dd><dt>Git dirty</dt><dd><code>True</code></dd></dl>
+    </details>
+  </section>
+
+  <footer>Generated locally by the ProtoLink infer-loop benchmark. No external assets or requests.</footer>
+</main>
+</body>
+</html>
