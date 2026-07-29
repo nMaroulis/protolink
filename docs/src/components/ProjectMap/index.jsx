@@ -84,26 +84,30 @@ const surfaces = [
   },
   {
     id: 'intelligence',
-    label: 'LLMs and tools',
+    label: 'LLMs, knowledge, and tools',
     eyebrow: 'Capability layer',
-    title: 'Provider-optional reasoning and tool execution',
+    title: 'Provider-optional reasoning, retrieval, and tool execution',
     accent: '#7c3aed',
     summary:
-      'LLM adapters, history, metrics, structured parsing, and native or MCP-backed tools can be attached to agents without changing the communication substrate.',
-    modules: ['protolink.llms', 'protolink.tools'],
+      'LLM adapters, managed or existing knowledge, and native or MCP-backed tools can be attached to agents without changing the communication substrate.',
+    modules: ['protolink.llms', 'protolink.rag', 'protolink.tools'],
     responsibilities: [
       'Normalizes inference and tool-call behavior across providers',
+      'Loads, indexes, retrieves, filters, and cites application-owned knowledge',
+      'Adapts existing vector databases and custom retrievers through small protocols',
       'Keeps provider SDK dependencies optional',
       'Builds tool schemas and execution boundaries',
       'Tracks history, context manifests, compaction, and usage metrics when enabled',
     ],
     boundaries: [
       'Agents can run without an LLM',
+      'Retrieval can be managed locally or remain owned by an external index',
       'Tools are explicit modules, not prompt-only affordances',
       'Metrics extensions do not mutate prompts or history implicitly',
     ],
     docs: [
       ['LLM', '/docs/llm'],
+      ['Knowledge and RAG', '/docs/rag'],
       ['Tool', '/docs/tool'],
       ['LLM Usage', '/docs/llm_examples'],
     ],
@@ -276,6 +280,7 @@ const flowSteps = [
 const quickLinks = [
   ['First agent', '/docs/getting-started'],
   ['A2A core', '/docs/a2a'],
+  ['Knowledge and RAG', '/docs/rag'],
   ['Registry', '/docs/registry'],
   ['Transport', '/docs/transport'],
   ['Runtime control', '/docs/runtime'],

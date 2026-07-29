@@ -39,6 +39,9 @@ class Tool(BaseTool):
     _signature: inspect.Signature = field(init=False, repr=False)
     _type_hints: dict[str, Any] = field(init=False, repr=False, default_factory=dict)
     _protolink_builtin_id: str | None = field(init=False, repr=False, default=None)
+    _protolink_knowledge_tool: bool = field(init=False, repr=False, default=False)
+    _protolink_knowledge_name: str | None = field(init=False, repr=False, default=None)
+    _protolink_ephemeral_result: bool = field(init=False, repr=False, default=False)
     _protolink_validates_args: ClassVar[bool] = True
 
     def __post_init__(self) -> None:

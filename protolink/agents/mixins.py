@@ -23,6 +23,7 @@ from protolink.llms.base import LLM
 from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult, HistoryCompactionStrategy
 from protolink.logging import get_agent_farewell, get_agent_greeting
 from protolink.models import AgentCard, AgentSkill, Message, Task
+from protolink.rag import Citation, Knowledge, RAGAnswer, Retriever, SearchHit
 from protolink.security.tls import TLSConfig
 from protolink.server import AgentServer
 from protolink.state.operations import StateOperationRequest, StateOperationResult, StateStoreReport
@@ -714,6 +715,68 @@ class AgentCommunicationMixin(_AgentMixinBase):
         last_part = result_task.get_last_part_content()
         return last_part if last_part else "No response generated"
 
+    async def ask(
+        self,
+        question: str,
+        *,
+        knowledge: str | list[str] | tuple[str, ...] | None = None,
+        k: int | None = None,
+        where: dict[str, Any] | None = None,
+        citations: bool = True,
+        session_id: str = "ask_session_id",
+    ) -> RAGAnswer:
+        """Retrieve relevant knowledge before producing a grounded answer.
+
+        Unlike :meth:`invoke`, which lets the model decide whether to use a
+        knowledge tool, ``ask`` always retrieves first. The same task,
+        cancellation, policy, telemetry, history, and infer-loop boundaries are
+        retained.
+
+        Args:
+            question: User question to answer.
+            knowledge: Optional knowledge name or names. Omit to search every
+                source attached to this agent.
+            k: Optional result count per knowledge source.
+            where: Optional metadata filters passed to every selected source.
+            citations: Whether to request bracketed citations and return
+                citation metadata.
+            session_id: Conversation session identifier.
+
+        Returns:
+            Grounded answer text plus the retrieved hits and citations.
+        """
+        if not self.knowledge:
+            raise RuntimeError("Agent.ask requires at least one attached knowledge source")
+        if self.llm is None:
+            raise RuntimeError("Agent.ask requires an LLM to generate an answer")
+        if not isinstance(question, str) or not question.strip():
+            raise ValueError("question cannot be empty")
+        selected = [knowledge] if isinstance(knowledge, str) else list(knowledge or ())
+        infer_metadata: dict[str, Any] = {
+            "retrieval": "always",
+            "citations": citations,
+        }
+        if selected:
+            infer_metadata["knowledge"] = selected
+        if k is not None:
+            infer_metadata["k"] = k
+        if where:
+            infer_metadata["where"] = dict(where)
+
+        task = Task.create_infer(prompt=question, metadata=infer_metadata)
+        task.metadata["session_id"] = session_id
+        result_task = await self.handle_task(task)
+        content = result_task.get_last_part_content()
+        text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False, default=str)
+        hits: list[SearchHit] = list(getattr(result_task, "_rag_hits", ()))
+        source_citations: list[Citation] = list(getattr(result_task, "_rag_citations", ()))
+        return RAGAnswer(
+            text=text or "No response generated",
+            citations=source_citations if citations else [],
+            hits=hits,
+            query=question,
+        )
+
     async def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         """Discover agents in the registry.
 
@@ -764,7 +827,14 @@ class AgentToolMixin(_AgentMixinBase):
 
     def add_tool(self, tool: BaseTool) -> None:
         """Register or replace a tool and keep its advertised skill in sync."""
-        replacing_runtime_tool = tool.name in self.tools
+        existing_tool = self.tools.get(tool.name)
+        if (
+            existing_tool is not None
+            and existing_tool is not tool
+            and getattr(existing_tool, "_protolink_knowledge_tool", False)
+        ):
+            raise ValueError(f"Tool '{tool.name}' belongs to an attached knowledge source and cannot be replaced")
+        replacing_runtime_tool = existing_tool is not None
         self.tools[tool.name] = tool
         skill = AgentSkill(
             id=tool.name,
@@ -780,6 +850,58 @@ class AgentToolMixin(_AgentMixinBase):
                     self.card.skills[index] = skill
                 return
         self._add_skill_to_agent_card(skill)
+
+    def add_knowledge(self, knowledge: Knowledge | Retriever) -> Knowledge:
+        """Attach knowledge and register its read-only retrieval tool.
+
+        Plain retrievers are wrapped as a source named ``"knowledge"``. Wrap a
+        retriever in :class:`~protolink.rag.Knowledge` when supplying a custom
+        name, description, reranker, or result limit.
+
+        Args:
+            knowledge: Knowledge façade or structural ``Retriever``.
+
+        Returns:
+            The normalized :class:`Knowledge` object.
+
+        Raises:
+            ValueError: A knowledge name or generated tool name already exists.
+        """
+        active = knowledge if isinstance(knowledge, Knowledge) else Knowledge(knowledge)
+        if active.name in self.knowledge:
+            raise ValueError(f"Knowledge source '{active.name}' is already attached")
+        tool = active.as_tool()
+        if tool.name in self.tools:
+            raise ValueError(
+                f"Knowledge tool '{tool.name}' conflicts with an existing tool. Choose a different Knowledge name."
+            )
+        self.knowledge[active.name] = active
+        self.add_tool(tool)
+        self.card.capabilities.rag = True
+        self.card.capabilities.tool_calling = True
+        return active
+
+    def retriever(
+        self,
+        *,
+        name: str = "knowledge",
+        description: str | None = None,
+        default_k: int = 5,
+    ):
+        """Decorate a sync or async search function as Agent knowledge."""
+
+        def decorator(function):
+            self.add_knowledge(
+                Knowledge.from_callable(
+                    function,
+                    name=name,
+                    description=description,
+                    default_k=default_k,
+                )
+            )
+            return function
+
+        return decorator
 
     def tool(
         self,
@@ -1215,7 +1337,10 @@ class AgentConfigurationMixin(_AgentMixinBase):
         except Exception as e:
             return {"error": str(e)}
 
-    def _build_tools_prompt(self) -> str | None:
+    def _build_tools_prompt(
+        self,
+        tools: dict[str, BaseTool] | None = None,
+    ) -> str | None:
         """Return deterministic JSON metadata for tools exposed to the LLM.
 
         Example:
@@ -1235,12 +1360,13 @@ class AgentConfigurationMixin(_AgentMixinBase):
         objects as schema metadata while keeping the emitted document valid
         JSON.
         """
-        if not self.tools:
+        active_tools = self.tools if tools is None else tools
+        if not active_tools:
             return ""
 
         tool_metadata = []
-        for name in sorted(self.tools):
-            tool = self.tools[name]
+        for name in sorted(active_tools):
+            tool = active_tools[name]
             raw_capabilities = getattr(tool, "capabilities", None) or ()
             if isinstance(raw_capabilities, str):
                 raw_capabilities = (raw_capabilities,)
@@ -1558,8 +1684,25 @@ class AgentSerializationMixin(_AgentMixinBase):
                 }
 
         # Tools
-        if self.tools:
-            data["tools"] = [self._serialize_tool(t) for t in self.tools.values()]
+        serializable_tools = [
+            tool for tool in self.tools.values() if not getattr(tool, "_protolink_knowledge_tool", False)
+        ]
+        if serializable_tools:
+            data["tools"] = [self._serialize_tool(tool) for tool in serializable_tools]
+
+        if self.knowledge:
+            data["knowledge"] = [
+                {
+                    "name": knowledge.name,
+                    "description": knowledge.description,
+                    "default_k": knowledge.default_k,
+                    "managed": knowledge.managed,
+                    "reconnect_required": True,
+                }
+                for knowledge in self.knowledge.values()
+            ]
+        if self.knowledge or self.retrieval != "auto":
+            data["retrieval"] = self.retrieval
 
         return data
 
@@ -1681,6 +1824,16 @@ class AgentSerializationMixin(_AgentMixinBase):
             else:
                 raise ValueError("Serialized policy configuration must be a dictionary")
         approval_handler = overrides.get("approval_handler")
+        knowledge = overrides.get("knowledge")
+        if data.get("knowledge") and knowledge is None:
+            raise ValueError(
+                "Serialized knowledge contains connection descriptors, not credentials or live clients. "
+                "Pass knowledge=... to Agent.from_dict() to reconnect the knowledge sources."
+            )
+        retrieval_value = overrides.get("retrieval", data.get("retrieval", "auto"))
+        if retrieval_value not in {"auto", "always", "required"}:
+            raise ValueError("retrieval must be 'auto', 'always', or 'required'")
+        retrieval = retrieval_value
 
         skills_val = overrides.get("skills", data.get("skills"))
         skills: Literal["auto", "fixed"] = skills_val if skills_val in ("auto", "fixed") else "auto"
@@ -1725,7 +1878,22 @@ class AgentSerializationMixin(_AgentMixinBase):
             credentials=credentials,
             policy=policy,
             approval_handler=approval_handler,
+            knowledge=knowledge,
+            retrieval=retrieval,
         )
+        descriptors = data.get("knowledge") or []
+        if descriptors:
+            if not isinstance(descriptors, list) or any(
+                not isinstance(item, dict) or not isinstance(item.get("name"), str) for item in descriptors
+            ):
+                raise ValueError("Serialized knowledge descriptors must contain string names")
+            expected_names = [str(item["name"]) for item in descriptors]
+            restored_names = list(agent.knowledge)
+            if restored_names != expected_names:
+                raise ValueError(
+                    "Reconnected knowledge names must exactly match the serialized descriptors: "
+                    f"expected {expected_names}, received {restored_names}"
+                )
 
         tools_data = data.get("tools", [])
         for tool_dict in tools_data:

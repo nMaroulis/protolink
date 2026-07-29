@@ -93,8 +93,8 @@ class OllamaLLM(ServerLLM):
     # LLM calling (invocation)
     # ----------------------------------------------------------------------
 
-    def call(self, history: ConversationHistory) -> str:
-        """Generate a single non-streaming response from Ollama."""
+    def _call_response(self, history: ConversationHistory) -> dict[str, Any]:
+        """Return the complete non-streaming Ollama response payload."""
         if self._client is None:
             raise ValueError("Ollama client not connected")
 
@@ -140,7 +140,12 @@ class OllamaLLM(ServerLLM):
         if "message" not in result or "content" not in result["message"]:
             raise RuntimeError(f"Unexpected Ollama response format. Missing 'message' or 'content': {result}")
 
-        return result["message"]["content"]
+        return result
+
+    def call(self, history: ConversationHistory) -> str:
+        """Generate a single non-streaming response from Ollama."""
+        result = self._call_response(history)
+        return str(result["message"]["content"])
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Generate a streaming response from Ollama."""
@@ -206,11 +211,19 @@ class OllamaLLM(ServerLLM):
         returned tool calls into the same action protocol.
         """
         if not self._supports_tool_calling:
-            return super().call_action(
-                history,
+            _ = agent_callback_available
+            result = self._call_response(history)
+            raw_response = str(result["message"]["content"])
+            action = self._parse_infer_response(
+                raw_response,
                 tools=tools,
-                agent_callback_available=agent_callback_available,
                 agent_cards=agent_cards,
+            )
+            return LLMActionResult(
+                action=action,
+                raw_response=raw_response,
+                native=False,
+                metadata=usage_metadata({"provider": "ollama"}, result),
             )
         if self._client is None:
             raise ValueError("Ollama client not connected")

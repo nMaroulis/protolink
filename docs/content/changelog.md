@@ -34,7 +34,73 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.6.7] - 2026-07-28
+## [0.6.8] - 2026-07-30
+
+:::note Latest release
+
+This patch release introduces first-party **Retrieval-Augmented Generation
+(RAG)**, a deterministic **infer-loop benchmark** for evaluating model
+correctness, tool use, delegation, semantic agent routing, recovery, and
+performance, and a substantially expanded local observability workflow.
+Telemetry traces can now be inspected and replayed in the dashboard through
+the `protolink dashboard` CLI command, alongside improved Registry and Runs
+views. The CLI also gains explicit version reporting, while richer parse errors
+and benchmark artifacts make local-model behavior easier to diagnose,
+compare, and improve.
+
+:::
+
+### Added
+
+- Added first-party Retrieval-Augmented Generation through the `Knowledge`
+  facade and `create_knowledge()`: dependency-free in-memory and persistent
+  SQLite indexes, automatic loading/chunking/embedding, vector, keyword, and
+  hybrid search, metadata filters, MMR, reranking, managed index lifecycle,
+  normalized hits, structured citations, and async/blocking APIs.
+- Added retrieval-only adapters for user-owned Chroma collections, Pinecone
+  indexes, Qdrant collections, arbitrary `Retriever` implementations, and sync
+  or async search functions. External clients, credentials, embedding
+  compatibility, and index ownership remain with the application.
+- Added `Agent(..., knowledge=..., retrieval="auto"|"always"|"required")`,
+  generated `search_<name>` tools, `Agent.add_knowledge()`,
+  `@agent.retriever`, and deterministic `Agent.ask()` / `agent.sync.ask()`
+  returning `RAGAnswer` text, hits, and citations. Knowledge reads participate
+  in policy, approvals, cancellation, budgets, telemetry, task metadata, and
+  the existing native/JSON-fallback inference loop. Raw knowledge passages are
+  ephemeral to the active authorized model loop and are omitted from
+  persistent conversation history, task boundaries, and telemetry.
+- Added the dependency-free `examples/rag_agent.py` and a complete RAG guide
+  covering managed indexes, existing vector databases, custom retrievers,
+  retrieval modes, citations, source lifecycle, and operational safety.
+- Added a deterministic, repository-local infer-loop benchmark that exercises
+  the real `AgentClient`, `Task`, coordinator `Agent`, provider adapter, model
+  inference loop, local tools, delegated agents, runtime events, and telemetry
+  against controlled inputs and independently recorded outcomes.
+- Added benchmark coverage for direct answers, coordinator-owned tool calls,
+  delegated tool calls, delegated inference, structured output, grounding
+  traps, and semantic routing choices. Routing cases require the coordinator
+  to decide whether to answer directly, use a local tool, delegate a tool, or
+  delegate inference; authoritative and decoy agents can return identical
+  values so the action ledger and trace prove which agent was actually
+  selected.
+- Added deterministic `smoke`, `core`, and `full` benchmark suites, including a
+  200-case full catalog, reproducible seeds, category and case filters,
+  repetitions, warm-up controls, prompt-file overrides, and native-tool or
+  portable JSON-action configurations.
+- Added strict, functional, and first-try benchmark scoring together with
+  rescued-attempt counts, parse-recovery and hallucinated-action diagnostics,
+  inference-step statistics, latency percentiles, scored wall time, provider
+  call timing, repeat probes, and baseline comparison support.
+- Added self-contained HTML benchmark reports plus JSON and CSV artifacts. The
+  report keeps dense bar charts within a horizontally scrollable viewport and
+  provides an attempt review for unresolved and recovered failures, including
+  the original request, expected outcome, actual output, model decisions,
+  successful actions, traces, and runtime errors.
+- Added `InferParseError` with the failed response, attempt count, parser cause, and a concise explanation.
+- Added a local dashboard Telemetry explorer for `traces.jsonl`, with CLI or browser-file loading, bounded recent-first paging, lazy trace detail, span waterfalls, grouped task records, and playable event replay.
+- Added session-only Registry and read-only Runs source controls, a redesigned searchable run replay workspace, a corrected span waterfall selection/timeline layout, `protolink --version`, and the dashboard version label.
+
+## [0.6.7] - 2026-07-27
 
 :::note Latest release
 

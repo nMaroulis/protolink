@@ -704,6 +704,12 @@ solves a different problem: it preserves indexed task snapshots and normalized
 run reports so an application can retrieve, replay, compare, or audit past
 executions.
 
+:::tip[View runs in Devtools]
+
+Open a local run store with `protolink dashboard --store runs.db --open`.
+
+:::
+
 ### TaskRecord
 
 <ApiReference

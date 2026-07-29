@@ -9,9 +9,10 @@ export default function ApiSurface({
   pills = [],
   cards = [],
   note,
+  ariaLabel,
 }) {
   return (
-    <section className={styles.surface} aria-label={`${title} API surface`}>
+    <section className={styles.surface} aria-label={ariaLabel ?? `${title} API surface`}>
       <div className={styles.header}>
         <div className={styles.copy}>
           <span className={styles.eyebrow}>{eyebrow}</span>

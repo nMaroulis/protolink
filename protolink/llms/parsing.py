@@ -69,11 +69,20 @@ class ActionParseError(ValueError):
     without requiring callers to recover structure from a rendered error
     string. ``feedback`` contains the concise validation detail that is safe to
     return to the model; the full exception message remains available for logs
-    and telemetry. Subclassing ``ValueError`` preserves the parser's public
-    failure contract for callers that do not need the structured attributes.
+    and telemetry. ``raw_response`` preserves the exact provider text for a
+    terminal :class:`~protolink.llms.errors.InferParseError`. Subclassing
+    ``ValueError`` preserves the parser's public failure contract for callers
+    that do not need the structured attributes.
     """
 
-    def __init__(self, message: str, *, feedback: str, parsed_data: Any = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        feedback: str,
+        parsed_data: Any = None,
+        raw_response: str | None = None,
+    ) -> None:
         """Initialize a validation failure with separate log and retry views.
 
         Args:
@@ -83,10 +92,13 @@ class ActionParseError(ValueError):
             parsed_data: Decoded and conservatively repaired response, when
                 decoding succeeded. The runtime inspects it but never dispatches
                 it unless strict action validation succeeds.
+            raw_response: Exact provider response before decoding or repair.
+                ``None`` is reserved for callers that cannot expose it.
         """
         super().__init__(message)
         self.feedback = feedback
         self.parsed_data = parsed_data
+        self.raw_response = raw_response
 
     @property
     def action_type(self) -> str | None:
@@ -140,11 +152,11 @@ def parse_infer_response(
         ``LLMAction`` type alias.
 
     Raises:
-        ValueError: If no valid JSON object can be decoded.
-        ActionParseError: If decoding succeeds but the payload does not satisfy
-            the strict ``LLMAction`` contract. The exception separates bounded
-            log diagnostics from concise model feedback and retains the decoded
-            payload only as structured context for capability-aware correction.
+        ActionParseError: If no valid JSON object can be decoded or the decoded
+            payload does not satisfy the strict ``LLMAction`` contract. The
+            exception remains a ``ValueError`` for compatibility, separates
+            bounded log diagnostics from concise model feedback, and preserves
+            the exact raw response for terminal infer-loop diagnostics.
     """
     data = decode_json_response(response)
     data = repair_fallback_action_payload(data, tools=tools or {}, agent_cards=agent_cards or [])
@@ -159,6 +171,7 @@ def parse_infer_response(
             f"{feedback}\n{parsed_diagnostic}",
             feedback=feedback,
             parsed_data=data,
+            raw_response=response,
         ) from exc
     except Exception as exc:
         parsed_diagnostic = _format_parsed_data_diagnostic(data)
@@ -167,6 +180,7 @@ def parse_infer_response(
             f"{feedback}\n{parsed_diagnostic}",
             feedback=feedback,
             parsed_data=data,
+            raw_response=response,
         ) from exc
 
 
@@ -431,10 +445,10 @@ def decode_json_response(response: str) -> Any:
         The decoded JSON value, usually a dictionary.
 
     Raises:
-        ValueError: If neither the full response nor the embedded-object
+        ActionParseError: If neither the full response nor the embedded-object
             fallback can be decoded, or if multiple embedded objects are found.
-            A bounded raw-response preview is included for debugging and model
-            feedback.
+            This remains ``ValueError``-compatible and keeps bounded diagnostics
+            separate from concise correction feedback.
     """
     try:
         return json.loads(response, strict=False)
@@ -447,8 +461,11 @@ def decode_json_response(response: str) -> Any:
                 fallback_texts.append(without_reasoning)
         elif _LEADING_REASONING_OPEN.match(response):
             raw_diagnostic = _format_raw_response_diagnostic(response)
-            raise ValueError(
-                f"Invalid JSON action response: unterminated leading reasoning block.\n{raw_diagnostic}"
+            feedback = "Invalid JSON action response: unterminated leading reasoning block."
+            raise ActionParseError(
+                f"{feedback}\n{raw_diagnostic}",
+                feedback=feedback,
+                raw_response=response,
             ) from original_error
         else:
             fallback_texts.append(response)
@@ -487,11 +504,21 @@ def decode_json_response(response: str) -> Any:
 
         raw_diagnostic = _format_raw_response_diagnostic(response)
         if ambiguous_count > 1:
-            raise ValueError(
+            feedback = (
                 f"Invalid JSON action response: found {ambiguous_count} valid top-level JSON objects; "
-                f"expected exactly one.\n{raw_diagnostic}"
+                "expected exactly one."
+            )
+            raise ActionParseError(
+                f"{feedback}\n{raw_diagnostic}",
+                feedback=feedback,
+                raw_response=response,
             ) from original_error
-        raise ValueError(f"Invalid JSON: {original_error}\n{raw_diagnostic}") from original_error
+        feedback = f"Invalid JSON: {original_error}"
+        raise ActionParseError(
+            f"{feedback}\n{raw_diagnostic}",
+            feedback=feedback,
+            raw_response=response,
+        ) from original_error
 
 
 def _serialize_json_content(value: Any) -> str:
@@ -621,6 +648,10 @@ def _format_parsed_data_diagnostic(data: Any) -> str:
 
 def _format_bounded_diagnostic(label: str, value: str) -> str:
     """Return a head-and-tail diagnostic with a fixed payload-size ceiling."""
+    if value == "":
+        return f"{label}: <empty>"
+    if not value.strip():
+        return f"{label}: <whitespace only; {len(value)} characters>"
     if len(value) <= _DIAGNOSTIC_PREVIEW_CHARS:
         return f"{label}: {value}"
 

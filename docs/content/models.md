@@ -1747,7 +1747,12 @@ Coarse capability and capacity declaration carried by an `AgentCard`. These valu
       Indicates that task or operation timeouts are understood by the agent.
     </ApiField>
     <ApiField name="rag" type="bool" defaultValue="False">
-      Advertises retrieval-augmented generation support.
+      Advertises retrieval-augmented generation support. Attaching a
+      <code>Knowledge</code> source through the Agent constructor,
+      <code>add_knowledge()</code>, or <code>@agent.retriever</code> sets this
+      flag to true automatically and registers the corresponding read-only
+      search tool. Setting the flag manually remains descriptive and does not
+      create a retriever or index.
     </ApiField>
     <ApiField name="code_execution" type="bool" defaultValue="False">
       Advertises access to a code-execution facility. This flag is not a security boundary; the actual sandbox and policy must be configured separately.

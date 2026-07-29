@@ -16,7 +16,7 @@ ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specificat
 
 A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, structured agent flows and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
 
-The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, built-in, native, or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
+The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, application knowledge for **RAG**, built-in, native, or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
 ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, vLLM, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
 
@@ -128,6 +128,7 @@ Install the integrations used here with `uv add "protolink[http,mcp]"`; the Olla
 | Plug-in surface | Built-in choices |
 | --- | --- |
 | [LLMs](https://nmaroulis.github.io/protolink/docs/llm/) | OpenAI, Anthropic, Gemini, Grok, DeepSeek, Hugging Face, Ollama, llama.cpp, LM Studio, vLLM, OpenAI-compatible servers, mock, custom |
+| [Knowledge and RAG](https://nmaroulis.github.io/protolink/docs/rag/) | Dependency-free memory and SQLite indexes, Chroma, Pinecone, Qdrant, custom vector stores and retrievers |
 | [Tools](https://nmaroulis.github.io/protolink/docs/tool/) | Built-in web search, URL fetch, calculator, current datetime, typed Python tools, MCP adapters, custom `BaseTool` implementations |
 | [Transports](https://nmaroulis.github.io/protolink/docs/transport/) | Runtime, HTTP, SSE JSON-RPC, WebSocket, gRPC, custom transports |
 | [Registry](https://nmaroulis.github.io/protolink/docs/registry/) | Local or network discovery through `Registry` and `RegistryClient` |
@@ -138,11 +139,35 @@ Install the integrations used here with `uv add "protolink[http,mcp]"`; the Olla
 | [Logging](https://nmaroulis.github.io/protolink/docs/logging/) | Colored console, text/JSON files, quiet logger, custom `BaseLogger` |
 | [Runtime control](https://nmaroulis.github.io/protolink/docs/runtime/) | Budgets, cancellation, policy, approvals, events, reports, replay, regression diffing, redaction |
 
+Attach private or application-owned knowledge with the same progressive-control
+API:
+
+```python
+from protolink import create_knowledge
+
+knowledge = create_knowledge(
+    "memory",
+    name="product_docs",
+    description="product manuals and troubleshooting guides",
+    sources=["docs/"],
+)
+planner_agent.add_knowledge(knowledge)
+
+answer = planner_agent.sync.ask("How do I reset a device?")
+print(answer.text, answer.citations)
+```
+
+`Agent.invoke()` lets the model choose the automatically registered
+`search_product_docs` tool. `Agent.ask()` always retrieves first and returns
+the answer together with normalized hits and citations. Existing Chroma,
+Pinecone, Qdrant, or custom search systems can be attached without moving
+their data. See [Retrieval-Augmented Generation](https://nmaroulis.github.io/protolink/docs/rag/).
+
 ## LLM-agnostic, with a strong local focus
 
 For LLM-backed agents, the **infer loop** is the heart of ProtoLink:
 
-1. The model proposes one next action.
+1. The model proposes one next action, including a knowledge search when one is available.
 2. ProtoLink parses and validates it.
 3. The runtime executes a tool call, agent delegation, or final response.
 4. The structured result is added to the task context.
@@ -308,6 +333,22 @@ protolink run diff baseline_run candidate_run --store runs.db
 ```
 
 See the [developer tools guide](https://nmaroulis.github.io/protolink/docs/devtools/).
+
+
+## Infer-loop benchmark
+
+The ProtoLink repository includes a closed-world regression benchmark for prompt and infer-loop changes. It exercises
+direct answers, local tools, directed and autonomous agent routing, dependent multi-step work, and grounding traps, then reports strict and
+recovered functional scores plus end-to-end, model-call, provider, and repeat/cache-sensitive timing.
+
+```bash
+python -m benchmarks.infer_loop --provider ollama --model gemma4:e4b --suite smoke
+```
+
+The benchmark is source-checkout tooling under `benchmarks/`, not part of the installable package. See the
+[infer-loop benchmark guide](benchmarks/infer_loop/README.md) for suite sizes, scoring, Ollama configuration, timing,
+baseline comparison, filtering, and CI thresholds.
+
 
 ## More examples
 

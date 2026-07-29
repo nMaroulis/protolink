@@ -95,7 +95,7 @@ const config = {
         {
           name: "keywords",
           content:
-            "ProtoLink, agent-to-agent, A2A, Python agents, LLM tools, runtime control, multi-agent systems",
+            "ProtoLink, agent-to-agent, A2A, Python agents, RAG, retrieval-augmented generation, vector search, LLM tools, runtime control, multi-agent systems",
         },
       ],
       colorMode: {
@@ -176,6 +176,10 @@ const config = {
               {
                 label: "Agents",
                 to: "/docs/agent",
+              },
+              {
+                label: "Knowledge and RAG",
+                to: "/docs/rag",
               },
               {
                 label: "Runtime",

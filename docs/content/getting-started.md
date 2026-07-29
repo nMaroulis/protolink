@@ -41,6 +41,9 @@ uv add "protolink[http]"
 # All supported LLM libraries
 uv add "protolink[llms]"
 
+# Optional local PDF ingestion for RAG
+uv add "protolink[rag-pdf]"
+
 # Development (all extras + testing tools)
 uv add "protolink[dev]"
 ```
@@ -57,6 +60,9 @@ pip install "protolink[http]"
 
 # All supported LLM libraries
 pip install "protolink[llms]"
+
+# Optional local PDF ingestion for RAG
+pip install "protolink[rag-pdf]"
 
 # Development (all extras + testing tools)
 pip install "protolink[dev]"
@@ -77,7 +83,7 @@ uv pip install -e ".[dev]"
 </Tabs>
 :::info[Optional extras]
 
-You usually only need the extras that match your use case. `protolink[llms]` installs every supported LLM SDK, so production projects may prefer installing only the provider libraries they actually use.
+You usually only need the extras that match your use case. `protolink[llms]` installs every supported LLM SDK, so production projects may prefer installing only the provider libraries they actually use. Dependency-free in-memory and SQLite [RAG](rag.md) are part of the base package; `protolink[rag-pdf]` is needed only when the built-in loader reads local PDF files.
 
 :::
 For development from source:

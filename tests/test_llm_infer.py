@@ -12,7 +12,9 @@ from protolink.core.part import ToolOutput
 from protolink.core.run_context import RunBudget, RunContext
 from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
 from protolink.llms.base import LLM
+from protolink.llms.errors import InferParseError
 from protolink.llms.history import ConversationHistory
+from protolink.llms.parsing import ActionParseError
 from protolink.models import AgentCard, AgentSkill
 from protolink.tools.base import BaseTool
 
@@ -694,6 +696,23 @@ async def test_infer_uses_configured_action_parse_attempt_limit():
 
     assert result.content == "Recovered on the configured final attempt"
     assert llm.call_count == 4
+
+
+@pytest.mark.asyncio
+async def test_infer_parse_error_exposes_last_model_response_and_reason():
+    llm = MockLLM(["NOT JSON 1", "NOT JSON 2", ""])
+
+    with pytest.raises(InferParseError) as exc_info:
+        await llm.infer(query="Trigger terminal parse failure", tools={})
+
+    error = exc_info.value
+    assert error.attempts == 3
+    assert error.step == 3
+    assert error.raw_response == ""
+    assert isinstance(error.last_error, ActionParseError)
+    assert error.__cause__ is error.last_error
+    assert error.explanation == "The LLM adapter returned an empty response, so no JSON action could be decoded."
+    assert "Raw response: <empty>" in str(error)
 
 
 @pytest.mark.asyncio

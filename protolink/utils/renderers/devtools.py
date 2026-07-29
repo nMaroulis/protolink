@@ -99,10 +99,16 @@ class DevtoolsTextRenderer:
 class DevtoolsHtmlRenderer:
     """Render the local Protolink dashboard as self-contained HTML."""
 
-    def render_dashboard(self, snapshot: dict[str, Any], *, start_tab: str = "dashboard") -> str:
+    def render_dashboard(
+        self,
+        snapshot: dict[str, Any],
+        *,
+        start_tab: str = "dashboard",
+        live: bool = False,
+    ) -> str:
         """Render the dashboard shell with an embedded initial snapshot."""
         snapshot_json = _safe_json(snapshot)
-        return _dashboard_html(snapshot_json, start_tab=start_tab)
+        return _dashboard_html(snapshot_json, start_tab=start_tab, live=live)
 
 
 def _table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
@@ -136,14 +142,23 @@ def _default_blueprint() -> dict[str, Any]:
     }
 
 
-def _dashboard_html(snapshot_json: str, *, start_tab: str = "dashboard", title: str = "Protolink Dashboard") -> str:
+def _dashboard_html(
+    snapshot_json: str,
+    *,
+    start_tab: str = "dashboard",
+    title: str = "Protolink Dashboard",
+    live: bool = False,
+) -> str:
     """Return the dashboard HTML document."""
     safe_title = escape(title)
-    safe_start_tab = start_tab if start_tab in {"dashboard", "runs", "registry", "chat", "studio"} else "dashboard"
+    safe_start_tab = (
+        start_tab if start_tab in {"dashboard", "runs", "telemetry", "registry", "chat", "studio"} else "dashboard"
+    )
     return (
         _DASHBOARD_TEMPLATE.replace("__PROTOLINK_TITLE__", safe_title)
         .replace("__PROTOLINK_SNAPSHOT_JSON__", snapshot_json)
         .replace("__PROTOLINK_START_TAB_VALUE__", safe_start_tab)
+        .replace("__PROTOLINK_LIVE_VALUE__", "true" if live else "false")
     )
 
 
@@ -187,8 +202,8 @@ body {
 }
 button, input, select, textarea { font: inherit; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(15,159,146,.22); outline-offset: 2px; }
-.shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
-.side { background: var(--nav); color: #f8fafc; padding: 22px 18px; display: flex; flex-direction: column; gap: 20px; border-right: 1px solid rgba(255,255,255,.08); }
+.shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; min-width: 0; }
+.side { background: var(--nav); color: #f8fafc; padding: 22px 18px; display: flex; flex-direction: column; gap: 20px; border-right: 1px solid rgba(255,255,255,.08); min-width: 0; }
 .brand-card { width: 100%; display: flex; align-items: center; gap: 11px; text-align: left; border: 0; border-radius: 0; padding: 3px 0; color: #f8fafc; background: transparent; cursor: pointer; transition: transform .18s ease, color .18s ease; }
 .brand-card:hover { transform: translateX(2px); color: #fff; }
 .brand-logo { width: 38px; height: 38px; display: grid; place-items: center; background: transparent; border: 0; box-shadow: none; flex: 0 0 auto; }
@@ -203,8 +218,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .nav button:hover { background: rgba(255,255,255,.08); }
 .nav button.active { color: #fff; background: rgba(15,159,146,.26); box-shadow: inset 3px 0 0 var(--teal); }
 .soon-mini { font-size: 10px; color: #fff; background: rgba(189,125,17,.95); border-radius: 999px; padding: 2px 6px; }
-.side-foot { margin-top: auto; color: #bac5d4; font-size: 12px; line-height: 1.5; }
-.main { padding: 24px; overflow: auto; }
+.side-foot { margin-top: auto; color: #bac5d4; font-size: 12px; line-height: 1.5; display: grid; gap: 8px; }
+.side-version { color: #8795a8; font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .03em; }
+.main { padding: 24px; overflow: auto; min-width: 0; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
 .kicker { margin: 0 0 4px; color: var(--teal); font-size: 12px; font-weight: 760; text-transform: uppercase; letter-spacing: .06em; }
 h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
@@ -224,7 +240,7 @@ h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
 .icon-muted { color: var(--muted); }
 .alerts { display: grid; gap: 8px; margin-bottom: 14px; }
 .alert { border: 1px solid var(--amber); background: var(--amber-soft); color: #6d4608; border-radius: 8px; padding: 10px 12px; }
-.grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: repeat(5, minmax(145px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .metric { width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; box-shadow: var(--shadow-soft); min-height: 104px; position: relative; overflow: hidden; cursor: pointer; color: var(--ink); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .metric::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--teal); }
 .metric[data-accent="indigo"]::before { background: var(--indigo); }
@@ -354,12 +370,184 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 .field { display: grid; gap: 5px; }
 .field label { color: var(--muted); font-size: 12px; }
 .field input, .field select { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: #fff; min-width: 0; }
-.replay-list { display: grid; gap: 8px; }
-.timeline-item { display: grid; grid-template-columns: 140px 1fr; gap: 10px; border-left: 3px solid var(--indigo); padding: 8px 0 8px 12px; }
-.timeline-item.error { border-left-color: var(--coral); }
-.timeline-item.warn { border-left-color: var(--amber); }
-.timeline-time { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.timeline-main { display: grid; gap: 2px; }
+.source-connect {
+  margin-bottom: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 13px 14px;
+  background: linear-gradient(110deg, rgba(255,255,255,.96), rgba(223,246,242,.58), rgba(232,235,255,.52));
+  box-shadow: var(--shadow-soft); display: grid; grid-template-columns: minmax(230px, .8fr) minmax(320px, 1.2fr); gap: 14px; align-items: center;
+}
+.source-connect-copy { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.source-connect-mark { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; flex: 0 0 auto; color: var(--teal); background: #fff; border: 1px solid rgba(15,159,146,.20); }
+.source-connect-text { display: grid; gap: 2px; min-width: 0; }
+.source-connect-text strong, .source-connect-text span { overflow-wrap: anywhere; }
+.source-connect-text span { color: var(--muted); font-size: 12px; }
+.source-connect-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.source-connect-form input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; background: rgba(255,255,255,.96); }
+.source-feedback { grid-column: 1 / -1; min-height: 15px; color: var(--muted); font-size: 11px; }
+.source-feedback.error { color: var(--coral); }
+.source-feedback.ok { color: var(--green); }
+.runs-overview { display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.run-overview-card { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; padding: 12px 13px; background: rgba(255,255,255,.94); box-shadow: var(--shadow-soft); }
+.run-overview-card::after { content: ""; position: absolute; inset: auto -22px -30px auto; width: 74px; height: 74px; border-radius: 999px; background: rgba(86,101,216,.08); }
+.run-overview-card:nth-child(2)::after { background: rgba(15,159,146,.09); }
+.run-overview-card:nth-child(3)::after { background: rgba(189,125,17,.10); }
+.run-overview-card:nth-child(4)::after { background: rgba(214,91,72,.09); }
+.run-overview-card span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .045em; }
+.run-overview-card strong { display: block; margin-top: 3px; font-size: 23px; line-height: 1.1; }
+.runs-layout { display: grid; grid-template-columns: minmax(300px, 370px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.run-browser { min-height: 610px; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.run-browser-head { padding: 12px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) 105px; gap: 8px; background: linear-gradient(180deg, #fff, #f8fbfe); }
+.run-browser-head input, .run-browser-head select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px 9px; }
+.run-record-list { overflow: auto; max-height: 690px; padding: 7px; display: grid; align-content: start; gap: 6px; }
+.run-record {
+  appearance: none; width: 100%; border: 1px solid transparent; border-left: 3px solid transparent; border-radius: 8px; padding: 10px;
+  background: transparent; color: var(--ink); text-align: left; cursor: pointer; display: grid; gap: 7px; transition: background .14s ease, border-color .14s ease;
+}
+.run-record:hover { background: #f7fafc; border-color: #e4eaf2; }
+.run-record.active { background: linear-gradient(90deg, rgba(232,235,255,.68), rgba(223,246,242,.38)); border-color: rgba(86,101,216,.18); border-left-color: var(--indigo); }
+.run-record-top, .run-record-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.run-record-id { font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 720; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-record-meta { color: var(--muted); font-size: 11px; }
+.run-record-agent { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-record-agent .agent-avatar { width: 25px; height: 25px; border-radius: 7px; font-size: 9px; box-shadow: none; }
+.run-replay-shell { min-height: 610px; }
+.run-replay-empty { min-height: 430px; display: grid; place-items: center; padding: 40px 24px; text-align: center; background: radial-gradient(circle at 20% 20%, rgba(86,101,216,.08), transparent 30%), radial-gradient(circle at 85% 80%, rgba(15,159,146,.08), transparent 30%); }
+.run-replay-empty > div { max-width: 440px; }
+.run-replay-empty h3 { margin: 8px 0 5px; font-size: 20px; }
+.run-replay-empty p { margin: 0; color: var(--muted); }
+.run-replay-hero { padding: 15px 16px; border-bottom: 1px solid var(--line); background: linear-gradient(120deg, #fff, #f3f5ff 55%, #f0fbf8); display: grid; gap: 12px; }
+.run-replay-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.run-replay-title h3 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.run-replay-title p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.run-replay-facts { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 8px; }
+.run-replay-fact { border: 1px solid rgba(86,101,216,.13); border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,.78); min-width: 0; }
+.run-replay-fact strong { display: block; margin-top: 2px; overflow-wrap: anywhere; }
+.run-timeline { padding: 14px 16px 18px; display: grid; gap: 0; }
+.run-event { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding-bottom: 14px; }
+.run-event:last-child { padding-bottom: 0; }
+.run-event-rail { position: relative; display: flex; justify-content: center; }
+.run-event-rail::after { content: ""; position: absolute; top: 22px; bottom: -14px; width: 1px; background: #dbe2ec; }
+.run-event:last-child .run-event-rail::after { display: none; }
+.run-event-dot { width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; background: var(--indigo-soft); border: 1px solid rgba(86,101,216,.24); color: var(--indigo); font-size: 9px; font-weight: 800; z-index: 1; }
+.run-event.error .run-event-dot { color: var(--coral); background: var(--coral-soft); border-color: rgba(214,91,72,.24); }
+.run-event.warn .run-event-dot { color: var(--amber); background: var(--amber-soft); border-color: rgba(189,125,17,.24); }
+.run-event-card { border: 1px solid #e3e9f2; border-radius: 8px; padding: 10px 11px; background: #fff; min-width: 0; }
+.run-event-card strong { display: block; overflow-wrap: anywhere; }
+.run-event-card p { margin: 3px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.run-event-meta { margin-top: 7px; color: var(--muted); font-size: 11px; display: flex; flex-wrap: wrap; gap: 8px; }
+.telemetry-drop {
+  margin-bottom: 14px; border: 1px dashed #b9c6d8; border-radius: 10px; padding: 12px 14px;
+  background: linear-gradient(110deg, rgba(223,246,242,.74), rgba(232,235,255,.64), rgba(255,255,255,.92));
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.telemetry-drop.dragging { border-color: var(--teal); transform: translateY(-1px); box-shadow: 0 0 0 4px rgba(15,159,146,.10); }
+.telemetry-source { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.telemetry-source-mark { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; flex: 0 0 auto; color: var(--teal); background: #fff; border: 1px solid rgba(15,159,146,.20); box-shadow: var(--shadow-soft); }
+.telemetry-source-copy { display: grid; gap: 2px; min-width: 0; }
+.telemetry-source-copy strong, .telemetry-source-copy span { overflow-wrap: anywhere; }
+.telemetry-source-copy span { color: var(--muted); font-size: 12px; }
+.telemetry-source-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.telemetry-grid { display: grid; grid-template-columns: minmax(290px, 360px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.trace-browser { min-height: 720px; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.trace-browser-head { padding: 13px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; background: linear-gradient(180deg, #fff, #f8fbfe); }
+.trace-browser-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.trace-browser-title h2 { border: 0; padding: 0; }
+.trace-filters { display: grid; grid-template-columns: minmax(0, 1fr) 112px; gap: 7px; }
+.trace-filters input, .trace-filters select {
+  width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px 9px;
+}
+.trace-window-note { padding: 8px 13px; color: var(--muted); font-size: 11px; border-bottom: 1px solid #edf1f6; background: #fbfcfe; }
+.trace-list { overflow: auto; max-height: 610px; scrollbar-color: #cbd5e1 transparent; }
+.trace-group + .trace-group { border-top: 4px solid #eef2f7; }
+.trace-group-head { padding: 8px 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); background: linear-gradient(90deg, #f7fafc, #fbfcff); border-bottom: 1px solid #e8edf4; font-size: 10px; text-transform: uppercase; letter-spacing: .045em; }
+.trace-group-head code { color: var(--indigo); font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-transform: none; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-record {
+  width: 100%; border: 0; border-bottom: 1px solid #edf1f6; padding: 12px 13px; background: #fff; color: var(--ink);
+  text-align: left; cursor: pointer; display: grid; gap: 7px; transition: background .14s ease, box-shadow .14s ease;
+}
+.trace-record:hover { background: #f8fbfe; }
+.trace-record.active { background: linear-gradient(90deg, var(--teal-soft), #f6f8ff 76%); box-shadow: inset 3px 0 0 var(--teal); }
+.trace-record-top, .trace-record-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.trace-agent { font-weight: 780; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-record-id { color: var(--muted); font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-record-bottom { color: var(--muted); font-size: 11px; }
+.trace-browser-foot { padding: 10px 12px; border-top: 1px solid var(--line); background: #fbfcfe; }
+.trace-browser-foot .btn { width: 100%; }
+.trace-workbench { display: grid; gap: 14px; min-width: 0; }
+.trace-empty {
+  min-height: 420px; padding: 48px 24px; border: 1px dashed #c7d2e0; border-radius: 10px; background:
+  radial-gradient(circle at 15% 10%, rgba(15,159,146,.10), transparent 28%),
+  radial-gradient(circle at 90% 90%, rgba(86,101,216,.09), transparent 32%), #fff;
+  display: grid; place-items: center; text-align: center;
+}
+.trace-empty-inner { max-width: 480px; }
+.trace-empty-icon { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 14px; display: grid; place-items: center; color: var(--indigo); background: var(--indigo-soft); border: 1px solid rgba(86,101,216,.18); }
+.trace-empty h2 { margin: 0 0 7px; font-size: 21px; }
+.trace-empty p { margin: 0; color: var(--muted); }
+.trace-hero { overflow: visible; }
+.trace-hero-head { padding: 15px 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: start; background: linear-gradient(120deg, #fff 10%, #f2fbf9 54%, #f3f5ff); }
+.trace-hero-title { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
+.trace-kind-mark { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; color: var(--teal); background: var(--teal-soft); border: 1px solid rgba(15,159,146,.18); flex: 0 0 auto; }
+.trace-hero-title h2 { margin: 0; padding: 0; border: 0; font-size: 18px; display: block; overflow-wrap: anywhere; }
+.trace-hero-title p { margin: 3px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.trace-hero-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.trace-stats { display: grid; grid-template-columns: repeat(5, minmax(112px, 1fr)); gap: 0; border-top: 1px solid var(--line); }
+.trace-stat { padding: 11px 13px; border-right: 1px solid #edf1f6; background: rgba(255,255,255,.82); }
+.trace-stat:last-child { border-right: 0; }
+.trace-stat strong { display: block; margin-top: 2px; font-size: 15px; overflow-wrap: anywhere; }
+.trace-waterfall { padding: 12px 14px 15px; overflow-x: auto; }
+.waterfall-inner { --span-label-column: 210px; min-width: 720px; }
+.waterfall-scale, .span-row { display: grid; grid-template-columns: var(--span-label-column) minmax(460px, 1fr); gap: 12px; }
+.waterfall-scale { align-items: end; padding: 0 8px 7px; border: 1px solid transparent; color: var(--muted); font-size: 10px; }
+.waterfall-scale-ticks { grid-column: 2; display: flex; justify-content: space-between; min-width: 0; font-variant-numeric: tabular-nums; }
+.span-row {
+  appearance: none; position: relative; width: 100%; align-items: center; padding: 6px 8px; border: 1px solid transparent;
+  border-radius: 7px; background: transparent; color: inherit; text-align: left; cursor: pointer;
+  transition: background .13s ease, border-color .13s ease;
+}
+.span-row::before { content: ""; position: absolute; left: 2px; top: 7px; bottom: 7px; width: 3px; border-radius: 999px; background: var(--teal); opacity: 0; }
+.span-row:hover { background: #f6f9fc; border-color: #e6ebf2; }
+.span-row.active { background: linear-gradient(90deg, rgba(223,246,242,.72), rgba(232,235,255,.34)); border-color: rgba(15,159,146,.18); }
+.span-row.active::before { opacity: 1; }
+.span-row.active .span-name { color: #116d65; }
+.span-label { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; padding-left: calc(var(--depth, 0) * 10px); }
+.span-kind-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--teal); }
+.span-kind-dot.llm { background: var(--indigo); }
+.span-kind-dot.tool { background: var(--amber); }
+.span-kind-dot.agent-call { background: var(--coral); }
+.span-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 12px; }
+.span-duration { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.span-track { position: relative; height: 21px; border-radius: 6px; background:
+  linear-gradient(90deg, rgba(215,222,234,.48) 1px, transparent 1px); background-size: 25% 100%; overflow: hidden; }
+.span-bar { position: absolute; min-width: 4px; height: 11px; top: 5px; border-radius: 999px; background: linear-gradient(90deg, var(--teal), #2cc6b9); }
+.span-bar.llm { background: linear-gradient(90deg, var(--indigo), #8c96ef); }
+.span-bar.tool { background: linear-gradient(90deg, var(--amber), #e9af42); }
+.span-bar.agent-call { background: linear-gradient(90deg, var(--coral), #ef8e7d); }
+.span-bar.error { background: repeating-linear-gradient(135deg, var(--coral), var(--coral) 5px, #f69b8d 5px, #f69b8d 9px); }
+.span-bar.open { border: 1px dashed rgba(189,125,17,.9); background: rgba(255,243,207,.92); }
+.trace-limit-note { margin-top: 9px; color: var(--muted); font-size: 11px; }
+.replay-controls { padding: 11px 13px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: auto auto auto minmax(120px, 1fr) auto auto; align-items: center; gap: 8px; background: linear-gradient(90deg, #fbfcfe, #f3faf9); }
+.replay-controls input[type="range"] { width: 100%; accent-color: var(--teal); }
+.replay-controls select { border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; background: #fff; }
+.event-stage { padding: 15px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 14px; min-height: 180px; }
+.event-focus { border-left: 3px solid var(--indigo); padding: 4px 0 4px 14px; min-width: 0; }
+.event-focus.error { border-left-color: var(--coral); }
+.event-focus-kicker { color: var(--teal); font-size: 10px; font-weight: 780; letter-spacing: .06em; text-transform: uppercase; }
+.event-focus h3 { margin: 5px 0 7px; font-size: 18px; overflow-wrap: anywhere; }
+.event-focus p { margin: 0; color: var(--muted); }
+.event-payload-preview { margin: 11px 0 0; max-height: 130px; overflow: auto; white-space: pre-wrap; border-radius: 8px; background: #111827; color: #dbe7f5; padding: 10px; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.event-rail { display: grid; align-content: center; gap: 6px; max-height: 160px; overflow: auto; padding-right: 4px; }
+.event-rail button { border: 0; background: transparent; color: var(--muted); text-align: left; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px; align-items: center; padding: 4px 6px; border-radius: 6px; font-size: 11px; }
+.event-rail button:hover, .event-rail button.active { background: var(--indigo-soft); color: var(--ink); }
+.event-dot { width: 7px; height: 7px; border-radius: 999px; background: #aab5c4; }
+.event-rail button.active .event-dot { background: var(--indigo); box-shadow: 0 0 0 3px rgba(86,101,216,.12); }
+.inspector-tabs { padding: 10px 12px 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.inspector-tab { border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); padding: 4px 9px; cursor: pointer; font-size: 11px; }
+.inspector-tab.active { color: var(--indigo); background: var(--indigo-soft); border-color: rgba(86,101,216,.22); font-weight: 740; }
+.inspector-body { padding: 12px; }
+.inspector-json { margin: 0; max-height: 360px; overflow: auto; white-space: pre-wrap; border: 1px solid #253247; border-radius: 8px; background: #111827; color: #dbe7f5; padding: 12px; font: 11px/1.48 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 .studio-layout { display: grid; grid-template-columns: 220px 1fr 280px; gap: 12px; min-height: 660px; }
 .palette, .props { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; box-shadow: var(--shadow); opacity: .68; }
 .palette h2, .props h2 { font-size: 14px; margin: 0 0 10px; }
@@ -383,12 +571,43 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 .code { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #111827; color: #e5e7eb; border-radius: 8px; padding: 12px; max-height: 260px; overflow: auto; }
 @media (max-width: 1180px) {
   .shell { grid-template-columns: 1fr; }
-  .side { position: sticky; top: 0; z-index: 5; }
-  .grid, .bands, .studio-layout, .chat-layout { grid-template-columns: 1fr; }
+  .side { position: sticky; top: 0; z-index: 5; padding: 12px 16px; gap: 10px; box-shadow: 0 10px 28px rgba(17,24,39,.18); }
+  .side-meta, .side-foot > span:not(.side-version) { display: none; }
+  .side-foot { display: block; position: absolute; top: 18px; right: 16px; margin: 0; }
+  .side-version { color: #bac5d4; }
+  .brand-card { width: auto; align-self: flex-start; }
+  .brand-logo { width: 32px; height: 32px; }
+  .brand-logo img { width: 28px; height: 28px; }
+  .brand { font-size: 17px; }
+  .sub { font-size: 10px; }
+  .nav { display: flex; gap: 6px; overflow-x: auto; padding: 2px 1px 4px; scrollbar-width: thin; width: 100%; max-width: 100%; min-width: 0; }
+  .nav::-webkit-scrollbar { height: 4px; }
+  .nav::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
+  .nav::-webkit-scrollbar-thumb { background: rgba(186,197,212,.42); border-radius: 999px; }
+  .nav button { flex: 0 0 auto; min-height: 34px; padding: 7px 10px; white-space: nowrap; }
+  .grid, .bands, .studio-layout, .chat-layout, .telemetry-grid, .runs-layout, .source-connect { grid-template-columns: 1fr; }
   .agent-hero { grid-template-columns: 1fr; }
   .agent-hero-actions { justify-content: flex-start; }
   .agent-stat-grid, .schema-grid { grid-template-columns: 1fr; }
   .debug-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  .trace-browser { min-height: 0; }
+  .trace-list { max-height: 430px; }
+  .run-browser { min-height: 0; }
+  .run-record-list { max-height: 430px; }
+  .event-stage { grid-template-columns: 1fr; }
+  .event-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .main { padding: 16px; }
+  .top { flex-direction: column; }
+  .telemetry-drop, .trace-hero-head { grid-template-columns: 1fr; display: grid; }
+  .telemetry-source-meta, .trace-hero-badges { justify-content: flex-start; }
+  .trace-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .runs-overview, .run-replay-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trace-stat { border-bottom: 1px solid #edf1f6; }
+  .replay-controls { grid-template-columns: repeat(3, auto); }
+  .replay-controls input[type="range"] { grid-column: 1 / -1; }
+  .event-rail { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -402,15 +621,20 @@ td { font-size: 13px; overflow-wrap: anywhere; }
     <div class="side-meta">
       <span>Local inspection</span>
       <span id="side-store">Store: -</span>
+      <span id="side-traces">Telemetry: -</span>
     </div>
     <nav class="nav">
       <button id="nav-dashboard" onclick="showView('dashboard')"><span class="nav-label" data-icon="dashboard">Dashboard</span></button>
       <button id="nav-registry" onclick="showView('registry')"><span class="nav-label" data-icon="registry">Registry</span></button>
       <button id="nav-runs" onclick="showView('runs')"><span class="nav-label" data-icon="timeline">Runs</span></button>
+      <button id="nav-telemetry" onclick="showView('telemetry')"><span class="nav-label" data-icon="activity">Telemetry</span></button>
       <button id="nav-chat" onclick="showView('chat')"><span class="nav-label" data-icon="chat">Chat</span></button>
       <button id="nav-studio" onclick="showView('studio')"><span class="nav-label" data-icon="studio">Studio</span> <span class="soon-mini">Soon</span></button>
     </nav>
-    <div class="side-foot">Local devtools over registry cards, run reports, agent status, and chat.</div>
+    <div class="side-foot">
+      <span>Local devtools over registry cards, run reports, telemetry traces, agent status, and chat.</span>
+      <span class="side-version" id="side-version">Protolink</span>
+    </div>
   </aside>
   <main class="main">
     <section id="view-dashboard" class="view">
@@ -418,7 +642,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
         <div>
           <p class="kicker">Local runtime view</p>
           <h1>Dashboard</h1>
-          <p class="lede">Inspect persisted task snapshots, run reports, registry cards, agent health, and chat-ready HTTP agents from one local surface.</p>
+          <p class="lede">Inspect persisted task snapshots, run reports, local telemetry, registry cards, agent health, and chat-ready HTTP agents from one local surface.</p>
         </div>
         <div class="actions"><button class="btn primary" data-icon="refresh" onclick="refresh()">Refresh</button><button class="btn" data-icon="ping" onclick="pingAll()">Ping all</button></div>
       </div>
@@ -427,12 +651,93 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       <div class="dashboard-stack"><div class="panel"><h2>Registry <span class="online-summary" id="dashboard-registry-summary"></span></h2><div class="panel-note">For full agent details, schemas, transports, and security metadata, open the Registry tab.</div><div id="health-table"></div></div></div>
     </section>
     <section id="view-runs" class="view">
-      <div class="top"><div><p class="kicker">Replay substrate</p><h1>Runs</h1><p class="lede">Task snapshots and run reports from the configured SQLite run store.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
-      <div class="panel"><h2>Run store</h2><div id="runs-table"></div></div>
-      <div class="panel"><h2>Replay</h2><div class="panel-body" id="replay-panel">Select a run or task to replay it from the live dashboard server.</div></div>
+      <div class="top"><div><p class="kicker">Execution archive</p><h1>Runs</h1><p class="lede">Search recent task snapshots and reports, then replay their event history from a read-only SQLite source.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
+      <div class="source-connect" id="runs-source-card">
+        <div class="source-connect-copy">
+          <span class="source-connect-mark" data-icon="timeline"></span>
+          <div class="source-connect-text"><strong id="runs-source-name">No run store connected</strong><span id="runs-source-detail">Connect an existing Protolink SQLite database.</span></div>
+        </div>
+        <form class="source-connect-form" onsubmit="connectRunStore(event)">
+          <input id="runs-source-input" type="text" autocomplete="off" spellcheck="false" placeholder="/path/to/runs.db" aria-label="SQLite run-store path" />
+          <button class="btn primary" id="runs-source-button" data-icon="plug" type="submit">Connect store</button>
+          <span class="source-feedback" id="runs-source-feedback" role="status" aria-live="polite"></span>
+        </form>
+      </div>
+      <div class="runs-overview" id="runs-overview"></div>
+      <div class="runs-layout">
+        <aside class="panel run-browser">
+          <div class="run-browser-head">
+            <input id="run-search" type="search" placeholder="Run, session, agent…" oninput="renderRuns()" aria-label="Filter runs" />
+            <select id="run-kind-filter" onchange="renderRuns()" aria-label="Filter run record type"><option value="">All records</option><option value="report">Reports</option><option value="task">Tasks</option></select>
+          </div>
+          <div class="run-record-list" id="runs-list"></div>
+        </aside>
+        <section class="panel run-replay-shell">
+          <h2>Replay <span class="online-summary" id="run-replay-summary" role="status" aria-live="polite">Select a record</span></h2>
+          <div id="replay-panel" class="run-replay-empty" aria-busy="false"><div><span class="trace-empty-icon" data-icon="timeline"></span><h3>Choose a run</h3><p>Select a report or task snapshot to inspect its correlation details and event timeline.</p></div></div>
+        </section>
+      </div>
+    </section>
+    <section id="view-telemetry" class="view">
+      <div class="top">
+        <div>
+          <p class="kicker">LocalTraceTelemetry</p>
+          <h1>Telemetry</h1>
+          <p class="lede">Explore Protolink <code>traces.jsonl</code> as grouped task records, span waterfalls, and a playable event timeline. Only a bounded recent window is loaded at once.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" data-icon="refresh" onclick="reloadTelemetry()">Latest</button>
+          <button class="btn primary" data-icon="upload" onclick="openTelemetryFile()">Open JSONL</button>
+          <input id="telemetry-file" type="file" accept=".jsonl,application/json,text/plain" hidden onchange="handleTelemetryFile(this.files && this.files[0])" />
+        </div>
+      </div>
+      <div class="telemetry-drop" id="telemetry-drop"
+        ondragenter="telemetryDrag(event, true)" ondragover="telemetryDrag(event, true)"
+        ondragleave="telemetryDrag(event, false)" ondrop="dropTelemetryFile(event)">
+        <div class="telemetry-source">
+          <span class="telemetry-source-mark" id="telemetry-source-icon"></span>
+          <div class="telemetry-source-copy"><strong id="telemetry-source-name">No telemetry source</strong><span id="telemetry-source-detail">Pass --traces to the CLI or drop a traces.jsonl file here.</span></div>
+        </div>
+        <div class="telemetry-source-meta" id="telemetry-source-meta"></div>
+      </div>
+      <div class="alerts" id="telemetry-alerts"></div>
+      <div class="grid" id="telemetry-metrics"></div>
+      <div class="telemetry-grid">
+        <aside class="panel trace-browser">
+          <div class="trace-browser-head">
+            <div class="trace-browser-title"><h2>Task records</h2><span class="pill idle" id="trace-filter-count">0</span></div>
+            <div class="trace-filters">
+              <input id="trace-search" type="search" placeholder="Agent, trace, task, model…" oninput="renderTelemetryList()" aria-label="Filter telemetry records" />
+              <select id="trace-status-filter" onchange="renderTelemetryList()" aria-label="Filter telemetry by status">
+                <option value="">All status</option>
+                <option value="ok">OK</option>
+                <option value="error">Error</option>
+                <option value="running">Running</option>
+              </select>
+            </div>
+          </div>
+          <div class="trace-window-note" id="trace-window-note">Recent-first bounded window</div>
+          <div class="trace-list" id="trace-list"></div>
+          <div class="trace-browser-foot"><button class="btn" id="trace-load-more" data-icon="download" onclick="loadOlderTelemetry()">Load older records</button></div>
+        </aside>
+        <div class="trace-workbench" id="trace-workbench">
+          <div class="trace-empty"><div class="trace-empty-inner"><span class="trace-empty-icon" data-icon="activity"></span><h2>Open a telemetry trace</h2><p>Select a task record, pass <code>--traces traces.jsonl</code>, or drop a file above. Uploaded files stay in this browser tab.</p></div></div>
+        </div>
+      </div>
     </section>
     <section id="view-registry" class="view">
       <div class="top"><div><p class="kicker">Discovery</p><h1>Registry</h1><p class="lede">Agent cards currently visible to the dashboard snapshot, with status probes and chat entry points for HTTP agents.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button><button class="btn" data-icon="ping" onclick="pingAll()">Ping all</button></div></div>
+      <div class="source-connect" id="registry-source-card">
+        <div class="source-connect-copy">
+          <span class="source-connect-mark" data-icon="registry"></span>
+          <div class="source-connect-text"><strong id="registry-source-name">No registry connected</strong><span id="registry-source-detail">Connect a local HTTP registry to discover agents.</span></div>
+        </div>
+        <form class="source-connect-form" onsubmit="connectRegistry(event)">
+          <input id="registry-source-input" type="url" autocomplete="url" spellcheck="false" placeholder="http://127.0.0.1:9000" aria-label="Registry URL" />
+          <button class="btn primary" id="registry-source-button" data-icon="plug" type="submit">Connect registry</button>
+          <span class="source-feedback" id="registry-source-feedback" role="status" aria-live="polite"></span>
+        </form>
+      </div>
       <div class="panel"><h2>Agents</h2><div id="registry-table"></div></div>
       <div class="panel"><h2>Selected agent</h2><div class="panel-body" id="agent-detail"></div></div>
     </section>
@@ -441,7 +746,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       <div class="chat-layout">
         <aside class="chat-sidebar">
           <div class="field"><label>Agent</label><select id="chat-agent-select" onchange="selectChatAgent(this.value)"></select></div>
-          <div class="field"><label>Session</label><input id="chat-session" oninput="chatSessionId = this.value || chatSessionId; renderDebugPanel()" /></div>
+          <div class="field"><label>Session</label><input id="chat-session" oninput="chatRequestGeneration += 1; chatPending = false; chatSessionId = this.value || chatSessionId; renderChat()" /></div>
           <div id="chat-agent-detail"></div>
         </aside>
         <div class="chat-box">
@@ -506,6 +811,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 </div>
 <script>
 window.__PROTOLINK_SNAPSHOT__ = __PROTOLINK_SNAPSHOT_JSON__;
+window.__PROTOLINK_LIVE__ = __PROTOLINK_LIVE_VALUE__;
 let snapshot = window.__PROTOLINK_SNAPSHOT__;
 let blueprint = JSON.parse(JSON.stringify(snapshot.studio?.blueprint || {nodes: [], edges: []}));
 let selectedAgentIndex = 0;
@@ -515,6 +821,20 @@ let chatSessionId = newChatSessionId();
 let chatPending = false;
 let chatDebugOpen = false;
 let chatDebugStats = {sent: 0, latencies: [], lastLatency: null, lastError: null};
+let selectedRunKey = null;
+let runReplayGeneration = 0;
+let chatRequestGeneration = 0;
+let sourceConnectGeneration = {registry: 0, runs: 0};
+let sourceConnectionBusy = {registry: false, runs: false};
+let sourceConnectionFeedback = {registry: null, runs: null};
+let sourceInputDraft = {registry: null, runs: null};
+const TELEMETRY_PAGE_SIZE = 50;
+const TELEMETRY_SUMMARY_CAP = 500;
+const TELEMETRY_SPAN_RENDER_CAP = 240;
+const TELEMETRY_EVENT_RENDER_CAP = 320;
+const TELEMETRY_JSON_PREVIEW_CHARS = 90000;
+const TELEMETRY_DETAIL_MAX_BYTES = 16 * 1024 * 1024;
+let telemetryState = createTelemetryState(snapshot.telemetry);
 
 const ICON_PATHS = {
   activity: '<path d="M22 12h-4l-3 8-6-16-3 8H2"/>',
@@ -534,12 +854,13 @@ const ICON_PATHS = {
   status: '<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-5"/>',
   studio: '<path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M9 14h6v6H9z"/><path d="M10 7h4M12 10v4"/>',
   timeline: '<path d="M4 5v14"/><circle cx="4" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><path d="M8 6h12M8 18h12M8 12h8"/>',
-  tool: '<path d="m14.7 6.3 3-3a3 3 0 0 1-4 4l-7.4 7.4a2 2 0 1 0 3 3l7.4-7.4a3 3 0 0 1 4-4l-3 3"/>'
+  tool: '<path d="m14.7 6.3 3-3a3 3 0 0 1-4 4l-7.4 7.4a2 2 0 1 0 3 3l7.4-7.4a3 3 0 0 1 4-4l-3 3"/>',
+  upload: '<path d="M12 21V8"/><path d="m7 13 5-5 5 5"/><path d="M5 3h14"/>'
 };
 
 function icon(name) {
   const body = ICON_PATHS[name] || ICON_PATHS.spark;
-  return `<svg class="icon icon-${escAttr(name)}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+  return `<svg class="icon icon-${htmlAttr(name)}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
 }
 
 function hydrateIcons(root = document) {
@@ -554,20 +875,60 @@ function newChatSessionId() {
 }
 
 function showView(name) {
+  if (name !== 'telemetry') stopTelemetryPlayback();
   for (const el of document.querySelectorAll('.view')) el.classList.remove('active');
   for (const el of document.querySelectorAll('.nav button')) el.classList.remove('active');
   document.getElementById('view-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'telemetry') renderTelemetry();
   if (name === 'chat') renderChat();
   if (name === 'studio') renderStudio();
   hydrateIcons();
 }
 
 async function refresh() {
-  try {
-    const res = await fetch('/api/snapshot');
-    if (res.ok) snapshot = await res.json();
-  } catch (_) {}
+  if (window.__PROTOLINK_LIVE__) {
+    const refreshGeneration = ++telemetryState.refreshGeneration;
+    const sourceGeneration = telemetryState.sourceGeneration;
+    try {
+      const res = await fetch('/api/snapshot', {cache: 'no-store'});
+      const refreshedSnapshot = res.ok ? await res.json() : null;
+      const refreshedRevision = Number(refreshedSnapshot?.source_revision || 0);
+      const currentRevision = Number(snapshot.source_revision || 0);
+      if (
+        refreshedSnapshot
+        && refreshGeneration === telemetryState.refreshGeneration
+        && refreshedRevision >= currentRevision
+      ) {
+        const previousRegistryUrl = snapshot.registry?.url || null;
+        const previousStore = snapshot.runs?.store || null;
+        chatRequestGeneration += 1;
+        chatPending = false;
+        snapshot = refreshedSnapshot;
+        if (previousRegistryUrl !== (snapshot.registry?.url || null)) {
+          sourceInputDraft.registry = null;
+          sourceConnectionFeedback.registry = null;
+          health = {};
+          selectedAgentIndex = 0;
+          chatMessages = [];
+          chatPending = false;
+        }
+        if (previousStore !== (snapshot.runs?.store || null)) {
+          sourceInputDraft.runs = null;
+          sourceConnectionFeedback.runs = null;
+        }
+        selectedRunKey = null;
+        runReplayGeneration += 1;
+        resetRunReplayPanel();
+        if (
+          telemetryState.mode !== 'upload'
+          && sourceGeneration === telemetryState.sourceGeneration
+        ) {
+          syncTelemetryFromSnapshot(snapshot.telemetry);
+        }
+      }
+    } catch (_) {}
+  }
   blueprint = blueprint.nodes?.length ? blueprint : JSON.parse(JSON.stringify(snapshot.studio?.blueprint || {nodes: [], edges: []}));
   render();
 }
@@ -576,34 +937,1653 @@ function render() {
   const agents = snapshot.registry?.agents || [];
   const tasks = snapshot.runs?.tasks || [];
   const reports = snapshot.runs?.reports || [];
+  const telemetryRecords = telemetryState.records || [];
+  const telemetryGroups = new Set(telemetryRecords.map(record => record.trace_id).filter(Boolean)).size;
   const onlineCount = agents.filter(agent => healthStatus(agent).state === 'online').length;
   const alerts = [];
   if (snapshot.registry?.error) alerts.push('Registry: ' + snapshot.registry.error);
   if (snapshot.runs?.error) alerts.push('Run store: ' + snapshot.runs.error);
+  if (telemetryState.error) alerts.push('Telemetry: ' + telemetryState.error);
   document.getElementById('alerts').innerHTML = alerts.map(message => `<div class="alert">${esc(message)}</div>`).join('');
+  document.getElementById('side-version').textContent = 'Protolink v' + boundedDisplayText(snapshot.version, 'unknown', 48);
   document.getElementById('side-store').textContent = 'Store: ' + (snapshot.runs?.store || 'not configured');
+  document.getElementById('side-traces').textContent = 'Telemetry: ' + telemetrySourceShortLabel();
   document.getElementById('metrics').innerHTML = [
     metric('Agents', agents.length, onlineCount ? `${onlineCount} online` : snapshot.registry?.url || 'snapshot', 'teal', 'registry', 'registry'),
     metric('Tasks', tasks.length, 'open in Runs', 'indigo', 'runs', 'timeline'),
     metric('Reports', reports.length, 'stored run reports', 'amber', 'runs', 'play'),
+    metric('Telemetry', telemetryRecords.length, telemetryGroups ? `${telemetryGroups} trace group${telemetryGroups === 1 ? '' : 's'} loaded` : 'open traces.jsonl', 'indigo', 'telemetry', 'activity'),
     metric('Store', raw(storeStateHtml(Boolean(snapshot.runs?.store), snapshot.runs?.error)), snapshot.runs?.error || 'local run store', snapshot.runs?.error ? 'coral' : 'teal', 'runs', 'status')
   ].join('');
   const registrySummary = document.getElementById('dashboard-registry-summary');
   if (registrySummary) registrySummary.innerHTML = `${statusDotHtml(onlineCount ? 'online' : agents.length ? 'unknown' : 'runtime')} ${esc(agents.length ? `${agents.length} visible` : 'no agents')}`;
   document.getElementById('health-table').innerHTML = table(['Agent', 'URL', 'Health', 'Actions'], agents.slice(0, 8).map((a, index) => agentHealthRow(a, index)));
-  document.getElementById('runs-table').innerHTML = table(['Kind', 'ID', 'Session', 'Agent', 'Time'], [
-    ...reports.map(r => ['report', replayButton(r.run_id), r.session_id || '-', r.agent_name || '-', r.created_at || '-']),
-    ...tasks.map(t => ['task', replayButton(t.run_id || t.task_id), t.session_id || '-', t.agent_name || '-', t.updated_at || '-'])
-  ]);
   document.getElementById('registry-table').innerHTML = table(['Agent', 'Transport', 'URL', 'Capabilities', 'Health', 'Actions'], agents.map((a, index) => registryRow(a, index)));
+  renderSourceControls();
+  renderRuns();
   renderAgentDetail();
+  renderTelemetry();
   renderChat();
   renderStudio();
   hydrateIcons();
 }
 
+function renderSourceControls() {
+  const registry = snapshot.registry || {};
+  const runs = snapshot.runs || {};
+  updateSourceControl({
+    kind: 'registry',
+    configured: registry.configured ?? Boolean(registry.url),
+    value: registry.url || '',
+    connectedName: registry.url || 'Registry connected',
+    emptyName: 'No registry connected',
+    connectedDetail: registry.error
+      ? 'Connected, but the registry is currently unavailable.'
+      : `${(registry.agents || []).length} agent card${(registry.agents || []).length === 1 ? '' : 's'} discovered`,
+    emptyDetail: 'Connect a local HTTP registry to discover agents.',
+  });
+  updateSourceControl({
+    kind: 'runs',
+    configured: runs.configured ?? Boolean(runs.store),
+    value: runs.store || '',
+    connectedName: runs.store || 'Run store connected',
+    emptyName: 'No run store connected',
+    connectedDetail: runs.error
+      ? 'The configured store could not be read.'
+      : `${(runs.reports || []).length} reports · ${(runs.tasks || []).length} task snapshots loaded`,
+    emptyDetail: 'Connect an existing Protolink SQLite database.',
+  });
+}
+
+function updateSourceControl(config) {
+  const input = document.getElementById(`${config.kind}-source-input`);
+  const button = document.getElementById(`${config.kind}-source-button`);
+  const name = document.getElementById(`${config.kind}-source-name`);
+  const detail = document.getElementById(`${config.kind}-source-detail`);
+  const feedback = document.getElementById(`${config.kind}-source-feedback`);
+  if (!input || !button || !name || !detail || !feedback) return;
+  if (document.activeElement !== input) input.value = sourceInputDraft[config.kind] ?? config.value;
+  name.textContent = config.configured ? config.connectedName : config.emptyName;
+  detail.textContent = config.configured ? config.connectedDetail : config.emptyDetail;
+  const busy = Boolean(sourceConnectionBusy[config.kind]);
+  input.disabled = !window.__PROTOLINK_LIVE__ || busy;
+  button.disabled = !window.__PROTOLINK_LIVE__ || busy;
+  const state = sourceConnectionFeedback[config.kind];
+  feedback.className = `source-feedback ${state?.kind || ''}`;
+  feedback.textContent = !window.__PROTOLINK_LIVE__
+    ? 'Serve the dashboard locally to connect or change this source.'
+    : state?.message || (config.configured ? 'Connection is session-only and resets when the dashboard stops.' : '');
+}
+
+async function connectRegistry(event) {
+  event.preventDefault();
+  const input = document.getElementById('registry-source-input');
+  sourceInputDraft.registry = input?.value || '';
+  await connectDashboardSource('registry', {url: sourceInputDraft.registry});
+}
+
+async function connectRunStore(event) {
+  event.preventDefault();
+  const input = document.getElementById('runs-source-input');
+  sourceInputDraft.runs = input?.value || '';
+  await connectDashboardSource('runs', {path: sourceInputDraft.runs});
+}
+
+async function connectDashboardSource(kind, body) {
+  if (!window.__PROTOLINK_LIVE__) {
+    sourceConnectionFeedback[kind] = {kind: 'error', message: 'Serve the dashboard locally to connect a source.'};
+    renderSourceControls();
+    return;
+  }
+  const generation = ++sourceConnectGeneration[kind];
+  sourceConnectionBusy[kind] = true;
+  sourceConnectionFeedback[kind] = {kind: '', message: kind === 'registry' ? 'Connecting registry…' : 'Opening store read-only…'};
+  renderSourceControls();
+  try {
+    const endpoint = kind === 'registry' ? '/api/sources/registry' : '/api/sources/runs';
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json();
+    if (generation !== sourceConnectGeneration[kind]) return;
+    if (!response.ok || payload.error) throw new Error(payload.error || `Source request failed (${response.status})`);
+    const revision = Number(payload.revision || 0);
+    snapshot.source_revision = Math.max(revision, Number(snapshot.source_revision || 0));
+    if (kind === 'registry') {
+      chatRequestGeneration += 1;
+      snapshot.registry = payload.registry;
+      sourceInputDraft.registry = null;
+      health = {};
+      selectedAgentIndex = 0;
+      chatMessages = [];
+      chatPending = false;
+      sourceConnectionFeedback.registry = payload.registry?.error
+        ? {kind: 'error', message: `Source saved, but connection failed: ${payload.registry.error}`}
+        : {kind: 'ok', message: payload.registry?.configured ? 'Registry connected.' : 'Registry disconnected.'};
+    } else {
+      snapshot.runs = payload.runs;
+      sourceInputDraft.runs = null;
+      selectedRunKey = null;
+      runReplayGeneration += 1;
+      resetRunReplayPanel();
+      sourceConnectionFeedback.runs = {kind: 'ok', message: payload.runs?.configured ? 'Run store connected read-only.' : 'Run store disconnected.'};
+    }
+  } catch (error) {
+    if (generation !== sourceConnectGeneration[kind]) return;
+    sourceConnectionFeedback[kind] = {kind: 'error', message: error?.message || String(error)};
+  } finally {
+    if (generation !== sourceConnectGeneration[kind]) return;
+    sourceConnectionBusy[kind] = false;
+    render();
+  }
+}
+
+function runIndexRecords() {
+  const reports = Array.isArray(snapshot.runs?.reports) ? snapshot.runs.reports : [];
+  const tasks = Array.isArray(snapshot.runs?.tasks) ? snapshot.runs.tasks : [];
+  const records = [
+    ...reports.map((record, sourceIndex) => ({
+      kind: 'report',
+      key: `report:${boundedSummaryText(record.run_id, 512)}`,
+      id: record.run_id,
+      correlationId: record.run_id,
+      sessionId: record.session_id,
+      traceId: record.trace_id,
+      agentName: record.agent_name,
+      timestamp: record.created_at,
+      state: record.state,
+      eventCount: record.event_count,
+      sourceIndex,
+    })),
+    ...tasks.map((record, sourceIndex) => ({
+      kind: 'task',
+      key: `task:${boundedSummaryText(record.task_id, 512)}`,
+      id: record.task_id,
+      correlationId: record.run_id || record.task_id,
+      sessionId: record.session_id,
+      traceId: record.trace_id,
+      agentName: record.agent_name,
+      timestamp: record.updated_at || record.created_at,
+      state: record.state,
+      eventCount: null,
+      sourceIndex,
+    })),
+  ];
+  records.sort((left, right) => {
+    const leftTime = timestampMs(left.timestamp);
+    const rightTime = timestampMs(right.timestamp);
+    if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) return rightTime - leftTime;
+    if (Number.isFinite(leftTime) !== Number.isFinite(rightTime)) return Number.isFinite(leftTime) ? -1 : 1;
+    if (left.kind !== right.kind) return left.kind === 'report' ? -1 : 1;
+    return left.sourceIndex - right.sourceIndex;
+  });
+  return records;
+}
+
+function runLifecycle(value) {
+  const state = boundedSummaryText(value || 'unknown', 64).toLowerCase();
+  if (['failed', 'error', 'rejected'].includes(state)) return {label: state, cls: 'error'};
+  if (['running', 'pending', 'submitted', 'working'].includes(state)) return {label: state, cls: 'warn'};
+  if (['completed', 'ok', 'success'].includes(state)) return {label: state, cls: 'ok'};
+  return {label: state, cls: 'idle'};
+}
+
+function renderRuns() {
+  const overview = document.getElementById('runs-overview');
+  const list = document.getElementById('runs-list');
+  if (!overview || !list) return;
+  const allRecords = runIndexRecords();
+  if (selectedRunKey && !allRecords.some(record => record.key === selectedRunKey)) {
+    selectedRunKey = null;
+    runReplayGeneration += 1;
+    resetRunReplayPanel();
+  }
+  const reportCount = allRecords.filter(record => record.kind === 'report').length;
+  const taskCount = allRecords.length - reportCount;
+  const sessions = new Set(allRecords.map(record => record.sessionId).filter(Boolean)).size;
+  const attention = allRecords.filter(record => ['error', 'warn'].includes(runLifecycle(record.state).cls)).length;
+  overview.innerHTML = [
+    runOverviewCard('Reports', reportCount, 'bounded recent index'),
+    runOverviewCard('Tasks', taskCount, 'persisted snapshots'),
+    runOverviewCard('Sessions', sessions, 'loaded correlations'),
+    runOverviewCard('Attention', attention, 'running or failed'),
+  ].join('');
+  const search = boundedSummaryText(document.getElementById('run-search')?.value || '', 256).trim().toLowerCase();
+  const kind = document.getElementById('run-kind-filter')?.value || '';
+  const records = allRecords.filter(record => {
+    if (kind && record.kind !== kind) return false;
+    if (!search) return true;
+    return [
+      record.id,
+      record.correlationId,
+      record.sessionId,
+      record.traceId,
+      record.agentName,
+      record.state,
+    ].some(value => boundedSummaryText(value, 512).toLowerCase().includes(search));
+  });
+  if (!records.length) {
+    const configured = snapshot.runs?.configured ?? Boolean(snapshot.runs?.store);
+    const message = snapshot.runs?.error
+      ? `Run store unavailable: ${snapshot.runs.error}`
+      : configured
+        ? (allRecords.length ? 'No run records match this filter.' : 'This store has no recent Protolink run records.')
+        : 'Connect a run store above to browse reports and task snapshots.';
+    list.innerHTML = `<div class="empty-muted">${esc(message)}</div>`;
+  } else {
+    list.innerHTML = records.map(renderRunRecord).join('');
+  }
+  hydrateIcons(list);
+}
+
+function runOverviewCard(label, value, hint) {
+  return `<div class="run-overview-card"><span>${esc(label)}</span><strong>${esc(formatCompactNumber(value))}</strong><div class="agent-meta">${esc(hint)}</div></div>`;
+}
+
+function renderRunRecord(record) {
+  const lifecycle = runLifecycle(record.state);
+  const active = record.key === selectedRunKey;
+  const detail = record.kind === 'report' && record.eventCount != null && Number.isFinite(Number(record.eventCount))
+    ? `${formatCompactNumber(record.eventCount)} events`
+    : `session ${shortId(record.sessionId || '-', 18)}`;
+  return `
+    <button type="button" class="run-record ${active ? 'active' : ''}" aria-pressed="${active ? 'true' : 'false'}" onclick="replayRun(${jsStringAttr(record.id)}, ${jsStringAttr(record.key)})">
+      <span class="run-record-top"><span class="pill ${record.kind === 'report' ? 'capability-badge' : 'idle'}">${esc(record.kind)}</span><span class="pill ${lifecycle.cls}">${esc(lifecycle.label)}</span></span>
+      <span class="run-record-id" title="${htmlAttr(record.id || '-')}">${esc(shortId(record.id || '-', 44))}</span>
+      <span class="run-record-meta"><span class="run-record-agent"><span class="agent-avatar">${esc(initials(record.agentName || record.kind))}</span>${esc(boundedDisplayText(record.agentName, 'unassigned', 80))}</span><span>${esc(relativeTime(record.timestamp) || detail)}</span></span>
+      <span class="run-record-meta"><span>${esc(detail)}</span><span>trace ${esc(shortId(record.traceId || '-', 14))}</span></span>
+    </button>
+  `;
+}
+
+function resetRunReplayPanel() {
+  const panel = document.getElementById('replay-panel');
+  const summary = document.getElementById('run-replay-summary');
+  if (summary) summary.textContent = 'Select a record';
+  if (panel) {
+    panel.setAttribute('aria-busy', 'false');
+    panel.className = 'run-replay-empty';
+    panel.innerHTML = '<div><span class="trace-empty-icon" data-icon="timeline"></span><h3>Choose a run</h3><p>Select a report or task snapshot to inspect its correlation details and event timeline.</p></div>';
+    hydrateIcons(panel);
+  }
+}
+
+function createTelemetryState(source) {
+  const meta = source && typeof source === 'object' ? source : {};
+  return {
+    mode: meta.configured ? (window.__PROTOLINK_LIVE__ ? 'server' : 'snapshot') : 'none',
+    source: meta,
+    uploadFile: null,
+    records: Array.isArray(meta.records) ? meta.records : [],
+    nextCursor: meta.next_cursor ?? null,
+    selectedRecordId: null,
+    selectedTrace: null,
+    selectedSpanKey: null,
+    loadingDetail: false,
+    loadingPage: false,
+    error: meta.error || null,
+    eventIndex: 0,
+    eventTimer: null,
+    eventSpeed: 950,
+    inspectorTab: 'summary',
+    sourceGeneration: 0,
+    detailGeneration: 0,
+    refreshGeneration: 0,
+    windowShifted: false,
+  };
+}
+
+function syncTelemetryFromSnapshot(source) {
+  const meta = source && typeof source === 'object' ? source : {};
+  stopTelemetryPlayback();
+  telemetryState.sourceGeneration += 1;
+  telemetryState.detailGeneration += 1;
+  telemetryState.mode = meta.configured ? (window.__PROTOLINK_LIVE__ ? 'server' : 'snapshot') : 'none';
+  telemetryState.source = meta;
+  telemetryState.uploadFile = null;
+  telemetryState.records = Array.isArray(meta.records) ? meta.records : [];
+  telemetryState.nextCursor = meta.next_cursor ?? null;
+  telemetryState.error = meta.error || null;
+  telemetryState.loadingDetail = false;
+  telemetryState.loadingPage = false;
+  telemetryState.windowShifted = false;
+  if (!telemetryState.records.some(record => record.record_id === telemetryState.selectedRecordId)) {
+    telemetryState.selectedRecordId = null;
+    telemetryState.selectedTrace = null;
+    telemetryState.selectedSpanKey = null;
+  }
+}
+
+function telemetrySourceShortLabel() {
+  if (telemetryState.mode === 'upload' && telemetryState.uploadFile) return telemetryState.uploadFile.name;
+  const path = telemetryState.source?.path;
+  if (path) return String(path).split(/[\\\\/]/).pop() || String(path);
+  return 'not loaded';
+}
+
+function telemetryLifecycle(record) {
+  const value = boundedSummaryText(record?.final_state || record?.status || 'unknown', 64).toLowerCase();
+  if (['failed', 'error'].includes(value)) return {value, cls: 'error'};
+  if (['canceled', 'cancelled'].includes(value)) return {value, cls: 'warn'};
+  if (['ok', 'completed', 'success'].includes(value)) return {value, cls: 'ok'};
+  return {value, cls: 'idle'};
+}
+
+function renderTelemetry() {
+  const sourceIcon = document.getElementById('telemetry-source-icon');
+  const sourceName = document.getElementById('telemetry-source-name');
+  const sourceDetail = document.getElementById('telemetry-source-detail');
+  const sourceMeta = document.getElementById('telemetry-source-meta');
+  const telemetryAlerts = document.getElementById('telemetry-alerts');
+  if (!sourceIcon || !sourceName || !sourceDetail || !sourceMeta || !telemetryAlerts) return;
+
+  const meta = telemetryState.source || {};
+  const file = telemetryState.uploadFile;
+  sourceIcon.innerHTML = icon(telemetryState.mode === 'upload' ? 'upload' : 'activity');
+  if (telemetryState.mode === 'upload' && file) {
+    sourceName.textContent = file.name;
+    sourceDetail.textContent = 'Browser file · payloads stay in this tab';
+  } else if (telemetryState.mode === 'snapshot') {
+    sourceName.textContent = meta.path || 'Telemetry snapshot';
+    sourceDetail.textContent = 'Static summary snapshot · open the matching JSONL file for details';
+  } else if (meta.configured) {
+    sourceName.textContent = meta.path || 'Configured telemetry file';
+    sourceDetail.textContent = meta.exists
+      ? 'CLI source · detail records are read lazily from disk'
+      : 'Waiting for the configured JSONL file to appear';
+  } else {
+    sourceName.textContent = 'No telemetry source';
+    sourceDetail.textContent = 'Pass --traces to the CLI or drop a traces.jsonl file here.';
+  }
+
+  const size = file ? file.size : meta.size_bytes;
+  const modified = file ? file.lastModified : meta.modified_at;
+  const malformed = Number(meta.malformed_count || 0);
+  const oversized = Number(meta.oversized_count || 0);
+  sourceMeta.innerHTML = [
+    size != null ? `<span class="pill idle">${esc(formatBytes(size))}</span>` : '',
+    modified ? `<span class="pill idle">${esc(relativeTime(modified))}</span>` : '',
+    malformed ? `<span class="pill warn">${esc(malformed)} malformed skipped</span>` : '',
+    oversized ? `<span class="pill warn">${esc(oversized)} oversized skipped</span>` : '',
+    meta.partial_tail ? '<span class="pill warn">partial tail ignored</span>' : '',
+    meta.scan_exhausted ? '<span class="pill warn">scan budget reached</span>' : '',
+    telemetryState.mode === 'upload'
+      ? '<span class="pill ok">local only</span>'
+      : telemetryState.mode === 'snapshot'
+        ? '<span class="pill idle">summaries only</span>'
+        : meta.exists
+          ? '<span class="pill ok">connected</span>'
+          : '',
+  ].join('');
+  telemetryAlerts.innerHTML = telemetryState.error
+    ? `<div class="alert">${esc(telemetryState.error)} <button type="button" class="mini-btn" style="margin-left:8px" onclick="${telemetryState.mode === 'snapshot' ? 'openTelemetryFile()' : 'reloadTelemetry()'}">${telemetryState.mode === 'snapshot' ? 'Open JSONL' : 'Load latest'}</button></div>`
+    : '';
+
+  renderTelemetryMetrics();
+  renderTelemetryList();
+  renderTelemetryWorkbench();
+  hydrateIcons(document.getElementById('view-telemetry'));
+
+  if (
+    telemetryState.records.length
+    && !telemetryState.selectedRecordId
+    && !telemetryState.loadingDetail
+    && !telemetryState.loadingPage
+    && ['server', 'upload'].includes(telemetryState.mode)
+  ) {
+    const recordId = telemetryState.records[0].record_id;
+    queueMicrotask(() => selectTelemetryRecord(recordId));
+  }
+}
+
+function renderTelemetryMetrics() {
+  const target = document.getElementById('telemetry-metrics');
+  if (!target) return;
+  const records = telemetryState.records || [];
+  const groups = new Set(records.map(record => record.trace_id).filter(Boolean)).size;
+  const errors = records.filter(record => telemetryLifecycle(record).cls === 'error').length;
+  const spans = records.reduce((sum, record) => sum + Number(record.span_count || 0), 0);
+  const events = records.reduce((sum, record) => sum + Number(record.event_count || 0), 0);
+  const tokens = records.reduce((sum, record) => sum + Number(record.llm_metrics?.total_tokens || 0), 0);
+  target.innerHTML = [
+    metric('Trace groups', groups, 'shared correlation IDs', 'teal', null, 'activity'),
+    metric('Task records', records.length, records.length >= TELEMETRY_SUMMARY_CAP ? 'window cap reached' : 'loaded summary window', 'indigo', null, 'timeline'),
+    metric('Errors', errors, errors ? 'inspect failed records' : 'none in loaded window', errors ? 'coral' : 'teal', null, 'status'),
+    metric('Spans', formatCompactNumber(spans), 'task · LLM · tool · agent', 'amber', null, 'timeline'),
+    metric('Events', formatCompactNumber(events), tokens ? `${formatCompactNumber(tokens)} tokens` : 'canonical trace events', 'indigo', null, 'activity'),
+  ].join('');
+}
+
+function filteredTelemetryRecords() {
+  const search = String(document.getElementById('trace-search')?.value || '').trim().toLowerCase();
+  const status = String(document.getElementById('trace-status-filter')?.value || '').toLowerCase();
+  return (telemetryState.records || []).filter(record => {
+    const lifecycle = telemetryLifecycle(record);
+    const statusMatches = !status
+      || (status === 'ok' && lifecycle.cls === 'ok')
+      || (status === 'error' && lifecycle.cls === 'error')
+      || lifecycle.value === status;
+    if (!statusMatches) return false;
+    if (!search) return true;
+    const haystack = [
+      record.agent_name,
+      record.trace_id,
+      record.task_id,
+      record.status,
+      record.final_state,
+      ...summaryModels(record),
+      ...summarySpanKinds(record),
+    ].join(' ').toLowerCase();
+    return haystack.includes(search);
+  });
+}
+
+function renderTelemetryList() {
+  const target = document.getElementById('trace-list');
+  const count = document.getElementById('trace-filter-count');
+  const note = document.getElementById('trace-window-note');
+  const more = document.getElementById('trace-load-more');
+  if (!target || !count || !note || !more) return;
+  const records = filteredTelemetryRecords();
+  count.textContent = `${records.length} / ${telemetryState.records.length}`;
+  const sourceLabel = telemetryState.mode === 'upload'
+    ? 'browser file'
+    : telemetryState.mode === 'server'
+      ? 'CLI source'
+      : telemetryState.mode === 'snapshot'
+        ? 'static summaries'
+        : 'no source';
+  note.textContent = telemetryState.windowShifted
+    ? `Older rolling window · ${sourceLabel} · Latest returns to the newest records`
+    : `Newest first · ${sourceLabel} · summaries only until selected`;
+  if (!records.length) {
+    const message = telemetryState.records.length ? 'No records match these filters.' : telemetryState.error || 'No telemetry records loaded.';
+    target.innerHTML = `<div style="padding:20px;color:var(--muted);">${esc(message)}</div>`;
+  } else {
+    target.innerHTML = groupTelemetryRecords(records).map(group => `
+      <section class="trace-group">
+        <div class="trace-group-head"><code title="${esc(group.traceId || 'No trace ID')}">${esc(shortId(group.traceId || 'No trace ID', 31))}</code><span>${group.records.length} task${group.records.length === 1 ? '' : 's'}</span></div>
+        ${group.records.map(renderTelemetryRecordButton).join('')}
+      </section>
+    `).join('');
+  }
+  const atCap = telemetryState.records.length >= TELEMETRY_SUMMARY_CAP;
+  more.disabled = telemetryState.loadingPage || telemetryState.nextCursor == null || telemetryState.mode === 'snapshot';
+  more.innerHTML = telemetryState.loadingPage
+    ? `${icon('activity')} Loading…`
+      : telemetryState.mode === 'snapshot'
+        ? `${icon('upload')} Open JSONL for history`
+        : telemetryState.nextCursor == null
+        ? `${icon('status')} Oldest loaded`
+        : `${icon('download')} Load ${TELEMETRY_PAGE_SIZE} older${atCap ? ' · roll window' : ''}`;
+  more.setAttribute('data-icon-ready', 'true');
+}
+
+function groupTelemetryRecords(records) {
+  const groups = new Map();
+  for (const record of records) {
+    const key = record.trace_id ? `trace:${record.trace_id}` : `record:${record.record_id}`;
+    if (!groups.has(key)) groups.set(key, {traceId: record.trace_id || null, records: []});
+    groups.get(key).records.push(record);
+  }
+  return [...groups.values()];
+}
+
+function renderTelemetryRecordButton(record) {
+  const lifecycle = telemetryLifecycle(record);
+  const metrics = record.llm_metrics || {};
+  const models = summaryModels(record);
+  const model = models.length ? models[0] : '';
+  return `
+    <button type="button" class="trace-record ${record.record_id === telemetryState.selectedRecordId ? 'active' : ''}" ${record.record_id === telemetryState.selectedRecordId ? 'aria-current="true"' : ''} onclick="selectTelemetryRecord(${jsStringAttr(record.record_id)})">
+      <div class="trace-record-top"><span class="trace-agent">${esc(boundedDisplayText(record.agent_name, 'unknown agent', 160))}</span><span class="pill ${lifecycle.cls}">${esc(boundedDisplayText(lifecycle.value, 'unknown', 48))}</span></div>
+      <div class="trace-record-id" title="${esc(record.task_id || '')}">${esc(shortId(record.task_id || record.record_id, 26))}</div>
+      <div class="trace-record-bottom"><span>${esc(timestampLabel(record.started_at))}</span><span>${esc(formatMilliseconds(record.duration_ms))}</span></div>
+      <div class="trace-record-bottom"><span>${esc(record.span_count || 0)} spans · ${esc(record.event_count || 0)} events</span><span>${esc(model || (metrics.total_tokens ? `${formatCompactNumber(metrics.total_tokens)} tok` : ''))}</span></div>
+    </button>
+  `;
+}
+
+function renderTelemetryWorkbench() {
+  const target = document.getElementById('trace-workbench');
+  if (!target) return;
+  if (telemetryState.loadingDetail) {
+    target.innerHTML = '<div class="trace-empty"><div class="trace-empty-inner"><span class="trace-empty-icon" data-icon="activity"></span><h2>Reading one trace</h2><p>The summary window stays light while this JSONL record is decoded.</p></div></div>';
+    hydrateIcons(target);
+    return;
+  }
+  const trace = telemetryState.selectedTrace;
+  if (!trace) {
+    const error = telemetryState.error;
+    const snapshotSelected = telemetryState.mode === 'snapshot' && telemetryState.selectedRecordId;
+    const message = error
+      || (snapshotSelected
+        ? 'This static file contains bounded summaries only. Open the matching JSONL file above to inspect this record.'
+        : 'Select a task record, pass --traces traces.jsonl, or drop a file above. Uploaded files stay in this browser tab.');
+    target.innerHTML = `<div class="trace-empty"><div class="trace-empty-inner"><span class="trace-empty-icon" data-icon="${error ? 'status' : 'activity'}"></span><h2>${error ? 'Trace unavailable' : snapshotSelected ? 'Summary selected' : 'Open a telemetry trace'}</h2><p>${esc(message)}</p></div></div>`;
+    hydrateIcons(target);
+    return;
+  }
+
+  const summary = telemetryState.records.find(record => record.record_id === telemetryState.selectedRecordId) || summarizeUploadTrace(trace, 0, 0, telemetryState.selectedRecordId || 'selected');
+  const lifecycle = telemetryLifecycle({...trace, final_state: trace.metadata?.final_state});
+  const spans = Array.isArray(trace.spans) ? trace.spans : [];
+  const events = telemetryTimelineEvents(trace);
+  const llmMetrics = trace.metadata?.llm_metrics || summary.llm_metrics || {};
+  const retries = Number(trace.metadata?.retry_count || 0);
+  target.innerHTML = `
+    <section class="panel trace-hero">
+      <div class="trace-hero-head">
+        <div class="trace-hero-title">
+          <span class="trace-kind-mark">${icon('activity')}</span>
+          <div><h2>${esc(boundedDisplayText(trace.agent_name || summary.agent_name, 'Telemetry record', 160))}</h2><p>task ${esc(shortId(trace.task_id || '-', 72))} · trace ${esc(shortId(trace.trace_id || '-', 72))}</p></div>
+        </div>
+        <div class="trace-hero-badges">
+          <span class="pill ${lifecycle.cls}">${statusDotHtml(lifecycle.cls === 'ok' ? 'online' : lifecycle.cls === 'error' ? 'offline' : 'unknown')}${esc(boundedDisplayText(lifecycle.value, 'unknown', 48))}</span>
+          ${summaryModels(summary).map(model => `<span class="pill capability-badge">${esc(model)}</span>`).join('')}
+        </div>
+      </div>
+      <div class="trace-stats">
+        ${traceStat('Duration', formatMilliseconds(trace.duration_ms ?? summary.duration_ms))}
+        ${traceStat('Spans', spans.length)}
+        ${traceStat('Events', Array.isArray(trace.events) ? trace.events.length : 0)}
+        ${traceStat('Retries', retries)}
+        ${traceStat('Tokens', llmMetrics.total_tokens ? formatCompactNumber(llmMetrics.total_tokens) : '—')}
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Span waterfall <span class="online-summary">${esc(spans.length)} operations · parent-linked within this task</span></h2>
+      ${renderSpanWaterfall(trace)}
+    </section>
+    <section class="panel">
+      <h2>Event replay <span class="online-summary">${esc(events.length)} visible · trace events counted once</span></h2>
+      ${renderTelemetryReplay(trace, events)}
+    </section>
+    <section class="panel">
+      <h2>Inspector <span class="online-summary">payloads are collapsed by default</span></h2>
+      ${renderTelemetryInspector(trace, events)}
+    </section>
+  `;
+  hydrateIcons(target);
+  const activeRail = target.querySelector('.event-rail button.active');
+  if (activeRail) activeRail.scrollIntoView({block: 'nearest'});
+}
+
+function traceStat(label, value) {
+  return `<div class="trace-stat"><span class="detail-label">${esc(label)}</span><strong>${esc(value)}</strong></div>`;
+}
+
+function collectRenderableSpans(trace) {
+  const rawSpans = Array.isArray(trace.spans) ? trace.spans : [];
+  const entries = [];
+  const spanScanLimit = Math.min(rawSpans.length, TELEMETRY_SPAN_RENDER_CAP * 20);
+  for (let index = 0; index < spanScanLimit && entries.length < TELEMETRY_SPAN_RENDER_CAP; index += 1) {
+    const span = rawSpans[index];
+    if (span && typeof span === 'object' && !Array.isArray(span)) {
+      entries.push({span, sourceIndex: index, key: `span:${index}`});
+    }
+  }
+  return entries;
+}
+
+function renderSpanWaterfall(trace) {
+  const rawSpans = Array.isArray(trace.spans) ? trace.spans : [];
+  const entries = collectRenderableSpans(trace);
+  if (!entries.length) return '<div class="panel-body"><div class="empty-muted">No spans were recorded for this task.</div></div>';
+  entries.sort((left, right) => {
+    const leftStart = timestampMs(left.span.started_at);
+    const rightStart = timestampMs(right.span.started_at);
+    if (Number.isFinite(leftStart) && Number.isFinite(rightStart) && leftStart !== rightStart) return leftStart - rightStart;
+    if (Number.isFinite(leftStart) !== Number.isFinite(rightStart)) return Number.isFinite(leftStart) ? -1 : 1;
+    return left.sourceIndex - right.sourceIndex;
+  });
+  const spanStarts = entries.map(entry => timestampMs(entry.span.started_at)).filter(Number.isFinite);
+  const spanEnds = entries.map(entry => {
+    const startedAt = timestampMs(entry.span.started_at);
+    const endedAt = timestampMs(entry.span.ended_at);
+    const duration = entry.span.duration_ms == null || entry.span.duration_ms === ''
+      ? Number.NaN
+      : Number(entry.span.duration_ms);
+    if (Number.isFinite(endedAt)) return endedAt;
+    if (Number.isFinite(startedAt) && Number.isFinite(duration) && duration >= 0) return startedAt + duration;
+    return Number.NaN;
+  }).filter(Number.isFinite);
+  const recordStart = timestampMs(trace.started_at);
+  const recordEnd = timestampMs(trace.ended_at);
+  const recordDuration = trace.duration_ms == null || trace.duration_ms === '' ? Number.NaN : Number(trace.duration_ms);
+  const startCandidates = [...spanStarts];
+  if (Number.isFinite(recordStart)) startCandidates.push(recordStart);
+  const traceStart = startCandidates.length ? Math.min(...startCandidates) : 0;
+  const endCandidates = [...spanEnds, ...spanStarts];
+  if (Number.isFinite(recordEnd)) endCandidates.push(recordEnd);
+  if (Number.isFinite(recordStart) && Number.isFinite(recordDuration) && recordDuration >= 0) {
+    endCandidates.push(recordStart + recordDuration);
+  }
+  const traceEnd = Math.max(traceStart + 1, ...(endCandidates.length ? endCandidates : [traceStart + 1]));
+  const total = Math.max(1, traceEnd - traceStart);
+  const idCounts = new Map();
+  for (const entry of entries) {
+    const id = entry.span.id == null ? '' : boundedSummaryText(entry.span.id, 4096);
+    if (id) idCounts.set(id, (idCounts.get(id) || 0) + 1);
+  }
+  const spanMap = new Map();
+  for (const entry of entries) {
+    const id = entry.span.id == null ? '' : boundedSummaryText(entry.span.id, 4096);
+    if (id && idCounts.get(id) === 1) spanMap.set(id, entry);
+  }
+  const depthMemo = new Map();
+  function spanDepth(entry) {
+    if (depthMemo.has(entry.key)) return depthMemo.get(entry.key);
+    const seen = new Set([entry.key]);
+    let current = entry;
+    let depth = 0;
+    while (depth < 8) {
+      const parentId = current.span.parent_id == null ? '' : boundedSummaryText(current.span.parent_id, 4096);
+      const parent = parentId ? spanMap.get(parentId) : null;
+      if (!parent || seen.has(parent.key)) break;
+      seen.add(parent.key);
+      current = parent;
+      depth += 1;
+    }
+    depthMemo.set(entry.key, depth);
+    return depth;
+  }
+  const hasSelection = entries.some(entry => entry.key === telemetryState.selectedSpanKey);
+  const rows = entries.map((entry, rowIndex) => {
+    const span = entry.span;
+    const spanName = boundedDisplayText(span.name || span.kind, 'span', 180);
+    const rawStart = timestampMs(span.started_at);
+    const rawEnd = timestampMs(span.ended_at);
+    const rawDuration = span.duration_ms == null || span.duration_ms === '' ? Number.NaN : Number(span.duration_ms);
+    const start = Number.isFinite(rawStart) ? rawStart : traceStart;
+    const durationEnd = Number.isFinite(rawDuration) && rawDuration >= 0 ? start + rawDuration : Number.NaN;
+    const resolvedEnd = Number.isFinite(rawEnd) ? rawEnd : durationEnd;
+    const end = Number.isFinite(resolvedEnd) ? resolvedEnd : traceEnd;
+    const left = Math.max(0, Math.min(99, ((start - traceStart) / total) * 100));
+    const width = Math.max(0.8, Math.min(100 - left, ((Math.max(end, start) - start) / total) * 100));
+    const kind = traceKindClass(span.kind);
+    const incomplete = !Number.isFinite(resolvedEnd);
+    const error = boundedSummaryText(span.status, 64).toLowerCase() === 'error' || Boolean(span.error);
+    const active = entry.key === telemetryState.selectedSpanKey;
+    const durationLabel = incomplete ? 'open' : formatMilliseconds(Number.isFinite(rawDuration) && rawDuration >= 0 ? rawDuration : Math.max(0, end - start));
+    const stateLabel = error ? 'error' : incomplete ? 'open' : boundedDisplayText(span.status, 'complete', 48);
+    const startOffsetLabel = formatMilliseconds(Math.max(0, start - traceStart));
+    return `
+      <button type="button" role="option" class="span-row ${active ? 'active' : ''}" data-span-key="${htmlAttr(entry.key)}" aria-selected="${active ? 'true' : 'false'}" tabindex="${active || (!hasSelection && rowIndex === 0) ? '0' : '-1'}" aria-label="${htmlAttr(`${spanName}, ${boundedDisplayText(span.kind, 'span', 48)}, starts ${startOffsetLabel} from trace start, ${durationLabel}, ${stateLabel}`)}" onclick="selectTelemetrySpan(${jsStringAttr(entry.key)})">
+        <span class="span-label" style="--depth:${spanDepth(entry)}">
+          <span class="span-kind-dot ${kind}"></span><span class="span-name" title="${htmlAttr(spanName)}">${esc(spanName)}</span>
+          <span class="span-duration">${esc(durationLabel)}</span>
+        </span>
+        <span class="span-track"><span class="span-bar ${kind} ${error ? 'error' : incomplete ? 'open' : ''}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></span></span>
+      </button>
+    `;
+  }).join('');
+  const capNote = rawSpans.length > entries.length
+    ? `<div class="trace-limit-note">Showing ${entries.length} of ${rawSpans.length} span entries to keep rendering responsive; invalid entries are ignored.</div>`
+    : '';
+  return `<div class="trace-waterfall"><div class="waterfall-inner" id="telemetry-span-waterfall" role="listbox" aria-label="Trace spans" onkeydown="handleTelemetrySpanKeydown(event)"><div class="waterfall-scale"><span class="waterfall-scale-ticks"><span>0 ms</span><span>${esc(formatMilliseconds(total / 2))}</span><span>${esc(formatMilliseconds(total))}</span></span></div>${rows}${capNote}</div></div>`;
+}
+
+function telemetryTimelineEvents(trace) {
+  const source = Array.isArray(trace.events) ? trace.events : [];
+  if (source.length <= TELEMETRY_EVENT_RENDER_CAP) {
+    const all = source
+      .map((event, sourceIndex) => ({event, sourceIndex}))
+      .filter(item => item.event && typeof item.event === 'object' && !Array.isArray(item.event));
+    all.sort((a, b) => timestampMs(a.event.timestamp) - timestampMs(b.event.timestamp));
+    return all;
+  }
+  const sampled = [];
+  const scanStart = Math.max(0, source.length - TELEMETRY_EVENT_RENDER_CAP * 8);
+  for (let sourceIndex = source.length - 1; sourceIndex >= scanStart && sampled.length < TELEMETRY_EVENT_RENDER_CAP; sourceIndex -= 1) {
+    const event = source[sourceIndex];
+    if (event && typeof event === 'object' && !Array.isArray(event)) sampled.push({event, sourceIndex});
+  }
+  sampled.reverse();
+  sampled.sort((a, b) => timestampMs(a.event.timestamp) - timestampMs(b.event.timestamp));
+  return sampled;
+}
+
+function renderTelemetryReplay(trace, events) {
+  if (!events.length) return '<div class="panel-body"><div class="empty-muted">This task has spans but no inference-loop events. Explicit task-level tools can legitimately appear only in the waterfall.</div></div>';
+  telemetryState.eventIndex = Math.max(0, Math.min(telemetryState.eventIndex, events.length - 1));
+  const active = events[telemetryState.eventIndex];
+  const truncated = (trace.events || []).length > events.length;
+  return `
+    <div class="replay-controls">
+      <button class="mini-btn" type="button" onclick="stepTelemetryEvent(-1)" aria-label="Previous event">←</button>
+      <button class="mini-btn primary" id="telemetry-play" type="button" onclick="toggleTelemetryPlayback()" aria-label="${telemetryState.eventTimer ? 'Pause' : 'Play'} event replay">${telemetryState.eventTimer ? 'Pause' : 'Play'}</button>
+      <button class="mini-btn" type="button" onclick="stepTelemetryEvent(1)" aria-label="Next event">→</button>
+      <input id="telemetry-event-range" type="range" min="0" max="${events.length - 1}" value="${telemetryState.eventIndex}" oninput="setTelemetryEventIndex(this.value)" aria-label="Telemetry event" />
+      <span class="pill idle" id="telemetry-event-count">${telemetryEventCountLabel(trace, events)}</span>
+      <select id="telemetry-speed" onchange="setTelemetrySpeed(this.value)" aria-label="Replay speed">
+        <option value="1600" ${telemetryState.eventSpeed === 1600 ? 'selected' : ''}>0.5x</option>
+        <option value="950" ${telemetryState.eventSpeed === 950 ? 'selected' : ''}>1x</option>
+        <option value="420" ${telemetryState.eventSpeed === 420 ? 'selected' : ''}>2x</option>
+      </select>
+    </div>
+    <div class="event-stage">
+      <article class="${telemetryEventFocusClass(active.event)}" id="telemetry-event-focus" aria-live="polite">
+        ${telemetryEventFocusHtml(trace, events)}
+      </article>
+      <nav class="event-rail" id="telemetry-event-rail" aria-label="Recorded telemetry events">
+        ${telemetryEventRailHtml(events)}
+      </nav>
+    </div>
+  `;
+}
+
+function telemetryEventCountLabel(trace, events) {
+  const total = Array.isArray(trace.events) ? trace.events.length : events.length;
+  return `${telemetryState.eventIndex + 1} / ${events.length}${total > events.length ? ` · latest ${events.length} of ${total}` : ''}`;
+}
+
+function telemetryEventFocusClass(event) {
+  return `event-focus ${boundedSummaryText(event?.type, 128).includes('error') ? 'error' : ''}`.trim();
+}
+
+function telemetryEventFocusHtml(trace, events) {
+  const active = events[telemetryState.eventIndex] || events[0] || {event: {}, sourceIndex: 0};
+  const event = active.event || {};
+  const payload = event.payload && typeof event.payload === 'object' ? event.payload : {};
+  const preview = jsonPreview(payload, 4200);
+  const elapsed = timestampMs(event.timestamp) - timestampMs(trace.started_at);
+  const timeFromStart = Number.isFinite(elapsed) ? Math.max(0, elapsed) : Number.NaN;
+  const omitted = Math.max(0, (Array.isArray(trace.events) ? trace.events.length : events.length) - events.length);
+  return `
+    <div class="event-focus-kicker">+${esc(formatMilliseconds(timeFromStart))} · event ${active.sourceIndex + 1}</div>
+    <h3>${esc(boundedDisplayText(event.type, 'event', 180))}</h3>
+    <p>${esc(eventSummary(event))}</p>
+    ${omitted ? `<div class="trace-limit-note">Replay is a contiguous recent-event window; ${formatCompactNumber(omitted)} earlier event entries are omitted for responsiveness.</div>` : ''}
+    <pre class="event-payload-preview">${esc(preview.text || '{}')}</pre>
+  `;
+}
+
+function telemetryEventRailHtml(events) {
+  return events.map((item, index) => `<button type="button" class="${index === telemetryState.eventIndex ? 'active' : ''}" ${index === telemetryState.eventIndex ? 'aria-current="step"' : ''} onclick="setTelemetryEventIndex(${index})"><span class="event-dot"></span><span>${esc(shortId(item.event?.type || 'event', 28))}</span></button>`).join('');
+}
+
+function renderTelemetryInspector(trace, events) {
+  const tabs = [
+    ['summary', 'Summary'],
+    ['payload', 'Event payload'],
+    ['span', 'Selected span'],
+    ['json', 'Trace JSON'],
+  ];
+  const body = telemetryInspectorBody(trace, events);
+  return `<div class="inspector-tabs" id="telemetry-inspector-tabs" role="tablist" aria-label="Trace inspector" onkeydown="handleTelemetryInspectorKeydown(event)">${tabs.map(([key, label]) => `<button type="button" role="tab" aria-controls="telemetry-inspector-panel" aria-selected="${telemetryState.inspectorTab === key ? 'true' : 'false'}" tabindex="${telemetryState.inspectorTab === key ? '0' : '-1'}" data-inspector-tab="${key}" class="inspector-tab ${telemetryState.inspectorTab === key ? 'active' : ''}" onclick="setTelemetryInspectorTab('${key}')">${esc(label)}</button>`).join('')}</div><div class="inspector-body" id="telemetry-inspector-panel" role="tabpanel">${body}</div>`;
+}
+
+function telemetryInspectorBody(trace, events) {
+  const event = events[telemetryState.eventIndex]?.event || null;
+  const selectedSpan = collectRenderableSpans(trace).find(entry => entry.key === telemetryState.selectedSpanKey);
+  const span = selectedSpan?.span || null;
+  let body = '';
+  if (telemetryState.inspectorTab === 'payload') {
+    body = inspectorJson(event?.payload ?? {}, 'No event payload is available.');
+  } else if (telemetryState.inspectorTab === 'span') {
+    body = span ? inspectorJson(span) : '<div class="empty-muted">Select a span in the waterfall.</div>';
+  } else if (telemetryState.inspectorTab === 'json') {
+    body = inspectorJson(trace);
+  } else {
+    const cost = trace.metadata?.llm_metrics?.total_cost;
+    const currency = trace.metadata?.llm_metrics?.currency;
+    body = `
+      <div class="detail-grid">
+        <div class="detail-item"><div class="detail-label">Started</div><div class="detail-value">${esc(timestampLabel(trace.started_at))}</div></div>
+        <div class="detail-item"><div class="detail-label">Ended</div><div class="detail-value">${esc(timestampLabel(trace.ended_at))}</div></div>
+        <div class="detail-item"><div class="detail-label">Agent</div><div class="detail-value">${esc(boundedDisplayText(trace.agent_name))}</div></div>
+        <div class="detail-item"><div class="detail-label">Final state</div><div class="detail-value">${esc(boundedDisplayText(trace.metadata?.final_state || trace.status))}</div></div>
+        <div class="detail-item"><div class="detail-label">Selected event</div><div class="detail-value">${esc(boundedDisplayText(event?.type, 'none'))}</div></div>
+        <div class="detail-item"><div class="detail-label">Selected span</div><div class="detail-value">${esc(boundedDisplayText(span?.name, 'none'))}</div></div>
+        <div class="detail-item"><div class="detail-label">Estimated cost</div><div class="detail-value">${cost == null ? '—' : `${esc(boundedDisplayText(cost, '', 80))} ${esc(boundedDisplayText(currency, '', 24))}`}</div></div>
+        <div class="detail-item"><div class="detail-label">Correlation</div><div class="detail-value">${esc((telemetryState.records || []).filter(record => record.trace_id && record.trace_id === trace.trace_id).length)} loaded task record(s)</div></div>
+      </div>
+    `;
+  }
+  return body;
+}
+
+function inspectorJson(value, emptyMessage = 'No data is available.') {
+  if (value == null) return `<div class="empty-muted">${esc(emptyMessage)}</div>`;
+  const preview = jsonPreview(value, TELEMETRY_JSON_PREVIEW_CHARS);
+  return `<pre class="inspector-json">${esc(preview.text)}</pre>${preview.truncated ? `<div class="trace-limit-note">Preview is structurally bounded (up to ${formatCompactNumber(TELEMETRY_JSON_PREVIEW_CHARS)} characters) for responsiveness. The source file is unchanged.</div>` : ''}`;
+}
+
+function jsonPreview(value, limit) {
+  const state = {nodes: 0, maxNodes: 260, maxString: Math.max(160, Math.min(2400, Math.floor(limit / 4))), truncated: false, seen: new WeakSet()};
+  const bounded = boundedPreviewValue(value, state, 0);
+  let text;
+  try { text = JSON.stringify(bounded, null, 2); }
+  catch (_) {
+    state.truncated = true;
+    text = String(bounded);
+  }
+  if (text.length > limit) {
+    state.truncated = true;
+    text = text.slice(0, limit) + '\\n… preview truncated …';
+  }
+  return {text, truncated: state.truncated};
+}
+
+function boundedPreviewValue(value, state, depth) {
+  if (value == null || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.length <= state.maxString) return value;
+    state.truncated = true;
+    return value.slice(0, state.maxString) + '…';
+  }
+  if (typeof value !== 'object') return String(value);
+  if (state.seen.has(value)) {
+    state.truncated = true;
+    return '[Circular]';
+  }
+  if (depth >= 6 || state.nodes >= state.maxNodes) {
+    state.truncated = true;
+    return Array.isArray(value) ? `[${value.length} items]` : '[Object]';
+  }
+  state.seen.add(value);
+  state.nodes += 1;
+  if (Array.isArray(value)) {
+    const visible = value.slice(0, Math.min(value.length, 60)).map(item => boundedPreviewValue(item, state, depth + 1));
+    if (value.length > visible.length) {
+      state.truncated = true;
+      visible.push(`… ${value.length - visible.length} more items`);
+    }
+    return visible;
+  }
+  const output = {};
+  let visibleFields = 0;
+  for (const key in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    if (visibleFields >= 60 || state.nodes >= state.maxNodes) {
+      state.truncated = true;
+      output['…'] = 'additional fields omitted';
+      break;
+    }
+    const safeKey = boundedSummaryText(key, 180);
+    if (safeKey !== key) state.truncated = true;
+    output[safeKey] = boundedPreviewValue(value[key], state, depth + 1);
+    visibleFields += 1;
+  }
+  return output;
+}
+
+function eventSummary(event) {
+  const payload = event?.payload && typeof event.payload === 'object' ? event.payload : {};
+  const parts = [
+    payload.model ? `model ${boundedDisplayText(payload.model, '', 120)}` : '',
+    payload.tool ? `tool ${boundedDisplayText(payload.tool, '', 120)}` : '',
+    payload.agent ? `agent ${boundedDisplayText(payload.agent, '', 120)}` : '',
+    payload.step != null ? `step ${boundedDisplayText(payload.step, '', 48)}` : '',
+    payload.latency_ms != null ? formatMilliseconds(payload.latency_ms) : '',
+    boundedDisplayText(payload.message || payload.decision?.reason, '', 420),
+  ].filter(Boolean);
+  return boundedDisplayText(parts.join(' · '), 'Provider-neutral inference-loop event', 720);
+}
+
+function updateTelemetryReplayDom() {
+  const trace = telemetryState.selectedTrace;
+  if (!trace) return;
+  const events = telemetryTimelineEvents(trace);
+  if (!events.length) return;
+  telemetryState.eventIndex = Math.max(0, Math.min(telemetryState.eventIndex, events.length - 1));
+  const range = document.getElementById('telemetry-event-range');
+  if (range) {
+    range.max = String(events.length - 1);
+    range.value = String(telemetryState.eventIndex);
+  }
+  const count = document.getElementById('telemetry-event-count');
+  if (count) count.textContent = telemetryEventCountLabel(trace, events);
+  const play = document.getElementById('telemetry-play');
+  if (play) {
+    play.textContent = telemetryState.eventTimer ? 'Pause' : 'Play';
+    play.setAttribute('aria-label', `${telemetryState.eventTimer ? 'Pause' : 'Play'} event replay`);
+  }
+  const focus = document.getElementById('telemetry-event-focus');
+  if (focus) {
+    focus.className = telemetryEventFocusClass(events[telemetryState.eventIndex]?.event);
+    focus.innerHTML = telemetryEventFocusHtml(trace, events);
+  }
+  const rail = document.getElementById('telemetry-event-rail');
+  if (rail) {
+    const buttons = [...rail.querySelectorAll('button')];
+    for (const [index, button] of buttons.entries()) {
+      const active = index === telemetryState.eventIndex;
+      button.classList.toggle('active', active);
+      if (active) button.setAttribute('aria-current', 'step');
+      else button.removeAttribute('aria-current');
+    }
+    buttons[telemetryState.eventIndex]?.scrollIntoView({block: 'nearest'});
+  }
+  if (telemetryState.inspectorTab === 'summary' || telemetryState.inspectorTab === 'payload') {
+    updateTelemetryInspectorDom();
+  }
+}
+
+function updateTelemetryInspectorDom() {
+  const trace = telemetryState.selectedTrace;
+  if (!trace) return;
+  const events = telemetryTimelineEvents(trace);
+  const tabs = document.getElementById('telemetry-inspector-tabs');
+  if (tabs) {
+    for (const button of tabs.querySelectorAll('[data-inspector-tab]')) {
+      const active = button.dataset.inspectorTab === telemetryState.inspectorTab;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+      button.tabIndex = active ? 0 : -1;
+    }
+  }
+  const panel = document.getElementById('telemetry-inspector-panel');
+  if (panel) panel.innerHTML = telemetryInspectorBody(trace, events);
+}
+
+async function selectTelemetryRecord(recordId) {
+  if (!recordId) return;
+  stopTelemetryPlayback();
+  const sourceGeneration = telemetryState.sourceGeneration;
+  const detailGeneration = ++telemetryState.detailGeneration;
+  telemetryState.selectedRecordId = recordId;
+  telemetryState.selectedTrace = null;
+  telemetryState.selectedSpanKey = null;
+  telemetryState.error = null;
+  telemetryState.eventIndex = 0;
+  telemetryState.inspectorTab = 'summary';
+  if (telemetryState.mode === 'snapshot') {
+    telemetryState.loadingDetail = false;
+    renderTelemetryList();
+    renderTelemetryWorkbench();
+    return;
+  }
+  telemetryState.loadingDetail = true;
+  renderTelemetryList();
+  renderTelemetryWorkbench();
+  try {
+    let trace;
+    if (telemetryState.mode === 'upload') {
+      const summary = telemetryState.records.find(record => record.record_id === recordId);
+      if (!summary || !telemetryState.uploadFile) throw new Error('Uploaded trace record is no longer available.');
+      if (Number(summary.length) > TELEMETRY_DETAIL_MAX_BYTES) {
+        throw new Error(`This trace record exceeds the ${formatBytes(TELEMETRY_DETAIL_MAX_BYTES)} browser detail limit.`);
+      }
+      const raw = await telemetryState.uploadFile.slice(summary.offset, summary.offset + summary.length).text();
+      trace = JSON.parse(raw);
+    } else if (telemetryState.mode === 'server') {
+      const response = await fetch('/api/traces/' + encodeURIComponent(recordId), {cache: 'no-store'});
+      const payload = await response.json();
+      if (!response.ok || payload.error) throw new Error(payload.error || `Trace request failed (${response.status})`);
+      trace = payload.trace;
+    } else {
+      throw new Error('Load a telemetry JSONL file first.');
+    }
+    if (
+      sourceGeneration !== telemetryState.sourceGeneration
+      || detailGeneration !== telemetryState.detailGeneration
+      || telemetryState.selectedRecordId !== recordId
+    ) return;
+    if (!trace || typeof trace !== 'object' || Array.isArray(trace)) throw new Error('The selected JSONL record is not a trace object.');
+    telemetryState.selectedTrace = trace;
+    telemetryState.selectedSpanKey = null;
+  } catch (error) {
+    if (
+      sourceGeneration !== telemetryState.sourceGeneration
+      || detailGeneration !== telemetryState.detailGeneration
+    ) return;
+    telemetryState.error = error?.message || String(error);
+  } finally {
+    if (
+      sourceGeneration !== telemetryState.sourceGeneration
+      || detailGeneration !== telemetryState.detailGeneration
+    ) return;
+    telemetryState.loadingDetail = false;
+    renderTelemetry();
+  }
+}
+
+function selectTelemetrySpan(spanKey) {
+  telemetryState.selectedSpanKey = boundedSummaryText(spanKey, 64);
+  telemetryState.inspectorTab = 'span';
+  const waterfall = document.getElementById('telemetry-span-waterfall');
+  for (const button of waterfall?.querySelectorAll('.span-row[data-span-key]') || []) {
+    const active = button.dataset.spanKey === telemetryState.selectedSpanKey;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    button.tabIndex = active ? 0 : -1;
+  }
+  updateTelemetryInspectorDom();
+}
+
+function handleTelemetrySpanKeydown(event) {
+  if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+  const buttons = [...event.currentTarget.querySelectorAll('.span-row[data-span-key]')];
+  if (!buttons.length) return;
+  const current = Math.max(0, buttons.indexOf(document.activeElement));
+  const next = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? buttons.length - 1
+      : Math.max(0, Math.min(buttons.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)));
+  event.preventDefault();
+  const button = buttons[next];
+  selectTelemetrySpan(button.dataset.spanKey);
+  button.focus();
+}
+
+function setTelemetryInspectorTab(tab) {
+  telemetryState.inspectorTab = tab;
+  updateTelemetryInspectorDom();
+}
+
+function handleTelemetryInspectorKeydown(event) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  const tabs = [...event.currentTarget.querySelectorAll('[data-inspector-tab]')];
+  if (!tabs.length) return;
+  const current = Math.max(0, tabs.indexOf(document.activeElement));
+  const next = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? tabs.length - 1
+      : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  event.preventDefault();
+  const button = tabs[next];
+  setTelemetryInspectorTab(button.dataset.inspectorTab);
+  button.focus();
+}
+
+function setTelemetryEventIndex(index) {
+  stopTelemetryPlayback();
+  const events = telemetryTimelineEvents(telemetryState.selectedTrace || {});
+  telemetryState.eventIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(0, events.length - 1)));
+  updateTelemetryReplayDom();
+}
+
+function stepTelemetryEvent(delta) {
+  const events = telemetryTimelineEvents(telemetryState.selectedTrace || {});
+  if (!events.length) return;
+  stopTelemetryPlayback();
+  telemetryState.eventIndex = Math.max(0, Math.min(events.length - 1, telemetryState.eventIndex + Number(delta || 0)));
+  updateTelemetryReplayDom();
+}
+
+function toggleTelemetryPlayback() {
+  if (telemetryState.eventTimer) {
+    stopTelemetryPlayback();
+    updateTelemetryReplayDom();
+    return;
+  }
+  const events = telemetryTimelineEvents(telemetryState.selectedTrace || {});
+  if (!events.length) return;
+  if (telemetryState.eventIndex >= events.length - 1) telemetryState.eventIndex = 0;
+  telemetryState.eventTimer = window.setInterval(() => {
+    if (telemetryState.eventIndex >= events.length - 1) {
+      stopTelemetryPlayback();
+    } else {
+      telemetryState.eventIndex += 1;
+    }
+    updateTelemetryReplayDom();
+  }, telemetryState.eventSpeed);
+  updateTelemetryReplayDom();
+}
+
+function stopTelemetryPlayback() {
+  if (telemetryState?.eventTimer) window.clearInterval(telemetryState.eventTimer);
+  if (telemetryState) telemetryState.eventTimer = null;
+}
+
+function setTelemetrySpeed(value) {
+  const wasPlaying = Boolean(telemetryState.eventTimer);
+  stopTelemetryPlayback();
+  telemetryState.eventSpeed = Number(value) || 950;
+  if (wasPlaying) toggleTelemetryPlayback();
+  else updateTelemetryReplayDom();
+}
+
+async function reloadTelemetry() {
+  stopTelemetryPlayback();
+  const sourceGeneration = ++telemetryState.sourceGeneration;
+  telemetryState.detailGeneration += 1;
+  if (telemetryState.mode === 'snapshot') {
+    telemetryState.error = 'Static telemetry summaries cannot refresh or load detail. Open the matching JSONL file in this tab.';
+    renderTelemetry();
+    return;
+  }
+  telemetryState.error = null;
+  telemetryState.selectedRecordId = null;
+  telemetryState.selectedTrace = null;
+  telemetryState.selectedSpanKey = null;
+  telemetryState.loadingDetail = false;
+  telemetryState.windowShifted = false;
+  if (telemetryState.mode === 'upload' && telemetryState.uploadFile) {
+    telemetryState.loadingPage = true;
+    renderTelemetry();
+    try {
+      const page = await readUploadTracePage(telemetryState.uploadFile, telemetryState.uploadFile.size, TELEMETRY_PAGE_SIZE);
+      if (sourceGeneration !== telemetryState.sourceGeneration) return;
+      applyTelemetryPage(page, true);
+    } catch (error) {
+      if (sourceGeneration !== telemetryState.sourceGeneration) return;
+      telemetryState.error = error?.message || String(error);
+    } finally {
+      if (sourceGeneration !== telemetryState.sourceGeneration) return;
+      telemetryState.loadingPage = false;
+      renderTelemetry();
+    }
+    return;
+  }
+  if (telemetryState.mode === 'server') {
+    await fetchTelemetryPage(null, true, sourceGeneration);
+    return;
+  }
+  await refresh();
+}
+
+async function loadOlderTelemetry() {
+  if (telemetryState.loadingPage || telemetryState.nextCursor == null) return;
+  if (telemetryState.mode === 'upload' && telemetryState.uploadFile) {
+    const sourceGeneration = telemetryState.sourceGeneration;
+    const sourceFile = telemetryState.uploadFile;
+    telemetryState.loadingPage = true;
+    renderTelemetryList();
+    try {
+      const page = await readUploadTracePage(sourceFile, telemetryState.nextCursor, TELEMETRY_PAGE_SIZE);
+      if (sourceGeneration !== telemetryState.sourceGeneration || telemetryState.uploadFile !== sourceFile) return;
+      applyTelemetryPage(page, false);
+    } catch (error) {
+      if (sourceGeneration !== telemetryState.sourceGeneration) return;
+      telemetryState.error = error?.message || String(error);
+    } finally {
+      if (sourceGeneration !== telemetryState.sourceGeneration) return;
+      telemetryState.loadingPage = false;
+      renderTelemetry();
+    }
+    return;
+  }
+  if (telemetryState.mode === 'server') {
+    await fetchTelemetryPage(telemetryState.nextCursor, false, telemetryState.sourceGeneration);
+  }
+}
+
+async function fetchTelemetryPage(cursor, replace, sourceGeneration = telemetryState.sourceGeneration) {
+  telemetryState.loadingPage = true;
+  telemetryState.error = null;
+  renderTelemetry();
+  try {
+    const params = new URLSearchParams({limit: String(TELEMETRY_PAGE_SIZE)});
+    if (cursor != null) params.set('cursor', String(cursor));
+    const response = await fetch('/api/traces?' + params.toString(), {cache: 'no-store'});
+    const page = await response.json();
+    if (!response.ok || page.error) throw new Error(page.error || `Trace page request failed (${response.status})`);
+    if (sourceGeneration !== telemetryState.sourceGeneration) return;
+    telemetryState.mode = 'server';
+    applyTelemetryPage(page, replace);
+  } catch (error) {
+    if (sourceGeneration !== telemetryState.sourceGeneration) return;
+    telemetryState.error = error?.message || String(error);
+  } finally {
+    if (sourceGeneration !== telemetryState.sourceGeneration) return;
+    telemetryState.loadingPage = false;
+    renderTelemetry();
+  }
+}
+
+function applyTelemetryPage(page, replace) {
+  const previousSource = telemetryState.source || {};
+  const incoming = Array.isArray(page.records) ? page.records : [];
+  const combined = replace ? incoming : [...telemetryState.records, ...incoming];
+  const seen = new Set();
+  const deduplicated = combined.filter(record => {
+    if (!record?.record_id || seen.has(record.record_id)) return false;
+    seen.add(record.record_id);
+    return true;
+  });
+  const overflow = Math.max(0, deduplicated.length - TELEMETRY_SUMMARY_CAP);
+  telemetryState.records = replace
+    ? deduplicated.slice(0, TELEMETRY_SUMMARY_CAP)
+    : deduplicated.slice(overflow);
+  telemetryState.windowShifted = replace ? false : telemetryState.windowShifted || overflow > 0;
+  if (
+    telemetryState.selectedRecordId
+    && !telemetryState.records.some(record => record.record_id === telemetryState.selectedRecordId)
+  ) {
+    telemetryState.detailGeneration += 1;
+    telemetryState.selectedRecordId = null;
+    telemetryState.selectedTrace = null;
+    telemetryState.selectedSpanKey = null;
+    telemetryState.loadingDetail = false;
+  }
+  telemetryState.nextCursor = page.next_cursor ?? null;
+  telemetryState.source = {
+    ...previousSource,
+    path: page.path ?? previousSource.path,
+    configured: page.configured == null ? true : Boolean(page.configured),
+    is_file: page.is_file == null ? previousSource.is_file : Boolean(page.is_file),
+    size_bytes: page.size_bytes ?? previousSource.size_bytes,
+    modified_at: page.modified_at ?? previousSource.modified_at,
+    malformed_count: replace
+      ? Number(page.malformed_count || 0)
+      : Number(previousSource.malformed_count || 0) + Number(page.malformed_count || 0),
+    oversized_count: replace
+      ? Number(page.oversized_count || 0)
+      : Number(previousSource.oversized_count || 0) + Number(page.oversized_count || 0),
+    partial_tail: replace ? Boolean(page.partial_tail) : Boolean(previousSource.partial_tail || page.partial_tail),
+    scan_exhausted: replace ? Boolean(page.scan_exhausted) : Boolean(previousSource.scan_exhausted || page.scan_exhausted),
+    exists: page.exists == null ? true : Boolean(page.exists),
+  };
+}
+
+function openTelemetryFile() {
+  document.getElementById('telemetry-file')?.click();
+}
+
+function telemetryDrag(event, active) {
+  event.preventDefault();
+  if (event.type === 'dragleave' && event.currentTarget.contains(event.relatedTarget)) return;
+  document.getElementById('telemetry-drop')?.classList.toggle('dragging', active);
+}
+
+function dropTelemetryFile(event) {
+  event.preventDefault();
+  document.getElementById('telemetry-drop')?.classList.remove('dragging');
+  const file = event.dataTransfer?.files?.[0];
+  if (file) handleTelemetryFile(file);
+}
+
+async function handleTelemetryFile(file) {
+  if (!file) return;
+  stopTelemetryPlayback();
+  const sourceGeneration = ++telemetryState.sourceGeneration;
+  telemetryState.detailGeneration += 1;
+  telemetryState.mode = 'upload';
+  telemetryState.uploadFile = file;
+  telemetryState.source = {
+    configured: true,
+    exists: true,
+    path: file.name,
+    size_bytes: file.size,
+    modified_at: file.lastModified,
+    malformed_count: 0,
+    partial_tail: false,
+  };
+  telemetryState.records = [];
+  telemetryState.nextCursor = null;
+  telemetryState.selectedRecordId = null;
+  telemetryState.selectedTrace = null;
+  telemetryState.selectedSpanKey = null;
+  telemetryState.loadingDetail = false;
+  telemetryState.error = null;
+  telemetryState.loadingPage = true;
+  telemetryState.windowShifted = false;
+  renderTelemetry();
+  try {
+    const page = await readUploadTracePage(file, file.size, TELEMETRY_PAGE_SIZE);
+    if (sourceGeneration !== telemetryState.sourceGeneration || telemetryState.uploadFile !== file) return;
+    applyTelemetryPage(page, true);
+    if (!page.records.length && page.oversized_count) {
+      throw new Error(`No readable trace records were found within the ${formatBytes(TELEMETRY_DETAIL_MAX_BYTES)} per-record safety limit.`);
+    }
+    if (!page.records.length && !page.partial_tail && page.next_cursor == null) {
+      throw new Error('No valid Protolink trace records were found in this file.');
+    }
+  } catch (error) {
+    if (sourceGeneration !== telemetryState.sourceGeneration) return;
+    telemetryState.error = error?.message || String(error);
+  } finally {
+    if (sourceGeneration !== telemetryState.sourceGeneration) return;
+    telemetryState.loadingPage = false;
+    const input = document.getElementById('telemetry-file');
+    if (input) input.value = '';
+    renderTelemetry();
+  }
+}
+
+async function readUploadTracePage(file, before, limit) {
+  if (before && typeof before === 'object' && before.kind === 'skip-line') {
+    return continueUploadSkippedLine(file, before);
+  }
+  const requestedEnd = before == null ? file.size : Number(before);
+  const end = Math.max(0, Math.min(Number.isFinite(requestedEnd) ? requestedEnd : file.size, file.size));
+  const chunkSize = 256 * 1024;
+  const scanCap = 32 * 1024 * 1024;
+  let base = end;
+  let scannedBytes = 0;
+  let newlineCount = 0;
+  let targetLines = limit + 1;
+  const chunks = [];
+  let result = {records: [], next_cursor: null, malformed_count: 0, oversized_count: 0, partial_tail: false};
+  while (base > 0 && scannedBytes < scanCap) {
+    const readSize = Math.min(chunkSize, base, scanCap - scannedBytes);
+    const start = base - readSize;
+    const chunk = new Uint8Array(await file.slice(start, base).arrayBuffer());
+    chunks.unshift(chunk);
+    scannedBytes += chunk.length;
+    newlineCount += countByte(chunk, 10);
+    base = start;
+    if (newlineCount >= targetLines || base === 0 || scannedBytes >= scanCap) {
+      result = scanUploadTraceBytes(joinByteChunks(chunks, scannedBytes), base, end, file.size, limit);
+      if (result.records.length >= limit || result.line_scan_exhausted || base === 0) break;
+      targetLines = Math.max(
+        newlineCount + Math.max(8, limit - result.records.length),
+        Math.ceil(newlineCount * 2),
+        targetLines * 2,
+      );
+    }
+  }
+  if (!result.records.length && scannedBytes >= scanCap && base > 0 && result.next_cursor == null) {
+    throw new Error('No complete trace record was found in the 32 MB scan window. The next JSONL line may be unusually large.');
+  }
+  return {
+    ...result,
+    size_bytes: file.size,
+    modified_at: file.lastModified,
+  };
+}
+
+async function continueUploadSkippedLine(file, cursor) {
+  const chunkSize = 256 * 1024;
+  const scanCap = 32 * 1024 * 1024;
+  const initialBefore = Math.max(0, Math.min(Number(cursor.before) || 0, file.size));
+  let position = initialBefore;
+  let scannedBytes = 0;
+  let skippedLineBytes = Math.max(0, Number(cursor.skipped_line_bytes) || 0);
+  while (position > 0 && scannedBytes < scanCap) {
+    const readSize = Math.min(chunkSize, position, scanCap - scannedBytes);
+    const start = position - readSize;
+    const chunk = new Uint8Array(await file.slice(start, position).arrayBuffer());
+    scannedBytes += chunk.length;
+    const newline = chunk.lastIndexOf(10);
+    if (newline >= 0) {
+      const boundary = start + newline + 1;
+      skippedLineBytes += initialBefore - boundary;
+      const partialTail = Boolean(cursor.partial_tail);
+      return {
+        records: [],
+        next_cursor: boundary > 0 ? boundary : null,
+        malformed_count: !partialTail && skippedLineBytes <= TELEMETRY_DETAIL_MAX_BYTES ? 1 : 0,
+        oversized_count: !partialTail && skippedLineBytes > TELEMETRY_DETAIL_MAX_BYTES ? 1 : 0,
+        partial_tail: partialTail,
+        scan_exhausted: false,
+        size_bytes: file.size,
+        modified_at: file.lastModified,
+      };
+    }
+    position = start;
+  }
+  skippedLineBytes += initialBefore - position;
+  const partialTail = Boolean(cursor.partial_tail);
+  if (position === 0) {
+    return {
+      records: [],
+      next_cursor: null,
+      malformed_count: !partialTail && skippedLineBytes <= TELEMETRY_DETAIL_MAX_BYTES ? 1 : 0,
+      oversized_count: !partialTail && skippedLineBytes > TELEMETRY_DETAIL_MAX_BYTES ? 1 : 0,
+      partial_tail: partialTail,
+      scan_exhausted: false,
+      size_bytes: file.size,
+      modified_at: file.lastModified,
+    };
+  }
+  return {
+    records: [],
+    next_cursor: {
+      kind: 'skip-line',
+      before: position,
+      skipped_line_bytes: skippedLineBytes,
+      partial_tail: partialTail,
+    },
+    malformed_count: 0,
+    oversized_count: 0,
+    partial_tail: partialTail,
+    scan_exhausted: true,
+    size_bytes: file.size,
+    modified_at: file.lastModified,
+  };
+}
+
+function countByte(data, byte) {
+  let count = 0;
+  for (const value of data) if (value === byte) count += 1;
+  return count;
+}
+
+function joinByteChunks(chunks, size) {
+  const joined = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return joined;
+}
+
+function scanUploadTraceBytes(data, base, end, fileSize, limit) {
+  const maxScannedLines = 5000;
+  const decoder = new TextDecoder('utf-8', {fatal: true});
+  let localEnd = data.length;
+  let partialTail = false;
+  let malformed = 0;
+  let oversized = 0;
+  let scannedLines = 0;
+  let blockedPrefix = false;
+  let blockedPartialTail = false;
+  let blankPrefix = false;
+  let safePrefixBoundary = null;
+  let oldestHandledOffset = null;
+  let knownLineEnd = false;
+  if (end === fileSize && localEnd && data[localEnd - 1] !== 10) {
+    partialTail = true;
+    const newline = previousByte(data, 10, localEnd - 1);
+    if (newline < 0 && base > 0) {
+      blockedPrefix = true;
+      blockedPartialTail = true;
+    }
+    localEnd = newline >= 0 ? newline + 1 : 0;
+  }
+  const records = [];
+  let oldestOffset = null;
+  while (localEnd > 0 && records.length < limit && scannedLines < maxScannedLines) {
+    const beforeTrim = localEnd;
+    while (localEnd > 0 && (data[localEnd - 1] === 10 || data[localEnd - 1] === 13)) localEnd -= 1;
+    if (localEnd < beforeTrim) knownLineEnd = true;
+    if (localEnd <= 0) {
+      if (base > 0 && !blockedPrefix) blankPrefix = true;
+      break;
+    }
+    const newline = previousByte(data, 10, localEnd - 1);
+    const lineStart = newline + 1;
+    if (lineStart === 0 && base > 0) {
+      if (knownLineEnd) safePrefixBoundary = base + localEnd;
+      else blockedPrefix = true;
+      break;
+    }
+    let raw = data.subarray(lineStart, localEnd);
+    if (raw.length && raw[raw.length - 1] === 13) raw = raw.subarray(0, raw.length - 1);
+    const offset = base + lineStart;
+    scannedLines += 1;
+    oldestHandledOffset = offset;
+    if (raw.length > TELEMETRY_DETAIL_MAX_BYTES) {
+      oversized += 1;
+      localEnd = newline;
+      continue;
+    }
+    try {
+      const trace = JSON.parse(decoder.decode(raw));
+      if (!trace || typeof trace !== 'object' || Array.isArray(trace)) throw new Error('not an object');
+      const summary = summarizeUploadTrace(trace, offset, raw.length);
+      records.push(summary);
+      oldestOffset = offset;
+    } catch (_) {
+      malformed += 1;
+    }
+    localEnd = newline;
+    knownLineEnd = true;
+  }
+  const lineScanExhausted = scannedLines >= maxScannedLines && (localEnd > 0 || base > 0);
+  return {
+    records,
+    next_cursor: safePrefixBoundary != null
+      ? safePrefixBoundary
+      : blockedPrefix
+        ? {
+            kind: 'skip-line',
+            before: base,
+            skipped_line_bytes: end - base,
+            partial_tail: blockedPartialTail,
+          }
+        : blankPrefix
+          ? base
+          : lineScanExhausted && oldestHandledOffset != null
+            ? oldestHandledOffset
+          : oldestOffset != null && oldestOffset > 0
+            ? oldestOffset
+            : null,
+    malformed_count: malformed,
+    oversized_count: oversized,
+    partial_tail: partialTail,
+    scan_exhausted: blockedPrefix || blankPrefix || safePrefixBoundary != null || lineScanExhausted,
+    line_scan_exhausted: lineScanExhausted,
+  };
+}
+
+function previousByte(data, byte, beforeIndex) {
+  for (let index = beforeIndex - 1; index >= 0; index -= 1) {
+    if (data[index] === byte) return index;
+  }
+  return -1;
+}
+
+function summarizeUploadTrace(trace, offset, length, forcedId) {
+  const spans = Array.isArray(trace.spans) ? trace.spans : [];
+  const events = Array.isArray(trace.events) ? trace.events : [];
+  const summarySpans = spans.slice(0, 2000);
+  const models = [...new Set(summarySpans.map(span => span?.metadata?.model).filter(Boolean).map(value => boundedSummaryText(value, 256)))].slice(0, 5);
+  const spanKinds = [...new Set(summarySpans.map(span => span?.kind).filter(Boolean).map(value => boundedSummaryText(value, 128)))].slice(0, 8);
+  const rawMetrics = trace.metadata?.llm_metrics && typeof trace.metadata.llm_metrics === 'object'
+    ? trace.metadata.llm_metrics
+    : {};
+  const metricKeys = [
+    'call_count', 'total_latency_ms', 'total_input_tokens', 'total_output_tokens', 'total_tokens',
+    'estimated_token_calls', 'total_cost', 'currency', 'max_context_used_percent',
+    'max_context_used_tokens', 'context_window_tokens',
+  ];
+  const llmMetrics = {};
+  for (const key of metricKeys) {
+    const value = rawMetrics[key];
+    if (typeof value === 'number' && Number.isFinite(value)) llmMetrics[key] = value;
+    else if (typeof value === 'string') llmMetrics[key] = boundedSummaryText(value, 128);
+  }
+  return {
+    record_id: forcedId || `upload-${offset}-${length}`,
+    offset,
+    length,
+    trace_id: optionalSummaryText(trace.trace_id),
+    task_id: optionalSummaryText(trace.task_id),
+    agent_name: optionalSummaryText(trace.agent_name),
+    started_at: optionalSummaryText(trace.started_at),
+    ended_at: optionalSummaryText(trace.ended_at),
+    duration_ms: Number.isFinite(Number(trace.duration_ms)) ? Number(trace.duration_ms) : null,
+    status: optionalSummaryText(trace.status),
+    final_state: optionalSummaryText(trace.metadata?.final_state),
+    span_count: spans.length,
+    event_count: events.length,
+    span_kinds: spanKinds,
+    models,
+    llm_metrics: llmMetrics,
+  };
+}
+
+function boundedSummaryText(value, limit = 512) {
+  const text = String(value ?? '');
+  return text.length <= limit ? text : text.slice(0, limit - 1) + '…';
+}
+
+function boundedDisplayText(value, fallback = '-', limit = 160) {
+  if (value == null || value === '') return fallback;
+  return boundedSummaryText(value, Math.max(8, limit));
+}
+
+function optionalSummaryText(value) {
+  return value == null || value === '' ? null : boundedSummaryText(value);
+}
+
+function summaryModels(record) {
+  return Array.isArray(record?.models) ? record.models.map(String) : [];
+}
+
+function summarySpanKinds(record) {
+  if (Array.isArray(record?.span_kinds)) return record.span_kinds.map(String);
+  if (record?.span_kinds && typeof record.span_kinds === 'object') return Object.keys(record.span_kinds);
+  return [];
+}
+
+function traceKindClass(kind) {
+  const value = boundedSummaryText(kind, 64).toLowerCase().replace(/_/g, '-');
+  return ['llm', 'tool', 'agent-call'].includes(value) ? value : 'task';
+}
+
+function timestampMs(value) {
+  if (value == null || value === '') return Number.NaN;
+  const text = typeof value === 'string' ? boundedSummaryText(value) : String(value);
+  const numeric = Number(text);
+  if (Number.isFinite(numeric) && text.trim() !== '') return numeric < 1e12 ? numeric * 1000 : numeric;
+  return new Date(text).getTime();
+}
+
+function formatMilliseconds(value) {
+  const ms = numericValue(value);
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  if (ms < 1) return `${ms.toFixed(2)} ms`;
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.round((ms % 60000) / 1000);
+  return `${minutes}m ${seconds}s`;
+}
+
+function formatBytes(value) {
+  const bytes = numericValue(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let amount = bytes / 1024;
+  let unit = units[0];
+  for (let index = 1; index < units.length && amount >= 1024; index += 1) {
+    amount /= 1024;
+    unit = units[index];
+  }
+  return `${amount.toFixed(amount < 10 ? 1 : 0)} ${unit}`;
+}
+
+function formatCompactNumber(value) {
+  const number = numericValue(value);
+  if (!Number.isFinite(number)) return '0';
+  return Intl.NumberFormat(undefined, {notation: Math.abs(number) >= 1000 ? 'compact' : 'standard', maximumFractionDigits: 1}).format(number);
+}
+
+function numericValue(value) {
+  if (typeof value === 'string' && value.length > 128) return Number.NaN;
+  return Number(value);
+}
+
+function shortId(value, limit = 20) {
+  const text = String(value || '-');
+  if (text.length <= limit) return text;
+  const head = Math.ceil((limit - 1) * .58);
+  return text.slice(0, head) + '…' + text.slice(-(limit - head - 1));
+}
+
+function relativeTime(value) {
+  const ms = timestampMs(value);
+  if (!Number.isFinite(ms)) return String(value || '');
+  const delta = Date.now() - ms;
+  if (Math.abs(delta) < 60000) return 'updated just now';
+  if (delta >= 0 && delta < 3600000) return `updated ${Math.floor(delta / 60000)}m ago`;
+  return new Date(ms).toLocaleString();
+}
+
 function metric(label, value, hint, accent, view, iconName) {
-  const action = view ? ` onclick="showView('${escAttr(view)}')"` : '';
+  const action = view ? ` onclick="showView(${jsStringAttr(view)})"` : '';
   return `<button type="button" class="metric" data-accent="${esc(accent || 'teal')}"${action}><div class="metric-top"><div class="label">${esc(label)}</div><span class="metric-icon">${icon(iconName || 'dashboard')}</span></div><div class="value">${cellHtml(value)}</div><div class="hint">${esc(hint || '')}</div></button>`;
 }
 function storeStateHtml(isOn, error) {
@@ -611,7 +2591,7 @@ function storeStateHtml(isOn, error) {
   const dot = isOn && !error ? 'online' : 'offline';
   return `<span class="store-state ${state}">${statusDotHtml(dot)}${esc(state)}</span>`;
 }
-function agentKey(agent) { return agent.url || agent.name || 'agent'; }
+function agentKey(agent) { return agent?.url || agent?.name || 'agent'; }
 function isHttpAgent(agent) { return /^https?:\\/\\//.test(String(agent.url || '')); }
 function hasChat(agent) { return Boolean(agent.capabilities?.has_llm); }
 function endpoint(agent, path) { return String(agent.url || '').replace(/\\/+$/, '') + path; }
@@ -647,10 +2627,11 @@ function formatDuration(seconds) {
   return `${secs}s`;
 }
 function timestampLabel(value) {
-  if (!value) return '-';
-  const numeric = Number(value);
-  const date = Number.isFinite(numeric) ? new Date(numeric * 1000) : new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
+  if (value == null || value === '') return '-';
+  const text = typeof value === 'string' ? boundedSummaryText(value) : String(value);
+  const parsed = timestampMs(value);
+  const date = Number.isFinite(parsed) ? new Date(parsed) : new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
   return date.toLocaleString();
 }
 function agentUptime(agent) {
@@ -690,7 +2671,7 @@ function transportKind(value) {
 }
 function transportBadge(value) {
   const label = String(value || '-');
-  return raw(`<span class="transport-badge ${escAttr(transportKind(label))}">${esc(label)}</span>`);
+  return raw(`<span class="transport-badge ${htmlAttr(transportKind(label))}">${esc(label)}</span>`);
 }
 function skillName(skill) { return typeof skill === 'string' ? skill : skill.id || skill.name || 'skill'; }
 function skillDescription(skill) { return typeof skill === 'string' ? '' : skill.description || ''; }
@@ -736,7 +2717,7 @@ function healthStatus(agent) {
   if (item.ok) return {state: 'online', label: `${item.latency_ms ?? '-'} ms`, detail: 'online'};
   return {state: 'offline', label: 'offline', detail: item.error || 'offline'};
 }
-function statusDotHtml(state) { return `<span class="status-dot ${escAttr(state || 'unknown')}"></span>`; }
+function statusDotHtml(state) { return `<span class="status-dot ${htmlAttr(state || 'unknown')}"></span>`; }
 function agentHealth(agent) {
   const status = healthStatus(agent);
   const cls = status.state === 'online' ? 'ok' : status.state === 'offline' ? 'error' : status.state === 'pending' ? 'warn' : 'idle';
@@ -768,10 +2749,6 @@ function agentHealthRow(agent, index) { return [agentCell(agent), agent.url || '
 function registryRow(agent, index) {
   return [agentCell(agent), transportBadge(agent.transport), agent.url || '-', capabilityBadges(agent.capabilities || {}), agentHealth(agent), agentActions(agent, index)];
 }
-function replayButton(id) {
-  if (!id) return '-';
-  return raw(`<button class="mini-btn" data-icon="play" onclick="replayRun('${escAttr(id)}')">${esc(id)}</button>`);
-}
 function pill(value) { const cls = value === 'completed' ? 'ok' : value === 'failed' ? 'error' : value === 'canceled' ? 'warn' : ''; return raw(`<span class="pill ${cls}">${esc(value || '-')}</span>`); }
 function table(headers, rows) {
   if (!rows.length) return '<div style="padding:14px;color:var(--muted);">(none)</div>';
@@ -780,7 +2757,8 @@ function table(headers, rows) {
 function raw(html) { return {__html: html}; }
 function cellHtml(cell) { return cell && typeof cell === 'object' && '__html' in cell ? cell.__html : esc(cell); }
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function escAttr(value) { return String(value ?? '').replace(/[\\\\'"]/g, c => '\\\\' + c).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function htmlAttr(value) { return esc(value); }
+function jsStringAttr(value) { return esc(JSON.stringify(String(value ?? ''))); }
 
 function selectAgent(index) {
   const agents = snapshot.registry?.agents || [];
@@ -895,12 +2873,18 @@ function openChat(index) {
 
 function selectChatAgent(index) {
   const agents = snapshot.registry?.agents || [];
-  selectedAgentIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(agents.length - 1, 0)));
+  const nextIndex = Math.max(0, Math.min(Number(index) || 0, Math.max(agents.length - 1, 0)));
+  if (nextIndex !== selectedAgentIndex) {
+    chatRequestGeneration += 1;
+    chatPending = false;
+  }
+  selectedAgentIndex = nextIndex;
   renderAgentDetail();
   renderChat();
 }
 
 function resetChat() {
+  chatRequestGeneration += 1;
   chatMessages = [];
   chatPending = false;
   chatDebugStats = {sent: 0, latencies: [], lastLatency: null, lastError: null};
@@ -1050,6 +3034,9 @@ async function sendChat() {
   input.value = '';
   handleChatInput();
   chatSessionId = document.getElementById('chat-session').value || chatSessionId;
+  const generation = ++chatRequestGeneration;
+  const requestedAgentKey = agentKey(agent);
+  const requestedSessionId = chatSessionId;
   chatMessages.push({role: 'user', text, time: timeLabel()});
   chatPending = true;
   renderChat();
@@ -1061,10 +3048,19 @@ async function sendChat() {
       body: JSON.stringify({url: agent.url, message: text, session_id: chatSessionId})
     });
     const data = await res.json();
+    const activeAgent = (snapshot.registry?.agents || [])[selectedAgentIndex];
+    const activeSessionId = document.getElementById('chat-session')?.value || chatSessionId;
+    if (
+      generation !== chatRequestGeneration
+      || !activeAgent
+      || agentKey(activeAgent) !== requestedAgentKey
+      || activeSessionId !== requestedSessionId
+    ) return;
     const latencyMs = Math.round(performance.now() - started);
     recordChatDebug(latencyMs, data.error || null);
     chatMessages.push({role: data.error ? 'system' : 'agent', text: data.response || data.error || 'No response', time: timeLabel(), latencyMs});
   } catch (err) {
+    if (generation !== chatRequestGeneration) return;
     const latencyMs = Math.round(performance.now() - started);
     recordChatDebug(latencyMs, 'Serve the dashboard locally to use chat actions.');
     chatMessages.push({role: 'system', text: 'Serve the dashboard locally to use chat actions.', time: timeLabel(), latencyMs});
@@ -1073,24 +3069,78 @@ async function sendChat() {
   renderChat();
 }
 
-async function replayRun(id) {
+async function replayRun(id, recordKey) {
   if (!id) return;
+  const generation = ++runReplayGeneration;
+  const activeKey = recordKey || `report:${boundedSummaryText(id, 512)}`;
+  selectedRunKey = activeKey;
+  renderRuns();
   const panel = document.getElementById('replay-panel');
-  panel.innerHTML = '<span class="pill warn">loading</span>';
+  const summary = document.getElementById('run-replay-summary');
+  if (!panel) return;
+  panel.setAttribute('aria-busy', 'true');
+  if (summary) summary.textContent = 'Loading replay…';
+  panel.className = 'run-replay-empty';
+  panel.innerHTML = '<div><span class="trace-empty-icon" data-icon="refresh"></span><h3>Loading replay</h3><p>Reading the selected record from the connected store.</p></div>';
+  hydrateIcons(panel);
+  if (!window.__PROTOLINK_LIVE__) {
+    if (summary) summary.textContent = 'Live dashboard required';
+    panel.innerHTML = '<div><span class="trace-empty-icon" data-icon="timeline"></span><h3>Replay unavailable in a static snapshot</h3><p>Serve the dashboard locally and reconnect this store to load full replay events.</p></div>';
+    panel.setAttribute('aria-busy', 'false');
+    hydrateIcons(panel);
+    return;
+  }
   try {
-    const res = await fetch('/api/runs/' + encodeURIComponent(id));
+    const recordKind = activeKey.startsWith('task:') ? 'task' : 'report';
+    const replayUrl = '/api/runs/' + encodeURIComponent(id) + '?kind=' + encodeURIComponent(recordKind);
+    const res = await fetch(replayUrl, {cache: 'no-store'});
     const view = await res.json();
+    if (generation !== runReplayGeneration || selectedRunKey !== activeKey) return;
+    if (!res.ok || view.error) throw new Error(view.error || `Replay request failed (${res.status})`);
+    if (!view || view.source === 'missing') throw new Error('Run record not found in the connected store.');
+    panel.className = '';
     panel.innerHTML = renderReplay(view);
+    panel.setAttribute('aria-busy', 'false');
+    if (summary) summary.textContent = `${(view.items || []).length} event${(view.items || []).length === 1 ? '' : 's'}`;
+    hydrateIcons(panel);
   } catch (err) {
-    panel.innerHTML = '<span class="pill error">Serve the dashboard to replay stored runs.</span>';
+    if (generation !== runReplayGeneration) return;
+    if (summary) summary.textContent = 'Replay unavailable';
+    panel.className = 'run-replay-empty';
+    panel.innerHTML = `<div><span class="trace-empty-icon" data-icon="status"></span><h3>Could not load replay</h3><p>${esc(err?.message || String(err))}</p></div>`;
+    panel.setAttribute('aria-busy', 'false');
+    hydrateIcons(panel);
   }
 }
 
 function renderReplay(view) {
-  if (!view || view.source === 'missing') return '<span class="pill error">Run not found</span>';
-  const items = view.items || [];
-  if (!items.length) return '<span class="pill idle">No replay events</span>';
-  return `<div class="replay-list">${items.map(item => `<div class="timeline-item ${esc(item.severity || '')}"><div class="timeline-time">${esc(item.timestamp || '-')}</div><div class="timeline-main"><strong>${esc(item.event_type || '-')}</strong><span>${esc(item.summary || '')}</span><span class="msg-meta">${esc(item.agent_name || view.agent_name || '-')}</span></div></div>`).join('')}</div>`;
+  const allItems = Array.isArray(view.items) ? view.items : [];
+  const items = allItems.slice(0, 500);
+  const omitted = Math.max(0, allItems.length - items.length);
+  const lifecycle = runLifecycle(view.final_task?.state || (items.some(item => item.severity === 'error') ? 'error' : 'completed'));
+  const timeline = items.length
+    ? `<div class="run-timeline">${items.map((item, index) => {
+        const severity = ['error', 'warn'].includes(item.severity) ? item.severity : '';
+        return `<div class="run-event ${severity}"><div class="run-event-rail"><span class="run-event-dot">${index + 1}</span></div><div class="run-event-card"><strong>${esc(boundedDisplayText(item.event_type, 'event', 160))}</strong><p>${esc(boundedDisplayText(item.summary, 'No summary', 1200))}</p><div class="run-event-meta"><span>${esc(timestampLabel(item.timestamp))}</span><span>${esc(boundedDisplayText(item.agent_name || view.agent_name, 'unassigned', 120))}</span>${item.task_id ? `<span>task ${esc(shortId(item.task_id, 26))}</span>` : ''}</div></div></div>`;
+      }).join('')}</div>`
+    : '<div class="panel-body"><div class="empty-muted">This record contains no replay events.</div></div>';
+  return `
+    <div class="run-replay-hero">
+      <div class="run-replay-title"><div><h3>${esc(shortId(view.run_id || '-', 72))}</h3><p>${esc(boundedDisplayText(view.source, 'run', 40))} replay from the connected read-only store</p></div><span class="pill ${lifecycle.cls}">${esc(lifecycle.label)}</span></div>
+      <div class="run-replay-facts">
+        ${runReplayFact('Agent', boundedDisplayText(view.agent_name, 'unassigned', 120))}
+        ${runReplayFact('Session', shortId(view.session_id || '-', 30))}
+        ${runReplayFact('Trace', shortId(view.trace_id || '-', 30))}
+        ${runReplayFact('Events', (view.items || []).length)}
+      </div>
+    </div>
+    ${omitted ? `<div class="trace-limit-note">Showing the first ${formatCompactNumber(items.length)} of ${formatCompactNumber(allItems.length)} replay events to keep the timeline responsive.</div>` : ''}
+    ${timeline}
+  `;
+}
+
+function runReplayFact(label, value) {
+  return `<div class="run-replay-fact"><span class="detail-label">${esc(label)}</span><strong>${esc(value)}</strong></div>`;
 }
 
 function timeLabel() { return new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); }
@@ -1127,6 +3177,24 @@ function renderStudio() {
   document.getElementById('node-kind').value = first?.kind || 'agent';
   document.getElementById('blueprint-json').textContent = JSON.stringify(blueprint, null, 2);
 }
+
+document.addEventListener('keydown', event => {
+  if (!document.getElementById('view-telemetry')?.classList.contains('active')) return;
+  if (event.target?.matches('input, select, textarea, button') || event.target?.closest?.('.inspector-json, .event-payload-preview')) return;
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    stepTelemetryEvent(-1);
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    stepTelemetryEvent(1);
+  } else if (event.key === ' ') {
+    event.preventDefault();
+    toggleTelemetryPlayback();
+  } else if (event.key === 'Escape') {
+    stopTelemetryPlayback();
+    updateTelemetryReplayDom();
+  }
+});
 
 showView('__PROTOLINK_START_TAB_VALUE__');
 render();

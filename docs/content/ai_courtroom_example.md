@@ -11,11 +11,21 @@ keywords:
   - ProtoLink
 ---
 
-<!--import courtroomHero from '@site/assets/ai_courtroom_article_hero.png';
-import courtroomConditions from '@site/assets/ai_courtroom_conditions.png';
-import courtroomResults from '@site/assets/ai_courtroom_results.png';-->
+
+import ExampleArticle from '@site/src/components/ExampleArticle';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # AI Courtroom Experiment
+
+<ExampleArticle
+  source="Level Up Coding"
+  title="Can AI Agents Change Each Other’s Minds?"
+  description="I built a replayable AI jury to find out, through an observable A2A experiment."
+  href="https://medium.com/gitconnected/can-ai-agents-change-each-others-minds-9162ed3a3ae1"
+  image="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*nbsbh3X0vrVMoTDbBh1ZjQ.png"
+  imageAlt="Can communication make AI agents smarter than independent voting?"
+/>
+
 
 :::tip[Communication is the experiment]
 
@@ -23,13 +33,6 @@ The courtroom is a memorable setting, but it is not the main result. This
 example asks a broader engineering question: **what changes when autonomous
 agents with different roles and perspectives are allowed to communicate
 directly?**
-
-:::
-
-:::info[Original Level Up Coding article]
-
-**Status: Pending.** The original Medium article link will be added here after
-publication on Level Up Coding.
 
 :::
 
@@ -43,17 +46,6 @@ HTML reports.
 
 :::
 
-<!--<figure className="doc-media-frame">
-  <img
-    src={courtroomHero}
-    alt="A fictional autonomous vehicle in a rain-lit lane below a network of tribunal agents and jurors, with one juror's public verdict changing from not guilty to guilty"
-  />
-  <figcaption>
-    The case gives the agents something consequential to disagree about.
-    ProtoLink makes the communication paths and observable revisions
-    inspectable.
-  </figcaption>
-</figure>-->
 
 The AI Courtroom is a flagship ProtoLink showcase built as an experiment rather
 than a scripted roleplay. Lawyers, witnesses, a judge, and jurors are separate,
@@ -150,9 +142,9 @@ Only the permitted peer communication changes:
 | `star` | The same five specialists | Four jurors address foreperson Sofia; Sofia chooses one reply target | Communication concentrated through a hub |
 | `mesh` | The same five specialists | Every juror chooses another juror and authors one direct message per round | Decentralized, agent-selected communication |
 
-<!--<figure className="doc-media-frame">
+<figure className="doc-media-frame">
   <img
-    src={courtroomConditions}
+    src="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*4rsN-Sge8xDG8wfiKgK3rQ.png"
     alt="Four communication conditions show one isolated generalist, five independent specialists, a foreperson star, and a decentralized direct-message mesh"
   />
   <figcaption>
@@ -160,7 +152,7 @@ Only the permitted peer communication changes:
     Solo is useful context, but it also changes panel size, persona composition,
     and inference budget.
   </figcaption>
-</figure>-->
+</figure>
 
 Star is not an automatic broadcast. Sofia receives four independently authored
 messages, then chooses one juror and one issue to address. This makes her an
@@ -302,16 +294,16 @@ designed to make the communication treatment visible in one quick run:
 | `star` | Not guilty | 2–3 | 80.21 | 93 | 0 |
 | `mesh` | Guilty | 3–2 | 80.54 | 93 | 1 |
 
-<!--<figure className="doc-media-frame">
+<figure className="doc-media-frame">
   <img
-    src={courtroomResults}
+    src="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*YF1mOZRkxMHRe55e2sEQHw.png"
     alt="Four tribunal panels compare verdicts, ballots, mean final guilt probabilities, A2A event counts, and vote flips for Solo, Independent, Star, and Mesh"
   />
   <figcaption>
     These are deterministic fixture results, not evidence that one topology is
     generally superior.
   </figcaption>
-</figure>-->
+</figure>
 
 The independent and mesh juries receive the same public record. In the mesh
 run, Sofia challenges Anika with the interaction between the unvalidated C-91
@@ -342,6 +334,34 @@ finishes, it automatically generates a standalone interactive `report.html`
 for each condition and prints the exact path to open. No web server or frontend
 setup is required.
 
+
+The embedded report below is the generated artifact from a local Mesh run using
+Ollama and `gemma4:e4b`. The replay UI and recorded A2A events are contained in
+the report itself; this is a saved example run, not a live simulation:
+
+```bash
+python examples/ai_courtroom/run.py \
+  --provider ollama \
+  --base-url "http://localhost:11434" \
+  --model gemma4:e4b \
+  --juror-provider ollama \
+  --juror-base-url "http://localhost:11434" \
+  --condition mesh \
+  --seed 7
+```
+
+<div className="generated-report-embed">
+  <iframe
+    src={useBaseUrl('/html/courtroom-mesh-report.html')}
+    title="Generated AI Courtroom Mesh replay using Ollama with gemma4:e4b"
+    loading="lazy"
+    sandbox="allow-scripts"
+  />
+</div>
+
+<p>If the embedded replay is too narrow for detailed inspection, <a href={useBaseUrl('/html/courtroom-mesh-report.html')} target="_blank" rel="noreferrer">open the generated Mesh report in a new tab</a>.</p>
+
+
 The report lets a developer:
 
 - play or step through every A2A exchange;
@@ -355,6 +375,8 @@ The report lets a developer:
 An all-condition run also creates an `index.html` comparison page for the
 Solo → Independent → Star → Mesh ladder. The models can stop running while the
 saved interaction remains replayable and shareable.
+
+
 
 ## Run the Example
 

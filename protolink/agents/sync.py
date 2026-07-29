@@ -6,6 +6,7 @@ import asyncio
 from typing import Any, Literal
 
 from protolink.models import AgentCard, Task
+from protolink.rag import RAGAnswer
 
 
 class SyncAgent:
@@ -47,6 +48,28 @@ class SyncAgent:
             Agent response text
         """
         return asyncio.run(self._agent.invoke(message, part_type, tool_name, tool_args, session_id))
+
+    def ask(
+        self,
+        question: str,
+        *,
+        knowledge: str | list[str] | tuple[str, ...] | None = None,
+        k: int | None = None,
+        where: dict[str, Any] | None = None,
+        citations: bool = True,
+        session_id: str = "ask_session_id",
+    ) -> RAGAnswer:
+        """Synchronously run deterministic retrieve-then-answer."""
+        return asyncio.run(
+            self._agent.ask(
+                question,
+                knowledge=knowledge,
+                k=k,
+                where=where,
+                citations=citations,
+                session_id=session_id,
+            )
+        )
 
     def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:
         """Synchronously discover agents in the registry.

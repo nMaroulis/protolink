@@ -1096,6 +1096,11 @@ decoding succeeded, the parser carries the decoded outer `type` separately from 
 therefore distinguish a malformed `agent_call`, malformed `tool_call`, invalid `final`, unknown action type, or object
 with no recognizable outer type without scraping its own diagnostic text.
 
+If the configured correction limit is exhausted, `infer()` raises `InferParseError`. It identifies the failed
+inference step and number of consecutive attempts, gives a short explanation, keeps the final parser error, and
+preserves the exact final model response. An empty Ollama response is reported as `<empty>` rather than appearing as a
+blank diagnostic.
+
 The correction also uses the current runtime capabilities. If the model selected `agent_call` but this inference has
 no delegation callback, ProtoLink says that the action cannot be dispatched and does not show Agent-call examples. If
 local tools or delegation are available, their canonical action shapes are included. ProtoLink does not silently
@@ -1142,6 +1147,22 @@ configure transient HTTP/provider retries, and it does not validate an applicati
 Those are separate boundaries whose retry budgets can multiply. Raising the limit can help a smaller model
 self-correct, but repeating a deterministic shape error is better handled by a lossless normalization or a clearer
 prompt than by unlimited retries.
+
+```python
+from protolink import InferParseError
+
+try:
+    result = await llm.infer(query="Review the evidence.", tools={})
+except InferParseError as exc:
+    print(f"Failed after {exc.attempts} invalid proposals at step {exc.step}")
+    print(exc.explanation)
+    print(f"Last model response: {exc.raw_response!r}")
+    print(f"Parser detail: {exc.last_error}")
+```
+
+`raw_response` is the exact final provider text: `""` means the provider returned no content, while `None` means an
+adapter could not expose the text. The rendered exception keeps the existing bounded diagnostic preview, but the exact
+attribute is not truncated. Treat it as potentially sensitive model output when logging or exporting it.
 
 ##### The action envelope is not the application schema
 
@@ -1412,8 +1433,13 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
 
 <ApiSection title="Raises">
   <ApiFields ariaLabel="LLM infer errors">
+    <ApiField name="InferParseError">
+      Raised when the configured number of consecutive model responses cannot be decoded or validated as ProtoLink
+      actions. Exposes <code>attempts</code>, <code>step</code>, <code>explanation</code>,
+      <code>raw_response</code>, and <code>last_error</code>.
+    </ApiField>
     <ApiField name="RuntimeError">
-      Raised after three consecutive parse failures, after ten steps without a final action, or when an unrecoverable provider, tool, or delegated-agent failure is wrapped by the loop.
+      Raised after ten steps without a final action, or when an unrecoverable provider, tool, or delegated-agent failure is wrapped by the loop.
     </ApiField>
     <ApiField name="BudgetExceededError">
       Raised when the configured run budget denies further work.
@@ -2792,13 +2818,14 @@ LLM failures can originate at several different boundaries:
 - **Parameter errors**: the downstream SDK or server rejects generation settings.
 - **Action errors**: a model emits malformed or invalid structured intent.
 - **Execution errors**: a selected tool, delegated agent, authorization policy, cancellation token, or run budget stops the loop.
-- **Guardrail errors**: repeated parse failures or the ten-step safety limit produces `RuntimeError`.
+- **Parse guardrail errors**: repeated parse failures produce `InferParseError`.
+- **Step guardrail errors**: the ten-step safety limit produces `RuntimeError`.
 
 Recoverable action mistakes are normally injected back into history so the model can self-correct. Application-level exception handling should focus on provider failures and runtime boundaries that cannot be repaired inside the loop.
 
 A direct `call_action()` or `call_action_stream()` invocation raises `ValueError` when its one response cannot become a
 valid action. `infer()` catches that validation failure, emits `llm_parse_error`, requests a correction, and raises
-`RuntimeError` only when `max_parse_failures` consecutive proposals have failed. Inspect the final field-level
+`InferParseError` only when `max_parse_failures` consecutive proposals have failed. Inspect the final field-level
 diagnostic before increasing the limit: repeated syntax drift may benefit from another attempt, while an unavailable
 tool, ambiguous action, or application-schema mismatch needs a prompt, capability, or application-layer fix.
 
@@ -2809,6 +2836,7 @@ from protolink import (
     ActionDeniedError,
     ApprovalRequiredError,
     BudgetExceededError,
+    InferParseError,
     create_llm,
 )
 
@@ -2825,6 +2853,9 @@ async def safe_inference():
         print(f"Budget stopped the run: {exc}")
     except (ApprovalRequiredError, ActionDeniedError) as exc:
         print(f"Policy stopped the action: {exc}")
+    except InferParseError as exc:
+        print(f"Model action parsing failed: {exc.explanation}")
+        print(f"Last model response: {exc.raw_response!r}")
     except asyncio.CancelledError:
         print("The run was cancelled.")
         raise
@@ -2835,6 +2866,24 @@ async def safe_inference():
 
 asyncio.run(safe_inference())
 ```
+
+An in-process `RuntimeTransport` request still raises `TransportRemoteError` at the client boundary, while preserving
+the typed infer error as its cause:
+
+```python
+from protolink import InferParseError, TransportRemoteError
+
+try:
+    task = await client.send_infer_task("Review the evidence.", agent_url)
+except TransportRemoteError as exc:
+    if isinstance(exc.__cause__, InferParseError):
+        print(exc.__cause__.explanation)
+        print(f"Last model response: {exc.__cause__.raw_response!r}")
+    raise
+```
+
+Remote network transports serialize failures rather than sharing Python exception objects, so this direct cause access
+is specific to the in-process runtime transport.
 
 ## Type aliases
 

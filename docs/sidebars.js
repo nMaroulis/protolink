@@ -25,6 +25,7 @@ const sidebars = {
         'client',
         'flows',
         'llm',
+        'rag',
         'logging',
         'models',
         'registry',
@@ -55,7 +56,7 @@ const sidebars = {
       type: 'category',
       label: 'Project',
       collapsed: false,
-      items: ['development', 'changelog', 'relevant'],
+      items: ['development', 'infer-loop-benchmark', 'changelog', 'relevant'],
     },
   ],
 };

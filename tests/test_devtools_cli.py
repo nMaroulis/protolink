@@ -1,9 +1,12 @@
 import json
+import sqlite3
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from protolink import RunContext, RunEvent, RunReport, SQLiteRunStore, Task
+from protolink.__version__ import __version__
 from protolink.cli import main as cli_main
 from protolink.devtools import (
     build_run_diff_view,
@@ -175,6 +178,66 @@ def test_devtools_helpers_project_store_records(tmp_path: Path):
     assert [item.event_type for item in view.items] == ["task.status", "llm.call.completed"]
 
 
+def test_run_replay_kind_disambiguates_report_and_task_ids(tmp_path: Path):
+    store_path = tmp_path / "runs.db"
+    store = SQLiteRunStore(store_path)
+    shared_id = "shared_run_and_task_id"
+
+    task = Task(id=shared_id)
+    task_context = RunContext(run_id="task_only_run", session_id="task_session")
+    task_context.attach_to_task(task)
+    task.complete("task result")
+    store.save_task(task, context=task_context, agent_name="task_agent")
+
+    report_task = Task.create_infer(prompt="report result")
+    report_context = RunContext(run_id=shared_id, session_id="report_session")
+    report_context.attach_to_task(report_task)
+    report_task.complete("report result")
+    store.save_report(
+        RunReport.from_events([], context=report_context, final_task=report_task.to_dict()),
+        agent_name="report_agent",
+    )
+
+    assert build_run_replay_view(store_path, shared_id).source == "report"
+    assert build_run_replay_view(store_path, shared_id, kind="report").agent_name == "report_agent"
+    task_view = build_run_replay_view(store_path, shared_id, kind="task")
+    assert task_view.source == "task"
+    assert task_view.agent_name == "task_agent"
+    assert task_view.final_task is not None
+    assert task_view.final_task["id"] == shared_id
+
+    invalid_kind: Any = "unknown"
+    with pytest.raises(ValueError, match="kind"):
+        build_run_replay_view(store_path, shared_id, kind=invalid_kind)
+
+
+def test_compact_run_index_does_not_decode_full_payloads(tmp_path: Path):
+    store_path = tmp_path / "runs.db"
+    task_id = _seed_run_store(store_path)
+    with sqlite3.connect(store_path) as connection:
+        connection.execute(
+            "UPDATE protolink_tasks SET task_json = ?, metadata_json = ? WHERE task_id = ?",
+            ("[]", "[]", task_id),
+        )
+        connection.execute(
+            "UPDATE protolink_run_reports SET report_json = ?, metadata_json = ? WHERE run_id = ?",
+            ("[]", "[]", "run_cli"),
+        )
+
+    compact = list_run_store_records(store_path, read_only=True, compact=True)
+
+    assert compact["tasks"][0]["task_id"] == task_id
+    assert "task" not in compact["tasks"][0]
+    assert compact["reports"][0]["run_id"] == "run_cli"
+    assert compact["reports"][0]["state"] is None
+    assert compact["reports"][0]["event_count"] is None
+
+    with pytest.raises(ValueError, match="task payload must be a JSON object"):
+        list_run_store_records(store_path, read_only=True)
+    with pytest.raises(ValueError, match="run-report payload must be a JSON object"):
+        build_run_replay_view(store_path, "run_cli", read_only=True, kind="report")
+
+
 def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path):
     store_path = tmp_path / "runs.db"
     _seed_run_store(store_path)
@@ -186,6 +249,8 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
 
     assert "Protolink Dashboard" in dashboard_html
     assert "window.__PROTOLINK_SNAPSHOT__" in dashboard_html
+    assert "window.__PROTOLINK_LIVE__ = false;" in dashboard_html
+    assert "window.location.protocol" not in dashboard_html
     assert "/api/agents/ping" in dashboard_html
     assert "/api/agents/chat" in dashboard_html
     assert "Ping all" in dashboard_html
@@ -213,6 +278,68 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
     assert "Protolink Studio" in dashboard_html
     assert "Protolink Studio is coming soon" in dashboard_html
     assert "studio-canvas" in dashboard_html
+    assert 'id="nav-telemetry"' in dashboard_html
+    assert 'id="view-telemetry"' in dashboard_html
+    assert "Open JSONL" in dashboard_html
+    assert "Span waterfall" in dashboard_html
+    assert "Event replay" in dashboard_html
+    assert "readUploadTracePage" in dashboard_html
+    assert "const maxScannedLines = 5000;" in dashboard_html
+    assert "result.line_scan_exhausted" in dashboard_html
+    assert "/api/traces/" in dashboard_html
+    assert "TELEMETRY_SUMMARY_CAP" in dashboard_html
+    assert 'id="registry-source-input"' in dashboard_html
+    assert 'id="runs-source-input"' in dashboard_html
+    assert "/api/sources/registry" in dashboard_html
+    assert "/api/sources/runs" in dashboard_html
+    assert 'id="side-version"' in dashboard_html
+    assert f'"version": "{__version__}"' in dashboard_html
+    assert "run-record-list" in dashboard_html
+    assert "run-replay-hero" in dashboard_html
+    assert "data-span-key" in dashboard_html
+    assert "handleTelemetrySpanKeydown" in dashboard_html
+
+
+@pytest.mark.parametrize("trace_flag", ["--traces", "--telemetry"])
+def test_dashboard_cli_embeds_bounded_telemetry_summary(tmp_path: Path, trace_flag: str):
+    trace_path = tmp_path / "traces.jsonl"
+    dashboard_path = tmp_path / f"dashboard-{trace_flag.removeprefix('--')}.html"
+    trace_path.write_text(
+        json.dumps(
+            {
+                "trace_id": "trace_dashboard",
+                "task_id": "task_dashboard",
+                "agent_name": "dashboard_agent",
+                "status": "ok",
+                "metadata": {"llm_metrics": {"total_tokens": 42}},
+                "spans": [],
+                "events": [],
+                "private_payload": "must stay lazy",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        cli_main(
+            [
+                "dashboard",
+                "--store",
+                str(tmp_path / "runs.db"),
+                trace_flag,
+                str(trace_path),
+                "--output",
+                str(dashboard_path),
+            ]
+        )
+        == 0
+    )
+
+    dashboard_html = dashboard_path.read_text(encoding="utf-8")
+    assert "task_dashboard" in dashboard_html
+    assert str(trace_path) in dashboard_html
+    assert "must stay lazy" not in dashboard_html
 
 
 def test_cli_studio_command_is_not_public():
@@ -228,9 +355,40 @@ def test_dashboard_snapshot_and_renderer_include_registry_and_store(tmp_path: Pa
     html = DevtoolsHtmlRenderer().render_dashboard(snapshot)
 
     assert snapshot["runs"]["reports"][0]["run_id"] == "run_cli"
+    assert snapshot["runs"]["reports"][0]["state"] is None
+    assert snapshot["runs"]["reports"][0]["event_count"] is None
+    assert "report" not in snapshot["runs"]["reports"][0]
+    assert "task" not in snapshot["runs"]["tasks"][0]
+    assert snapshot["runs"]["configured"] is True
+    assert snapshot["registry"]["configured"] is False
+    assert snapshot["version"] == __version__
     assert "run_cli" in html
     assert "Protolink Studio" in html
     assert "Selected agent" in html
+
+
+def test_dashboard_without_store_does_not_create_default_database(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    output_path = tmp_path / "dashboard.html"
+
+    assert cli_main(["dashboard", "--output", str(output_path)]) == 0
+
+    assert output_path.is_file()
+    assert not (tmp_path / "runs.db").exists()
+    assert "No run store connected" in output_path.read_text(encoding="utf-8")
+
+
+def test_dashboard_auto_discovers_existing_default_store(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    store_path = tmp_path / "runs.db"
+    _seed_run_store(store_path)
+    output_path = tmp_path / "dashboard.html"
+
+    assert cli_main(["dashboard", "--output", str(output_path)]) == 0
+
+    dashboard_html = output_path.read_text(encoding="utf-8")
+    assert "run_cli" in dashboard_html
+    assert '"store": "runs.db"' in dashboard_html
 
 
 def test_dashboard_agent_actions_use_http_contracts(monkeypatch):

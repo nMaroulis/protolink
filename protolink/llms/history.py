@@ -8,6 +8,9 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
+EPHEMERAL_TOOL_OBSERVATION_KEY = "_protolink_ephemeral_tool_observation"
+"""Internal message-metadata key for tool output that must not persist."""
+
 
 class LLMMessageRole(str, Enum):
     SYSTEM = "system"

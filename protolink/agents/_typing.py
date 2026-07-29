@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
     from protolink.logging import BaseLogger
     from protolink.models import AgentCard, AgentSkill, Part, Task
+    from protolink.rag import Knowledge, RAGAnswer, RetrievalMode, Retriever
     from protolink.server import AgentServer
     from protolink.state import State
     from protolink.state.operations import StateOperationRequest, StateOperationResult
@@ -31,6 +32,8 @@ class _AgentMixinBase(Protocol):
 
     card: AgentCard
     tools: dict[str, BaseTool]
+    knowledge: dict[str, Knowledge]
+    retrieval: RetrievalMode
     skills: Literal["auto", "fixed"]
     action_authorizer: ActionAuthorizer
     registry_client: RegistryClient | None
@@ -148,11 +151,24 @@ class _AgentMixinBase(Protocol):
 
     def add_tool(self, tool: BaseTool) -> None: ...
 
+    def add_knowledge(self, knowledge: Knowledge | Retriever) -> Knowledge: ...
+
+    async def ask(
+        self,
+        question: str,
+        *,
+        knowledge: str | list[str] | tuple[str, ...] | None = None,
+        k: int | None = None,
+        where: dict[str, Any] | None = None,
+        citations: bool = True,
+        session_id: str = "ask_session_id",
+    ) -> RAGAnswer: ...
+
     def _add_skill_to_agent_card(self, skill: AgentSkill) -> None: ...
 
     def _resolve_skills(self, skills_mode: Literal["auto", "fixed"]) -> None: ...
 
-    def _build_tools_prompt(self) -> str | None: ...
+    def _build_tools_prompt(self, tools: dict[str, BaseTool] | None = None) -> str | None: ...
 
     async def execute_tool(
         self,

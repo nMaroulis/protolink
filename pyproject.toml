@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protolink"
-version = "0.6.7"
+version = "0.6.8"
 description = "A lightweight Python runtime for local and distributed agent meshes."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,7 +22,7 @@ include = ["protolink*"]
 
 # Type Checking - ty setup
 [tool.ty.src]
-include = ["protolink"]
+include = ["protolink", "benchmarks"]
 exclude = ["build", "tests"]
 
 [tool.ty.rules]
@@ -45,6 +45,8 @@ allowed-unresolved-imports = [
     "llama_cpp.**",
     "mcp.**",
     "openai.**",
+    "pypdf.**",
+    "qdrant_client.**",
 ]
 
 [project.urls]
@@ -90,6 +92,10 @@ metrics = [
     "tiktoken>=0.7.0",
 ]
 
+rag-pdf = [
+    "pypdf>=5.0.0",
+]
+
 # Database Drivers
 db = [
 ]
@@ -103,6 +109,7 @@ all = [
     "protolink[db]",
     "protolink[telemetry]",
     "protolink[metrics]",
+    "protolink[rag-pdf]",
 ]
 
 # Only for testing
@@ -143,6 +150,7 @@ build = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 python_files = "test_*.py"
 addopts = "-v"
 asyncio_default_test_loop_scope = "module"

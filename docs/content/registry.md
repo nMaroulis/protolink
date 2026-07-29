@@ -29,6 +29,12 @@ registry.start(background=True)
 registry.stop()
 ```
 
+:::tip[View the registry in Devtools]
+
+While the registry is running, open it with `protolink dashboard --registry-url http://localhost:9000 --open`.
+
+:::
+
 ## How It Works
 
 The Registry is both a local runtime object and a transport-backed service. Locally, it stores registered agents by their stable `AgentCard.url`, keeps liveness metadata in `RegistryEntry`, and maintains secondary indexes for common discovery filters. Over the transport, `RegistryClient` sends the same registration, heartbeat, unregistration, and discovery requests that agents use when they connect to a registry URL.
