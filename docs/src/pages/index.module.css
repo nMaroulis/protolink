@@ -1890,7 +1890,6 @@
 }
 
 :global([data-theme='dark']) .secondaryButton,
-:global([data-theme='dark']) .positioning,
 :global([data-theme='dark']) .pathwayCard,
 :global([data-theme='dark']) .foundationCard,
 :global([data-theme='dark']) .shapeCard,
@@ -1907,7 +1906,7 @@
 }
 
 :global([data-theme='dark']) .positioning {
-  color: color-mix(in srgb, var(--protolink-ink) 84%, var(--ifm-color-primary-light));
+  color: color-mix(in srgb, var(--protolink-muted) 78%, var(--ifm-color-primary-light));
 }
 
 :global([data-theme='dark']) .kicker {
