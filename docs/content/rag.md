@@ -508,9 +508,16 @@ external index.
 
 ## Connect an Existing Vector Database
 
-ProtoLink adapters receive clients and indexes that your application already
-created. ProtoLink does not create vendor resources, own their credentials, or
-ingest into them.
+ProtoLink adapters receive clients and indexes that your application already created. ProtoLink does not create vendor resources, own their credentials, or ingest into them.
+
+
+<div className="provider-strip-label">[ ChromaDB ]   [ Pinecone ]   [ Qdrant ]</div>
+
+<div className="provider-strip">
+  <img src="https://assets.streamlinehq.com/image/private/w_100,h_100,ar_1/f_auto/v1/icons/1/chroma-erzavigj9yrwcd5lup0swm.png/chroma-1xw4nxhjo4c64ndhrqtxp.png?_a=DATAiZAAZAA0" width="55" className="hover-icon" />
+  <img src="https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/2/pinecone-icon-ye23mxqezdqo34qhde01eg.png/pinecone-icon-gw5gzfji55rizxc6hfnhpa.png?_a=DATAiZAAZAA0" width="55" className="hover-icon" />
+  <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/qdrant-icon-light.svg" width="55" className="hover-icon" />
+</div>
 
 ### Chroma
 

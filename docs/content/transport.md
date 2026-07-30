@@ -29,6 +29,16 @@ The **Transport** layer is low-level and typically not used directly by applicat
 
 All transports inherit from the base `Transport` class.
 
+<div className="provider-strip-label">[ http ]   [ runtime ]   [ websockets ]   [ sse json-rpc ]   [ grpc ]</div>
+
+<div className="provider-strip">
+  <img src="https://uxwing.com/wp-content/themes/uxwing/download/web-app-development/http-icon.png" width="55" className="hover-icon" />
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Python_Windows_bytecode_icon_2016.svg/960px-Python_Windows_bytecode_icon_2016.svg.png?_=20220830131150" width="55" className="hover-icon" />
+  <img src="https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/5/websocket-w02xh571b3sxzooa60n1.png/websocket-16wzrfp0ko22h8s0km8xcb.png?_a=DATAiZAAZAA0" width="55" className="hover-icon" />
+  <img src="https://cdn.iconscout.com/icon/free/png-256/free-json-icon-svg-download-png-226010.png?f=webp&w=128" width="55" className="hover-icon" />
+  <img src="https://img-resize-cdn.joshmartin.ch/2550x0%2Ccbc4c56136fef320860b8e74c818ea95624c7bb8f63d85330b1b243a02a08914/https://joshmartin.ch/app/uploads/2024/04/pluginicon.png" width="55" className="hover-icon" />
+</div>
+
 - **HTTPTransport**
     - Uses HTTP/HTTPS for synchronous request/response.
     - Used for both Agent-to-Agent and Agent-to-Registry communication.

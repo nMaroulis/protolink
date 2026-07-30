@@ -102,7 +102,7 @@ compare, and improve.
 
 ## [0.6.7] - 2026-07-27
 
-:::note Latest release
+:::note Release summary
 
 This patch release hardens the controlled inference path from task admission through provider calls, tool execution,
 delegation, streaming finalization, and observability. It keeps the portable JSON action protocol as the default for
