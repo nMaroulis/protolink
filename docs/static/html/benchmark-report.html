@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
-  <title>Infer-loop benchmark · 20260728T184629Z-ollama-gemma4-e4b</title>
+  <title>Infer-loop benchmark · 20260729T200129Z-ollama-gemma4-e4b</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -71,8 +71,10 @@
     .latency-line--p95 i { background:var(--purple); }
     .latency-line b { text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
     .latency-empty,.empty { color:var(--muted); }
+    .case-chart-scroll { width:100%; max-width:100%; overflow-x:auto; overscroll-behavior-inline:contain; }
+    .case-chart-canvas { width:100%; }
     .case-chart-scale { display:flex; justify-content:space-between; margin:0 0 6px; color:var(--muted); font-size:11px; }
-    .case-chart { display:flex; align-items:flex-end; gap:max(1px,.15vw); height:190px; padding:10px 8px 0; border-bottom:1px solid var(--border); background:linear-gradient(to top,var(--grid) 1px,transparent 1px) 0 50%/100% 50%; }
+    .case-chart { display:flex; align-items:flex-end; gap:0; height:190px; padding:10px 8px 0; border-bottom:1px solid var(--border); background:linear-gradient(to top,var(--grid) 1px,transparent 1px) 0 50%/100% 50%; }
     .case-bar { flex:1 1 1px; min-width:1px; max-width:34px; border-radius:3px 3px 0 0; background:var(--blue); }
     .case-bar--functional { background:var(--teal); }
     .case-bar--failed { background:var(--red); }
@@ -97,6 +99,24 @@
     .status--strict { color:var(--blue); background:var(--blue-soft); }
     .status--functional { color:var(--teal); background:var(--teal-soft); }
     .status--failed { color:var(--red); background:var(--red-soft); }
+    .failure-list { display:grid; gap:10px; }
+    .failure-card { overflow:hidden; border:1px solid var(--border); border-radius:11px; background:var(--surface-soft); }
+    .failure-card > summary { position:relative; display:grid; grid-template-columns:minmax(190px,1.2fr) minmax(100px,.65fr) auto auto auto; gap:12px; align-items:center; padding:12px 38px 12px 14px; cursor:pointer; list-style:none; }
+    .failure-card > summary::after { content:">"; position:absolute; top:50%; right:14px; color:var(--muted); font-size:20px; transform:translateY(-50%); transition:transform .15s ease; }
+    .failure-card[open] > summary::after { transform:translateY(-50%) rotate(90deg); }
+    .failure-card > summary > code { min-width:0; overflow-wrap:anywhere; font-weight:800; }
+    .failure-card > summary > span:not(.status) { color:var(--muted); font-size:12px; }
+    .failure-body { padding:0 14px 14px; border-top:1px solid var(--border); }
+    .failure-overview,.failure-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .failure-overview { margin-top:12px; }
+    .failure-overview > div:first-child { grid-column:1/-1; }
+    .failure-overview > div,.failure-grid > div { min-width:0; }
+    .failure-attempt { margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+    .failure-attempt h3 { display:flex; gap:8px; align-items:center; margin:0 0 4px; font-size:15px; }
+    .failure-attempt h3 span { padding:2px 6px; border-radius:999px; color:var(--blue); background:var(--blue-soft); font-size:10px; text-transform:uppercase; }
+    .failure-body h3,.failure-body h4 { margin:0 0 6px; font-size:12px; color:var(--muted); letter-spacing:.03em; text-transform:uppercase; }
+    .failure-diagnostics { margin:8px 0; color:var(--red); font-size:12px; overflow-wrap:anywhere; }
+    pre { max-height:260px; margin:0; padding:10px; overflow:auto; border:1px solid var(--grid); border-radius:8px; background:var(--surface-soft); white-space:pre-wrap; overflow-wrap:anywhere; }
     details.panel summary { cursor:pointer; font-weight:800; }
     dl { display:grid; grid-template-columns:minmax(130px,.28fr) minmax(0,1fr); gap:0; margin:16px 0 0; }
     dt,dd { min-width:0; margin:0; padding:9px 0; border-bottom:1px solid var(--grid); }
@@ -117,6 +137,10 @@
       .metrics { grid-template-columns:1fr; }
       .chart-row { grid-template-columns:110px 1fr 48px; gap:8px; }
       .latency-row { grid-template-columns:1fr; gap:8px; }
+      .failure-card > summary { grid-template-columns:1fr auto; }
+      .failure-card > summary > span:not(.status) { display:none; }
+      .failure-overview,.failure-grid { grid-template-columns:1fr; }
+      .failure-overview > div:first-child { grid-column:auto; }
       dl { grid-template-columns:1fr; }
       dd { padding-top:0; }
     }
@@ -134,8 +158,8 @@
   <header>
     <div>
       <div class="eyebrow">ProtoLink · infer-loop benchmark</div>
-      <h1>20260728T184629Z-ollama-gemma4-e4b</h1>
-      <p>ollama / gemma4:e4b · core · 40 cases · 2 repetition(s) · generated 2026-07-28T19:07:49.278136+00:00</p>
+      <h1>20260729T200129Z-ollama-gemma4-e4b</h1>
+      <p>ollama / gemma4:e4b · full · 200 cases · 1 repetition(s) · generated 2026-07-29T20:58:18.668150+00:00</p>
     </div>
     <span class="run-badge warn">Review failures</span>
   </header>
@@ -143,40 +167,40 @@
   <div class="metrics">
             <article class="metric metric--strict">
               <div class="metric-label">Strict</div>
-              <div class="metric-value">76 / 80</div>
-              <div class="metric-rate">95.0%</div>
-              <div class="meter" role="img" aria-label="Strict 95.0%">
-                <span style="width:95.000%"></span>
+              <div class="metric-value">187 / 200</div>
+              <div class="metric-rate">93.5%</div>
+              <div class="meter" role="img" aria-label="Strict 93.5%">
+                <span style="width:93.500%"></span>
               </div>
               <p>Exact result, actions, and clean protocol</p>
             </article>
-
+            
             <article class="metric metric--functional">
               <div class="metric-label">Functional</div>
-              <div class="metric-value">76 / 80</div>
-              <div class="metric-rate">95.0%</div>
-              <div class="meter" role="img" aria-label="Functional 95.0%">
-                <span style="width:95.000%"></span>
+              <div class="metric-value">188 / 200</div>
+              <div class="metric-rate">94.0%</div>
+              <div class="meter" role="img" aria-label="Functional 94.0%">
+                <span style="width:94.000%"></span>
               </div>
               <p>Correct after possible self-correction</p>
             </article>
-
+            
             <article class="metric metric--first">
               <div class="metric-label">First try</div>
-              <div class="metric-value">76 / 80</div>
-              <div class="metric-rate">95.0%</div>
-              <div class="meter" role="img" aria-label="First try 95.0%">
-                <span style="width:95.000%"></span>
+              <div class="metric-value">187 / 200</div>
+              <div class="metric-rate">93.5%</div>
+              <div class="meter" role="img" aria-label="First try 93.5%">
+                <span style="width:93.500%"></span>
               </div>
               <p>Strict on the first fresh attempt</p>
             </article>
-
+            
         <article class="metric metric--time">
           <div class="metric-label">Strict first-try latency</div>
-          <div class="metric-value">13.51s</div>
-          <div class="metric-rate">p95 36.75s</div>
+          <div class="metric-value">14.51s</div>
+          <div class="metric-rate">p95 26.54s</div>
           <div class="metric-rule"></div>
-          <p>Scored wall time 1252.15s</p>
+          <p>Scored wall time 3189.15s</p>
         </article>
         </div>
 
@@ -184,281 +208,291 @@
     <div class="panel">
       <h2>Correctness by category</h2>
       <p class="section-intro">Functional success is shown above strict, clean success.</p>
-
+      
             <div class="chart-row">
               <div class="chart-label">
                 <strong>direct final</strong>
-                <span>14/14 strict</span>
+                <span>30/30 strict</span>
               </div>
-              <div class="paired-bars" role="img" aria-label="direct final: strict 14 of 14, functional 14 of 14">
+              <div class="paired-bars" role="img" aria-label="direct final: strict 30 of 30, functional 30 of 30">
                 <div class="bar bar--functional"><span style="width:100.000%"></span></div>
                 <div class="bar bar--strict"><span style="width:100.000%"></span></div>
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-
+            
             <div class="chart-row">
               <div class="chart-label">
                 <strong>local tool</strong>
-                <span>14/14 strict</span>
+                <span>30/30 strict</span>
               </div>
-              <div class="paired-bars" role="img" aria-label="local tool: strict 14 of 14, functional 14 of 14">
+              <div class="paired-bars" role="img" aria-label="local tool: strict 30 of 30, functional 30 of 30">
                 <div class="bar bar--functional"><span style="width:100.000%"></span></div>
                 <div class="bar bar--strict"><span style="width:100.000%"></span></div>
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-
+            
             <div class="chart-row">
               <div class="chart-label">
                 <strong>delegated tool</strong>
-                <span>14/14 strict</span>
+                <span>30/30 strict</span>
               </div>
-              <div class="paired-bars" role="img" aria-label="delegated tool: strict 14 of 14, functional 14 of 14">
+              <div class="paired-bars" role="img" aria-label="delegated tool: strict 30 of 30, functional 30 of 30">
                 <div class="bar bar--functional"><span style="width:100.000%"></span></div>
                 <div class="bar bar--strict"><span style="width:100.000%"></span></div>
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-
+            
             <div class="chart-row">
               <div class="chart-label">
                 <strong>delegated infer</strong>
-                <span>14/14 strict</span>
+                <span>30/30 strict</span>
               </div>
-              <div class="paired-bars" role="img" aria-label="delegated infer: strict 14 of 14, functional 14 of 14">
+              <div class="paired-bars" role="img" aria-label="delegated infer: strict 30 of 30, functional 30 of 30">
                 <div class="bar bar--functional"><span style="width:100.000%"></span></div>
                 <div class="bar bar--strict"><span style="width:100.000%"></span></div>
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-
+            
             <div class="chart-row">
               <div class="chart-label">
                 <strong>multi step</strong>
-                <span>8/12 strict</span>
+                <span>20/30 strict</span>
               </div>
-              <div class="paired-bars" role="img" aria-label="multi step: strict 8 of 12, functional 8 of 12">
+              <div class="paired-bars" role="img" aria-label="multi step: strict 20 of 30, functional 20 of 30">
                 <div class="bar bar--functional"><span style="width:66.667%"></span></div>
                 <div class="bar bar--strict"><span style="width:66.667%"></span></div>
               </div>
               <div class="chart-value">66.7%</div>
             </div>
-
+            
             <div class="chart-row">
               <div class="chart-label">
                 <strong>grounding trap</strong>
-                <span>12/12 strict</span>
+                <span>30/30 strict</span>
               </div>
-              <div class="paired-bars" role="img" aria-label="grounding trap: strict 12 of 12, functional 12 of 12">
+              <div class="paired-bars" role="img" aria-label="grounding trap: strict 30 of 30, functional 30 of 30">
                 <div class="bar bar--functional"><span style="width:100.000%"></span></div>
                 <div class="bar bar--strict"><span style="width:100.000%"></span></div>
               </div>
               <div class="chart-value">100.0%</div>
             </div>
-
+            
+            <div class="chart-row">
+              <div class="chart-label">
+                <strong>routing choice</strong>
+                <span>17/20 strict</span>
+              </div>
+              <div class="paired-bars" role="img" aria-label="routing choice: strict 17 of 20, functional 18 of 20">
+                <div class="bar bar--functional"><span style="width:90.000%"></span></div>
+                <div class="bar bar--strict"><span style="width:85.000%"></span></div>
+              </div>
+              <div class="chart-value">85.0%</div>
+            </div>
+            
       <div class="legend"><span><i class="legend-functional"></i>Functional</span><span><i></i>Strict</span></div>
     </div>
     <div class="panel">
       <h2>Attempt diagnostics</h2>
-      <p class="section-intro">84 executed fresh attempts.</p>
-
+      <p class="section-intro">200 executed fresh attempts.</p>
+      
             <div class="diagnostic-row">
               <span>Hallucinated action</span>
               <div class="diagnostic-track" role="img"
-                   aria-label="Hallucinated action: 8 of 84 attempts">
-                <span style="width:9.524%"></span>
+                   aria-label="Hallucinated action: 12 of 200 attempts">
+                <span style="width:6.000%"></span>
               </div>
-              <strong>8</strong>
+              <strong>12</strong>
             </div>
-
+            
             <div class="diagnostic-row">
               <span>Parse recovery</span>
               <div class="diagnostic-track" role="img"
-                   aria-label="Parse recovery: 0 of 84 attempts">
+                   aria-label="Parse recovery: 0 of 200 attempts">
                 <span style="width:0.000%"></span>
               </div>
               <strong>0</strong>
             </div>
-
+            
             <div class="diagnostic-row">
               <span>Provider retry</span>
               <div class="diagnostic-track" role="img"
-                   aria-label="Provider retry: 0 of 84 attempts">
+                   aria-label="Provider retry: 0 of 200 attempts">
                 <span style="width:0.000%"></span>
               </div>
               <strong>0</strong>
             </div>
-
+            
             <div class="diagnostic-row">
               <span>Crashed</span>
               <div class="diagnostic-track" role="img"
-                   aria-label="Crashed: 8 of 84 attempts">
-                <span style="width:9.524%"></span>
+                   aria-label="Crashed: 10 of 200 attempts">
+                <span style="width:5.000%"></span>
               </div>
-              <strong>8</strong>
+              <strong>10</strong>
             </div>
-
+            
             <div class="diagnostic-row">
               <span>Timed out</span>
               <div class="diagnostic-track" role="img"
-                   aria-label="Timed out: 0 of 84 attempts">
+                   aria-label="Timed out: 0 of 200 attempts">
                 <span style="width:0.000%"></span>
               </div>
               <strong>0</strong>
             </div>
-
+            
     </div>
   </section>
 
   <section class="panel">
     <h2>Latency distributions</h2>
     <p class="section-intro">Bars share one p95 scale; medians and tails stay separate from correctness.</p>
-
+    
             <div class="latency-row">
-              <div><strong>First attempt end-to-end</strong><span>80 samples</span></div>
+              <div><strong>First attempt end-to-end</strong><span>200 samples</span></div>
               <div class="latency-bars">
                 <div class="latency-line">
                   <span>median</span>
-                  <div><i style="width:52.153%"></i></div>
-                  <b>13.69s</b>
+                  <div><i style="width:55.978%"></i></div>
+                  <b>14.86s</b>
                 </div>
                 <div class="latency-line latency-line--p95">
                   <span>p95</span>
                   <div><i style="width:100.000%"></i></div>
-                  <b>26.25s</b>
+                  <b>26.54s</b>
                 </div>
               </div>
             </div>
-
+            
             <div class="latency-row">
-              <div><strong>Selected attempt end-to-end</strong><span>80 samples</span></div>
+              <div><strong>Selected attempt end-to-end</strong><span>200 samples</span></div>
               <div class="latency-bars">
                 <div class="latency-line">
                   <span>median</span>
-                  <div><i style="width:52.153%"></i></div>
-                  <b>13.69s</b>
+                  <div><i style="width:55.978%"></i></div>
+                  <b>14.86s</b>
                 </div>
                 <div class="latency-line latency-line--p95">
                   <span>p95</span>
                   <div><i style="width:100.000%"></i></div>
-                  <b>26.25s</b>
+                  <b>26.54s</b>
                 </div>
               </div>
             </div>
-
+            
             <div class="latency-row">
-              <div><strong>LLM per attempt</strong><span>84 samples</span></div>
+              <div><strong>LLM per attempt</strong><span>200 samples</span></div>
               <div class="latency-bars">
                 <div class="latency-line">
                   <span>median</span>
-                  <div><i style="width:53.552%"></i></div>
-                  <b>14.06s</b>
+                  <div><i style="width:55.942%"></i></div>
+                  <b>14.85s</b>
                 </div>
                 <div class="latency-line latency-line--p95">
                   <span>p95</span>
-                  <div><i style="width:99.911%"></i></div>
-                  <b>26.22s</b>
+                  <div><i style="width:99.935%"></i></div>
+                  <b>26.52s</b>
                 </div>
               </div>
             </div>
-
+            
             <div class="latency-row">
-              <div><strong>Non-LLM per attempt</strong><span>76 samples</span></div>
+              <div><strong>Non-LLM per attempt</strong><span>190 samples</span></div>
               <div class="latency-bars">
                 <div class="latency-line">
                   <span>median</span>
-                  <div><i style="width:0.028%"></i></div>
-                  <b>7.4ms</b>
+                  <div><i style="width:0.031%"></i></div>
+                  <b>8.3ms</b>
                 </div>
                 <div class="latency-line latency-line--p95">
                   <span>p95</span>
-                  <div><i style="width:0.050%"></i></div>
-                  <b>13.1ms</b>
+                  <div><i style="width:0.061%"></i></div>
+                  <b>16.1ms</b>
                 </div>
               </div>
             </div>
-
+            
             <div class="latency-row">
-              <div><strong>Individual LLM call</strong><span>162 samples</span></div>
+              <div><strong>Individual LLM call</strong><span>388 samples</span></div>
               <div class="latency-bars">
                 <div class="latency-line">
                   <span>median</span>
-                  <div><i style="width:21.256%"></i></div>
-                  <b>5.58s</b>
+                  <div><i style="width:22.886%"></i></div>
+                  <b>6.07s</b>
                 </div>
                 <div class="latency-line latency-line--p95">
                   <span>p95</span>
-                  <div><i style="width:61.128%"></i></div>
-                  <b>16.04s</b>
+                  <div><i style="width:68.243%"></i></div>
+                  <b>18.11s</b>
                 </div>
               </div>
             </div>
-
+            
   </section>
 
   <section class="panel">
     <h2>Case latency and outcome</h2>
     <p class="section-intro">Each bar is the selected attempt for one logical case repetition.</p>
-
-        <div class="case-chart-scale"><span>44.88s</span><span>0</span></div>
-        <div class="case-chart" role="img"
-             aria-label="Selected attempt latency for 80 logical case results">
-          <span class="case-bar case-bar--strict" style="height:12.752%" aria-label="direct-final-0001#r1: Strict, latency 5.72s"></span><span class="case-bar case-bar--strict" style="height:11.713%" aria-label="direct-final-0001#r2: Strict, latency 5.26s"></span><span class="case-bar case-bar--strict" style="height:27.228%" aria-label="local-tool-0001#r1: Strict, latency 12.22s"></span><span class="case-bar case-bar--strict" style="height:26.236%" aria-label="local-tool-0001#r2: Strict, latency 11.78s"></span><span class="case-bar case-bar--strict" style="height:24.798%" aria-label="delegated-tool-0001#r1: Strict, latency 11.13s"></span><span class="case-bar case-bar--strict" style="height:24.145%" aria-label="delegated-tool-0001#r2: Strict, latency 10.84s"></span><span class="case-bar case-bar--strict" style="height:33.594%" aria-label="delegated-infer-0001#r1: Strict, latency 15.08s"></span><span class="case-bar case-bar--strict" style="height:31.017%" aria-label="delegated-infer-0001#r2: Strict, latency 13.92s"></span><span class="case-bar case-bar--strict" style="height:98.606%" aria-label="multi-step-0001#r1: Strict, latency 44.26s"></span><span class="case-bar case-bar--strict" style="height:92.211%" aria-label="multi-step-0001#r2: Strict, latency 41.39s"></span><span class="case-bar case-bar--strict" style="height:41.856%" aria-label="grounding-trap-0001#r1: Strict, latency 18.79s"></span><span class="case-bar case-bar--strict" style="height:37.094%" aria-label="grounding-trap-0001#r2: Strict, latency 16.65s"></span><span class="case-bar case-bar--strict" style="height:12.496%" aria-label="direct-final-0002#r1: Strict, latency 5.61s"></span><span class="case-bar case-bar--strict" style="height:11.752%" aria-label="direct-final-0002#r2: Strict, latency 5.27s"></span><span class="case-bar case-bar--strict" style="height:27.787%" aria-label="local-tool-0002#r1: Strict, latency 12.47s"></span><span class="case-bar case-bar--strict" style="height:29.993%" aria-label="local-tool-0002#r2: Strict, latency 13.46s"></span><span class="case-bar case-bar--strict" style="height:31.647%" aria-label="delegated-tool-0002#r1: Strict, latency 14.20s"></span><span class="case-bar case-bar--strict" style="height:29.295%" aria-label="delegated-tool-0002#r2: Strict, latency 13.15s"></span><span class="case-bar case-bar--strict" style="height:30.209%" aria-label="delegated-infer-0002#r1: Strict, latency 13.56s"></span><span class="case-bar case-bar--strict" style="height:29.540%" aria-label="delegated-infer-0002#r2: Strict, latency 13.26s"></span><span class="case-bar case-bar--strict" style="height:47.753%" aria-label="multi-step-0002#r1: Strict, latency 21.43s"></span><span class="case-bar case-bar--strict" style="height:52.968%" aria-label="multi-step-0002#r2: Strict, latency 23.77s"></span><span class="case-bar case-bar--strict" style="height:41.539%" aria-label="grounding-trap-0002#r1: Strict, latency 18.64s"></span><span class="case-bar case-bar--strict" style="height:36.508%" aria-label="grounding-trap-0002#r2: Strict, latency 16.39s"></span><span class="case-bar case-bar--strict" style="height:15.086%" aria-label="direct-final-0003#r1: Strict, latency 6.77s"></span><span class="case-bar case-bar--strict" style="height:14.938%" aria-label="direct-final-0003#r2: Strict, latency 6.70s"></span><span class="case-bar case-bar--strict" style="height:29.887%" aria-label="local-tool-0003#r1: Strict, latency 13.41s"></span><span class="case-bar case-bar--strict" style="height:27.257%" aria-label="local-tool-0003#r2: Strict, latency 12.23s"></span><span class="case-bar case-bar--strict" style="height:37.878%" aria-label="delegated-tool-0003#r1: Strict, latency 17.00s"></span><span class="case-bar case-bar--strict" style="height:36.162%" aria-label="delegated-tool-0003#r2: Strict, latency 16.23s"></span><span class="case-bar case-bar--strict" style="height:31.672%" aria-label="delegated-infer-0003#r1: Strict, latency 14.22s"></span><span class="case-bar case-bar--strict" style="height:32.599%" aria-label="delegated-infer-0003#r2: Strict, latency 14.63s"></span><span class="case-bar case-bar--failed" style="height:38.698%" aria-label="multi-step-0003#r1: Failed, latency 17.37s"></span><span class="case-bar case-bar--failed" style="height:38.567%" aria-label="multi-step-0003#r2: Failed, latency 17.31s"></span><span class="case-bar case-bar--strict" style="height:42.805%" aria-label="grounding-trap-0003#r1: Strict, latency 19.21s"></span><span class="case-bar case-bar--strict" style="height:36.387%" aria-label="grounding-trap-0003#r2: Strict, latency 16.33s"></span><span class="case-bar case-bar--strict" style="height:12.377%" aria-label="direct-final-0004#r1: Strict, latency 5.56s"></span><span class="case-bar case-bar--strict" style="height:12.172%" aria-label="direct-final-0004#r2: Strict, latency 5.46s"></span><span class="case-bar case-bar--strict" style="height:27.675%" aria-label="local-tool-0004#r1: Strict, latency 12.42s"></span><span class="case-bar case-bar--strict" style="height:26.667%" aria-label="local-tool-0004#r2: Strict, latency 11.97s"></span><span class="case-bar case-bar--strict" style="height:40.572%" aria-label="delegated-tool-0004#r1: Strict, latency 18.21s"></span><span class="case-bar case-bar--strict" style="height:38.294%" aria-label="delegated-tool-0004#r2: Strict, latency 17.19s"></span><span class="case-bar case-bar--strict" style="height:30.006%" aria-label="delegated-infer-0004#r1: Strict, latency 13.47s"></span><span class="case-bar case-bar--strict" style="height:29.406%" aria-label="delegated-infer-0004#r2: Strict, latency 13.20s"></span><span class="case-bar case-bar--strict" style="height:100.000%" aria-label="multi-step-0004#r1: Strict, latency 44.88s"></span><span class="case-bar case-bar--strict" style="height:81.878%" aria-label="multi-step-0004#r2: Strict, latency 36.75s"></span><span class="case-bar case-bar--strict" style="height:37.911%" aria-label="grounding-trap-0004#r1: Strict, latency 17.02s"></span><span class="case-bar case-bar--strict" style="height:32.961%" aria-label="grounding-trap-0004#r2: Strict, latency 14.79s"></span><span class="case-bar case-bar--strict" style="height:12.367%" aria-label="direct-final-0005#r1: Strict, latency 5.55s"></span><span class="case-bar case-bar--strict" style="height:11.811%" aria-label="direct-final-0005#r2: Strict, latency 5.30s"></span><span class="case-bar case-bar--strict" style="height:28.133%" aria-label="local-tool-0005#r1: Strict, latency 12.63s"></span><span class="case-bar case-bar--strict" style="height:27.328%" aria-label="local-tool-0005#r2: Strict, latency 12.27s"></span><span class="case-bar case-bar--strict" style="height:28.938%" aria-label="delegated-tool-0005#r1: Strict, latency 12.99s"></span><span class="case-bar case-bar--strict" style="height:28.648%" aria-label="delegated-tool-0005#r2: Strict, latency 12.86s"></span><span class="case-bar case-bar--strict" style="height:30.789%" aria-label="delegated-infer-0005#r1: Strict, latency 13.82s"></span><span class="case-bar case-bar--strict" style="height:29.277%" aria-label="delegated-infer-0005#r2: Strict, latency 13.14s"></span><span class="case-bar case-bar--strict" style="height:51.486%" aria-label="multi-step-0005#r1: Strict, latency 23.11s"></span><span class="case-bar case-bar--strict" style="height:58.480%" aria-label="multi-step-0005#r2: Strict, latency 26.25s"></span><span class="case-bar case-bar--strict" style="height:40.892%" aria-label="grounding-trap-0005#r1: Strict, latency 18.35s"></span><span class="case-bar case-bar--strict" style="height:37.630%" aria-label="grounding-trap-0005#r2: Strict, latency 16.89s"></span><span class="case-bar case-bar--strict" style="height:11.981%" aria-label="direct-final-0006#r1: Strict, latency 5.38s"></span><span class="case-bar case-bar--strict" style="height:11.655%" aria-label="direct-final-0006#r2: Strict, latency 5.23s"></span><span class="case-bar case-bar--strict" style="height:29.170%" aria-label="local-tool-0006#r1: Strict, latency 13.09s"></span><span class="case-bar case-bar--strict" style="height:28.165%" aria-label="local-tool-0006#r2: Strict, latency 12.64s"></span><span class="case-bar case-bar--strict" style="height:35.948%" aria-label="delegated-tool-0006#r1: Strict, latency 16.13s"></span><span class="case-bar case-bar--strict" style="height:35.571%" aria-label="delegated-tool-0006#r2: Strict, latency 15.97s"></span><span class="case-bar case-bar--strict" style="height:30.197%" aria-label="delegated-infer-0006#r1: Strict, latency 13.55s"></span><span class="case-bar case-bar--strict" style="height:29.551%" aria-label="delegated-infer-0006#r2: Strict, latency 13.26s"></span><span class="case-bar case-bar--failed" style="height:32.560%" aria-label="multi-step-0006#r1: Failed, latency 14.61s"></span><span class="case-bar case-bar--failed" style="height:32.495%" aria-label="multi-step-0006#r2: Failed, latency 14.59s"></span><span class="case-bar case-bar--strict" style="height:34.926%" aria-label="grounding-trap-0006#r1: Strict, latency 15.68s"></span><span class="case-bar case-bar--strict" style="height:34.973%" aria-label="grounding-trap-0006#r2: Strict, latency 15.70s"></span><span class="case-bar case-bar--strict" style="height:12.120%" aria-label="direct-final-0007#r1: Strict, latency 5.44s"></span><span class="case-bar case-bar--strict" style="height:11.535%" aria-label="direct-final-0007#r2: Strict, latency 5.18s"></span><span class="case-bar case-bar--strict" style="height:28.174%" aria-label="local-tool-0007#r1: Strict, latency 12.65s"></span><span class="case-bar case-bar--strict" style="height:26.658%" aria-label="local-tool-0007#r2: Strict, latency 11.97s"></span><span class="case-bar case-bar--strict" style="height:35.823%" aria-label="delegated-tool-0007#r1: Strict, latency 16.08s"></span><span class="case-bar case-bar--strict" style="height:35.723%" aria-label="delegated-tool-0007#r2: Strict, latency 16.03s"></span><span class="case-bar case-bar--strict" style="height:33.007%" aria-label="delegated-infer-0007#r1: Strict, latency 14.81s"></span><span class="case-bar case-bar--strict" style="height:32.128%" aria-label="delegated-infer-0007#r2: Strict, latency 14.42s"></span>
+    
+        <div class="case-chart-scroll" role="region" tabindex="0"
+             aria-label="Scrollable selected-attempt latency chart">
+          <div class="case-chart-canvas" style="min-width:max(100%,216px)">
+            <div class="case-chart-scale"><span>50.77s</span><span>0</span></div>
+            <div class="case-chart" role="img"
+                 aria-label="Selected attempt latency for 200 logical case results">
+              <span class="case-bar case-bar--strict" style="height:13.013%" aria-label="direct-final-0001#r1: Strict, latency 6.61s"></span><span class="case-bar case-bar--strict" style="height:30.261%" aria-label="local-tool-0001#r1: Strict, latency 15.36s"></span><span class="case-bar case-bar--strict" style="height:24.541%" aria-label="delegated-tool-0001#r1: Strict, latency 12.46s"></span><span class="case-bar case-bar--strict" style="height:42.574%" aria-label="routing-choice-0001#r1: Strict, latency 21.62s"></span><span class="case-bar case-bar--strict" style="height:27.724%" aria-label="delegated-infer-0001#r1: Strict, latency 14.08s"></span><span class="case-bar case-bar--strict" style="height:80.330%" aria-label="multi-step-0001#r1: Strict, latency 40.79s"></span><span class="case-bar case-bar--strict" style="height:41.671%" aria-label="grounding-trap-0001#r1: Strict, latency 21.16s"></span><span class="case-bar case-bar--strict" style="height:15.503%" aria-label="direct-final-0002#r1: Strict, latency 7.87s"></span><span class="case-bar case-bar--strict" style="height:26.061%" aria-label="local-tool-0002#r1: Strict, latency 13.23s"></span><span class="case-bar case-bar--strict" style="height:31.307%" aria-label="delegated-tool-0002#r1: Strict, latency 15.90s"></span><span class="case-bar case-bar--strict" style="height:28.061%" aria-label="routing-choice-0002#r1: Strict, latency 14.25s"></span><span class="case-bar case-bar--strict" style="height:29.328%" aria-label="delegated-infer-0002#r1: Strict, latency 14.89s"></span><span class="case-bar case-bar--strict" style="height:49.358%" aria-label="multi-step-0002#r1: Strict, latency 25.06s"></span><span class="case-bar case-bar--strict" style="height:34.534%" aria-label="grounding-trap-0002#r1: Strict, latency 17.53s"></span><span class="case-bar case-bar--strict" style="height:11.653%" aria-label="direct-final-0003#r1: Strict, latency 5.92s"></span><span class="case-bar case-bar--strict" style="height:26.961%" aria-label="local-tool-0003#r1: Strict, latency 13.69s"></span><span class="case-bar case-bar--strict" style="height:29.823%" aria-label="delegated-tool-0003#r1: Strict, latency 15.14s"></span><span class="case-bar case-bar--strict" style="height:27.962%" aria-label="delegated-infer-0003#r1: Strict, latency 14.20s"></span><span class="case-bar case-bar--failed" style="height:31.718%" aria-label="multi-step-0003#r1: Failed, latency 16.10s"></span><span class="case-bar case-bar--strict" style="height:36.094%" aria-label="grounding-trap-0003#r1: Strict, latency 18.33s"></span><span class="case-bar case-bar--strict" style="height:14.207%" aria-label="direct-final-0004#r1: Strict, latency 7.21s"></span><span class="case-bar case-bar--strict" style="height:24.164%" aria-label="local-tool-0004#r1: Strict, latency 12.27s"></span><span class="case-bar case-bar--strict" style="height:42.007%" aria-label="delegated-tool-0004#r1: Strict, latency 21.33s"></span><span class="case-bar case-bar--strict" style="height:12.685%" aria-label="routing-choice-0003#r1: Strict, latency 6.44s"></span><span class="case-bar case-bar--strict" style="height:28.464%" aria-label="delegated-infer-0004#r1: Strict, latency 14.45s"></span><span class="case-bar case-bar--strict" style="height:63.867%" aria-label="multi-step-0004#r1: Strict, latency 32.43s"></span><span class="case-bar case-bar--strict" style="height:32.695%" aria-label="grounding-trap-0004#r1: Strict, latency 16.60s"></span><span class="case-bar case-bar--strict" style="height:11.651%" aria-label="direct-final-0005#r1: Strict, latency 5.92s"></span><span class="case-bar case-bar--strict" style="height:27.088%" aria-label="local-tool-0005#r1: Strict, latency 13.75s"></span><span class="case-bar case-bar--strict" style="height:23.198%" aria-label="delegated-tool-0005#r1: Strict, latency 11.78s"></span><span class="case-bar case-bar--strict" style="height:38.175%" aria-label="routing-choice-0004#r1: Strict, latency 19.38s"></span><span class="case-bar case-bar--strict" style="height:28.372%" aria-label="delegated-infer-0005#r1: Strict, latency 14.41s"></span><span class="case-bar case-bar--strict" style="height:50.012%" aria-label="multi-step-0005#r1: Strict, latency 25.39s"></span><span class="case-bar case-bar--strict" style="height:40.562%" aria-label="grounding-trap-0005#r1: Strict, latency 20.59s"></span><span class="case-bar case-bar--strict" style="height:13.956%" aria-label="direct-final-0006#r1: Strict, latency 7.09s"></span><span class="case-bar case-bar--strict" style="height:27.401%" aria-label="local-tool-0006#r1: Strict, latency 13.91s"></span><span class="case-bar case-bar--strict" style="height:31.156%" aria-label="delegated-tool-0006#r1: Strict, latency 15.82s"></span><span class="case-bar case-bar--strict" style="height:28.045%" aria-label="delegated-infer-0006#r1: Strict, latency 14.24s"></span><span class="case-bar case-bar--failed" style="height:31.475%" aria-label="multi-step-0006#r1: Failed, latency 15.98s"></span><span class="case-bar case-bar--strict" style="height:32.791%" aria-label="grounding-trap-0006#r1: Strict, latency 16.65s"></span><span class="case-bar case-bar--strict" style="height:11.632%" aria-label="direct-final-0007#r1: Strict, latency 5.91s"></span><span class="case-bar case-bar--strict" style="height:28.382%" aria-label="local-tool-0007#r1: Strict, latency 14.41s"></span><span class="case-bar case-bar--strict" style="height:32.553%" aria-label="delegated-tool-0007#r1: Strict, latency 16.53s"></span><span class="case-bar case-bar--strict" style="height:40.824%" aria-label="routing-choice-0005#r1: Strict, latency 20.73s"></span><span class="case-bar case-bar--strict" style="height:31.828%" aria-label="delegated-infer-0007#r1: Strict, latency 16.16s"></span><span class="case-bar case-bar--strict" style="height:88.104%" aria-label="multi-step-0007#r1: Strict, latency 44.73s"></span><span class="case-bar case-bar--strict" style="height:38.216%" aria-label="grounding-trap-0007#r1: Strict, latency 19.40s"></span><span class="case-bar case-bar--strict" style="height:11.693%" aria-label="direct-final-0008#r1: Strict, latency 5.94s"></span><span class="case-bar case-bar--strict" style="height:28.739%" aria-label="local-tool-0008#r1: Strict, latency 14.59s"></span><span class="case-bar case-bar--strict" style="height:42.916%" aria-label="delegated-tool-0008#r1: Strict, latency 21.79s"></span><span class="case-bar case-bar--functional" style="height:100.000%" aria-label="routing-choice-0006#r1: Functional, latency 50.77s"></span><span class="case-bar case-bar--strict" style="height:28.756%" aria-label="delegated-infer-0008#r1: Strict, latency 14.60s"></span><span class="case-bar case-bar--strict" style="height:49.744%" aria-label="multi-step-0008#r1: Strict, latency 25.26s"></span><span class="case-bar case-bar--strict" style="height:35.643%" aria-label="grounding-trap-0008#r1: Strict, latency 18.10s"></span><span class="case-bar case-bar--strict" style="height:11.334%" aria-label="direct-final-0009#r1: Strict, latency 5.75s"></span><span class="case-bar case-bar--strict" style="height:25.133%" aria-label="local-tool-0009#r1: Strict, latency 12.76s"></span><span class="case-bar case-bar--strict" style="height:22.708%" aria-label="delegated-tool-0009#r1: Strict, latency 11.53s"></span><span class="case-bar case-bar--strict" style="height:28.348%" aria-label="delegated-infer-0009#r1: Strict, latency 14.39s"></span><span class="case-bar case-bar--failed" style="height:35.327%" aria-label="multi-step-0009#r1: Failed, latency 17.94s"></span><span class="case-bar case-bar--strict" style="height:40.236%" aria-label="grounding-trap-0009#r1: Strict, latency 20.43s"></span><span class="case-bar case-bar--strict" style="height:13.757%" aria-label="direct-final-0010#r1: Strict, latency 6.98s"></span><span class="case-bar case-bar--strict" style="height:24.216%" aria-label="local-tool-0010#r1: Strict, latency 12.30s"></span><span class="case-bar case-bar--strict" style="height:29.711%" aria-label="delegated-tool-0010#r1: Strict, latency 15.09s"></span><span class="case-bar case-bar--strict" style="height:47.480%" aria-label="routing-choice-0007#r1: Strict, latency 24.11s"></span><span class="case-bar case-bar--strict" style="height:26.762%" aria-label="delegated-infer-0010#r1: Strict, latency 13.59s"></span><span class="case-bar case-bar--strict" style="height:46.565%" aria-label="multi-step-0010#r1: Strict, latency 23.64s"></span><span class="case-bar case-bar--strict" style="height:34.349%" aria-label="grounding-trap-0010#r1: Strict, latency 17.44s"></span><span class="case-bar case-bar--strict" style="height:10.670%" aria-label="direct-final-0011#r1: Strict, latency 5.42s"></span><span class="case-bar case-bar--strict" style="height:25.701%" aria-label="local-tool-0011#r1: Strict, latency 13.05s"></span><span class="case-bar case-bar--strict" style="height:27.769%" aria-label="delegated-tool-0011#r1: Strict, latency 14.10s"></span><span class="case-bar case-bar--failed" style="height:27.834%" aria-label="routing-choice-0008#r1: Failed, latency 14.13s"></span><span class="case-bar case-bar--strict" style="height:25.915%" aria-label="delegated-infer-0011#r1: Strict, latency 13.16s"></span><span class="case-bar case-bar--strict" style="height:48.619%" aria-label="multi-step-0011#r1: Strict, latency 24.69s"></span><span class="case-bar case-bar--strict" style="height:38.444%" aria-label="grounding-trap-0011#r1: Strict, latency 19.52s"></span><span class="case-bar case-bar--strict" style="height:10.913%" aria-label="direct-final-0012#r1: Strict, latency 5.54s"></span><span class="case-bar case-bar--strict" style="height:24.236%" aria-label="local-tool-0012#r1: Strict, latency 12.31s"></span><span class="case-bar case-bar--strict" style="height:39.565%" aria-label="delegated-tool-0012#r1: Strict, latency 20.09s"></span><span class="case-bar case-bar--strict" style="height:30.411%" aria-label="delegated-infer-0012#r1: Strict, latency 15.44s"></span><span class="case-bar case-bar--failed" style="height:32.874%" aria-label="multi-step-0012#r1: Failed, latency 16.69s"></span><span class="case-bar case-bar--strict" style="height:30.017%" aria-label="grounding-trap-0012#r1: Strict, latency 15.24s"></span><span class="case-bar case-bar--strict" style="height:10.757%" aria-label="direct-final-0013#r1: Strict, latency 5.46s"></span><span class="case-bar case-bar--strict" style="height:25.398%" aria-label="local-tool-0013#r1: Strict, latency 12.90s"></span><span class="case-bar case-bar--strict" style="height:22.230%" aria-label="delegated-tool-0013#r1: Strict, latency 11.29s"></span><span class="case-bar case-bar--strict" style="height:39.271%" aria-label="routing-choice-0009#r1: Strict, latency 19.94s"></span><span class="case-bar case-bar--strict" style="height:30.009%" aria-label="delegated-infer-0013#r1: Strict, latency 15.24s"></span><span class="case-bar case-bar--strict" style="height:46.391%" aria-label="multi-step-0013#r1: Strict, latency 23.55s"></span><span class="case-bar case-bar--strict" style="height:39.293%" aria-label="grounding-trap-0013#r1: Strict, latency 19.95s"></span><span class="case-bar case-bar--strict" style="height:13.950%" aria-label="direct-final-0014#r1: Strict, latency 7.08s"></span><span class="case-bar case-bar--strict" style="height:23.439%" aria-label="local-tool-0014#r1: Strict, latency 11.90s"></span><span class="case-bar case-bar--strict" style="height:30.008%" aria-label="delegated-tool-0014#r1: Strict, latency 15.24s"></span><span class="case-bar case-bar--strict" style="height:26.325%" aria-label="routing-choice-0010#r1: Strict, latency 13.37s"></span><span class="case-bar case-bar--strict" style="height:27.127%" aria-label="delegated-infer-0014#r1: Strict, latency 13.77s"></span><span class="case-bar case-bar--strict" style="height:47.665%" aria-label="multi-step-0014#r1: Strict, latency 24.20s"></span><span class="case-bar case-bar--strict" style="height:32.996%" aria-label="grounding-trap-0014#r1: Strict, latency 16.75s"></span><span class="case-bar case-bar--strict" style="height:11.182%" aria-label="direct-final-0015#r1: Strict, latency 5.68s"></span><span class="case-bar case-bar--strict" style="height:24.928%" aria-label="local-tool-0015#r1: Strict, latency 12.66s"></span><span class="case-bar case-bar--strict" style="height:28.738%" aria-label="delegated-tool-0015#r1: Strict, latency 14.59s"></span><span class="case-bar case-bar--strict" style="height:28.211%" aria-label="delegated-infer-0015#r1: Strict, latency 14.32s"></span><span class="case-bar case-bar--failed" style="height:35.509%" aria-label="multi-step-0015#r1: Failed, latency 18.03s"></span><span class="case-bar case-bar--strict" style="height:36.259%" aria-label="grounding-trap-0015#r1: Strict, latency 18.41s"></span><span class="case-bar case-bar--strict" style="height:13.866%" aria-label="direct-final-0016#r1: Strict, latency 7.04s"></span><span class="case-bar case-bar--strict" style="height:25.831%" aria-label="local-tool-0016#r1: Strict, latency 13.12s"></span><span class="case-bar case-bar--strict" style="height:39.581%" aria-label="delegated-tool-0016#r1: Strict, latency 20.10s"></span><span class="case-bar case-bar--strict" style="height:12.804%" aria-label="routing-choice-0011#r1: Strict, latency 6.50s"></span><span class="case-bar case-bar--strict" style="height:27.339%" aria-label="delegated-infer-0016#r1: Strict, latency 13.88s"></span><span class="case-bar case-bar--strict" style="height:71.603%" aria-label="multi-step-0016#r1: Strict, latency 36.35s"></span><span class="case-bar case-bar--strict" style="height:32.469%" aria-label="grounding-trap-0016#r1: Strict, latency 16.49s"></span><span class="case-bar case-bar--strict" style="height:10.745%" aria-label="direct-final-0017#r1: Strict, latency 5.46s"></span><span class="case-bar case-bar--strict" style="height:24.900%" aria-label="local-tool-0017#r1: Strict, latency 12.64s"></span><span class="case-bar case-bar--strict" style="height:21.572%" aria-label="delegated-tool-0017#r1: Strict, latency 10.95s"></span><span class="case-bar case-bar--strict" style="height:40.729%" aria-label="routing-choice-0012#r1: Strict, latency 20.68s"></span><span class="case-bar case-bar--strict" style="height:30.799%" aria-label="delegated-infer-0017#r1: Strict, latency 15.64s"></span><span class="case-bar case-bar--strict" style="height:50.597%" aria-label="multi-step-0017#r1: Strict, latency 25.69s"></span><span class="case-bar case-bar--strict" style="height:40.519%" aria-label="grounding-trap-0017#r1: Strict, latency 20.57s"></span><span class="case-bar case-bar--strict" style="height:14.056%" aria-label="direct-final-0018#r1: Strict, latency 7.14s"></span><span class="case-bar case-bar--strict" style="height:22.617%" aria-label="local-tool-0018#r1: Strict, latency 11.48s"></span><span class="case-bar case-bar--strict" style="height:33.595%" aria-label="delegated-tool-0018#r1: Strict, latency 17.06s"></span><span class="case-bar case-bar--strict" style="height:34.615%" aria-label="delegated-infer-0018#r1: Strict, latency 17.58s"></span><span class="case-bar case-bar--failed" style="height:36.108%" aria-label="multi-step-0018#r1: Failed, latency 18.33s"></span><span class="case-bar case-bar--strict" style="height:34.660%" aria-label="grounding-trap-0018#r1: Strict, latency 17.60s"></span><span class="case-bar case-bar--strict" style="height:11.157%" aria-label="direct-final-0019#r1: Strict, latency 5.66s"></span><span class="case-bar case-bar--strict" style="height:27.695%" aria-label="local-tool-0019#r1: Strict, latency 14.06s"></span><span class="case-bar case-bar--strict" style="height:27.264%" aria-label="delegated-tool-0019#r1: Strict, latency 13.84s"></span><span class="case-bar case-bar--strict" style="height:43.502%" aria-label="routing-choice-0013#r1: Strict, latency 22.09s"></span><span class="case-bar case-bar--strict" style="height:34.826%" aria-label="delegated-infer-0019#r1: Strict, latency 17.68s"></span><span class="case-bar case-bar--strict" style="height:59.936%" aria-label="multi-step-0019#r1: Strict, latency 30.43s"></span><span class="case-bar case-bar--strict" style="height:43.194%" aria-label="grounding-trap-0019#r1: Strict, latency 21.93s"></span><span class="case-bar case-bar--strict" style="height:15.596%" aria-label="direct-final-0020#r1: Strict, latency 7.92s"></span><span class="case-bar case-bar--strict" style="height:27.210%" aria-label="local-tool-0020#r1: Strict, latency 13.82s"></span><span class="case-bar case-bar--strict" style="height:39.063%" aria-label="delegated-tool-0020#r1: Strict, latency 19.83s"></span><span class="case-bar case-bar--strict" style="height:49.603%" aria-label="routing-choice-0014#r1: Strict, latency 25.19s"></span><span class="case-bar case-bar--strict" style="height:28.910%" aria-label="delegated-infer-0020#r1: Strict, latency 14.68s"></span><span class="case-bar case-bar--strict" style="height:47.728%" aria-label="multi-step-0020#r1: Strict, latency 24.23s"></span><span class="case-bar case-bar--strict" style="height:37.275%" aria-label="grounding-trap-0020#r1: Strict, latency 18.93s"></span><span class="case-bar case-bar--strict" style="height:13.120%" aria-label="direct-final-0021#r1: Strict, latency 6.66s"></span><span class="case-bar case-bar--strict" style="height:28.310%" aria-label="local-tool-0021#r1: Strict, latency 14.37s"></span><span class="case-bar case-bar--strict" style="height:23.745%" aria-label="delegated-tool-0021#r1: Strict, latency 12.06s"></span><span class="case-bar case-bar--strict" style="height:29.260%" aria-label="delegated-infer-0021#r1: Strict, latency 14.86s"></span><span class="case-bar case-bar--failed" style="height:34.175%" aria-label="multi-step-0021#r1: Failed, latency 17.35s"></span><span class="case-bar case-bar--strict" style="height:37.577%" aria-label="grounding-trap-0021#r1: Strict, latency 19.08s"></span><span class="case-bar case-bar--strict" style="height:17.303%" aria-label="direct-final-0022#r1: Strict, latency 8.79s"></span><span class="case-bar case-bar--strict" style="height:27.407%" aria-label="local-tool-0022#r1: Strict, latency 13.92s"></span><span class="case-bar case-bar--strict" style="height:32.041%" aria-label="delegated-tool-0022#r1: Strict, latency 16.27s"></span><span class="case-bar case-bar--strict" style="height:63.242%" aria-label="routing-choice-0015#r1: Strict, latency 32.11s"></span><span class="case-bar case-bar--strict" style="height:28.580%" aria-label="delegated-infer-0022#r1: Strict, latency 14.51s"></span><span class="case-bar case-bar--strict" style="height:54.194%" aria-label="multi-step-0022#r1: Strict, latency 27.52s"></span><span class="case-bar case-bar--strict" style="height:39.334%" aria-label="grounding-trap-0022#r1: Strict, latency 19.97s"></span><span class="case-bar case-bar--strict" style="height:11.356%" aria-label="direct-final-0023#r1: Strict, latency 5.77s"></span><span class="case-bar case-bar--strict" style="height:26.896%" aria-label="local-tool-0023#r1: Strict, latency 13.66s"></span><span class="case-bar case-bar--strict" style="height:28.371%" aria-label="delegated-tool-0023#r1: Strict, latency 14.40s"></span><span class="case-bar case-bar--strict" style="height:31.856%" aria-label="routing-choice-0016#r1: Strict, latency 16.17s"></span><span class="case-bar case-bar--strict" style="height:33.188%" aria-label="delegated-infer-0023#r1: Strict, latency 16.85s"></span><span class="case-bar case-bar--strict" style="height:54.193%" aria-label="multi-step-0023#r1: Strict, latency 27.52s"></span><span class="case-bar case-bar--strict" style="height:45.027%" aria-label="grounding-trap-0023#r1: Strict, latency 22.86s"></span><span class="case-bar case-bar--strict" style="height:15.404%" aria-label="direct-final-0024#r1: Strict, latency 7.82s"></span><span class="case-bar case-bar--strict" style="height:27.001%" aria-label="local-tool-0024#r1: Strict, latency 13.71s"></span><span class="case-bar case-bar--strict" style="height:41.600%" aria-label="delegated-tool-0024#r1: Strict, latency 21.12s"></span><span class="case-bar case-bar--strict" style="height:30.874%" aria-label="delegated-infer-0024#r1: Strict, latency 15.68s"></span><span class="case-bar case-bar--failed" style="height:33.323%" aria-label="multi-step-0024#r1: Failed, latency 16.92s"></span><span class="case-bar case-bar--strict" style="height:31.614%" aria-label="grounding-trap-0024#r1: Strict, latency 16.05s"></span><span class="case-bar case-bar--strict" style="height:11.397%" aria-label="direct-final-0025#r1: Strict, latency 5.79s"></span><span class="case-bar case-bar--strict" style="height:25.681%" aria-label="local-tool-0025#r1: Strict, latency 13.04s"></span><span class="case-bar case-bar--strict" style="height:22.906%" aria-label="delegated-tool-0025#r1: Strict, latency 11.63s"></span><span class="case-bar case-bar--failed" style="height:40.641%" aria-label="routing-choice-0017#r1: Failed, latency 20.63s"></span><span class="case-bar case-bar--strict" style="height:26.976%" aria-label="delegated-infer-0025#r1: Strict, latency 13.70s"></span><span class="case-bar case-bar--strict" style="height:52.274%" aria-label="multi-step-0025#r1: Strict, latency 26.54s"></span><span class="case-bar case-bar--strict" style="height:40.887%" aria-label="grounding-trap-0025#r1: Strict, latency 20.76s"></span><span class="case-bar case-bar--strict" style="height:14.508%" aria-label="direct-final-0026#r1: Strict, latency 7.37s"></span><span class="case-bar case-bar--strict" style="height:27.140%" aria-label="local-tool-0026#r1: Strict, latency 13.78s"></span><span class="case-bar case-bar--strict" style="height:24.084%" aria-label="delegated-tool-0026#r1: Strict, latency 12.23s"></span><span class="case-bar case-bar--strict" style="height:29.263%" aria-label="routing-choice-0018#r1: Strict, latency 14.86s"></span><span class="case-bar case-bar--strict" style="height:27.404%" aria-label="delegated-infer-0026#r1: Strict, latency 13.91s"></span><span class="case-bar case-bar--strict" style="height:49.343%" aria-label="multi-step-0026#r1: Strict, latency 25.05s"></span><span class="case-bar case-bar--strict" style="height:33.999%" aria-label="grounding-trap-0026#r1: Strict, latency 17.26s"></span><span class="case-bar case-bar--strict" style="height:10.602%" aria-label="direct-final-0027#r1: Strict, latency 5.38s"></span><span class="case-bar case-bar--strict" style="height:28.370%" aria-label="local-tool-0027#r1: Strict, latency 14.40s"></span><span class="case-bar case-bar--strict" style="height:27.380%" aria-label="delegated-tool-0027#r1: Strict, latency 13.90s"></span><span class="case-bar case-bar--strict" style="height:26.683%" aria-label="delegated-infer-0027#r1: Strict, latency 13.55s"></span><span class="case-bar case-bar--failed" style="height:33.900%" aria-label="multi-step-0027#r1: Failed, latency 17.21s"></span><span class="case-bar case-bar--strict" style="height:35.620%" aria-label="grounding-trap-0027#r1: Strict, latency 18.09s"></span><span class="case-bar case-bar--strict" style="height:14.676%" aria-label="direct-final-0028#r1: Strict, latency 7.45s"></span><span class="case-bar case-bar--strict" style="height:26.650%" aria-label="local-tool-0028#r1: Strict, latency 13.53s"></span><span class="case-bar case-bar--strict" style="height:41.521%" aria-label="delegated-tool-0028#r1: Strict, latency 21.08s"></span><span class="case-bar case-bar--strict" style="height:15.906%" aria-label="routing-choice-0019#r1: Strict, latency 8.08s"></span><span class="case-bar case-bar--strict" style="height:26.589%" aria-label="delegated-infer-0028#r1: Strict, latency 13.50s"></span><span class="case-bar case-bar--strict" style="height:46.992%" aria-label="multi-step-0028#r1: Strict, latency 23.86s"></span><span class="case-bar case-bar--strict" style="height:33.504%" aria-label="grounding-trap-0028#r1: Strict, latency 17.01s"></span><span class="case-bar case-bar--strict" style="height:13.864%" aria-label="direct-final-0029#r1: Strict, latency 7.04s"></span><span class="case-bar case-bar--strict" style="height:25.068%" aria-label="local-tool-0029#r1: Strict, latency 12.73s"></span><span class="case-bar case-bar--strict" style="height:22.705%" aria-label="delegated-tool-0029#r1: Strict, latency 11.53s"></span><span class="case-bar case-bar--strict" style="height:49.437%" aria-label="routing-choice-0020#r1: Strict, latency 25.10s"></span><span class="case-bar case-bar--strict" style="height:28.042%" aria-label="delegated-infer-0029#r1: Strict, latency 14.24s"></span><span class="case-bar case-bar--strict" style="height:52.273%" aria-label="multi-step-0029#r1: Strict, latency 26.54s"></span><span class="case-bar case-bar--strict" style="height:40.988%" aria-label="grounding-trap-0029#r1: Strict, latency 20.81s"></span><span class="case-bar case-bar--strict" style="height:13.727%" aria-label="direct-final-0030#r1: Strict, latency 6.97s"></span><span class="case-bar case-bar--strict" style="height:25.554%" aria-label="local-tool-0030#r1: Strict, latency 12.97s"></span><span class="case-bar case-bar--strict" style="height:29.971%" aria-label="delegated-tool-0030#r1: Strict, latency 15.22s"></span><span class="case-bar case-bar--strict" style="height:26.571%" aria-label="delegated-infer-0030#r1: Strict, latency 13.49s"></span><span class="case-bar case-bar--failed" style="height:29.755%" aria-label="multi-step-0030#r1: Failed, latency 15.11s"></span><span class="case-bar case-bar--strict" style="height:29.271%" aria-label="grounding-trap-0030#r1: Strict, latency 14.86s"></span>
+            </div>
+          </div>
         </div>
         <div class="legend">
           <span><i class="legend-strict"></i>Strict</span>
           <span><i class="legend-functional"></i>Functional</span>
           <span><i class="legend-failed"></i>Failed</span>
         </div>
-
+        
   </section>
 
   <section class="two-col">
     <div class="panel">
       <h2>Repetitions</h2>
-
+      
         <div class="table-wrap">
           <table>
             <thead><tr><th>Repetition</th><th>Strict first attempts</th><th>Median E2E</th><th>Median LLM</th></tr></thead>
             <tbody>
             <tr>
               <td>1</td>
-              <td>38</td>
-              <td>14.01s</td>
-              <td>14.00s</td>
-            </tr>
-
-            <tr>
-              <td>2</td>
-              <td>38</td>
-              <td>13.36s</td>
-              <td>13.35s</td>
+              <td>187</td>
+              <td>14.86s</td>
+              <td>14.85s</td>
             </tr>
             </tbody>
           </table>
         </div>
-
+        
     </div>
     <div class="panel">
       <h2>Cache-sensitive repeat probe</h2>
       <div class="mini-grid">
         <div class="mini-stat">
           <span>End-to-end</span>
-          <strong>+3.6% faster</strong>
+          <strong>—</strong>
         </div>
-
+        
         <div class="mini-stat">
           <span>First LLM call</span>
-          <strong>+3.8% faster</strong>
+          <strong>—</strong>
         </div>
-
+        
         <div class="mini-stat">
           <span>First prompt eval</span>
-          <strong>+0.5% faster</strong>
+          <strong>—</strong>
         </div>
         </div>
-      <p class="section-intro cache-note">38 eligible strict adjacent pairs. This is a cache-sensitive repeat signal, not proof of a cache hit.</p>
+      <p class="section-intro cache-note">No eligible pairs. Use at least two repetitions; both adjacent first attempts must be strict, retry-free, timing-complete, and use the same LLM call count.</p>
     </div>
   </section>
 
@@ -468,58 +502,1479 @@
   </section>
 
   <section class="panel">
-    <h2>Strict failures</h2>
-    <p class="section-intro">4 logical case results need review.</p>
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Logical case</th><th>Category</th><th>Result</th><th>Attempts</th><th>Latency</th><th>Diagnostics</th></tr></thead>
-            <tbody>
-            <tr>
-              <td><code>multi-step-0003#r1</code></td>
-              <td>multi step</td>
-              <td><span class="status status--failed">Failed</span></td>
-              <td>2</td>
-              <td>17.37s</td>
-              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
-            </tr>
-
-            <tr>
-              <td><code>multi-step-0003#r2</code></td>
-              <td>multi step</td>
-              <td><span class="status status--failed">Failed</span></td>
-              <td>2</td>
-              <td>17.31s</td>
-              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
-            </tr>
-
-            <tr>
-              <td><code>multi-step-0006#r1</code></td>
-              <td>multi step</td>
-              <td><span class="status status--failed">Failed</span></td>
-              <td>2</td>
-              <td>14.61s</td>
-              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
-            </tr>
-
-            <tr>
-              <td><code>multi-step-0006#r2</code></td>
-              <td>multi step</td>
-              <td><span class="status status--failed">Failed</span></td>
-              <td>2</td>
-              <td>14.59s</td>
-              <td>task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</td>
-            </tr>
-            </tbody>
-          </table>
-        </div>
-
+    <h2>Attempt review</h2>
+    <p class="section-intro">13 logical case result(s) had a non-strict attempt:
+      13 unresolved, 0 rescued by a later fresh attempt.</p>
+    
+        <div class="failure-list">
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0003#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>16.10s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0019, perform these actions in order. First call local multiply_numbers with a=33, b=22, request_id=REQ-01337-0019. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-C3, REQUEST_ID=REQ-01337-0019, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=726;local_receipt=BENCH-MUL-E44F057F67;verdict=red;oracle_receipt=BENCH-ORACLE-A657EC6CDF</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 33,
+      &quot;b&quot;: 22,
+      &quot;request_id&quot;: &quot;REQ-01337-0019&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-C3&quot;,
+      &quot;REQUEST_ID=REQ-01337-0019&quot;,
+      &quot;EVIDENCE=BENCH-MUL-E44F057F67&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 33,
+        &quot;b&quot;: 22,
+        &quot;request_id&quot;: &quot;REQ-01337-0019&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-C3, REQUEST_ID=REQ-01337-0019, and EVIDENCE=&lt;BENCH-MUL-E44F057F67&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 33,
+      &quot;b&quot;: 22,
+      &quot;request_id&quot;: &quot;REQ-01337-0019&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0006#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>15.98s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0039, perform these actions in order. First call local multiply_numbers with a=33, b=3, request_id=REQ-01337-0039. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-E5, REQUEST_ID=REQ-01337-0039, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=99;local_receipt=BENCH-MUL-A4AFBC37B7;verdict=amber;oracle_receipt=BENCH-ORACLE-F93A5144FF</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 33,
+      &quot;b&quot;: 3,
+      &quot;request_id&quot;: &quot;REQ-01337-0039&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-E5&quot;,
+      &quot;REQUEST_ID=REQ-01337-0039&quot;,
+      &quot;EVIDENCE=BENCH-MUL-A4AFBC37B7&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 33,
+        &quot;b&quot;: 3,
+        &quot;request_id&quot;: &quot;REQ-01337-0039&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-E5, REQUEST_ID=REQ-01337-0039, EVIDENCE=&lt;BENCH-MUL-A4AFBC37B7&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 33,
+      &quot;b&quot;: 3,
+      &quot;request_id&quot;: &quot;REQ-01337-0039&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>routing-choice-0006#r1</code>
+                <span>routing choice</span>
+                <span class="status status--functional">Functional</span>
+                <span>1 attempt(s)</span>
+                <span>50.77s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">invalid_tool_action</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0051, use the authoritative current source index to find clamp; no archived index is acceptable. Supply request_id=REQ-01337-0051 and source_receipt=NONE. Return exactly matches=&lt;number of reported matches&gt;;receipt=&lt;reported receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>matches=1;receipt=BENCH-SEARCH-5F49F0CA5E</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;workspace_agent&quot;,
+    &quot;args&quot;: {
+      &quot;query&quot;: &quot;clamp&quot;,
+      &quot;request_id&quot;: &quot;REQ-01337-0051&quot;,
+      &quot;source_receipt&quot;: &quot;NONE&quot;
+    },
+    &quot;kind&quot;: &quot;agent_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;search_symbol&quot;
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">invalid_tool_action</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>matches=1;receipt=BENCH-SEARCH-5F49F0CA5E</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;query&quot;: &quot;clamp&quot;,
+        &quot;request_id&quot;: &quot;REQ-01337-0051&quot;,
+        &quot;source_receipt&quot;: &quot;NONE&quot;
+      },
+      &quot;tool&quot;: &quot;search_symbol&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;tool_call&quot;,
+      &quot;agent&quot;: &quot;workspace_agent&quot;,
+      &quot;args&quot;: {
+        &quot;query&quot;: &quot;clamp&quot;,
+        &quot;request_id&quot;: &quot;REQ-01337-0051&quot;,
+        &quot;source_receipt&quot;: &quot;NONE&quot;
+      },
+      &quot;tool&quot;: &quot;search_symbol&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;final&quot;,
+    &quot;payload&quot;: {
+      &quot;content&quot;: &quot;matches=1;receipt=BENCH-SEARCH-5F49F0CA5E&quot;,
+      &quot;type&quot;: &quot;final&quot;
+    },
+    &quot;step&quot;: 3,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;workspace_agent&quot;,
+    &quot;args&quot;: {
+      &quot;query&quot;: &quot;clamp&quot;,
+      &quot;request_id&quot;: &quot;REQ-01337-0051&quot;,
+      &quot;source_receipt&quot;: &quot;NONE&quot;
+    },
+    &quot;kind&quot;: &quot;agent_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;search_symbol&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>No runtime error</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0009#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>17.94s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0059, perform these actions in order. First call local multiply_numbers with a=20, b=25, request_id=REQ-01337-0059. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-B7, REQUEST_ID=REQ-01337-0059, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=500;local_receipt=BENCH-MUL-11B5A5E16B;verdict=green;oracle_receipt=BENCH-ORACLE-EFA1F679B2</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 20,
+      &quot;b&quot;: 25,
+      &quot;request_id&quot;: &quot;REQ-01337-0059&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-B7&quot;,
+      &quot;REQUEST_ID=REQ-01337-0059&quot;,
+      &quot;EVIDENCE=BENCH-MUL-11B5A5E16B&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 20,
+        &quot;b&quot;: 25,
+        &quot;request_id&quot;: &quot;REQ-01337-0059&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-B7, REQUEST_ID=REQ-01337-0059, EVIDENCE=&lt;BENCH-MUL-11B5A5E16B&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 20,
+      &quot;b&quot;: 25,
+      &quot;request_id&quot;: &quot;REQ-01337-0059&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>routing-choice-0008#r1</code>
+                <span>routing choice</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>14.13s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">final_output_mismatch, execution_ledger_mismatch, trace_action_mismatch</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0071, use the appropriate coordinator-owned capability to combine CEDAR and VECTOR with / between them and obtain its opaque execution receipt. Return exactly joined=&lt;reported joined&gt;;receipt=&lt;reported receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>joined=CEDAR/VECTOR;receipt=BENCH-JOIN-C6C7B2C4E6</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;left&quot;: &quot;CEDAR&quot;,
+      &quot;request_id&quot;: &quot;REQ-01337-0071&quot;,
+      &quot;right&quot;: &quot;VECTOR&quot;,
+      &quot;separator&quot;: &quot;/&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;join_tokens&quot;
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">final_output_mismatch, execution_ledger_mismatch, trace_action_mismatch</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>joined=CEDAR/ VECTOR;receipt=BENCH-JOIN-A9A6C7D252</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;left&quot;: &quot;CEDAR&quot;,
+        &quot;request_id&quot;: &quot;REQ-01337-0071&quot;,
+        &quot;right&quot;: &quot;VECTOR&quot;,
+        &quot;separator&quot;: &quot;/ &quot;
+      },
+      &quot;tool&quot;: &quot;join_tokens&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;final&quot;,
+    &quot;payload&quot;: {
+      &quot;content&quot;: &quot;joined=CEDAR/ VECTOR;receipt=BENCH-JOIN-A9A6C7D252&quot;,
+      &quot;type&quot;: &quot;final&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;left&quot;: &quot;CEDAR&quot;,
+      &quot;request_id&quot;: &quot;REQ-01337-0071&quot;,
+      &quot;right&quot;: &quot;VECTOR&quot;,
+      &quot;separator&quot;: &quot;/ &quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;join_tokens&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>No runtime error</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0012#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>16.69s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0079, perform these actions in order. First call local multiply_numbers with a=28, b=25, request_id=REQ-01337-0079. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0079, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=700;local_receipt=BENCH-MUL-CC941B86B4;verdict=amber;oracle_receipt=BENCH-ORACLE-9D47C891F7</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 28,
+      &quot;b&quot;: 25,
+      &quot;request_id&quot;: &quot;REQ-01337-0079&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-A1&quot;,
+      &quot;REQUEST_ID=REQ-01337-0079&quot;,
+      &quot;EVIDENCE=BENCH-MUL-CC941B86B4&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 28,
+        &quot;b&quot;: 25,
+        &quot;request_id&quot;: &quot;REQ-01337-0079&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0079, EVIDENCE=&lt;BENCH-MUL-CC941B86B4&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 28,
+      &quot;b&quot;: 25,
+      &quot;request_id&quot;: &quot;REQ-01337-0079&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0015#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>18.03s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0099, perform these actions in order. First call local multiply_numbers with a=36, b=21, request_id=REQ-01337-0099. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0099, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=756;local_receipt=BENCH-MUL-E1865C1D63;verdict=amber;oracle_receipt=BENCH-ORACLE-08F6CFC9B2</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 36,
+      &quot;b&quot;: 21,
+      &quot;request_id&quot;: &quot;REQ-01337-0099&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-A1&quot;,
+      &quot;REQUEST_ID=REQ-01337-0099&quot;,
+      &quot;EVIDENCE=BENCH-MUL-E1865C1D63&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 36,
+        &quot;b&quot;: 21,
+        &quot;request_id&quot;: &quot;REQ-01337-0099&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0099, and EVIDENCE=&lt;BENCH-MUL-E1865C1D63&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 36,
+      &quot;b&quot;: 21,
+      &quot;request_id&quot;: &quot;REQ-01337-0099&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0018#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>18.33s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0119, perform these actions in order. First call local multiply_numbers with a=16, b=8, request_id=REQ-01337-0119. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-B7, REQUEST_ID=REQ-01337-0119, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=128;local_receipt=BENCH-MUL-7062B60072;verdict=green;oracle_receipt=BENCH-ORACLE-41E7A3797E</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 16,
+      &quot;b&quot;: 8,
+      &quot;request_id&quot;: &quot;REQ-01337-0119&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-B7&quot;,
+      &quot;REQUEST_ID=REQ-01337-0119&quot;,
+      &quot;EVIDENCE=BENCH-MUL-7062B60072&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 16,
+        &quot;b&quot;: 8,
+        &quot;request_id&quot;: &quot;REQ-01337-0119&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-B7, REQUEST_ID=REQ-01337-0119, EVIDENCE=&lt;BENCH-MUL-7062B60072&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 16,
+      &quot;b&quot;: 8,
+      &quot;request_id&quot;: &quot;REQ-01337-0119&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0021#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>17.35s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0139, perform these actions in order. First call local multiply_numbers with a=4, b=16, request_id=REQ-01337-0139. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-C3, REQUEST_ID=REQ-01337-0139, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=64;local_receipt=BENCH-MUL-BD04ADFFCF;verdict=red;oracle_receipt=BENCH-ORACLE-D451374CD5</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 4,
+      &quot;b&quot;: 16,
+      &quot;request_id&quot;: &quot;REQ-01337-0139&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-C3&quot;,
+      &quot;REQUEST_ID=REQ-01337-0139&quot;,
+      &quot;EVIDENCE=BENCH-MUL-BD04ADFFCF&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 4,
+        &quot;b&quot;: 16,
+        &quot;request_id&quot;: &quot;REQ-01337-0139&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-C3, REQUEST_ID=REQ-01337-0139, EVIDENCE=&lt;BENCH-MUL-BD04ADFFCF&gt;&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 4,
+      &quot;b&quot;: 16,
+      &quot;request_id&quot;: &quot;REQ-01337-0139&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0024#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>16.92s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0159, perform these actions in order. First call local multiply_numbers with a=35, b=14, request_id=REQ-01337-0159. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-C3, REQUEST_ID=REQ-01337-0159, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=490;local_receipt=BENCH-MUL-0B72144581;verdict=red;oracle_receipt=BENCH-ORACLE-308CE4D371</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 35,
+      &quot;b&quot;: 14,
+      &quot;request_id&quot;: &quot;REQ-01337-0159&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-C3&quot;,
+      &quot;REQUEST_ID=REQ-01337-0159&quot;,
+      &quot;EVIDENCE=BENCH-MUL-0B72144581&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 35,
+        &quot;b&quot;: 14,
+        &quot;request_id&quot;: &quot;REQ-01337-0159&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-C3, REQUEST_ID=REQ-01337-0159, EVIDENCE=&lt;BENCH-MUL-0B72144581&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 35,
+      &quot;b&quot;: 14,
+      &quot;request_id&quot;: &quot;REQ-01337-0159&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>routing-choice-0017#r1</code>
+                <span>routing choice</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>20.63s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">final_output_mismatch</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0164, obtain the authoritative current source digest for pricing.py using the available specialists. An archived snapshot is not acceptable. Return exactly digest=&lt;reported digest&gt;;receipt=&lt;reported receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>digest=SRC-P9A22;receipt=BENCH-READ-EE8AD3546F</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;workspace_agent&quot;,
+    &quot;args&quot;: {
+      &quot;path&quot;: &quot;pricing.py&quot;,
+      &quot;request_id&quot;: &quot;REQ-01337-0164&quot;
+    },
+    &quot;kind&quot;: &quot;agent_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;read_file&quot;
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">final_output_mismatch</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>digest=SRC-P9A22;receipt=BENCH-READ-EE8AD546F</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;tool_call&quot;,
+      &quot;agent&quot;: &quot;workspace_agent&quot;,
+      &quot;args&quot;: {
+        &quot;path&quot;: &quot;pricing.py&quot;,
+        &quot;request_id&quot;: &quot;REQ-01337-0164&quot;
+      },
+      &quot;tool&quot;: &quot;read_file&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;final&quot;,
+    &quot;payload&quot;: {
+      &quot;content&quot;: &quot;digest=SRC-P9A22;receipt=BENCH-READ-EE8AD546F&quot;,
+      &quot;type&quot;: &quot;final&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;workspace_agent&quot;,
+    &quot;args&quot;: {
+      &quot;path&quot;: &quot;pricing.py&quot;,
+      &quot;request_id&quot;: &quot;REQ-01337-0164&quot;
+    },
+    &quot;kind&quot;: &quot;agent_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;read_file&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>No runtime error</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0027#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>17.21s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0179, perform these actions in order. First call local multiply_numbers with a=27, b=14, request_id=REQ-01337-0179. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0179, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=378;local_receipt=BENCH-MUL-95D4969D61;verdict=amber;oracle_receipt=BENCH-ORACLE-6C27405667</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 27,
+      &quot;b&quot;: 14,
+      &quot;request_id&quot;: &quot;REQ-01337-0179&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-A1&quot;,
+      &quot;REQUEST_ID=REQ-01337-0179&quot;,
+      &quot;EVIDENCE=BENCH-MUL-95D4969D61&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 27,
+        &quot;b&quot;: 14,
+        &quot;request_id&quot;: &quot;REQ-01337-0179&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0179, EVIDENCE=&lt;BENCH-MUL-95D4969D61&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 27,
+      &quot;b&quot;: 14,
+      &quot;request_id&quot;: &quot;REQ-01337-0179&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            
+            <details class="failure-card">
+              <summary>
+                <code>multi-step-0030#r1</code>
+                <span>multi step</span>
+                <span class="status status--failed">Failed</span>
+                <span>1 attempt(s)</span>
+                <span>15.11s</span>
+              </summary>
+              <div class="failure-body">
+                <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                <div class="failure-overview">
+                  <div>
+                    <h3>Request</h3>
+                    <pre><code>For REQ-01337-0199, perform these actions in order. First call local multiply_numbers with a=6, b=24, request_id=REQ-01337-0199. Then delegate infer to oracle_agent with a prompt containing REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0199, and EVIDENCE=&lt;the exact multiply receipt&gt;. Return exactly product=&lt;product&gt;;local_receipt=&lt;multiply receipt&gt;;verdict=&lt;oracle verdict&gt;;oracle_receipt=&lt;oracle receipt&gt;.</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected final output</h3>
+                    <pre><code>product=144;local_receipt=BENCH-MUL-FC453782E9;verdict=amber;oracle_receipt=BENCH-ORACLE-93CFB3E8CB</code></pre>
+                  </div>
+                  <div>
+                    <h3>Expected actions</h3>
+                    <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 6,
+      &quot;b&quot;: 24,
+      &quot;request_id&quot;: &quot;REQ-01337-0199&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt_contains&quot;: [],
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  },
+  {
+    &quot;agent&quot;: &quot;oracle_agent&quot;,
+    &quot;args&quot;: null,
+    &quot;kind&quot;: &quot;agent_infer&quot;,
+    &quot;prompt_contains&quot;: [
+      &quot;REFERENCE=REF-A1&quot;,
+      &quot;REQUEST_ID=REQ-01337-0199&quot;,
+      &quot;EVIDENCE=BENCH-MUL-FC453782E9&quot;
+    ],
+    &quot;tool&quot;: null
+  }
+]</code></pre>
+                  </div>
+                </div>
+                
+                <article class="failure-attempt">
+                  <h3>Attempt 1
+                    <span>selected</span>
+                  </h3>
+                  <p class="failure-diagnostics">task_not_completed, missing_final_output, execution_ledger_mismatch, trace_action_mismatch, exception</p>
+                  <div class="failure-grid">
+                    <div>
+                      <h4>Actual final output</h4>
+                      <pre><code>(no final output)</code></pre>
+                    </div>
+                    <div>
+                      <h4>Model decisions</h4>
+                      <pre><code>[
+  {
+    &quot;action&quot;: &quot;tool_call&quot;,
+    &quot;payload&quot;: {
+      &quot;args&quot;: {
+        &quot;a&quot;: 6,
+        &quot;b&quot;: 24,
+        &quot;request_id&quot;: &quot;REQ-01337-0199&quot;
+      },
+      &quot;tool&quot;: &quot;multiply_numbers&quot;,
+      &quot;type&quot;: &quot;tool_call&quot;
+    },
+    &quot;step&quot;: 1,
+    &quot;type&quot;: &quot;action&quot;
+  },
+  {
+    &quot;action&quot;: &quot;agent_call&quot;,
+    &quot;payload&quot;: {
+      &quot;action&quot;: &quot;infer&quot;,
+      &quot;agent&quot;: &quot;oracle_agent&quot;,
+      &quot;prompt&quot;: &quot;REFERENCE=REF-A1, REQUEST_ID=REQ-01337-0199, EVIDENCE=&lt;BENCH-MUL-FC453782E9&gt;.&quot;,
+      &quot;type&quot;: &quot;agent_call&quot;
+    },
+    &quot;step&quot;: 2,
+    &quot;type&quot;: &quot;action&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Successful actions</h4>
+                      <pre><code>[
+  {
+    &quot;agent&quot;: &quot;benchmark_coordinator&quot;,
+    &quot;args&quot;: {
+      &quot;a&quot;: 6,
+      &quot;b&quot;: 24,
+      &quot;request_id&quot;: &quot;REQ-01337-0199&quot;
+    },
+    &quot;kind&quot;: &quot;local_tool&quot;,
+    &quot;prompt&quot;: null,
+    &quot;tool&quot;: &quot;multiply_numbers&quot;
+  }
+]</code></pre>
+                    </div>
+                    <div>
+                      <h4>Runtime result</h4>
+                      <pre><code>TransportRemoteError: Runtime request failed at runtime://infer-benchmark-26858be12c9a/coordinator: Agent call to &#x27;oracle_agent&#x27; failed: Delegated agent &#x27;oracle_agent&#x27; failed: Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE</code></pre>
+                    </div>
+                  </div>
+                </article>
+                
+              </div>
+            </details>
+            </div>
+        
   </section>
 
   <section>
     <details class="panel">
       <summary>Run configuration and identity</summary>
-      <dl><dt>Run</dt><dd><code>20260728T184629Z-ollama-gemma4-e4b</code></dd><dt>Created</dt><dd><code>2026-07-28T19:07:49.278136+00:00</code></dd><dt>ProtoLink</dt><dd><code>0.6.7</code></dd><dt>Provider</dt><dd><code>ollama</code></dd><dt>Model</dt><dd><code>gemma4:e4b</code></dd><dt>Action mode</dt><dd><code>json_prompt</code></dd><dt>Model parameters</dt><dd><code>{&quot;num_ctx&quot;: 8192, &quot;num_predict&quot;: 2048, &quot;seed&quot;: 1337, &quot;temperature&quot;: 0.0}</code></dd><dt>Suite</dt><dd><code>core</code></dd><dt>Selected cases</dt><dd><code>40</code></dd><dt>Repetitions</dt><dd><code>2</code></dd><dt>Fresh attempts</dt><dd><code>2</code></dd><dt>Seed</dt><dd><code>1337</code></dd><dt>Suite hash</dt><dd><code>1ff42bf7154120d61153b7440976ad987c5a9cd06ba7d817e9ac753f8e8e8fdc</code></dd><dt>Prompt hash</dt><dd><code>b80047206caf36f31e47a46c43a33cfff5c705fcd8494ea5ee4adb55638937f8</code></dd><dt>Benchmark prompt hash</dt><dd><code>8ff5126cdd4162f961f87b90ceac1b1510d8bd6c599e53ab66d7e2a300074e9c</code></dd><dt>Git commit</dt><dd><code>a9479318b3a6</code></dd><dt>Git dirty</dt><dd><code>True</code></dd></dl>
+      <dl><dt>Run</dt><dd><code>20260729T200129Z-ollama-gemma4-e4b</code></dd><dt>Created</dt><dd><code>2026-07-29T20:58:18.668150+00:00</code></dd><dt>ProtoLink</dt><dd><code>0.6.7</code></dd><dt>Provider</dt><dd><code>ollama</code></dd><dt>Model</dt><dd><code>gemma4:e4b</code></dd><dt>Action mode</dt><dd><code>json_prompt</code></dd><dt>Model parameters</dt><dd><code>{&quot;num_ctx&quot;: 8192, &quot;num_predict&quot;: 2048, &quot;seed&quot;: 1337, &quot;temperature&quot;: 0.0}</code></dd><dt>Suite</dt><dd><code>full</code></dd><dt>Selected cases</dt><dd><code>200</code></dd><dt>Repetitions</dt><dd><code>1</code></dd><dt>Fresh attempts</dt><dd><code>1</code></dd><dt>Seed</dt><dd><code>1337</code></dd><dt>Suite hash</dt><dd><code>0126ee1d417ade7cbddb7ba2471f601d086b3810153dbb60b742277c98277160</code></dd><dt>Prompt hash</dt><dd><code>79d1d46b476270fa0badf2fcbb3d30867e77c0b328a2ae9875a93f8320ec18a6</code></dd><dt>Benchmark prompt hash</dt><dd><code>8ff5126cdd4162f961f87b90ceac1b1510d8bd6c599e53ab66d7e2a300074e9c</code></dd><dt>Git commit</dt><dd><code>f23b226a3ad2</code></dd><dt>Git dirty</dt><dd><code>True</code></dd></dl>
     </details>
   </section>
 

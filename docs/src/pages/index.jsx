@@ -298,6 +298,63 @@ const moduleDefinitions = [
     ],
   },
   {
+    id: "rag",
+    label: "RAG",
+    detail: "grounded knowledge",
+    badge: "KB",
+    tone: "teal",
+    options: [
+      {
+        id: "memory",
+        label: "In-memory knowledge",
+        kind: "local",
+        imports: ["from protolink import create_knowledge"],
+        setup: [
+          "knowledge = create_knowledge(",
+          '    "memory",',
+          '    name="product_docs",',
+          '    description="product manuals and troubleshooting guides",',
+          '    sources=["docs/"],',
+          ")",
+        ],
+        agentArg: "knowledge=knowledge",
+      },
+      {
+        id: "sqlite",
+        label: "SQLite knowledge",
+        kind: "persistent",
+        imports: ["from protolink import create_knowledge"],
+        setup: [
+          "knowledge = create_knowledge(",
+          '    "sqlite",',
+          '    path="knowledge.db",',
+          '    namespace="production",',
+          '    name="product_docs",',
+          '    sources=["docs/"],',
+          ")",
+        ],
+        agentArg: "knowledge=knowledge",
+      },
+      {
+        id: "custom",
+        label: "Existing retriever",
+        kind: "adapter",
+        imports: ["from protolink import Knowledge"],
+        setup: [
+          "async def search_company_docs(query: str, *, k: int = 5, where=None):",
+          "    return await company_search(query, limit=k, filters=where)",
+          "",
+          "knowledge = Knowledge.from_callable(",
+          "    search_company_docs,",
+          '    name="company_docs",',
+          '    description="private company documentation",',
+          ")",
+        ],
+        agentArg: "knowledge=knowledge",
+      },
+    ],
+  },
+  {
     id: "telemetry",
     label: "Telemetry",
     detail: "observability",
@@ -1197,7 +1254,8 @@ export default function Home() {
               <p className={styles.lede}>
                 ProtoLink helps you build distributed, LLM-powered agent systems
                 where every agent is an entity with identity, tools, optional
-                memory, transport, discovery, and a clean task contract.
+                grounded knowledge, transport, discovery, and a clean task
+                contract.
               </p>
               <p className={styles.positioning}>
                 Focus on your agent logic, let Protolink handle communication,
@@ -1310,7 +1368,7 @@ export default function Home() {
             </h2>
             <p>
               The docs cover the full surface: agents, clients, LLMs, tools,
-              transports, registry discovery, state, storage, telemetry,
+              RAG, transports, registry discovery, state, storage, telemetry,
               structured flows, examples, and the runtime controls that make
               production behavior inspectable.
             </p>

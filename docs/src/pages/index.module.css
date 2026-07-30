@@ -622,6 +622,11 @@
   --module-hue: 187 96% 58%;
 }
 
+.moduleEntry[data-tone='teal'],
+.optionInspector[data-tone='teal'] {
+  --module-hue: 168 76% 48%;
+}
+
 .moduleEntry[data-tone='gray'],
 .optionInspector[data-tone='gray'] {
   --module-hue: 215 18% 62%;
