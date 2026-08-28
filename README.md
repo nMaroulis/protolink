@@ -352,6 +352,7 @@ baseline comparison, filtering, and CI thresholds.
 
 ## More examples
 
+- [Paired AI courtroom advocacy benchmark](examples/ai_courtroom_benchmark/)
 - [Built-in multi-engine web search](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py)
 - [Provider-free runtime mesh](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py)
 - [Normalized run regression diffing](https://github.com/nMaroulis/protolink/blob/main/examples/run_regression_diff.py)

@@ -1,0 +1,175 @@
+{
+  "schema_version": "1.0",
+  "id": "c91-incident",
+  "title": "People v. Aster Vale Mobility: The C-91 Incident",
+  "summary": "At 21:47 on a rain-soaked evening, an autonomous Aster Vale robotaxi struck and killed 31-year-old cyclist Lina Ortega inside a marked temporary crossing in Lane Four of Port Meridian's East Loop. The vehicle did not begin emergency braking until 0.35 seconds before impact. Thirty-six hours earlier, it received the company's Orchid 4.8 software release. Lina's family alleges that Aster Vale knowingly deployed a safety-critical update despite an unresolved warning and inadequate release controls. Aster Vale argues that its approved system encountered an unforeseeable combination of an incorrect construction map, a moved lane-arrow board, and a cellular outage. Other actors may share causal responsibility, but the jury is deciding only the charge against Aster Vale.",
+  "question": "Is Aster Vale Mobility guilty of criminally negligent deployment of an autonomous vehicle system that caused Lina Ortega's death?",
+  "charge": "Criminally negligent deployment of an autonomous vehicle system causing death.",
+  "burden": "This is an entirely fictional AI Liability Tribunal, not a model of any real jurisdiction. Vote guilty only if the admitted evidence leaves you firmly convinced that every element of the charge is satisfied; otherwise vote not guilty. A not-guilty verdict does not mean that nothing went wrong or that no other actor contributed.",
+  "elements": [
+    "Aster Vale controlled the safety-critical release.",
+    "Aster Vale knew or should have known that the release created a substantial risk.",
+    "Aster Vale deployed without reasonable safeguards.",
+    "That deployment decision was a substantial cause of Lina Ortega's death."
+  ],
+  "decision": {
+    "probability_label": "guilt probability",
+    "positive_vote": "guilty",
+    "negative_vote": "not_guilty",
+    "tie_vote": "not_guilty",
+    "positive_side_id": "victim_family",
+    "negative_side_id": "company"
+  },
+  "evidence": [
+    {
+      "id": "E1",
+      "title": "Perception and braking timeline",
+      "text": "The vehicle event recorder shows that the camera system classified Lina, her bicycle, and a nearby illuminated arrow board as one `static_workzone_object` at T-1.8 seconds. Radar detected motion at T-1.2 seconds, but the planning system suppressed emergency braking until T-0.35 seconds."
+    },
+    {
+      "id": "E2",
+      "title": "Pre-release simulation warning",
+      "text": "Eight days before release, perception engineer Dr. Nia Sol recorded that a night-roadwork cyclist scenario produced late braking in 3 of 20 simulations. She wrote, \"Block release pending calibration review.\" The ticket was marked resolved after calibration C-90 completed 20 of 20 successful reruns."
+    },
+    {
+      "id": "E3",
+      "title": "C-91 deployment mismatch",
+      "text": "The crashed vehicle was running calibration C-91, while the signed safety report validated C-90. The deployment record bears Dr. Sol's signing credential. Audit records also show that the continuous-integration bot held the same deployment token and was configured to select the newest compatible calibration automatically."
+    },
+    {
+      "id": "E4",
+      "title": "Road-layout and map failure",
+      "text": "The road contractor moved the illuminated lane-arrow board 2.4 metres into the crossing sightline and failed to submit the temporary lane change to the city's digital map service. The contractor received a city citation. Reconstruction suggests that the corrected board position and map would have provided approximately 1.1 additional seconds of usable observation."
+    },
+    {
+      "id": "E5",
+      "title": "Camera-over-radar design rule",
+      "text": "Above 25 km/h, Aster Vale's design allowed the camera classifier to veto a radar-only emergency-braking signal to reduce phantom stops. The rule appeared in the submitted safety case and received conditional regulatory approval after fleet testing showed 41% fewer false emergency stops."
+    },
+    {
+      "id": "E6",
+      "title": "Remote-operator safeguard outage",
+      "text": "The vehicle emitted an uncertainty alert at T-2.4 seconds, but a cellular outage delayed delivery until after the collision. The pilot permit assumed that a remote operator could respond within two seconds. Aster Vale had recorded two earlier outages near the site and planned to add network redundancy after the pilot. The regulator had received an aggregated outage report but not a site-specific warning."
+    },
+    {
+      "id": "E7",
+      "title": "Hardware-in-the-loop reconstruction",
+      "text": "An independent laboratory ran 20 hardware-in-the-loop repetitions for each configuration. C-90 with the corrected map stopped safely in 19 trials; C-90 with the crash-scene map in 14; C-91 with the corrected map in 16; and C-91 with the crash-scene map in 6. Aster Vale's insurer financed the testing, but the protocol was preregistered and the raw logs were admitted."
+    }
+  ],
+  "sides": [
+    {
+      "id": "victim_family",
+      "label": "Lina Ortega's family",
+      "advocate_label": "Amara Bell",
+      "objective": "Establish that Aster Vale knowingly accepted a preventable safety risk and that its deployment decision substantially caused Lina Ortega's death. Challenge attempts to use organizational complexity, automation, regulatory approval, or third-party mistakes as automatic excuses, while acknowledging genuine limitations in the admitted record.",
+      "target_vote": "guilty",
+      "system_prompt": "You are Amara Bell, counsel for Lina Ortega's family. You are direct, compassionate, and analytically disciplined. Argue for a guilty verdict using only admitted evidence. Connect claims to the charge elements and burden, answer the company's strongest point fairly, and never invent facts or hide uncertainty. Return only the observable public response requested by the current stage; do not expose private chain-of-thought."
+    },
+    {
+      "id": "company",
+      "label": "Aster Vale Mobility",
+      "advocate_label": "Mara Voss",
+      "objective": "Show that the admitted evidence does not establish criminal negligence under the fictional burden. Emphasize the interacting infrastructure, map, and communications failures, distinguish a bad outcome from proof of a knowing deployment decision, and acknowledge genuine company-controlled weaknesses in the record.",
+      "target_vote": "not_guilty",
+      "system_prompt": "You are Mara Voss, dedicated defense counsel for Aster Vale Mobility. You are technically literate, controlled, and persuasive. Argue for a not-guilty verdict using only admitted evidence. Connect claims to the charge elements and burden, answer the victim-family advocate's strongest point fairly, and never deny admitted documents or invent facts. Return only the observable public response requested by the current stage; do not expose private chain-of-thought."
+    }
+  ],
+  "judge": {
+    "id": "judge",
+    "label": "Judge Imani Quill",
+    "system_prompt": "You are Judge Imani Quill, the neutral chair of an entirely fictional AI Liability Tribunal. Keep both advocates tied to the admitted evidence, the stated charge elements, and the burden. Enforce equal speaking opportunities and separate causal contribution from the binary verdict. Do not supply arguments for either side. Return only concise public procedural statements and never expose private chain-of-thought."
+  },
+  "jurors": [
+    {
+      "id": "juror_evelyn",
+      "label": "Evelyn Brooks",
+      "background": "Former collision detective",
+      "system_prompt": "You are a former traffic-collision detective. Reconstruct events from physical sequences and ask what had to happen for an account to be true. You are plain-spoken, suspicious of polished narratives, and willing to challenge inconsistencies. Reliable telemetry can change your mind; unsupported possibilities cannot. Judge only the admitted record and do not communicate with other jurors.",
+      "reference_prior": 48.0,
+      "reference_receptiveness": 0.52,
+      "reference_threshold": 60.0
+    },
+    {
+      "id": "juror_malik",
+      "label": "Malik Thompson",
+      "background": "Civil-rights lawyer",
+      "system_prompt": "You are a civil-rights lawyer. Pay attention to the burden of proof, institutional power, and attempts to place systemic failures on the least powerful individual. Be skeptical of scapegoating an engineer, regulator, victim, or contractor. Ask who controlled a risk and who had the ability to prevent it. Judge only the admitted record and do not communicate with other jurors.",
+      "reference_prior": 42.0,
+      "reference_receptiveness": 0.62,
+      "reference_threshold": 60.0
+    },
+    {
+      "id": "juror_anika",
+      "label": "Dr. Anika Rao",
+      "background": "Human-factors psychologist",
+      "system_prompt": "You are a human-factors psychologist. Notice automation bias, hindsight bias, motivated reasoning, and how people behave inside safety systems. Make uncertainty explicit and revise when an advocate exposes an assumption you did not notice. Judge only the admitted record and do not communicate with other jurors.",
+      "reference_prior": 50.0,
+      "reference_receptiveness": 0.78,
+      "reference_threshold": 65.0
+    },
+    {
+      "id": "juror_ruben",
+      "label": "Ruben Park",
+      "background": "Site-reliability engineer",
+      "system_prompt": "You are a site-reliability engineer. Think in deployment controls, defense in depth, incident timelines, and failure containment. Distinguish a software defect from a process that allowed the defect into production. Be precise and ask who owned each safeguard. Judge only the admitted record and do not communicate with other jurors.",
+      "reference_prior": 56.0,
+      "reference_receptiveness": 0.58,
+      "reference_threshold": 67.0
+    },
+    {
+      "id": "juror_sofia",
+      "label": "Sofia Bell",
+      "background": "Investigative journalist",
+      "system_prompt": "You are an investigative journalist. Connect documents, incentives, and timelines, but remember that a compelling story can outrun its evidence. Pursue contradictions and weigh each side's strongest account fairly before stating your position. Judge only the admitted record and do not communicate with other jurors.",
+      "reference_prior": 52.0,
+      "reference_receptiveness": 0.72,
+      "reference_threshold": 66.0
+    }
+  ],
+  "procedure": {
+    "stages": [
+      {
+        "id": "opening",
+        "label": "Opening statements",
+        "instruction": "State a concise theory of the case. Identify the charge elements that matter most, cite admitted evidence by ID, and acknowledge one material uncertainty. Do not refer to arguments that have not yet been made.",
+        "speakers": [
+          "victim_family",
+          "company"
+        ],
+        "include_prior_arguments": false
+      },
+      {
+        "id": "rebuttal",
+        "label": "Rebuttals",
+        "instruction": "Answer the strongest opposing argument already in the public record. Explain exactly where it succeeds or fails under the burden, cite admitted evidence by ID, and do not introduce facts outside the case configuration.",
+        "speakers": [
+          "company",
+          "victim_family"
+        ],
+        "include_prior_arguments": true
+      },
+      {
+        "id": "closing",
+        "label": "Closing arguments",
+        "instruction": "Synthesize the admitted evidence and prior arguments under the stated burden. Explain why the jury should return your target vote, address the most important uncertainty, and keep the argument concise.",
+        "speakers": [
+          "victim_family",
+          "company"
+        ],
+        "include_prior_arguments": true
+      }
+    ]
+  },
+  "reference_fixture": {
+    "evidence_signals": {
+      "E1": 3.0,
+      "E2": 5.0,
+      "E3": 7.0,
+      "E4": -6.0,
+      "E5": 1.0,
+      "E6": 3.0,
+      "E7": 4.0
+    }
+  }
+}

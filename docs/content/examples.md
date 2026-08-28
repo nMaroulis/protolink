@@ -148,6 +148,13 @@ ProtoLink messages, how one communication topology produces a different
 deterministic verdict, and how every run automatically generates standalone
 interactive HTML reports for replay and comparison.
 
+For a model-versus-model experiment, see the
+[`ai_courtroom_benchmark`](https://github.com/nMaroulis/protolink/tree/main/examples/ai_courtroom_benchmark)
+example. It runs two advocates on opposite sides of a portable JSON case,
+swaps their roles, keeps the judge and independent jury fixed, and generates a
+standalone replay report with opinion trajectories, citations, vote flips, and
+fairness checks.
+
 ### 🛠️ [`devtools_dashboard.py`](https://github.com/nMaroulis/protolink/blob/main/examples/devtools_dashboard.py)
 **Purpose**: Local devtools, run replay, registry snapshot, and dashboard
 
