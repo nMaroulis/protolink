@@ -27,9 +27,15 @@ STUDIO_CSS = r"""
   --studio-module: #3b718f;
   --studio-module-soft: #e2f1f7;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
 }
+.studio-topbar { grid-row: 1; }
+.studio-workspace { grid-row: 2; }
+.studio-root.has-notice { grid-template-rows: auto auto minmax(0, 1fr); }
+.studio-root.has-notice .studio-notice { grid-row: 2; }
+.studio-root.has-notice .studio-workspace { grid-row: 3; }
 .studio-topbar {
   display: flex;
   justify-content: space-between;
@@ -69,6 +75,7 @@ STUDIO_CSS = r"""
 .studio-command-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .studio-command-row .btn { min-height: 32px; padding: 6px 9px; box-shadow: none; }
 .studio-command-row .btn.is-danger { color: var(--coral); border-color: rgba(214,91,72,.28); }
+.studio-command-row .btn.is-danger:not(:disabled) { background: #fff8f6; }
 .studio-runtime-pill {
   display: inline-flex;
   align-items: center;
@@ -377,26 +384,36 @@ STUDIO_CSS = r"""
 .studio-check-field span { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
 .studio-inspector-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .studio-inspector-actions .mini-btn.is-danger { color: var(--coral); border-color: rgba(214,91,72,.28); }
-.studio-output {
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: #fff;
-  box-shadow: var(--shadow-soft);
+.studio-output-dialog {
+  width: min(760px, calc(100vw - 32px));
+  height: calc(100dvh - 32px);
+  max-width: none;
+  max-height: none;
+  margin: 16px 16px 16px auto;
+  padding: 0;
+  border: 1px solid rgba(112,128,150,.34);
+  border-radius: 16px;
+  color: var(--ink);
+  background: #111827;
+  box-shadow: 0 30px 90px rgba(15,23,42,.34);
   overflow: hidden;
 }
+.studio-output-dialog[open] { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); }
+.studio-output-dialog::backdrop { background: rgba(15,23,42,.42); backdrop-filter: blur(3px); }
 .studio-output-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(90deg, #fff, #f8fbff);
 }
 .studio-output-title h2 { margin: 0; font-size: 14px; }
 .studio-output-title p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
 .studio-output-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
-.studio-output-tabs { display: flex; gap: 5px; padding: 9px 12px 0; background: #f8fafc; }
+.studio-output-close { width: 30px; padding: 0; font-size: 18px; line-height: 1; }
+.studio-output-tabs { display: flex; gap: 5px; padding: 10px 14px 0; background: #f8fafc; overflow-x: auto; }
 .studio-output-tab {
   border: 1px solid #d9e1ec;
   border-bottom: 0;
@@ -408,13 +425,14 @@ STUDIO_CSS = r"""
   font-size: 11px;
 }
 .studio-output-tab[aria-selected="true"] { color: #e5edf7; background: #111827; border-color: #263247; }
-.studio-output-meta { min-height: 30px; padding: 7px 12px; color: #9eabc0; background: #111827; font-size: 10px; border-bottom: 1px solid #263247; }
+.studio-output-meta { min-height: 32px; padding: 8px 14px; color: #9eabc0; background: #111827; font-size: 10px; border-bottom: 1px solid #263247; }
 .studio-output-code {
   margin: 0;
-  min-height: 180px;
-  max-height: 440px;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
-  padding: 14px;
+  padding: 16px;
   white-space: pre;
   tab-size: 4;
   color: #dbe7f5;
@@ -424,6 +442,15 @@ STUDIO_CSS = r"""
 .studio-output-code:focus-visible { outline: 3px solid rgba(15,159,146,.35); outline-offset: -3px; }
 .studio-hidden-input { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .studio-static-note { color: var(--amber); }
+@media (min-width: 1121px) {
+  .main.studio-main { height: var(--studio-main-height, 100dvh); overflow: hidden; }
+  .main.studio-main #view-studio.active,
+  .main.studio-main .studio-root { height: 100%; min-height: 0; }
+  .main.studio-main .studio-workspace { height: 100%; min-height: 0; }
+  .main.studio-main .studio-palette,
+  .main.studio-main .studio-inspector { max-height: none; }
+  .main.studio-main .studio-canvas-viewport { min-height: 0; }
+}
 @media (max-width: 1380px) {
   .studio-workspace { grid-template-columns: 212px minmax(430px, 1fr) 300px; }
 }
@@ -445,6 +472,7 @@ STUDIO_CSS = r"""
   .studio-canvas-viewport { min-height: 520px; max-height: 66vh; }
   .studio-output-head { flex-direction: column; }
   .studio-output-actions { justify-content: flex-start; }
+  .studio-output-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); margin: 8px; border-radius: 13px; }
 }
 @media (max-width: 480px) {
   .studio-palette-list { grid-template-columns: 1fr; }
@@ -452,6 +480,12 @@ STUDIO_CSS = r"""
   .studio-command-row .btn { width: 100%; }
   .studio-canvas-toolbar { align-items: flex-start; flex-direction: column; }
   .studio-canvas-actions { justify-content: flex-start; }
+}
+@media (min-width: 1121px) and (max-height: 760px) {
+  .studio-topbar { padding: 12px 14px; }
+  .studio-heading .lede { display: none; }
+  .studio-workspace { gap: 9px; }
+  .studio-panel-head { padding-block: 10px; }
 }
 """
 
@@ -470,12 +504,15 @@ STUDIO_HTML = r"""
           <span class="studio-runtime-pill" id="studio-runtime-pill" data-state="idle"><span class="status-dot runtime"></span><span id="studio-runtime-label">Editor ready</span></span>
           <button type="button" class="btn" id="studio-undo" onclick="studioUndo()">Undo</button>
           <button type="button" class="btn" id="studio-redo" onclick="studioRedo()">Redo</button>
-          <button type="button" class="btn" id="studio-reset" data-icon="reset" onclick="studioResetProject()">Reset</button>
+          <button type="button" class="btn" id="studio-reset" data-icon="reset" onclick="studioResetProject()">Restore starter</button>
+          <button type="button" class="btn is-danger" id="studio-clear" onclick="studioClearProject()">Clear canvas</button>
         </div>
         <div class="studio-command-row">
           <button type="button" class="btn" id="studio-import-json" data-icon="upload" onclick="studioOpenImport()">Import JSON</button>
           <button type="button" class="btn" id="studio-export-json" data-icon="download" onclick="studioExportJson()">Export JSON</button>
           <button type="button" class="btn" id="studio-generate" data-icon="details" onclick="studioGenerateCode()">Generate Python</button>
+          <button type="button" class="btn" id="studio-open-code" aria-haspopup="dialog" aria-controls="studio-output-dialog" aria-expanded="false" onclick="studioOpenOutput('python')">Code</button>
+          <button type="button" class="btn" id="studio-open-logs" aria-haspopup="dialog" aria-controls="studio-output-dialog" aria-expanded="false" onclick="studioOpenOutput('logs')">Logs</button>
           <button type="button" class="btn primary" id="studio-run" data-icon="play" onclick="studioRunProject()">Run</button>
           <button type="button" class="btn is-danger" id="studio-stop" onclick="studioStopProject()">Stop</button>
         </div>
@@ -534,12 +571,13 @@ STUDIO_HTML = r"""
       </aside>
     </div>
 
-    <section class="studio-output" aria-labelledby="studio-output-title">
+    <dialog class="studio-output-dialog" id="studio-output-dialog" aria-labelledby="studio-output-title" aria-describedby="studio-output-description" oncancel="studioHandleOutputCancel(event)" onclose="studioHandleOutputClosed()" onmousedown="studioHandleOutputBackdrop(event)">
       <div class="studio-output-head">
         <div class="studio-output-title"><h2 id="studio-output-title">Output</h2><p id="studio-output-description">Inspect the portable blueprint, generated Python, or runtime logs.</p></div>
         <div class="studio-output-actions">
           <button type="button" class="mini-btn" id="studio-copy-python" onclick="studioCopyPython()">Copy Python</button>
           <button type="button" class="mini-btn primary" id="studio-download-python" data-icon="download" onclick="studioDownloadPython()">Download Python</button>
+          <button type="button" class="mini-btn studio-output-close" id="studio-close-output" aria-label="Close output panel" onclick="studioCloseOutput()">&times;</button>
         </div>
       </div>
       <div class="studio-output-tabs" role="tablist" aria-label="Studio output" onkeydown="studioOutputTabKeydown(event)">
@@ -547,9 +585,9 @@ STUDIO_HTML = r"""
         <button type="button" class="studio-output-tab" id="studio-output-tab-blueprint" role="tab" aria-controls="studio-output-code" aria-selected="false" tabindex="-1" onclick="studioSetOutputTab('blueprint')">Blueprint JSON</button>
         <button type="button" class="studio-output-tab" id="studio-output-tab-logs" role="tab" aria-controls="studio-output-code" aria-selected="false" tabindex="-1" onclick="studioSetOutputTab('logs')">Runtime logs</button>
       </div>
-      <div class="studio-output-meta" id="studio-output-meta">Python generation requires the served dashboard.</div>
-      <pre class="studio-output-code" id="studio-output-code" tabindex="0" role="tabpanel" aria-live="polite"></pre>
-    </section>
+      <div class="studio-output-meta" id="studio-output-meta" role="status" aria-live="polite">Python generation requires the served dashboard.</div>
+      <pre class="studio-output-code" id="studio-output-code" tabindex="0" role="tabpanel"></pre>
+    </dialog>
   </div>
 </section>
 """
@@ -862,6 +900,8 @@ let studioStatusTimer = null;
 let studioStatusPending = false;
 let studioGeneration = 0;
 let studioFieldSequence = 0;
+let studioOutputReturnFocus = null;
+let studioRestoreOutputFocus = true;
 let studioState = {
   blueprint: studioNormalizeBlueprint(studioPersistedBlueprint || studioSnapshotBlueprint),
   resetBlueprint: studioClone(studioSnapshotBlueprint),
@@ -885,11 +925,6 @@ let studioState = {
 function syncStudioSnapshot(source) {
   if (!source || typeof source !== 'object') return;
   studioCatalog = studioMergeCatalog(source.catalog || studioCatalog);
-  if (!studioState.blueprint.nodes.length && source.blueprint?.nodes?.length) {
-    studioState.blueprint = studioNormalizeBlueprint(source.blueprint);
-    studioState.resetBlueprint = studioClone(studioState.blueprint);
-    studioSchedulePersistence();
-  }
 }
 
 function studioNodeById(nodeId) {
@@ -974,6 +1009,7 @@ function studioRenderNotice() {
   if (!target || !text) return;
   const notice = studioState.notice;
   target.classList.toggle('is-visible', Boolean(notice?.message));
+  document.querySelector('.studio-root')?.classList.toggle('has-notice', Boolean(notice?.message));
   target.dataset.tone = notice?.tone || 'info';
   text.textContent = notice?.message || '';
 }
@@ -1886,6 +1922,53 @@ function studioShowProjectSettings() {
   document.getElementById('studio-tab-project')?.focus();
 }
 
+function studioOpenOutput(tab = studioState.outputTab) {
+  const dialog = document.getElementById('studio-output-dialog');
+  if (!dialog) return;
+  studioSetOutputTab(tab);
+  if (!dialog.open) {
+    studioOutputReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    studioRestoreOutputFocus = true;
+    dialog.showModal();
+  }
+  for (const id of ['studio-open-code', 'studio-open-logs']) {
+    document.getElementById(id)?.setAttribute('aria-expanded', 'true');
+  }
+  window.requestAnimationFrame(() => {
+    document.getElementById(`studio-output-tab-${studioState.outputTab}`)?.focus();
+  });
+}
+
+function studioCloseOutput({restoreFocus = true} = {}) {
+  const dialog = document.getElementById('studio-output-dialog');
+  studioRestoreOutputFocus = restoreFocus;
+  if (dialog?.open) dialog.close();
+  else studioHandleOutputClosed();
+}
+
+function studioHandleOutputClosed() {
+  for (const id of ['studio-open-code', 'studio-open-logs']) {
+    document.getElementById(id)?.setAttribute('aria-expanded', 'false');
+  }
+  const returnFocus = studioOutputReturnFocus;
+  studioOutputReturnFocus = null;
+  if (studioRestoreOutputFocus && returnFocus?.isConnected) returnFocus.focus({preventScroll: true});
+  studioRestoreOutputFocus = true;
+}
+
+function studioHandleOutputCancel(event) {
+  event.preventDefault();
+  studioCloseOutput();
+}
+
+function studioHandleOutputBackdrop(event) {
+  if (event.target !== event.currentTarget) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  const inside = event.clientX >= rect.left && event.clientX <= rect.right
+    && event.clientY >= rect.top && event.clientY <= rect.bottom;
+  if (!inside) studioCloseOutput();
+}
+
 function studioInspectorTabKeydown(event) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
   event.preventDefault();
@@ -1977,6 +2060,7 @@ function studioRenderControls() {
   };
   setDisabled('studio-undo', !studioState.history.length || busy);
   setDisabled('studio-redo', !studioState.future.length || busy);
+  setDisabled('studio-clear', busy || Boolean(studioState.runtime.running), studioState.runtime.running ? 'Stop the active project before clearing the canvas' : 'Clear every node and connection');
   setDisabled('studio-generate', !live || busy, live ? 'Validate and generate Python' : 'Available in the served dashboard');
   setDisabled('studio-run', !live || busy || Boolean(studioState.runtime.running), live ? 'Generate and run this project locally' : 'Available in the served dashboard');
   setDisabled('studio-stop', !live || busy || !studioState.runtime.running, live ? 'Stop the active Studio process' : 'Available in the served dashboard');
@@ -2023,6 +2107,7 @@ async function studioGenerateCode(options = {}) {
     studioState.codeWarnings = Array.isArray(payload.warnings) ? payload.warnings.map(item => studioString(item, '', 1000)) : [];
     studioState.codeStale = false;
     studioState.outputTab = 'python';
+    if (!options.quiet && options.openOutput !== false) studioOpenOutput('python');
     studioSetNotice(
       studioState.codeWarnings.length ? `Python generated with ${studioState.codeWarnings.length} warning(s).` : 'Python generated successfully.',
       studioState.codeWarnings.length ? 'warning' : 'success',
@@ -2170,6 +2255,37 @@ function studioResetProject() {
   studioSetNotice('Studio reset to the starter blueprint.', 'success');
 }
 
+function studioClearProject() {
+  if (studioState.busy) return;
+  if (studioState.runtime.running) {
+    studioSetNotice('Stop the active Studio project before clearing the canvas.', 'warning');
+    return;
+  }
+  if (!window.confirm('Clear every node and connection from Studio? You can restore them with Undo.')) return;
+  const before = studioDesignSnapshot();
+  studioState.blueprint = studioNormalizeBlueprint({
+    version: 1,
+    project: {name: 'untitled_studio', description: 'A new Protolink Studio project.'},
+    nodes: [],
+    edges: [],
+  });
+  studioState.selectedNodeId = null;
+  studioState.selectedEdgeId = null;
+  studioState.connectionSourceId = null;
+  studioState.code = null;
+  studioState.codeFilename = null;
+  studioState.codeWarnings = [];
+  studioState.codeStale = true;
+  studioState.outputTab = 'blueprint';
+  studioGeneration += 1;
+  window.clearTimeout(studioPersistenceTimer);
+  studioRecordHistory(before);
+  studioPersistBlueprint();
+  studioCloseOutput({restoreFocus: false});
+  studioRender();
+  studioSetNotice('Canvas cleared. Undo is available.', 'success');
+}
+
 function studioApplyRuntime(payload) {
   if (!payload || typeof payload !== 'object') return;
   studioState.runtime = {
@@ -2216,7 +2332,7 @@ async function studioRunProject() {
     const payload = await studioRequest('/api/studio/run', 'POST', {blueprint: studioState.blueprint});
     studioApplyRuntime(payload);
     studioState.outputTab = 'logs';
-    studioRenderOutput();
+    studioOpenOutput('logs');
     studioSetNotice('Studio project started.', 'success');
   } catch (error) {
     studioSetNotice(error.message || 'Could not start the Studio project.', 'error', 0);
@@ -2235,7 +2351,7 @@ async function studioStopProject() {
     const payload = await studioRequest('/api/studio/stop', 'POST', {run_id: studioState.runtime.run_id});
     studioApplyRuntime(payload);
     studioState.outputTab = 'logs';
-    studioRenderOutput();
+    studioOpenOutput('logs');
     studioSetNotice('Studio project stopped.', 'success');
   } catch (error) {
     studioSetNotice(error.message || 'Could not stop the Studio project.', 'error', 0);
@@ -2246,6 +2362,16 @@ async function studioStopProject() {
 }
 
 let studioMounted = false;
+
+function studioFitWorkspace() {
+  const main = document.querySelector('.main');
+  if (!main || !document.getElementById('view-studio')?.classList.contains('active')) {
+    main?.style.removeProperty('--studio-main-height');
+    return;
+  }
+  const top = Math.max(0, main.getBoundingClientRect().top);
+  main.style.setProperty('--studio-main-height', `${Math.max(520, window.innerHeight - top)}px`);
+}
 
 function studioRender() {
   studioRenderPalette();
@@ -2260,6 +2386,7 @@ function renderStudio() {
   if (!studioMounted) {
     studioMounted = true;
     studioRender();
+    window.requestAnimationFrame(studioFitWorkspace);
     return;
   }
   studioRenderPalette();
@@ -2267,6 +2394,7 @@ function renderStudio() {
   studioRenderOutput();
   studioRenderControls();
   studioRenderNotice();
+  window.requestAnimationFrame(studioFitWorkspace);
 }
 
 function studioInstallEvents() {
@@ -2289,6 +2417,11 @@ function studioInstallEvents() {
   document.addEventListener('keydown', event => {
     if (!document.getElementById('view-studio')?.classList.contains('active')) return;
     const editing = event.target?.matches?.('input, textarea, select, [contenteditable="true"]');
+    if (event.key === 'Escape' && document.getElementById('studio-output-dialog')?.open) {
+      event.preventDefault();
+      studioCloseOutput();
+      return;
+    }
     if (event.key === 'Escape' && studioState.connectionSourceId) {
       event.preventDefault();
       studioCancelConnection();
@@ -2307,6 +2440,7 @@ function studioInstallEvents() {
       studioDeleteSelection();
     }
   });
+  window.addEventListener('resize', studioFitWorkspace);
 }
 
 studioInstallEvents();

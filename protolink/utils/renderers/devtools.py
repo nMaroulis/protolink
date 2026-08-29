@@ -828,6 +828,12 @@ function newChatSessionId() {
 
 function showView(name) {
   if (name !== 'telemetry') stopTelemetryPlayback();
+  const main = document.querySelector('.main');
+  main?.classList.toggle('studio-main', name === 'studio');
+  if (name !== 'studio' && typeof studioCloseOutput === 'function') {
+    studioCloseOutput({restoreFocus: false});
+    main?.style.removeProperty('--studio-main-height');
+  }
   for (const el of document.querySelectorAll('.view')) el.classList.remove('active');
   for (const el of document.querySelectorAll('.nav button')) el.classList.remove('active');
   document.getElementById('view-' + name).classList.add('active');

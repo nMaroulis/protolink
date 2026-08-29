@@ -281,8 +281,20 @@ def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     assert "studio-canvas" in dashboard_html
     assert "studio-node-layer" in dashboard_html
     assert "Generate Python" in dashboard_html
+    assert "Restore starter" in dashboard_html
+    assert "Clear canvas" in dashboard_html
     assert "Import JSON" in dashboard_html
     assert "Export JSON" in dashboard_html
+    assert '<dialog class="studio-output-dialog"' in dashboard_html
+    assert 'id="studio-open-code"' in dashboard_html
+    assert 'id="studio-open-logs"' in dashboard_html
+    assert 'aria-controls="studio-output-dialog"' in dashboard_html
+    assert 'id="studio-close-output"' in dashboard_html
+    assert 'aria-label="Close output panel"' in dashboard_html
+    assert 'class="studio-output"' not in dashboard_html
+    assert "studioOpenOutput" in dashboard_html
+    assert "studioCloseOutput" in dashboard_html
+    assert "studioClearProject" in dashboard_html
     assert "studioGenerateCode" in dashboard_html
     assert "studioRunProject" in dashboard_html
     assert "/api/studio/generate" in dashboard_html
