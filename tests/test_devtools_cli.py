@@ -238,7 +238,7 @@ def test_compact_run_index_does_not_decode_full_payloads(tmp_path: Path):
         build_run_replay_view(store_path, "run_cli", read_only=True, kind="report")
 
 
-def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path):
+def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     store_path = tmp_path / "runs.db"
     _seed_run_store(store_path)
     dashboard_path = tmp_path / "dashboard.html"
@@ -276,8 +276,17 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
     assert "Skills and schemas" in dashboard_html
     assert "Studio Preview" not in dashboard_html
     assert "Protolink Studio" in dashboard_html
-    assert "Protolink Studio is coming soon" in dashboard_html
+    assert "Protolink Studio is coming soon" not in dashboard_html
+    assert "Visual runtime builder" in dashboard_html
     assert "studio-canvas" in dashboard_html
+    assert "studio-node-layer" in dashboard_html
+    assert "Generate Python" in dashboard_html
+    assert "Import JSON" in dashboard_html
+    assert "Export JSON" in dashboard_html
+    assert "studioGenerateCode" in dashboard_html
+    assert "studioRunProject" in dashboard_html
+    assert "/api/studio/generate" in dashboard_html
+    assert "/api/studio/run" in dashboard_html
     assert 'id="nav-telemetry"' in dashboard_html
     assert 'id="view-telemetry"' in dashboard_html
     assert "Open JSONL" in dashboard_html

@@ -34,6 +34,14 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [Unreleased]
+
+### Added
+
+- Promoted the dashboard's Studio tab from a preview to an active visual builder for Agent, LLM, Tool, Registry, Flow, and operational Module nodes. The canvas supports compatible declarative connections, node/project editing, undo/redo, browser-local draft persistence, and JSON import/export; served dashboards additionally generate Python that can be viewed, copied, and downloaded.
+- Added `/studio` and the `/api/studio/catalog`, `/api/studio/generate`, `/api/studio/status`, `/api/studio/run`, and `/api/studio/stop` routes. Studio validates bounded JSON, rejects embedded secrets in favor of environment-variable references, and runs at most one generated project in a loopback-controlled subprocess that is stopped and cleaned up with the dashboard.
+- Added public Studio blueprint, validation, catalog, code-generation, and runtime helpers, and updated the provider-free dashboard example to embed the standard runnable starter blueprint.
+
 ## [0.6.8] - 2026-07-30
 
 :::note Latest release

@@ -6,12 +6,12 @@ Protolink includes local devtools for the same runtime contracts that power agen
 
 The important idea is that devtools are not a separate observability product bolted onto the framework. They are a small projection layer over Protolink's core design: an agent is an autonomous runtime entity, and its execution can be described through typed context, events, reports, registry cards, and stored task state.
 
-The current surface has four command groups plus one disabled dashboard preview:
+The current surface has four command groups, including the dashboard and its Studio builder:
 
 - `protolink doctor` checks local installation, optional extras, run-store readability, and optional agent/registry endpoints.
 - `protolink registry list` and `protolink registry inspect` inspect a running HTTP registry.
 - `protolink run list`, `protolink run replay`, and `protolink run diff` inspect durable task snapshots and run reports.
-- `protolink dashboard` serves or writes a local HTML dashboard for runs, local telemetry, and registry state, with a disabled Studio preview tab.
+- `protolink dashboard` serves or writes a local HTML dashboard for runs, local telemetry, registry state, and visual Studio blueprints.
 
 ## When To Use Each Tool
 
@@ -24,9 +24,9 @@ The current surface has four command groups plus one disabled dashboard preview:
 | `run replay` | You need a readable timeline for a stored run. | `SQLiteRunStore`. | No |
 | `run diff` | You need a normalized regression comparison between two stored reports. | `SQLiteRunStore`. | No |
 | `dashboard` | You want a local visual summary of registry, run-store, and local telemetry state. | Registry, `SQLiteRunStore`, and/or local trace JSONL. | No |
-| Dashboard Studio preview | You want to see where the future topology canvas will live. | Starter blueprint preview. | No |
+| Dashboard Studio | You want to compose agents, LLMs, tools, registries, flows, and modules visually, then export code. | Declarative Studio blueprint. | Only when you click **Run** in a served dashboard. |
 
-Because these commands do not execute stored runs, they are safe to use while debugging production-like traces, copied SQLite files, or CI artifacts. They inspect runtime records; they do not re-call tools, re-run prompts, or contact model providers.
+The inspection commands do not execute stored runs, so replay and comparison never re-call tools, prompts, or model providers. Studio execution is a separate, explicit action: **Run** starts the generated project and can therefore contact the transports, providers, tools, and modules you configured.
 
 ## Why This Exists
 
@@ -48,7 +48,7 @@ flowchart LR
     Collectors --> HTML["DevtoolsHtmlRenderer"]
     Text --> CLI["protolink CLI"]
     HTML --> Dashboard["Dashboard"]
-    HTML --> Studio["Studio preview"]
+    HTML --> Studio["Studio visual builder"]
 ```
 
 This keeps devtools modular: a CLI can render text, a notebook can call the collectors directly, and a web surface can reuse the same HTML renderer without coupling to private agent internals.
@@ -230,14 +230,14 @@ protolink dashboard --store runs.db --output dashboard.html
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif" alt="Protolink Dashboard UI" />
 </figure>
 
-The dashboard is deliberately small: no build step and no frontend dependencies. It serves a local page with branded navigation, top-level runtime cards, registry agents, agent health probes, a chat panel for HTTP LLM agents, run replay, a Telemetry trace explorer, and a disabled Studio preview tab. The sidebar shows the active Protolink version. The JSON endpoint at `/api/snapshot` uses the same collector as static rendering.
+The dashboard is deliberately small: no build step and no frontend dependencies. It serves a local page with branded navigation, top-level runtime cards, registry agents, agent health probes, a chat panel for HTTP LLM agents, run replay, a Telemetry trace explorer, and the Studio visual builder. The sidebar shows the active Protolink version. The JSON endpoint at `/api/snapshot` uses the same collector as static rendering, and `/studio` opens the same page with Studio selected.
 
 Use the served dashboard when you want live refresh against a local registry or run store, or bounded access to the trace file supplied with `--traces`. Use `--output` when you want a portable snapshot for a demo, issue, notebook, or support handoff. The Telemetry view also has an **Open JSONL** control, so either served or static HTML can inspect a file selected in the browser without first configuring a CLI path.
 
 The distinction between served and static mode matters:
 
-- Served mode can refresh `/api/snapshot`, connect a registry URL or existing SQLite run store for the current process, replay runs through `/api/runs/{run_id}`, page through the configured telemetry file, load selected trace details lazily, ping HTTP agents through `/api/agents/ping`, and proxy chat messages through `/api/agents/chat`.
-- Static mode embeds the current snapshot in the HTML file. It is excellent for demos and handoffs, and its browser file picker can still inspect local JSONL. Server-backed refresh, ping, chat, run replay, and CLI-configured telemetry paging need the local dashboard server.
+- Served mode can refresh `/api/snapshot`, connect a registry URL or existing SQLite run store for the current process, replay runs through `/api/runs/{run_id}`, page through the configured telemetry file, load selected trace details lazily, ping HTTP agents through `/api/agents/ping`, proxy chat messages through `/api/agents/chat`, and validate, generate, run, stop, and monitor Studio projects.
+- Static mode embeds the current snapshot in the HTML file. It is excellent for demos and handoffs: Studio canvas editing and blueprint import/export stay in the browser, and the Telemetry file picker can inspect local JSONL. Python generation, live Studio execution, server-backed refresh, ping, chat, run replay, and CLI-configured telemetry paging need the local dashboard server.
 
 The dashboard currently focuses on:
 
@@ -251,7 +251,7 @@ The dashboard currently focuses on:
 - A chat reset control that clears the visible conversation, starts a fresh dashboard session ID, and resets the local latency/debug counters.
 - Run replay buttons that load the same replay projection used by `protolink run replay`.
 - A Telemetry view for filtering completed task records, inspecting nested task/LLM/tool/agent-call spans, replaying chronological events, and opening redacted inputs, outputs, metadata, and raw JSON only when selected.
-- A disabled Studio preview for the future topology canvas.
+- An active Studio canvas for composing, configuring, exporting, and locally testing a supported topology.
 
 It intentionally avoids provider-specific visualizations. Provider details belong in the structured run events and reports; the dashboard should remain generic enough for any Protolink agent system.
 
@@ -289,27 +289,37 @@ Agent health indicators follow the same idea as the terminal renderers: runtime-
 
 The selected-agent panel is intentionally more than a name/URL preview. It shows role, version, protocol, transport, input/output formats, security schemes, capability flags, tags, skills, and advertised input/output schemas for each skill. The dashboard overview points users to this Registry tab instead of duplicating a Details button in the landing table. Empty schema sections are explicit so users can tell the difference between "not advertised" and a dashboard loading issue.
 
-## Protolink Studio Preview
+## Protolink Studio
 
-Studio is currently disabled. It remains visible as a locked dashboard tab so users can see the direction without mistaking it for a supported public API.
+Studio is the dashboard's active visual builder. It ships with the standard Protolink package and has no separate CLI command: run `protolink dashboard`, select **Studio**, or open `http://127.0.0.1:8765/studio` when using the default host and port.
 
-There is no standalone `protolink studio` command. The future Studio should return only when the blueprint format, scaffold generation, and execution boundaries are stable enough to document as a real user-facing workflow.
+The palette separates runtime topology from operational modules:
 
-The Studio model is intentionally simple:
+- **Agent**, **LLM**, **Tool**, **Registry**, and **Flow** are the core nodes. The inspector exposes the relevant card, model, transport, schema, flow, state, and lifecycle settings for each kind.
+- **Module** covers storage (`memory`, `sqlite`), telemetry (`local`, `langsmith`, `langfuse`), logging (`console`, `file`, `quiet`), SQLite run storage, capability policy, knowledge (`memory`, `sqlite`), and bearer authentication.
+- LLM choices are mock, OpenAI, Anthropic, Gemini, Grok, DeepSeek, Hugging Face, Ollama, LM Studio, OpenAI-compatible, vLLM, and llama.cpp local/server adapters. Tool choices include calculator, current date/time, URL fetch, web search, and a custom placeholder.
+- Agent and Registry transports can use HTTP, WebSocket, gRPC, runtime, SSE, JSON-RPC, or SSE JSON-RPC. Flow nodes support pipeline, parallel, router, and graph construction.
 
-- **Agent nodes** represent autonomous runtime entities.
-- **LLM nodes** represent model backends or model configuration.
-- **Tool nodes** represent native tools, MCP adapters, or external actions.
-- **Registry nodes** represent discovery boundaries.
-- **Edges** represent ownership, dependency, discovery, or intended call paths depending on how you use the blueprint.
+Add nodes from the palette, drag them on the canvas, and select a node to edit it. Connections are typed-ish: Studio accepts only node-kind pairs the generator understands, including Agent–LLM, Agent–Tool, Agent–Registry, Agent–Flow, Agent–Agent, Flow–Flow, Flow–Registry, Agent–Module, and Registry–Storage. Each edge retains a relation, label, and order; ordered flow connections affect generated flow wiring. Validation rejects missing endpoints, duplicate/self connections, unsupported pairs, and cyclic nested flows.
 
-That simplicity is useful as a preview. It lets Protolink present the design philosophy visually without forcing users into a heavy project format. A future generator can interpret the same blueprint more strictly when Studio is promoted from preview to tool.
+**Generate Python** validates the blueprint and returns a readable module built from Protolink's public APIs. The code view shows warnings for incomplete topology, and the result can be copied or downloaded under its generated filename. Generating does not execute anything. In a served dashboard, **Run** starts the generated module as the dashboard's single active Studio subprocess; the status panel shows lifecycle data and bounded combined output, and **Stop** terminates it. Closing the dashboard also stops the child process and removes its temporary script.
 
-Typical uses:
+Static and served Studio intentionally have different boundaries:
 
-- Show where the topology canvas will live inside the dashboard.
-- Explain how an agent plugs into LLMs, tools, telemetry, registry, and storage.
-- Keep the future structured-flow or scaffold-generator direction visible.
+- A static `--output` page can edit the canvas, keep the draft in browser local storage, and import or export the declarative blueprint as JSON. It has no Python process behind it, so **Generate Python**, **Copy Python**, **Download Python**, runtime status, **Run**, and **Stop** require a served dashboard.
+- A served page uses the local validation and generation endpoints. Starting and stopping projects is additionally restricted to loopback clients. The normal dashboard Host, same-origin JSON, and request-size checks apply to every action endpoint.
+
+Studio v1 stores bounded JSON, not arbitrary Python. It never evaluates snippets from the blueprint. Public built-in tools are generated directly; a custom Tool node becomes a safe placeholder handler for you to replace in the downloaded file. Only the provider, flow, transport, and module implementations exposed by the Studio catalog are constructed automatically, and selected optional integrations still require their normal Protolink extras. Advanced settings must remain JSON data.
+
+Do not put credentials in a blueprint. Secret-bearing keys are rejected; enter an environment-variable name in fields such as `api_key_env`, `secret_env`, or `credentials_env`, then define that variable in the environment that launches the dashboard. A running Studio project inherits that environment. Review downloaded code before running providers, tools, transports, or modules that can make network requests or write local data.
+
+The served routes are:
+
+- `GET /studio` opens the dashboard with Studio selected.
+- `GET /api/studio/catalog` returns the supported node and implementation choices.
+- `POST /api/studio/generate` validates a blueprint and returns Python, filename, normalized blueprint, warnings, and a digest.
+- `GET /api/studio/status` returns the active run state and recent output.
+- `POST /api/studio/run` starts one generated project; `POST /api/studio/stop` stops it by run ID.
 
 ## Collector And Renderer APIs
 
@@ -319,7 +329,7 @@ The UI pieces live in `protolink.utils.renderers.devtools`:
   eyebrow="Developer tooling module"
   title="Devtools Collectors And Renderers"
   path="protolink.devtools"
-  description="The collector and renderer API for local dashboards, telemetry exploration, run replay and comparison, registry inspection, chat probes, terminal summaries, and application-specific debug panels."
+  description="The collector, renderer, and Studio blueprint API for local dashboards, telemetry exploration, run replay and comparison, registry inspection, chat probes, code generation, terminal summaries, and application-specific debug panels."
   pills={[
     "Dashboard snapshots",
     "HTML renderer",
@@ -328,6 +338,7 @@ The UI pieces live in `protolink.utils.renderers.devtools`:
     "Run diff",
     "Telemetry JSONL",
     "Agent probes",
+    "Studio blueprints",
   ]}
   cards={[
     {
@@ -350,17 +361,32 @@ The UI pieces live in `protolink.utils.renderers.devtools`:
       text: "Ping and chat with public HTTP agent endpoints without coupling the renderer to network behavior.",
       code: "ping_agent()",
     },
+    {
+      title: "Generate Studio code",
+      text: "Validate a declarative topology and produce an editable Python module through public Protolink APIs.",
+      code: "generate_studio_code()",
+    },
   ]}
 />
 
 ```python
+from pathlib import Path
+
+from protolink.devtools import (
+    chat_with_agent,
+    default_studio_blueprint,
+    generate_studio_code,
+    ping_agent,
+)
 from protolink.devtools.server import build_dashboard_snapshot
-from protolink.devtools import chat_with_agent, ping_agent
 from protolink.utils.renderers.devtools import DevtoolsHtmlRenderer, DevtoolsTextRenderer
 
 snapshot = build_dashboard_snapshot(store_path="runs.db")
 html = DevtoolsHtmlRenderer().render_dashboard(snapshot)
 text = DevtoolsTextRenderer().render_run_list(snapshot["runs"])
+
+generated = generate_studio_code(default_studio_blueprint())
+Path(generated.filename).write_text(generated.source, encoding="utf-8")
 
 probe = ping_agent("http://127.0.0.1:8010")
 reply = chat_with_agent("http://127.0.0.1:8010", "hello", session_id="docs")
@@ -373,7 +399,7 @@ The collectors and renderers are separate on purpose:
 - Collectors such as `build_dashboard_snapshot()`, `list_run_store_records()`, `build_run_replay_view()`, and `build_run_diff_view()` return plain dictionaries or small dataclasses.
 - Agent actions such as `ping_agent()` and `chat_with_agent()` call public HTTP agent endpoints. They are deliberately separate from the renderer so applications can reuse them in their own debug panels.
 - Text renderers turn those structures into terminal-friendly tables.
-- HTML renderers turn those structures into standalone dashboard pages with registry health, chat, run replay, local telemetry inspection, and the disabled Studio preview included.
+- HTML renderers turn those structures into standalone dashboard pages with registry health, chat, run replay, local telemetry inspection, and Studio blueprint editing included. Server-backed Studio code generation and execution remain responsibilities of the local dashboard server.
 
 This separation keeps the public API simple. You can replace the renderer without replacing the collectors, or use the collectors inside your own app while keeping Protolink's CLI behavior unchanged.
 
@@ -410,7 +436,7 @@ protolink run replay dashboard_demo_1 --store .protolink-devtools/runs.db
 protolink dashboard --store .protolink-devtools/runs.db --open
 ```
 
-Because it uses `create_llm("mock")`, it does not need provider credentials. The static dashboard HTML generated by the example also includes the demo registry snapshot. The default demo agents use `RuntimeTransport`, so the dashboard shows them as runtime agents.
+Because it uses `create_llm("mock")`, it does not need provider credentials. The static dashboard HTML generated by the example includes the demo registry snapshot plus the same offline-safe Studio starter blueprint and catalog used by the served dashboard. The default demo agents use `RuntimeTransport`, so the dashboard shows them as runtime agents.
 
 To click the dashboard ping and chat controls, run the same example in live HTTP mode:
 
@@ -418,4 +444,4 @@ To click the dashboard ping and chat controls, run the same example in live HTTP
 python examples/devtools_dashboard.py --output-dir .protolink-devtools --serve-live
 ```
 
-Live mode starts provider-free HTTP agents, an HTTP registry, and the local dashboard. It still records the same task loop to `SQLiteRunStore`, but now the registry advertises HTTP agent URLs that the dashboard can probe and chat with.
+Live mode starts provider-free HTTP agents, an HTTP registry, and the local dashboard. It still records the same task loop to `SQLiteRunStore`, but now the registry advertises HTTP agent URLs that the dashboard can probe and chat with. Studio's Python generation, copy/download, and local **Run**/**Stop** controls are available in this served mode.

@@ -12,7 +12,8 @@ runs a small task loop, persists task snapshots and run reports, and renders a d
 or serve with ``protolink dashboard``.
 
 The generated registry uses ``RuntimeTransport`` so it stays provider-free and does not bind ports. The dashboard's ping
-and chat controls become active when the served dashboard points at a running HTTP registry with HTTP agent URLs.
+and chat controls become active when the served dashboard points at a running HTTP registry with HTTP agent URLs. The
+embedded Studio project uses the public, provider-free starter blueprint and the same catalog as the served dashboard.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from typing import Any, Literal
 
 from protolink import Agent, AgentCard, RunContext, RunRecorder, SQLiteRunStore, Task, create_llm
 from protolink.core.agent_card import AgentCapabilities
+from protolink.devtools import default_studio_blueprint, studio_catalog
 from protolink.devtools.server import serve_dashboard
 from protolink.discovery import Registry
 from protolink.transport import HTTPTransport, RuntimeTransport
@@ -91,13 +93,16 @@ async def main(
             print()
             print(f"Live registry: {registry_url}")
             print(f"Live dashboard: http://{host}:{dashboard_port}")
-            print("Press Ctrl-C to stop the demo agents, registry, and dashboard.")
+            print(f"Live Studio: http://{host}:{dashboard_port}/studio")
+            print("Press Ctrl-C to stop the demo agents, registry, dashboard, and any Studio project.")
             serve_dashboard(host=host, port=dashboard_port, registry_url=registry_url, store_path=store_path)
         else:
             print(f"  protolink dashboard --store {store_path} --open")
             print(f"  python examples/devtools_dashboard.py --output-dir {output_dir} --serve-live")
             print()
             print("Note: the static dashboard HTML includes the demo registry snapshot.")
+            print("Note: static Studio supports visual editing and JSON import/export.")
+            print("Note: serve the dashboard to generate Python or use Studio Run/Stop.")
             print("Note: live ping/chat actions require HTTP agents from --registry-url.")
     finally:
         for agent in started_agents:
@@ -170,7 +175,6 @@ def _build_snapshot(
     registry_agents: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Build a dashboard snapshot for the demo run store and registry."""
-    registry_label = "http registry" if registry_url.startswith("http") else "runtime registry"
     return {
         "registry": {"url": registry_url, "agents": registry_agents, "error": None},
         "runs": {
@@ -180,20 +184,8 @@ def _build_snapshot(
             "error": None,
         },
         "studio": {
-            "blueprint": {
-                "nodes": [
-                    {"id": "planner", "kind": "agent", "label": "planner_agent", "x": 90, "y": 120},
-                    {"id": "researcher", "kind": "agent", "label": "research_agent", "x": 330, "y": 80},
-                    {"id": "writer", "kind": "agent", "label": "writer_agent", "x": 330, "y": 220},
-                    {"id": "registry", "kind": "registry", "label": registry_label, "x": 580, "y": 150},
-                ],
-                "edges": [
-                    {"from": "planner", "to": "researcher"},
-                    {"from": "planner", "to": "writer"},
-                    {"from": "researcher", "to": "registry"},
-                    {"from": "writer", "to": "registry"},
-                ],
-            }
+            "blueprint": default_studio_blueprint(),
+            "catalog": studio_catalog(),
         },
     }
 

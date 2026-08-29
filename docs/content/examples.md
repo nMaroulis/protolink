@@ -156,16 +156,17 @@ standalone replay report with opinion trajectories, citations, vote flips, and
 fairness checks.
 
 ### 🛠️ [`devtools_dashboard.py`](https://github.com/nMaroulis/protolink/blob/main/examples/devtools_dashboard.py)
-**Purpose**: Local devtools, run replay, registry snapshot, and dashboard
+**Purpose**: Local devtools, run replay, registry snapshot, dashboard, and Studio
 
 - Uses `create_llm("mock")`, so it runs without provider credentials
 - Creates several agents and registers their cards in an in-process registry
 - Runs a small task loop and records each streamed run with `RunRecorder`
 - Saves durable task snapshots and `RunReport` records to `SQLiteRunStore`
-- Renders static dashboard HTML using `DevtoolsHtmlRenderer`, including the disabled Studio preview
+- Renders static dashboard HTML using `DevtoolsHtmlRenderer`, including the provider-free Studio starter blueprint and catalog
 - Prints follow-up commands for `protolink run list`, `protolink run replay`, and `protolink dashboard`
-- Supports `--serve-live` to start provider-free HTTP agents, an HTTP registry, and the dashboard so ping/chat actions can be clicked
-- The dashboard also contains registry health, selected-agent detail, run replay, and chat panels
+- Supports `--serve-live` to start provider-free HTTP agents, an HTTP registry, and the dashboard so ping/chat and Studio Generate/Run/Stop actions are available
+- Static Studio supports visual editing plus JSON import/export; the served dashboard adds Python view/copy/download, runtime status, and local process controls
+- The dashboard also contains registry health, selected-agent detail, run replay, telemetry, and chat panels
 
 ### 📝 [`basic_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/basic_agent.py)
 **Purpose**: Minimal agent setup focused on core concepts

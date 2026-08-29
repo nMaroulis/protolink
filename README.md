@@ -319,7 +319,9 @@ The `protolink dashboard` CLI command projects run-store and registry state into
 protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
 ```
 
-It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry, and provides local views for agent health, HTTP chat, task history, trace summaries, and run replay. The dashboard does not create agents or upload telemetry; it presents the runtime state your agents already emit.
+It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry, and provides local views for agent health, HTTP chat, task history, trace summaries, and run replay. It also includes **Protolink Studio**, an active visual builder for Agent, LLM, Tool, Registry, Flow, and operational Module nodes. Connect compatible nodes, configure transports and modules in the inspector, then generate ordinary Python that can be viewed, copied, or downloaded.
+
+Open Studio from the sidebar or directly at `http://127.0.0.1:8765/studio`. A served dashboard can start and stop one generated project as a local subprocess and show its recent output; closing the dashboard stops that process and removes its temporary script. A static `--output` dashboard remains useful for visual blueprint editing and export, but Python generation and live execution require the local dashboard server. Studio blueprints are declarative: raw secrets are rejected, so configure environment-variable names such as `OPENAI_API_KEY` and review the generated code before running integrations with external side effects.
 
 ![ProtoLink dashboard overview](https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif)
 

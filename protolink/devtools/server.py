@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import sqlite3
+import subprocess
 import webbrowser
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +18,14 @@ from protolink.__version__ import __version__
 from protolink.devtools.agents import chat_with_agent, ping_agent
 from protolink.devtools.registry import fetch_registry_agents
 from protolink.devtools.runs import build_run_replay_view, list_run_store_records
+from protolink.devtools.studio import (
+    StudioRuntimeManager,
+    StudioValidationError,
+    default_studio_blueprint,
+    generate_studio_code,
+    studio_catalog,
+    studio_code_digest,
+)
 from protolink.devtools.traces import (
     DEFAULT_TRACE_PAGE_LIMIT,
     InvalidTraceTokenError,
@@ -109,7 +118,10 @@ def build_dashboard_snapshot(
             "error": None,
         },
         "telemetry": telemetry,
-        "studio": {"blueprint": _default_studio_blueprint()},
+        "studio": {
+            "blueprint": default_studio_blueprint(),
+            "catalog": studio_catalog(),
+        },
     }
 
     if registry_url:
@@ -150,6 +162,7 @@ def serve_dashboard(
 ) -> None:
     """Serve the local dashboard until interrupted."""
     renderer = DevtoolsHtmlRenderer()
+    studio_runtime = StudioRuntimeManager()
     source_state = _DashboardSourceState(
         registry_url=registry_url or None,
         store_path=Path(store_path).expanduser() if store_path else None,
@@ -183,6 +196,12 @@ def serve_dashboard(
                 return
             if path == "/api/snapshot":
                 self._send_json(current_snapshot())
+                return
+            if path == "/api/studio/catalog":
+                self._send_json(studio_catalog())
+                return
+            if path == "/api/studio/status":
+                self._send_json(studio_runtime.status())
                 return
             if path.startswith("/api/runs/"):
                 _, active_store, _ = source_state.current()
@@ -275,6 +294,70 @@ def serve_dashboard(
                 self._send_json({"error": "Dashboard request body is too large"}, status=413)
                 return
             path = urlsplit(self.path).path
+            if path == "/api/studio/generate":
+                payload = self._read_json()
+                if "blueprint" not in payload:
+                    self._send_json({"error": "Missing Studio blueprint"}, status=400)
+                    return
+                try:
+                    generated = generate_studio_code(payload["blueprint"])
+                except StudioValidationError as exc:
+                    self._send_json(exc.to_dict(), status=422)
+                    return
+                except (TypeError, ValueError, OverflowError) as exc:
+                    self._send_json({"error": _dashboard_error_message(exc)}, status=422)
+                    return
+                response = generated.to_dict()
+                response.update(
+                    {
+                        "language": "python",
+                        "digest": studio_code_digest(generated.source),
+                    }
+                )
+                self._send_json(response)
+                return
+
+            if path == "/api/studio/run":
+                if not _dashboard_source_mutation_allowed(self.client_address[0]):
+                    self._send_json(
+                        {"error": "Studio projects can only be run from this machine"},
+                        status=403,
+                    )
+                    return
+                payload = self._read_json()
+                if "blueprint" not in payload:
+                    self._send_json({"error": "Missing Studio blueprint"}, status=400)
+                    return
+                try:
+                    self._send_json(studio_runtime.start(payload["blueprint"]), status=201)
+                except StudioValidationError as exc:
+                    self._send_json(exc.to_dict(), status=422)
+                except (TypeError, ValueError, OverflowError) as exc:
+                    self._send_json({"error": _dashboard_error_message(exc)}, status=422)
+                except RuntimeError as exc:
+                    self._send_json({"error": _dashboard_error_message(exc)}, status=409)
+                except (OSError, subprocess.SubprocessError) as exc:
+                    self._send_json({"error": _dashboard_error_message(exc)}, status=500)
+                return
+
+            if path == "/api/studio/stop":
+                if not _dashboard_source_mutation_allowed(self.client_address[0]):
+                    self._send_json(
+                        {"error": "Studio projects can only be stopped from this machine"},
+                        status=403,
+                    )
+                    return
+                payload = self._read_json()
+                run_id = payload.get("run_id")
+                if not isinstance(run_id, str) or not run_id:
+                    self._send_json({"error": "Missing Studio run id"}, status=400)
+                    return
+                try:
+                    self._send_json(studio_runtime.stop(run_id))
+                except RuntimeError as exc:
+                    self._send_json({"error": _dashboard_error_message(exc)}, status=409)
+                return
+
             if path == "/api/sources/registry":
                 if not _dashboard_source_mutation_allowed(self.client_address[0]):
                     self._send_json(
@@ -486,6 +569,7 @@ def serve_dashboard(
     except KeyboardInterrupt:
         print("\nStopping Protolink dashboard")
     finally:
+        studio_runtime.close()
         server.server_close()
 
 
@@ -663,18 +747,3 @@ def _ip_literal(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | N
         return ipaddress.ip_address(value)
     except ValueError:
         return None
-
-
-def _default_studio_blueprint() -> dict[str, Any]:
-    """Return a starter canvas blueprint used by the disabled Studio preview."""
-    return {
-        "nodes": [
-            {"id": "agent-1", "kind": "agent", "label": "Planner", "x": 110, "y": 120},
-            {"id": "llm-1", "kind": "llm", "label": "LLM", "x": 370, "y": 70},
-            {"id": "tool-1", "kind": "tool", "label": "Search Tool", "x": 370, "y": 190},
-        ],
-        "edges": [
-            {"from": "agent-1", "to": "llm-1"},
-            {"from": "agent-1", "to": "tool-1"},
-        ],
-    }
