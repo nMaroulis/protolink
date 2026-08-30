@@ -16,6 +16,7 @@ from .studio import (
     StudioValidationError,
     default_studio_blueprint,
     generate_studio_code,
+    load_studio_blueprint,
     studio_catalog,
     validate_studio_blueprint,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "inspect_registry_agent",
     "list_run_store_records",
     "list_trace_records",
+    "load_studio_blueprint",
     "load_trace_record",
     "ping_agent",
     "studio_catalog",

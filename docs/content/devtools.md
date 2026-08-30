@@ -291,7 +291,7 @@ The selected-agent panel is intentionally more than a name/URL preview. It shows
 
 ## Protolink Studio
 
-Studio is the dashboard's active visual builder. It ships with the standard Protolink package and has no separate CLI command: run `protolink dashboard`, select **Studio**, or open `http://127.0.0.1:8765/studio` when using the default host and port.
+Studio is the dashboard's active visual builder. It ships with the standard Protolink package: run `protolink studio [blueprint.json]`, or start `protolink dashboard` and select **Studio** (or open `http://127.0.0.1:8765/studio` when using the default host and port).
 
 The palette separates runtime topology from operational modules:
 

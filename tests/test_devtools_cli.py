@@ -363,9 +363,103 @@ def test_dashboard_cli_embeds_bounded_telemetry_summary(tmp_path: Path, trace_fl
     assert "must stay lazy" not in dashboard_html
 
 
-def test_cli_studio_command_is_not_public():
-    with pytest.raises(SystemExit):
-        cli_main(["studio", "--output", "studio.html"])
+def test_cli_studio_without_blueprint_serves_default(monkeypatch):
+    served_args = {}
+
+    def fake_serve_dashboard(**kwargs):
+        served_args.update(kwargs)
+
+    monkeypatch.setattr("protolink.cli.serve_dashboard", fake_serve_dashboard)
+
+    assert cli_main(["studio"]) == 0
+    assert served_args["start_tab"] == "studio"
+    assert served_args["project_loaded"] is False
+    assert served_args["blueprint"] is None
+
+
+def test_cli_studio_loads_custom_blueprint_and_serves(tmp_path: Path, monkeypatch):
+    blueprint_path = tmp_path / "custom_mesh.json"
+    custom_blueprint = {
+        "version": 1,
+        "project": {
+            "name": "custom_loaded_topology",
+            "description": "A loaded custom mesh.",
+        },
+        "nodes": [
+            {
+                "id": "agent-custom",
+                "kind": "agent",
+                "label": "Custom Worker",
+                "x": 100,
+                "y": 100,
+                "config": {
+                    "name": "custom_worker",
+                    "description": "A custom worker.",
+                    "url": "runtime://custom_worker",
+                    "transport": "runtime",
+                },
+            }
+        ],
+        "edges": [],
+    }
+    blueprint_path.write_text(json.dumps(custom_blueprint), encoding="utf-8")
+
+    served_args = {}
+
+    def fake_serve_dashboard(**kwargs):
+        served_args.update(kwargs)
+
+    monkeypatch.setattr("protolink.cli.serve_dashboard", fake_serve_dashboard)
+
+    assert cli_main(["studio", str(blueprint_path)]) == 0
+    assert served_args["start_tab"] == "studio"
+    assert served_args["project_loaded"] is True
+    assert served_args["host"] == "127.0.0.1"
+    assert served_args["port"] == 8765
+    assert served_args["blueprint"]["project"]["name"] == "custom_loaded_topology"
+    assert served_args["blueprint"]["nodes"][0]["id"] == "agent-custom"
+
+    # Test with custom --ip and --port
+    assert cli_main(["studio", str(blueprint_path), "--ip", "0.0.0.0", "--port", "9999"]) == 0
+    assert served_args["host"] == "0.0.0.0"
+    assert served_args["port"] == 9999
+
+    # Test with --host alias
+    assert cli_main(["studio", str(blueprint_path), "--host", "127.0.0.2", "--port", "8888"]) == 0
+    assert served_args["host"] == "127.0.0.2"
+    assert served_args["port"] == 8888
+
+
+def test_cli_studio_rejects_non_json_missing_or_invalid_blueprint(tmp_path: Path, capsys):
+    non_json_path = tmp_path / "mesh.yaml"
+    non_json_path.write_text("{}", encoding="utf-8")
+    assert cli_main(["studio", str(non_json_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert ".json" in err
+
+    missing_path = tmp_path / "non_existent.json"
+    assert cli_main(["studio", str(missing_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert "not found" in err
+
+    invalid_json_path = tmp_path / "broken.json"
+    invalid_json_path.write_text("not json content {", encoding="utf-8")
+    assert cli_main(["studio", str(invalid_json_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert "Invalid JSON" in err
+
+    invalid_blueprint_path = tmp_path / "invalid_blueprint.json"
+    invalid_blueprint_path.write_text(
+        json.dumps({"version": 1, "nodes": "not a list"}),
+        encoding="utf-8",
+    )
+    assert cli_main(["studio", str(invalid_blueprint_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert "nodes must be an array" in err
 
 
 def test_dashboard_snapshot_and_renderer_include_registry_and_store(tmp_path: Path):

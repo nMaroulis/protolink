@@ -23,10 +23,48 @@ from protolink.devtools.studio import (
     StudioValidationError,
     default_studio_blueprint,
     generate_studio_code,
+    load_studio_blueprint,
     studio_catalog,
     validate_studio_blueprint,
 )
 from protolink.utils.renderers.devtools import DevtoolsHtmlRenderer
+
+
+def test_load_studio_blueprint_reads_and_validates_json_file(tmp_path: Path):
+    project_path = tmp_path / "valid_blueprint.json"
+    blueprint_data = default_studio_blueprint()
+    project_path.write_text(json.dumps(blueprint_data), encoding="utf-8")
+
+    loaded = load_studio_blueprint(project_path)
+    assert loaded["version"] == 1
+    assert loaded["project"]["name"] == "my_protolink_mesh"
+    assert len(loaded["nodes"]) == len(blueprint_data["nodes"])
+
+    # Test non-json extension
+    non_json_path = tmp_path / "blueprint.yaml"
+    non_json_path.write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError, match="\\.json"):
+        load_studio_blueprint(non_json_path)
+
+    # Test file not found
+    with pytest.raises(FileNotFoundError, match="not found"):
+        load_studio_blueprint(tmp_path / "non_existent.json")
+
+    # Test path is directory
+    with pytest.raises(ValueError, match="\\.json"):
+        load_studio_blueprint(tmp_path)
+
+    # Test malformed JSON
+    bad_json_path = tmp_path / "bad.json"
+    bad_json_path.write_text("{broken json", encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid JSON"):
+        load_studio_blueprint(bad_json_path)
+
+    # Test invalid blueprint structure
+    invalid_schema_path = tmp_path / "invalid_schema.json"
+    invalid_schema_path.write_text(json.dumps({"nodes": "not a list"}), encoding="utf-8")
+    with pytest.raises(StudioValidationError, match="nodes must be an array"):
+        load_studio_blueprint(invalid_schema_path)
 
 
 def test_studio_catalog_and_default_blueprint_are_versioned_and_runnable():

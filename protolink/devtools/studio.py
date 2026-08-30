@@ -376,6 +376,38 @@ def validate_studio_blueprint(value: Any) -> dict[str, Any]:
     }
 
 
+def load_studio_blueprint(path: str | Path) -> dict[str, Any]:
+    """Load, parse, and validate a Studio blueprint from a JSON file.
+
+    Args:
+        path: Path to the Studio blueprint JSON file.
+
+    Returns:
+        The validated and normalized blueprint dictionary.
+
+    Raises:
+        FileNotFoundError: If the blueprint file does not exist.
+        ValueError: If the file is not a .json file, path is not a file,
+            JSON is malformed, or the blueprint violates schema/safety constraints.
+    """
+    file_path = Path(path).expanduser()
+    if file_path.suffix.lower() != ".json":
+        raise ValueError(f"Studio blueprint file must be a .json file: {file_path}")
+    if not file_path.exists():
+        raise FileNotFoundError(f"Studio blueprint file not found: {file_path}")
+    if not file_path.is_file():
+        raise ValueError(f"Studio blueprint path is not a file: {file_path}")
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"Failed to read Studio blueprint file: {exc}") from exc
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ValueError(f"Invalid JSON in Studio blueprint file: {exc}") from exc
+    return validate_studio_blueprint(data)
+
+
 def generate_studio_code(value: Any) -> StudioCode:
     """Generate a readable, runnable Python module from a Studio blueprint."""
     blueprint = validate_studio_blueprint(value)

@@ -894,6 +894,9 @@ function studioContainsEmbeddedSecret(value, key = '', seen = new Set()) {
 let studioCatalog = studioMergeCatalog(snapshot.studio?.catalog);
 const studioSnapshotBlueprint = studioNormalizeBlueprint(snapshot.studio?.blueprint || {nodes: [], edges: []});
 const studioPersistedBlueprint = studioReadPersistedBlueprint();
+const studioInitialBlueprint = snapshot.studio?.loaded
+  ? studioSnapshotBlueprint
+  : (studioPersistedBlueprint || studioSnapshotBlueprint);
 let studioPersistenceTimer = null;
 let studioNoticeTimer = null;
 let studioStatusTimer = null;
@@ -903,7 +906,7 @@ let studioFieldSequence = 0;
 let studioOutputReturnFocus = null;
 let studioRestoreOutputFocus = true;
 let studioState = {
-  blueprint: studioNormalizeBlueprint(studioPersistedBlueprint || studioSnapshotBlueprint),
+  blueprint: studioNormalizeBlueprint(studioInitialBlueprint),
   resetBlueprint: studioClone(studioSnapshotBlueprint),
   history: [],
   future: [],

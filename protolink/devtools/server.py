@@ -88,6 +88,8 @@ def build_dashboard_snapshot(
     registry_url: str | None = None,
     store_path: str | Path | None = None,
     trace_path: str | Path | None = None,
+    blueprint: dict[str, Any] | None = None,
+    project_loaded: bool = False,
     limit: int = 20,
     source_revision: int = 0,
 ) -> dict[str, Any]:
@@ -119,8 +121,9 @@ def build_dashboard_snapshot(
         },
         "telemetry": telemetry,
         "studio": {
-            "blueprint": default_studio_blueprint(),
+            "blueprint": blueprint if blueprint is not None else default_studio_blueprint(),
             "catalog": studio_catalog(),
+            "loaded": project_loaded,
         },
     }
 
@@ -158,7 +161,10 @@ def serve_dashboard(
     registry_url: str | None = None,
     store_path: str | Path | None = None,
     trace_path: str | Path | None = None,
+    blueprint: dict[str, Any] | None = None,
+    project_loaded: bool = False,
     open_browser: bool = False,
+    start_tab: str = "dashboard",
 ) -> None:
     """Serve the local dashboard until interrupted."""
     renderer = DevtoolsHtmlRenderer()
@@ -174,6 +180,8 @@ def serve_dashboard(
             registry_url=active_registry,
             store_path=active_store,
             trace_path=trace_path,
+            blueprint=blueprint,
+            project_loaded=project_loaded,
             source_revision=revision,
         )
 
@@ -188,7 +196,7 @@ def serve_dashboard(
             query = parse_qs(request.query, keep_blank_values=True)
             if path == "/":
                 snapshot = current_snapshot()
-                self._send_html(renderer.render_dashboard(snapshot, live=True))
+                self._send_html(renderer.render_dashboard(snapshot, start_tab=start_tab, live=True))
                 return
             if path == "/studio":
                 snapshot = current_snapshot()
@@ -561,13 +569,15 @@ def serve_dashboard(
 
     server = ThreadingHTTPServer((host, port), Handler)
     url = f"http://{host}:{server.server_port}"
-    print(f"Protolink dashboard running at {url}")
+    target_url = f"{url}/studio" if start_tab == "studio" else url
+    service_label = "Protolink Studio" if start_tab == "studio" else "Protolink dashboard"
+    print(f"{service_label} running at {target_url}")
     if open_browser:
-        webbrowser.open(url)
+        webbrowser.open(target_url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping Protolink dashboard")
+        print(f"\nStopping {service_label}")
     finally:
         studio_runtime.close()
         server.server_close()

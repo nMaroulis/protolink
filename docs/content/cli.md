@@ -263,7 +263,7 @@ The selected-agent panel shows the agent card as an operational profile: health,
 
 The Studio tab is an active visual builder for Agent, LLM, Tool, Registry, Flow, and Module nodes. Compatible connections carry a relation and order, while the inspector exposes supported transports, providers, schemas, flows, and operational modules. In served mode, **Generate Python** opens readable public-API code that can be copied or downloaded; **Run** and **Stop** manage one local generated subprocess with live status and bounded logs. Closing the dashboard stops that child process and removes its temporary script.
 
-Studio blueprints are declarative JSON and do not evaluate arbitrary Python. Built-in tools generate working integrations, while custom tools generate safe placeholder handlers for later editing. Put environment-variable names, never raw credentials, in secret settings. There is no standalone `protolink studio` command; Studio is included under `protolink dashboard` and can be opened directly at `/studio`.
+Studio blueprints are declarative JSON and do not evaluate arbitrary Python. Built-in tools generate working integrations, while custom tools generate safe placeholder handlers for later editing. Put environment-variable names, never raw credentials, in secret settings. Studio can be opened with an optional blueprint JSON file via `protolink studio [blueprint.json]` or through the dashboard at `/studio`.
 
 See [Developer Tools](devtools.md) for the architecture, renderer APIs, and provider-free example.
 
@@ -279,6 +279,7 @@ protolink run list [--store PATH] [--limit N] [--json]
 protolink run replay RUN_ID [--store PATH] [--json]
 protolink run diff BASELINE CANDIDATE [--store PATH] [--json]
 protolink dashboard [--store PATH] [--traces PATH] [--registry-url URL] [--host HOST] [--port PORT] [--open] [--output PATH]
+protolink studio [BLUEPRINT_JSON] [--ip HOST] [--port PORT]
 ```
 
 | Argument | Description |
