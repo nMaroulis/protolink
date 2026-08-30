@@ -34,17 +34,25 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [Unreleased]
+## [0.6.9] - TBA
+
+
+:::note Latest release
+
+Introducing the Studio UI. Using the `protolink dashboard` or `protolink studio` cli command the user can create Agents, LLMs, Tools, Flows and all available Protolink modules through a simple intuitive UI. 
+
+:::
 
 ### Added
 
+- New CLI `studio` command -> `protolink studio --blueprint --ip --port`. You can load the studio with a blueprint JSON as input.
 - Promoted the dashboard's Studio tab from a preview to an active visual builder for Agent, LLM, Tool, Registry, Flow, and operational Module nodes. The canvas supports compatible declarative connections, node/project editing, undo/redo, browser-local draft persistence, and JSON import/export; served dashboards additionally generate Python that can be viewed, copied, and downloaded.
 - Added `/studio` and the `/api/studio/catalog`, `/api/studio/generate`, `/api/studio/status`, `/api/studio/run`, and `/api/studio/stop` routes. Studio validates bounded JSON, rejects embedded secrets in favor of environment-variable references, and runs at most one generated project in a loopback-controlled subprocess that is stopped and cleaned up with the dashboard.
 - Added public Studio blueprint, validation, catalog, code-generation, and runtime helpers, and updated the provider-free dashboard example to embed the standard runnable starter blueprint.
 
 ## [0.6.8] - 2026-07-30
 
-:::note Latest release
+:::note Release summary
 
 This patch release introduces first-party **Retrieval-Augmented Generation
 (RAG)**, a deterministic **infer-loop benchmark** for evaluating model
