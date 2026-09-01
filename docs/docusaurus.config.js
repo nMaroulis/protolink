@@ -168,6 +168,10 @@ const config = {
                 label: "Developer Tools",
                 to: "/docs/devtools",
               },
+              {
+                label: "Studio",
+                to: "/docs/studio",
+              },
             ],
           },
           {

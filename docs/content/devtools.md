@@ -293,6 +293,8 @@ The selected-agent panel is intentionally more than a name/URL preview. It shows
 
 Studio is the dashboard's active visual builder. It ships with the standard Protolink package: run `protolink studio [blueprint.json]`, or start `protolink dashboard` and select **Studio** (or open `http://127.0.0.1:8765/studio` when using the default host and port).
 
+For a complete workspace tour, every node and module setting, connection and Flow semantics, generated-code guarantees, execution controls, blueprint format, and security limits, see the dedicated [Protolink Studio guide](studio.md).
+
 The palette separates runtime topology from operational modules:
 
 - **Agent**, **LLM**, **Tool**, **Registry**, and **Flow** are the core nodes. The inspector exposes the relevant card, model, transport, schema, flow, state, and lifecycle settings for each kind.

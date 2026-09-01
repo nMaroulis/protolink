@@ -265,7 +265,7 @@ The Studio tab is an active visual builder for Agent, LLM, Tool, Registry, Flow,
 
 Studio blueprints are declarative JSON and do not evaluate arbitrary Python. Built-in tools generate working integrations, while custom tools generate safe placeholder handlers for later editing. Put environment-variable names, never raw credentials, in secret settings. Studio can be opened with an optional blueprint JSON file via `protolink studio [blueprint.json]` or through the dashboard at `/studio`.
 
-See [Developer Tools](devtools.md) for the architecture, renderer APIs, and provider-free example.
+See [Protolink Studio](studio.md) for the complete visual-builder guide, and [Developer Tools](devtools.md) for the surrounding dashboard architecture, renderer APIs, and provider-free example.
 
 ## Command Reference
 

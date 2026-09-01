@@ -167,6 +167,7 @@ const surfaces = [
     docs: [
       ['CLI', '/docs/cli'],
       ['Developer Tools', '/docs/devtools'],
+      ['Studio', '/docs/studio'],
       ['Telemetry', '/docs/telemetry'],
       ['Authentication', '/docs/authentication'],
     ],

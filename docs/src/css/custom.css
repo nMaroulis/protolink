@@ -268,6 +268,19 @@ html {
   background: rgba(10, 132, 255, 0.09);
 }
 
+.sidebar-item-studio > .menu__link::after {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-left: 0.48rem;
+  background: linear-gradient(135deg, #8064f3 0%, #5665d8 38%, #0f9f92 70%, #ff765f 100%);
+  content: "";
+  filter: drop-shadow(0 1px 2px rgba(86, 101, 216, 0.32));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20viewBox%3D%270%200%2024%2024%27%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%3E%3Cpath%20d%3D%27M12%202.5l2.05%205.45L19.5%2010l-5.45%202.05L12%2017.5l-2.05-5.45L4.5%2010l5.45-2.05L12%202.5Z%27/%3E%3Cpath%20d%3D%27m19%2015%201.05%202.95L23%2019l-2.95%201.05L19%2023l-1.05-2.95L15%2019l2.95-1.05L19%2015Z%27/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20viewBox%3D%270%200%2024%2024%27%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%3E%3Cpath%20d%3D%27M12%202.5l2.05%205.45L19.5%2010l-5.45%202.05L12%2017.5l-2.05-5.45L4.5%2010l5.45-2.05L12%202.5Z%27/%3E%3Cpath%20d%3D%27m19%2015%201.05%202.95L23%2019l-2.95%201.05L19%2023l-1.05-2.95L15%2019l2.95-1.05L19%2015Z%27/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
 .theme-doc-markdown {
   color: var(--protolink-ink);
   font-size: 1rem;

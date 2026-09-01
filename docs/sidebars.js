@@ -13,6 +13,12 @@ const sidebars = {
         'getting-started',
         'cli',
         'devtools',
+        {
+          type: 'doc',
+          id: 'studio',
+          label: 'Studio',
+          className: 'sidebar-item-studio',
+        },
       ],
     },
     {
