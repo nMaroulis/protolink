@@ -85,13 +85,13 @@ The shortest complete workflow is:
 | --- | --- |
 | Command bar | Undo/redo, restore the starter, clear the whole project, import/export JSON, generate code, open outputs, and run/stop the project. |
 | Components | Search and add the six supported node kinds. New nodes receive safe defaults and stable IDs. |
-| Canvas | Arrange nodes and create directed connections. The summary shows the current node and connection counts. |
+| Canvas | Pan and zoom through the topology, arrange nodes, create directed connections, and fit the project or current selection. The summary shows the current node and connection counts. |
 | Inspector | Edit the selected node or connection. The **Project** tab edits the generated project name and description. |
 | Output dialog | Switch between **Python**, **Blueprint JSON**, and **Runtime logs** without leaving or scrolling away from the canvas. |
 
 ## Canvas and connections
 
-The current canvas is larger than its viewport. Scroll or use a trackpad inside the canvas to move horizontally and vertically, drag nodes by their cards, and use **Find selection** to bring the selected item back into view. The palette, canvas, inspector, and output dialog scroll independently, so the Studio page itself stays fixed on desktop.
+The canvas uses a pan-and-zoom camera instead of visible scrollbars. Drag empty canvas space to pan; with the canvas focused, hold Space while dragging when you want to move the view without disturbing a node. A mouse wheel or trackpad pans in two dimensions, while Ctrl/Cmd+wheel zooms around the pointer. Use **−** and **+** for stepped zoom, the percentage control to return to 100%, **Fit project** to frame all nodes, and **Find selection** to center the selected node or connection. The palette, canvas, inspector, and output dialog remain contained, so the Studio page itself stays fixed on desktop.
 
 To create an edge, click the output dot on the right side of a node. Compatible input dots glow; click one to finish the connection. Press Escape or choose **Cancel connection** to stop. Select the edge itself to edit its fields.
 
@@ -226,7 +226,9 @@ Studio keeps the current draft in browser local storage under the dashboard orig
 
 Changing a design marks previously generated code as stale. **Run** regenerates it before starting when necessary.
 
-When a node card has keyboard focus, the arrow keys move it by 8 pixels and Shift+Arrow moves it by 24 pixels. Escape closes the output dialog or cancels an in-progress connection. Inspector and output tabs support normal arrow-key tab navigation.
+The camera is view-only state. Its pan offset and zoom are not written to the blueprint, browser draft, design history, exported JSON, or generated Python.
+
+When the canvas viewport has keyboard focus, **+** and **−** zoom, **0** returns to 100%, **F** fits the project, and the arrow keys pan. When a node card has keyboard focus, the arrow keys move it by 8 pixels and Shift+Arrow moves it by 24 pixels. Escape closes the output dialog or cancels an in-progress connection. Inspector and output tabs support normal arrow-key tab navigation.
 
 ## Generated Python
 

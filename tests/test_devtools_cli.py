@@ -279,7 +279,25 @@ def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     assert "Protolink Studio is coming soon" not in dashboard_html
     assert "Visual runtime builder" in dashboard_html
     assert "studio-canvas" in dashboard_html
+    assert 'id="studio-canvas-camera"' in dashboard_html
     assert "studio-node-layer" in dashboard_html
+    assert 'id="studio-zoom-out"' in dashboard_html
+    assert 'aria-label="Zoom out"' in dashboard_html
+    assert 'id="studio-zoom-level"' in dashboard_html
+    assert 'aria-live="polite"' in dashboard_html
+    assert 'id="studio-zoom-in"' in dashboard_html
+    assert 'aria-label="Zoom in"' in dashboard_html
+    assert 'id="studio-fit-view"' in dashboard_html
+    assert "Fit project" in dashboard_html
+    assert "transform-origin: 0 0" in dashboard_html
+    assert "touch-action: none" in dashboard_html
+    assert "studioApplyCamera" in dashboard_html
+    assert "studioScreenToCanvas" in dashboard_html
+    assert "studioZoomBy" in dashboard_html
+    assert "studioFitView" in dashboard_html
+    assert "studioFocusSelection" in dashboard_html
+    assert "studioStartPan" in dashboard_html
+    assert "{passive: false}" in dashboard_html
     assert "Generate Python" in dashboard_html
     assert "Restore starter" in dashboard_html
     assert "Clear canvas" in dashboard_html

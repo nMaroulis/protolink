@@ -210,19 +210,62 @@ STUDIO_CSS = r"""
 .studio-project-summary span { color: var(--muted); font-size: 11px; }
 .studio-canvas-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .studio-canvas-actions .mini-btn { background: rgba(255,255,255,.88); }
+.studio-camera-controls {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 3px 10px rgba(46,61,82,.06);
+}
+.studio-camera-controls .mini-btn {
+  min-width: 31px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.studio-camera-controls .mini-btn + .mini-btn { border-left: 1px solid var(--line); }
+.studio-camera-controls .studio-zoom-level { min-width: 52px; padding-inline: 8px; font-variant-numeric: tabular-nums; }
 .studio-canvas-viewport {
   position: relative;
   min-height: 570px;
-  overflow: auto;
+  overflow: hidden;
   background: linear-gradient(145deg, #edf2f8, #e9f1f4);
   box-shadow: inset 0 0 35px rgba(66,84,110,.08);
   overscroll-behavior: contain;
-  scrollbar-color: #bac6d6 #edf2f7;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
 }
-.studio-canvas {
+.studio-canvas-viewport.is-panning { cursor: grabbing; }
+.studio-canvas-viewport:focus-visible { outline: 2px solid var(--indigo); outline-offset: -2px; }
+.studio-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.studio-canvas-camera {
   position: relative;
   width: 1800px;
   height: 1050px;
+  min-width: 100%;
+  min-height: 100%;
+}
+.studio-canvas {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 1800px;
+  height: 1050px;
+  transform-origin: 0 0;
+  will-change: transform;
   background-image:
     radial-gradient(circle at 18% 16%, rgba(86,101,216,.10), transparent 26%),
     radial-gradient(circle at 76% 72%, rgba(15,159,146,.10), transparent 28%),
@@ -238,10 +281,11 @@ STUDIO_CSS = r"""
   stroke: #8190a5;
   stroke-width: 2.25;
   vector-effect: non-scaling-stroke;
+  pointer-events: none;
   transition: stroke .16s ease, stroke-width .16s ease, filter .16s ease;
 }
 .studio-edge-line.is-selected { stroke: var(--indigo); stroke-width: 3; filter: drop-shadow(0 2px 4px rgba(86,101,216,.25)); }
-.studio-edge-hit { fill: none; stroke: transparent; stroke-width: 18; pointer-events: stroke; cursor: pointer; }
+.studio-edge-hit { fill: none; stroke: transparent; stroke-width: 18; vector-effect: non-scaling-stroke; pointer-events: stroke; cursor: pointer; }
 .studio-edge-hit:focus-visible + .studio-edge-line,
 .studio-edge-hit:hover + .studio-edge-line { stroke: var(--indigo); stroke-width: 3; }
 .studio-node {
@@ -558,15 +602,24 @@ STUDIO_HTML = r"""
           <div class="studio-project-summary"><strong id="studio-canvas-title">Studio project</strong><span id="studio-canvas-summary">0 nodes · 0 connections</span></div>
           <div class="studio-canvas-actions">
             <button type="button" class="mini-btn" id="studio-project-settings" onclick="studioShowProjectSettings()">Project settings</button>
+            <div class="studio-camera-controls" role="group" aria-label="Canvas zoom controls">
+              <button type="button" class="mini-btn" id="studio-zoom-out" aria-label="Zoom out" onclick="studioZoomBy(-1)">−</button>
+              <button type="button" class="mini-btn studio-zoom-level" id="studio-zoom-level" aria-label="Reset zoom to 100 percent" aria-live="polite" onclick="studioResetZoom()">100%</button>
+              <button type="button" class="mini-btn" id="studio-zoom-in" aria-label="Zoom in" onclick="studioZoomBy(1)">+</button>
+            </div>
+            <button type="button" class="mini-btn" id="studio-fit-view" onclick="studioFitView()">Fit project</button>
             <button type="button" class="mini-btn" id="studio-fit-selection" onclick="studioFocusSelection()">Find selection</button>
             <button type="button" class="mini-btn" id="studio-delete-selection" onclick="studioDeleteSelection()">Delete selected</button>
           </div>
         </div>
-        <div class="studio-canvas-viewport" id="studio-canvas-viewport" role="region" aria-label="Studio topology canvas" tabindex="0">
-          <div class="studio-canvas" id="studio-canvas">
-            <svg class="studio-edge-layer" id="studio-edge-layer" viewBox="0 0 1800 1050" aria-label="Topology connections"></svg>
-            <div class="studio-node-layer" id="studio-node-layer"></div>
-            <div class="studio-canvas-empty" id="studio-canvas-empty"><strong>Build your first mesh</strong>Choose a component from the palette. Connect a node's right output port to another node's left input port.</div>
+        <div class="studio-canvas-viewport" id="studio-canvas-viewport" role="region" aria-label="Studio topology canvas" aria-describedby="studio-canvas-help" tabindex="0">
+          <span class="studio-visually-hidden" id="studio-canvas-help">Drag empty canvas space to pan. Use Control or Command plus the wheel to zoom. Press plus, minus, zero, or F while the canvas is focused for zoom controls.</span>
+          <div class="studio-canvas-camera" id="studio-canvas-camera">
+            <div class="studio-canvas" id="studio-canvas">
+              <svg class="studio-edge-layer" id="studio-edge-layer" viewBox="0 0 1800 1050" aria-label="Topology connections"></svg>
+              <div class="studio-node-layer" id="studio-node-layer"></div>
+              <div class="studio-canvas-empty" id="studio-canvas-empty"><strong>Build your first mesh</strong>Choose a component from the palette. Connect a node's right output port to another node's left input port.</div>
+            </div>
           </div>
         </div>
         <div class="studio-connection-bar" id="studio-connection-bar">
@@ -618,6 +671,10 @@ const STUDIO_NODE_WIDTH = 196;
 const STUDIO_NODE_HEIGHT = 112;
 const STUDIO_CANVAS_WIDTH = 1800;
 const STUDIO_CANVAS_HEIGHT = 1050;
+const STUDIO_ZOOM_MIN = .25;
+const STUDIO_ZOOM_MAX = 1.75;
+const STUDIO_ZOOM_STEP = .1;
+const STUDIO_FIT_PADDING = 54;
 const STUDIO_HISTORY_LIMIT = 60;
 const STUDIO_IMPORT_MAX_BYTES = 1024 * 1024;
 const STUDIO_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
@@ -921,6 +978,12 @@ let studioGeneration = 0;
 let studioFieldSequence = 0;
 let studioOutputReturnFocus = null;
 let studioRestoreOutputFocus = true;
+let studioPanSession = null;
+let studioSuppressCanvasClick = false;
+let studioSpacePan = false;
+let studioNodeDragActive = false;
+let studioCameraResizeObserver = null;
+let studioCameraResizeFrame = null;
 let studioState = {
   blueprint: studioNormalizeBlueprint(studioInitialBlueprint),
   resetBlueprint: studioClone(studioSnapshotBlueprint),
@@ -939,6 +1002,7 @@ let studioState = {
   codeStale: true,
   runtime: {state: 'idle', running: false, run_id: null, logs: []},
   notice: null,
+  camera: {zoom: 1, offsetX: 0, offsetY: 0, initialized: false},
 };
 
 function syncStudioSnapshot(source) {
@@ -1127,11 +1191,178 @@ function studioRenderPalette() {
   count.textContent = String(kinds.length);
 }
 
+function studioClampZoom(value) {
+  const zoom = Number(value);
+  if (!Number.isFinite(zoom)) return studioState.camera.zoom;
+  return Math.max(STUDIO_ZOOM_MIN, Math.min(STUDIO_ZOOM_MAX, zoom));
+}
+
+function studioApplyCamera() {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  const camera = document.getElementById('studio-canvas-camera');
+  const canvas = document.getElementById('studio-canvas');
+  if (!viewport || !camera || !canvas) return false;
+  const zoom = studioClampZoom(studioState.camera.zoom);
+  const scaledWidth = STUDIO_CANVAS_WIDTH * zoom;
+  const scaledHeight = STUDIO_CANVAS_HEIGHT * zoom;
+  const offsetX = viewport.clientWidth / 2;
+  const offsetY = viewport.clientHeight / 2;
+  studioState.camera.zoom = zoom;
+  studioState.camera.offsetX = offsetX;
+  studioState.camera.offsetY = offsetY;
+  camera.style.width = `${scaledWidth + viewport.clientWidth}px`;
+  camera.style.height = `${scaledHeight + viewport.clientHeight}px`;
+  canvas.style.left = `${offsetX}px`;
+  canvas.style.top = `${offsetY}px`;
+  canvas.style.transform = `scale(${zoom})`;
+
+  const percentage = Math.round(zoom * 100);
+  const level = document.getElementById('studio-zoom-level');
+  if (level) {
+    level.textContent = `${percentage}%`;
+    level.setAttribute('aria-label', `Zoom is ${percentage} percent. Reset zoom to 100 percent`);
+  }
+  const zoomOut = document.getElementById('studio-zoom-out');
+  const zoomIn = document.getElementById('studio-zoom-in');
+  if (zoomOut) zoomOut.disabled = zoom <= STUDIO_ZOOM_MIN + .001;
+  if (zoomIn) zoomIn.disabled = zoom >= STUDIO_ZOOM_MAX - .001;
+  return true;
+}
+
+function studioScreenToCanvas(clientX, clientY) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport) return {x: 0, y: 0};
+  const rect = viewport.getBoundingClientRect();
+  const localX = Number(clientX) - rect.left - viewport.clientLeft;
+  const localY = Number(clientY) - rect.top - viewport.clientTop;
+  const zoom = studioState.camera.zoom || 1;
+  return {
+    x: (viewport.scrollLeft + localX - studioState.camera.offsetX) / zoom,
+    y: (viewport.scrollTop + localY - studioState.camera.offsetY) / zoom,
+  };
+}
+
+function studioScrollCamera(left, top, animate = false) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport) return;
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  viewport.scrollTo({
+    left: Math.max(0, left),
+    top: Math.max(0, top),
+    behavior: animate && !reduceMotion ? 'smooth' : 'auto',
+  });
+}
+
+function studioCenterWorldPoint(worldX, worldY, animate = false) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport) return;
+  const zoom = studioState.camera.zoom;
+  studioScrollCamera(
+    studioState.camera.offsetX + worldX * zoom - viewport.clientWidth / 2,
+    studioState.camera.offsetY + worldY * zoom - viewport.clientHeight / 2,
+    animate,
+  );
+}
+
+function studioSetZoom(nextZoom, options = {}) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport || studioNodeDragActive) return;
+  const oldZoom = studioState.camera.zoom;
+  const zoom = studioClampZoom(nextZoom);
+  if (Math.abs(zoom - oldZoom) < .0001) return;
+  const rect = viewport.getBoundingClientRect();
+  const localX = Number.isFinite(options.clientX)
+    ? options.clientX - rect.left - viewport.clientLeft
+    : viewport.clientWidth / 2;
+  const localY = Number.isFinite(options.clientY)
+    ? options.clientY - rect.top - viewport.clientTop
+    : viewport.clientHeight / 2;
+  const worldX = (viewport.scrollLeft + localX - studioState.camera.offsetX) / oldZoom;
+  const worldY = (viewport.scrollTop + localY - studioState.camera.offsetY) / oldZoom;
+  studioState.camera.zoom = zoom;
+  studioApplyCamera();
+  studioScrollCamera(
+    studioState.camera.offsetX + worldX * zoom - localX,
+    studioState.camera.offsetY + worldY * zoom - localY,
+  );
+}
+
+function studioZoomBy(direction) {
+  const next = Math.round((studioState.camera.zoom + Number(direction) * STUDIO_ZOOM_STEP) * 10) / 10;
+  studioSetZoom(next);
+}
+
+function studioResetZoom() {
+  studioSetZoom(1);
+}
+
+function studioFitView({animate = true, announce = true} = {}) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport || !viewport.clientWidth || !viewport.clientHeight) return false;
+  const nodes = studioState.blueprint.nodes;
+  if (!nodes.length) {
+    studioState.camera.zoom = studioClampZoom(Math.min(
+      1,
+      (viewport.clientWidth - STUDIO_FIT_PADDING * 2) / STUDIO_CANVAS_WIDTH,
+      (viewport.clientHeight - STUDIO_FIT_PADDING * 2) / STUDIO_CANVAS_HEIGHT,
+    ));
+    studioApplyCamera();
+    studioCenterWorldPoint(STUDIO_CANVAS_WIDTH / 2, STUDIO_CANVAS_HEIGHT / 2, animate);
+    if (announce) studioSetNotice(`The empty canvas is centered at ${Math.round(studioState.camera.zoom * 100)}%.`, 'info');
+    return true;
+  }
+  const left = Math.min(...nodes.map(node => node.x));
+  const top = Math.min(...nodes.map(node => node.y));
+  const right = Math.max(...nodes.map(node => node.x + STUDIO_NODE_WIDTH));
+  const bottom = Math.max(...nodes.map(node => node.y + STUDIO_NODE_HEIGHT));
+  const availableWidth = Math.max(1, viewport.clientWidth - STUDIO_FIT_PADDING * 2);
+  const availableHeight = Math.max(1, viewport.clientHeight - STUDIO_FIT_PADDING * 2);
+  studioState.camera.zoom = studioClampZoom(Math.min(
+    1,
+    availableWidth / Math.max(1, right - left),
+    availableHeight / Math.max(1, bottom - top),
+  ));
+  studioApplyCamera();
+  studioCenterWorldPoint((left + right) / 2, (top + bottom) / 2, animate);
+  if (announce) studioSetNotice(`Project fitted at ${Math.round(studioState.camera.zoom * 100)}%.`, 'info');
+  return true;
+}
+
+function studioInitializeCamera() {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport || !viewport.clientWidth || !viewport.clientHeight) return;
+  if (!studioState.camera.initialized) {
+    studioState.camera.initialized = true;
+    studioFitView({animate: false, announce: false});
+    return;
+  }
+  studioApplyCamera();
+}
+
+function studioScheduleCamera({fit = false} = {}) {
+  window.requestAnimationFrame(() => {
+    studioFitWorkspace();
+    window.requestAnimationFrame(() => {
+      if (fit) {
+        studioState.camera.initialized = true;
+        studioFitView({animate: false, announce: false});
+      } else {
+        studioInitializeCamera();
+      }
+    });
+  });
+}
+
 function studioNextNodePosition() {
   const viewport = document.getElementById('studio-canvas-viewport');
   const index = studioState.blueprint.nodes.length;
-  const originX = viewport ? viewport.scrollLeft + Math.max(55, viewport.clientWidth * .24) : 90;
-  const originY = viewport ? viewport.scrollTop + Math.max(55, viewport.clientHeight * .18) : 80;
+  const zoom = studioState.camera.zoom || 1;
+  const originX = viewport
+    ? (viewport.scrollLeft + Math.max(55, viewport.clientWidth * .24) - studioState.camera.offsetX) / zoom
+    : 90;
+  const originY = viewport
+    ? (viewport.scrollTop + Math.max(55, viewport.clientHeight * .18) - studioState.camera.offsetY) / zoom
+    : 80;
   const stepX = STUDIO_NODE_WIDTH + 34;
   const stepY = STUDIO_NODE_HEIGHT + 34;
   const positions = [[0, 0]];
@@ -1265,25 +1496,28 @@ function studioRenderEdges() {
 }
 
 function studioStartDrag(event, nodeId) {
-  if (event.button !== 0) return;
+  if (event.button !== 0 || studioSpacePan || studioPanSession) return;
   const node = studioNodeById(nodeId);
   const nodeElement = event.currentTarget.closest('.studio-node');
   const dragHandle = event.currentTarget;
   if (!node || !nodeElement) return;
   event.preventDefault();
+  event.stopPropagation();
   studioSelectNode(nodeId);
   const before = studioDesignSnapshot();
   const startX = event.clientX;
   const startY = event.clientY;
   const originX = node.x;
   const originY = node.y;
+  const zoom = studioState.camera.zoom || 1;
   let moved = false;
+  studioNodeDragActive = true;
   nodeElement.classList.add('is-dragging');
   dragHandle.setPointerCapture?.(event.pointerId);
 
   const move = moveEvent => {
-    const nextX = studioFinite(originX + moveEvent.clientX - startX, originX, STUDIO_CANVAS_WIDTH - STUDIO_NODE_WIDTH - 20);
-    const nextY = studioFinite(originY + moveEvent.clientY - startY, originY, STUDIO_CANVAS_HEIGHT - STUDIO_NODE_HEIGHT - 20);
+    const nextX = studioFinite(originX + (moveEvent.clientX - startX) / zoom, originX, STUDIO_CANVAS_WIDTH - STUDIO_NODE_WIDTH - 20);
+    const nextY = studioFinite(originY + (moveEvent.clientY - startY) / zoom, originY, STUDIO_CANVAS_HEIGHT - STUDIO_NODE_HEIGHT - 20);
     moved = moved || nextX !== originX || nextY !== originY;
     node.x = nextX;
     node.y = nextY;
@@ -1295,12 +1529,15 @@ function studioStartDrag(event, nodeId) {
     dragHandle.removeEventListener('pointermove', move);
     dragHandle.removeEventListener('pointerup', finish);
     dragHandle.removeEventListener('pointercancel', finish);
+    dragHandle.removeEventListener('lostpointercapture', finish);
     nodeElement.classList.remove('is-dragging');
+    studioNodeDragActive = false;
     if (moved) studioRecordHistory(before);
   };
   dragHandle.addEventListener('pointermove', move);
   dragHandle.addEventListener('pointerup', finish);
   dragHandle.addEventListener('pointercancel', finish);
+  dragHandle.addEventListener('lostpointercapture', finish);
 }
 
 function studioMoveNodeWithKeyboard(event, nodeId) {
@@ -1479,18 +1716,21 @@ function studioCancelConnection() {
 
 function studioFocusSelection() {
   const viewport = document.getElementById('studio-canvas-viewport');
-  let node = studioNodeById(studioState.selectedNodeId);
+  const node = studioNodeById(studioState.selectedNodeId);
   const edge = studioEdgeById(studioState.selectedEdgeId);
-  if (!node && edge) node = studioNodeById(edge.from);
-  if (!viewport || !node) {
+  const source = edge ? studioNodeById(edge.from) : null;
+  const target = edge ? studioNodeById(edge.to) : null;
+  if (!viewport || (!node && (!source || !target))) {
     studioSetNotice('Select a node or connection first.', 'warning');
     return;
   }
-  viewport.scrollTo({
-    left: Math.max(0, node.x - viewport.clientWidth / 2 + STUDIO_NODE_WIDTH / 2),
-    top: Math.max(0, node.y - viewport.clientHeight / 2 + STUDIO_NODE_HEIGHT / 2),
-    behavior: 'smooth',
-  });
+  const centerX = node
+    ? node.x + STUDIO_NODE_WIDTH / 2
+    : (source.x + target.x + STUDIO_NODE_WIDTH) / 2;
+  const centerY = node
+    ? node.y + STUDIO_NODE_HEIGHT / 2
+    : (source.y + target.y + STUDIO_NODE_HEIGHT) / 2;
+  studioCenterWorldPoint(centerX, centerY, true);
 }
 
 function studioDeleteSelection() {
@@ -2107,6 +2347,7 @@ function studioRenderControls() {
   setDisabled('studio-copy-python', !live || busy || !generatedCurrent, !live ? 'Available in the served dashboard' : generatedCurrent ? 'Copy generated Python' : 'Generate current Python first');
   setDisabled('studio-download-python', !live || busy || !generatedCurrent, !live ? 'Available in the served dashboard' : generatedCurrent ? 'Download generated Python' : 'Generate current Python first');
   setDisabled('studio-delete-selection', !studioState.selectedNodeId && !studioState.selectedEdgeId);
+  setDisabled('studio-fit-selection', !studioState.selectedNodeId && !studioState.selectedEdgeId, 'Select a node or connection to center it');
   studioRenderRuntime();
 }
 
@@ -2246,8 +2487,10 @@ async function studioImportFile(file) {
     studioState.selectedNodeId = null;
     studioState.selectedEdgeId = null;
     studioState.connectionSourceId = null;
+    studioState.camera.initialized = false;
     studioRecordHistory(before);
     studioRender();
+    studioScheduleCamera({fit: true});
     studioSetNotice(`Imported ${normalized.nodes.length} nodes and ${normalized.edges.length} connections.`, 'success');
   } catch (error) {
     studioSetNotice(`Could not import Studio JSON: ${error.message}`, 'error', 0);
@@ -2290,8 +2533,10 @@ function studioResetProject() {
   studioState.selectedNodeId = null;
   studioState.selectedEdgeId = null;
   studioState.connectionSourceId = null;
+  studioState.camera.initialized = false;
   studioRecordHistory(before);
   studioRender();
+  studioScheduleCamera({fit: true});
   studioSetNotice('Studio reset to the starter blueprint.', 'success');
 }
 
@@ -2312,6 +2557,8 @@ function studioClearProject() {
   studioState.selectedNodeId = null;
   studioState.selectedEdgeId = null;
   studioState.connectionSourceId = null;
+  studioState.camera.zoom = 1;
+  studioState.camera.initialized = false;
   studioState.code = null;
   studioState.codeFilename = null;
   studioState.codeWarnings = [];
@@ -2323,6 +2570,7 @@ function studioClearProject() {
   studioPersistBlueprint();
   studioCloseOutput({restoreFocus: false});
   studioRender();
+  studioScheduleCamera({fit: true});
   studioSetNotice('Canvas cleared. Undo is available.', 'success');
 }
 
@@ -2413,6 +2661,109 @@ function studioFitWorkspace() {
   main.style.setProperty('--studio-main-height', `${Math.max(520, window.innerHeight - top)}px`);
 }
 
+function studioStartPan(event) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport || studioNodeDragActive || studioPanSession) return;
+  const interactive = event.target.closest?.('.studio-node, .studio-edge-hit, button, input, textarea, select, [contenteditable="true"]');
+  const middleButton = event.button === 1;
+  const spaceDrag = event.button === 0 && studioSpacePan;
+  const backgroundDrag = event.button === 0 && !interactive;
+  if (!middleButton && !spaceDrag && !backgroundDrag) return;
+  event.preventDefault();
+  viewport.focus({preventScroll: true});
+  studioPanSession = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    scrollLeft: viewport.scrollLeft,
+    scrollTop: viewport.scrollTop,
+    moved: false,
+  };
+  viewport.classList.add('is-panning');
+  viewport.setPointerCapture?.(event.pointerId);
+}
+
+function studioMovePan(event) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  const session = studioPanSession;
+  if (!viewport || !session || session.pointerId !== event.pointerId) return;
+  event.preventDefault();
+  const dx = event.clientX - session.startX;
+  const dy = event.clientY - session.startY;
+  if (Math.hypot(dx, dy) > 3) session.moved = true;
+  viewport.scrollLeft = session.scrollLeft - dx;
+  viewport.scrollTop = session.scrollTop - dy;
+}
+
+function studioFinishPan(event) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  const session = studioPanSession;
+  if (!viewport || !session || session.pointerId !== event.pointerId) return;
+  studioPanSession = null;
+  viewport.classList.remove('is-panning');
+  if (event.type !== 'lostpointercapture' && viewport.hasPointerCapture?.(event.pointerId)) {
+    viewport.releasePointerCapture(event.pointerId);
+  }
+  if (session.moved) {
+    studioSuppressCanvasClick = true;
+    window.setTimeout(() => { studioSuppressCanvasClick = false; }, 0);
+  }
+}
+
+function studioWheelCanvas(event) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport || studioNodeDragActive) return;
+  event.preventDefault();
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.clientHeight : 1;
+  if (event.ctrlKey || event.metaKey) {
+    const delta = event.deltaY * unit;
+    if (!delta) return;
+    studioSetZoom(studioState.camera.zoom * Math.exp(-delta * .0018), {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+    return;
+  }
+  let deltaX = event.deltaX * unit;
+  let deltaY = event.deltaY * unit;
+  if (event.shiftKey && Math.abs(deltaX) < Math.abs(deltaY)) {
+    deltaX = deltaY;
+    deltaY = 0;
+  }
+  viewport.scrollLeft += deltaX;
+  viewport.scrollTop += deltaY;
+}
+
+function studioCanvasKeydown(event) {
+  const viewport = document.getElementById('studio-canvas-viewport');
+  if (!viewport || event.target !== viewport || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.key === '+' || event.key === '=') {
+    event.preventDefault();
+    studioZoomBy(1);
+  } else if (event.key === '-' || event.key === '_') {
+    event.preventDefault();
+    studioZoomBy(-1);
+  } else if (event.key === '0') {
+    event.preventDefault();
+    studioResetZoom();
+  } else if (event.key.toLowerCase() === 'f') {
+    event.preventDefault();
+    studioFitView();
+  } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+    event.preventDefault();
+    const distance = event.shiftKey ? 140 : 48;
+    if (event.key === 'ArrowLeft') viewport.scrollLeft -= distance;
+    if (event.key === 'ArrowRight') viewport.scrollLeft += distance;
+    if (event.key === 'ArrowUp') viewport.scrollTop -= distance;
+    if (event.key === 'ArrowDown') viewport.scrollTop += distance;
+  }
+}
+
+function studioResizeWorkspace() {
+  studioFitWorkspace();
+  window.requestAnimationFrame(studioApplyCamera);
+}
+
 function studioRender() {
   studioRenderPalette();
   studioRenderCanvas();
@@ -2426,7 +2777,7 @@ function renderStudio() {
   if (!studioMounted) {
     studioMounted = true;
     studioRender();
-    window.requestAnimationFrame(studioFitWorkspace);
+    studioScheduleCamera();
     return;
   }
   studioRenderPalette();
@@ -2434,7 +2785,7 @@ function renderStudio() {
   studioRenderOutput();
   studioRenderControls();
   studioRenderNotice();
-  window.requestAnimationFrame(studioFitWorkspace);
+  studioScheduleCamera();
 }
 
 function studioInstallEvents() {
@@ -2446,8 +2797,29 @@ function studioInstallEvents() {
   document.getElementById('studio-import-file')?.addEventListener('change', event => {
     studioImportFile(event.target.files?.[0] || null);
   });
-  document.getElementById('studio-canvas')?.addEventListener('click', event => {
-    if (!['studio-canvas', 'studio-node-layer', 'studio-edge-layer'].includes(event.target.id)) return;
+  const viewport = document.getElementById('studio-canvas-viewport');
+  viewport?.addEventListener('pointerdown', studioStartPan);
+  viewport?.addEventListener('pointermove', studioMovePan);
+  viewport?.addEventListener('pointerup', studioFinishPan);
+  viewport?.addEventListener('pointercancel', studioFinishPan);
+  viewport?.addEventListener('lostpointercapture', studioFinishPan);
+  viewport?.addEventListener('wheel', studioWheelCanvas, {passive: false});
+  viewport?.addEventListener('keydown', studioCanvasKeydown);
+  if (viewport && window.ResizeObserver) {
+    studioCameraResizeObserver = new ResizeObserver(() => {
+      window.cancelAnimationFrame(studioCameraResizeFrame);
+      studioCameraResizeFrame = window.requestAnimationFrame(studioApplyCamera);
+    });
+    studioCameraResizeObserver.observe(viewport);
+  }
+  viewport?.addEventListener('click', event => {
+    if (!studioSuppressCanvasClick) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    studioSuppressCanvasClick = false;
+  }, true);
+  viewport?.addEventListener('click', event => {
+    if (event.target.closest?.('.studio-node, .studio-edge-hit, button, input, textarea, select, [contenteditable="true"]')) return;
     studioState.selectedNodeId = null;
     studioState.selectedEdgeId = null;
     studioUpdateCanvasSelection();
@@ -2468,6 +2840,11 @@ function studioInstallEvents() {
       return;
     }
     if (editing) return;
+    if (event.key === ' ' && !event.repeat && (event.target === viewport || event.target === document.body)) {
+      event.preventDefault();
+      studioSpacePan = true;
+      return;
+    }
     const modifier = event.metaKey || event.ctrlKey;
     if (modifier && !event.altKey && event.key.toLowerCase() === 'z') {
       event.preventDefault();
@@ -2480,7 +2857,11 @@ function studioInstallEvents() {
       studioDeleteSelection();
     }
   });
-  window.addEventListener('resize', studioFitWorkspace);
+  document.addEventListener('keyup', event => {
+    if (event.key === ' ') studioSpacePan = false;
+  });
+  window.addEventListener('blur', () => { studioSpacePan = false; });
+  window.addEventListener('resize', studioResizeWorkspace);
 }
 
 studioInstallEvents();
