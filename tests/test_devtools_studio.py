@@ -126,11 +126,14 @@ def test_studio_generation_is_independent_of_canvas_layout():
     blueprint = default_studio_blueprint()
     baseline = generate_studio_code(blueprint).source
     for index, node in enumerate(blueprint["nodes"]):
-        node["x"] = 1700 - index * 119
-        node["y"] = 900 - index * 83
+        node["x"] = 2784 - index * 119
+        node["y"] = 1668 - index * 83
 
-    moved = generate_studio_code(blueprint).source
+    validated = validate_studio_blueprint(blueprint)
+    moved = generate_studio_code(validated).source
 
+    assert validated["nodes"][0]["x"] == 2784
+    assert validated["nodes"][0]["y"] == 1668
     assert moved == baseline
 
 

@@ -118,8 +118,8 @@ STUDIO_CSS = r"""
 .studio-notice-mark { width: 8px; height: 8px; margin-top: 6px; border-radius: 999px; background: currentColor; flex: 0 0 auto; }
 .studio-workspace {
   display: grid;
-  grid-template-columns: 236px minmax(460px, 1fr) 326px;
-  gap: 12px;
+  grid-template-columns: clamp(190px, 18%, 220px) minmax(0, 1fr) clamp(270px, 25%, 300px);
+  gap: 10px;
   align-items: stretch;
   min-width: 0;
   min-height: 650px;
@@ -232,7 +232,7 @@ STUDIO_CSS = r"""
   position: relative;
   min-height: 570px;
   overflow: hidden;
-  background: linear-gradient(145deg, #edf2f8, #e9f1f4);
+  background: #edf2f8;
   box-shadow: inset 0 0 35px rgba(66,84,110,.08);
   overscroll-behavior: contain;
   touch-action: none;
@@ -253,25 +253,37 @@ STUDIO_CSS = r"""
   border: 0;
 }
 .studio-canvas-camera {
+  --studio-grid-size: 24px;
+  --studio-grid-origin-x: 0px;
+  --studio-grid-origin-y: 0px;
   position: relative;
-  width: 1800px;
-  height: 1050px;
+  width: 3000px;
+  height: 1800px;
   min-width: 100%;
   min-height: 100%;
+  background-color: #edf2f8;
+  background-image:
+    radial-gradient(circle, rgba(104,120,143,.30) .65px, transparent .95px),
+    linear-gradient(145deg, #edf2f8, #e9f1f4);
+  background-position:
+    var(--studio-grid-origin-x) var(--studio-grid-origin-y),
+    0 0;
+  background-size:
+    var(--studio-grid-size) var(--studio-grid-size),
+    100% 100%;
+  background-repeat: repeat, no-repeat;
 }
 .studio-canvas {
   position: absolute;
   inset: 0 auto auto 0;
-  width: 1800px;
-  height: 1050px;
+  width: 3000px;
+  height: 1800px;
   transform-origin: 0 0;
   will-change: transform;
   background-image:
     radial-gradient(circle at 18% 16%, rgba(86,101,216,.10), transparent 26%),
-    radial-gradient(circle at 76% 72%, rgba(15,159,146,.10), transparent 28%),
-    radial-gradient(circle, rgba(104,120,143,.35) 1px, transparent 1.2px),
-    linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,0));
-  background-size: 100% 100%, 100% 100%, 24px 24px, 100% 100%;
+    radial-gradient(circle at 76% 72%, rgba(15,159,146,.10), transparent 28%);
+  background-size: 100% 100%, 100% 100%;
 }
 .studio-edge-layer, .studio-node-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
 .studio-edge-layer { overflow: visible; }
@@ -509,9 +521,6 @@ STUDIO_CSS = r"""
   .main.studio-main .studio-inspector { max-height: none; }
   .main.studio-main .studio-canvas-viewport { min-height: 0; }
 }
-@media (max-width: 1380px) {
-  .studio-workspace { grid-template-columns: 212px minmax(430px, 1fr) 300px; }
-}
 @media (max-width: 1120px) {
   .studio-topbar { flex-direction: column; }
   .studio-heading .lede { display: none; }
@@ -616,7 +625,7 @@ STUDIO_HTML = r"""
           <span class="studio-visually-hidden" id="studio-canvas-help">Drag empty canvas space to pan. Use Control or Command plus the wheel to zoom. Press plus, minus, zero, or F while the canvas is focused for zoom controls.</span>
           <div class="studio-canvas-camera" id="studio-canvas-camera">
             <div class="studio-canvas" id="studio-canvas">
-              <svg class="studio-edge-layer" id="studio-edge-layer" viewBox="0 0 1800 1050" aria-label="Topology connections"></svg>
+              <svg class="studio-edge-layer" id="studio-edge-layer" viewBox="0 0 3000 1800" aria-label="Topology connections"></svg>
               <div class="studio-node-layer" id="studio-node-layer"></div>
               <div class="studio-canvas-empty" id="studio-canvas-empty"><strong>Build your first mesh</strong>Choose a component from the palette. Connect a node's right output port to another node's left input port.</div>
             </div>
@@ -669,9 +678,9 @@ const STUDIO_NODE_KINDS = ['agent', 'llm', 'tool', 'registry', 'flow', 'module']
 const STUDIO_NODE_KIND_SET = new Set(STUDIO_NODE_KINDS);
 const STUDIO_NODE_WIDTH = 196;
 const STUDIO_NODE_HEIGHT = 112;
-const STUDIO_CANVAS_WIDTH = 1800;
-const STUDIO_CANVAS_HEIGHT = 1050;
-const STUDIO_ZOOM_MIN = .25;
+const STUDIO_CANVAS_WIDTH = 3000;
+const STUDIO_CANVAS_HEIGHT = 1800;
+const STUDIO_ZOOM_MIN = .1;
 const STUDIO_ZOOM_MAX = 1.75;
 const STUDIO_ZOOM_STEP = .1;
 const STUDIO_FIT_PADDING = 54;
@@ -1212,6 +1221,9 @@ function studioApplyCamera() {
   studioState.camera.offsetY = offsetY;
   camera.style.width = `${scaledWidth + viewport.clientWidth}px`;
   camera.style.height = `${scaledHeight + viewport.clientHeight}px`;
+  camera.style.setProperty('--studio-grid-size', `${Math.max(8, 24 * zoom)}px`);
+  camera.style.setProperty('--studio-grid-origin-x', `${offsetX}px`);
+  camera.style.setProperty('--studio-grid-origin-y', `${offsetY}px`);
   canvas.style.left = `${offsetX}px`;
   canvas.style.top = `${offsetY}px`;
   canvas.style.transform = `scale(${zoom})`;
@@ -1301,14 +1313,10 @@ function studioFitView({animate = true, announce = true} = {}) {
   if (!viewport || !viewport.clientWidth || !viewport.clientHeight) return false;
   const nodes = studioState.blueprint.nodes;
   if (!nodes.length) {
-    studioState.camera.zoom = studioClampZoom(Math.min(
-      1,
-      (viewport.clientWidth - STUDIO_FIT_PADDING * 2) / STUDIO_CANVAS_WIDTH,
-      (viewport.clientHeight - STUDIO_FIT_PADDING * 2) / STUDIO_CANVAS_HEIGHT,
-    ));
+    studioState.camera.zoom = 1;
     studioApplyCamera();
     studioCenterWorldPoint(STUDIO_CANVAS_WIDTH / 2, STUDIO_CANVAS_HEIGHT / 2, animate);
-    if (announce) studioSetNotice(`The empty canvas is centered at ${Math.round(studioState.camera.zoom * 100)}%.`, 'info');
+    if (announce) studioSetNotice('The empty canvas is centered at 100%.', 'info');
     return true;
   }
   const left = Math.min(...nodes.map(node => node.x));

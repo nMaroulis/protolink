@@ -280,6 +280,12 @@ def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     assert "Visual runtime builder" in dashboard_html
     assert "studio-canvas" in dashboard_html
     assert 'id="studio-canvas-camera"' in dashboard_html
+    assert 'viewBox="0 0 3000 1800"' in dashboard_html
+    assert "const STUDIO_CANVAS_WIDTH = 3000;" in dashboard_html
+    assert "const STUDIO_CANVAS_HEIGHT = 1800;" in dashboard_html
+    assert "const STUDIO_ZOOM_MIN = .1;" in dashboard_html
+    assert dashboard_html.count("width: 3000px;") == 2
+    assert dashboard_html.count("height: 1800px;") == 2
     assert "studio-node-layer" in dashboard_html
     assert 'id="studio-zoom-out"' in dashboard_html
     assert 'aria-label="Zoom out"' in dashboard_html
@@ -291,6 +297,10 @@ def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     assert "Fit project" in dashboard_html
     assert "transform-origin: 0 0" in dashboard_html
     assert "touch-action: none" in dashboard_html
+    assert "--studio-grid-size" in dashboard_html
+    assert "--studio-grid-origin-x" in dashboard_html
+    assert "--studio-grid-origin-y" in dashboard_html
+    assert "camera.style.setProperty" in dashboard_html
     assert "studioApplyCamera" in dashboard_html
     assert "studioScreenToCanvas" in dashboard_html
     assert "studioZoomBy" in dashboard_html
