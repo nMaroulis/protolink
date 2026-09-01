@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import keyword
 import math
 import os
 import pprint
@@ -66,21 +67,159 @@ _LLM_PROVIDER_KWARGS: dict[str, frozenset[str]] = {
     "deepseek": frozenset({"api_key", "base_url", "model", "model_params", "supports_tool_calling"}),
     "huggingface": frozenset({"api_key", "model", "model_params"}),
     "ollama": frozenset({"base_url", "headers", "model", "model_params", "supports_tool_calling"}),
-    "lmstudio": frozenset(
-        {"api_key", "base_url", "headers", "model", "model_params", "supports_tool_calling"}
-    ),
+    "lmstudio": frozenset({"api_key", "base_url", "headers", "model", "model_params", "supports_tool_calling"}),
     "openai-compatible": frozenset(
         {"api_key", "base_url", "headers", "model", "model_params", "supports_tool_calling"}
     ),
-    "vllm": frozenset(
-        {"api_key", "base_url", "headers", "model", "model_params", "supports_tool_calling"}
-    ),
-    "llama.cpp-server": frozenset(
-        {"base_url", "headers", "model", "model_params", "supports_tool_calling"}
-    ),
+    "vllm": frozenset({"api_key", "base_url", "headers", "model", "model_params", "supports_tool_calling"}),
+    "llama.cpp-server": frozenset({"base_url", "headers", "model", "model_params", "supports_tool_calling"}),
     "llama.cpp-local": frozenset({"model", "model_params", "supports_tool_calling"}),
 }
 _LLM_FACTORY_KWARGS = frozenset({"max_parse_failures", "metrics_enabled", "metrics_profile"})
+_AGENT_CAPABILITY_FIELDS = frozenset(
+    {
+        "streaming",
+        "push_notifications",
+        "state_transition_history",
+        "delegation",
+        "has_llm",
+        "max_concurrency",
+        "message_batching",
+        "tool_calling",
+        "multi_step_reasoning",
+        "timeout_support",
+        "rag",
+        "code_execution",
+    }
+)
+_TRANSPORT_OPTION_FIELDS: dict[str, frozenset[str]] = {
+    "http": frozenset({"timeout", "backend", "validate_schema", "log_level", "access_log"}),
+    "sse": frozenset({"timeout", "backend", "validate_schema", "log_level", "access_log"}),
+    "json-rpc": frozenset({"timeout", "backend", "validate_schema", "log_level", "access_log"}),
+    "sse-json-rpc": frozenset({"timeout", "backend", "validate_schema", "log_level", "access_log"}),
+    "websocket": frozenset({"timeout"}),
+    "grpc": frozenset(
+        {
+            "timeout",
+            "channel_options",
+            "server_options",
+            "maximum_concurrent_rpcs",
+            "graceful_shutdown_timeout",
+            "enable_health",
+            "enable_reflection",
+        }
+    ),
+    "runtime": frozenset(),
+}
+_COMMON_TRANSPORT_CONFIG_FIELDS = frozenset(
+    {
+        "transport",
+        "url",
+        "credentials_env",
+        "transport_config",
+        "transport_options",
+        "timeout",
+        "backend",
+        "validate_schema",
+        "log_level",
+        "access_log",
+    }
+)
+_NODE_CONFIG_FIELDS: dict[str, frozenset[str]] = {
+    "agent": _COMMON_TRANSPORT_CONFIG_FIELDS
+    | frozenset(
+        {
+            "name",
+            "description",
+            "role",
+            "version",
+            "system_prompt",
+            "skills",
+            "state",
+            "verbosity",
+            "discovery_ttl",
+            "registry_heartbeat_interval",
+            "expose_chat",
+            "override_system_prompt",
+            "a2a",
+            "register",
+            "retrieval",
+            "capabilities",
+            "security_schemes",
+            "interfaces",
+            "tags",
+            "input_formats",
+            "output_formats",
+            "advanced",
+        }
+    ),
+    "llm": frozenset(
+        {
+            "provider",
+            "model",
+            "api_key_env",
+            "base_url",
+            "headers",
+            "default_response",
+            "model_params",
+            "temperature",
+            "max_tokens",
+            "supports_tool_calling",
+            "metrics_enabled",
+            "max_parse_failures",
+            "advanced",
+        }
+    ),
+    "tool": frozenset(
+        {
+            "implementation",
+            "builtin",
+            "name",
+            "description",
+            "input_schema",
+            "output_schema",
+            "tags",
+            "capabilities",
+            "args",
+            "examples",
+            "response_template",
+        }
+    ),
+    "registry": _COMMON_TRANSPORT_CONFIG_FIELDS | frozenset({"verbosity", "entry_ttl_seconds", "advanced"}),
+    "flow": frozenset({"name", "flow_type", "routing_prompt", "entry_node"}),
+    "module": frozenset(
+        {
+            "module_type",
+            "implementation",
+            "name",
+            "namespace",
+            "path",
+            "ttl",
+            "table_name",
+            "max_traces",
+            "capture_payloads",
+            "api_key_env",
+            "project_name",
+            "public_key_env",
+            "secret_key_env",
+            "host",
+            "level",
+            "table_prefix",
+            "default_effect",
+            "rules",
+            "description",
+            "sources",
+            "default_k",
+            "context_max_chars",
+            "secret_env",
+            "algorithm",
+            "issuer",
+            "audience",
+            "leeway_seconds",
+            "advanced",
+        }
+    ),
+}
 
 _MAX_BLUEPRINT_BYTES = 1024 * 1024
 _MAX_NODES = 200
@@ -229,10 +368,11 @@ def default_studio_blueprint() -> dict[str, Any]:
 def validate_studio_blueprint(value: Any) -> dict[str, Any]:
     """Validate and normalize a declarative Studio blueprint.
 
-    Validation is intentionally strict at the process boundary.  Unknown
-    configuration keys remain available through ``advanced`` mappings, but all
-    values must still be bounded JSON data and secrets must be referenced by
-    environment-variable name rather than embedded in the blueprint.
+    Validation is intentionally strict at the process boundary.  Every emitted
+    constructor argument maps to a public Protolink API; only LLM providers have
+    a validated ``advanced`` option mapping.  Values must be bounded JSON data,
+    and secrets must be referenced by environment-variable name rather than
+    embedded in the blueprint.
     """
     issues: list[str] = []
     if not isinstance(value, dict):
@@ -333,9 +473,7 @@ def validate_studio_blueprint(value: Any) -> dict[str, Any]:
             source_node = next(node for node in nodes if node["id"] == source)
             target_node = next(node for node in nodes if node["id"] == target)
             if not _connection_allowed(source_node, target_node):
-                issues.append(
-                    f"{path} cannot connect {source_node['kind']} to {target_node['kind']}"
-                )
+                issues.append(f"{path} cannot connect {source_node['kind']} to {target_node['kind']}")
         relation = _clean_text(raw_edge.get("relation"), "auto", limit=32).lower().replace(" ", "_")
         label = _clean_text(raw_edge.get("label"), "", limit=80)
         raw_order = raw_edge.get("order", index + 1)
@@ -409,76 +547,14 @@ def load_studio_blueprint(path: str | Path) -> dict[str, Any]:
 
 
 def generate_studio_code(value: Any) -> StudioCode:
-    """Generate a readable, runnable Python module from a Studio blueprint."""
+    """Generate a readable, directly runnable module using public Protolink APIs."""
     blueprint = validate_studio_blueprint(value)
     warnings = _blueprint_warnings(blueprint)
     project_slug = _python_slug(blueprint["project"]["name"]) or "protolink_studio"
-    lines: list[str] = [
-        '"""Generated by Protolink Studio. Edit freely; this file uses public APIs only."""',
-        "",
-        "from __future__ import annotations",
-        "",
-        "import asyncio",
-        "import os",
-        "import signal",
-        "import threading",
-        "from typing import Any",
-        "",
-        "from protolink.agents import Agent",
-        "from protolink.core.policy import CapabilityPolicy",
-        "from protolink.discovery import Registry",
-        "from protolink.flows import Graph, Parallel, Pipeline, Router",
-        "from protolink.llms import create_llm",
-        "from protolink.logging import ConsoleLogger, FileLogger, QuietLogger",
-        "from protolink.models import AgentCard, Task",
-        "from protolink.rag import create_knowledge",
-        "from protolink.security import BearerTokenAuth",
-        "from protolink.storage import InMemoryStorage, SQLiteRunStore, SQLiteStorage",
-        "from protolink.telemetry import LangfuseTelemetry, LangSmithTelemetry, LocalTraceTelemetry, MultiTelemetry",
-        "from protolink.tools import Tool",
-        "from protolink.tools.builtins import calculator, current_datetime, fetch_url, web_search",
-        "from protolink.transport import TransportConfig, get_transport",
-        "",
-        f"BLUEPRINT = {_literal(blueprint)}",
-        "",
-        "registries: dict[str, Registry] = {}",
-        "llms: dict[str, Any] = {}",
-        "tools: dict[str, Any] = {}",
-        "modules: dict[str, Any] = {}",
-        "agents: dict[str, Agent] = {}",
-        "flows: dict[str, Any] = {}",
-        "_built = False",
-        "_shutdown = threading.Event()",
-        "",
-        "",
-        "def make_transport(",
-        "    kind: str,",
-        "    url: str,",
-        "    *,",
-        "    options: dict[str, Any] | None = None,",
-        "    config: dict[str, Any] | None = None,",
-        "):",
-        '    """Build one configured transport from declarative settings."""',
-        "    return get_transport(",
-        "        kind,",
-        "        url=url,",
-        "        config=TransportConfig.from_dict(config or {}),",
-        "        **(options or {}),",
-        "    )",
-        "",
-        "",
-        "def build() -> None:",
-        '    """Construct registries, modules, models, tools, agents, and flows."""',
-        "    global _built",
-        "    if _built:",
-        "        return",
-        "    for collection in (registries, llms, tools, modules, agents, flows):",
-        "        collection.clear()",
-    ]
-
     nodes = blueprint["nodes"]
     edges = blueprint["edges"]
     node_map = {node["id"]: node for node in nodes}
+    runtime_names = _runtime_names(nodes)
     registry_nodes = [node for node in nodes if node["kind"] == "registry"]
     module_nodes = [node for node in nodes if node["kind"] == "module"]
     llm_nodes = [node for node in nodes if node["kind"] == "llm"]
@@ -486,66 +562,206 @@ def generate_studio_code(value: Any) -> StudioCode:
     agent_nodes = [node for node in nodes if node["kind"] == "agent"]
     flow_nodes = [node for node in nodes if node["kind"] == "flow"]
 
-    if not any((registry_nodes, module_nodes, llm_nodes, tool_nodes, agent_nodes, flow_nodes)):
+    module_pairs = {(node["config"]["module_type"], node["config"]["implementation"]) for node in module_nodes}
+    flow_class_names = {
+        "pipeline": "Pipeline",
+        "parallel": "Parallel",
+        "router": "Router",
+        "graph": "Graph",
+    }
+    flow_imports = [
+        flow_class_names[flow_type]
+        for flow_type in STUDIO_FLOW_TYPES
+        if any(node["config"]["flow_type"] == flow_type for node in flow_nodes)
+    ]
+    logger_imports = [
+        class_name
+        for implementation, class_name in (
+            ("console", "ConsoleLogger"),
+            ("file", "FileLogger"),
+            ("quiet", "QuietLogger"),
+        )
+        if ("logger", implementation) in module_pairs
+    ]
+    storage_imports = [
+        class_name
+        for pair, class_name in (
+            (("storage", "memory"), "InMemoryStorage"),
+            (("storage", "sqlite"), "SQLiteStorage"),
+            (("run_store", "sqlite"), "SQLiteRunStore"),
+        )
+        if pair in module_pairs
+    ]
+    telemetry_imports = [
+        class_name
+        for implementation, class_name in (
+            ("local", "LocalTraceTelemetry"),
+            ("langsmith", "LangSmithTelemetry"),
+            ("langfuse", "LangfuseTelemetry"),
+        )
+        if ("telemetry", implementation) in module_pairs
+    ]
+    if sum(node["config"]["module_type"] == "telemetry" for node in module_nodes) > 1:
+        telemetry_imports.append("MultiTelemetry")
+    builtin_imports = [
+        name
+        for name in STUDIO_BUILTIN_TOOLS
+        if any(
+            node["config"]["implementation"] == "builtin" and node["config"]["builtin"] == name for node in tool_nodes
+        )
+    ]
+    uses_environment = any(
+        key.endswith("_env") and bool(item) for node in nodes for key, item in node["config"].items()
+    )
+    uses_transport = bool(agent_nodes or registry_nodes)
+
+    protolink_imports: list[str] = []
+    if agent_nodes:
+        protolink_imports.append("from protolink.agents import Agent")
+    if any(node["config"]["module_type"] == "policy" for node in module_nodes):
+        protolink_imports.append("from protolink.core.policy import CapabilityPolicy")
+    if registry_nodes:
+        protolink_imports.append("from protolink.discovery import Registry")
+    if flow_imports:
+        protolink_imports.append(f"from protolink.flows import {', '.join(flow_imports)}")
+    if llm_nodes:
+        protolink_imports.append("from protolink.llms import create_llm")
+    if logger_imports:
+        protolink_imports.append(f"from protolink.logging import {', '.join(logger_imports)}")
+    model_imports = [name for name, present in (("AgentCard", agent_nodes), ("Task", flow_nodes)) if present]
+    if model_imports:
+        protolink_imports.append(f"from protolink.models import {', '.join(model_imports)}")
+    if any(node["config"]["module_type"] == "knowledge" for node in module_nodes):
+        protolink_imports.append("from protolink.rag import create_knowledge")
+    if any(node["config"]["module_type"] == "auth" for node in module_nodes):
+        protolink_imports.append("from protolink.security import BearerTokenAuth")
+    if storage_imports:
+        protolink_imports.append(f"from protolink.storage import {', '.join(storage_imports)}")
+    if telemetry_imports:
+        protolink_imports.append(f"from protolink.telemetry import {', '.join(telemetry_imports)}")
+    if any(node["config"]["implementation"] == "custom" for node in tool_nodes):
+        protolink_imports.append("from protolink.tools import Tool")
+    if builtin_imports:
+        protolink_imports.append(f"from protolink.tools.builtins import {', '.join(builtin_imports)}")
+    if uses_transport:
+        protolink_imports.append("from protolink.transport import TransportConfig, get_transport")
+
+    lines: list[str] = [
+        '"""Runnable Protolink topology generated by Protolink Studio."""',
+        "",
+        "from __future__ import annotations",
+        "",
+        *(["import os"] if uses_environment else []),
+        "import signal",
+        "import threading",
+        "from typing import Any",
+        "",
+        *protolink_imports,
+        "",
+    ]
+    collection_specs = (
+        ("registries", "Registry", registry_nodes),
+        ("llms", "Any", llm_nodes),
+        ("tools", "Any", tool_nodes),
+        ("modules", "Any", module_nodes),
+        ("agents", "Agent", agent_nodes),
+        ("flows", "Any", flow_nodes),
+    )
+    for collection, item_type, collection_nodes in collection_specs:
+        if collection_nodes:
+            lines.append(f"{collection}: dict[str, {item_type}] = {{}}")
+    if any(spec[2] for spec in collection_specs):
+        lines.append("")
+    lines.extend(
+        [
+            "_built = False",
+            "_shutdown = threading.Event()",
+            "",
+            "",
+            "def build() -> None:",
+            '    """Construct the configured Protolink objects once."""',
+            "    global _built",
+            "    if _built:",
+            "        return",
+        ]
+    )
+    for collection, _item_type, collection_nodes in collection_specs:
+        if collection_nodes:
+            lines.append(f"    {collection}.clear()")
+    if not nodes:
         lines.append("    pass")
 
     for node in module_nodes:
-        _emit_module(lines, node)
+        _emit_module(lines, node, runtime_names)
     for node in registry_nodes:
-        _emit_registry(lines, node, node_map, edges)
+        _emit_registry(lines, node, node_map, edges, runtime_names)
     for node in llm_nodes:
-        _emit_llm(lines, node)
+        _emit_llm(lines, node, runtime_names)
     for node in tool_nodes:
-        _emit_tool(lines, node)
+        _emit_tool(lines, node, runtime_names)
     for node in agent_nodes:
-        _emit_agent(lines, node, node_map, edges)
-
-    ordered_flows = _order_flow_nodes(flow_nodes, node_map, edges)
-    for node in ordered_flows:
-        _emit_flow(lines, node, node_map, edges)
+        _emit_agent(lines, node, node_map, edges, runtime_names)
+    for node in _order_flow_nodes(flow_nodes, node_map, edges):
+        _emit_flow(lines, node, node_map, edges, runtime_names)
 
     lines.append("    _built = True")
+    if flow_nodes:
+        lines.extend(
+            [
+                "",
+                "",
+                "async def run_flow(flow_name: str, prompt: str) -> Task:",
+                '    """Execute a configured flow by name."""',
+                "    build()",
+                "    flow = flows.get(flow_name)",
+                "    if flow is None:",
+                "        raise KeyError(f'Unknown flow: {flow_name}')",
+                "    return await flow.execute(Task.create_infer(prompt=prompt))",
+            ]
+        )
 
     lines.extend(
         [
             "",
             "",
-            "async def run_flow(flow_name: str, prompt: str) -> Task:",
-            '    """Execute a constructed flow by node id or configured name."""',
-            "    build()",
-            "    flow = flows.get(flow_name)",
-            "    if flow is None:",
-            "        for node_id, candidate in flows.items():",
-            "            config = next((n['config'] for n in BLUEPRINT['nodes'] if n['id'] == node_id), {})",
-            "            if config.get('name') == flow_name:",
-            "                flow = candidate",
-            "                break",
-            "    if flow is None:",
-            "        raise KeyError(f'Unknown flow: {flow_name}')",
-            "    return await flow.execute(Task.create_infer(prompt=prompt))",
-            "",
-            "",
             "def start() -> None:",
-            '    """Start every configured registry and agent in the background."""',
+            '    """Start configured registries and agents in the background."""',
             "    build()",
-            "    for registry in registries.values():",
-            "        registry.start(background=True)",
-            "    for node_id, agent in agents.items():",
-            "        config = next(n['config'] for n in BLUEPRINT['nodes'] if n['id'] == node_id)",
-            "        agent.start(register=bool(config.get('register', True)), background=True)",
-            "    print("
-            + _literal(f"Protolink Studio project {blueprint['project']['name']} is running.")
-            + ", flush=True)",
-            "    for node_id, agent in agents.items():",
-            "        print(f'  agent {node_id}: {agent.card.url}', flush=True)",
+        ]
+    )
+    if registry_nodes:
+        lines.extend(["    for registry in registries.values():", "        registry.start(background=True)"])
+    for node in agent_nodes:
+        name = runtime_names[node["id"]]
+        register = bool(node["config"].get("register", True))
+        lines.append(f"    agents[{_literal(name)}].start(register={register!r}, background=True)")
+    lines.append(
+        "    print(" + _literal(f"Protolink project {blueprint['project']['name']} is running.") + ", flush=True)"
+    )
+    if agent_nodes:
+        lines.extend(
+            [
+                "    for agent_name, agent in agents.items():",
+                "        print(f'  agent {agent_name}: {agent.card.url}', flush=True)",
+            ]
+        )
+
+    lines.extend(
+        [
             "",
             "",
             "def stop() -> None:",
             '    """Stop agents before registries so unregister calls can complete."""',
-            "    for agent in reversed(list(agents.values())):",
-            "        agent.stop()",
-            "    for registry in reversed(list(registries.values())):",
-            "        registry.stop()",
+        ]
+    )
+    if agent_nodes:
+        lines.extend(["    for agent in reversed(list(agents.values())):", "        agent.stop()"])
+    if registry_nodes:
+        lines.extend(["    for registry in reversed(list(registries.values())):", "        registry.stop()"])
+    if not agent_nodes and not registry_nodes:
+        lines.append("    pass")
+    lines.extend(
+        [
             "",
             "",
             "def _request_shutdown(_signum: int, _frame: Any) -> None:",
@@ -562,7 +778,7 @@ def generate_studio_code(value: Any) -> StudioCode:
             "            pass",
             "    finally:",
             "        stop()",
-            "        print('Protolink Studio project stopped.', flush=True)",
+            "        print('Protolink project stopped.', flush=True)",
             "",
             "",
             'if __name__ == "__main__":',
@@ -571,7 +787,7 @@ def generate_studio_code(value: Any) -> StudioCode:
         ]
     )
     source = "\n".join(lines)
-    filename = f"{project_slug}.py"
+    filename = f"protolink_studio_{project_slug}.py"
     compile(source, filename, "exec")
     return StudioCode(source=source, filename=filename, blueprint=blueprint, warnings=tuple(warnings))
 
@@ -722,8 +938,8 @@ class StudioRuntimeManager:
         }
 
 
-def _node_defaults(kind: str, label: str, node_id: str) -> dict[str, Any]:
-    slug = _python_slug(label) or _python_slug(node_id) or kind
+def _node_defaults(kind: str, label: str, _node_id: str) -> dict[str, Any]:
+    slug = _python_slug(label) or kind
     if kind == "agent":
         return {
             "name": slug,
@@ -749,7 +965,6 @@ def _node_defaults(kind: str, label: str, node_id: str) -> dict[str, Any]:
             "output_formats": ["text/plain"],
             "transport_config": {},
             "transport_options": {},
-            "advanced": {},
         }
     if kind == "llm":
         return {
@@ -772,6 +987,8 @@ def _node_defaults(kind: str, label: str, node_id: str) -> dict[str, Any]:
             "output_schema": {"type": "object"},
             "tags": [],
             "capabilities": [],
+            "args": {},
+            "examples": [],
             "response_template": f"{label} completed.",
         }
     if kind == "registry":
@@ -782,7 +999,6 @@ def _node_defaults(kind: str, label: str, node_id: str) -> dict[str, Any]:
             "entry_ttl_seconds": None,
             "transport_config": {},
             "transport_options": {},
-            "advanced": {},
         }
     if kind == "flow":
         return {"name": slug, "flow_type": "pipeline", "routing_prompt": "Choose the best route."}
@@ -791,11 +1007,13 @@ def _node_defaults(kind: str, label: str, node_id: str) -> dict[str, Any]:
         "implementation": "memory",
         "name": slug,
         "namespace": slug,
-        "advanced": {},
     }
 
 
 def _validate_node_config(kind: str, config: dict[str, Any], path: str, issues: list[str]) -> None:
+    unsupported_fields = sorted(set(config).difference(_NODE_CONFIG_FIELDS[kind]))
+    if unsupported_fields:
+        issues.append(f"{path}.config contains unsupported fields: {', '.join(unsupported_fields)}")
     for mapping_name in ("advanced", "transport_config", "transport_options"):
         if mapping_name in config and not isinstance(config[mapping_name], dict):
             issues.append(f"{path}.config.{mapping_name} must be an object")
@@ -804,11 +1022,18 @@ def _validate_node_config(kind: str, config: dict[str, Any], path: str, issues: 
             issues.append(
                 f"{path}.config.{secret_name} must not contain a secret; use the matching *_env field instead"
             )
+    advanced = config.get("advanced")
+    if kind in {"agent", "registry", "module"} and isinstance(advanced, dict) and advanced:
+        issues.append(
+            f"{path}.config.advanced is not supported for {kind} nodes; "
+            "use the explicit Studio fields for public constructor arguments"
+        )
     if kind in {"agent", "registry"}:
         transport = str(config.get("transport") or "").lower()
         if transport not in STUDIO_TRANSPORTS:
             issues.append(f"{path}.config.transport must be one of {', '.join(STUDIO_TRANSPORTS)}")
         _validate_transport_url(config.get("url"), transport, f"{path}.config.url", issues)
+        _validate_transport_settings(config, transport, path, issues)
     if kind == "agent":
         if not str(config.get("name") or "").strip():
             issues.append(f"{path}.config.name is required")
@@ -828,6 +1053,20 @@ def _validate_node_config(kind: str, config: dict[str, Any], path: str, issues: 
         for key in ("state", "tags", "input_formats", "output_formats", "interfaces"):
             if key in config and not isinstance(config[key], list):
                 issues.append(f"{path}.config.{key} must be an array")
+        capabilities = config.get("capabilities")
+        if isinstance(capabilities, dict):
+            unsupported = sorted(set(capabilities).difference(_AGENT_CAPABILITY_FIELDS))
+            if unsupported:
+                issues.append(f"{path}.config.capabilities contains unsupported fields: {', '.join(unsupported)}")
+            for name, value in capabilities.items():
+                if name == "max_concurrency":
+                    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                        issues.append(f"{path}.config.capabilities.max_concurrency must be an integer of at least 1")
+                elif name in _AGENT_CAPABILITY_FIELDS and not isinstance(value, bool):
+                    issues.append(f"{path}.config.capabilities.{name} must be a boolean")
+        interfaces = config.get("interfaces")
+        if isinstance(interfaces, list):
+            _validate_agent_interfaces(interfaces, path, issues)
         state = config.get("state")
         if isinstance(state, list) and any(item not in {"conversation", "tools", "task", "flow"} for item in state):
             issues.append(f"{path}.config.state contains an unsupported state module")
@@ -878,6 +1117,10 @@ def _validate_node_config(kind: str, config: dict[str, Any], path: str, issues: 
         for key in ("tags", "capabilities"):
             if key in config and not isinstance(config[key], list):
                 issues.append(f"{path}.config.{key} must be an array")
+        if "args" in config and not isinstance(config["args"], dict):
+            issues.append(f"{path}.config.args must be an object")
+        if "examples" in config and not isinstance(config["examples"], list):
+            issues.append(f"{path}.config.examples must be an array")
     elif kind == "flow":
         if config.get("flow_type") not in STUDIO_FLOW_TYPES:
             issues.append(f"{path}.config.flow_type must be one of {', '.join(STUDIO_FLOW_TYPES)}")
@@ -934,8 +1177,105 @@ def _validate_transport_url(value: Any, transport: str, path: str, issues: list[
     }.get(transport, set())
     if parsed.scheme not in schemes or not parsed.hostname:
         issues.append(f"{path} must use a {transport} URL")
+    if parsed.scheme in {"https", "wss", "grpcs"}:
+        issues.append(f"{path} uses TLS, which requires a concrete TLSConfig that Studio does not expose yet")
     if parsed.username is not None or parsed.password is not None:
         issues.append(f"{path} must not contain credentials")
+
+
+def _validate_transport_settings(
+    config: dict[str, Any],
+    transport: str,
+    path: str,
+    issues: list[str],
+) -> None:
+    """Validate transport data against the public factory and config APIs."""
+    raw_options = config.get("transport_options")
+    if isinstance(raw_options, dict):
+        raw_options = _transport_options(config)
+        allowed = _TRANSPORT_OPTION_FIELDS.get(transport, frozenset())
+        unsupported = sorted(set(raw_options).difference(allowed))
+        if unsupported:
+            issues.append(
+                f"{path}.config.transport_options contains unsupported {transport} options: {', '.join(unsupported)}"
+            )
+        timeout = raw_options.get("timeout")
+        if timeout is not None and (
+            not isinstance(timeout, (int, float))
+            or isinstance(timeout, bool)
+            or not math.isfinite(float(timeout))
+            or timeout <= 0
+        ):
+            issues.append(f"{path}.config.transport_options.timeout must be greater than zero")
+        if "backend" in raw_options and raw_options["backend"] not in {"starlette", "fastapi"}:
+            issues.append(f"{path}.config.transport_options.backend must be starlette or fastapi")
+        if "log_level" in raw_options and raw_options["log_level"] not in {
+            "critical",
+            "error",
+            "warning",
+            "info",
+            "debug",
+            "trace",
+        }:
+            issues.append(f"{path}.config.transport_options.log_level is invalid")
+        for name in ("validate_schema", "access_log", "enable_health", "enable_reflection"):
+            if name in raw_options and not isinstance(raw_options[name], bool):
+                issues.append(f"{path}.config.transport_options.{name} must be a boolean")
+        maximum_concurrent_rpcs = raw_options.get("maximum_concurrent_rpcs")
+        if maximum_concurrent_rpcs is not None and (
+            not isinstance(maximum_concurrent_rpcs, int)
+            or isinstance(maximum_concurrent_rpcs, bool)
+            or maximum_concurrent_rpcs < 1
+        ):
+            issues.append(f"{path}.config.transport_options.maximum_concurrent_rpcs must be a positive integer")
+        for name in ("channel_options", "server_options"):
+            if name in raw_options and not _valid_grpc_options(raw_options[name]):
+                issues.append(f"{path}.config.transport_options.{name} must be an array of [name, value] pairs")
+
+    if transport == "runtime" and config.get("credentials_env"):
+        issues.append(f"{path}.config.credentials_env is not supported by the runtime transport")
+
+    raw_transport_config = config.get("transport_config")
+    if not isinstance(raw_transport_config, dict):
+        return
+    try:
+        from protolink.transport import TransportConfig
+
+        TransportConfig.from_dict(raw_transport_config)
+    except (TypeError, ValueError) as exc:
+        issues.append(f"{path}.config.transport_config is invalid: {exc}")
+
+
+def _valid_grpc_options(value: Any) -> bool:
+    return isinstance(value, list) and all(
+        isinstance(item, list)
+        and len(item) == 2
+        and isinstance(item[0], str)
+        and bool(item[0])
+        and isinstance(item[1], (str, int))
+        and not isinstance(item[1], bool)
+        for item in value
+    )
+
+
+def _validate_agent_interfaces(interfaces: list[Any], path: str, issues: list[str]) -> None:
+    """Validate additional AgentCard interfaces before code generation."""
+    allowed = {"url", "transport", "protocolVersion"}
+    for index, interface in enumerate(interfaces):
+        interface_path = f"{path}.config.interfaces[{index}]"
+        if not isinstance(interface, dict):
+            issues.append(f"{interface_path} must be an object")
+            continue
+        unsupported = sorted(set(interface).difference(allowed))
+        if unsupported:
+            issues.append(f"{interface_path} contains unsupported fields: {', '.join(unsupported)}")
+        transport = str(interface.get("transport") or "http").lower()
+        if transport not in STUDIO_TRANSPORTS:
+            issues.append(f"{interface_path}.transport must be a supported transport")
+            continue
+        _validate_transport_url(interface.get("url"), transport, f"{interface_path}.url", issues)
+        if "protocolVersion" in interface and not isinstance(interface["protocolVersion"], str):
+            issues.append(f"{interface_path}.protocolVersion must be a string")
 
 
 def _validate_integer(
@@ -1047,8 +1387,10 @@ def _find_embedded_secrets(value: Any, path: str, issues: list[str]) -> None:
         return
     for key, item in value.items():
         normalized = re.sub(r"[^a-z0-9]+", "_", key.casefold()).strip("_")
-        if normalized.endswith("_env") and _is_present(item) and (
-            not isinstance(item, str) or not _ENV_NAME_RE.fullmatch(item)
+        if (
+            normalized.endswith("_env")
+            and _is_present(item)
+            and (not isinstance(item, str) or not _ENV_NAME_RE.fullmatch(item))
         ):
             issues.append(f"{path}.{key} must be an environment variable name")
             continue
@@ -1083,171 +1425,138 @@ def _emit_registry(
     node: dict[str, Any],
     node_map: dict[str, dict[str, Any]],
     edges: list[dict[str, Any]],
+    runtime_names: dict[str, str],
 ) -> None:
     config = node["config"]
-    options = _transport_options(config)
-    var = _python_slug(node["id"])
+    name = runtime_names[node["id"]]
     storage_ids = [
         target["id"]
         for target, _edge in _connected_nodes(node["id"], node_map, edges)
         if target["kind"] == "module" and target["config"].get("module_type") == "storage"
     ]
-    lines.extend(
-        [
-            "",
-            f"    # Registry: {_comment_text(node['label'])}",
-            f"    registry_transport_options_{var} = {_literal(options)}",
-        ]
-    )
-    _emit_env_option(lines, f"registry_transport_options_{var}", "credentials", config.get("credentials_env"))
-    lines.extend(
-        [
-            f"    registry_transport_{var} = make_transport(",
-            f"        {_literal(config['transport'])},",
-            f"        {_literal(config['url'])},",
-            f"        options=registry_transport_options_{var},",
-            f"        config={_literal(config.get('transport_config') or {})},",
-            "    )",
-        ]
-    )
-    kwargs = dict(config.get("advanced") or {})
-    for reserved in ("transport", "storage"):
-        kwargs.pop(reserved, None)
-    kwargs.update(
-        {
-            "verbosity": int(config.get("verbosity", 1)),
-            "entry_ttl_seconds": config.get("entry_ttl_seconds"),
-        }
-    )
-    storage_expr = f"modules[{_literal(storage_ids[0])}]" if storage_ids else "None"
-    lines.extend(
-        [
-            f"    registries[{_literal(node['id'])}] = Registry(",
-            f"        transport=registry_transport_{var},",
-            f"        storage={storage_expr},",
-            f"        **{_literal(kwargs)},",
-            "    )",
-        ]
+    lines.extend(["", f"    # Registry: {_comment_text(node['label'])}"])
+    transport_var = f"registry_transport_{name}"
+    _emit_transport(lines, transport_var, config)
+    storage_expr = f"modules[{_literal(runtime_names[storage_ids[0]])}]" if storage_ids else "None"
+    _emit_call(
+        lines,
+        f"registries[{_literal(name)}]",
+        "Registry",
+        kwargs=(
+            ("transport", transport_var),
+            ("storage", storage_expr),
+            ("verbosity", repr(int(config.get("verbosity", 1)))),
+            ("entry_ttl_seconds", _literal(config.get("entry_ttl_seconds"))),
+        ),
     )
 
 
-def _emit_module(lines: list[str], node: dict[str, Any]) -> None:
+def _emit_module(lines: list[str], node: dict[str, Any], runtime_names: dict[str, str]) -> None:
     config = node["config"]
     module_type = config["module_type"]
     implementation = config["implementation"]
-    kwargs = dict(config.get("advanced") or {})
-    for reserved in (
-        "authenticator",
-        "card",
-        "credentials",
-        "knowledge",
-        "llm",
-        "logger",
-        "policy",
-        "registry",
-        "run_store",
-        "storage",
-        "telemetry",
-        "transport",
-    ):
-        kwargs.pop(reserved, None)
     name = str(config.get("name") or _python_slug(node["label"]))
-    expression: str
+    target = f"modules[{_literal(runtime_names[node['id']])}]"
+    callable_name: str
+    positional: tuple[str, ...] = ()
+    kwargs: tuple[tuple[str, str], ...]
     if module_type == "storage" and implementation == "memory":
-        kwargs.update({"namespace": config.get("namespace", name), "ttl": config.get("ttl")})
-        expression = f"InMemoryStorage(**{_literal(kwargs)})"
+        callable_name = "InMemoryStorage"
+        kwargs = (
+            ("namespace", _literal(config.get("namespace", name))),
+            ("ttl", _literal(config.get("ttl"))),
+        )
     elif module_type == "storage":
-        kwargs.update(
-            {
-                "db_path": config.get("path") or "storage.db",
-                "table_name": config.get("table_name", "storage"),
-                "namespace": config.get("namespace", name),
-            }
+        callable_name = "SQLiteStorage"
+        kwargs = (
+            ("db_path", _literal(config.get("path") or "storage.db")),
+            ("table_name", _literal(config.get("table_name", "storage"))),
+            ("namespace", _literal(config.get("namespace", name))),
         )
-        expression = f"SQLiteStorage(**{_literal(kwargs)})"
     elif module_type == "telemetry" and implementation == "local":
-        kwargs.update(
-            {
-                "path": config.get("path") or "traces.jsonl",
-                "capture_payloads": bool(config.get("capture_payloads", True)),
-                "max_traces": int(config.get("max_traces", 1000)),
-            }
+        callable_name = "LocalTraceTelemetry"
+        kwargs = (
+            ("path", _literal(config.get("path") or "traces.jsonl")),
+            ("capture_payloads", repr(bool(config.get("capture_payloads", True)))),
+            ("max_traces", repr(int(config.get("max_traces", 1000)))),
         )
-        expression = f"LocalTraceTelemetry(**{_literal(kwargs)})"
     elif module_type == "telemetry" and implementation == "langsmith":
-        api_expr = _env_expression(config.get("api_key_env"))
-        expression = f"LangSmithTelemetry(api_key={api_expr}, project_name={_literal(config.get('project_name'))})"
+        callable_name = "LangSmithTelemetry"
+        kwargs = (
+            ("api_key", _env_expression(config.get("api_key_env"))),
+            ("project_name", _literal(config.get("project_name"))),
+        )
     elif module_type == "telemetry":
-        public_expr = _env_expression(config.get("public_key_env"))
-        secret_expr = _env_expression(config.get("secret_key_env"))
-        expression = (
-            f"LangfuseTelemetry(public_key={public_expr}, secret_key={secret_expr}, "
-            f"host={_literal(config.get('host'))})"
+        callable_name = "LangfuseTelemetry"
+        kwargs = (
+            ("public_key", _env_expression(config.get("public_key_env"))),
+            ("secret_key", _env_expression(config.get("secret_key_env"))),
+            ("host", _literal(config.get("host"))),
         )
     elif module_type == "logger" and implementation == "console":
-        kwargs.update({"name": name, "level": config.get("level", "INFO")})
-        expression = f"ConsoleLogger(**{_literal(kwargs)})"
+        callable_name = "ConsoleLogger"
+        kwargs = (("name", _literal(name)), ("level", _literal(config.get("level", "INFO"))))
     elif module_type == "logger" and implementation == "file":
-        kwargs.update(
-            {
-                "filepath": config.get("path") or "protolink.log",
-                "name": name,
-                "level": config.get("level", "INFO"),
-            }
+        callable_name = "FileLogger"
+        kwargs = (
+            ("filepath", _literal(config.get("path") or "protolink.log")),
+            ("name", _literal(name)),
+            ("level", _literal(config.get("level", "INFO"))),
         )
-        expression = f"FileLogger(**{_literal(kwargs)})"
     elif module_type == "logger":
-        expression = f"QuietLogger(name={_literal(name)})"
+        callable_name = "QuietLogger"
+        kwargs = (("name", _literal(name)),)
     elif module_type == "run_store":
-        kwargs.update(
-            {
-                "db_path": config.get("path") or "runs.db",
-                "table_prefix": config.get("table_prefix", "protolink"),
-            }
+        callable_name = "SQLiteRunStore"
+        kwargs = (
+            ("db_path", _literal(config.get("path") or "runs.db")),
+            ("table_prefix", _literal(config.get("table_prefix", "protolink"))),
         )
-        expression = f"SQLiteRunStore(**{_literal(kwargs)})"
     elif module_type == "policy":
-        kwargs.update(
-            {
-                "rules": config.get("rules") or {},
-                "default_effect": config.get("default_effect", "allow"),
-                "name": name,
-            }
+        callable_name = "CapabilityPolicy"
+        kwargs = (
+            ("rules", _literal(config.get("rules") or {})),
+            ("default_effect", _literal(config.get("default_effect", "allow"))),
+            ("name", _literal(name)),
         )
-        expression = f"CapabilityPolicy(**{_literal(kwargs)})"
     elif module_type == "knowledge":
-        kwargs.update(
-            {
-                "name": name,
-                "description": config.get("description") or f"Knowledge source {name}",
-                "sources": config.get("sources") or [],
-                "default_k": int(config.get("default_k", 5)),
-                "context_max_chars": int(config.get("context_max_chars", 12000)),
-            }
-        )
+        callable_name = "create_knowledge"
+        positional = (_literal(implementation),)
+        knowledge_kwargs: list[tuple[str, str]] = [
+            ("name", _literal(name)),
+            ("description", _literal(config.get("description") or f"Knowledge source {name}")),
+            ("sources", _literal(config.get("sources") or [])),
+            ("default_k", repr(int(config.get("default_k", 5)))),
+            ("context_max_chars", repr(int(config.get("context_max_chars", 12000)))),
+        ]
         if implementation == "sqlite":
-            kwargs["path"] = config.get("path") or "knowledge.db"
-            kwargs["namespace"] = config.get("namespace", name)
-        expression = f"create_knowledge({_literal(implementation)}, **{_literal(kwargs)})"
+            knowledge_kwargs.extend(
+                [
+                    ("path", _literal(config.get("path") or "knowledge.db")),
+                    ("namespace", _literal(config.get("namespace", name))),
+                ]
+            )
+        kwargs = tuple(knowledge_kwargs)
     else:
-        expression = (
-            f"BearerTokenAuth(secret={_env_expression(config.get('secret_env'))}, "
-            f"algorithm={_literal(config.get('algorithm', 'HS256'))}, issuer={_literal(config.get('issuer'))}, "
-            f"audience={_literal(config.get('audience'))}, "
-            f"leeway_seconds={int(config.get('leeway_seconds', 0))})"
+        callable_name = "BearerTokenAuth"
+        kwargs = (
+            ("secret", _env_expression(config.get("secret_env"))),
+            ("algorithm", _literal(config.get("algorithm", "HS256"))),
+            ("issuer", _literal(config.get("issuer"))),
+            ("audience", _literal(config.get("audience"))),
+            ("leeway_seconds", repr(int(config.get("leeway_seconds", 0)))),
         )
     lines.extend(
         [
             "",
             f"    # Module: {_comment_text(node['label'])} ({module_type}/{implementation})",
-            f"    modules[{_literal(node['id'])}] = {expression}",
         ]
     )
+    _emit_call(lines, target, callable_name, positional=positional, kwargs=kwargs)
 
 
-def _emit_llm(lines: list[str], node: dict[str, Any]) -> None:
+def _emit_llm(lines: list[str], node: dict[str, Any], runtime_names: dict[str, str]) -> None:
     config = node["config"]
-    var = _python_slug(node["id"])
     options = dict(config.get("advanced") or {})
     if config.get("model"):
         options["model"] = config["model"]
@@ -1262,16 +1571,20 @@ def _emit_llm(lines: list[str], node: dict[str, Any]) -> None:
         options["base_url"] = config["base_url"]
     if config.get("headers"):
         options["headers"] = config["headers"]
-    if config.get("provider") in {
-        "deepseek",
-        "grok",
-        "ollama",
-        "lmstudio",
-        "openai-compatible",
-        "vllm",
-        "llama.cpp-server",
-        "llama.cpp-local",
-    } and "supports_tool_calling" in config:
+    if (
+        config.get("provider")
+        in {
+            "deepseek",
+            "grok",
+            "ollama",
+            "lmstudio",
+            "openai-compatible",
+            "vllm",
+            "llama.cpp-server",
+            "llama.cpp-local",
+        }
+        and "supports_tool_calling" in config
+    ):
         options["supports_tool_calling"] = bool(config["supports_tool_calling"])
     if "metrics_enabled" in config:
         options["metrics_enabled"] = bool(config["metrics_enabled"])
@@ -1279,53 +1592,53 @@ def _emit_llm(lines: list[str], node: dict[str, Any]) -> None:
         options["max_parse_failures"] = int(config["max_parse_failures"])
     if config.get("provider") == "mock":
         options["default_response"] = config.get("default_response", "Studio mock response")
-    lines.extend(
-        ["", f"    # LLM: {_comment_text(node['label'])}", f"    llm_options_{var} = {_literal(options)}"]
-    )
-    _emit_env_option(lines, f"llm_options_{var}", "api_key", config.get("api_key_env"))
-    lines.append(
-        f"    llms[{_literal(node['id'])}] = create_llm({_literal(config['provider'])}, **llm_options_{var})"
+    option_expressions = {key: _literal(value) for key, value in options.items()}
+    if config.get("api_key_env"):
+        option_expressions["api_key"] = _env_expression(config["api_key_env"])
+    lines.extend(["", f"    # LLM: {_comment_text(node['label'])}"])
+    _emit_call(
+        lines,
+        f"llms[{_literal(runtime_names[node['id']])}]",
+        "create_llm",
+        positional=(_literal(config["provider"]),),
+        kwargs=tuple((key, option_expressions[key]) for key in sorted(option_expressions)),
     )
 
 
-def _emit_tool(lines: list[str], node: dict[str, Any]) -> None:
+def _emit_tool(lines: list[str], node: dict[str, Any], runtime_names: dict[str, str]) -> None:
     config = node["config"]
+    name = runtime_names[node["id"]]
     if config["implementation"] == "builtin":
         lines.extend(
             [
                 "",
                 f"    # Tool: {_comment_text(node['label'])}",
-                "    builtin_factories = {",
-                '        "calculator": calculator,',
-                '        "current_datetime": current_datetime,',
-                '        "fetch_url": fetch_url,',
-                '        "web_search": web_search,',
-                "    }",
-                f"    tools[{_literal(node['id'])}] = builtin_factories[{_literal(config['builtin'])}]()",
+                f"    tools[{_literal(name)}] = {config['builtin']}()",
             ]
         )
         return
-    var = _python_slug(node["id"])
     lines.extend(
         [
             "",
             f"    # Tool: {_comment_text(node['label'])}",
-            f"    def handle_{var}(**kwargs: Any) -> dict[str, Any]:",
+            f"    def handle_{name}(**kwargs: Any) -> dict[str, Any]:",
             '        """Generated safe placeholder; replace its body with application logic."""',
             "        return {",
             '            "ok": True,',
-            f"            \"tool\": {_literal(config.get('name'))},",
+            f'            "tool": {_literal(config.get("name"))},',
             '            "input": kwargs,',
-            f"            \"message\": {_literal(config.get('response_template'))},",
+            f'            "message": {_literal(config.get("response_template"))},',
             "        }",
-            f"    tools[{_literal(node['id'])}] = Tool(",
+            f"    tools[{_literal(name)}] = Tool(",
             f"        name={_literal(config.get('name'))},",
             f"        description={_literal(config.get('description'))},",
             f"        input_schema={_literal(config.get('input_schema'))},",
             f"        output_schema={_literal(config.get('output_schema'))},",
             f"        tags={_literal(config.get('tags') or [])},",
+            f"        args={_literal(config.get('args') or {})},",
+            f"        examples={_literal(config.get('examples') or [])},",
             f"        capabilities={_literal(config.get('capabilities') or [])},",
-            f"        func=handle_{var},",
+            f"        func=handle_{name},",
             "    )",
         ]
     )
@@ -1336,9 +1649,10 @@ def _emit_agent(
     node: dict[str, Any],
     node_map: dict[str, dict[str, Any]],
     edges: list[dict[str, Any]],
+    runtime_names: dict[str, str],
 ) -> None:
     config = node["config"]
-    var = _python_slug(node["id"])
+    name = runtime_names[node["id"]]
     connected = _connected_nodes(node["id"], node_map, edges)
     llm_ids = [item[0]["id"] for item in connected if item[0]["kind"] == "llm"]
     tool_ids = [item[0]["id"] for item in connected if item[0]["kind"] == "tool"]
@@ -1367,84 +1681,52 @@ def _emit_agent(
         "tags": config.get("tags") or [],
         "interfaces": config.get("interfaces") or [],
     }
-    options = _transport_options(config)
-    lines.extend(
-        [
-            "",
-            f"    # Agent: {_comment_text(node['label'])}",
-            f"    agent_transport_options_{var} = {_literal(options)}",
-        ]
-    )
-    _emit_env_option(lines, f"agent_transport_options_{var}", "credentials", config.get("credentials_env"))
-    lines.extend(
-        [
-            f"    agent_transport_{var} = make_transport(",
-            f"        {_literal(config['transport'])},",
-            f"        {_literal(config['url'])},",
-            f"        options=agent_transport_options_{var},",
-            f"        config={_literal(config.get('transport_config') or {})},",
-            "    )",
-            f"    card_{var} = AgentCard(**{_literal(card)})",
-        ]
-    )
-    kwargs = dict(config.get("advanced") or {})
-    for reserved in (
-        "authenticator",
-        "card",
-        "credentials",
-        "knowledge",
-        "llm",
-        "logger",
-        "policy",
-        "registry",
-        "run_store",
-        "storage",
-        "telemetry",
-        "transport",
-    ):
-        kwargs.pop(reserved, None)
-    kwargs.update(
-        {
-            "system_prompt": config.get("system_prompt") or None,
-            "state": config.get("state") or None,
-            "skills": config.get("skills", "auto"),
-            "discovery_ttl": int(config.get("discovery_ttl", 0)),
-            "override_system_prompt": bool(config.get("override_system_prompt", False)),
-            "verbosity": int(config.get("verbosity", 1)),
-            "expose_chat": bool(config.get("expose_chat", True)),
-            "a2a": bool(config.get("a2a", False)),
-            "retrieval": config.get("retrieval", "auto"),
-            "registry_heartbeat_interval": config.get("registry_heartbeat_interval"),
-        }
+    lines.extend(["", f"    # Agent: {_comment_text(node['label'])}"])
+    transport_var = f"agent_transport_{name}"
+    card_var = f"card_{name}"
+    _emit_transport(lines, transport_var, config)
+    _emit_call(
+        lines,
+        card_var,
+        "AgentCard",
+        kwargs=tuple((key, _literal(value)) for key, value in card.items()),
     )
     special = {
-        "storage": _module_expression(modules_by_type, "storage"),
-        "telemetry": _module_expression(modules_by_type, "telemetry"),
-        "logger": _module_expression(modules_by_type, "logger"),
-        "run_store": _module_expression(modules_by_type, "run_store"),
-        "policy": _module_expression(modules_by_type, "policy"),
-        "authenticator": _module_expression(modules_by_type, "auth"),
+        "storage": _module_expression(modules_by_type, "storage", runtime_names),
+        "telemetry": _module_expression(modules_by_type, "telemetry", runtime_names),
+        "logger": _module_expression(modules_by_type, "logger", runtime_names),
+        "run_store": _module_expression(modules_by_type, "run_store", runtime_names),
+        "policy": _module_expression(modules_by_type, "policy", runtime_names),
+        "authenticator": _module_expression(modules_by_type, "auth", runtime_names),
     }
-    lines.extend(
-        [
-            f"    agents[{_literal(node['id'])}] = Agent(",
-            f"        card=card_{var},",
-            f"        transport=agent_transport_{var},",
-            f"        registry={f'registries[{_literal(registry_ids[0])}]' if registry_ids else 'None'},",
-            f"        llm={f'llms[{_literal(llm_ids[0])}]' if llm_ids else 'None'},",
-        ]
-    )
-    for key, expression in special.items():
-        lines.append(f"        {key}={expression},")
+    registry_expr = f"registries[{_literal(runtime_names[registry_ids[0]])}]" if registry_ids else "None"
+    llm_expr = f"llms[{_literal(runtime_names[llm_ids[0]])}]" if llm_ids else "None"
+    agent_kwargs: list[tuple[str, str]] = [
+        ("card", card_var),
+        ("transport", transport_var),
+        ("registry", registry_expr),
+        ("llm", llm_expr),
+        *special.items(),
+        ("system_prompt", _literal(config.get("system_prompt") or None)),
+        ("state", _literal(config.get("state") or None)),
+        ("skills", _literal(config.get("skills", "auto"))),
+        ("discovery_ttl", repr(int(config.get("discovery_ttl", 0)))),
+        ("override_system_prompt", repr(bool(config.get("override_system_prompt", False)))),
+        ("verbosity", repr(int(config.get("verbosity", 1)))),
+        ("expose_chat", repr(bool(config.get("expose_chat", True)))),
+        ("a2a", repr(bool(config.get("a2a", False)))),
+        ("retrieval", _literal(config.get("retrieval", "auto"))),
+        ("registry_heartbeat_interval", _literal(config.get("registry_heartbeat_interval"))),
+    ]
     knowledge_ids = modules_by_type.get("knowledge", [])
     if knowledge_ids:
-        knowledge_expr = ", ".join(f"modules[{_literal(item)}]" for item in knowledge_ids)
-        lines.append(f"        knowledge=[{knowledge_expr}],")
+        knowledge_expr = ", ".join(f"modules[{_literal(runtime_names[item])}]" for item in knowledge_ids)
+        agent_kwargs.append(("knowledge", f"[{knowledge_expr}]"))
     if config.get("credentials_env"):
-        lines.append(f"        credentials=os.getenv({_literal(config['credentials_env'])}),")
-    lines.extend([f"        **{_literal(kwargs)},", "    )"])
+        agent_kwargs.append(("credentials", _env_expression(config["credentials_env"])))
+    _emit_call(lines, f"agents[{_literal(name)}]", "Agent", kwargs=tuple(agent_kwargs))
     for tool_id in tool_ids:
-        lines.append(f"    agents[{_literal(node['id'])}].add_tool(tools[{_literal(tool_id)}])")
+        lines.append(f"    agents[{_literal(name)}].add_tool(tools[{_literal(runtime_names[tool_id])}])")
 
 
 def _emit_flow(
@@ -1452,8 +1734,10 @@ def _emit_flow(
     node: dict[str, Any],
     node_map: dict[str, dict[str, Any]],
     edges: list[dict[str, Any]],
+    runtime_names: dict[str, str],
 ) -> None:
     config = node["config"]
+    name = runtime_names[node["id"]]
     connected = _connected_nodes(node["id"], node_map, edges)
     registry_ids = [item[0]["id"] for item in connected if item[0]["kind"] == "registry"]
     targets: list[tuple[dict[str, Any], dict[str, Any]]] = []
@@ -1466,63 +1750,67 @@ def _emit_flow(
             target = node_map[edge["from"]]
             if target["kind"] == "agent":
                 targets.append((target, edge))
-    targets.sort(key=lambda item: (item[1].get("order", 0), item[0]["y"], item[0]["x"], item[0]["id"]))
-    target_expressions = [_target_expression(target) for target, _edge in targets]
-    registry_expr = f"registries[{_literal(registry_ids[0])}]" if registry_ids else "None"
+    targets.sort(
+        key=lambda item: (
+            item[1].get("order", 0),
+            item[1]["id"],
+            runtime_names[item[0]["id"]],
+        )
+    )
+    target_expressions = [_target_expression(target, runtime_names) for target, _edge in targets]
+    registry_expr = f"registries[{_literal(runtime_names[registry_ids[0]])}]" if registry_ids else "None"
     flow_type = config["flow_type"]
     lines.extend(["", f"    # Flow: {_comment_text(node['label'])} ({flow_type})"])
     if flow_type == "pipeline":
         targets_expr = ", ".join(target_expressions)
-        lines.append(
-            f"    flows[{_literal(node['id'])}] = "
-            f"Pipeline(steps=[{targets_expr}], registry={registry_expr})"
-        )
+        lines.append(f"    flows[{_literal(name)}] = Pipeline(steps=[{targets_expr}], registry={registry_expr})")
     elif flow_type == "parallel":
         targets_expr = ", ".join(target_expressions)
-        lines.append(
-            f"    flows[{_literal(node['id'])}] = "
-            f"Parallel(branches=[{targets_expr}], registry={registry_expr})"
-        )
+        lines.append(f"    flows[{_literal(name)}] = Parallel(branches=[{targets_expr}], registry={registry_expr})")
     elif flow_type == "router":
         routes: list[str] = []
         for target, edge in targets:
             route_key = edge.get("label") or target["config"].get("name") or target["label"]
-            routes.append(f"{_literal(_python_slug(str(route_key)) or target['id'])}: {_target_expression(target)}")
+            route_name = _python_slug(str(route_key)) or runtime_names[target["id"]]
+            routes.append(f"{_literal(route_name)}: {_target_expression(target, runtime_names)}")
         lines.append(
-            f"    flows[{_literal(node['id'])}] = Router(routes={{{', '.join(routes)}}}, "
+            f"    flows[{_literal(name)}] = Router(routes={{{', '.join(routes)}}}, "
             f"routing_prompt={_literal(config.get('routing_prompt') or 'Choose the best route.')}, "
             f"registry={registry_expr})"
         )
     else:
-        graph_var = f"graph_{_python_slug(node['id'])}"
+        graph_var = f"graph_{name}"
         lines.append(f"    {graph_var} = Graph(registry={registry_expr})")
         graph_names: dict[str, str] = {}
         for target, _edge in targets:
-            graph_name = _python_slug(str(target["config"].get("name") or target["label"])) or target["id"]
+            graph_name = runtime_names[target["id"]]
             graph_names[target["id"]] = graph_name
-            lines.append(f"    {graph_var}.add_node({_literal(graph_name)}, {_target_expression(target)})")
+            lines.append(
+                f"    {graph_var}.add_node({_literal(graph_name)}, {_target_expression(target, runtime_names)})"
+            )
         if targets:
             requested_entry = str(config.get("entry_node") or "")
-            entry_id = requested_entry if requested_entry in graph_names else targets[0][0]["id"]
+            entry_id = next(
+                (
+                    target_id
+                    for target_id, graph_name in graph_names.items()
+                    if requested_entry in {target_id, graph_name}
+                ),
+                targets[0][0]["id"],
+            )
             lines.append(f"    {graph_var}.set_entry_point({_literal(graph_names[entry_id])})")
-        graph_edges = [
-            edge
-            for edge in edges
-            if edge["from"] in graph_names and edge["to"] in graph_names
-        ]
+        graph_edges = [edge for edge in edges if edge["from"] in graph_names and edge["to"] in graph_names]
         if graph_edges:
             for edge in graph_edges:
                 source_name = _literal(graph_names[edge["from"]])
                 target_name = _literal(graph_names[edge["to"]])
-                lines.append(
-                    f"    {graph_var}.add_edge({source_name}, {target_name})"
-                )
+                lines.append(f"    {graph_var}.add_edge({source_name}, {target_name})")
         else:
             for (first, _), (second, _) in pairwise(targets):
                 source_name = _literal(graph_names[first["id"]])
                 target_name = _literal(graph_names[second["id"]])
                 lines.append(f"    {graph_var}.add_edge({source_name}, {target_name})")
-        lines.append(f"    flows[{_literal(node['id'])}] = {graph_var}")
+        lines.append(f"    flows[{_literal(name)}] = {graph_var}")
 
 
 def _connected_nodes(
@@ -1555,15 +1843,13 @@ def _order_flow_nodes(
             dependency_ids = {
                 edge["to"]
                 for edge in edges
-                if edge["from"] == node_id
-                and edge["to"] in remaining
-                and node_map[edge["to"]]["kind"] == "flow"
+                if edge["from"] == node_id and edge["to"] in remaining and node_map[edge["to"]]["kind"] == "flow"
             }
             if not dependency_ids:
                 ready.append(remaining[node_id])
         if not ready:
             raise StudioValidationError(["flow connections contain a cycle; nested flows must be acyclic"])
-        ready.sort(key=lambda item: (item["y"], item["x"], item["id"]))
+        ready.sort(key=lambda item: (str(item["config"].get("name") or item["label"]), item["id"]))
         for node in ready:
             remaining.pop(node["id"], None)
             ordered.append(node)
@@ -1586,9 +1872,7 @@ def _blueprint_warnings(blueprint: dict[str, Any]) -> list[str]:
             if llm_count > 1:
                 warnings.append(f"Agent {node['label']!r} uses the first of {llm_count} connected LLM nodes.")
             if registry_count > 1:
-                warnings.append(
-                    f"Agent {node['label']!r} uses the first of {registry_count} connected Registry nodes."
-                )
+                warnings.append(f"Agent {node['label']!r} uses the first of {registry_count} connected Registry nodes.")
             module_counts: dict[str, int] = {}
             for connected_node, _edge in connected:
                 if connected_node["kind"] == "module":
@@ -1609,8 +1893,7 @@ def _blueprint_warnings(blueprint: dict[str, Any]) -> list[str]:
             warnings.append(f"Module {node['label']!r} is not attached to an agent or registry.")
         if node["kind"] == "registry":
             storage_count = sum(
-                item[0]["kind"] == "module" and item[0]["config"].get("module_type") == "storage"
-                for item in connected
+                item[0]["kind"] == "module" and item[0]["config"].get("module_type") == "storage" for item in connected
             )
             if storage_count > 1:
                 warnings.append(f"Registry {node['label']!r} uses only its first connected storage module.")
@@ -1649,22 +1932,82 @@ def _transport_options(config: dict[str, Any]) -> dict[str, Any]:
     return options
 
 
-def _target_expression(node: dict[str, Any]) -> str:
+def _target_expression(node: dict[str, Any], runtime_names: dict[str, str]) -> str:
     collection = "agents" if node["kind"] == "agent" else "flows"
-    return f"{collection}[{_literal(node['id'])}]"
+    return f"{collection}[{_literal(runtime_names[node['id']])}]"
 
 
-def _module_expression(modules_by_type: dict[str, list[str]], module_type: str) -> str:
+def _module_expression(
+    modules_by_type: dict[str, list[str]],
+    module_type: str,
+    runtime_names: dict[str, str],
+) -> str:
     ids = modules_by_type.get(module_type) or []
     if module_type == "telemetry" and len(ids) > 1:
-        expressions = ", ".join(f"modules[{_literal(item)}]" for item in ids)
+        expressions = ", ".join(f"modules[{_literal(runtime_names[item])}]" for item in ids)
         return f"MultiTelemetry([{expressions}])"
-    return f"modules[{_literal(ids[0])}]" if ids else "None"
+    return f"modules[{_literal(runtime_names[ids[0]])}]" if ids else "None"
 
 
-def _emit_env_option(lines: list[str], mapping: str, key: str, env_name: Any) -> None:
-    if env_name:
-        lines.append(f"    {mapping}[{_literal(key)}] = os.getenv({_literal(env_name)})")
+def _runtime_names(nodes: list[dict[str, Any]]) -> dict[str, str]:
+    """Allocate stable, human-readable names without exposing canvas node IDs."""
+    names: dict[str, str] = {}
+    used: set[str] = set()
+    for node in nodes:
+        config = node["config"]
+        if node["kind"] in {"agent", "flow", "module"}:
+            preferred = config.get("name") or node["label"]
+        elif node["kind"] == "tool":
+            preferred = config.get("builtin") if config.get("implementation") == "builtin" else config.get("name")
+        else:
+            preferred = node["label"]
+        base = _python_slug(str(preferred or node["kind"])) or node["kind"]
+        if keyword.iskeyword(base):
+            base = f"{base}_"
+        candidate = base
+        suffix = 2
+        while candidate in used:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+        used.add(candidate)
+        names[node["id"]] = candidate
+    return names
+
+
+def _emit_transport(lines: list[str], target: str, config: dict[str, Any]) -> None:
+    """Emit one direct call to the public transport factory."""
+    kwargs: list[tuple[str, str]] = [
+        ("url", _literal(config["url"])),
+        (
+            "config",
+            f"TransportConfig.from_dict({_literal(config.get('transport_config') or {})})",
+        ),
+    ]
+    kwargs.extend((key, _literal(value)) for key, value in sorted(_transport_options(config).items()))
+    if config.get("credentials_env"):
+        kwargs.append(("credentials", _env_expression(config["credentials_env"])))
+    _emit_call(
+        lines,
+        target,
+        "get_transport",
+        positional=(_literal(config["transport"]),),
+        kwargs=tuple(kwargs),
+    )
+
+
+def _emit_call(
+    lines: list[str],
+    target: str,
+    callable_name: str,
+    *,
+    positional: tuple[str, ...] = (),
+    kwargs: tuple[tuple[str, str], ...] = (),
+) -> None:
+    """Append a readable, explicitly-keyworded constructor assignment."""
+    lines.append(f"    {target} = {callable_name}(")
+    lines.extend(f"        {expression}," for expression in positional)
+    lines.extend(f"        {key}={expression}," for key, expression in kwargs)
+    lines.append("    )")
 
 
 def _env_expression(env_name: Any) -> str:
@@ -1672,7 +2015,8 @@ def _env_expression(env_name: Any) -> str:
 
 
 def _literal(value: Any) -> str:
-    return pprint.pformat(value, width=100, sort_dicts=True, compact=False)
+    formatted = pprint.pformat(value, width=100, sort_dicts=True, compact=True)
+    return formatted.replace("\n", "\n    ")
 
 
 def _clean_text(value: Any, fallback: str, *, limit: int) -> str:

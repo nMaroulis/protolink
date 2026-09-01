@@ -31,12 +31,14 @@ STUDIO_CSS = r"""
   gap: 14px;
   min-width: 0;
 }
+.studio-root [hidden] { display: none !important; }
 .studio-topbar { grid-row: 1; }
 .studio-workspace { grid-row: 2; }
 .studio-root.has-notice { grid-template-rows: auto auto minmax(0, 1fr); }
 .studio-root.has-notice .studio-notice { grid-row: 2; }
 .studio-root.has-notice .studio-workspace { grid-row: 3; }
 .studio-topbar {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -49,7 +51,9 @@ STUDIO_CSS = r"""
     radial-gradient(circle at 66% 120%, rgba(15,159,146,.15), transparent 34%),
     linear-gradient(135deg, #fff 0%, #f8fbff 58%, #f3fbf9 100%);
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
+.studio-topbar::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: linear-gradient(90deg, var(--studio-llm), var(--studio-agent) 54%, var(--studio-tool)); }
 .studio-heading { min-width: 0; }
 .studio-heading h1 { display: flex; align-items: center; gap: 10px; }
 .studio-heading .lede { max-width: 690px; }
@@ -76,6 +80,9 @@ STUDIO_CSS = r"""
 .studio-command-row .btn { min-height: 32px; padding: 6px 9px; box-shadow: none; }
 .studio-command-row .btn.is-danger { color: var(--coral); border-color: rgba(214,91,72,.28); }
 .studio-command-row .btn.is-danger:not(:disabled) { background: #fff8f6; }
+.studio-command-row .studio-build-action { color: #3542a0; border-color: rgba(86,101,216,.28); background: var(--indigo-soft); }
+.studio-command-row .studio-output-launcher { color: #354158; border-color: #ccd5e2; background: #f4f7fb; }
+.studio-command-row .studio-output-launcher[data-active="true"] { color: #fff; border-color: #273449; background: #111827; }
 .studio-runtime-pill {
   display: inline-flex;
   align-items: center;
@@ -155,6 +162,7 @@ STUDIO_CSS = r"""
   align-items: center;
   gap: 9px;
   border: 1px solid var(--line);
+  border-left: 3px solid var(--studio-kind, var(--teal));
   border-radius: 9px;
   padding: 9px;
   color: var(--ink);
@@ -163,7 +171,8 @@ STUDIO_CSS = r"""
   cursor: pointer;
   transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
-.studio-palette-item:hover { transform: translateY(-1px); border-color: rgba(15,159,146,.38); box-shadow: 0 8px 18px rgba(24,33,47,.08); }
+.studio-palette-item:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--studio-kind, var(--teal)) 46%, #d7dee9); box-shadow: 0 8px 18px color-mix(in srgb, var(--studio-kind, var(--teal)) 12%, rgba(24,33,47,.08)); }
+.studio-palette-item:focus-visible { outline-color: color-mix(in srgb, var(--studio-kind, var(--teal)) 36%, transparent); }
 .studio-palette-icon {
   width: 34px;
   height: 34px;
@@ -179,12 +188,12 @@ STUDIO_CSS = r"""
 .studio-palette-copy strong { font-size: 12px; }
 .studio-palette-copy span { color: var(--muted); font-size: 10px; line-height: 1.35; }
 .studio-palette-plus { color: var(--muted); font-size: 18px; }
-.studio-kind-agent { --studio-kind: var(--studio-agent); --studio-kind-soft: var(--studio-agent-soft); }
-.studio-kind-llm { --studio-kind: var(--studio-llm); --studio-kind-soft: var(--studio-llm-soft); }
-.studio-kind-tool { --studio-kind: var(--studio-tool); --studio-kind-soft: var(--studio-tool-soft); }
-.studio-kind-registry { --studio-kind: var(--studio-registry); --studio-kind-soft: var(--studio-registry-soft); }
-.studio-kind-flow { --studio-kind: var(--studio-flow); --studio-kind-soft: var(--studio-flow-soft); }
-.studio-kind-module { --studio-kind: var(--studio-module); --studio-kind-soft: var(--studio-module-soft); }
+.studio-kind-agent { --studio-kind: var(--studio-agent); --studio-kind-soft: var(--studio-agent-soft); --studio-kind-text: #08766d; }
+.studio-kind-llm { --studio-kind: var(--studio-llm); --studio-kind-soft: var(--studio-llm-soft); --studio-kind-text: #3f4bac; }
+.studio-kind-tool { --studio-kind: var(--studio-tool); --studio-kind-soft: var(--studio-tool-soft); --studio-kind-text: #a83e2f; }
+.studio-kind-registry { --studio-kind: var(--studio-registry); --studio-kind-soft: var(--studio-registry-soft); --studio-kind-text: #835507; }
+.studio-kind-flow { --studio-kind: var(--studio-flow); --studio-kind-soft: var(--studio-flow-soft); --studio-kind-text: #623a91; }
+.studio-kind-module { --studio-kind: var(--studio-module); --studio-kind-soft: var(--studio-module-soft); --studio-kind-text: #2d607b; }
 .studio-canvas-panel { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; overflow: hidden; }
 .studio-canvas-toolbar {
   display: flex;
@@ -197,7 +206,7 @@ STUDIO_CSS = r"""
   background: linear-gradient(90deg, #fff, #f7fbff 54%, #f3fbf9);
 }
 .studio-project-summary { display: grid; gap: 1px; min-width: 0; }
-.studio-project-summary strong { overflow-wrap: anywhere; }
+.studio-project-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .studio-project-summary span { color: var(--muted); font-size: 11px; }
 .studio-canvas-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .studio-canvas-actions .mini-btn { background: rgba(255,255,255,.88); }
@@ -205,7 +214,8 @@ STUDIO_CSS = r"""
   position: relative;
   min-height: 570px;
   overflow: auto;
-  background: #edf2f7;
+  background: linear-gradient(145deg, #edf2f8, #e9f1f4);
+  box-shadow: inset 0 0 35px rgba(66,84,110,.08);
   overscroll-behavior: contain;
   scrollbar-color: #bac6d6 #edf2f7;
 }
@@ -214,9 +224,11 @@ STUDIO_CSS = r"""
   width: 1800px;
   height: 1050px;
   background-image:
+    radial-gradient(circle at 18% 16%, rgba(86,101,216,.10), transparent 26%),
+    radial-gradient(circle at 76% 72%, rgba(15,159,146,.10), transparent 28%),
     radial-gradient(circle, rgba(104,120,143,.35) 1px, transparent 1.2px),
     linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,0));
-  background-size: 24px 24px, 100% 100%;
+  background-size: 100% 100%, 100% 100%, 24px 24px, 100% 100%;
 }
 .studio-edge-layer, .studio-node-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
 .studio-edge-layer { overflow: visible; }
@@ -241,7 +253,7 @@ STUDIO_CSS = r"""
   border-top: 4px solid var(--studio-kind, var(--teal));
   border-radius: 11px;
   background: rgba(255,255,255,.98);
-  box-shadow: 0 12px 28px rgba(24,33,47,.14);
+  box-shadow: 0 9px 22px rgba(24,33,47,.12);
   user-select: none;
   transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
   touch-action: none;
@@ -260,14 +272,14 @@ STUDIO_CSS = r"""
   border-radius: 7px;
   padding: 11px 15px 12px;
   color: var(--ink);
-  background: transparent;
+  background: radial-gradient(circle at 100% 0, color-mix(in srgb, var(--studio-kind-soft, #f7fafc) 72%, transparent), transparent 52%);
   text-align: left;
   cursor: grab;
 }
 .studio-node-main:active { cursor: grabbing; }
 .studio-node-main:focus-visible { outline: 3px solid color-mix(in srgb, var(--studio-kind, var(--teal)) 28%, transparent); outline-offset: 3px; }
 .studio-node-topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.studio-node-kind { color: var(--studio-kind, var(--teal)); font-size: 9px; font-weight: 820; letter-spacing: .07em; text-transform: uppercase; }
+.studio-node-kind { color: var(--studio-kind-text, var(--studio-kind, var(--teal))); font-size: 9px; font-weight: 820; letter-spacing: .07em; text-transform: uppercase; }
 .studio-node-id { color: #8793a4; font: 9px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .studio-node-label { font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
 .studio-node-summary { color: var(--muted); font-size: 10px; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
@@ -392,6 +404,7 @@ STUDIO_CSS = r"""
   margin: 16px 16px 16px auto;
   padding: 0;
   border: 1px solid rgba(112,128,150,.34);
+  border-top: 3px solid var(--studio-llm);
   border-radius: 16px;
   color: var(--ink);
   background: #111827;
@@ -399,7 +412,7 @@ STUDIO_CSS = r"""
   overflow: hidden;
 }
 .studio-output-dialog[open] { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); }
-.studio-output-dialog::backdrop { background: rgba(15,23,42,.42); backdrop-filter: blur(3px); }
+.studio-output-dialog::backdrop { background: rgba(15,23,42,.30); backdrop-filter: blur(3px); }
 .studio-output-head {
   display: flex;
   align-items: center;
@@ -440,6 +453,7 @@ STUDIO_CSS = r"""
   font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 .studio-output-code:focus-visible { outline: 3px solid rgba(15,159,146,.35); outline-offset: -3px; }
+.studio-output-code.is-empty { display: grid; place-items: center; padding: 40px; color: #9eabc0; text-align: center; white-space: pre-wrap; }
 .studio-hidden-input { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .studio-static-note { color: var(--amber); }
 @media (min-width: 1121px) {
@@ -456,6 +470,7 @@ STUDIO_CSS = r"""
 }
 @media (max-width: 1120px) {
   .studio-topbar { flex-direction: column; }
+  .studio-heading .lede { display: none; }
   .studio-commandbar { width: 100%; justify-items: start; }
   .studio-command-row { justify-content: flex-start; }
   .studio-workspace { grid-template-columns: 214px minmax(0, 1fr); }
@@ -467,7 +482,9 @@ STUDIO_CSS = r"""
   .studio-command-row .btn { flex: 1 1 auto; }
   .studio-workspace { grid-template-columns: 1fr; min-height: 0; }
   .studio-palette, .studio-inspector { max-height: none; }
-  .studio-palette-list { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
+  .studio-palette-list { display: flex; grid-template-columns: none; overflow-x: auto; overflow-y: hidden; padding: 9px; }
+  .studio-palette-item { flex: 0 0 190px; min-height: 70px; }
+  .studio-palette-copy span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .studio-canvas-panel, .studio-inspector { grid-column: auto; }
   .studio-canvas-viewport { min-height: 520px; max-height: 66vh; }
   .studio-output-head { flex-direction: column; }
@@ -475,7 +492,7 @@ STUDIO_CSS = r"""
   .studio-output-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); margin: 8px; border-radius: 13px; }
 }
 @media (max-width: 480px) {
-  .studio-palette-list { grid-template-columns: 1fr; }
+  .studio-palette-list { display: flex; }
   .studio-command-row { width: 100%; }
   .studio-command-row .btn { width: 100%; }
   .studio-canvas-toolbar { align-items: flex-start; flex-direction: column; }
@@ -510,9 +527,9 @@ STUDIO_HTML = r"""
         <div class="studio-command-row">
           <button type="button" class="btn" id="studio-import-json" data-icon="upload" onclick="studioOpenImport()">Import JSON</button>
           <button type="button" class="btn" id="studio-export-json" data-icon="download" onclick="studioExportJson()">Export JSON</button>
-          <button type="button" class="btn" id="studio-generate" data-icon="details" onclick="studioGenerateCode()">Generate Python</button>
-          <button type="button" class="btn" id="studio-open-code" aria-haspopup="dialog" aria-controls="studio-output-dialog" aria-expanded="false" onclick="studioOpenOutput('python')">Code</button>
-          <button type="button" class="btn" id="studio-open-logs" aria-haspopup="dialog" aria-controls="studio-output-dialog" aria-expanded="false" onclick="studioOpenOutput('logs')">Logs</button>
+          <button type="button" class="btn studio-build-action" id="studio-generate" data-icon="details" onclick="studioGenerateCode()">Generate Python</button>
+          <button type="button" class="btn studio-output-launcher" id="studio-open-code" aria-haspopup="dialog" aria-controls="studio-output-dialog" aria-expanded="false" onclick="studioOpenOutput('python')">Code</button>
+          <button type="button" class="btn studio-output-launcher" id="studio-open-logs" aria-haspopup="dialog" aria-controls="studio-output-dialog" aria-expanded="false" onclick="studioOpenOutput('logs')">Logs</button>
           <button type="button" class="btn primary" id="studio-run" data-icon="play" onclick="studioRunProject()">Run</button>
           <button type="button" class="btn is-danger" id="studio-stop" onclick="studioStopProject()">Stop</button>
         </div>
@@ -731,8 +748,8 @@ function studioSlug(value, fallback = 'component') {
   return slug || fallback;
 }
 
-function studioDefaultConfig(kind, label, id) {
-  const name = studioSlug(label, studioSlug(id, kind));
+function studioDefaultConfig(kind, label) {
+  const name = studioSlug(label, kind);
   if (kind === 'agent') return {
     name,
     description: `${label} agent.`,
@@ -759,7 +776,6 @@ function studioDefaultConfig(kind, label, id) {
     output_formats: ['text/plain'],
     transport_config: {},
     transport_options: {},
-    advanced: {},
   };
   if (kind === 'llm') return {
     provider: 'mock',
@@ -782,6 +798,8 @@ function studioDefaultConfig(kind, label, id) {
     output_schema: {type: 'object'},
     tags: [],
     capabilities: [],
+    args: {},
+    examples: [],
     response_template: `${label} completed.`,
   };
   if (kind === 'registry') return {
@@ -791,7 +809,6 @@ function studioDefaultConfig(kind, label, id) {
     entry_ttl_seconds: null,
     transport_config: {},
     transport_options: {},
-    advanced: {},
   };
   if (kind === 'flow') return {
     name,
@@ -805,7 +822,6 @@ function studioDefaultConfig(kind, label, id) {
     namespace: name,
     path: '',
     secret_env: '',
-    advanced: {},
   };
 }
 
@@ -829,7 +845,7 @@ function studioNormalizeBlueprint(value) {
       label,
       x: studioFinite(rawNode.x, 80 + (index % 4) * 250, STUDIO_CANVAS_WIDTH - STUDIO_NODE_WIDTH - 20),
       y: studioFinite(rawNode.y, 70 + Math.floor(index / 4) * 170, STUDIO_CANVAS_HEIGHT - STUDIO_NODE_HEIGHT - 20),
-      config: {...studioDefaultConfig(kind, label, id), ...studioClone(rawConfig)},
+      config: {...studioDefaultConfig(kind, label), ...studioClone(rawConfig)},
     });
   }
   const nodeIds = new Set(nodes.map(node => node.id));
@@ -1153,7 +1169,7 @@ function studioAddNode(kind) {
   const label = `${STUDIO_KIND_META[kind].label} ${count}`;
   const position = studioNextNodePosition();
   studioMutate(blueprintValue => {
-    blueprintValue.nodes.push({id, kind, label, ...position, config: studioDefaultConfig(kind, label, id)});
+    blueprintValue.nodes.push({id, kind, label, ...position, config: studioDefaultConfig(kind, label)});
   }, `${label} added.`);
   studioState.selectedNodeId = id;
   studioState.selectedEdgeId = null;
@@ -1700,7 +1716,6 @@ function studioRenderNodeInspector(body, node) {
     studioCreateField(config, 'Interfaces', node.config.interfaces ?? [], {type: 'json', jsonKind: 'array', hint: 'Agent interface objects as a JSON array.'}, value => set('interfaces', value));
     studioCreateField(config, 'Transport config', node.config.transport_config, {type: 'json'}, value => set('transport_config', value));
     studioCreateField(config, 'Transport options', node.config.transport_options, {type: 'json'}, value => set('transport_options', value));
-    studioCreateField(config, 'Advanced constructor options', node.config.advanced, {type: 'json', hint: 'Escape hatch for supported constructor keyword arguments.'}, value => set('advanced', value));
   } else if (node.kind === 'llm') {
     const provider = node.config.provider || 'mock';
     studioCreateField(config, 'Provider', provider, {type: 'select', choices: studioCatalog.llm_providers, rerender: true}, value => {
@@ -1732,6 +1747,8 @@ function studioRenderNodeInspector(body, node) {
     }
     studioCreateField(config, 'Tags', (node.config.tags || []).join(', '), {type: 'array'}, value => set('tags', value));
     studioCreateField(config, 'Capabilities', (node.config.capabilities || []).join(', '), {type: 'array'}, value => set('capabilities', value));
+    studioCreateField(config, 'Default arguments', node.config.args ?? {}, {type: 'json', hint: 'JSON-safe defaults passed through Tool.args.'}, value => set('args', value));
+    studioCreateField(config, 'Examples', node.config.examples ?? [], {type: 'json', jsonKind: 'array', hint: 'JSON-safe Tool examples.'}, value => set('examples', value));
     studioCreateField(config, 'Input schema', node.config.input_schema, {type: 'json'}, value => set('input_schema', value));
     studioCreateField(config, 'Output schema', node.config.output_schema, {type: 'json'}, value => set('output_schema', value));
   } else if (node.kind === 'registry') {
@@ -1742,7 +1759,6 @@ function studioRenderNodeInspector(body, node) {
     studioCreateField(config, 'Entry TTL seconds', node.config.entry_ttl_seconds, {type: 'number', min: 0.001, step: 0.1, optional: true}, value => set('entry_ttl_seconds', value));
     studioCreateField(config, 'Transport config', node.config.transport_config, {type: 'json'}, value => set('transport_config', value));
     studioCreateField(config, 'Transport options', node.config.transport_options, {type: 'json'}, value => set('transport_options', value));
-    studioCreateField(config, 'Advanced registry options', node.config.advanced, {type: 'json'}, value => set('advanced', value));
   } else if (node.kind === 'flow') {
     studioCreateField(config, 'Flow name', node.config.name, {required: true, maxLength: 100}, value => set('name', value));
     studioCreateField(config, 'Flow type', node.config.flow_type, {type: 'select', choices: studioCatalog.flow_types}, value => set('flow_type', value));
@@ -1816,7 +1832,6 @@ function studioRenderModuleFields(config, node, set) {
     studioCreateField(config, 'Audience', node.config.audience, {maxLength: 200}, value => set('audience', value));
     studioCreateField(config, 'Leeway seconds', node.config.leeway_seconds ?? 0, {type: 'number', min: 0, step: 1, integer: true}, value => set('leeway_seconds', value));
   }
-  studioCreateField(config, 'Advanced constructor options', node.config.advanced, {type: 'json'}, value => set('advanced', value));
 }
 
 function studioRenderEdgeInspector(body, edge) {
@@ -1934,9 +1949,7 @@ function studioOpenOutput(tab = studioState.outputTab) {
     studioRestoreOutputFocus = true;
     dialog.showModal();
   }
-  for (const id of ['studio-open-code', 'studio-open-logs']) {
-    document.getElementById(id)?.setAttribute('aria-expanded', 'true');
-  }
+  studioSyncOutputLaunchers();
   window.requestAnimationFrame(() => {
     document.getElementById(`studio-output-tab-${studioState.outputTab}`)?.focus();
   });
@@ -1950,9 +1963,7 @@ function studioCloseOutput({restoreFocus = true} = {}) {
 }
 
 function studioHandleOutputClosed() {
-  for (const id of ['studio-open-code', 'studio-open-logs']) {
-    document.getElementById(id)?.setAttribute('aria-expanded', 'false');
-  }
+  studioSyncOutputLaunchers();
   const returnFocus = studioOutputReturnFocus;
   studioOutputReturnFocus = null;
   if (studioRestoreOutputFocus && returnFocus?.isConnected) returnFocus.focus({preventScroll: true});
@@ -1985,6 +1996,18 @@ function studioSetOutputTab(tab) {
   studioRenderOutput();
 }
 
+function studioSyncOutputLaunchers() {
+  const open = Boolean(document.getElementById('studio-output-dialog')?.open);
+  const codeActive = open && studioState.outputTab !== 'logs';
+  const logsActive = open && studioState.outputTab === 'logs';
+  const code = document.getElementById('studio-open-code');
+  const logs = document.getElementById('studio-open-logs');
+  code?.setAttribute('aria-expanded', String(open));
+  logs?.setAttribute('aria-expanded', String(open));
+  if (code) code.dataset.active = String(codeActive);
+  if (logs) logs.dataset.active = String(logsActive);
+}
+
 function studioOutputTabKeydown(event) {
   const tabs = ['python', 'blueprint', 'logs'];
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -2000,6 +2023,7 @@ function studioOutputTabKeydown(event) {
 function studioRenderOutput() {
   const code = document.getElementById('studio-output-code');
   const meta = document.getElementById('studio-output-meta');
+  const title = document.getElementById('studio-output-title');
   if (!code || !meta) return;
   for (const tab of ['python', 'blueprint', 'logs']) {
     const button = document.getElementById(`studio-output-tab-${tab}`);
@@ -2009,27 +2033,38 @@ function studioRenderOutput() {
     button.tabIndex = selected ? 0 : -1;
   }
   code.setAttribute('aria-labelledby', `studio-output-tab-${studioState.outputTab}`);
+  let empty = false;
   if (studioState.outputTab === 'blueprint') {
+    if (title) title.textContent = 'Blueprint JSON';
     code.textContent = JSON.stringify(studioState.blueprint, null, 2);
     meta.textContent = `Schema v${studioState.blueprint.version} · ${studioState.blueprint.nodes.length} nodes · portable JSON`;
   } else if (studioState.outputTab === 'logs') {
+    if (title) title.textContent = 'Runtime logs';
     const logs = Array.isArray(studioState.runtime.logs) ? studioState.runtime.logs.map(line => studioString(line, '', 10000)) : [];
+    empty = !logs.length;
     code.textContent = logs.length ? logs.join('\n') : 'No runtime output yet. Run the project from a served local dashboard to stream logs here.';
     const state = studioString(studioState.runtime.state, 'idle', 40);
     const exit = studioState.runtime.exit_code == null ? '' : ` · exit ${studioState.runtime.exit_code}`;
     meta.textContent = `${state}${exit} · ${logs.length} log ${logs.length === 1 ? 'line' : 'lines'}`;
   } else if (!window.__PROTOLINK_LIVE__) {
+    if (title) title.textContent = 'Generated Python';
+    empty = true;
     code.textContent = 'Python generation is available when this dashboard is served by Protolink.\n\nThe complete visual editor and JSON import/export remain available in this static file.';
     meta.textContent = 'Static editor · serve the dashboard to generate and run code';
   } else if (!studioState.code) {
+    if (title) title.textContent = 'Generated Python';
+    empty = true;
     code.textContent = 'Select “Generate Python” to validate this blueprint and create a standalone Protolink script.';
     meta.textContent = 'No generated Python yet';
   } else {
+    if (title) title.textContent = 'Generated Python';
     code.textContent = studioState.code;
     const stale = studioState.codeStale ? ' · draft changed—regenerate before use' : '';
     const warnings = studioState.codeWarnings.length ? ` · ${studioState.codeWarnings.length} warning${studioState.codeWarnings.length === 1 ? '' : 's'}` : '';
     meta.textContent = `${studioState.codeFilename || 'generated.py'}${stale}${warnings}`;
   }
+  code.classList.toggle('is-empty', empty);
+  studioSyncOutputLaunchers();
 }
 
 function studioRenderRuntime() {
@@ -2067,6 +2102,8 @@ function studioRenderControls() {
   setDisabled('studio-generate', !live || busy, live ? 'Validate and generate Python' : 'Available in the served dashboard');
   setDisabled('studio-run', !live || busy || Boolean(studioState.runtime.running), live ? 'Generate and run this project locally' : 'Available in the served dashboard');
   setDisabled('studio-stop', !live || busy || !studioState.runtime.running, live ? 'Stop the active Studio process' : 'Available in the served dashboard');
+  const stop = document.getElementById('studio-stop');
+  if (stop) stop.hidden = !live || (!studioState.runtime.running && studioState.busy !== 'stop');
   setDisabled('studio-copy-python', !live || busy || !generatedCurrent, !live ? 'Available in the served dashboard' : generatedCurrent ? 'Copy generated Python' : 'Generate current Python first');
   setDisabled('studio-download-python', !live || busy || !generatedCurrent, !live ? 'Available in the served dashboard' : generatedCurrent ? 'Download generated Python' : 'Generate current Python first');
   setDisabled('studio-delete-selection', !studioState.selectedNodeId && !studioState.selectedEdgeId);

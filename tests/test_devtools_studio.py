@@ -76,25 +76,34 @@ def test_studio_catalog_and_default_blueprint_are_versioned_and_runnable():
     assert catalog["llm_providers"] == list(STUDIO_LLM_PROVIDERS)
     assert catalog["builtin_tools"] == list(STUDIO_BUILTIN_TOOLS)
     assert catalog["flow_types"] == list(STUDIO_FLOW_TYPES)
-    assert generated.filename == "my_protolink_mesh.py"
-    assert "AgentCard(**" in generated.source
+    assert generated.filename == "protolink_studio_my_protolink_mesh.py"
+    assert "card_planner = AgentCard(" in generated.source
     assert "TransportConfig.from_dict" in generated.source
-    assert "agent.start(register=" in generated.source
+    assert "agents['planner'].start(register=True, background=True)" in generated.source
+    assert "flows['main_pipeline'] = Pipeline(" in generated.source
+    assert "FLOW_ALIASES" not in generated.source
+    assert "BLUEPRINT" not in generated.source
+    assert "'nodes':" not in generated.source
+    assert "'edges':" not in generated.source
+    assert "'x':" not in generated.source
+    assert "'y':" not in generated.source
+    for canvas_id in ("registry-1", "flow-1", "agent-1", "llm-1", "tool-1"):
+        assert canvas_id not in generated.source
     ast.parse(generated.source)
     compile(generated.source, generated.filename, "exec")
 
     namespace: dict[str, Any] = {"__name__": "studio_test"}
     exec(compile(generated.source, generated.filename, "exec"), namespace)
     namespace["build"]()
-    built_agent = namespace["agents"]["agent-1"]
+    built_agent = namespace["agents"]["planner"]
     namespace["build"]()
 
-    assert list(namespace["registries"]) == ["registry-1"]
-    assert list(namespace["agents"]) == ["agent-1"]
-    assert list(namespace["flows"]) == ["flow-1"]
-    assert namespace["agents"]["agent-1"] is built_agent
-    assert namespace["agents"]["agent-1"].card.role == "worker"
-    assert "calculator" in namespace["agents"]["agent-1"].tools
+    assert list(namespace["registries"]) == ["local_registry"]
+    assert list(namespace["agents"]) == ["planner"]
+    assert list(namespace["flows"]) == ["main_pipeline"]
+    assert namespace["agents"]["planner"] is built_agent
+    assert namespace["agents"]["planner"].card.role == "worker"
+    assert "calculator" in namespace["agents"]["planner"].tools
 
 
 def test_studio_generation_is_deterministic_and_source_injection_safe():
@@ -111,6 +120,116 @@ def test_studio_generation_is_deterministic_and_source_injection_safe():
     assert "\n__import__('os').system" not in first.source
     assert repr(hostile) in first.source
     compile(first.source, first.filename, "exec")
+
+
+def test_studio_generation_is_independent_of_canvas_layout():
+    blueprint = default_studio_blueprint()
+    baseline = generate_studio_code(blueprint).source
+    for index, node in enumerate(blueprint["nodes"]):
+        node["x"] = 1700 - index * 119
+        node["y"] = 900 - index * 83
+
+    moved = generate_studio_code(blueprint).source
+
+    assert moved == baseline
+
+
+def test_studio_generation_allocates_clean_collision_safe_runtime_names():
+    blueprint = default_studio_blueprint()
+    blueprint["nodes"][2]["config"]["name"] = "class"
+    blueprint["nodes"][2]["label"] = "Class"
+    blueprint["nodes"][3]["label"] = "Class"
+
+    source = generate_studio_code(blueprint).source
+
+    assert "agents['class_'] = Agent(" in source
+    assert "llms['class__2'] = create_llm(" in source
+    assert "agent-1" not in source
+    assert "llm-1" not in source
+
+
+def test_studio_generation_never_uses_canvas_ids_as_logical_fallbacks():
+    canvas_ids = [f"canvas_sentinel_{kind}" for kind in ("agent", "llm", "tool", "registry", "flow", "module")]
+    blueprint = {
+        "version": 1,
+        "project": {"name": "symbol_labels", "description": ""},
+        "nodes": [
+            {
+                "id": node_id,
+                "kind": kind,
+                "label": "🧠",
+                "x": index * 10,
+                "y": index * 10,
+                "config": {},
+            }
+            for index, (kind, node_id) in enumerate(
+                zip(("agent", "llm", "tool", "registry", "flow", "module"), canvas_ids, strict=True)
+            )
+        ],
+        "edges": [],
+    }
+
+    source = generate_studio_code(blueprint).source
+
+    assert all(node_id not in source for node_id in canvas_ids)
+    assert "agents['agent'] = Agent(" in source
+    assert "registries['registry'] = Registry(" in source
+
+
+@pytest.mark.parametrize("project_name", ["os", "signal", "threading", "typing", "protolink"])
+def test_studio_filename_cannot_shadow_generated_imports(project_name: str):
+    blueprint = default_studio_blueprint()
+    blueprint["project"]["name"] = project_name
+
+    generated = generate_studio_code(blueprint)
+
+    assert Path(generated.filename).stem == f"protolink_studio_{project_name}"
+
+
+@pytest.mark.parametrize("kind", ["agent", "registry", "module"])
+def test_studio_rejects_unmapped_constructor_options(kind: str):
+    blueprint = default_studio_blueprint()
+    if kind == "module":
+        blueprint["nodes"].append(
+            {
+                "id": "module-advanced",
+                "kind": "module",
+                "label": "Memory",
+                "x": 20,
+                "y": 20,
+                "config": {
+                    "module_type": "storage",
+                    "implementation": "memory",
+                    "name": "memory",
+                    "advanced": {"unknown": True},
+                },
+            }
+        )
+    else:
+        index = 2 if kind == "agent" else 0
+        blueprint["nodes"][index]["config"]["advanced"] = {"unknown": True}
+
+    with pytest.raises(StudioValidationError, match="advanced is not supported"):
+        generate_studio_code(blueprint)
+
+
+def test_studio_rejects_unknown_config_fields_instead_of_silently_dropping_them():
+    blueprint = default_studio_blueprint()
+    blueprint["nodes"][2]["config"]["verbositty"] = 2
+
+    with pytest.raises(StudioValidationError, match="unsupported fields: verbositty"):
+        generate_studio_code(blueprint)
+
+
+def test_studio_generation_emits_agent_start_options_without_canvas_lookups():
+    blueprint = default_studio_blueprint()
+    blueprint["nodes"][2]["config"]["register"] = False
+
+    source = generate_studio_code(blueprint).source
+
+    assert "agents['planner'].start(register=False, background=True)" in source
+    assert "flow = flows.get(flow_name)" in source
+    assert "BLUEPRINT" not in source
 
 
 @pytest.mark.parametrize(
@@ -133,9 +252,7 @@ def test_studio_validation_rejects_invalid_topologies(mutate, message: str):
 
 def test_studio_validation_rejects_nested_secrets_and_flow_cycles():
     secret_blueprint = default_studio_blueprint()
-    secret_blueprint["nodes"][3]["config"]["advanced"] = {
-        "headers": {"Authorization": "Bearer actual-secret"}
-    }
+    secret_blueprint["nodes"][3]["config"]["advanced"] = {"headers": {"Authorization": "Bearer actual-secret"}}
 
     with pytest.raises(StudioValidationError, match="environment-variable"):
         generate_studio_code(secret_blueprint)
@@ -187,9 +304,7 @@ def test_studio_validation_rejects_provider_mismatches_and_common_secrets():
         generate_studio_code(blueprint)
 
     blueprint = default_studio_blueprint()
-    blueprint["nodes"][2]["config"]["advanced"] = {
-        "transport": {"credentials_env": "literal-secret-value"}
-    }
+    blueprint["nodes"][2]["config"]["advanced"] = {"transport": {"credentials_env": "literal-secret-value"}}
 
     with pytest.raises(StudioValidationError, match="environment variable name"):
         generate_studio_code(blueprint)
@@ -281,12 +396,9 @@ def test_studio_generates_all_flow_types_and_declarative_modules():
     exec(compile(generated.source, generated.filename, "exec"), namespace)
     namespace["build"]()
 
-    assert set(namespace["modules"]) == {"storage-1", "policy-1"}
-    assert namespace["agents"]["agent-1"].storage is namespace["modules"]["storage-1"]
-    assert (
-        namespace["agents"]["agent-1"].action_authorizer.policy
-        is namespace["modules"]["policy-1"]
-    )
+    assert set(namespace["modules"]) == {"memory", "safe_policy"}
+    assert namespace["agents"]["planner"].storage is namespace["modules"]["memory"]
+    assert namespace["agents"]["planner"].action_authorizer.policy is namespace["modules"]["safe_policy"]
 
 
 def test_studio_uses_safe_defaults_for_blank_module_paths():
@@ -325,11 +437,11 @@ def test_studio_uses_safe_defaults_for_blank_module_paths():
 
     source = generate_studio_code(blueprint).source
 
-    assert "'db_path': 'storage.db'" in source
-    assert "'path': 'traces.jsonl'" in source
-    assert "'filepath': 'protolink.log'" in source
-    assert "'db_path': 'runs.db'" in source
-    assert "'path': 'knowledge.db'" in source
+    assert "db_path='storage.db'" in source
+    assert "path='traces.jsonl'" in source
+    assert "filepath='protolink.log'" in source
+    assert "db_path='runs.db'" in source
+    assert "path='knowledge.db'" in source
     compile(source, "blank_module_paths.py", "exec")
 
 
