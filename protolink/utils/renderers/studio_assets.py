@@ -232,7 +232,7 @@ STUDIO_CSS = r"""
   position: relative;
   min-height: 570px;
   overflow: hidden;
-  background: #edf2f8;
+  background: #e4eaf1;
   box-shadow: inset 0 0 35px rgba(66,84,110,.08);
   overscroll-behavior: contain;
   touch-action: none;
@@ -261,10 +261,10 @@ STUDIO_CSS = r"""
   height: 1800px;
   min-width: 100%;
   min-height: 100%;
-  background-color: #edf2f8;
+  background-color: #e4eaf1;
   background-image:
-    radial-gradient(circle, rgba(104,120,143,.30) .65px, transparent .95px),
-    linear-gradient(145deg, #edf2f8, #e9f1f4);
+    radial-gradient(circle, rgba(99,113,134,.30) .65px, transparent .95px),
+    linear-gradient(145deg, #e4eaf1, #e0e8ec);
   background-position:
     var(--studio-grid-origin-x) var(--studio-grid-origin-y),
     0 0;
@@ -274,16 +274,25 @@ STUDIO_CSS = r"""
   background-repeat: repeat, no-repeat;
 }
 .studio-canvas {
+  --studio-world-edge: 1px;
+  --studio-world-shadow: 18px;
   position: absolute;
   inset: 0 auto auto 0;
   width: 3000px;
   height: 1800px;
   transform-origin: 0 0;
   will-change: transform;
+  background-color: rgba(252,253,255,.72);
   background-image:
     radial-gradient(circle at 18% 16%, rgba(86,101,216,.10), transparent 26%),
-    radial-gradient(circle at 76% 72%, rgba(15,159,146,.10), transparent 28%);
-  background-size: 100% 100%, 100% 100%;
+    radial-gradient(circle at 76% 72%, rgba(15,159,146,.10), transparent 28%),
+    linear-gradient(145deg, rgba(255,255,255,.20), rgba(238,246,249,.12));
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  outline: var(--studio-world-edge) solid rgba(75,91,119,.52);
+  outline-offset: calc(0px - var(--studio-world-edge));
+  box-shadow:
+    0 0 var(--studio-world-shadow) rgba(46,61,82,.18),
+    inset 0 0 0 var(--studio-world-edge) rgba(255,255,255,.72);
 }
 .studio-edge-layer, .studio-node-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
 .studio-edge-layer { overflow: visible; }
@@ -622,7 +631,7 @@ STUDIO_HTML = r"""
           </div>
         </div>
         <div class="studio-canvas-viewport" id="studio-canvas-viewport" role="region" aria-label="Studio topology canvas" aria-describedby="studio-canvas-help" tabindex="0">
-          <span class="studio-visually-hidden" id="studio-canvas-help">Drag empty canvas space to pan. Use Control or Command plus the wheel to zoom. Press plus, minus, zero, or F while the canvas is focused for zoom controls.</span>
+          <span class="studio-visually-hidden" id="studio-canvas-help">The lightly outlined surface is the draggable work area. Drag empty space to pan. Use Control or Command plus the wheel to zoom. Press plus, minus, zero, or F while the canvas is focused for zoom controls.</span>
           <div class="studio-canvas-camera" id="studio-canvas-camera">
             <div class="studio-canvas" id="studio-canvas">
               <svg class="studio-edge-layer" id="studio-edge-layer" viewBox="0 0 3000 1800" aria-label="Topology connections"></svg>
@@ -1224,6 +1233,8 @@ function studioApplyCamera() {
   camera.style.setProperty('--studio-grid-size', `${Math.max(8, 24 * zoom)}px`);
   camera.style.setProperty('--studio-grid-origin-x', `${offsetX}px`);
   camera.style.setProperty('--studio-grid-origin-y', `${offsetY}px`);
+  canvas.style.setProperty('--studio-world-edge', `${1 / zoom}px`);
+  canvas.style.setProperty('--studio-world-shadow', `${18 / zoom}px`);
   canvas.style.left = `${offsetX}px`;
   canvas.style.top = `${offsetY}px`;
   canvas.style.transform = `scale(${zoom})`;
@@ -1366,11 +1377,11 @@ function studioNextNodePosition() {
   const index = studioState.blueprint.nodes.length;
   const zoom = studioState.camera.zoom || 1;
   const originX = viewport
-    ? (viewport.scrollLeft + Math.max(55, viewport.clientWidth * .24) - studioState.camera.offsetX) / zoom
-    : 90;
+    ? (viewport.scrollLeft + viewport.clientWidth / 2 - studioState.camera.offsetX) / zoom - STUDIO_NODE_WIDTH / 2
+    : STUDIO_CANVAS_WIDTH / 2 - STUDIO_NODE_WIDTH / 2;
   const originY = viewport
-    ? (viewport.scrollTop + Math.max(55, viewport.clientHeight * .18) - studioState.camera.offsetY) / zoom
-    : 80;
+    ? (viewport.scrollTop + viewport.clientHeight / 2 - studioState.camera.offsetY) / zoom - STUDIO_NODE_HEIGHT / 2
+    : STUDIO_CANVAS_HEIGHT / 2 - STUDIO_NODE_HEIGHT / 2;
   const stepX = STUDIO_NODE_WIDTH + 34;
   const stepY = STUDIO_NODE_HEIGHT + 34;
   const positions = [[0, 0]];

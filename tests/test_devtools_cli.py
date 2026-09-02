@@ -301,6 +301,9 @@ def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     assert "--studio-grid-origin-x" in dashboard_html
     assert "--studio-grid-origin-y" in dashboard_html
     assert "camera.style.setProperty" in dashboard_html
+    assert "--studio-world-edge" in dashboard_html
+    assert "--studio-world-shadow" in dashboard_html
+    assert "The lightly outlined surface is the draggable work area." in dashboard_html
     assert "studioApplyCamera" in dashboard_html
     assert "studioScreenToCanvas" in dashboard_html
     assert "studioZoomBy" in dashboard_html

@@ -73,6 +73,13 @@ def test_studio_catalog_and_default_blueprint_are_versioned_and_runnable():
     generated = generate_studio_code(blueprint)
 
     assert catalog["schema_version"] == blueprint["version"] == 1
+    assert [(node["x"], node["y"]) for node in blueprint["nodes"]] == [
+        (1117, 733),
+        (1117, 955),
+        (1401, 851),
+        (1687, 749),
+        (1687, 947),
+    ]
     assert catalog["llm_providers"] == list(STUDIO_LLM_PROVIDERS)
     assert catalog["builtin_tools"] == list(STUDIO_BUILTIN_TOOLS)
     assert catalog["flow_types"] == list(STUDIO_FLOW_TYPES)
