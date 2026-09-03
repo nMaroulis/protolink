@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 :::tip[Update Protolink]
 
-Upgrade to the latest published release before following the notes below.
+Upgrade to the latest published release. Entries marked **Unreleased** describe the next version and are not yet available from PyPI.
 <Tabs groupId="package-manager">
 <TabItem value="pip" label="pip" default>
 ```bash title="Terminal"
@@ -34,9 +34,52 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.6.9] - 2026-09-03
+
+
+:::note Latest Release
+
+This release adds Protolink Studio and simplifies the path from a typed Python function to a local agent. It also makes convenience-call failures explicit, completes the blocking task and tool APIs, and ships type metadata with the package.
+
+:::
+
+### Added
+
+- New CLI `studio` command -> `protolink studio --blueprint --ip --port`. You can load the studio with a blueprint JSON as input.
+- Promoted the dashboard's Studio tab from a preview to an active visual builder for Agent, LLM, Tool, Registry, Flow, and operational Module nodes. The canvas supports compatible declarative connections, node/project editing, undo/redo, browser-local draft persistence, and JSON import/export; served dashboards additionally generate Python that can be viewed, copied, and downloaded.
+- Added `/studio` and the `/api/studio/catalog`, `/api/studio/generate`, `/api/studio/status`, `/api/studio/run`, and `/api/studio/stop` routes. Studio validates bounded JSON, rejects embedded secrets in favor of environment-variable references, and runs at most one generated project in a loopback-controlled subprocess that is stopped and cleaned up with the dashboard.
+- Added public Studio blueprint, validation, catalog, code-generation, and runtime helpers, and updated the provider-free dashboard example to embed the standard runnable starter blueprint.
+- Added `@agent.tool` and `@agent.tool()` registration with inferred function names, cleaned docstrings, and typed schemas. Explicit keyword and positional metadata remain supported, and the original function and callable type are preserved.
+- Added direct callable registration with `agent.add_tool(add)`. Synchronous and asynchronous functions, bound methods, and callable objects are wrapped automatically with `Tool.from_callable()`; existing tool objects retain their identity, metadata, and policy behavior.
+- Added `Tool.from_callable()` for reusable tool definitions with optional schema, discovery, capability, and approval-preview metadata.
+- Added `agent.sync.call_tool()` for raw validated and authorized tool results, and `agent.sync.run_task()` for complete task execution and inspection.
+- Added `Task.raise_for_status()` and the exported `TaskExecutionError`, whose `.task` attribute retains the original failed or canceled task and its partial outputs.
+- Added the `py.typed` package marker for installed type-checker support.
+
+### Changed
+
+- `invoke()` and `ask()` now execute through `run_task()`, preserving active-task registration, cancellation, and configured run persistence for custom handlers.
+- README and getting-started examples now begin with a provider-free tool call using only the base package, then introduce tasks, inference, and HTTP. Updated API references, session guidance, public docstrings, and release checks.
+- Aligned Python package metadata, runtime version, lockfiles, and documentation version labels for 0.6.9.
+- CI now installs the built wheel in an isolated environment with only base dependencies and checks the typed marker, imports, CLI, and local runtime. Release versions and Ruff pins are aligned across package and CI configuration.
+
+### Fixed
+
+- Replaced deprecated string-based `logging.getLevelName()` calls with `logging.getLevelNamesMapping()`.
+- `invoke()` and `ask()` now raise `TaskExecutionError` when a handler returns a failed or canceled task instead of presenting it as a successful response. Exceptions raised directly during execution retain their original types.
+- `invoke()` preserves valid empty strings, zero, false, and empty containers, and no longer returns an unchanged request as the response. `ask()` also preserves empty answer text and excludes unchanged request content. The no-response fallback applies only when response content is absent or `None`.
+- Every `SyncAgent` method now detects an active event loop before creating a coroutine and directs callers to the corresponding async method, avoiding unawaited-coroutine warnings on this misuse.
+- Callable-instance tools now resolve `__call__` annotations for schema inference and argument validation. `Tool.from_callable()` rejects blank or non-string names before registration.
+
+### Compatibility
+
+Python 3.11 or newer is now required.
+
+Successful explicit tool calls through `invoke(..., part_type="tool_call")` still return `ToolOutput`; use `call_tool()` for the raw tool return value. Code that previously inspected an error-bearing result from `invoke()` or `ask()` should catch `TaskExecutionError` and inspect `exception.task`, or use `run_task()` to handle returned states directly. `raise_for_status()` checks only failed and canceled states; it neither waits for completion nor rejects `input-required` or other nonterminal states.
+
 ## [0.6.8] - 2026-07-30
 
-:::note Latest release
+:::note Release summary
 
 This patch release introduces first-party **Retrieval-Augmented Generation
 (RAG)**, a deterministic **infer-loop benchmark** for evaluating model

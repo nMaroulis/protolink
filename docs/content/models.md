@@ -96,6 +96,7 @@ from protolink.llms.history import ConversationHistory, LLMMessage, LLMMessageRo
 - [Tasks and lifecycle](#tasks-and-lifecycle)
   - [Task](#task)
   - [TaskState](#taskstate)
+  - [TaskExecutionError](#taskexecutionerror)
 - [Server endpoints](#server-endpoints)
   - [EndpointSpec](#endpointspec)
 - [LLM context models](#llm-context-models)
@@ -2489,6 +2490,31 @@ Move the task model to `CANCELED` and optionally retain a reason. This updates l
 
 </ApiReference>
 
+#### Task.raise_for_status {#task-raise-for-status}
+
+<ApiReference
+  kind="method"
+  path="protolink.Task.raise_for_status"
+  signature={`raise_for_status() -> Task`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py"
+>
+
+Raise <code>TaskExecutionError</code> for a failed or canceled task; otherwise return the same task unchanged. This is a status check, not a wait or a requirement that the task be completed. Submitted, working, input-required, and unknown states also pass through unchanged.
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Task raise_for_status return value">
+  <ApiField name="self" type="Task">The original task, allowing <code>agent.sync.run_task(task).raise_for_status()</code> when the caller wants both the full task and explicit failure checking.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Task raise_for_status errors">
+  <ApiField name="TaskExecutionError">The task has state <code>FAILED</code> or <code>CANCELED</code>. The exception retains this exact task as <code>exception.task</code>.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiCallout label="Application boundary">
+  <code>Agent.invoke()</code> and <code>Agent.ask()</code> perform this check automatically after <code>run_task()</code>. Direct task and client APIs let callers inspect returned states or opt into the check. Exceptions raised by execution still propagate with their original types.
+</ApiCallout>
+
+</ApiReference>
+
 #### Task.to_dict {#task-to-dict}
 
 <ApiReference
@@ -2873,6 +2899,34 @@ print(task.get_last_part_content()) # "It's 22°C and sunny in New York."
 ```
 
 </ApiSection>
+
+### TaskExecutionError
+
+<ApiReference
+  kind="exception"
+  path="protolink.TaskExecutionError"
+  signature={`class TaskExecutionError(RuntimeError):
+    def __init__(self, task: Task) -> None: ...
+    task: Task`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py"
+>
+
+A returned task failed or was canceled. Import it from <code>protolink</code> or <code>protolink.models</code>. The message identifies the task and state, and includes the stored error or cancellation reason when available. The <code>task</code> attribute retains the original object, including partial outputs and metadata; it is not a copy.
+
+```python
+from protolink import Task, TaskExecutionError
+
+task = Task.create_infer(prompt="Draft a report")
+task.cancel("Stopped by user")
+
+try:
+    task.raise_for_status()
+except TaskExecutionError as exc:
+    assert exc.task is task
+    print(exc.task.metadata["cancel_reason"])
+```
+
+</ApiReference>
 
 ### TaskState
 

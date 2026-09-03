@@ -150,7 +150,7 @@ The protocol is the smallest contract understood by Agent registration and execu
 </ApiSection>
 
 <ApiCallout label="Runtime boundary">
-  Calling a tool object directly bypasses Agent authorization, approval, cancellation, telemetry, and tool-call budget checks. Register it and use <code>agent.call_tool()</code>, <code>agent.call_tool_in_context()</code>, or task inference when those controls matter.
+  Calling a tool object directly bypasses Agent authorization and approvals. Register it and use <code>agent.call_tool()</code> or <code>agent.sync.call_tool()</code> for those controls. Use task execution for the full cancellation, telemetry, budget, and persistence lifecycle.
 </ApiCallout>
 
 </ApiReference>
@@ -176,6 +176,8 @@ The protocol is the smallest contract understood by Agent registration and execu
 >
 
 Adapt a synchronous or asynchronous Python callable to the `BaseTool` contract. Construction inspects the callable signature and resolved type hints, infers any missing schemas, normalizes explicit schemas, and converts missing tags, examples, and capabilities into empty collections.
+
+For ordinary functions, use `agent.add_tool(func)` or `@agent.tool` to infer name, description, and schemas. Use `Tool.from_callable(func, ...)` for a reusable definition with explicit metadata overrides, and the constructor when restoring or assembling a complete tool definition.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Tool constructor parameters">
@@ -221,6 +223,57 @@ Adapt a synchronous or asynchronous Python callable to the `BaseTool` contract. 
 </ApiSection>
 
 </ApiReference>
+
+### Tool.from_callable
+
+<ApiReference
+  kind="classmethod"
+  path="protolink.tools.Tool.from_callable"
+  signature={`Tool.from_callable(
+    func: Callable[..., Any],
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    input_schema: dict[str, Any] | None = None,
+    output_schema: Any | None = None,
+    tags: list[str] | None = None,
+    examples: list[Any] | None = None,
+    capabilities: Collection[str] | None = None,
+    action_builder: ActionBuilder | None = None,
+) -> Tool`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py"
+>
+
+Create a reusable tool from a synchronous or asynchronous callable. The default name is the function name, or the class name for a callable object. The default description is its cleaned docstring, falling back to <code>Call &lt;name&gt;.</code>. Explicit metadata takes precedence; missing input and output schemas use the same type-hint inference as the constructor. <code>agent.add_tool(func)</code> calls this factory automatically for ordinary callables; use it explicitly when adding metadata overrides or sharing a preconfigured tool.
+
+<ApiSection title="Parameters"><ApiFields ariaLabel="Tool from_callable parameters">
+  <ApiField name="func" type="Callable[..., Any]" required>Original callable retained as <code>tool.func</code>. The factory does not replace or execute it.</ApiField>
+  <ApiField name="name, description" type="str | None" defaultValue="None">Optional public metadata overrides. All arguments after <code>func</code> are keyword-only.</ApiField>
+  <ApiField name="input_schema, output_schema, tags, examples, capabilities, action_builder">The same schema, discovery, permission, and preview metadata accepted by the explicit constructor.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Returns"><ApiFields ariaLabel="Tool from_callable return value">
+  <ApiField name="tool" type="Tool">A tool ready for <code>agent.add_tool()</code>, with inferred schemas and unchanged validation behavior.</ApiField>
+</ApiFields></ApiSection>
+
+<ApiSection title="Raises"><ApiFields ariaLabel="Tool from_callable errors">
+  <ApiField name="TypeError">The input is not callable, its signature cannot be inspected, or its explicit or inferred name is not a string.</ApiField>
+  <ApiField name="ValueError">The tool name is empty or whitespace-only, or signature inspection or explicit schema normalization fails.</ApiField>
+</ApiFields></ApiSection>
+
+</ApiReference>
+
+```python
+from protolink import Tool
+
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+add_tool = Tool.from_callable(add, tags=["math"])
+agent.add_tool(add_tool)
+# The same definition can also be registered on another agent.
+```
 
 ### Tool.validate_args
 
@@ -670,29 +723,31 @@ Create a fresh timezone-aware clock tool. UTC requires no external service or ti
 
 ### Registering Native Tools
 
-To register a native tool, **decorate** an async function with `@agent.tool`:
+Pass an existing function to `agent.add_tool()` or decorate a function with `@agent.tool`. Both infer the public name, cleaned docstring, and schemas from the callable:
 
 ```python
-from protolink.agents import Agent
-from protolink.models import AgentCard
+from protolink import Agent, AgentCard
 
 agent_card = AgentCard(
-    url="http://localhost:8020",
+    url="runtime://calculator",
     name="calculator_agent", 
     description="Agent with math tools"
 )
-agent = Agent(card=agent_card, transport="http")
+agent = Agent(card=agent_card, transport="runtime", verbosity=0)
 
-@agent.tool(name="add", description="Add two numbers together")
-async def add_numbers(a: int, b: int) -> int:
+def add(a: int, b: int) -> int:
     """Add two integers and return the result."""
     return a + b
 
+agent.add_tool(add)
 
-@agent.tool(name="multiply", description="Multiply two numbers")
-async def multiply_numbers(a: float, b: float) -> float:
+
+@agent.tool()
+async def multiply(a: float, b: float) -> float:
     """Multiply two numbers and return the result."""
     return a * b
+
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
 
 # Inferred Schemas:
 # input_schema: {
@@ -707,33 +762,37 @@ async def multiply_numbers(a: float, b: float) -> float:
 # output_schema: {"type": "integer"}
 ```
 
+Synchronous functions, asynchronous functions, bound methods, and callable objects can all be passed directly to `add_tool()`. To reuse `add` on another agent, call `other_agent.add_tool(add)`. Registration inspects the callable without executing it; the registered wrapper is available as `agent.tools["add"]`.
+
+Existing `Tool`, built-in, MCP, and custom tool objects retain their metadata and behavior when passed to `add_tool()`. For explicit schemas, tags, capabilities, or approval previews, create a configured `Tool.from_callable(add, ...)` first. See [Agent.add_tool](agent.md#agentadd_tool) for replacement rules.
+
 ### Agent.tool
 
 <ApiReference
   kind="method"
   path="protolink.agents.Agent.tool"
   signature={`tool(
-    name: str,
-    description: str,
+    name: str | ToolCallableT | None = None,
+    description: str | None = None,
     input_schema: dict[str, Any] | None = None,
     output_schema: dict[str, Any] | None = None,
     tags: list[str] | None = None,
     examples: list[Any] | None = None,
     capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
     action_builder: ActionBuilder | None = None,
-) -> Callable[[Callable[..., Any]], Callable[..., Any]]`}
+) -> ToolCallableT | Callable[[ToolCallableT], ToolCallableT]`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py#L783"
 >
 
-Create a decorator that wraps a Python callable in `Tool`, registers it immediately on this Agent, and synchronizes the corresponding advertised `AgentSkill`. The decorated name remains bound to the original function, while the runtime wrapper is available through `agent.tools[name]`.
+Wrap a Python callable in `Tool`, register it immediately on this Agent, and synchronize the corresponding advertised `AgentSkill`. The decorated name remains bound to the original function and retains its type signature, while the runtime wrapper is available through `agent.tools[name]`. `ToolCallableT` represents the decorated callable's type. Bare decoration, empty parentheses, explicit keywords, and the existing `@agent.tool("name", "description")` form are supported.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Agent tool decorator parameters">
-    <ApiField name="name" type="str" required>
-      Stable identifier exposed to models, clients, task parts, and policy actions. Reusing an existing runtime name replaces the tool and its matching skill.
+    <ApiField name="name" type="str | ToolCallableT | None" defaultValue="None">
+      Stable public identifier, inferred from the function name when omitted. Bare decoration passes the callable here. Reusing an existing runtime name replaces the tool and its matching skill.
     </ApiField>
-    <ApiField name="description" type="str" required>
-      Selection guidance shown to the LLM and discovery clients. Include the operation's purpose, prerequisites, and important side effects.
+    <ApiField name="description" type="str | None" defaultValue="None">
+      Selection guidance shown to the LLM and discovery clients. Defaults to the cleaned docstring, or <code>Call &lt;name&gt;.</code> when the function has none. Include the operation's purpose, prerequisites, and relevant side effects in your docstring or explicit description.
     </ApiField>
     <ApiField name="input_schema" type="dict[str, Any] | None" defaultValue="None">
       Explicit JSON Schema or legacy field map. <code>None</code> infers a schema from the decorated function's signature and type hints.
@@ -758,8 +817,8 @@ Create a decorator that wraps a Python callable in `Tool`, registers it immediat
 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Agent tool decorator return value">
-    <ApiField name="decorator" type="Callable">
-      A decorator that registers the wrapped function and then returns that original function unchanged.
+    <ApiField name="function or decorator" type="ToolCallableT | Callable[[ToolCallableT], ToolCallableT]">
+      Bare decoration returns the original function; the configured form returns a decorator that registers and returns it unchanged. Direct Python calls bypass Agent authorization and approvals.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -982,7 +1041,7 @@ async def publish_record(record_id: str) -> dict[str, str]:
 
 Policy is evaluated after argument validation and immediately before the callable runs. See [Runtime](runtime.md#capability-policy) for wildcard rules, `RunContext.permissions`, approval handlers, and preview artifacts.
 
-Use `agent.call_tool_in_context(name, context, **arguments)` when a deterministic application path invokes a tool directly and needs the same per-run permissions, cancellation, and approval behavior as task execution.
+Use `agent.call_tool_in_context(name, context, **arguments)` to supply explicit per-run permissions and approval context. `agent.call_tool()` and `agent.sync.call_tool()` create a fresh context and return the raw result. These direct calls do not register a task or create its lifecycle, telemetry, and persistence records; use `run_task(Task.create_tool_call(...))` when the full task boundary is needed.
 
 ### Tool Cancellation
 

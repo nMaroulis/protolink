@@ -1,6 +1,6 @@
 # ProtoLink
 
-[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
@@ -39,30 +39,93 @@ Focus on the agent's role and capabilities. ProtoLink handles the infer loop, va
 
 ## Start with one agent
 
-Install the HTTP extra:
+Install the base package:
 
 ```bash
-uv add "protolink[http]"
+uv add protolink
 ```
 
-Create and start a provider-free agent:
+Register an ordinary typed function and call it:
 
 ```python
 from protolink import Agent, AgentCard
 
-planner_agent = Agent(
+agent = Agent(
     card=AgentCard(
-        name="planner",
-        description="Builds clear execution plans",
-        url="http://127.0.0.1:8000",
+        name="calculator",
+        description="Adds numbers",
+        url="runtime://calculator",
     ),
-    transport="http",
+    transport="runtime",
+    verbosity=0,
 )
 
-planner_agent.start()
+@agent.tool
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-No `async main()`, event-loop setup, model account, or API key is required. `start()` owns the lifecycle and blocks for a standalone service; use `start(background=True)` when embedding the agent in another application.
+This example needs no model, API key, server, or network connection. The function name, docstring, and type hints become the tool's public metadata and argument schema. `@agent.tool()` also works; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
+
+Choose the result you need:
+
+| Goal | Blocking API | Result |
+| --- | --- | --- |
+| Call a known tool | `agent.sync.call_tool("add", a=2, b=3)` | The validated, authorized tool's raw result |
+| Let a model respond or choose tools | `agent.sync.invoke("What is 2 + 3?")` | Final part content; requires an LLM |
+| Keep task state, artifacts, and metadata | `agent.sync.run_task(task)` | The complete `Task` |
+
+In async applications and notebooks with an active event loop, use `await agent.call_tool(...)`, `await agent.invoke(...)`, or `await agent.run_task(...)`.
+
+Add an LLM when you need inference. The mock backend lets you try the same API without a provider:
+
+```python
+from protolink import create_llm
+
+agent.llm = create_llm("mock", default_response="Hello from ProtoLink")
+print(agent.sync.invoke("Say hello"))
+```
+
+`invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect, and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
+
+## Your first agent mesh
+
+Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:
+
+```python
+from protolink import Agent, AgentCard, Task
+from protolink.discovery import Registry
+
+registry = Registry(url="http://127.0.0.1:9000", transport="http")
+calculator = Agent(
+    AgentCard(name="calculator", description="Adds numbers", url="http://127.0.0.1:8001"),
+    transport="http", registry=registry,
+)
+caller = Agent(
+    {"name": "caller", "description": "Sends work", "url": "http://127.0.0.1:8002"},
+    transport="http", registry=registry,
+)
+calculator.add_tool(add)
+
+registry.start(background=True)
+calculator.start(background=True)
+caller.start(background=True)
+
+try:
+    peer = caller.sync.discover_agents({"name": "calculator"})[0]
+    task = Task.create_tool_call(tool_name="add", args={"a": 2, "b": 3})
+    result = caller.sync.call_agent(peer.url, task).raise_for_status()
+    print(result.get_last_part_content().result)  # 5
+finally:
+    caller.stop()
+    calculator.stop()
+    registry.stop()
+```
+
+Agents register automatically, discover each other, and exchange tasks directly. Add models, tools, or more agents as you grow—the same API works across processes and machines.
 
 ## Plug in only what the agent needs
 
@@ -319,7 +382,9 @@ The `protolink dashboard` CLI command projects run-store and registry state into
 protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
 ```
 
-It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry, and provides local views for agent health, HTTP chat, task history, trace summaries, and run replay. The dashboard does not create agents or upload telemetry; it presents the runtime state your agents already emit.
+It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry, and provides local views for agent health, HTTP chat, task history, trace summaries, and run replay. It also includes **Protolink Studio**, an active visual builder for Agent, LLM, Tool, Registry, Flow, and operational Module nodes. Connect compatible nodes, configure transports and modules in the inspector, then generate ordinary Python that can be viewed, copied, or downloaded.
+
+Open Studio from the sidebar or directly at `http://127.0.0.1:8765/studio`. A served dashboard can start and stop one generated project as a local subprocess and show its recent output; closing the dashboard stops that process and removes its temporary script. A static `--output` dashboard remains useful for visual blueprint editing and export, but Python generation and live execution require the local dashboard server. Generated Python uses Protolink's public constructors directly and contains logical agent, tool, module, registry, LLM, and flow definitions—not canvas IDs, coordinates, edges, or embedded blueprint JSON. Studio blueprints are declarative: raw secrets are rejected, so configure environment-variable names such as `OPENAI_API_KEY` and review the generated code before running integrations with external side effects.
 
 ![ProtoLink dashboard overview](https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif)
 

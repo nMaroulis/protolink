@@ -238,7 +238,7 @@ def test_compact_run_index_does_not_decode_full_payloads(tmp_path: Path):
         build_run_replay_view(store_path, "run_cli", read_only=True, kind="report")
 
 
-def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path):
+def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     store_path = tmp_path / "runs.db"
     _seed_run_store(store_path)
     dashboard_path = tmp_path / "dashboard.html"
@@ -276,8 +276,60 @@ def test_dashboard_static_output_includes_disabled_studio_preview(tmp_path: Path
     assert "Skills and schemas" in dashboard_html
     assert "Studio Preview" not in dashboard_html
     assert "Protolink Studio" in dashboard_html
-    assert "Protolink Studio is coming soon" in dashboard_html
+    assert "Protolink Studio is coming soon" not in dashboard_html
+    assert "Visual runtime builder" in dashboard_html
     assert "studio-canvas" in dashboard_html
+    assert 'id="studio-canvas-camera"' in dashboard_html
+    assert 'viewBox="0 0 3000 1800"' in dashboard_html
+    assert "const STUDIO_CANVAS_WIDTH = 3000;" in dashboard_html
+    assert "const STUDIO_CANVAS_HEIGHT = 1800;" in dashboard_html
+    assert "const STUDIO_ZOOM_MIN = .1;" in dashboard_html
+    assert dashboard_html.count("width: 3000px;") == 2
+    assert dashboard_html.count("height: 1800px;") == 2
+    assert "studio-node-layer" in dashboard_html
+    assert 'id="studio-zoom-out"' in dashboard_html
+    assert 'aria-label="Zoom out"' in dashboard_html
+    assert 'id="studio-zoom-level"' in dashboard_html
+    assert 'aria-live="polite"' in dashboard_html
+    assert 'id="studio-zoom-in"' in dashboard_html
+    assert 'aria-label="Zoom in"' in dashboard_html
+    assert 'id="studio-fit-view"' in dashboard_html
+    assert "Fit project" in dashboard_html
+    assert "transform-origin: 0 0" in dashboard_html
+    assert "touch-action: none" in dashboard_html
+    assert "--studio-grid-size" in dashboard_html
+    assert "--studio-grid-origin-x" in dashboard_html
+    assert "--studio-grid-origin-y" in dashboard_html
+    assert "camera.style.setProperty" in dashboard_html
+    assert "--studio-world-edge" in dashboard_html
+    assert "--studio-world-shadow" in dashboard_html
+    assert "The lightly outlined surface is the draggable work area." in dashboard_html
+    assert "studioApplyCamera" in dashboard_html
+    assert "studioScreenToCanvas" in dashboard_html
+    assert "studioZoomBy" in dashboard_html
+    assert "studioFitView" in dashboard_html
+    assert "studioFocusSelection" in dashboard_html
+    assert "studioStartPan" in dashboard_html
+    assert "{passive: false}" in dashboard_html
+    assert "Generate Python" in dashboard_html
+    assert "Restore starter" in dashboard_html
+    assert "Clear canvas" in dashboard_html
+    assert "Import JSON" in dashboard_html
+    assert "Export JSON" in dashboard_html
+    assert '<dialog class="studio-output-dialog"' in dashboard_html
+    assert 'id="studio-open-code"' in dashboard_html
+    assert 'id="studio-open-logs"' in dashboard_html
+    assert 'aria-controls="studio-output-dialog"' in dashboard_html
+    assert 'id="studio-close-output"' in dashboard_html
+    assert 'aria-label="Close output panel"' in dashboard_html
+    assert 'class="studio-output"' not in dashboard_html
+    assert "studioOpenOutput" in dashboard_html
+    assert "studioCloseOutput" in dashboard_html
+    assert "studioClearProject" in dashboard_html
+    assert "studioGenerateCode" in dashboard_html
+    assert "studioRunProject" in dashboard_html
+    assert "/api/studio/generate" in dashboard_html
+    assert "/api/studio/run" in dashboard_html
     assert 'id="nav-telemetry"' in dashboard_html
     assert 'id="view-telemetry"' in dashboard_html
     assert "Open JSONL" in dashboard_html
@@ -342,9 +394,103 @@ def test_dashboard_cli_embeds_bounded_telemetry_summary(tmp_path: Path, trace_fl
     assert "must stay lazy" not in dashboard_html
 
 
-def test_cli_studio_command_is_not_public():
-    with pytest.raises(SystemExit):
-        cli_main(["studio", "--output", "studio.html"])
+def test_cli_studio_without_blueprint_serves_default(monkeypatch):
+    served_args = {}
+
+    def fake_serve_dashboard(**kwargs):
+        served_args.update(kwargs)
+
+    monkeypatch.setattr("protolink.cli.serve_dashboard", fake_serve_dashboard)
+
+    assert cli_main(["studio"]) == 0
+    assert served_args["start_tab"] == "studio"
+    assert served_args["project_loaded"] is False
+    assert served_args["blueprint"] is None
+
+
+def test_cli_studio_loads_custom_blueprint_and_serves(tmp_path: Path, monkeypatch):
+    blueprint_path = tmp_path / "custom_mesh.json"
+    custom_blueprint = {
+        "version": 1,
+        "project": {
+            "name": "custom_loaded_topology",
+            "description": "A loaded custom mesh.",
+        },
+        "nodes": [
+            {
+                "id": "agent-custom",
+                "kind": "agent",
+                "label": "Custom Worker",
+                "x": 100,
+                "y": 100,
+                "config": {
+                    "name": "custom_worker",
+                    "description": "A custom worker.",
+                    "url": "runtime://custom_worker",
+                    "transport": "runtime",
+                },
+            }
+        ],
+        "edges": [],
+    }
+    blueprint_path.write_text(json.dumps(custom_blueprint), encoding="utf-8")
+
+    served_args = {}
+
+    def fake_serve_dashboard(**kwargs):
+        served_args.update(kwargs)
+
+    monkeypatch.setattr("protolink.cli.serve_dashboard", fake_serve_dashboard)
+
+    assert cli_main(["studio", str(blueprint_path)]) == 0
+    assert served_args["start_tab"] == "studio"
+    assert served_args["project_loaded"] is True
+    assert served_args["host"] == "127.0.0.1"
+    assert served_args["port"] == 8765
+    assert served_args["blueprint"]["project"]["name"] == "custom_loaded_topology"
+    assert served_args["blueprint"]["nodes"][0]["id"] == "agent-custom"
+
+    # Test with custom --ip and --port
+    assert cli_main(["studio", str(blueprint_path), "--ip", "0.0.0.0", "--port", "9999"]) == 0
+    assert served_args["host"] == "0.0.0.0"
+    assert served_args["port"] == 9999
+
+    # Test with --host alias
+    assert cli_main(["studio", str(blueprint_path), "--host", "127.0.0.2", "--port", "8888"]) == 0
+    assert served_args["host"] == "127.0.0.2"
+    assert served_args["port"] == 8888
+
+
+def test_cli_studio_rejects_non_json_missing_or_invalid_blueprint(tmp_path: Path, capsys):
+    non_json_path = tmp_path / "mesh.yaml"
+    non_json_path.write_text("{}", encoding="utf-8")
+    assert cli_main(["studio", str(non_json_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert ".json" in err
+
+    missing_path = tmp_path / "non_existent.json"
+    assert cli_main(["studio", str(missing_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert "not found" in err
+
+    invalid_json_path = tmp_path / "broken.json"
+    invalid_json_path.write_text("not json content {", encoding="utf-8")
+    assert cli_main(["studio", str(invalid_json_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert "Invalid JSON" in err
+
+    invalid_blueprint_path = tmp_path / "invalid_blueprint.json"
+    invalid_blueprint_path.write_text(
+        json.dumps({"version": 1, "nodes": "not a list"}),
+        encoding="utf-8",
+    )
+    assert cli_main(["studio", str(invalid_blueprint_path)]) == 1
+    err = capsys.readouterr().err
+    assert "Failed to load Studio blueprint" in err
+    assert "nodes must be an array" in err
 
 
 def test_dashboard_snapshot_and_renderer_include_registry_and_store(tmp_path: Path):

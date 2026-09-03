@@ -11,7 +11,8 @@ import inspect
 import json
 import threading
 import time
-from typing import Any, Literal, TypeVar
+from collections.abc import Callable
+from typing import Any, Literal, TypeVar, cast, overload
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
@@ -37,9 +38,10 @@ from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
 
 from ._typing import _AgentMixinBase
-from .helpers import _coerce_state_operation_request
+from .helpers import _coerce_state_operation_request, _response_content
 
 AgentSerializationT = TypeVar("AgentSerializationT", bound="AgentSerializationMixin")
+ToolCallableT = TypeVar("ToolCallableT", bound=Callable[..., Any])
 
 
 class AgentLifecycleMixin(_AgentMixinBase):
@@ -687,18 +689,32 @@ class AgentCommunicationMixin(_AgentMixinBase):
         tool_name: str | None = None,
         tool_args: dict[str, Any] | None = None,
         session_id: str = "invocation_session_id",
-    ) -> str:
-        """Simple synchronous processing (convenience method).
+    ) -> Any:
+        """Process a message and return its final response content.
+
+        The task runs through :meth:`run_task`, including cancellation and
+        persistence for custom handlers. Use ``run_task`` directly when the
+        caller needs the full task instead of only its final part.
 
         Args:
-            message: User message text
-            part_type: Type of part to create
-            tool_name: Name of tool (if part_type is "tool_call")
-            tool_args: Arguments for tool (if part_type is "tool_call")
-            session_id: Session ID to use for the task
+            message: Inference prompt; unused in tool-call mode.
+            part_type: Execute inference or an explicit tool call.
+            tool_name: Registered tool name for tool-call mode.
+            tool_args: Keyword arguments for tool-call mode.
+            session_id: Conversation partition. The default shares history
+                when conversation state is enabled; pass a distinct ID for
+                each independent conversation.
 
         Returns:
-            Agent response text
+            Final part content, including ``ToolOutput`` for tool calls.
+            Empty strings, zero, false, and empty collections are preserved.
+            Returns ``"No response generated"`` only when no response content
+            was produced. Use ``call_tool`` for a tool's raw return value.
+
+        Raises:
+            ValueError: The part type is unsupported.
+            TaskExecutionError: The returned task failed or was canceled.
+                Handler, provider, and policy exceptions propagate unchanged.
         """
         # Create a task with the user message
         if part_type == "infer":
@@ -709,11 +725,13 @@ class AgentCommunicationMixin(_AgentMixinBase):
             raise ValueError(f"Unsupported part type: {part_type}")
 
         task.metadata["session_id"] = session_id
+        request_item_ids = {item.id for item in [*task.messages, *task.artifacts]}
 
         # Process the task
-        result_task = await self.handle_task(task)
-        last_part = result_task.get_last_part_content()
-        return last_part if last_part else "No response generated"
+        result_task = await self.run_task(task)
+        result_task.raise_for_status()
+        last_part = _response_content(result_task, request_item_ids)
+        return last_part if last_part is not None else "No response generated"
 
     async def ask(
         self,
@@ -740,10 +758,18 @@ class AgentCommunicationMixin(_AgentMixinBase):
             where: Optional metadata filters passed to every selected source.
             citations: Whether to request bracketed citations and return
                 citation metadata.
-            session_id: Conversation session identifier.
+            session_id: Conversation partition. Pass distinct IDs for
+                independent conversations when conversation state is enabled.
 
         Returns:
             Grounded answer text plus the retrieved hits and citations.
+
+        Raises:
+            RuntimeError: Knowledge or an LLM has not been configured.
+            ValueError: The question is empty.
+            TaskExecutionError: The returned task failed or was canceled.
+                Retrieval, handler, provider, and policy exceptions propagate
+                unchanged.
         """
         if not self.knowledge:
             raise RuntimeError("Agent.ask requires at least one attached knowledge source")
@@ -765,13 +791,17 @@ class AgentCommunicationMixin(_AgentMixinBase):
 
         task = Task.create_infer(prompt=question, metadata=infer_metadata)
         task.metadata["session_id"] = session_id
-        result_task = await self.handle_task(task)
-        content = result_task.get_last_part_content()
+        request_item_ids = {item.id for item in [*task.messages, *task.artifacts]}
+        result_task = await self.run_task(task)
+        result_task.raise_for_status()
+        content = _response_content(result_task, request_item_ids)
+        if content is None:
+            content = "No response generated"
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False, default=str)
         hits: list[SearchHit] = list(getattr(result_task, "_rag_hits", ()))
         source_citations: list[Citation] = list(getattr(result_task, "_rag_citations", ()))
         return RAGAnswer(
-            text=text or "No response generated",
+            text=text,
             citations=source_citations if citations else [],
             hits=hits,
             query=question,
@@ -825,8 +855,33 @@ class AgentCommunicationMixin(_AgentMixinBase):
 class AgentToolMixin(_AgentMixinBase):
     """Manages tools, skills, and runtime action authorization."""
 
-    def add_tool(self, tool: BaseTool) -> None:
-        """Register or replace a tool and keep its advertised skill in sync."""
+    def add_tool(self, tool: BaseTool | Callable[..., Any]) -> None:
+        """Register a tool or Python callable and synchronize its advertised skill.
+
+        Plain synchronous and asynchronous callables are wrapped with
+        ``Tool.from_callable()`` to infer their name, cleaned docstring, and
+        schemas. Existing tools are retained unchanged, including custom
+        structural tools and MCP wrappers. Registration never calls the tool.
+
+        Args:
+            tool: A tool instance or Python callable. For explicit metadata,
+                pass ``Tool.from_callable(func, name=..., capabilities=...)``.
+
+        Raises:
+            TypeError: The value is not callable or cannot be inspected.
+            ValueError: Callable inspection or metadata inference fails, or
+                the tool would replace an attached knowledge source's tool.
+
+        Registering an existing name replaces the runtime tool and updates its
+        skill. Use ``agent.call_tool()`` or task execution to invoke it through
+        argument validation, policy, and approval checks.
+        """
+        if not callable(tool):
+            raise TypeError("add_tool expects a tool instance or a Python callable")
+        # Legacy structural tools may omit optional examples and capabilities.
+        if not all(hasattr(tool, field) for field in ("name", "description", "input_schema", "output_schema", "tags")):
+            tool = Tool.from_callable(tool)
+        tool = cast(BaseTool, tool)
         existing_tool = self.tools.get(tool.name)
         if (
             existing_tool is not None
@@ -903,22 +958,43 @@ class AgentToolMixin(_AgentMixinBase):
 
         return decorator
 
+    @overload
+    def tool(self, name: ToolCallableT, /) -> ToolCallableT: ...
+
+    @overload
     def tool(
         self,
-        name: str,
-        description: str,
+        name: str | None = None,
+        description: str | None = None,
         input_schema: dict[str, Any] | None = None,
         output_schema: dict[str, Any] | None = None,
         tags: list[str] | None = None,
         examples: list[Any] | None = None,
         capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
         action_builder: ActionBuilder | None = None,
-    ):
-        """Decorate a function as a tool with optional policy metadata.
+    ) -> Callable[[ToolCallableT], ToolCallableT]: ...
+
+    def tool(
+        self,
+        name: str | ToolCallableT | None = None,
+        description: str | None = None,
+        input_schema: dict[str, Any] | None = None,
+        output_schema: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+        examples: list[Any] | None = None,
+        capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
+        action_builder: ActionBuilder | None = None,
+    ) -> ToolCallableT | Callable[[ToolCallableT], ToolCallableT]:
+        """Register a function as a tool while preserving the original callable.
+
+        Use ``@agent.tool`` or ``@agent.tool()`` to infer the name, cleaned
+        docstring, and schemas. Explicit metadata overrides those defaults;
+        ``@agent.tool("name", "description")`` remains supported. Functions
+        without a docstring use ``"Call <name>."`` as their description.
 
         Args:
-            name: Stable tool name exposed to agents and models.
-            description: Human-readable tool purpose.
+            name: Public tool name, or the function when used without parentheses.
+            description: Human-readable purpose; defaults to the function docstring.
             input_schema: Optional JSON Schema for keyword arguments.
             output_schema: Optional JSON Schema for the return value.
             tags: Optional discovery and presentation tags.
@@ -928,19 +1004,20 @@ class AgentToolMixin(_AgentMixinBase):
                 artifacts.
 
         Returns:
-            A decorator that registers the wrapped callable on this agent.
+            The unchanged function for bare decoration, or a decorator that
+            registers and returns it. Calling that function directly remains a
+            normal Python call; use ``agent.call_tool()`` for runtime policy.
         """
 
-        # decorator for Native functions
-        def decorator(func):
+        def decorator(func: ToolCallableT) -> ToolCallableT:
             self.add_tool(
-                Tool(
-                    name=name,
+                Tool.from_callable(
+                    func,
+                    name=name if isinstance(name, str) else None,
                     description=description,
                     input_schema=input_schema,
                     output_schema=output_schema,
                     tags=tags,
-                    func=func,
                     examples=examples,
                     capabilities=capabilities,
                     action_builder=action_builder,
@@ -948,13 +1025,27 @@ class AgentToolMixin(_AgentMixinBase):
             )
             return func
 
-        return decorator
+        if name is None or isinstance(name, str):
+            return decorator
+        return decorator(name)
 
-    async def call_tool(self, tool_name: str, **kwargs):
-        """Invoke a registered tool after runtime policy authorization.
+    async def call_tool(self, tool_name: str, **kwargs: Any) -> Any:
+        """Validate, authorize, and call a registered tool.
 
-        Direct calls use a fresh run context. Task-based execution uses the context propagated on the task, allowing
-        per-run permissions and cancellation state to participate in the decision.
+        Direct calls use a fresh run context and return the raw tool result.
+        Use ``run_task(Task.create_tool_call(...))`` when you also need task
+        lifecycle state, cancellation by task ID, and durable task snapshots.
+
+        Args:
+            tool_name: Registered tool name.
+            **kwargs: Keyword arguments validated before policy and approval.
+
+        Returns:
+            The tool's return value, including ``None`` or falsey values.
+
+        Raises:
+            ValueError: The tool is not registered or its arguments are invalid.
+                Tool, policy, and approval exceptions propagate unchanged.
         """
         tool = self.tools.get(tool_name, None)
         if not tool:
@@ -1503,8 +1594,6 @@ class AgentSerializationMixin(_AgentMixinBase):
             return tool
         else:
             func_path = tool_dict.get("func_path")
-            from collections.abc import Callable
-
             func: Callable[..., Any] | None = None
             if func_path:
                 try:

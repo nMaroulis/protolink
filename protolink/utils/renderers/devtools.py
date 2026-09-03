@@ -9,6 +9,7 @@ from html import escape
 from typing import Any
 
 from protolink.devtools.models import DoctorReport, RunDiffView, RunReplayView
+from protolink.utils.renderers.studio_assets import STUDIO_CSS, STUDIO_HTML, STUDIO_JS
 
 
 class DevtoolsTextRenderer:
@@ -127,19 +128,14 @@ def _table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
 
 def _safe_json(data: dict[str, Any]) -> str:
     """Serialize JSON safely for embedding in a script tag."""
-    return json.dumps(data).replace("</", "<\\/")
-
-
-def _default_blueprint() -> dict[str, Any]:
-    """Return the default blueprint used by the disabled Studio preview."""
-    return {
-        "nodes": [
-            {"id": "agent-1", "kind": "agent", "label": "Planner", "x": 110, "y": 120},
-            {"id": "llm-1", "kind": "llm", "label": "LLM", "x": 370, "y": 70},
-            {"id": "tool-1", "kind": "tool", "label": "Search Tool", "x": 370, "y": 190},
-        ],
-        "edges": [{"from": "agent-1", "to": "llm-1"}, {"from": "agent-1", "to": "tool-1"}],
-    }
+    return (
+        json.dumps(data)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
 
 
 def _dashboard_html(
@@ -159,6 +155,9 @@ def _dashboard_html(
         .replace("__PROTOLINK_SNAPSHOT_JSON__", snapshot_json)
         .replace("__PROTOLINK_START_TAB_VALUE__", safe_start_tab)
         .replace("__PROTOLINK_LIVE_VALUE__", "true" if live else "false")
+        .replace("__PROTOLINK_STUDIO_CSS__", STUDIO_CSS)
+        .replace("__PROTOLINK_STUDIO_HTML__", STUDIO_HTML)
+        .replace("__PROTOLINK_STUDIO_JS__", STUDIO_JS)
     )
 
 
@@ -217,7 +216,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .nav button { text-align: left; border: 0; border-radius: 8px; padding: 10px 12px; color: #dbe4ef; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; }
 .nav button:hover { background: rgba(255,255,255,.08); }
 .nav button.active { color: #fff; background: rgba(15,159,146,.26); box-shadow: inset 3px 0 0 var(--teal); }
-.soon-mini { font-size: 10px; color: #fff; background: rgba(189,125,17,.95); border-radius: 999px; padding: 2px 6px; }
 .side-foot { margin-top: auto; color: #bac5d4; font-size: 12px; line-height: 1.5; display: grid; gap: 8px; }
 .side-version { color: #8795a8; font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .03em; }
 .main { padding: 24px; overflow: auto; min-width: 0; }
@@ -548,27 +546,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
-.studio-layout { display: grid; grid-template-columns: 220px 1fr 280px; gap: 12px; min-height: 660px; }
-.palette, .props { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; box-shadow: var(--shadow); opacity: .68; }
-.palette h2, .props h2 { font-size: 14px; margin: 0 0 10px; }
-.palette .btn { width: 100%; margin-bottom: 8px; text-align: left; justify-content: flex-start; }
-.canvas-wrap { position: relative; background: #edf1f5; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); }
-.canvas { position: relative; min-height: 660px; background-image: linear-gradient(#dce4ee 1px, transparent 1px), linear-gradient(90deg, #dce4ee 1px, transparent 1px); background-size: 32px 32px; }
-.edge-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.node { position: absolute; width: 165px; min-height: 72px; border-radius: 8px; border: 1px solid var(--line); background: #fff; box-shadow: 0 10px 24px rgba(23,32,42,.13); user-select: none; z-index: 1;}
-.node .kind { padding: 7px 9px 0; font-size: 11px; color: var(--muted); text-transform: uppercase; }
-.node .label { padding: 2px 9px 10px; font-weight: 740; }
-.node.agent { border-top: 4px solid var(--teal); }
-.node.llm { border-top: 4px solid var(--indigo); }
-.node.tool { border-top: 4px solid var(--coral); }
-.node.registry { border-top: 4px solid var(--amber); }
-.studio-muted { pointer-events: none; filter: saturate(.78); opacity: .66; }
-.studio-lock { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(245,247,251,.42); backdrop-filter: blur(1.2px); z-index: 1000;}
-.studio-lock-inner { max-width: 460px; text-align: center; border: 1px solid rgba(15,159,146,.28); background: rgba(255,255,255,.96); border-radius: 8px; padding: 24px; box-shadow: 0 28px 80px rgba(24,33,47,.26), 0 0 0 1px rgba(255,255,255,.82), 0 0 0 9999px rgba(255,255,255,.18); z-index: 1001;}
-.studio-lock-inner .eyebrow { display: inline-flex; margin-bottom: 10px; color: var(--teal); background: var(--teal-soft); border: 1px solid rgba(15,159,146,.18); border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 760; text-transform: uppercase; letter-spacing: .06em; }
-.studio-lock-inner h2 { margin: 0 0 7px; font-size: 24px; }
-.studio-lock-inner p { margin: 0; color: var(--muted); }
-.code { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: #111827; color: #e5e7eb; border-radius: 8px; padding: 12px; max-height: 260px; overflow: auto; }
+__PROTOLINK_STUDIO_CSS__
 @media (max-width: 1180px) {
   .shell { grid-template-columns: 1fr; }
   .side { position: sticky; top: 0; z-index: 5; padding: 12px 16px; gap: 10px; box-shadow: 0 10px 28px rgba(17,24,39,.18); }
@@ -585,7 +563,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
   .nav::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
   .nav::-webkit-scrollbar-thumb { background: rgba(186,197,212,.42); border-radius: 999px; }
   .nav button { flex: 0 0 auto; min-height: 34px; padding: 7px 10px; white-space: nowrap; }
-  .grid, .bands, .studio-layout, .chat-layout, .telemetry-grid, .runs-layout, .source-connect { grid-template-columns: 1fr; }
+  .grid, .bands, .chat-layout, .telemetry-grid, .runs-layout, .source-connect { grid-template-columns: 1fr; }
   .agent-hero { grid-template-columns: 1fr; }
   .agent-hero-actions { justify-content: flex-start; }
   .agent-stat-grid, .schema-grid { grid-template-columns: 1fr; }
@@ -629,7 +607,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
       <button id="nav-runs" onclick="showView('runs')"><span class="nav-label" data-icon="timeline">Runs</span></button>
       <button id="nav-telemetry" onclick="showView('telemetry')"><span class="nav-label" data-icon="activity">Telemetry</span></button>
       <button id="nav-chat" onclick="showView('chat')"><span class="nav-label" data-icon="chat">Chat</span></button>
-      <button id="nav-studio" onclick="showView('studio')"><span class="nav-label" data-icon="studio">Studio</span> <span class="soon-mini">Soon</span></button>
+      <button id="nav-studio" onclick="showView('studio')"><span class="nav-label" data-icon="studio">Studio</span></button>
     </nav>
     <div class="side-foot">
       <span>Local devtools over registry cards, run reports, telemetry traces, agent status, and chat.</span>
@@ -781,39 +759,13 @@ td { font-size: 13px; overflow-wrap: anywhere; }
         </div>
       </div>
     </section>
-    <section id="view-studio" class="view">
-      <div class="top"><div><p class="kicker">Canvas preview</p><h1>Protolink Studio</h1><p class="lede">The visual agent builder is disabled while the blueprint format settles.</p></div><div class="actions"><button class="btn" data-icon="plug" disabled>Connect</button><button class="btn primary" data-icon="download" disabled>Export JSON</button></div></div>
-      <div class="studio-layout">
-        <aside class="palette">
-          <h2>Palette</h2>
-          <button class="btn" data-icon="agent" disabled>Add Agent</button>
-          <button class="btn" data-icon="spark" disabled>Add LLM</button>
-          <button class="btn" data-icon="tool" disabled>Add Tool</button>
-          <button class="btn" data-icon="registry" disabled>Add Registry</button>
-        </aside>
-        <div class="canvas-wrap">
-          <div class="canvas" id="studio-canvas">
-            <svg class="edge-layer studio-muted" id="edge-layer"></svg>
-            <div class="studio-lock"><div class="studio-lock-inner"><span class="eyebrow">Preview locked</span><h2>Protolink Studio is coming soon</h2><p>Studio will return as a proper canvas builder for agents, LLMs, tools, registries, telemetry, and flow blueprints. For now, this page is a disabled preview inside the dashboard.</p></div></div>
-          </div>
-        </div>
-        <aside class="props">
-          <h2>Selection</h2>
-          <div class="field"><label>Label</label><input id="node-label" disabled /></div>
-          <div class="field"><label>Kind</label><select id="node-kind" disabled><option>agent</option><option>llm</option><option>tool</option><option>registry</option></select></div>
-          <button class="btn" data-icon="details" disabled>Delete</button>
-          <h2 style="margin-top:16px;">Blueprint</h2>
-          <div class="code" id="blueprint-json"></div>
-        </aside>
-      </div>
-    </section>
+    __PROTOLINK_STUDIO_HTML__
   </main>
 </div>
 <script>
 window.__PROTOLINK_SNAPSHOT__ = __PROTOLINK_SNAPSHOT_JSON__;
 window.__PROTOLINK_LIVE__ = __PROTOLINK_LIVE_VALUE__;
 let snapshot = window.__PROTOLINK_SNAPSHOT__;
-let blueprint = JSON.parse(JSON.stringify(snapshot.studio?.blueprint || {nodes: [], edges: []}));
 let selectedAgentIndex = 0;
 let chatMessages = [];
 let health = {};
@@ -876,6 +828,12 @@ function newChatSessionId() {
 
 function showView(name) {
   if (name !== 'telemetry') stopTelemetryPlayback();
+  const main = document.querySelector('.main');
+  main?.classList.toggle('studio-main', name === 'studio');
+  if (name !== 'studio' && typeof studioCloseOutput === 'function') {
+    studioCloseOutput({restoreFocus: false});
+    main?.style.removeProperty('--studio-main-height');
+  }
   for (const el of document.querySelectorAll('.view')) el.classList.remove('active');
   for (const el of document.querySelectorAll('.nav button')) el.classList.remove('active');
   document.getElementById('view-' + name).classList.add('active');
@@ -929,7 +887,7 @@ async function refresh() {
       }
     } catch (_) {}
   }
-  blueprint = blueprint.nodes?.length ? blueprint : JSON.parse(JSON.stringify(snapshot.studio?.blueprint || {nodes: [], edges: []}));
+  syncStudioSnapshot(snapshot.studio);
   render();
 }
 
@@ -3145,38 +3103,7 @@ function runReplayFact(label, value) {
 
 function timeLabel() { return new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); }
 
-function renderStudio() {
-  const canvas = document.getElementById('studio-canvas');
-  const edgeLayer = document.getElementById('edge-layer');
-  if (!canvas || !edgeLayer) return;
-  for (const el of canvas.querySelectorAll('.node')) el.remove();
-  edgeLayer.innerHTML = '';
-  const nodeMap = Object.fromEntries((blueprint.nodes || []).map(n => [n.id, n]));
-  for (const edge of blueprint.edges || []) {
-    const a = nodeMap[edge.from], b = nodeMap[edge.to];
-    if (!a || !b) continue;
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', String(a.x + 165));
-    line.setAttribute('y1', String(a.y + 36));
-    line.setAttribute('x2', String(b.x));
-    line.setAttribute('y2', String(b.y + 36));
-    line.setAttribute('stroke', '#7a8799');
-    line.setAttribute('stroke-width', '2');
-    edgeLayer.appendChild(line);
-  }
-  for (const node of blueprint.nodes || []) {
-    const el = document.createElement('div');
-    el.className = `node studio-muted ${node.kind}`;
-    el.style.left = `${node.x}px`;
-    el.style.top = `${node.y}px`;
-    el.innerHTML = `<div class="kind">${esc(node.kind)}</div><div class="label">${esc(node.label)}</div>`;
-    canvas.appendChild(el);
-  }
-  const first = blueprint.nodes?.[0] || null;
-  document.getElementById('node-label').value = first?.label || '';
-  document.getElementById('node-kind').value = first?.kind || 'agent';
-  document.getElementById('blueprint-json').textContent = JSON.stringify(blueprint, null, 2);
-}
+__PROTOLINK_STUDIO_JS__
 
 document.addEventListener('keydown', event => {
   if (!document.getElementById('view-telemetry')?.classList.contains('active')) return;

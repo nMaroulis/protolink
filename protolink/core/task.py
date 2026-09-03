@@ -40,6 +40,23 @@ _ALLOWED_TRANSITIONS: dict[TaskState, set[TaskState]] = {
 _TERMINAL_STATES: set[TaskState] = {TaskState.COMPLETED, TaskState.CANCELED, TaskState.FAILED}
 
 
+class TaskExecutionError(RuntimeError):
+    """A returned task failed or was canceled.
+
+    Attributes:
+        task: The original task, including its state, error metadata, and any
+            partial outputs. Raised by :meth:`Task.raise_for_status`; exceptions
+            raised directly by a handler retain their original types.
+    """
+
+    def __init__(self, task: "Task") -> None:
+        self.task = task
+        key = "cancel_reason" if task.state is TaskState.CANCELED else "error"
+        reason = task.metadata.get(key)
+        message = f"Task '{task.id}' {task.state.value}"
+        super().__init__(f"{message}: {reason}" if reason else message)
+
+
 def _coerce_task_state(state: TaskState | str) -> TaskState:
     """Normalize a state value to ``TaskState``.
 
@@ -127,6 +144,21 @@ class Task:
     def is_terminal(self) -> bool:
         """Return whether the task is in a terminal lifecycle state."""
         return self.state in _TERMINAL_STATES
+
+    def raise_for_status(self) -> "Task":
+        """Raise for a failed or canceled task; otherwise return this task.
+
+        This check does not wait for completion. Submitted, working, and
+        input-required tasks remain valid protocol responses; inspect ``state``
+        when your application requires a completed result.
+
+        Raises:
+            TaskExecutionError: The task failed or was canceled. The exception's
+                ``task`` attribute retains the original task and partial outputs.
+        """
+        if self.state in {TaskState.FAILED, TaskState.CANCELED}:
+            raise TaskExecutionError(self)
+        return self
 
     def add_message(self, message: Message) -> "Task":
         """Add a message to the task and update the last item cache.

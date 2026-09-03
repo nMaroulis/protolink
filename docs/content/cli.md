@@ -8,7 +8,7 @@ Use the CLI in three common moments:
 
 - **First setup**: create a starter agent and confirm optional dependencies with `protolink doctor`.
 - **Local debugging and regression checks**: inspect registry entries, list stored runs, replay a timeline, compare stored reports, and explore local trace JSONL without writing custom scripts.
-- **Developer presentation**: open the dashboard when you want a visual view of runs, agents, telemetry, and the future Studio preview.
+- **Developer presentation**: open the dashboard when you want a visual view of runs, agents, telemetry, or the active Studio topology builder.
 
 Most inspection commands support both human-readable terminal output and JSON. Use text while working interactively; use `--json` when integrating with CI, shell scripts, notebooks, or another application.
 
@@ -219,7 +219,7 @@ protolink dashboard \
 
 `--telemetry traces.jsonl` is an alias for `--traces traces.jsonl`.
 
-The dashboard is a local, dependency-free HTML surface over the same collectors used by the CLI. It is useful when a run has enough events that a table is easier to scan than terminal output, or when you want to show registered agents, health probes, agent chat, stored run reports, and local telemetry side by side.
+The dashboard is a local, dependency-free HTML surface over the same collectors used by the CLI. It is useful when a run has enough events that a table is easier to scan than terminal output, or when you want to show registered agents, health probes, agent chat, stored run reports, local telemetry, and a visual Studio topology side by side.
 
 `--store` is optional for the dashboard. When it is omitted, an existing `./runs.db` is discovered automatically; no database is created when that file is absent. In a served dashboard, the Registry and Runs pages can connect or change their sources for the lifetime of that dashboard process. Registry URLs are fetched by the local dashboard server; run stores must already exist and are opened read-only. Source changes are accepted only from a loopback client and are not written to project configuration. Static snapshots show the source controls but cannot connect server-side sources.
 
@@ -229,7 +229,7 @@ Write a static dashboard snapshot:
 protolink dashboard --store runs.db --output dashboard.html
 ```
 
-Static output is useful for demos, bug reports, and notebooks because the generated file embeds the current snapshot. It will not live-refresh, but it can be opened without starting a server. Its Telemetry view can still inspect a JSONL file chosen with **Open JSONL** in the browser.
+Static output is useful for demos, bug reports, and notebooks because the generated file embeds the current snapshot. It will not live-refresh, but it can be opened without starting a server. Its Telemetry view can still inspect a JSONL file chosen with **Open JSONL**, and Studio can edit, persist locally, import, and export a JSON blueprint in the browser. Python generation and Studio execution require the served dashboard.
 
 When the dashboard is served, it can call the local JSON endpoints behind the page:
 
@@ -241,14 +241,19 @@ When the dashboard is served, it can call the local JSON endpoints behind the pa
 - `/api/traces/{record_id}` lazily loads one selected telemetry record.
 - `/api/agents/ping` probes an HTTP agent's `/status` endpoint and returns latency/status data.
 - `/api/agents/chat` proxies a message to an HTTP LLM agent's `POST /chat` endpoint.
+- `GET /studio` opens the same dashboard with Studio selected.
+- `GET /api/studio/catalog` lists supported node kinds, transports, providers, tools, flows, and module implementations.
+- `POST /api/studio/generate` validates a blueprint and returns generated Python plus its filename, normalized blueprint, warnings, and digest.
+- `GET /api/studio/status` returns the current Studio subprocess state and recent output.
+- `POST /api/studio/run` starts one generated project, and `POST /api/studio/stop` stops it by run ID.
 
-Those actions require HTTP agent URLs from the registry. Runtime-only demo agents still appear in the registry and Studio preview, but they are marked as runtime agents because there is no network endpoint for the browser dashboard to ping.
+Ping and chat require HTTP agent URLs from the registry. Runtime-only demo agents still appear in the registry, but they are marked as runtime agents because there is no network endpoint for the browser dashboard to ping.
 
 The Telemetry view uses the path supplied by `--traces` for server-backed inspection. It pages completed task records in recent-first order, keeps a rolling window of at most 500 summaries, and loads the selected record's spans, events, inputs, outputs, metadata, and raw JSON only on demand. This avoids placing a long-lived system's complete trace file in `/api/snapshot` or rendering every historical record at once while still allowing continued navigation into older history. The browser's **Open JSONL** control provides the same bounded, lazy-detail workflow for a file selected locally instead of a CLI-configured path.
 
 Each JSONL line is a completed task record. Related or delegated tasks can share a `trace_id`, so the dashboard treats that field as a correlation key and groups the distinct task records beneath it; it does not assume that a trace ID uniquely identifies one line. Blank or malformed records are skipped and reported. An incomplete final line from an active writer is tolerated as a partial write and can appear after a later refresh once it is complete. A 16 MB per-record detail limit and bounded reverse scans protect the dashboard from pathological payloads; opaque continuation cursors let the server move past a physical line that is itself larger than one scan page.
 
-Trace payloads remain local, but local does not automatically mean non-sensitive. The browser file picker reads the selected file in the page rather than uploading it to a hosted service. The dashboard server binds to `127.0.0.1` by default, rejects unexpected HTTP `Host` names, and accepts action POSTs only as same-origin JSON requests. If you set `--host` to `0.0.0.0` or another non-loopback address, other network clients may be able to reach trace details, registry data, agent probes, and the chat proxy; use an IP address with wildcard binds, and only broaden the binding on a trusted network with appropriate access controls.
+Trace payloads remain local, but local does not automatically mean non-sensitive. The browser file picker reads the selected file in the page rather than uploading it to a hosted service. The dashboard server binds to `127.0.0.1` by default, rejects unexpected HTTP `Host` names, and accepts action POSTs only as same-origin JSON requests. Studio **Run** and **Stop** are limited to loopback clients. If you set `--host` to `0.0.0.0` or another non-loopback address, other network clients may be able to reach trace details, registry data, generated Studio code, agent probes, and the chat proxy; use an IP address with wildcard binds, and only broaden the binding on a trusted network with appropriate access controls.
 
 The dashboard landing view puts five cards at the top: Agents, Tasks, Reports, Telemetry, and Store. Agents opens the registry view; Telemetry opens the bounded trace explorer; and Tasks, Reports, and Store route to Runs. Runs uses a compact, searchable recent-record browser beside a detailed correlation hero and event timeline. Only compact task/report indexes are embedded in the snapshot; full replay data is loaded after selection. Under the cards, the dashboard keeps Registry as the primary table so agent discovery and health stay immediately visible. The sidebar places Registry directly after Dashboard and shows the running Protolink version at the bottom.
 
@@ -256,9 +261,11 @@ The dashboard chat view also includes a Debug toggle for local agent probing. It
 
 The selected-agent panel shows the agent card as an operational profile: health, uptime when reported by `/status`, role, version, protocol, transport, endpoint, input/output formats, security schemes, capability flags, tags, skills, and advertised skill schemas.
 
-The dashboard still has a Studio tab, but it is deliberately disabled and marked as coming soon. It previews the future direction without exposing a public `protolink studio` command before the blueprint format and execution story are ready.
+The Studio tab is an active visual builder for Agent, LLM, Tool, Registry, Flow, and Module nodes. Compatible connections carry a relation and order, while the inspector exposes supported transports, providers, schemas, flows, and operational modules. In served mode, **Generate Python** opens readable public-API code that can be copied or downloaded; **Run** and **Stop** manage one local generated subprocess with live status and bounded logs. Closing the dashboard stops that child process and removes its temporary script.
 
-See [Developer Tools](devtools.md) for the architecture, renderer APIs, and provider-free example.
+Studio blueprints are declarative JSON and do not evaluate arbitrary Python. Built-in tools generate working integrations, while custom tools generate safe placeholder handlers for later editing. Put environment-variable names, never raw credentials, in secret settings. Studio can be opened with an optional blueprint JSON file via `protolink studio [blueprint.json]` or through the dashboard at `/studio`.
+
+See [Protolink Studio](studio.md) for the complete visual-builder guide, and [Developer Tools](devtools.md) for the surrounding dashboard architecture, renderer APIs, and provider-free example.
 
 ## Command Reference
 
@@ -272,6 +279,7 @@ protolink run list [--store PATH] [--limit N] [--json]
 protolink run replay RUN_ID [--store PATH] [--json]
 protolink run diff BASELINE CANDIDATE [--store PATH] [--json]
 protolink dashboard [--store PATH] [--traces PATH] [--registry-url URL] [--host HOST] [--port PORT] [--open] [--output PATH]
+protolink studio [BLUEPRINT_JSON] [--ip HOST] [--port PORT]
 ```
 
 | Argument | Description |

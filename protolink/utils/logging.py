@@ -106,10 +106,7 @@ def _resolve_log_level(default_level: int) -> int:
     if not env_level:
         return default_level
 
-    level = logging.getLevelName(env_level.upper())
-    if isinstance(level, int):
-        return level
-    return default_level
+    return logging.getLevelNamesMapping().get(env_level.upper(), default_level)
 
 
 def _resolve_log_file(explicit_file: str | None) -> str | None:

@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from protolink.__version__ import __version__
 from protolink.devtools import (
@@ -21,6 +22,7 @@ from protolink.devtools import (
     fetch_registry_agents,
     inspect_registry_agent,
     list_run_store_records,
+    load_studio_blueprint,
 )
 from protolink.devtools.server import build_dashboard_snapshot, serve_dashboard
 from protolink.templates import TEMPLATES
@@ -128,6 +130,17 @@ def _build_parser() -> argparse.ArgumentParser:
     dashboard_parser.add_argument("--port", type=int, default=8765, help="Dashboard bind port.")
     dashboard_parser.add_argument("--open", action="store_true", help="Open the dashboard in a browser.")
     dashboard_parser.add_argument("--output", help="Write a static dashboard HTML snapshot and exit.")
+
+    studio_parser = subparsers.add_parser("studio", help="Open the local Protolink Studio visual builder.")
+    studio_parser.add_argument("blueprint", nargs="?", help="Optional Studio blueprint JSON file (e.g. name.json).")
+    studio_parser.add_argument(
+        "--ip",
+        "--host",
+        dest="host",
+        default="127.0.0.1",
+        help="Studio bind IP address or hostname.",
+    )
+    studio_parser.add_argument("--port", type=int, default=8765, help="Studio bind port.")
 
     return parser
 
@@ -276,6 +289,27 @@ def main(argv: list[str] | None = None) -> int:
             store_path=dashboard_store,
             trace_path=args.traces,
             open_browser=args.open,
+        )
+        return 0
+
+    if args.command == "studio":
+        default_store = Path("runs.db")
+        dashboard_store = default_store if default_store.is_file() else None
+        blueprint: dict[str, Any] | None = None
+        if args.blueprint:
+            try:
+                blueprint = load_studio_blueprint(args.blueprint)
+            except Exception as exc:
+                print(f"Failed to load Studio blueprint: {exc}", file=sys.stderr)
+                return 1
+
+        serve_dashboard(
+            host=args.host,
+            port=args.port,
+            store_path=dashboard_store,
+            blueprint=blueprint,
+            project_loaded=bool(args.blueprint),
+            start_tab="studio",
         )
         return 0
 

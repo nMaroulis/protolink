@@ -19,7 +19,7 @@ from protolink.core.report_diff import (
     RunReportTolerance,
 )
 from protolink.core.run_context import RunBudget, RunContext
-from protolink.core.task import Task, TaskState
+from protolink.core.task import Task, TaskExecutionError, TaskState
 from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.state.operations import StateOperationRequest, StateOperationResult, StateStoreReport
@@ -57,5 +57,6 @@ __all__ = [
     "StateStoreReport",
     "Task",
     "TaskCancellationRequest",
+    "TaskExecutionError",
     "TaskState",
 ]
