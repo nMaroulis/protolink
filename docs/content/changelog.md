@@ -34,10 +34,10 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.6.9] - Unreleased
+## [0.6.9] - 2026-09-03
 
 
-:::note Release in preparation
+:::note Latest Release
 
 This release adds Protolink Studio and simplifies the path from a typed Python function to a local agent. It also makes convenience-call failures explicit, completes the blocking task and tool APIs, and ships type metadata with the package.
 
@@ -50,6 +50,7 @@ This release adds Protolink Studio and simplifies the path from a typed Python f
 - Added `/studio` and the `/api/studio/catalog`, `/api/studio/generate`, `/api/studio/status`, `/api/studio/run`, and `/api/studio/stop` routes. Studio validates bounded JSON, rejects embedded secrets in favor of environment-variable references, and runs at most one generated project in a loopback-controlled subprocess that is stopped and cleaned up with the dashboard.
 - Added public Studio blueprint, validation, catalog, code-generation, and runtime helpers, and updated the provider-free dashboard example to embed the standard runnable starter blueprint.
 - Added `@agent.tool` and `@agent.tool()` registration with inferred function names, cleaned docstrings, and typed schemas. Explicit keyword and positional metadata remain supported, and the original function and callable type are preserved.
+- Added direct callable registration with `agent.add_tool(add)`. Synchronous and asynchronous functions, bound methods, and callable objects are wrapped automatically with `Tool.from_callable()`; existing tool objects retain their identity, metadata, and policy behavior.
 - Added `Tool.from_callable()` for reusable tool definitions with optional schema, discovery, capability, and approval-preview metadata.
 - Added `agent.sync.call_tool()` for raw validated and authorized tool results, and `agent.sync.run_task()` for complete task execution and inspection.
 - Added `Task.raise_for_status()` and the exported `TaskExecutionError`, whose `.task` attribute retains the original failed or canceled task and its partial outputs.

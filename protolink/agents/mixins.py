@@ -12,7 +12,7 @@ import json
 import threading
 import time
 from collections.abc import Callable
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, Literal, TypeVar, cast, overload
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
@@ -855,8 +855,33 @@ class AgentCommunicationMixin(_AgentMixinBase):
 class AgentToolMixin(_AgentMixinBase):
     """Manages tools, skills, and runtime action authorization."""
 
-    def add_tool(self, tool: BaseTool) -> None:
-        """Register or replace a tool and keep its advertised skill in sync."""
+    def add_tool(self, tool: BaseTool | Callable[..., Any]) -> None:
+        """Register a tool or Python callable and synchronize its advertised skill.
+
+        Plain synchronous and asynchronous callables are wrapped with
+        ``Tool.from_callable()`` to infer their name, cleaned docstring, and
+        schemas. Existing tools are retained unchanged, including custom
+        structural tools and MCP wrappers. Registration never calls the tool.
+
+        Args:
+            tool: A tool instance or Python callable. For explicit metadata,
+                pass ``Tool.from_callable(func, name=..., capabilities=...)``.
+
+        Raises:
+            TypeError: The value is not callable or cannot be inspected.
+            ValueError: Callable inspection or metadata inference fails, or
+                the tool would replace an attached knowledge source's tool.
+
+        Registering an existing name replaces the runtime tool and updates its
+        skill. Use ``agent.call_tool()`` or task execution to invoke it through
+        argument validation, policy, and approval checks.
+        """
+        if not callable(tool):
+            raise TypeError("add_tool expects a tool instance or a Python callable")
+        # Legacy structural tools may omit optional examples and capabilities.
+        if not all(hasattr(tool, field) for field in ("name", "description", "input_schema", "output_schema", "tags")):
+            tool = Tool.from_callable(tool)
+        tool = cast(BaseTool, tool)
         existing_tool = self.tools.get(tool.name)
         if (
             existing_tool is not None

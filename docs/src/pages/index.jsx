@@ -254,6 +254,17 @@ const moduleDefinitions = [
         ],
       },
       {
+        id: "callable",
+        label: "Existing function",
+        kind: "add_tool",
+        setup: [
+          "def lookup_docs(query: str) -> str:",
+          '    """Search project documentation."""',
+          '    return "source-cited answer"',
+        ],
+        after: ["agent.add_tool(lookup_docs)"],
+      },
+      {
         id: "mcp-stdio",
         label: "MCP stdio",
         kind: "adapter",

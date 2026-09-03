@@ -127,7 +127,9 @@ print(agent.sync.call_tool("add", a=2, b=3))  # 5
 
 No model, API key, server process, or network connection is needed. The decorator infers the tool name from `add`, the description from its cleaned docstring, and the schemas from its type hints. Both synchronous and asynchronous functions work. `@agent.tool()` and explicit metadata such as `@agent.tool(name="sum", description="Add two numbers")` are also supported.
 
-`call_tool()` validates arguments, applies the Agent's policy and approval rules, and returns the raw result. Calling `add(2, 3)` remains an ordinary Python call and bypasses those Agent controls. To share a tool definition between agents, use `Tool.from_callable(add)` with `agent.add_tool()`; see [Native Tools](tool.md#native-tools).
+For an existing function, call `agent.add_tool(add)`. The same call works on another agent, and synchronous functions, asynchronous functions, bound methods, and callable objects all use the same metadata inference. Use `Tool.from_callable(add, ...)` when you need custom schemas, tags, or permission metadata; see [Native Tools](tool.md#native-tools).
+
+`call_tool()` validates arguments, applies the Agent's policy and approval rules, and returns the raw result. Calling `add(2, 3)` remains an ordinary Python call and bypasses those Agent controls. Registration never executes the function.
 
 ### Keep the complete task
 

@@ -177,7 +177,7 @@ The protocol is the smallest contract understood by Agent registration and execu
 
 Adapt a synchronous or asynchronous Python callable to the `BaseTool` contract. Construction inspects the callable signature and resolved type hints, infers any missing schemas, normalizes explicit schemas, and converts missing tags, examples, and capabilities into empty collections.
 
-For ordinary functions, start with `Tool.from_callable(func)` to infer name, description, and schemas without supplying the constructor's required metadata arguments. Use the explicit constructor when restoring or assembling a complete tool definition.
+For ordinary functions, use `agent.add_tool(func)` or `@agent.tool` to infer name, description, and schemas. Use `Tool.from_callable(func, ...)` for a reusable definition with explicit metadata overrides, and the constructor when restoring or assembling a complete tool definition.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Tool constructor parameters">
@@ -244,7 +244,7 @@ For ordinary functions, start with `Tool.from_callable(func)` to infer name, des
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py"
 >
 
-Create a reusable tool from a synchronous or asynchronous callable. The default name is the function name, or the class name for a callable object. The default description is its cleaned docstring, falling back to <code>Call &lt;name&gt;.</code>. Explicit metadata takes precedence; missing input and output schemas use the same type-hint inference as the constructor.
+Create a reusable tool from a synchronous or asynchronous callable. The default name is the function name, or the class name for a callable object. The default description is its cleaned docstring, falling back to <code>Call &lt;name&gt;.</code>. Explicit metadata takes precedence; missing input and output schemas use the same type-hint inference as the constructor. <code>agent.add_tool(func)</code> calls this factory automatically for ordinary callables; use it explicitly when adding metadata overrides or sharing a preconfigured tool.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Tool from_callable parameters">
   <ApiField name="func" type="Callable[..., Any]" required>Original callable retained as <code>tool.func</code>. The factory does not replace or execute it.</ApiField>
@@ -723,7 +723,7 @@ Create a fresh timezone-aware clock tool. UTC requires no external service or ti
 
 ### Registering Native Tools
 
-Decorate a typed synchronous or asynchronous function with `@agent.tool`. Its name and cleaned docstring supply the public metadata:
+Pass an existing function to `agent.add_tool()` or decorate a function with `@agent.tool`. Both infer the public name, cleaned docstring, and schemas from the callable:
 
 ```python
 from protolink import Agent, AgentCard
@@ -735,10 +735,11 @@ agent_card = AgentCard(
 )
 agent = Agent(card=agent_card, transport="runtime", verbosity=0)
 
-@agent.tool
 def add(a: int, b: int) -> int:
     """Add two integers and return the result."""
     return a + b
+
+agent.add_tool(add)
 
 
 @agent.tool()
@@ -760,6 +761,10 @@ print(agent.sync.call_tool("add", a=2, b=3))  # 5
 # }
 # output_schema: {"type": "integer"}
 ```
+
+Synchronous functions, asynchronous functions, bound methods, and callable objects can all be passed directly to `add_tool()`. To reuse `add` on another agent, call `other_agent.add_tool(add)`. Registration inspects the callable without executing it; the registered wrapper is available as `agent.tools["add"]`.
+
+Existing `Tool`, built-in, MCP, and custom tool objects retain their metadata and behavior when passed to `add_tool()`. For explicit schemas, tags, capabilities, or approval previews, create a configured `Tool.from_callable(add, ...)` first. See [Agent.add_tool](agent.md#agentadd_tool) for replacement rules.
 
 ### Agent.tool
 

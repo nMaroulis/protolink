@@ -68,7 +68,7 @@ def add(a: int, b: int) -> int:
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-This example needs no model, API key, server, or network connection. The function name, docstring, and type hints become the tool's public metadata and argument schema. `@agent.tool()` also works; explicit names and descriptions remain available when needed. Use `Tool.from_callable(add)` to create a reusable tool for multiple agents.
+This example needs no model, API key, server, or network connection. The function name, docstring, and type hints become the tool's public metadata and argument schema. `@agent.tool()` also works; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
 
 Choose the result you need:
 
@@ -91,7 +91,41 @@ print(agent.sync.invoke("Say hello"))
 
 `invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect, and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
 
-For an HTTP service, install `protolink[http]`, use an HTTP card URL and `transport="http"`, then call `agent.start()`. `start()` owns the lifecycle and blocks for a standalone service; use `start(background=True)` when embedding the agent in another application.
+## Your first agent mesh
+
+Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:
+
+```python
+from protolink import Agent, AgentCard, Task
+from protolink.discovery import Registry
+
+registry = Registry(url="http://127.0.0.1:9000", transport="http")
+calculator = Agent(
+    AgentCard(name="calculator", description="Adds numbers", url="http://127.0.0.1:8001"),
+    transport="http", registry=registry,
+)
+caller = Agent(
+    {"name": "caller", "description": "Sends work", "url": "http://127.0.0.1:8002"},
+    transport="http", registry=registry,
+)
+calculator.add_tool(add)
+
+registry.start(background=True)
+calculator.start(background=True)
+caller.start(background=True)
+
+try:
+    peer = caller.sync.discover_agents({"name": "calculator"})[0]
+    task = Task.create_tool_call(tool_name="add", args={"a": 2, "b": 3})
+    result = caller.sync.call_agent(peer.url, task).raise_for_status()
+    print(result.get_last_part_content().result)  # 5
+finally:
+    caller.stop()
+    calculator.stop()
+    registry.stop()
+```
+
+Agents register automatically, discover each other, and exchange tasks directly. Add models, tools, or more agents as you grow—the same API works across processes and machines.
 
 ## Plug in only what the agent needs
 

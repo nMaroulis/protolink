@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
@@ -149,7 +149,7 @@ class _AgentMixinBase(Protocol):
         session_id: str = "invocation_session_id",
     ) -> Any: ...
 
-    def add_tool(self, tool: BaseTool) -> None: ...
+    def add_tool(self, tool: BaseTool | Callable[..., Any]) -> None: ...
 
     def add_knowledge(self, knowledge: Knowledge | Retriever) -> Knowledge: ...
 

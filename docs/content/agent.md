@@ -1394,14 +1394,27 @@ Tools give agents explicit callable capabilities. ProtoLink supports opt-in buil
 
 ### Agent.add_tool
 
-<ApiReference kind="method" path="protolink.agents.Agent.add_tool" signature={`add_tool(tool: BaseTool) -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
-Register or replace a runtime tool by name and synchronize its public skill advertisement.
+<ApiReference kind="method" path="protolink.agents.Agent.add_tool" signature={`add_tool(tool: BaseTool | Callable[..., Any]) -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Register a Python callable or an existing tool and synchronize its public skill advertisement. Plain callables are wrapped with <code>Tool.from_callable()</code>, inferring their name, cleaned docstring, and schemas. Synchronous functions, asynchronous functions, bound methods, and callable objects are supported.
 
-<ApiSection title="Parameters"><ApiFields ariaLabel="add tool parameters"><ApiField name="tool" type="BaseTool" required>Executable tool carrying a stable name, description, schemas, tags, and examples. Replacing an existing runtime tool also replaces its generated skill; an independently card-defined skill with the same ID is preserved on the first registration.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Parameters"><ApiFields ariaLabel="add tool parameters"><ApiField name="tool" type="BaseTool | Callable[..., Any]" required>A Python callable or a tool carrying its own name, description, schemas, and tags. Existing native, built-in, MCP, and custom tools are retained unchanged, including their policy metadata. Replacing an existing runtime name also replaces its generated skill; an independently card-defined skill with the same ID is preserved on the first registration. Tools belonging to attached knowledge sources cannot be replaced.</ApiField></ApiFields></ApiSection>
 
-<ApiCallout label="No execution">Registration has no external side effect beyond mutating <code>agent.tools</code> and <code>card.skills</code>. Policy, validation, approvals, telemetry, and cancellation run only when the tool is called.</ApiCallout>
+<ApiSection title="Raises"><ApiFields ariaLabel="add tool errors"><ApiField name="TypeError | ValueError">The argument is not callable, callable inspection or metadata inference fails, or the name would replace an attached knowledge tool.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="No execution">Registration does not invoke the callable. Agent calls apply validation, policy, and approvals; task execution also supplies telemetry and cancellation. Calling the original Python function directly bypasses these runtime controls.</ApiCallout>
 
 </ApiReference>
+
+```python
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+agent.add_tool(add)
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
+```
+
+Register the same function on another agent with `other_agent.add_tool(add)`. For explicit metadata such as a public name, tags, or capabilities, pass `Tool.from_callable(add, ...)` to `add_tool()`.
 
 ### Agent.tool
 
@@ -1430,7 +1443,7 @@ Wrap a Python callable as a ProtoLink <code>Tool</code>, register it immediately
 
 <ApiSection title="Returns"><ApiFields ariaLabel="tool decorator return value"><ApiField name="function or decorator" type="ToolCallableT | Callable[[ToolCallableT], ToolCallableT]">Bare decoration returns the unchanged function; configured decoration returns a decorator that registers and returns it. Ordinary calls to that function bypass Agent validation and policy.</ApiField></ApiFields></ApiSection>
 
-<ApiCallout label="Reusable tools">Use <code>Tool.from_callable(func, ...)</code> to create an independent tool definition, then register it with <code>add_tool()</code> on one or more agents.</ApiCallout>
+<ApiCallout label="Reusable tools">Register an existing function with <code>agent.add_tool(func)</code> on each agent that needs it. Use <code>Tool.from_callable(func, ...)</code> to share a tool definition with explicit metadata overrides.</ApiCallout>
 
 </ApiReference>
 

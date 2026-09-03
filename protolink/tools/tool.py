@@ -68,8 +68,9 @@ class Tool(BaseTool):
         The callable's name and cleaned docstring supply default metadata.
         Callables without a docstring use ``"Call <name>."``. Explicit metadata
         takes precedence, and missing schemas are inferred as in the regular
-        constructor. Register the returned tool with ``agent.add_tool(tool)``
-        to invoke it through Agent policy and task execution.
+        constructor. Use ``agent.add_tool(func)`` for inferred defaults, or
+        register this configured wrapper with ``agent.add_tool(tool)`` to keep
+        explicit metadata when invoking through Agent policy and task execution.
 
         Args:
             func: Synchronous or asynchronous callable to wrap.
