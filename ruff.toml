@@ -8,6 +8,7 @@ exclude = [
     "build",
     "dist",
     "*.egg-info",
+    "*.ipynb"
 ]
 
 [lint]
