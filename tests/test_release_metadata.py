@@ -2,9 +2,8 @@
 
 import json
 import re
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 from protolink import __version__
 
