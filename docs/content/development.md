@@ -14,7 +14,7 @@ This guide covers how to contribute to Protolink, from setting up your developme
   <img src="https://raw.githubusercontent.com/pheralb/svgl/42f8f2de1987d83a7c6ad9d5dc2576377aa5110b/static/library/uv.svg" width="55" className="hover-icon" />
 </div>
 
-- **Python 3.10+** - Required for all development
+- **Python 3.11+** - Required for all development
 - **Git** - For version control
 - **uv** - Recommended package manager (or `pip`)
 

@@ -65,12 +65,15 @@ This release adds Protolink Studio and simplifies the path from a typed Python f
 
 ### Fixed
 
+- Replaced deprecated string-based `logging.getLevelName()` calls with `logging.getLevelNamesMapping()`.
 - `invoke()` and `ask()` now raise `TaskExecutionError` when a handler returns a failed or canceled task instead of presenting it as a successful response. Exceptions raised directly during execution retain their original types.
 - `invoke()` preserves valid empty strings, zero, false, and empty containers, and no longer returns an unchanged request as the response. `ask()` also preserves empty answer text and excludes unchanged request content. The no-response fallback applies only when response content is absent or `None`.
 - Every `SyncAgent` method now detects an active event loop before creating a coroutine and directs callers to the corresponding async method, avoiding unawaited-coroutine warnings on this misuse.
 - Callable-instance tools now resolve `__call__` annotations for schema inference and argument validation. `Tool.from_callable()` rejects blank or non-string names before registration.
 
 ### Compatibility
+
+Python 3.11 or newer is now required.
 
 Successful explicit tool calls through `invoke(..., part_type="tool_call")` still return `ToolOutput`; use `call_tool()` for the raw tool return value. Code that previously inspected an error-bearing result from `invoke()` or `ask()` should catch `TaskExecutionError` and inspect `exception.task`, or use `run_task()` to handle returned states directly. `raise_for_status()` checks only failed and canceled states; it neither waits for completion nor rejects `input-required` or other nonterminal states.
 

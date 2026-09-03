@@ -10,7 +10,7 @@ This document describes how to set up a development environment, coding standard
 
 ### Prerequisites
 
-- Python 3.10+ (as advertised in the project badges)
+- Python 3.11+ (as advertised in the project badges)
 - [uv](https://github.com/astral-sh/uv) **recommended** or `pip`
 - Git
 
