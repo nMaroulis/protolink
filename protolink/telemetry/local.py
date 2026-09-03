@@ -14,7 +14,7 @@ import contextvars
 import json
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, is_dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ Redactor = Callable[[Any], Any]
 
 def _utc_now() -> str:
     """Return a timezone-aware ISO-8601 timestamp for trace records."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _duration_ms(started_at: str, ended_at: str | None) -> float | None:

@@ -15,7 +15,7 @@ import os
 import random
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -333,7 +333,7 @@ async def run_benchmark(config: BenchmarkConfig, *, llm: LLM | None = None) -> B
     summary: dict[str, Any] = {
         "schema_version": 3,
         "run_id": run_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "protolink_version": __version__,
         "provider": provider_summary,
         "suite": {

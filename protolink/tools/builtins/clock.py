@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, tzinfo
-from datetime import timezone as datetime_timezone
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -42,7 +41,7 @@ async def _run_current_datetime(timezone: _TimezoneName = "UTC") -> dict[str, An
     if not timezone_name:
         raise ValueError("timezone must not be empty")
     if timezone_name == "UTC":
-        zone: tzinfo = datetime_timezone.utc
+        zone: tzinfo = UTC
     else:
         try:
             zone = ZoneInfo(timezone_name)

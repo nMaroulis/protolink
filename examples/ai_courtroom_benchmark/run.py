@@ -7,7 +7,7 @@ import argparse
 import asyncio
 import math
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -155,7 +155,7 @@ async def async_main(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     """Build the portable benchmark CLI documented by the example README."""
     root = Path(__file__).resolve().parent
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     parser = argparse.ArgumentParser(
         description=("Compare two advocate LLMs on the same configured case, with a paired role swap and fixed jury."),
     )
@@ -255,7 +255,7 @@ def _validate_model_selections(args: argparse.Namespace) -> None:
 
 def _default_run_id(case: CaseConfig) -> str:
     """Build a case-specific benchmark ID when the hidden override is absent."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     return f"{case.id}-advocacy-{timestamp}"
 
 

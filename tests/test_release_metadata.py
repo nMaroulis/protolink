@@ -2,16 +2,11 @@
 
 import json
 import re
-import sys
 from pathlib import Path
 
+import tomllib
+
 from protolink import __version__
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
-
 
 ROOT = Path(__file__).resolve().parents[1]
 

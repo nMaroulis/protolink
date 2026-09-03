@@ -10,7 +10,7 @@ import asyncio
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from protolink.a2a.v1.serialization import (
@@ -717,8 +717,8 @@ def _timestamp(value: Any, *, internal: bool = False) -> datetime:
     if parsed.tzinfo is None:
         if not internal:
             raise _A2AError(-32602, "statusTimestampAfter must include a timezone")
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _default_media_type(content_fields: set[str]) -> str | None:

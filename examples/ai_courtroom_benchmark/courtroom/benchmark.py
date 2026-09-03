@@ -7,7 +7,7 @@ import math
 import re
 import statistics
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -101,7 +101,7 @@ async def run_benchmark(
     for artifact in ("benchmark.json", "summary.json", "transcript.md", "report.html"):
         (destination / artifact).unlink(missing_ok=True)
 
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     candidates = {candidate_a.id: candidate_a, candidate_b.id: candidate_b}
     candidate_public = {candidate_id: spec.public() for candidate_id, spec in candidates.items()}
     case_hash = stable_hash(case.model_dump(mode="json"))
@@ -165,7 +165,7 @@ async def run_benchmark(
             }
             trial_wrappers.append(wrapper)
 
-    finished_at = datetime.now(timezone.utc).isoformat()
+    finished_at = datetime.now(UTC).isoformat()
     candidate_metrics = _aggregate_candidate_metrics(
         case=case,
         candidates=candidates,
@@ -238,7 +238,7 @@ async def _run_trial(
     output_dir: Path,
     progress: Any,
 ) -> dict[str, Any]:
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     namespace = _slug(f"{settings.benchmark_id}-{trial_id}")
     agents: dict[str, Agent] = {}
     started: list[Agent] = []
@@ -418,7 +418,7 @@ def _setup_failure_result(
     error: Exception,
 ) -> dict[str, Any]:
     """Build a report-compatible failed leg when setup cannot create a trial."""
-    finished_at = datetime.now(timezone.utc).isoformat()
+    finished_at = datetime.now(UTC).isoformat()
     error_message = " ".join(str(error).split())
     if len(error_message) > 500:
         error_message = f"{error_message[:497]}..."

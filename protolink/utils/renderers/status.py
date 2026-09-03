@@ -8,7 +8,7 @@ These utilities provide human-readable representations of AgentCard instances wi
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import escape
 from typing import TYPE_CHECKING
 
@@ -30,7 +30,7 @@ def _list(items: Iterable[str], empty: str = "None") -> str:
 
 def _now_utc() -> str:
     """Human-friendly UTC timestamp."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def to_status_html(agent: AgentCard, start_time: float | None) -> str:

@@ -9,7 +9,7 @@ import statistics
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from protolink import Agent, RunContext, Task
@@ -83,7 +83,7 @@ class AdvocacyTrial:
         self.config = config
         self._progress_callback = progress
         self.sequence = 0
-        self.started_at = datetime.now(timezone.utc).isoformat()
+        self.started_at = datetime.now(UTC).isoformat()
         self.events: list[InteractionEvent] = []
         self.arguments: list[dict[str, Any]] = []
         self.jurors = {
@@ -140,7 +140,7 @@ class AdvocacyTrial:
         error: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Build one complete or partial trial artifact from observable state."""
-        finished_at = datetime.now(timezone.utc).isoformat()
+        finished_at = datetime.now(UTC).isoformat()
         baseline_complete = len(self.baseline_checkpoint) == len(self.jurors)
         baseline_hash = _stable_hash(self.baseline_checkpoint) if baseline_complete else None
         result: dict[str, Any] = {

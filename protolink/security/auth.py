@@ -10,7 +10,7 @@ import json
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from protolink.types import HttpAuthScheme, SecuritySchemeType
@@ -58,7 +58,7 @@ def _numeric_date(value: Any, *, claim: str) -> float:
 
 def _numeric_date_to_iso(value: float) -> str:
     """Return an ISO timestamp for a JWT NumericDate value."""
-    return datetime.fromtimestamp(value, timezone.utc).isoformat()
+    return datetime.fromtimestamp(value, UTC).isoformat()
 
 
 @dataclass
@@ -91,7 +91,7 @@ class SecurityContext:
             return False
 
         expires = datetime.fromisoformat(self.expires_at)
-        return datetime.now(timezone.utc) > expires
+        return datetime.now(UTC) > expires
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""

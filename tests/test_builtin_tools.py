@@ -9,7 +9,7 @@ import socket
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
@@ -96,7 +96,7 @@ async def test_calculator_reports_division_by_zero() -> None:
 
 @pytest.mark.asyncio
 async def test_current_datetime_defaults_to_aware_utc(monkeypatch: pytest.MonkeyPatch) -> None:
-    fixed = datetime(2026, 7, 15, 10, 11, 12, tzinfo=timezone.utc)
+    fixed = datetime(2026, 7, 15, 10, 11, 12, tzinfo=UTC)
     monkeypatch.setattr(clock_module, "_now", lambda zone: fixed.astimezone(zone))
 
     result = await current_datetime()()
@@ -117,7 +117,7 @@ async def test_current_datetime_rejects_unknown_timezone() -> None:
 async def test_current_datetime_utc_does_not_require_host_timezone_database(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixed = datetime(2026, 7, 15, 10, 11, 12, tzinfo=timezone.utc)
+    fixed = datetime(2026, 7, 15, 10, 11, 12, tzinfo=UTC)
 
     def fail_zone_lookup(name: str) -> Any:
         raise clock_module.ZoneInfoNotFoundError(name)
@@ -1303,7 +1303,7 @@ def test_registering_tool_preserves_predeclared_agent_skill() -> None:
 async def test_builtin_tools_survive_agent_yaml_round_trip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixed = datetime(2026, 7, 15, 10, 11, 12, tzinfo=timezone.utc)
+    fixed = datetime(2026, 7, 15, 10, 11, 12, tzinfo=UTC)
     monkeypatch.setattr(clock_module, "_now", lambda zone: fixed.astimezone(zone))
     monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "yaml-must-not-contain-this-key")
     agent = Agent(

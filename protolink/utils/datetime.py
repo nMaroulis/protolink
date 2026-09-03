@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal, overload
 
 
@@ -31,7 +31,7 @@ def utc_now(*, iso: bool = True) -> datetime | str:
         This function should be used instead of datetime.now() to ensure
         consistent timezone handling throughout the application.
     """
-    dt = datetime.now(timezone.utc)
+    dt = datetime.now(UTC)
 
     return dt.isoformat() if iso else dt
 
@@ -55,10 +55,10 @@ def format_iso8601(dt: datetime | None = None) -> str:
         dt = utc_now(iso=False)
     elif dt.tzinfo is None:
         # If naive datetime, assume UTC
-        dt = dt.replace(tzinfo=timezone.utc)
-    elif dt.tzinfo != timezone.utc:
+        dt = dt.replace(tzinfo=UTC)
+    elif dt.tzinfo != UTC:
         # Convert to UTC if different timezone
-        dt = dt.astimezone(timezone.utc)
+        dt = dt.astimezone(UTC)
 
     return dt.isoformat()
 
@@ -84,7 +84,7 @@ def parse_iso8601(timestamp: str) -> datetime:
         dt = datetime.fromisoformat(timestamp)
         if dt.tzinfo is None:
             # Assume UTC if no timezone info
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return dt
     except ValueError as e:
         raise ValueError(f"Invalid ISO8601 timestamp: {timestamp}") from e

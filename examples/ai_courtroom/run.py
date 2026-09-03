@@ -8,7 +8,7 @@ import asyncio
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -490,7 +490,7 @@ async def async_main(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the intentionally small experiment CLI."""
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     default_output = Path(__file__).resolve().parent / "output" / timestamp
     parser = argparse.ArgumentParser(
         description="Run a replayable AI Liability Tribunal over direct ProtoLink A2A calls.",

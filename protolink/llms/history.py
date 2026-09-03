@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -34,7 +34,7 @@ class LLMMessage:
 
     # Observability & tracing
     id: str = field(default_factory=lambda: str(uuid4()))
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # provider specific fields
     tool_calls: dict[str, Any] = field(default_factory=dict)
@@ -62,9 +62,7 @@ class LLMMessage:
             name=data.get("name"),
             metadata=data.get("metadata", {}),
             id=data.get("id", str(uuid4())),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if "created_at" in data
-            else datetime.now(timezone.utc),
+            created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(UTC),
             tool_calls=data.get("tool_calls", {}),
             tool_name=data.get("tool_name"),
         )

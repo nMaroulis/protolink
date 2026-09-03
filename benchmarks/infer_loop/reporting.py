@@ -13,7 +13,7 @@ import re
 import statistics
 import subprocess
 from dataclasses import fields as dataclass_fields
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from string import Template
 from typing import Any
@@ -425,7 +425,7 @@ def _safe_slug(value: str) -> str:
 def _create_output_dir(config: BenchmarkConfig) -> Path:
     root = config.output_root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     default_name = f"{timestamp}-{_safe_slug(config.provider)}-{_safe_slug(config.model or 'default')}"
     path = root / _safe_slug(config.run_name or default_name)
     if path.exists():

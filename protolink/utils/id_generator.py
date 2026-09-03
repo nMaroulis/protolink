@@ -4,7 +4,7 @@ This module provides functions for generating various types of IDs used in Proto
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import ClassVar
 
 
@@ -123,4 +123,4 @@ class IDGenerator:
     @staticmethod
     def _generate_timestamp() -> str:
         """Generate a timestamp string in a compact format."""
-        return datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        return datetime.now(UTC).strftime("%Y%m%d%H%M%S")

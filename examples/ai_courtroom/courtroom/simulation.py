@@ -10,7 +10,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from protolink import Agent, RunContext, Task
@@ -141,7 +141,7 @@ class CourtroomSimulation:
         self.events: list[InteractionEvent] = []
         self.sequence = 0
         self.random = random.Random(config.seed)
-        self.started_at = datetime.now(timezone.utc).isoformat()
+        self.started_at = datetime.now(UTC).isoformat()
         self.public_record_entries: list[dict[str, Any]] = []
         self.deliberation_log: list[dict[str, Any]] = []
         self.participants = public_participant_profiles(
@@ -220,7 +220,7 @@ class CourtroomSimulation:
         )
         self._progress(1, "Judgment · sending the frozen tally to the judge")
         judgment = await self._announce_judgment(ballots, official)
-        finished_at = datetime.now(timezone.utc).isoformat()
+        finished_at = datetime.now(UTC).isoformat()
 
         result: dict[str, Any] = {
             "schema_version": "2.0",

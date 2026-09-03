@@ -22,7 +22,7 @@ import threading
 import uuid
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
@@ -844,7 +844,7 @@ class StudioRuntimeManager:
             self._logs.clear()
             self._run_id = run_id
             self._project = generated.blueprint["project"]["name"]
-            self._started_at = datetime.now(timezone.utc).isoformat()
+            self._started_at = datetime.now(UTC).isoformat()
             self._last_exit_code = None
             self._reader = threading.Thread(
                 target=self._read_output,

@@ -14,7 +14,7 @@ import json
 import math
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -346,7 +346,7 @@ class TraceJsonlReader:
             "exists": True,
             "is_file": self.path.is_file(),
             "size_bytes": stat.st_size,
-            "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+            "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
         }
 
 
