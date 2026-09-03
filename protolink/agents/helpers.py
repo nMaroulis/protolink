@@ -4,8 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from protolink.core.task import Task
 from protolink.llms.compaction import HistoryCompactionStrategy
 from protolink.state.operations import StateOperationRequest
+
+
+def _response_content(task: Task, request_item_ids: set[str]) -> Any:
+    """Return new response content without mistaking the input for an answer."""
+    last_item = task.get_last_item()
+    if last_item is None or last_item.id in request_item_ids:
+        return None
+    return task.get_last_part_content()
 
 
 def _coerce_state_operation_request(

@@ -621,7 +621,7 @@ STUDIO_HTML = r"""
           <div class="studio-canvas-actions">
             <button type="button" class="mini-btn" id="studio-project-settings" onclick="studioShowProjectSettings()">Project settings</button>
             <div class="studio-camera-controls" role="group" aria-label="Canvas zoom controls">
-              <button type="button" class="mini-btn" id="studio-zoom-out" aria-label="Zoom out" onclick="studioZoomBy(-1)">−</button>
+              <button type="button" class="mini-btn" id="studio-zoom-out" aria-label="Zoom out" onclick="studioZoomBy(-1)">&minus;</button>
               <button type="button" class="mini-btn studio-zoom-level" id="studio-zoom-level" aria-label="Reset zoom to 100 percent" aria-live="polite" onclick="studioResetZoom()">100%</button>
               <button type="button" class="mini-btn" id="studio-zoom-in" aria-label="Zoom in" onclick="studioZoomBy(1)">+</button>
             </div>

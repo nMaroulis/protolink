@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from protolink.__version__ import __version__
 from protolink.devtools import (

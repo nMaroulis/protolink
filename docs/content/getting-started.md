@@ -102,62 +102,107 @@ Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares ident
 
 ## First Agent
 
-Below is a compact example that wires together an agent, HTTP transport, an OpenAI-compatible LLM wrapper, and built-in, native, and MCP tools:
+Save this as `agent.py` and run `python agent.py`. It uses only the base package:
 
 ```python
-from protolink.agents import Agent
-from protolink.models import AgentCard
-from protolink.tools import current_datetime, web_search
-from protolink.tools.adapters import MCPToolAdapter
-from protolink.llms.api import OpenAILLM
-from protolink.discovery import Registry
+from protolink import Agent, AgentCard
 
-# Initialize Registry for A2A Discovery
-registry = Registry(url="http://127.0.0.1:9000", transport="http")
-registry.start(background=True)
-
-# Define the agent card
-agent_card = AgentCard(
-    name="example_agent",
-    description="A dummy agent",
-    url="http://127.0.0.1:8020",
+agent = Agent(
+    card=AgentCard(
+        name="calculator",
+        description="Adds numbers",
+        url="runtime://calculator",
+    ),
+    transport="runtime",
+    verbosity=0,
 )
 
-# OpenAI API LLM. If model is omitted, OpenAILLM uses its built-in default.
-llm = OpenAILLM(model="gpt-4o-mini")
-
-# Initialize the agent
-agent = Agent(agent_card, transport="http", a2a=True, llm=llm, registry=registry)
-
-# Add opt-in built-in tools
-agent.add_tool(current_datetime())
-agent.add_tool(web_search())
-
-# Add Native tool
-@agent.tool(name="add", description="Add two numbers")
-async def add_numbers(a: int, b: int):
+@agent.tool
+def add(a: int, b: int) -> int:
+    """Add two integers."""
     return a + b
 
-# Add MCP tools and return them as Protolink native tools
-mcp_adapter = MCPToolAdapter(transport="sse", url="https://api.example.com/mcp/sse")
-mcp_tools = mcp_adapter.get_tools()
-for mcp_tool in mcp_tools:
-    agent.add_tool(mcp_tool)
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
+```
 
-# Start the agent
+No model, API key, server process, or network connection is needed. The decorator infers the tool name from `add`, the description from its cleaned docstring, and the schemas from its type hints. Both synchronous and asynchronous functions work. `@agent.tool()` and explicit metadata such as `@agent.tool(name="sum", description="Add two numbers")` are also supported.
+
+`call_tool()` validates arguments, applies the Agent's policy and approval rules, and returns the raw result. Calling `add(2, 3)` remains an ordinary Python call and bypasses those Agent controls. To share a tool definition between agents, use `Tool.from_callable(add)` with `agent.add_tool()`; see [Native Tools](tool.md#native-tools).
+
+### Keep the complete task
+
+Use `run_task()` when you need lifecycle state, artifacts, run metadata, cancellation by task ID, or configured run storage:
+
+```python
+from protolink import Task, TaskExecutionError
+
+task = Task.create_tool_call(tool_name="add", args={"a": 2, "b": 3})
+result = agent.sync.run_task(task)
+
+try:
+    result.raise_for_status()
+except TaskExecutionError as exc:
+    print(exc.task.state.value)
+else:
+    print(result.state.value)  # completed
+    print(result.get_last_part_content().result)  # 5
+```
+
+`run_task()` returns the complete task, including a returned failed or canceled state. `raise_for_status()` returns the same task or raises `TaskExecutionError` for those two states; it does not wait for completion. Exceptions raised directly during execution still propagate with their original types. Direct `call_tool()` errors also propagate unchanged.
+
+### Add inference
+
+`invoke()` lets an LLM answer or choose tools. Try the API with the provider-free mock first:
+
+```python
+from protolink import create_llm
+
+agent.llm = create_llm("mock", default_response="Hello from ProtoLink")
+print(agent.sync.invoke("Say hello"))  # Hello from ProtoLink
+```
+
+Replace the mock with a configured [LLM backend](llm.md) for real inference. An LLM may require an installed SDK, a running local model server, or provider credentials; direct tool calls require none of them.
+
+`invoke()` returns the final part's content and raises `TaskExecutionError` when its task is failed or canceled. It preserves structured results such as `ToolOutput` in explicit tool-call mode. Prefer `call_tool()` when you already know the tool and want its raw return value, or `run_task()` when your application needs the full task. `ask()` adds deterministic retrieval before inference and returns a `RAGAnswer`; see [RAG](rag.md).
+
+Conversation memory is opt-in with `state=["conversation"]`. Supply an explicit `session_id` for each conversation in `invoke()` and `ask()`, especially when serving multiple users. Their convenience defaults reuse a shared session per method; they do not create an isolated conversation for every call.
+
+### Async applications and notebooks
+
+The `.sync` facade is for blocking scripts. In an async function or a notebook with an active event loop, await the same methods directly:
+
+```python
+result = await agent.call_tool("add", a=2, b=3)
+response = await agent.invoke("Say hello", session_id="conversation-123")
+```
+
+Calling `.sync` from an active event loop raises an actionable `RuntimeError` before a coroutine is created.
+
+### Serve the agent over HTTP
+
+Install the HTTP extra with `uv add "protolink[http]"`, then create a service:
+
+```python
+from protolink import Agent, AgentCard
+
+agent = Agent(
+    card=AgentCard(
+        name="calculator",
+        description="Adds numbers",
+        url="http://127.0.0.1:8020",
+    ),
+    transport="http",
+)
+
+@agent.tool
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
 agent.start()
 ```
 
-This example demonstrates the core pieces of Protolink:
-
-- **AgentCard** to describe the agent.
-- **Transport** (here the `"http"` shortcut) for native agent communication, with `a2a=True` adding the A2A 1.0 inbound and outbound adapters.
-- **LLM** backend (`OpenAILLM`).
-- **Built-in tools** registered explicitly as ordinary `Tool` instances.
-- **Native tools** (Python functions decorated with `@agent.tool`).
-- **MCP tools** registered via `MCPToolAdapter`.
-
-The built-ins require no additional package extra. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. It declares `network.read`, and registering it does not perform a network request. Built-ins are opt-in, and the default capability policy is allow-by-default, so configure a restrictive `CapabilityPolicy` when network access should be denied or approval-gated. See [Tools](tool.md#built-in-tools) for the complete API and safety behavior.
+`start()` runs the service until stopped. The same tool is now available to peers through the native task API. Add `a2a=True` for the supported A2A 1.0 boundary, or add an LLM for inference and browser chat. Registry discovery, [built-in tools](tool.md#built-in-tools), and [MCP tools](tool.md) can be attached independently as your application grows.
 
 
 ### Using the CLI

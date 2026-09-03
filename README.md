@@ -39,30 +39,59 @@ Focus on the agent's role and capabilities. ProtoLink handles the infer loop, va
 
 ## Start with one agent
 
-Install the HTTP extra:
+Install the base package:
 
 ```bash
-uv add "protolink[http]"
+uv add protolink
 ```
 
-Create and start a provider-free agent:
+Register an ordinary typed function and call it:
 
 ```python
 from protolink import Agent, AgentCard
 
-planner_agent = Agent(
+agent = Agent(
     card=AgentCard(
-        name="planner",
-        description="Builds clear execution plans",
-        url="http://127.0.0.1:8000",
+        name="calculator",
+        description="Adds numbers",
+        url="runtime://calculator",
     ),
-    transport="http",
+    transport="runtime",
+    verbosity=0,
 )
 
-planner_agent.start()
+@agent.tool
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-No `async main()`, event-loop setup, model account, or API key is required. `start()` owns the lifecycle and blocks for a standalone service; use `start(background=True)` when embedding the agent in another application.
+This example needs no model, API key, server, or network connection. The function name, docstring, and type hints become the tool's public metadata and argument schema. `@agent.tool()` also works; explicit names and descriptions remain available when needed. Use `Tool.from_callable(add)` to create a reusable tool for multiple agents.
+
+Choose the result you need:
+
+| Goal | Blocking API | Result |
+| --- | --- | --- |
+| Call a known tool | `agent.sync.call_tool("add", a=2, b=3)` | The validated, authorized tool's raw result |
+| Let a model respond or choose tools | `agent.sync.invoke("What is 2 + 3?")` | Final part content; requires an LLM |
+| Keep task state, artifacts, and metadata | `agent.sync.run_task(task)` | The complete `Task` |
+
+In async applications and notebooks with an active event loop, use `await agent.call_tool(...)`, `await agent.invoke(...)`, or `await agent.run_task(...)`.
+
+Add an LLM when you need inference. The mock backend lets you try the same API without a provider:
+
+```python
+from protolink import create_llm
+
+agent.llm = create_llm("mock", default_response="Hello from ProtoLink")
+print(agent.sync.invoke("Say hello"))
+```
+
+`invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect, and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
+
+For an HTTP service, install `protolink[http]`, use an HTTP card URL and `transport="http"`, then call `agent.start()`. `start()` owns the lifecycle and blocks for a standalone service; use `start(background=True)` when embedding the agent in another application.
 
 ## Plug in only what the agent needs
 

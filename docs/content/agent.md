@@ -633,14 +633,14 @@ Return the inbound server facade created for the current transport, or <code>Non
 
 <ApiReference kind="async method" path="protolink.agents.Agent.run_task" signature={`async run_task(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/engine.py">
 
-Run the configured <code>handle_task()</code> implementation inside the live-execution registry. Server routes use this wrapper so even a completely overridden handler remains discoverable through <code>active_task_ids</code> and cancellable by task ID.
+Run the configured <code>handle_task()</code> implementation inside the live-execution registry. Server routes, <code>invoke()</code>, and <code>ask()</code> use this wrapper so even a completely overridden handler remains discoverable through <code>active_task_ids</code> and cancellable by task ID. Use it directly when your application needs the full task.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="run task parameters">
   <ApiField name="task" type="Task" required>The mutable protocol task to execute. Terminal tasks are returned immediately without registering a new execution.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="run task return value">
-  <ApiField name="task" type="Task">The handler result. Successful, failed, and canceled snapshots are offered to <code>run_store</code> when configured.</ApiField>
+  <ApiField name="task" type="Task">The handler result. Successful, failed, and canceled snapshots are offered to <code>run_store</code> when configured. Returned failed or canceled states do not automatically raise; call <code>task.raise_for_status()</code> for that check. Exceptions raised by the handler still propagate unchanged.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiCallout label="Cancellation behavior">Protocol cancellation requested through <code>cancel_task()</code> is converted into a returned task in the <code>canceled</code> state. External coroutine cancellation is also persisted as canceled but <code>asyncio.CancelledError</code> is re-raised to its caller.</ApiCallout>
@@ -881,23 +881,23 @@ Return an immutable snapshot of task IDs currently registered for live execution
     tool_name: str | None = None,
     tool_args: dict[str, Any] | None = None,
     session_id: str = "invocation_session_id",
-) -> str`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+) -> Any`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
 
-Create a one-step task, process it through <code>handle_task()</code>, and return only the final part content. This convenience API is useful for direct application calls but intentionally discards the richer Task envelope.
+Create a one-step task, process it through <code>run_task()</code>, check its status, and return only the final response part's content. This includes active-task registration, cancellation, and configured persistence for custom handlers.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="invoke parameters">
   <ApiField name="message" type="str" required>User prompt for inference. In tool-call mode it is not used as the tool argument payload.</ApiField>
   <ApiField name="part_type" type={'Literal["tool_call", "infer"]'} defaultValue={'"infer"'}>Choose an LLM inference part or an explicit registered-tool call.</ApiField>
-  <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name in tool-call mode. Omission becomes an empty name and therefore produces a normal tool-not-found output.</ApiField>
+  <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name in tool-call mode. Omission becomes an empty name, producing a failed task and <code>TaskExecutionError</code>.</ApiField>
   <ApiField name="tool_args" type="dict[str, Any] | None" defaultValue="None">Keyword arguments encoded into the tool-call part.</ApiField>
-  <ApiField name="session_id" type="str" defaultValue={'"invocation_session_id"'}>Conversation-state partition attached to task metadata. The stable default means sequential invocations share history when conversation state is enabled.</ApiField>
+  <ApiField name="session_id" type="str" defaultValue={'"invocation_session_id"'}>Conversation-state partition attached to task metadata. The stable default shares history when conversation state is enabled; pass a distinct ID for each conversation.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="invoke return value"><ApiField name="response" type="str">Last part content, or <code>"No response generated"</code> when the task produced none.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="invoke return value"><ApiField name="response" type="Any">Final response part content, including <code>ToolOutput</code> for explicit tool calls. Empty strings, zero, false, and empty containers are preserved. Returns <code>"No response generated"</code> only when there is no new response part or its content is <code>None</code>.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="invoke errors"><ApiField name="ValueError">An unsupported <code>part_type</code> was supplied.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="invoke errors"><ApiField name="ValueError">An unsupported <code>part_type</code> was supplied.</ApiField><ApiField name="TaskExecutionError">The returned task is failed or canceled. The exception's <code>task</code> attribute retains its state, outputs, and metadata.</ApiField><ApiField name="execution error">Exceptions raised by a handler, provider, policy, or other runtime component propagate with their original types.</ApiField></ApiFields></ApiSection>
 
-<ApiCallout label="Task details">Use <code>handle_task()</code>, <code>run_task()</code>, or the client API when callers need task state, artifacts, run context, or structured error information.</ApiCallout>
+<ApiCallout label="Choose the result">Use <code>call_tool()</code> for a known tool's raw return value. Use <code>run_task()</code> or the client API when callers need task state, artifacts, run context, or structured error information.</ApiCallout>
 
 </ApiReference>
 
@@ -913,7 +913,7 @@ Create a one-step task, process it through <code>handle_task()</code>, and retur
     session_id: str = "ask_session_id",
 ) -> RAGAnswer`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
 
-Run deterministic retrieve-then-answer through the Agent's normal task,
+Run deterministic retrieve-then-answer through <code>run_task()</code> and the Agent's normal task,
 policy, cancellation, telemetry, history, budget, and inference boundaries.
 Unlike <code>invoke()</code> in automatic mode, this method always searches
 before the first model call.
@@ -924,7 +924,7 @@ before the first model call.
   <ApiField name="k" type="int | None" defaultValue="None">Maximum hits per selected source. Omission uses each source's <code>default_k</code>.</ApiField>
   <ApiField name="where" type="dict[str, Any] | None" defaultValue="None">Metadata filter passed to every selected source.</ApiField>
   <ApiField name="citations" type="bool" defaultValue="True">Request bracketed evidence labels and retain structured Citation values. When false, hits are still returned but <code>RAGAnswer.citations</code> is empty.</ApiField>
-  <ApiField name="session_id" type="str" defaultValue={'"ask_session_id"'}>Conversation-state partition attached to the generated task.</ApiField>
+  <ApiField name="session_id" type="str" defaultValue={'"ask_session_id"'}>Conversation-state partition attached to the generated task. Pass a distinct ID for each conversation when state is enabled.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="ask return value">
@@ -934,7 +934,8 @@ before the first model call.
 <ApiSection title="Raises"><ApiFields ariaLabel="ask errors">
   <ApiField name="RuntimeError">No knowledge source is attached.</ApiField>
   <ApiField name="ValueError | TypeError">The question, selected names, result count, or filters are invalid.</ApiField>
-  <ApiField name="retrieval or inference error">Search, policy, budget, provider, and task failures propagate through their normal typed errors.</ApiField>
+  <ApiField name="TaskExecutionError">The returned task is failed or canceled. Inspect <code>exception.task</code> for its complete details.</ApiField>
+  <ApiField name="retrieval or inference error">Raised search, policy, budget, provider, and handler exceptions keep their original types.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiCallout label="Complete RAG guide">See <a href="rag">Retrieval-Augmented Generation</a> for managed indexes, existing vector databases, custom retrievers, retrieval modes, citations, and lifecycle operations.</ApiCallout>
@@ -1132,7 +1133,7 @@ At the A2A boundary, a standard user text part remains a ProtoLink `Part(type="t
 
 ## Synchronous API (`SyncAgent`)
 
-Protolink is built on an asynchronous foundation using `asyncio`, which is essential for handling concurrent agent interactions and streaming responses. However, many development workflows, such as data science notebooks, CLI tools, and simple automation scripts, benefit from a straightforward, blocking API.
+Protolink uses `asyncio` for concurrent agent interactions and streaming. CLI tools and ordinary Python scripts can use the blocking `.sync` facade without managing an event loop.
 
 The `Agent` class provides a `.sync` property, which is an instance of `SyncAgent`. This class acts as a thin, synchronous wrapper around the agent's core async methods.
 
@@ -1148,12 +1149,28 @@ The `SyncAgent` class does not re-implement any logic. Instead, it delegates cal
 
 :::warning[Event Loop Conflict]
 
-The synchronous API is **not thread-safe** if called from within an active event loop (e.g., inside a FastAPI endpoint or an async function). Doing so will raise a `RuntimeError`. For async applications, always use the standard `await agent.invoke()` methods.
+Every `SyncAgent` method checks for an active event loop before creating a coroutine. Inside an async function, a FastAPI endpoint, or a notebook with an active loop, it raises `RuntimeError` with the corresponding `await agent.method(...)` alternative. Use that async method directly; this is an event-loop restriction, not a thread-safety guarantee.
 
 :::
 ### Key Sync Methods
 
 The sync facade exposes blocking equivalents with the same parameter and return contracts:
+
+### SyncAgent.call_tool
+
+<ApiReference kind="method" path="protolink.agents.SyncAgent.call_tool" signature={`call_tool(tool_name: str, **kwargs: Any) -> Any`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+
+Blocking form of <code>Agent.call_tool()</code>. Validates arguments, applies policy and approvals, and returns the raw tool value, including <code>None</code>. Validation, authorization, and tool exceptions propagate unchanged. It does not create a task or its lifecycle records; use <code>run_task()</code> when those are needed.
+
+</ApiReference>
+
+### SyncAgent.run_task
+
+<ApiReference kind="method" path="protolink.agents.SyncAgent.run_task" signature={`run_task(task: Task) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+
+Blocking form of <code>Agent.run_task()</code>. Runs the handler under active-task registration and configured run persistence, returning the complete task. Returned failed and canceled states remain available for inspection; call <code>result.raise_for_status()</code> to raise <code>TaskExecutionError</code> for either. Exceptions raised by execution still propagate.
+
+</ApiReference>
 
 ### SyncAgent.invoke
 
@@ -1163,14 +1180,14 @@ The sync facade exposes blocking equivalents with the same parameter and return 
     tool_name: str | None = None,
     tool_args: dict[str, Any] | None = None,
     session_id: str = "invocation_session_id",
-) -> str`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
-Blocking form of <code>Agent.invoke()</code>. Every argument and the returned final-part text have the same meaning; the wrapper runs the coroutine with <code>asyncio.run()</code>.
+) -> Any`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
+Blocking form of <code>Agent.invoke()</code>. Arguments, final-part content, and <code>TaskExecutionError</code> behavior match the async method; the wrapper runs the coroutine with <code>asyncio.run()</code>.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SyncAgent invoke parameters">
     <ApiField name="message" type="str" required>User prompt used to create an infer Part. In tool-call mode the wrapper still forwards it, but the underlying Agent builds the tool Part from <code>tool_name</code> and <code>tool_args</code>.</ApiField>
     <ApiField name="part_type" type={'Literal["tool_call", "infer"]'} defaultValue={'"infer"'}>Select direct inference or an explicit tool call. Other values are rejected by <code>Agent.invoke()</code>.</ApiField>
-    <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name for tool-call mode. A falsey value becomes an empty tool name and produces the Agent's normal tool-not-found result.</ApiField>
+    <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name for tool-call mode. Omission produces a failed tool-not-found task and raises <code>TaskExecutionError</code>.</ApiField>
     <ApiField name="tool_args" type="dict[str, Any] | None" defaultValue="None">Keyword arguments placed in the generated tool-call Part. <code>None</code> and an empty mapping are normalized to an empty argument mapping.</ApiField>
     <ApiField name="session_id" type="str" defaultValue={'"invocation_session_id"'}>Session identifier written to task metadata before execution. The stable default shares conversation state across sequential invocations when conversation persistence is enabled.</ApiField>
   </ApiFields>
@@ -1191,7 +1208,7 @@ Blocking form of <code>Agent.invoke()</code>. Every argument and the returned fi
 ) -> RAGAnswer`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
 
 Blocking form of <code>Agent.ask()</code> with the same retrieval, filter,
-citation, and return contract. The wrapper uses <code>asyncio.run()</code> and
+citation, return, and <code>TaskExecutionError</code> contract. The wrapper uses <code>asyncio.run()</code> and
 must not be called from an active event loop.
 
 </ApiReference>
@@ -1249,25 +1266,24 @@ Blocking form of local live-task cancellation.
 ### Usage Example
 
 ```python
-from protolink.agents import Agent
-from protolink.models import Task
+from protolink import Agent, AgentCard, Task
 
 agent = Agent(
-    card={"name": "my-agent", "description": "Runtime demo agent", "url": "runtime://agent"},
+    card=AgentCard(name="calculator", description="Adds numbers", url="runtime://calculator"),
     transport="runtime",
+    verbosity=0,
 )
 
-# Use the .sync property for blocking calls
-response = agent.sync.invoke("Hello, agent!")
-print(f"Agent said: {response}")
+@agent.tool
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
 
-# Discovering other agents synchronously
-discovered = agent.sync.discover_agents(filter_by={"name": "weather-agent"})
-if discovered:
-    target_url = discovered[0].url
-    # Call agent synchronously
-    task = Task.create_infer("What is the temperature?")
-    result = agent.sync.call_agent(target_url, task)
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
+
+task = Task.create_tool_call(tool_name="add", args={"a": 2, "b": 3})
+result = agent.sync.run_task(task).raise_for_status()
+print(result.state.value)  # completed
 ```
 
 
@@ -1390,20 +1406,20 @@ Register or replace a runtime tool by name and synchronize its public skill adve
 ### Agent.tool
 
 <ApiReference kind="decorator factory" path="protolink.agents.Agent.tool" signature={`tool(
-    name: str,
-    description: str,
+    name: str | ToolCallableT | None = None,
+    description: str | None = None,
     input_schema: dict[str, Any] | None = None,
     output_schema: dict[str, Any] | None = None,
     tags: list[str] | None = None,
     examples: list[Any] | None = None,
     capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
     action_builder: ActionBuilder | None = None,
-)`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
-Wrap a Python callable as a ProtoLink <code>Tool</code>, register it immediately, and return the original callable so ordinary direct Python usage remains possible.
+) -> ToolCallableT | Callable[[ToolCallableT], ToolCallableT]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
+Wrap a Python callable as a ProtoLink <code>Tool</code>, register it immediately, and preserve the original callable and its type signature. Use <code>@agent.tool</code> or <code>@agent.tool()</code> for inferred metadata; explicit keyword and positional forms remain supported. <code>ToolCallableT</code> represents the decorated callable's type.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="tool decorator parameters">
-  <ApiField name="name" type="str" required>Stable identifier exposed to models, peers, policy, and serialized configuration.</ApiField>
-  <ApiField name="description" type="str" required>Purpose statement used in prompts and skill discovery.</ApiField>
+  <ApiField name="name" type="str | ToolCallableT | None" defaultValue="None">Stable public identifier, inferred from the function name when omitted. Bare decoration passes the callable here automatically.</ApiField>
+  <ApiField name="description" type="str | None" defaultValue="None">Purpose statement used in prompts and skill discovery. Omission uses the cleaned function docstring, or <code>Call &lt;name&gt;.</code> when absent.</ApiField>
   <ApiField name="input_schema" type="dict[str, Any] | None" defaultValue="None">Optional JSON Schema used to validate keyword arguments before authorization.</ApiField>
   <ApiField name="output_schema" type="dict[str, Any] | None" defaultValue="None">Descriptive return schema advertised with the tool.</ApiField>
   <ApiField name="tags" type="list[str] | None" defaultValue="None">Discovery and presentation labels.</ApiField>
@@ -1412,7 +1428,9 @@ Wrap a Python callable as a ProtoLink <code>Tool</code>, register it immediately
   <ApiField name="action_builder" type="ActionBuilder | None" defaultValue="None">Hook that can enrich the concrete <code>RunAction</code> with preview artifacts or metadata before approval.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="tool decorator return value"><ApiField name="decorator" type="Callable">Decorator that registers the wrapped function and returns that same function.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="tool decorator return value"><ApiField name="function or decorator" type="ToolCallableT | Callable[[ToolCallableT], ToolCallableT]">Bare decoration returns the unchanged function; configured decoration returns a decorator that registers and returns it. Ordinary calls to that function bypass Agent validation and policy.</ApiField></ApiFields></ApiSection>
+
+<ApiCallout label="Reusable tools">Use <code>Tool.from_callable(func, ...)</code> to create an independent tool definition, then register it with <code>add_tool()</code> on one or more agents.</ApiCallout>
 
 </ApiReference>
 
@@ -1663,7 +1681,7 @@ When an agent is initialized with the `state` parameter, it tracks internal stat
 
 :::tip[Session IDs]
 
-When using direct invocation methods like `invoke()` or `sync.invoke()`, a default `session_id` of `"invocation_session_id"` is used if none is provided. This ensures that sequential calls to the same agent instance share history by default when `state=["conversation"]` is enabled.
+`invoke()` and `sync.invoke()` default to `session_id="invocation_session_id"`; `ask()` and `sync.ask()` use `"ask_session_id"`. Each method reuses its default conversation when `state=["conversation"]` is enabled. Pass an explicit `session_id` for every independent conversation, especially in applications serving multiple users. Use the same explicit ID across `invoke()` and `ask()` when they should share history.
 
 If no `session_id` is provided in the task metadata (for non-invoke calls), the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
 
@@ -1817,4 +1835,5 @@ The `Agent` class includes several error handling patterns:
 - **Missing Transport**: Construction and `start()` can operate without a server transport, but outbound `call_agent()` and `send_message_to()` raise `RuntimeError`.
 - **Authentication Failures**: Returns `401` or `403` responses for invalid auth.
 - **Tool Errors**: Direct `call_tool()` calls propagate validation, policy, approval, and tool errors. Task-based tool execution converts ordinary tool failures into an error-bearing `tool_output` part; policy failures remain raised.
+- **Convenience Calls**: `invoke()` and `ask()` raise the top-level `TaskExecutionError` when the returned task is failed or canceled. Its `.task` attribute preserves the complete task. Use `run_task()` to inspect returned states directly or add `raise_for_status()` explicitly; the check leaves nonterminal states unchanged.
 - **Task Processing**: Non-streaming engine errors mark the task failed and are re-raised through direct handler calls. The streaming engine emits a `TaskErrorEvent` and a final failed status event.

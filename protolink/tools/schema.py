@@ -38,12 +38,17 @@ JSON_SCHEMA_KEYS = {
 def _safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
     """Safely extract type hints from a callable.
 
-    Handles potential TypeErrors or other exceptions during type hint resolution.
+    Python callable instances store their annotations on ``__call__``. Their
+    original signature still determines the accepted argument names and defaults.
+    Unresolvable annotations fall back to schema inference from the signature.
     """
+    target = func
+    if callable(func) and not inspect.isroutine(func) and not inspect.isclass(func):
+        call_method = func.__call__
+        if inspect.ismethod(call_method) or inspect.isfunction(call_method):
+            target = call_method
     try:
-        return get_type_hints(func, include_extras=True)
-    except TypeError:
-        return get_type_hints(func)
+        return get_type_hints(target, include_extras=True)
     except Exception:
         return {}
 

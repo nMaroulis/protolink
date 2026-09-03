@@ -55,6 +55,7 @@ from protolink.core.report_diff import (
     normalize_run_report,
 )
 from protolink.core.run_context import RunBudget, RunContext
+from protolink.core.task import TaskExecutionError
 
 __all__ = [
     "ALL_RUN_REPORT_SECTIONS",
@@ -98,6 +99,7 @@ __all__ = [
     "TaskAlreadyRunningError",
     "TaskCancellationError",
     "TaskCancellationRequest",
+    "TaskExecutionError",
     "TaskNotCancelableError",
     "TaskNotFoundError",
     "assert_budget_under",

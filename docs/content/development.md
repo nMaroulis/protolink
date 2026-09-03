@@ -135,6 +135,8 @@ ruff check .
 
 Protolink uses **ty** for static type checking.
 
+The installed package includes a `py.typed` marker so type checkers can discover its inline annotations. Public tool decorators preserve the decorated function's callable type; keep overloads and return annotations aligned with runtime behavior when changing convenience APIs.
+
 ```bash
 # Run type checks
 ty check .
@@ -350,6 +352,7 @@ Maintainers can follow this process for releases:
 2. **Update documentation versions** in `docs/package.json`, regenerate `docs/package-lock.json`, and update the current-release labels in the documentation.
 3. **Finalize the changelog** in `docs/content/changelog.md`: replace `Unreleased` with the publication date and move the latest-release note to the new version.
 4. **Run release gates**: formatting, linting, type checking, the full test suite, the Docusaurus production build, `python -m build`, and `python -m twine check dist/*`.
+   Check that the wheel and source distribution include `protolink/py.typed`, that installed metadata and `protolink.__version__` agree, and that the first getting-started example runs using only the base dependencies.
 5. **Tag Release**: `git tag vX.Y.Z`
 6. **Push Tags**: `git push origin --tags`
 7. **Upload to PyPI**: `python -m twine upload dist/*`

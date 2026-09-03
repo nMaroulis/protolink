@@ -1,5 +1,4 @@
 import inspect
-import typing
 from collections.abc import Awaitable, Callable, Collection
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
@@ -7,7 +6,13 @@ from typing import Any, ClassVar
 from protolink.core.actions import RunAction
 from protolink.core.run_context import RunContext
 from protolink.tools.base import BaseTool
-from protolink.tools.schema import infer_input_schema, infer_output_schema, normalize_schema, validate_tool_args
+from protolink.tools.schema import (
+    _safe_get_type_hints,
+    infer_input_schema,
+    infer_output_schema,
+    normalize_schema,
+    validate_tool_args,
+)
 
 ActionBuilder = Callable[[dict[str, Any], RunContext], RunAction | Awaitable[RunAction]]
 """Callable that enriches a tool action before policy evaluation."""
@@ -44,6 +49,68 @@ class Tool(BaseTool):
     _protolink_ephemeral_result: bool = field(init=False, repr=False, default=False)
     _protolink_validates_args: ClassVar[bool] = True
 
+    @classmethod
+    def from_callable(
+        cls,
+        func: Callable[..., Any],
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        input_schema: dict[str, Any] | None = None,
+        output_schema: Any | None = None,
+        tags: list[str] | None = None,
+        examples: list[Any] | None = None,
+        capabilities: Collection[str] | None = None,
+        action_builder: ActionBuilder | None = None,
+    ) -> "Tool":
+        """Create a reusable tool from a typed Python callable.
+
+        The callable's name and cleaned docstring supply default metadata.
+        Callables without a docstring use ``"Call <name>."``. Explicit metadata
+        takes precedence, and missing schemas are inferred as in the regular
+        constructor. Register the returned tool with ``agent.add_tool(tool)``
+        to invoke it through Agent policy and task execution.
+
+        Args:
+            func: Synchronous or asynchronous callable to wrap.
+            name: Public tool name; defaults to the callable's name or class name.
+            description: Tool purpose; defaults to the callable's docstring.
+            input_schema: Optional schema overriding inferred keyword arguments.
+            output_schema: Optional schema overriding the return annotation.
+            tags: Optional discovery and presentation labels.
+            examples: Optional examples advertised on the agent's skill card.
+            capabilities: Permission capabilities required before execution.
+            action_builder: Optional callback enriching the prepared runtime action.
+
+        Returns:
+            A tool with the same schema, validation, and policy metadata as one
+            constructed explicitly.
+
+        Raises:
+            TypeError: ``func`` is not callable or cannot be inspected, or the
+                explicit or inferred name is not a string.
+            ValueError: The tool name is empty or whitespace-only, or the
+                callable signature or explicit schema is invalid.
+        """
+        if not callable(func):
+            raise TypeError("Tool.from_callable requires a callable")
+        tool_name = name if name is not None else getattr(func, "__name__", type(func).__name__)
+        if not isinstance(tool_name, str):
+            raise TypeError("Tool name must be a string")
+        if not tool_name.strip():
+            raise ValueError("Tool name must not be empty or whitespace-only")
+        return cls(
+            name=tool_name,
+            description=description if description is not None else inspect.getdoc(func) or f"Call {tool_name}.",
+            input_schema=input_schema,
+            output_schema=output_schema,
+            tags=tags,
+            func=func,
+            examples=examples,
+            capabilities=capabilities,
+            action_builder=action_builder,
+        )
+
     def __post_init__(self) -> None:
         """Populate missing schemas.
 
@@ -51,10 +118,7 @@ class Tool(BaseTool):
         they are inferred from the wrapped callable.
         """
         self._signature = inspect.signature(self.func)
-        try:
-            self._type_hints = typing.get_type_hints(self.func, include_extras=True)
-        except Exception:
-            self._type_hints = {}
+        self._type_hints = _safe_get_type_hints(self.func)
 
         # Input Schema
         if self.input_schema is None:

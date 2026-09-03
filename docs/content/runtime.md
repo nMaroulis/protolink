@@ -846,7 +846,13 @@ import asyncio
 from protolink import Agent, AgentCard, Task
 
 agent = Agent(AgentCard(name="worker", description="Worker", url="runtime://worker"))
-task = Task.create_infer(prompt="Perform long-running work")
+
+@agent.tool
+async def wait_for_signal() -> None:
+    """Wait until this task is canceled."""
+    await asyncio.Event().wait()
+
+task = Task.create_tool_call(tool_name="wait_for_signal")
 
 running = asyncio.create_task(agent.run_task(task))
 # Cancellation targets active execution, so wait until registration completes.
@@ -859,7 +865,9 @@ assert canceled.state.value == "canceled"
 assert result.state.value == "canceled"
 ```
 
-The default `handle_task()` path also registers direct calls through `execute_task()`. `run_task()` is the server-facing wrapper and should be used by direct callers that override `handle_task()` completely, because it guarantees active-task registration around custom logic.
+The default `handle_task()` path also registers direct calls through `execute_task()`. `run_task()` guarantees active-task registration around custom handlers and offers results to configured run storage. The same wrapper is used by server routes, `invoke()`, and `ask()`. Blocking scripts can use `agent.sync.run_task(task)`; async applications use `await agent.run_task(task)`.
+
+`run_task()` returns a protocol-canceled task so callers can inspect its partial results. Calling `result.raise_for_status()` raises `TaskExecutionError` for a failed or canceled result and preserves it as `exception.task`. `invoke()` and `ask()` perform that check automatically rather than returning canceled work as a successful answer. Other states, including `input-required`, pass through the check unchanged. External coroutine cancellation still propagates as `asyncio.CancelledError`.
 
 ### Remote Cancellation
 
@@ -1470,6 +1478,8 @@ async def publish_record(record_id: str) -> dict:
 Tool arguments are validated before the action is prepared and again before execution. Tool-declared capabilities are always merged into a custom action, so an `action_builder` cannot accidentally omit a required policy check.
 
 For deterministic code that invokes a tool without a `Task`, use `agent.call_tool_in_context(tool_name, context, **arguments)`. It applies the same argument preparation, capability policy, and approval handler as model-driven execution.
+
+When no application-owned context is needed, use `await agent.call_tool(name, **arguments)` or `agent.sync.call_tool(name, **arguments)`. Both return the raw tool value and propagate validation, policy, approval, and callable errors. These methods do not create a task or a persisted task lifecycle; use `run_task(Task.create_tool_call(...))` for those controls.
 
 ### ApprovalRequest
 

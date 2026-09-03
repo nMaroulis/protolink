@@ -99,3 +99,24 @@ jobs:
       run: |
         python -m build
         twine check dist/*
+
+    - name: Verify the installed base wheel
+      run: |
+        python -m venv "$RUNNER_TEMP/protolink-wheel"
+        "$RUNNER_TEMP/protolink-wheel/bin/python" -m pip install dist/*.whl
+        cd "$RUNNER_TEMP"
+        "$RUNNER_TEMP/protolink-wheel/bin/python" -I - <<'PY'
+        from importlib.metadata import version
+        from importlib.resources import files
+
+        from protolink import Agent, AgentCard, __version__, create_llm
+
+        assert __version__ == version("protolink")
+        assert files("protolink").joinpath("py.typed").is_file()
+        agent = Agent(
+            AgentCard(name="wheel-smoke", description="Installed wheel check", url="runtime://wheel-smoke"),
+            llm=create_llm("mock", default_response="Installed successfully"),
+        )
+        assert agent.sync.invoke("Hello") == "Installed successfully"
+        PY
+        "$RUNNER_TEMP/protolink-wheel/bin/protolink" --version
