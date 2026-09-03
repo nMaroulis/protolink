@@ -1,151 +1,84 @@
-# Basic Example
+# Basic Example: One Complete Multi-Agent Notebook
 
-This directory contains a basic example of how to use ProtoLink to create a multi-agent system with HTTP transport. The example demonstrates:
+Open [`basic_example.ipynb`](basic_example.ipynb) for a detailed introduction built around short, direct ProtoLink calls. Start a `Registry`, then WeatherAgent, then AlertAgent; discover peers, call tools, invoke agents, and explore the HTTP pages and APIs.
 
-- **Registry**: A central service for agent discovery and registration
-- **Weather Agent**: An agent that provides weather data
-- **Alert Agent**: An agent that processes weather data and sends alerts
+Both agents are ordinary `Agent` instances with tools, instructions, and an LLM; AlertAgent also enables conversation state. There is no `handle_task` override. The default HTTP transport, `MockLLM`, and small weather tool need no API key, model server, or external weather service. The alert tool returns demonstration output without sending an external notification.
 
-## Files
+## Quick Start
 
-- [`registry.ipynb`](registry.ipynb) - Sets up the HTTP registry for agent discovery
-- [`weather_agent.ipynb`](weather_agent.ipynb) - Creates a weather agent with mock weather data
-- [`alert_agent.ipynb`](alert_agent.ipynb) - Creates an alert agent that communicates with the weather agent
+From the repository root, install the notebook and HTTP dependencies, then launch Jupyter:
 
-## Architecture Overview
-
-```
-┌─────────────────┐    HTTP REST API   ┌─────────────────┐
-│   Registry      │◄──────────────────►│  Alert Agent    │
-│  (localhost:    │                    │  (localhost:    │
-│   9010)         │                    │   8020)         │
-└─────────────────┘                    └─────────────────┘
-         ▲                                   ▲
-         │                                   │
-         │ HTTP REST API                     │ HTTP REST API
-         │                                   │
-┌─────────────────┐                    ┌─────────────────┐
-│ Weather Agent   │◄──────────────────►│  Alert Agent    │
-│ (localhost:     │                    │                 │
-│  8010)          │                    │                 │
-└─────────────────┘                    └─────────────────┘
+```bash
+python -m pip install -e '.[http,notebook]'
+python -m jupyter lab examples/notebooks/basic_example/basic_example.ipynb
 ```
 
-## Getting Started
+Choose the Python environment where you installed ProtoLink as the notebook kernel, then run the cells from top to bottom. Jupyter supports the notebook's top-level `await`.
 
-### 1. Start the Registry
+**Run All includes cleanup.** Pause before the final cleanup cell to use the browser status and chat pages. Run cleanup when finished, and before rebuilding the example with different settings.
 
-First, run the [`registry.ipynb`](registry.ipynb) notebook to start the registry service:
+## What the Notebook Covers
 
-```python
-from protolink.discovery import Registry
+- **Core API:** `Registry(...)`, `Agent(...)`, `start()`, `call_tool()`, `invoke()`, `call_agent()`, and `stop()`.
+- **Discovery and state:** use the agent's existing `client` to inspect peers and manage conversation state.
+- **HTTP:** open status and chat pages, send small JSON requests, and inspect the endpoint tables.
+- **Plug-in components:** add a calculator, attach a reusable `Tool`, replace a weather tool implementation, and attach knowledge.
+- **Configuration recipes:** change the transport, LLM, conversation storage, or run store with short examples.
+- **Optional extensions:** see a declarative mock delegation example and reference snippets for streaming and cancellation.
 
-REGISTRY_URL = "http://localhost:9010"
+`MockLLM` returns configured text. The optional delegation example scripts a peer call through the normal agent loop; its final mock text is fixed, rather than generated from the returned weather data. Choose a real LLM from the notebook's replacement recipes for open-ended conversations.
 
-# Create and start registry (uses HTTP transport by default)
-registry = Registry(transport="http", url=REGISTRY_URL)
-registry.start()
+## Architecture and Default Addresses
+
+```text
+                       Registry :9010
+                     /                \
+          registers /                  \ registers
+                   /                    \
+          WeatherAgent :8010 <---- AlertAgent :8020
+                    typed task delegation
 ```
 
-The registry exposes these endpoints:
-- **GET** `/agents` - List all registered agents
-- **POST** `/agents` - Register a new agent  
-- **DELETE** `/agents/{agent_url}` - Unregister an agent
-- **GET** `/status` - View registry status and registered agents
+The registry provides discovery; agent-to-agent tasks go to the discovered agent's address. With the default HTTP configuration, the browser pages are:
 
-### 2. Start the Weather Agent
+| Service | Status page | Chat page |
+| --- | --- | --- |
+| Registry | [localhost:9010/status](http://localhost:9010/status) | — |
+| WeatherAgent | [localhost:8010/status](http://localhost:8010/status) | [localhost:8010/chat](http://localhost:8010/chat) |
+| AlertAgent | [localhost:8020/status](http://localhost:8020/status) | [localhost:8020/chat](http://localhost:8020/chat) |
 
-Run the [`weather_agent.ipynb`](weather_agent.ipynb) notebook:
+Change the URL values near the top of the notebook if these ports are occupied.
 
-```python
-from protolink.agents import Agent
-from protolink.models import AgentCard, Task
+## Transport Choices
 
-URL = "http://localhost:8010"
-REGISTRY_URL = "http://localhost:9010"
+The notebook lists HTTP, SSE JSON-RPC, WebSocket, in-process runtime, and gRPC configurations. Change the agents' `TRANSPORT` and URLs together; the registry can stay on HTTP or use its own transport setting. Install the optional gRPC dependency with `python -m pip install -e '.[grpc]'` before selecting it.
 
-class WeatherAgent(Agent):
-    async def handle_task(self, task: Task):
-        result = await self.call_tool("get_weather", city="Geneva")
-        return task.complete(f"Weather data: {result}")
+Before a transport change, run cleanup, then update the settings and rerun from the top. Skip the two HTTP-only request cells for runtime, WebSocket, and gRPC agents. Browser pages work with HTTP and SSE; runtime opens no network ports. Streaming requires a transport that advertises streaming support, such as SSE JSON-RPC.
 
-card = AgentCard(url=URL, name="WeatherAgent", description="Produces weather data")
-# Using transport type strings - the agent will create HTTP transports internally
-agent = WeatherAgent(card=card, transport="http", registry="http", registry_url=REGISTRY_URL)
+## HTTP Agent API Reference
 
-@agent.tool(name="get_weather", description="Return weather data for a city")
-async def get_weather(city: str):
-    return {"city": city, "temperature": 28, "condition": "sunny"}
+The notebook includes a few direct JSON requests and an endpoint reference. The default HTTP agents expose:
 
-agent.start(register=True)
-```
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/healthz` | Transport health probe |
+| `GET` | `/readyz` | Readiness probe; currently uses the same transport health handler |
+| `GET` | `/status` | HTML status page |
+| `GET` | `/.well-known/agent.json` | Agent card and advertised capabilities |
+| `GET` | `/chat` | HTML chat page |
+| `POST` | `/chat` | Chat request for an agent with an LLM |
+| `POST` | `/tasks/` | Submit a typed task |
+| `POST` | `/tasks/cancel` | Request cancellation of a task |
+| `POST` | `/state/describe` | Inspect conversation state |
+| `POST` | `/state/compact` | Compact conversation state |
+| `POST` | `/state/reset` | Reset conversation state |
+| `POST` | `/llm/history/compact` | Compact LLM history |
 
-### 3. Start the Alert Agent
+The registry has its own discovery API and status page. Task, chat, and state requests go to the agents. Streaming and cancellation are covered as optional reference examples; a `/tasks/stream` endpoint is registered only for a transport with streaming support.
 
-Run the [`alert_agent.ipynb`](alert_agent.ipynb) notebook:
+## Rerunning and Troubleshooting
 
-```python
-from protolink.agents import Agent
-from protolink.models import Message, Task
-from protolink.transport import HTTPTransport
-
-URL = "http://localhost:8020"
-REGISTRY_URL = "http://localhost:9010"
-
-class AlertAgent(Agent):
-    async def handle_task(self, task: Task):
-        data = task.payload
-        if data["temperature"] > 25:
-            await self.call_tool("alert_tool", message=f"Hot weather in {data['city']}! {data['temperature']}°C")
-        return task
-
-# Using HTTPTransport instances directly (alternate approach)
-transport = HTTPTransport(url=URL)
-registry = HTTPTransport(url=REGISTRY_URL)
-
-card = {"url": URL, "name": "AlertAgent", "description": "Sends alerts based on data"}
-agent = AlertAgent(card=card, transport=transport, registry=registry)
-
-@agent.tool(name="alert_tool", description="Send an alert")
-async def send_alert(message: str):
-    print(f"ALERT: {message}")
-    return {"status": "sent", "message": message}
-
-agent.start(register=True)
-```
-
-## Key Concepts
-
-### Registry
-- **Purpose**: Central service for agent discovery and registration
-- **Transport**: Accepts either a transport type string (`"http"`) or a `Transport` instance
-- **Endpoints**: Provides agent management and status endpoints
-
-### Agents
-- **Transport**: Can use transport type strings (`"http"`) or `HTTPTransport` instances
-- **Registration**: Agents can pass registry as a string, transport instance, or transport type with separate URL
-- **Tools**: Agents can define native tools using the `@tool` decorator
-- **Task Handling**: Agents implement `handle_task` to process incoming tasks
-
-### Communication Patterns
-- **Agent-to-Registry**: HTTP REST API for registration and discovery
-- **Agent-to-Agent**: HTTP client-server for task delegation and responses
-- **Tool Calling**: Agents can call their own tools and receive results
-
-## Testing the System
-
-Once all agents are running:
-
-1. **Check Registry Status**: Visit `http://localhost:9010/status`
-2. **Check Agent Status**: 
-   - Weather Agent: `http://localhost:8010/status`
-   - Alert Agent: `http://localhost:8020/status`
-3. **Send Tasks**: Use the Alert Agent to send tasks to the Weather Agent and observe the alert system
-
-## Ports Used
-
-- **Registry**: 9010
-- **Weather Agent**: 8010  
-- **Alert Agent**: 8020
-
-Make sure these ports are available before starting the system.
+- **Connection refused:** run the startup cells in order and leave the services running until after the HTTP exploration cells.
+- **Address already in use:** run cleanup for this notebook's previous run or change the configured ports.
+- **Import error:** install the extras in the selected notebook kernel's Python environment.
+- **Changed transport or component:** run cleanup, update the configuration, and rerun from the top. Restart the kernel for a completely fresh session.

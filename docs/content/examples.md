@@ -4,77 +4,39 @@ This section links to example projects and code snippets in the repository.
 
 :::tip[New here?]
 
-Start with the **Jupyter Notebooks** in `examples/notebooks/basic_example`! They provide the easiest and best interactive introduction to running the Registry and Agents.
+Start with the **Basic Example notebook** in `examples/notebooks/basic_example`. It starts a registry and two agents in one interactive walkthrough.
 
 :::
-## Jupyter Notebooks (Recommended)
+## Jupyter Notebook (Recommended)
 
-The best way to get started is by running the interactive notebooks in [`examples/notebooks/basic_example`](https://github.com/nMaroulis/protolink/tree/main/examples/notebooks/basic_example). These notebooks teach you the core concepts of Protolink through a complete multi-agent system:
+[`basic_example.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/basic_example.ipynb) is one detailed notebook built around short, direct ProtoLink calls. Run its cells in order to start the registry first, then WeatherAgent, then AlertAgent. Both are ordinary `Agent` instances with tools and an LLM; AlertAgent also enables conversation state. No `handle_task` override is needed.
 
-### 🎯 What You'll Learn
+The default configuration uses HTTP, a small weather tool, and `MockLLM`. No API key, model server, or external weather service is required. Mock replies are configured text; the optional delegation example scripts a peer call but does not generate its final reply from the returned weather data.
 
-- **Registry Setup**: How to run a central discovery service for agents
-- **Agent Creation**: Building agents with tools and task handling
-- **Agent Communication**: How agents discover and communicate with each other
-- **Transport Configuration**: Using HTTP transport for agent-to-agent messaging
-- **Tool Integration**: Adding native tools to agents using decorators
+### What You'll Learn
 
-### 📚 Notebook Sequence
+- **Core API:** start the services, then use `call_tool()`, `invoke()`, and `call_agent()`.
+- **Discovery and state:** use the agent's existing `client` to inspect peers and manage conversation state.
+- **Tools and knowledge:** add a calculator, attach a reusable `Tool`, replace a weather implementation, and attach knowledge.
+- **HTTP APIs:** open status and chat pages, send small JSON requests, and consult the endpoint tables for health, tasks, chat, and state controls.
+- **Replaceable components:** follow short configuration recipes for LLMs, storage, run stores, and HTTP, SSE JSON-RPC, WebSocket, runtime, or gRPC transports.
+- **Optional extensions:** explore declarative mock delegation and reference snippets for streaming and cancellation.
+- **Lifecycle:** stop the agents and registry before changing settings or rerunning the example.
 
-Run these notebooks in order to build a complete weather monitoring system:
+### Quick Start
 
-#### 1. **[`registry.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/registry.ipynb)** - Start the Registry
-- Sets up the central discovery service on `localhost:9010`
-- Exposes REST API endpoints for agent registration and discovery
-- Provides a web interface at `/status` to view registered agents
+From the repository root:
 
-#### 2. **[`weather_agent.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/weather_agent.ipynb)** - Create a Data Provider
-- Builds an agent that provides mock weather data
-- Demonstrates tool creation with the `@tool` decorator
-- Shows agent registration and task handling patterns
-- Runs on `localhost:8010`
-
-#### 3. **[`alert_agent.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/alert_agent.ipynb)** - Create a Consumer Agent
-- Builds an agent that processes weather data and sends alerts
-- Demonstrates agent-to-agent communication via the registry
-- Shows different transport configuration patterns
-- Runs on `localhost:8020`
-
-### 🏗️ System Architecture
-
-```
-┌─────────────────┐    HTTP REST API   ┌─────────────────┐
-│   Registry      │◄──────────────────►│  Alert Agent    │
-│  (localhost:    │                    │  (localhost:    │
-│   9010)         │                    │   8020)         │
-└─────────────────┘                    └─────────────────┘
-         ▲                                   ▲
-         │                                   │
-         │ HTTP REST API                     │ HTTP REST API
-         │                                   │
-┌─────────────────┐                    ┌─────────────────┐
-│ Weather Agent   │◄──────────────────►│  Alert Agent    │
-│ (localhost:     │                    │                 │
-│  8010)          │                    │                 │
-└─────────────────┘                    └─────────────────┘
+```bash
+python -m pip install -e '.[http,notebook]'
+python -m jupyter lab examples/notebooks/basic_example/basic_example.ipynb
 ```
 
-### 🚀 Quick Start
+Select the environment where ProtoLink is installed as the notebook kernel and run from top to bottom. Jupyter supports the notebook's top-level `await`.
 
-1. **Start the Registry** (run `registry.ipynb` first)
-2. **Start the Weather Agent** (run `weather_agent.ipynb`)
-3. **Start the Alert Agent** (run `alert_agent.ipynb`)
-4. **Test the System**: Visit `http://localhost:9010/status` to see all registered agents
+The default registry listens on `localhost:9010`, WeatherAgent on `localhost:8010`, and AlertAgent on `localhost:8020`. Each has a `/status` page; the agents also expose `/chat`. The registry handles discovery, and tasks go directly to the discovered agent.
 
-### 💡 Key Concepts Demonstrated
-
-- **Transport Flexibility**: Use transport strings (`"http"`) or `HTTPTransport` instances
-- **Registry Patterns**: Pass registry as URL string or `Registry` object
-- **Tool Creation**: Native tools with automatic schema inference
-- **Task Handling**: Implement `handle_task` for processing incoming tasks
-- **Agent Discovery**: Find and communicate with other agents via the registry
-
-
+**Run All also runs cleanup at the end.** Pause before the final cleanup cell to use the browser pages, then run cleanup when finished. To change the agents' transport, update `TRANSPORT` and their URLs together, rerun from the top after cleanup, and skip the two HTTP-only request cells. The registry can stay on HTTP. See the [example README](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/README.md) for the endpoint reference and rerun guidance.
 
 ## Example Scripts
 
