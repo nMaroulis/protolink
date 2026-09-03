@@ -980,8 +980,7 @@ async def test_external_unary_coroutine_cancellation_is_persisted_and_reraised(t
     running.cancel("runtime shutdown")
     with pytest.raises(asyncio.CancelledError) as exc_info:
         await running
-    if sys.version_info >= (3, 11):
-        assert str(exc_info.value) == "runtime shutdown"
+    assert str(exc_info.value) == "runtime shutdown"
 
     persisted = store.get_task(task.id)
     assert task.state is TaskState.CANCELED
@@ -1015,8 +1014,7 @@ async def test_external_stream_coroutine_cancellation_is_persisted_and_reraised(
     running.cancel("stream consumer shutdown")
     with pytest.raises(asyncio.CancelledError) as exc_info:
         await running
-    if sys.version_info >= (3, 11):
-        assert str(exc_info.value) == "stream consumer shutdown"
+    assert str(exc_info.value) == "stream consumer shutdown"
 
     persisted = store.get_task(task.id)
     assert task.state is TaskState.CANCELED
