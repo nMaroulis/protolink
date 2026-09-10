@@ -1,12 +1,14 @@
 # ProtoLink
 
-[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nmaroulis/protolink)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/protolink?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=YELLOW&left_text=%E2%AC%87%EF%B8%8F)](https://pepy.tech/projects/protolink)
+[![Python Version](https://img.shields.io/badge/Python-3.11%2B-60A5FA?style=flat&logo=python&logoColor=white&labelColor=1F2937)](https://www.python.org/downloads/)
+[![PyPI version](https://img.shields.io/pypi/v/protolink?style=flat&logo=pypi&logoColor=white&label=PyPI&labelColor=1F2937&color=38BDF8)](https://pypi.org/project/protolink/)
+[![Pydantic](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/pydantic/pydantic/main/docs/badge/v2.json&style=flat&logo=pydantic&logoColor=white&labelColor=1F2937&color=F472B6)](https://pydantic.dev)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat&logo=ruff&logoColor=white&labelColor=1F2937&color=A3E635)](https://github.com/astral-sh/ruff)
+[![ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json&style=flat&labelColor=1F2937&color=C4B5FD)](https://github.com/astral-sh/ty)
+[![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-Ask_AI-A78BFA?style=flat&logo=readme&logoColor=white&labelColor=1F2937)](https://deepwiki.com/nmaroulis/protolink)
+[![License: MIT](https://img.shields.io/badge/License-MIT-34D399?style=flat&labelColor=1F2937)](https://opensource.org/licenses/MIT)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/protolink?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=BLUE&left_text=Downloads)](https://pepy.tech/projects/protolink)
+
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="ProtoLink logo" width="60%">
