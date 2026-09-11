@@ -260,6 +260,10 @@ Namespaces isolate multiple logical indexes in the same database. SQLite is a
 good fit for local and moderate corpora. Use a dedicated vector database for a
 large production corpus or approximate-nearest-neighbor search.
 
+Connections are opened and closed within each operation, including failed
+operations. Writes commit on success and roll back on failure, so applications
+do not need a separate close call for the SQLite knowledge store.
+
 ### Bring a managed VectorStore
 
 Use `"vector"` when ProtoLink should own ingestion but your application

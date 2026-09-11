@@ -1,7 +1,10 @@
 import json
 import sqlite3
+from contextlib import closing
+from io import BytesIO
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 
 import pytest
 
@@ -26,6 +29,43 @@ def test_cli_doctor_emits_structured_json(capsys):
 
     assert payload["status"] in {"ok", "warn"}
     assert any(check["name"] == "protolink" for check in payload["checks"])
+
+
+def test_ping_closes_http_error_response(monkeypatch):
+    body = BytesIO(b"unread error response")
+    error = HTTPError("http://localhost/status", 503, "Unavailable", {}, body)
+
+    def fail(request, timeout):
+        raise error
+
+    monkeypatch.setattr("protolink.devtools.agents.urlopen", fail)
+    try:
+        result = ping_agent("http://localhost")
+        assert result["ok"] is False
+        assert result["status"] == 503
+        assert result["error"] == "Unavailable"
+        assert body.closed
+    finally:
+        error.close()
+
+
+def test_doctor_closes_http_error_response(monkeypatch):
+    from protolink.devtools.doctor import _probe_json_endpoint
+
+    body = BytesIO(b"unread error response")
+    error = HTTPError("http://localhost/discover", 503, "Unavailable", {}, body)
+
+    def fail(request, timeout):
+        raise error
+
+    monkeypatch.setattr("protolink.devtools.doctor.urlopen", fail)
+    try:
+        result = _probe_json_endpoint("registry", "http://localhost/discover", 1)
+        assert result.status == "error"
+        assert "503" in result.detail
+        assert body.closed
+    finally:
+        error.close()
 
 
 def test_cli_run_list_and_replay_use_sqlite_run_store(tmp_path: Path, capsys):
@@ -214,7 +254,7 @@ def test_run_replay_kind_disambiguates_report_and_task_ids(tmp_path: Path):
 def test_compact_run_index_does_not_decode_full_payloads(tmp_path: Path):
     store_path = tmp_path / "runs.db"
     task_id = _seed_run_store(store_path)
-    with sqlite3.connect(store_path) as connection:
+    with closing(sqlite3.connect(store_path)) as connection, connection:
         connection.execute(
             "UPDATE protolink_tasks SET task_json = ?, metadata_json = ? WHERE task_id = ?",
             ("[]", "[]", task_id),

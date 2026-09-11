@@ -14,6 +14,7 @@ import sqlite3
 import threading
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -172,6 +173,9 @@ class SQLiteVectorStore:
     vector extension is required. This is suitable for local and moderate indexes. Large production corpora should use
     a dedicated vector database through a ProtoLink retriever adapter.
 
+    Each operation opens and closes its own connection. Writes commit on
+    success and roll back on failure; applications need no separate close call.
+
     Args:
         path: SQLite database path.
         namespace: Logical partition inside the database.
@@ -262,12 +266,13 @@ class SQLiteVectorStore:
         return await asyncio.to_thread(self._list_sources_sync)
 
     def _connect(self) -> sqlite3.Connection:
+        """Open one operation's connection; the caller owns its closure."""
         connection = sqlite3.connect(self.path, timeout=30.0)
         connection.row_factory = sqlite3.Row
         return connection
 
     def _initialize(self) -> None:
-        with self._lock, self._connect() as connection:
+        with self._lock, closing(self._connect()) as connection, connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS rag_vectors (
@@ -300,7 +305,7 @@ class SQLiteVectorStore:
     def _upsert_sync(self, records: Sequence[VectorRecord]) -> int:
         dimensions = _record_dimensions(records)
         rows = self._record_rows(records, dimensions)
-        with self._lock, self._connect() as connection:
+        with self._lock, closing(self._connect()) as connection, connection:
             existing = connection.execute(
                 "SELECT DISTINCT dimensions FROM rag_vectors WHERE namespace = ?",
                 (self.namespace,),
@@ -347,7 +352,7 @@ class SQLiteVectorStore:
             selector_values.extend(sources)
         selector = " OR ".join(selectors) if selectors else "0"
 
-        with self._lock, self._connect() as connection:
+        with self._lock, closing(self._connect()) as connection, connection:
             retained_rows = connection.execute(
                 f"""
                 SELECT DISTINCT dimensions
@@ -418,7 +423,7 @@ class SQLiteVectorStore:
         ]
 
     def _read_records_sync(self) -> list[_StoredRecord]:
-        with self._lock, self._connect() as connection:
+        with self._lock, closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """
                 SELECT id, document_id, chunk_index, source, text, metadata_json, embedding_json
@@ -468,7 +473,7 @@ class SQLiteVectorStore:
         if not matched:
             return 0
         placeholders = ", ".join("?" for _ in matched)
-        with self._lock, self._connect() as connection:
+        with self._lock, closing(self._connect()) as connection, connection:
             cursor = connection.execute(
                 f"DELETE FROM rag_vectors WHERE namespace = ? AND id IN ({placeholders})",
                 (self.namespace, *matched),
@@ -476,7 +481,7 @@ class SQLiteVectorStore:
             return max(cursor.rowcount, 0)
 
     def _list_sources_sync(self) -> list[str]:
-        with self._lock, self._connect() as connection:
+        with self._lock, closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 """
                 SELECT DISTINCT source

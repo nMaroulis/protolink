@@ -8,7 +8,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from protolink.__version__ import __version__
@@ -104,6 +104,8 @@ def _probe_json_endpoint(name: str, url: str, timeout: float) -> CheckResult:
             status_code = getattr(response, "status", 200)
         payload: Any = json.loads(raw.decode("utf-8"))
     except (OSError, URLError, json.JSONDecodeError) as exc:
+        if isinstance(exc, HTTPError):
+            exc.close()
         return CheckResult(name, "error", f"failed to probe {url}: {exc}")
 
     detail = f"HTTP {status_code}, JSON {type(payload).__name__}"

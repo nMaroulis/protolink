@@ -68,9 +68,12 @@ Completion checks let applications define success using task and tool outcomes, 
 - Direct tool dispatch enforces native budgets and emits action lifecycle receipts. Repeated calls with the same live `RunContext` share tool counters; delegated tool dispatch also counts against its parent's tool limit. Active task permissions propagate to nested direct tool calls.
 - Structured flows use separate node task identities while preserving the enclosing task ID, partial results, and live cancellation; they stop on failed, canceled, or input-required tasks. Existing default Graph iteration limits and callable/delegation signatures are preserved.
 - Aligned runtime metadata and documentation versions for 0.7.0.
+- Require pytest-asyncio 1.4 or newer in the test extra to avoid an implicit event-loop leak in older test runners. Runtime dependencies are unchanged.
 
 ### Fixed
 
+- SQLite knowledge-store operations and dashboard run-store inspection now close their database connections on both success and failure. Writes retain commit/rollback behavior, preventing connection accumulation in long-running applications. Regression tests also verify rollback after a failed index replacement.
+- Dashboard agent pings and doctor probes now close HTTP error responses before returning diagnostics, preventing socket leaks when a remote endpoint returns an error status.
 - Native task submission keeps response deduplication but disables automatic transport retries; a lost response cannot prove a side effect did not occur. Request/response transports return structured task policy/budget failures.
 - Approval callbacks cannot silently mutate prepared arguments or artifacts after they have been presented for authorization.
 - Partially failed server startup now attempts transport cleanup before propagating the startup failure.

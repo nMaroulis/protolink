@@ -529,7 +529,8 @@ def test_studio_dashboard_endpoints_generate_run_status_and_stop(monkeypatch, tm
 
         with pytest.raises(HTTPError) as missing_blueprint:
             _post_json(base_url, "/api/studio/generate", {})
-        assert missing_blueprint.value.code == 400
+        with missing_blueprint.value as response:
+            assert response.code == 400
     finally:
         server.shutdown()
         thread.join(timeout=3)

@@ -38,14 +38,17 @@ def ping_agent(agent_url: str, *, timeout: float = 3.0) -> dict[str, Any]:
             raw_body = response.read(128_000)
             status = getattr(response, "status", 200)
     except HTTPError as exc:
-        latency_ms = round((time.perf_counter() - started) * 1000)
-        return {
-            "ok": False,
-            "status": exc.code,
-            "latency_ms": latency_ms,
-            "url": status_url,
-            "error": exc.reason,
-        }
+        # HTTPError owns a response body/socket even when only its status is
+        # needed. Close it before returning the normalized probe result.
+        with exc:
+            latency_ms = round((time.perf_counter() - started) * 1000)
+            return {
+                "ok": False,
+                "status": exc.code,
+                "latency_ms": latency_ms,
+                "url": status_url,
+                "error": exc.reason,
+            }
 
     latency_ms = round((time.perf_counter() - started) * 1000)
     return {
