@@ -26,6 +26,8 @@ class ClientRequestSpec:
         headers: Optional protocol-specific request headers. Transports that do not use headers may ignore them.
         channel: Multiplexing channel used to isolate concurrent traffic.
         idempotent: Whether retries and server-side response deduplication are safe for this operation.
+        allow_retries: Whether transport retries are permitted in addition to deduplication.
+            Task submission disables retries because a lost response cannot prove an effect did not occur.
     """
 
     name: str
@@ -38,3 +40,4 @@ class ClientRequestSpec:
     channel: str = "default"
     idempotent: bool = False
     headers: Mapping[str, str] | None = None
+    allow_retries: bool = True

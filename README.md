@@ -39,6 +39,8 @@ The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hoste
 
 Focus on the agent's role and capabilities. ProtoLink handles the infer loop, validated tool execution, delegation, communication, lifecycle, and the operational modules around them.
 
+ProtoLink also works as an engine for **coding agents and other agent applications**. Authorized command execution, recoverable file edits, cancellation, and execution limits help applications handle real work reliably. Typed outcomes and completion checks distinguish an approved plan from an executed, verified result, while bounded workflows keep repair attempts under control. The same lifecycle, policy, and reporting primitives support research assistants, data processing, and operational automation. See the [execution and recovery guide](docs/content/execution-tools.md) and [runnable examples](examples/runtime_capabilities/). Local command execution runs on the host and is not a sandbox.
+
 ## Start with one agent
 
 Install the base package:

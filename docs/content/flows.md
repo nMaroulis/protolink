@@ -7,6 +7,8 @@ import ApiReference, {
 
 # Flows
 
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+
 Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact`, and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
 
 Flows are a ProtoLink runtime extension, not an A2A protocol operation. The important boundary is that deterministic orchestration does not escape into graph-private models: it continues to use the shared A2A-based task language.
@@ -288,6 +290,7 @@ Base contract and shared dispatcher for deterministic workflows. It owns remote-
     steps: list[FlowTarget] | None = None,
     client: AgentClient | None = None,
     registry: Registry | RegistryClient | None = None,
+    *, max_steps: int | None = None,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/pipeline.py">
 Execute an ordered sequence against one evolving Task. Before each step, Pipeline clears transient <code>flow_state</code> and compiles instructions for the known downstream target; the final step receives terminal-output guidance.
 
@@ -295,6 +298,7 @@ Execute an ordered sequence against one evolving Task. Before each step, Pipelin
   <ApiField name="steps" type="list[FlowTarget] | None" defaultValue="None">Initial ordered targets. The list is retained as <code>pipeline.steps</code>; <code>None</code> creates an empty pipeline.</ApiField>
   <ApiField name="client" type="AgentClient | None" defaultValue="None">Remote-dispatch client inherited by unconfigured nested flows.</ApiField>
   <ApiField name="registry" type="Registry | RegistryClient | None" defaultValue="None">Optional name-resolution source.</ApiField>
+  <ApiField name="max_steps" type="int | None" defaultValue="None">Stop before dispatching more than this many pipeline steps.</ApiField>
 </ApiFields></ApiSection>
 
 </ApiReference>
@@ -342,12 +346,16 @@ Dispatch to one developer-approved target using a route decision already written
 <ApiReference kind="class" path="protolink.flows.Graph" signature={`Graph(
     client: AgentClient | None = None,
     registry: Registry | RegistryClient | None = None,
+    *, max_iterations: int = 50,
+    max_node_visits: int | dict[str, int] | None = None,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py">
 Create an initially empty named state machine. Nodes, edges, and entry point are added separately; <code>"__END__"</code> is reserved as the terminal destination.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Graph constructor parameters">
   <ApiField name="client" type="AgentClient | None" defaultValue="None">Remote-node client.</ApiField>
   <ApiField name="registry" type="Registry | RegistryClient | None" defaultValue="None">Optional node-name resolver.</ApiField>
+  <ApiField name="max_iterations" type="int" defaultValue="50">Total node-dispatch bound.</ApiField>
+  <ApiField name="max_node_visits" type="int | dict[str, int] | None" defaultValue="None">Common or per-node visit limit, including application repair attempts.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Attributes"><ApiFields ariaLabel="Graph attributes">

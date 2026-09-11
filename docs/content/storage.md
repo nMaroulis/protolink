@@ -8,6 +8,8 @@ import ApiReference, {
 
 # Storage
 
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+
 ProtoLink provides pluggable storage for Agent state, process-local caches, and
 durable execution records. Persistence depends on the selected backend:
 `SQLiteStorage` survives restarts, while `InMemoryStorage` intentionally does

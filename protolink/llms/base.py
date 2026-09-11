@@ -1295,7 +1295,19 @@ class LLM(ABC):
                             "action_id": action_id,
                         }
                     )
-                    tool_result = await tool(**tool_args)
+                    if callable(getattr(tool, "execute_authorized", None)):
+                        from protolink.core.execution import ToolExecution, execute_authorized_tool
+
+                        if authorization is None:
+                            raise RuntimeError("Prepared tools require an action authorizer")
+                        tool_result = await execute_authorized_tool(
+                            tool,
+                            ToolExecution(authorization, active_context, active_budget_enforcer, cancellation_token),
+                        )
+                    else:
+                        if cancellation_token is not None:
+                            cancellation_token.raise_if_cancelled()
+                        tool_result = await tool(**tool_args)
                 except ActionPolicyError:
                     raise
                 except BudgetExceededError:

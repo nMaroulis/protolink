@@ -171,6 +171,11 @@ class RunEvent:
             A normalized run event that preserves the original event dictionary in ``payload``.
         """
         payload = _event_to_dict(event)
+        if "version" in payload and "payload" in payload and "event_id" in payload:
+            normalized = cls.from_dict(payload)
+            if sequence is not None:
+                normalized.sequence = sequence
+            return normalized
         source_type = str(payload.get("type") or "run.event")
         event_type = _normalized_event_type(source_type, payload)
         payload = _promote_runtime_payload(payload)

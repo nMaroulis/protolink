@@ -4,6 +4,7 @@ from protolink.models import Task
 from protolink.types import FlowTarget
 
 from .base import Flow
+from .limits import WorkflowLimitError, workflow_execution
 
 
 class Pipeline(Flow):
@@ -28,6 +29,8 @@ class Pipeline(Flow):
         steps: list[FlowTarget] | None = None,
         client: AgentClient | None = None,
         registry: Registry | RegistryClient | None = None,
+        *,
+        max_steps: int | None = None,
     ) -> None:
         """Initialize the linear pipeline with a sequence of steps.
 
@@ -37,9 +40,14 @@ class Pipeline(Flow):
             client: An optional `AgentClient` for making remote calls. If omitting and making
                 remote calls, it will attempt to infer from the registry.
             registry: Optional registry configuration to discover string-based agents by name.
+            max_steps: Optional traversal ceiling checked before dispatching another step.
+                This is separate from the shared native RunBudget step counter.
         """
         super().__init__(client=client, registry=registry)
         self.steps = steps or []
+        if max_steps is not None and max_steps < 0:
+            raise ValueError("max_steps cannot be negative")
+        self.max_steps = max_steps
 
     def add_step(self, step: FlowTarget) -> "Pipeline":
         """Add a step to the pipeline.
@@ -53,6 +61,7 @@ class Pipeline(Flow):
         self.steps.append(step)
         return self
 
+    @workflow_execution
     async def execute(self, task: Task) -> Task:
         """Execute the task sequentially through the defined steps.
 
@@ -71,6 +80,8 @@ class Pipeline(Flow):
         current_task = task
 
         for idx, step in enumerate(self.steps):
+            if self.max_steps is not None and idx >= self.max_steps:
+                raise WorkflowLimitError(limit=self.max_steps, observed=idx + 1)
             # Check if there is a subsequent target step
             next_target = None
             if idx + 1 < len(self.steps):
@@ -86,5 +97,7 @@ class Pipeline(Flow):
                 current_task.flow_state["prompt"] = await self._build_flow_prompt(is_final=True)
 
             current_task = await self._execute_target(step, current_task)
+            if current_task.state.value in {"failed", "canceled", "input_required"}:
+                return current_task
 
         return current_task

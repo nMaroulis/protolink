@@ -8,10 +8,13 @@ dataset URI, ticket collection, or any other application boundary.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from protolink.utils import utc_now
 from protolink.utils.id_generator import IDGenerator
+
+if TYPE_CHECKING:
+    from protolink.core.budget import BudgetEnforcer
 
 RUN_CONTEXT_METADATA_KEY = "run_context"
 """Task metadata key used to store the serialized ``RunContext``."""
@@ -21,8 +24,10 @@ RUN_CONTEXT_METADATA_KEY = "run_context"
 class RunBudget:
     """Optional execution limits carried with a run.
 
-    Budgets are advisory runtime metadata. They provide a stable typed container that applications and custom policies
-    can read, render, or enforce without inventing their own task metadata shape.
+    Native task/tool execution and bounded structured flows enforce these limits.
+    Applications and custom policies can also inspect them without inventing a
+    task metadata shape. Serialized budgets carry limits, not suspended execution
+    counters or distributed atomic accounting state.
 
     Attributes:
         max_steps: Maximum logical runtime steps allowed for the run.
@@ -126,6 +131,7 @@ class RunContext:
     cancel_reason: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: utc_now())
+    _tool_budget: BudgetEnforcer | None = field(default=None, init=False, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the context into a JSON-compatible dictionary."""

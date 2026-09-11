@@ -32,6 +32,7 @@ class RunReport:
         final_task: Serialized final task payload, when available.
         metadata: Application-owned report metadata.
         created_at: ISO timestamp for report creation.
+        validations: Structured acceptance results extracted from native validation events.
     """
 
     context: RunContext | None = None
@@ -44,6 +45,14 @@ class RunReport:
     final_task: dict[str, Any] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: utc_now())
+    validations: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+
+    @classmethod
+    def from_task(cls, task: Any) -> RunReport:
+        """Build a report from native task receipts without replaying execution."""
+        return cls.from_events(
+            task.metadata.get("run_events", []), context=RunContext.from_task(task), final_task=task.to_dict()
+        )
 
     @classmethod
     def from_events(
@@ -100,6 +109,11 @@ class RunReport:
             metrics=tuple(metrics),
             final_task=report_final_task,
             metadata=dict(metadata or {}),
+            validations=tuple(
+                event.payload["validation"]
+                for event in normalized
+                if event.type == "validation.completed" and isinstance(event.payload.get("validation"), dict)
+            ),
         )
 
     def to_dict(self, *, redaction_policy: RedactionPolicy | None = None) -> dict[str, Any]:
@@ -119,6 +133,7 @@ class RunReport:
             "final_task": self.final_task,
             "metadata": self.metadata,
             "created_at": self.created_at,
+            "validations": list(self.validations),
         }
         if redaction_policy is not None:
             return redaction_policy.redact(data)
@@ -139,6 +154,7 @@ class RunReport:
             final_task=dict(data["final_task"]) if isinstance(data.get("final_task"), dict) else None,
             metadata=dict(data.get("metadata") or {}),
             created_at=str(data.get("created_at") or utc_now()),
+            validations=tuple(_dict_items(data.get("validations"))),
         )
 
     def redacted(self, policy: RedactionPolicy | None = None) -> RunReport:

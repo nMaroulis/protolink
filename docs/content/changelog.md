@@ -34,10 +34,53 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.7.0] - 2026-09-11
+
+:::note Latest Release
+
+**ProtoLink 0.7.0 provides a more complete execution engine for agent applications**, bringing command execution, recoverable file changes, managed agent groups, approval lifecycles, and completion checks into the existing runtime. These capabilities are particularly useful for coding agents that need to run commands, edit files, request permission, and verify results. The same building blocks support research assistants, data processing, and operational automation. Applications continue to define their own roles, models, domain knowledge, workflows, and interfaces.
+
+Command tools now prepare the exact argument array, working directory, environment, limits, and execution boundary before authorization. Output streams through native events, and typed results expose exit status, truncation, timeout, cancellation, and duration. Execution limits and subprocess cleanup give applications control over long-running work. A command agent can run without an LLM, and a small backend interface allows applications to supply other execution environments. The first-party local backend runs on the host and does not provide sandbox isolation.
+
+Filesystem tools add a recoverable path from a proposed change to an applied edit and, when needed, an approved restoration. Diff previews are bound to the resolved target and its actual preimage. Original bytes and permission modes are saved before mutation, stale approvals are rejected, and restoration refuses to overwrite a resource that has changed since the edit. Recovery records distinguish applied, restored, failed, and uncertain changes, preserving the information needed to inspect interrupted work.
+
+The reusable approval broker handles multiple pending requests, correlates decisions with the exact prepared action, and releases waits on cancellation or expiration. Application adapters supply authentication and presentation while ProtoLink tracks the approval lifecycle. Reconnecting clients can inspect pending requests and prior decisions without executing an action again. Approval remains separate from proof of execution, and interrupted effects remain explicitly uncertain.
+
+Embedded applications can manage owned agents with `AgentGroup`, including readiness checks, cleanup after partial startup, and shutdown of active runs. `RunHandle` exposes typed events, cancellation, a normalized final result, and the existing `RunReport`, reducing the need for applications to reconstruct outcomes from transport-specific stream shapes. Local invocation and the existing network transports share these runtime facilities.
+
+Completion checks let applications define success using task and tool outcomes, artifacts, and resource revisions. Evidence becomes stale when its referenced resource changes. Configurable Graph and Pipeline limits bound workflow iterations and repair attempts, while denied actions and uncertain transport failures are never automatically replayed. These additions reuse ProtoLink's policies, budgets, cancellation, storage, reports, and flows, preserve the `Agent` constructor, and add no base-package dependencies.
+
+:::
+
+### Added
+
+- Optional `process_tool()` with a small `ExecutionBackend` interface and local host implementation. Commands use explicit argv, cwd, environment, and limits; prepared artifacts pass through native authorization. Typed results and events retain bounded output, exit status, timeout/cancellation details, and duration. POSIX process groups are cleaned up; host execution is explicitly not a sandbox.
+- `PreparedTool` and `ToolExecution` for optional tools that execute their exact authorized preparation, including native budget, cancellation, task correlation, and event access. Existing callable tools retain their contract.
+- `AgentGroup` for owned/external resource lifecycle, readiness, partial-start rollback, and shutdown. `RunHandle` normalizes local and transported task events, final results, cancellation, and existing `RunReport`/`RunStore` integration without replaying uncertain operations.
+- `ApprovalBroker` with scoped request inspection, exact prepared-action fingerprints, simultaneous approvals, explicit resolution outcomes, cancellation/expiry, reconnectable subscriptions, and optional existing Storage persistence. Orphan requests are inspection-only uncertainty records.
+- Optional `filesystem_tools()` for create, replace, preview, and separately authorized restoration. POSIX descriptor-relative access rejects symlinks and stale preimages; dedicated checkpoints preserve original bytes/modes before atomic mutation. Recovery conflicts and interrupted writes remain explicit. Added small resource/revision/checkpoint interfaces and `StorageCheckpointStore`.
+- `CompletionCheck`, `CompletionValidator`, typed evidence/outcomes, and resource-dependent `ValidationResult` records. Native events, reports, and report comparisons retain acceptance results; approval-only evidence cannot prove execution, and changed revisions invalidate checks.
+- Configurable Graph total/per-node visit limits and Pipeline step limits, shared native budgets across nested bounded workflows, and structured `WorkflowLimitError` blockers. Repair limits are independent of transport retries.
+- Five provider-free examples and an execution/recovery guide with public API contracts, ownership rules, migration guidance, and platform/recovery limits.
+
+### Changed
+
+- Direct tool dispatch enforces native budgets and emits action lifecycle receipts. Repeated calls with the same live `RunContext` share tool counters; delegated tool dispatch also counts against its parent's tool limit. Active task permissions propagate to nested direct tool calls.
+- Structured flows use separate node task identities while preserving the enclosing task ID, partial results, and live cancellation; they stop on failed, canceled, or input-required tasks. Existing default Graph iteration limits and callable/delegation signatures are preserved.
+- Aligned runtime metadata and documentation versions for 0.7.0.
+
+### Fixed
+
+- Native task submission keeps response deduplication but disables automatic transport retries; a lost response cannot prove a side effect did not occur. Request/response transports return structured task policy/budget failures.
+- Approval callbacks cannot silently mutate prepared arguments or artifacts after they have been presented for authorization.
+- Partially failed server startup now attempts transport cleanup before propagating the startup failure.
+- Direct and streaming policy/budget failures retain structured task blockers instead of requiring applications to interpret error prose.
+- Closing a task stream promptly closes its nested execution and subprocesses. Streaming budgets remain scoped to execution even when a consumer closes the stream from another asyncio task on Python 3.11.
+
 ## [0.6.9] - 2026-09-03
 
 
-:::note Latest Release
+:::note Release Summary
 
 This release adds Protolink Studio and simplifies the path from a typed Python function to a local agent. It also makes convenience-call failures explicit, completes the blocking task and tool APIs, and ships type metadata with the package.
 
@@ -79,7 +122,7 @@ Successful explicit tool calls through `invoke(..., part_type="tool_call")` stil
 
 ## [0.6.8] - 2026-07-30
 
-:::note Release summary
+:::note Release Summary
 
 This patch release introduces first-party **Retrieval-Augmented Generation
 (RAG)**, a deterministic **infer-loop benchmark** for evaluating model
@@ -145,7 +188,7 @@ compare, and improve.
 
 ## [0.6.7] - 2026-07-27
 
-:::note Release summary
+:::note Release Summary
 
 This patch release hardens the controlled inference path from task admission through provider calls, tool execution,
 delegation, streaming finalization, and observability. It keeps the portable JSON action protocol as the default for
@@ -272,7 +315,7 @@ behavior more deterministic. Adds vLLM client support natively. Fixes Local Tele
 
 ## [0.6.6] - 2026-07-17
 
-:::note Release summary
+:::note Release Summary
 
 This release adds normalized run-report regression diffing, a small opt-in built-in tool set, and an explicit
 description of ProtoLink's A2A architecture without replacing its small Python runtime API.

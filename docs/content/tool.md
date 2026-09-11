@@ -8,6 +8,8 @@ import ApiReference, {
 
 # Tools
 
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+
 Tools extend agent capabilities with additional functions. They enable LLMs and agents to interact with external systems, execute code, access data, and perform specialized tasks that go beyond pure text generation.
 
 ## Overview

@@ -11,6 +11,8 @@ from protolink.tools.tool import Tool
 
 from .calculator import calculator
 from .clock import current_datetime
+from .filesystem import filesystem_tools
+from .process import process_tool
 from .web import fetch_url, web_search
 
 _BUILTIN_FACTORIES: dict[str, Callable[[], Tool]] = {
@@ -33,5 +35,7 @@ __all__ = [
     "calculator",
     "current_datetime",
     "fetch_url",
+    "filesystem_tools",
+    "process_tool",
     "web_search",
 ]

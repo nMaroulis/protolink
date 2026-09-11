@@ -121,7 +121,7 @@ class AgentServer:
                 name="task",
                 path="/tasks/",
                 method="POST",
-                handler=self._agent.run_task,
+                handler=self._run_task_response,
                 request_source="body",
                 request_parser=Task.from_dict,
             ),
@@ -257,6 +257,20 @@ class AgentServer:
             ]
             self._transport.setup_routes(chat_endpoints)
 
+    async def _run_task_response(self, task: Task) -> Task:
+        """Return structured runtime denials/budget failures across request-response transports."""
+        from protolink.core.budget import BudgetExceededError
+        from protolink.core.execution import record_task_blocker
+        from protolink.core.policy import ActionPolicyError
+
+        try:
+            return await self._agent.run_task(task)
+        except (ActionPolicyError, BudgetExceededError) as exc:
+            await record_task_blocker(task, exc)
+            if not task.is_terminal:
+                task.fail(str(exc))
+            return task
+
     async def start(self) -> None:
         """Start the agent server.
 
@@ -271,7 +285,11 @@ class AgentServer:
             return
 
         self._build_endpoints()
-        await self._transport.start()
+        try:
+            await self._transport.start()
+        except BaseException:
+            await self._transport.stop()
+            raise
         self._is_running = True
 
     async def stop(self) -> None:

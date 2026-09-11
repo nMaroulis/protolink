@@ -1050,7 +1050,10 @@ class AgentToolMixin(_AgentMixinBase):
         tool = self.tools.get(tool_name, None)
         if not tool:
             raise ValueError(f"Tool {tool_name} not found")
-        context = RunContext(agent_chain=[self.card.name])
+        from protolink.core.execution import current_task
+
+        task = current_task()
+        context = RunContext.from_task(task) if task is not None else RunContext(agent_chain=[self.card.name])
         return await self.call_tool_in_context(tool_name, context, **kwargs)
 
     async def call_tool_in_context(
@@ -1075,8 +1078,22 @@ class AgentToolMixin(_AgentMixinBase):
         tool = self.tools.get(tool_name)
         if not tool:
             raise ValueError(f"Tool {tool_name} not found")
-        _, call_args = await self._authorize_tool_action(tool, kwargs, context)
-        return await tool(**call_args)
+        from protolink.agents.engine import _current_task_budget
+        from protolink.core.budget import BudgetEnforcer, BudgetExceededError
+        from protolink.core.execution import ToolExecution, current_task, execute_authorized_tool
+
+        budget = _current_task_budget(None) or getattr(context, "_tool_budget", None) or BudgetEnforcer(context)
+        context._tool_budget = budget
+        decision = budget.check_next_step()
+        if not decision.allowed:
+            raise BudgetExceededError(decision)
+        authorization, _ = await self._authorize_tool_action(tool, kwargs, context)
+        decision = budget.check_tool_call()
+        if not decision.allowed:
+            raise BudgetExceededError(decision)
+        task = current_task()
+        token = self.get_cancellation_token(task.id) if task else None
+        return await execute_authorized_tool(tool, ToolExecution(authorization, context, budget, token))
 
     async def authorize_action(
         self,

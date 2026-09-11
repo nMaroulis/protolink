@@ -36,6 +36,7 @@ const sidebars = {
         'models',
         'registry',
         'runtime',
+        'execution-tools',
         'server',
         'state',
         'storage',

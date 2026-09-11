@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from abc import ABC, abstractmethod
 
 from protolink.client import AgentClient, RegistryClient
@@ -180,6 +181,7 @@ class Flow(ABC):
             or agent_name_or_url.startswith("ws://")
             or agent_name_or_url.startswith("wss://")
             or agent_name_or_url.startswith("runtime://")
+            or agent_name_or_url.startswith("grpc://")
         ):
             return agent_name_or_url
 
@@ -234,7 +236,38 @@ class Flow(ABC):
             RuntimeError: If remote execution is requested but no client/registry is available.
         """
         from protolink.agents.base import Agent
+        from protolink.core.budget import BudgetExceededError
+        from protolink.core.execution import current_task, current_workflow_budget, emit_runtime_event
+        from protolink.core.run_context import RunContext
+        from protolink.flows.limits import merge_node_result
         from protolink.models import Message
+        from protolink.utils.id_generator import IDGenerator
+
+        context = RunContext.ensure_task_context(task)
+        if context.canceled or task.state.value == "canceled":
+            raise asyncio.CancelledError(context.cancel_reason)
+        budget = current_workflow_budget()
+        if budget is not None:
+            decision = budget.check_next_step()
+            if not decision.allowed:
+                raise BudgetExceededError(decision)
+        if task.state.value in {"failed", "input_required"}:
+            return task
+        enclosing_task = current_task() if budget is not None else None
+        if budget is not None or task.state.value == "completed":
+            # Each completed agent task is immutable lifecycle history. Continue
+            # the workflow with a fresh task ID, retaining accumulated evidence.
+            data = copy.deepcopy(task.to_dict())
+            data.update(id=IDGenerator.generate_task_id(), state="submitted")
+            task = Task.from_dict(data)
+        target_name = (
+            target.card.name
+            if isinstance(target, Agent)
+            else target
+            if isinstance(target, str)
+            else type(target).__name__
+        )
+        await emit_runtime_event("workflow.node.started", context, target=target_name)
 
         # --- Flow Transition Bridge ---
         # When a flow step completes, its output is a Part of type "infer_output" (or "text", etc.).
@@ -262,22 +295,38 @@ class Flow(ABC):
                     if content is not None:
                         task.add_message(Message.infer(prompt=str(content)))
 
-        if isinstance(target, Flow):
-            # Propagate client/registry if missing in the nested flow
-            if target.client is None:
-                target.client = self.client
-            if target.registry_client is None:
-                target.registry_client = self.registry_client
-            return await target.execute(task)
-        elif isinstance(target, Agent):
-            return await target.handle_task(task)
-        elif isinstance(target, str):
-            self._ensure_client()
-            url = await self._resolve_agent_url(target)
-            assert self.client is not None
-            return await self.client.send_task(url, task)
-        else:
-            raise ValueError(f"Invalid execution target type: {type(target)}")
+        result = task
+        try:
+            if isinstance(target, Flow):
+                if target.client is None:
+                    target.client = self.client
+                if target.registry_client is None:
+                    target.registry_client = self.registry_client
+                result = await target.execute(task)
+            elif isinstance(target, Agent):
+                result = await target.run_task(task)
+            elif isinstance(target, str):
+                self._ensure_client()
+                url = await self._resolve_agent_url(target)
+                assert self.client is not None
+                try:
+                    result = await self.client.send_task(url, task)
+                except asyncio.CancelledError:
+                    cancellation = asyncio.create_task(
+                        self.client.cancel_task(url, task.id, reason="Workflow canceled")
+                    )
+                    try:
+                        await asyncio.wait_for(asyncio.shield(cancellation), timeout=2.0)
+                    except (Exception, asyncio.CancelledError):
+                        cancellation.cancel()
+                        await asyncio.gather(cancellation, return_exceptions=True)
+                    raise
+            else:
+                raise ValueError(f"Invalid execution target type: {type(target)}")
+            return result
+        finally:
+            if enclosing_task is not None and enclosing_task is not result:
+                merge_node_result(enclosing_task, result)
 
 
 class SyncFlow:

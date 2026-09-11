@@ -54,6 +54,15 @@ from protolink.core import (
     diff_run_reports,
     normalize_run_report,
 )
+from protolink.core.approvals import ApprovalBroker, ApprovalScope
+from protolink.core.resources import ResourceConflictError, ResourceRevision, StorageCheckpointStore
+from protolink.core.validation import (
+    CompletionCheck,
+    CompletionEvidence,
+    CompletionValidator,
+    ToolOutcome,
+    ValidationResult,
+)
 from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
 from protolink.llms import (
     ContextItem,
@@ -76,6 +85,7 @@ from protolink.rag import (
     SearchHit,
     create_knowledge,
 )
+from protolink.runtime import AgentGroup, RunHandle, RunResult
 from protolink.security import TLSConfig
 from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import RunReportRecord, RunStore, SQLiteRunStore, TaskRecord
@@ -103,12 +113,15 @@ __all__ = [
     "ActionPolicyError",
     "Agent",
     "AgentCard",
+    "AgentGroup",
     "AgentInterface",
     "AgentSkill",
+    "ApprovalBroker",
     "ApprovalDecision",
     "ApprovalHandler",
     "ApprovalRequest",
     "ApprovalRequiredError",
+    "ApprovalScope",
     "Artifact",
     "BaseTool",
     "BudgetDecision",
@@ -120,6 +133,9 @@ __all__ = [
     "CancellationToken",
     "CapabilityPolicy",
     "Citation",
+    "CompletionCheck",
+    "CompletionEvidence",
+    "CompletionValidator",
     "ContextItem",
     "ContextManifest",
     "Document",
@@ -145,12 +161,15 @@ __all__ = [
     "PolicyEffect",
     "RAGAnswer",
     "RedactionPolicy",
+    "ResourceConflictError",
+    "ResourceRevision",
     "RetryPolicy",
     "Router",
     "RunAction",
     "RunBudget",
     "RunContext",
     "RunEvent",
+    "RunHandle",
     "RunRecorder",
     "RunReplay",
     "RunReport",
@@ -162,12 +181,14 @@ __all__ = [
     "RunReportSection",
     "RunReportSource",
     "RunReportTolerance",
+    "RunResult",
     "RunStore",
     "SQLiteRunStore",
     "SearchHit",
     "StateOperationRequest",
     "StateOperationResult",
     "StateStoreReport",
+    "StorageCheckpointStore",
     "TLSConfig",
     "Task",
     "TaskAlreadyRunningError",
@@ -179,6 +200,7 @@ __all__ = [
     "TaskRecord",
     "TaskState",
     "Tool",
+    "ToolOutcome",
     "TransportConfig",
     "TransportConnectionError",
     "TransportError",
@@ -188,6 +210,7 @@ __all__ = [
     "TransportProtocolError",
     "TransportRemoteError",
     "TransportTimeoutError",
+    "ValidationResult",
     "__version__",
     "assert_budget_under",
     "assert_no_denied_actions",

@@ -6,6 +6,7 @@ from protolink.models import Task
 from protolink.types import FlowTarget
 
 from .base import Flow
+from .limits import WorkflowLimitError, workflow_execution
 
 
 class Graph(Flow):
@@ -25,14 +26,27 @@ class Graph(Flow):
         self,
         client: AgentClient | None = None,
         registry: Registry | RegistryClient | None = None,
+        *,
+        max_iterations: int = 50,
+        max_node_visits: int | dict[str, int] | None = None,
     ) -> None:
         """Initialize an empty Graph.
 
         Args:
             client: Optional `AgentClient` for executing remote pathing.
             registry: Optional registry configuration for mapping agent discovery.
+            max_iterations: Total dispatch ceiling; defaults to the existing 50-visit bound.
+            max_node_visits: Optional per-node mapping or common visit ceiling.
+                Use a named repair node's limit to bound application repair cycles.
         """
         super().__init__(client=client, registry=registry)
+        if max_iterations <= 0:
+            raise ValueError("max_iterations must be positive")
+        limits = max_node_visits.values() if isinstance(max_node_visits, dict) else [max_node_visits]
+        if any(limit is not None and limit < 0 for limit in limits):
+            raise ValueError("max_node_visits cannot be negative")
+        self.max_iterations = max_iterations
+        self.max_node_visits = dict(max_node_visits) if isinstance(max_node_visits, dict) else max_node_visits
 
         self.nodes: dict[str, FlowTarget] = {}
 
@@ -125,6 +139,7 @@ class Graph(Flow):
         self.entry_point = node_name
         return self
 
+    @workflow_execution
     async def execute(self, task: Task) -> Task:
         """Execute the graph traversal sequence based on connections and state logic.
 
@@ -149,15 +164,20 @@ class Graph(Flow):
         current_task = task
 
         iteration_count = 0
-        max_iterations = 50  # Prevents absolute infinite loops blindly locking the system
+        visits: dict[str, int] = {}
 
         while current_node_name != self.finish_point:
             iteration_count += 1
-            if iteration_count > max_iterations:
-                raise RuntimeError(
-                    f"Graph depth exceeded safety threshold of {max_iterations} iterations. "
-                    "You may have an infinite loop in your edge configuration."
-                )
+            if iteration_count > self.max_iterations:
+                raise WorkflowLimitError(limit=self.max_iterations, observed=iteration_count)
+            visits[current_node_name] = visits.get(current_node_name, 0) + 1
+            limit = (
+                self.max_node_visits.get(current_node_name)
+                if isinstance(self.max_node_visits, dict)
+                else self.max_node_visits
+            )
+            if limit is not None and visits[current_node_name] > limit:
+                raise WorkflowLimitError(limit=limit, observed=visits[current_node_name], node=current_node_name)
 
             self._logger.info(f"Graph orchestrating node: [{current_node_name}]")
             target = self.nodes[current_node_name]
@@ -178,6 +198,8 @@ class Graph(Flow):
                 current_task.flow_state.clear()
 
             current_task = await self._execute_target(target, current_task)
+            if current_task.state.value in {"failed", "canceled", "input_required"}:
+                return current_task
 
             # Determine the subsequent destination
             if current_node_name in self.edges:

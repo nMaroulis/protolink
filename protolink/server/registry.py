@@ -143,7 +143,11 @@ class RegistryServer:
         if self._is_running:
             return
         self._build_endpoints()
-        await self._transport.start()
+        try:
+            await self._transport.start()
+        except BaseException:
+            await self._transport.stop()
+            raise
         self._is_running = True
 
     async def stop(self) -> None:

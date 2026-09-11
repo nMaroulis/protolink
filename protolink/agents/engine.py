@@ -16,6 +16,15 @@ from typing import Any
 from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError
 from protolink.core.cancellation import ActiveTaskExecution, CancellationToken, mark_task_canceled
+from protolink.core.execution import (
+    ToolExecution,
+    closing_stream,
+    execute_authorized_tool,
+    execution_scope,
+    record_task_blocker,
+    stream_runtime_events,
+    suppress_runtime_events,
+)
 from protolink.core.policy import (
     ActionAuthorization,
     ActionDeniedError,
@@ -47,7 +56,9 @@ def _activate_task_budget(task: Task, context: RunContext) -> Token[_TaskBudgetS
     current = _active_task_budget.get()
     if current is not None and current[0] == task.id:
         return None
-    return _active_task_budget.set((task.id, BudgetEnforcer(context)))
+    from protolink.core.execution import current_workflow_budget
+
+    return _active_task_budget.set((task.id, current_workflow_budget() or BudgetEnforcer(context)))
 
 
 def _deactivate_task_budget(token: Token[_TaskBudgetScope | None] | None) -> None:
@@ -65,6 +76,35 @@ def _current_task_budget(task: Task | None) -> BudgetEnforcer | None:
     if task is None or task.id == task_id:
         return enforcer
     return None
+
+
+async def _budgeted_task_stream(source: AsyncIterator[Any], task: Task, context: RunContext) -> AsyncIterator[Any]:
+    """Keep one budget without leaking context variables across consumer yields.
+
+    Consumers may advance or close a generator from another asyncio task (for
+    example with ``wait_for``). Each advancement therefore owns its own token.
+    """
+    from protolink.core.execution import current_workflow_budget
+
+    budget = _current_task_budget(task) or current_workflow_budget() or BudgetEnforcer(context)
+    try:
+        while True:
+            token = _active_task_budget.set((task.id, budget))
+            try:
+                event = await anext(source)
+            except StopAsyncIteration:
+                return
+            finally:
+                _active_task_budget.reset(token)
+            yield event
+    finally:
+        token = _active_task_budget.set((task.id, budget))
+        try:
+            close = getattr(source, "aclose", None)
+            if close is not None:
+                await close()
+        finally:
+            _active_task_budget.reset(token)
 
 
 def _accepts_keyword_argument(callback: Any, name: str) -> bool:
@@ -100,7 +140,8 @@ class AgentExecutionMixin(_AgentMixinBase):
         budget_token = _activate_task_budget(task, context)
         try:
             self._raise_if_execution_canceled(task, execution.token)
-            result = await self.handle_task(task)
+            with execution_scope(task):
+                result = await self.handle_task(task)
             self._persist_task_snapshot(result)
             return result
         except asyncio.CancelledError as exc:
@@ -111,6 +152,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 raise
             return task
         except Exception as exc:
+            await record_task_blocker(task, exc)
             if not task.is_terminal:
                 task.fail(str(exc))
             self._persist_task_snapshot(task)
@@ -144,11 +186,11 @@ class AgentExecutionMixin(_AgentMixinBase):
             default_session_id=task.metadata.get("session_id", task.id),
             agent_name=self.card.name,
         )
-        budget_token = _activate_task_budget(task, context)
         try:
             self._raise_if_execution_canceled(task, execution.token)
-            async for event in self.handle_task_streaming(task):
-                yield event
+            async with closing_stream(_budgeted_task_stream(self.handle_task_streaming(task), task, context)) as stream:
+                async for event in stream:
+                    yield event
         except asyncio.CancelledError as exc:
             protocol_cancellation = execution.token.is_cancelled
             mark_task_canceled(task, self._cancellation_reason(exc, execution.token))
@@ -160,7 +202,6 @@ class AgentExecutionMixin(_AgentMixinBase):
             if not task.is_terminal:
                 mark_task_canceled(task, "Streaming consumer closed before task completion")
             self._persist_task_snapshot(task)
-            _deactivate_task_budget(budget_token)
             if owner:
                 self._task_executions.unregister(task.id, execution.execution_task)
 
@@ -254,13 +295,17 @@ class AgentExecutionMixin(_AgentMixinBase):
             default_session_id=task.metadata.get("session_id", task.id),
             agent_name=self.card.name,
         )
-        budget_token = _activate_task_budget(task, context)
         try:
             self._raise_if_execution_canceled(task, execution.token)
             if self.telemetry:
                 await self._emit_telemetry("on_task_start", task, self.card.name)
-            async for event in self._handle_task_streaming_impl(task, execution.token):
-                yield event
+            async with closing_stream(
+                _budgeted_task_stream(
+                    stream_runtime_events(self._handle_task_streaming_impl(task, execution.token), task), task, context
+                )
+            ) as stream:
+                async for event in stream:
+                    yield event
         except asyncio.CancelledError as exc:
             protocol_cancellation = execution.token.is_cancelled
             mark_task_canceled(task, self._cancellation_reason(exc, execution.token))
@@ -274,7 +319,6 @@ class AgentExecutionMixin(_AgentMixinBase):
                 self._persist_task_snapshot(task)
             if self.telemetry:
                 await self._emit_telemetry("on_task_end", task, task, self.card.name)
-            _deactivate_task_budget(budget_token)
             if owner:
                 self._task_executions.unregister(task.id, execution.execution_task)
 
@@ -397,6 +441,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 metadata={"task": task.to_dict()},
             )
         except Exception as e:
+            await record_task_blocker(task, e)
             previous_state = self._state_value(task.state)
             if not task.is_terminal:
                 task.fail(str(e))
@@ -742,7 +787,8 @@ class AgentExecutionMixin(_AgentMixinBase):
         budget_token = _activate_task_budget(task, context)
         try:
             self._raise_if_execution_canceled(task, execution.token)
-            result = await self._execute_task_impl(task, execution.token)
+            with execution_scope(task):
+                result = await self._execute_task_impl(task, execution.token)
             self._persist_task_snapshot(result)
             return result
         except asyncio.CancelledError as exc:
@@ -817,6 +863,7 @@ class AgentExecutionMixin(_AgentMixinBase):
 
             self._finalize_task_state(task, outputs)
         except Exception as exc:
+            await record_task_blocker(task, exc)
             if not task.is_terminal:
                 task.fail(str(exc))
             raise
@@ -994,12 +1041,15 @@ class AgentExecutionMixin(_AgentMixinBase):
             await self._emit_telemetry("on_tool_start", tool_name, args)
 
         try:
-            _, call_args = await self._authorize_tool_action(tool, args, context)
+            authorization, _ = await self._authorize_tool_action(tool, args, context)
             if active_token is not None:
                 active_token.raise_if_cancelled()
             self._enforce_budget_decision(active_budget_enforcer.evaluate())
             self._enforce_budget_decision(active_budget_enforcer.check_tool_call())
-            result = await tool(**call_args)
+            with execution_scope(task):
+                result = await execute_authorized_tool(
+                    tool, ToolExecution(authorization, context, active_budget_enforcer, active_token)
+                )
             post_action_decision = active_budget_enforcer.evaluate()
             if not post_action_decision.allowed:
                 # Runtime is a dispatch boundary, not a retroactive verdict on
@@ -1244,16 +1294,17 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         async def authorize_inference_action(action: RunAction) -> ActionAuthorization:
             """Prepare tool actions and enforce this agent's runtime policy."""
-            if action.kind == "tool.call":
-                tool = self.tools.get(action.name)
-                if tool is None:
-                    raise ValueError(f"Tool {action.name} not found")
-                arguments = action.payload.get("arguments", {})
-                if not isinstance(arguments, dict):
-                    raise TypeError("Tool action payload.arguments must be a dictionary")
-                authorization, _ = await self._authorize_tool_action(tool, arguments, active_context)
-                return authorization
-            return await self.authorize_action(action, active_context)
+            with suppress_runtime_events():
+                if action.kind == "tool.call":
+                    tool = self.tools.get(action.name)
+                    if tool is None:
+                        raise ValueError(f"Tool {action.name} not found")
+                    arguments = action.payload.get("arguments", {})
+                    if not isinstance(arguments, dict):
+                        raise TypeError("Tool action payload.arguments must be a dictionary")
+                    authorization, _ = await self._authorize_tool_action(tool, arguments, active_context)
+                    return authorization
+                return await self.authorize_action(action, active_context)
 
         async def handle_inference_agent_call(
             agent_name: str,
@@ -1686,6 +1737,10 @@ class AgentExecutionMixin(_AgentMixinBase):
                 )
             )
 
+        class NativeSink:
+            async def emit(self, event: Any) -> None:
+                await queue.put(event)
+
         async def run_inference() -> None:
             explicit_budget_token = (
                 _active_task_budget.set((task.id if task is not None else "", budget_enforcer))
@@ -1693,13 +1748,14 @@ class AgentExecutionMixin(_AgentMixinBase):
                 else None
             )
             try:
-                part = await self.call_llm(
-                    infer_part,
-                    task=task,
-                    streaming=True,
-                    event_callback=emit,
-                    cancellation_token=cancellation_token,
-                )
+                with execution_scope(task, NativeSink()):
+                    part = await self.call_llm(
+                        infer_part,
+                        task=task,
+                        streaming=True,
+                        event_callback=emit,
+                        cancellation_token=cancellation_token,
+                    )
                 await queue.put({"__protolink_part__": part.to_dict()})
             except asyncio.CancelledError as exc:
                 await queue.put(exc)
@@ -1812,6 +1868,14 @@ class AgentExecutionMixin(_AgentMixinBase):
             args = payload.get("args", {})
             if not tool_name:
                 raise ValueError(f"tool_call agent_call must specify 'tool' field. Received payload: {payload}")
+            # A delegated tool is still a tool dispatch by the parent task.
+            # Charge before sending; the child also enforces its inherited limits.
+            active_budget = _current_task_budget(None)
+            if active_budget is None and parent_context is not None:
+                active_budget = parent_context._tool_budget or BudgetEnforcer(parent_context)
+                parent_context._tool_budget = active_budget
+            if active_budget is not None:
+                self._enforce_budget_decision(active_budget.check_tool_call())
             # Create task with tool_call part for the remote agent to execute
             task = Task.create(Message(role="agent", parts=[Part.tool_call(tool_name=tool_name, args=args)]))
             return await call_delegated_task(task)

@@ -8,6 +8,8 @@ import ApiReference, {
 
 # Runtime
 
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+
 Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part`, and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools, and any other agent application.
 
 The runtime layer does not replace transports, telemetry, storage, or structured flows. It gives them shared execution metadata, concrete action intents, policy and approval boundaries, and a normalized event stream.

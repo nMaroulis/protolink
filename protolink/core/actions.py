@@ -7,6 +7,8 @@ remote agents, and local applications use the same policy boundary.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -98,6 +100,18 @@ class RunAction:
             "metadata": self.metadata,
             "created_at": self.created_at,
         }
+
+    @property
+    def fingerprint(self) -> str:
+        """SHA-256 of the complete prepared action, including its previews.
+
+        Approval adapters use this digest with the request ID to reject stale
+        decisions. It is a correlation value, not an authentication credential.
+        """
+        from protolink.utils.serialization import Serializer
+
+        payload = json.dumps(Serializer.serialize_to_dict(self.to_dict()), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode()).hexdigest()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RunAction:

@@ -8,6 +8,8 @@ typed approval checkpoint for an application-provided handler.
 
 from __future__ import annotations
 
+import asyncio
+import copy
 import inspect
 import math
 from collections.abc import Awaitable, Callable, Mapping
@@ -495,21 +497,37 @@ class ActionAuthorizer:
             ActionDeniedError: The policy or approver denied the action.
             ApprovalRequiredError: Approval is required but no handler exists.
         """
-        decision = await self.policy.evaluate(action, context)
+        from protolink.core.execution import emit_runtime_event
+
+        if context.canceled:
+            raise asyncio.CancelledError(context.cancel_reason)
+        fingerprint = action.fingerprint
+        await emit_runtime_event("action.requested", context, action_id=action.action_id, action=action.to_dict())
+        decision = await self.policy.evaluate(copy.deepcopy(action), context.copy())
+        await emit_runtime_event("action.policy", context, action_id=action.action_id, decision=decision.to_dict())
         if decision.effect is PolicyEffect.DENY:
+            await emit_runtime_event("action.denied", context, action_id=action.action_id, decision=decision.to_dict())
             raise ActionDeniedError(action=action, decision=decision)
         if decision.effect is PolicyEffect.ALLOW:
             return ActionAuthorization(action=action, policy_decision=decision)
 
         request = ApprovalRequest(action=action, policy_decision=decision, run_id=context.run_id)
+        await emit_runtime_event("approval.required", context, action_id=action.action_id, request=request.to_dict())
         if self.approval_handler is None:
             raise ApprovalRequiredError(request)
 
-        handler_result = self.approval_handler(request, context)
+        handler_request = copy.deepcopy(request)
+        handler_result = self.approval_handler(handler_request, context.copy())
         if inspect.isawaitable(handler_result):
             handler_result = await handler_result
+        if handler_request.action.fingerprint != fingerprint or action.fingerprint != fingerprint:
+            raise ValueError("Prepared action changed while awaiting approval")
+        if context.canceled:
+            raise asyncio.CancelledError(context.cancel_reason)
         approval = _coerce_approval_decision(handler_result, request)
+        await emit_runtime_event("approval.decided", context, action_id=action.action_id, decision=approval.to_dict())
         if not approval.approved:
+            await emit_runtime_event("action.denied", context, action_id=action.action_id, decision=approval.to_dict())
             raise ActionDeniedError(
                 action=action,
                 decision=decision,
@@ -517,6 +535,7 @@ class ActionAuthorizer:
                 approval_decision=approval,
             )
 
+        await emit_runtime_event("action.approved", context, action_id=action.action_id, decision=approval.to_dict())
         return ActionAuthorization(
             action=action,
             policy_decision=decision,

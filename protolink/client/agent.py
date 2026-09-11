@@ -85,6 +85,7 @@ class AgentClient:
         response_parser=Task.from_dict,
         request_source="body",
         idempotent=True,
+        allow_retries=False,
     )
 
     AGENT_CARD_REQUEST = ClientRequestSpec(

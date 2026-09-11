@@ -401,7 +401,11 @@ class Transport(ABC):
     ) -> T:
         """Run an operation under the configured idempotent retry policy."""
         policy = self.config.retry
-        may_retry = request_spec.idempotent and request_spec.method.upper() in policy.retryable_methods
+        may_retry = (
+            request_spec.idempotent
+            and request_spec.allow_retries
+            and request_spec.method.upper() in policy.retryable_methods
+        )
         current = context
         started = time.perf_counter()
         last_error: TransportError | None = None
