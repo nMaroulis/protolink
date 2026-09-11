@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import threading
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
@@ -384,7 +385,7 @@ def test_dashboard_run_store_validation_rejects_missing_and_non_sqlite_files(tmp
 
 def test_read_only_run_store_rejects_sqlite_without_protolink_tables(tmp_path: Path):
     database = tmp_path / "other.db"
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection, connection:
         connection.execute("CREATE TABLE unrelated (id INTEGER PRIMARY KEY)")
     modified_at = database.stat().st_mtime_ns
 
@@ -416,7 +417,7 @@ def test_dashboard_trace_endpoints_page_detail_and_disable_caching(tmp_path: Pat
         RunReport.from_events([], context=report_context, final_task=report_task.to_dict()),
         agent_name="report_agent",
     )
-    with sqlite3.connect(store_path) as connection:
+    with closing(sqlite3.connect(store_path)) as connection, connection:
         connection.execute(
             """
             INSERT INTO protolink_run_reports
@@ -454,14 +455,16 @@ def test_dashboard_trace_endpoints_page_detail_and_disable_caching(tmp_path: Pat
 
         with pytest.raises(HTTPError) as invalid_limit:
             urlopen(f"{base_url}/api/traces?limit=not-an-integer", timeout=3)
-        assert invalid_limit.value.code == 400
-        assert invalid_limit.value.headers["Cache-Control"] == "no-store"
+        with invalid_limit.value as response:
+            assert response.code == 400
+            assert response.headers["Cache-Control"] == "no-store"
 
         hostile_request = Request(f"{base_url}/api/traces", headers={"Host": "attacker.example"})
         with pytest.raises(HTTPError) as hostile_host:
             urlopen(hostile_request, timeout=3)
-        assert hostile_host.value.code == 421
-        assert hostile_host.value.headers["Cache-Control"] == "no-store"
+        with hostile_host.value as response:
+            assert response.code == 421
+            assert response.headers["Cache-Control"] == "no-store"
 
         plain_post = Request(
             f"{base_url}/api/agents/ping",
@@ -471,7 +474,8 @@ def test_dashboard_trace_endpoints_page_detail_and_disable_caching(tmp_path: Pat
         )
         with pytest.raises(HTTPError) as unsupported_content_type:
             urlopen(plain_post, timeout=3)
-        assert unsupported_content_type.value.code == 415
+        with unsupported_content_type.value as response:
+            assert response.code == 415
 
         cross_origin_post = Request(
             f"{base_url}/api/agents/ping",
@@ -484,7 +488,8 @@ def test_dashboard_trace_endpoints_page_detail_and_disable_caching(tmp_path: Pat
         )
         with pytest.raises(HTTPError) as cross_origin:
             urlopen(cross_origin_post, timeout=3)
-        assert cross_origin.value.code == 403
+        with cross_origin.value as response:
+            assert response.code == 403
 
         invalid_utf8_post = Request(
             f"{base_url}/api/agents/ping",
@@ -530,14 +535,16 @@ def test_dashboard_trace_endpoints_page_detail_and_disable_caching(tmp_path: Pat
 
         with pytest.raises(HTTPError) as invalid_replay_kind:
             urlopen(f"{base_url}/api/runs/{shared_id}?kind=unknown", timeout=3)
-        assert invalid_replay_kind.value.code == 400
+        with invalid_replay_kind.value as response:
+            assert response.code == 400
 
         with pytest.raises(HTTPError) as malformed_replay:
             urlopen(f"{base_url}/api/runs/malformed_report?kind=report", timeout=3)
-        malformed_error = json.loads(malformed_replay.value.read())
-        assert malformed_replay.value.code == 422
-        assert "must be a JSON object" in malformed_error["error"]
-        assert len(malformed_error["error"]) <= 500
+        with malformed_replay.value as response:
+            malformed_error = json.loads(response.read())
+            assert response.code == 422
+            assert "must be a JSON object" in malformed_error["error"]
+            assert len(malformed_error["error"]) <= 500
 
         with urlopen(f"{base_url}/api/snapshot", timeout=3) as response:
             connected_snapshot = json.loads(response.read())
@@ -590,7 +597,8 @@ def test_invalid_registry_request_does_not_supersede_valid_inflight_connection(t
         )
         with pytest.raises(HTTPError) as invalid_source:
             urlopen(invalid_request, timeout=3)
-        assert invalid_source.value.code == 400
+        with invalid_source.value as response:
+            assert response.code == 400
 
         release_fetch.set()
         connect_thread.join(timeout=3)

@@ -7,6 +7,7 @@ import json
 import sqlite3
 import subprocess
 import webbrowser
+from contextlib import closing
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -670,7 +671,7 @@ def _validate_run_store_path(value: Any) -> Path:
     }
     try:
         uri = resolved.as_uri() + "?mode=ro"
-        with sqlite3.connect(uri, uri=True, timeout=2.0) as connection:
+        with closing(sqlite3.connect(uri, uri=True, timeout=2.0)) as connection:
             for table, expected in required_columns.items():
                 actual = {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")}
                 if not expected.issubset(actual):
