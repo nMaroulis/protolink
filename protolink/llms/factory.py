@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import importlib
-from enum import Enum
+from enum import StrEnum
 from typing import Any, ClassVar
 
 from protolink.llms.base import LLM
 from protolink.llms.metrics import LLMModelProfile
 
 
-class LLMProvider(str, Enum):
+class LLMProvider(StrEnum):
     ANTHROPIC = "anthropic"
     DEEPSEEK = "deepseek"
     GEMINI = "gemini"

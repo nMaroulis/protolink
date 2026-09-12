@@ -11,10 +11,12 @@ import sys
 from protolink import Agent, AgentCard, ApprovalDecision, CapabilityPolicy
 from protolink.tools.builtins import process_tool
 
+
 async def approve(request, context):
     # Present request.action.artifacts in your application's authenticated UI.
     approved = await application_ui.confirm(request.to_dict())
     return ApprovalDecision(approved=approved, request_id=request.request_id)
+
 
 agent = Agent(
     AgentCard(name="commands", description="Command execution", url="runtime://commands"),
@@ -23,9 +25,12 @@ agent = Agent(
 )
 agent.add_tool(process_tool())
 result = await agent.call_tool(
-    "execute_command", argv=[sys.executable, "-c", "print('hello')"],
-    cwd="/absolute/working/directory", env={},
-    timeout_seconds=10, max_output_bytes=4096,
+    "execute_command",
+    argv=[sys.executable, "-c", "print('hello')"],
+    cwd="/absolute/working/directory",
+    env={},
+    timeout_seconds=10,
+    max_output_bytes=4096,
 )
 print(result.exit_code, result.stdout, result.truncated)
 ```
@@ -80,10 +85,13 @@ atomic accounting service for arbitrary parallel agent graphs.
 from protolink import AgentGroup, Task
 
 async with AgentGroup([agent]) as group:
-    handle = group.run("commands", Task.create_tool_call(
-        tool_name="execute_command",
-        args={"argv": ["/absolute/executable"], "cwd": "/absolute/directory", "env": {}},
-    ))
+    handle = group.run(
+        "commands",
+        Task.create_tool_call(
+            tool_name="execute_command",
+            args={"argv": ["/absolute/executable"], "cwd": "/absolute/directory", "env": {}},
+        ),
+    )
     async for event in handle.events():
         render(event)  # Application presentation.
         if application_wants_to_stop():
@@ -139,7 +147,8 @@ for pending in broker.pending(scope):
 
 resolution = broker.resolve(
     ApprovalDecision(approved=True, request_id=displayed_request_id),
-    scope=scope, fingerprint=displayed_fingerprint,
+    scope=scope,
+    fingerprint=displayed_fingerprint,
 )
 ```
 
@@ -223,13 +232,15 @@ arbitrary process/tool effects are not reversible.
 ```python
 from protolink import CompletionCheck, CompletionValidator, RunReport
 
-validator = CompletionValidator([
-    CompletionCheck(
-        "command succeeded",
-        lambda evidence: evidence.outcomes[-1].result["exit_code"] == 0,
-        action_ids=(executed_action_id,),
-    )
-])
+validator = CompletionValidator(
+    [
+        CompletionCheck(
+            "command succeeded",
+            lambda evidence: evidence.outcomes[-1].result["exit_code"] == 0,
+            action_ids=(executed_action_id,),
+        )
+    ]
+)
 checks = await validator.validate(final_task, report=final_report)
 assert all(check.passed for check in checks)
 updated_report = RunReport.from_task(final_task)

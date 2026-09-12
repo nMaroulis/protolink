@@ -4,7 +4,7 @@ from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
@@ -12,7 +12,7 @@ EPHEMERAL_TOOL_OBSERVATION_KEY = "_protolink_ephemeral_tool_observation"
 """Internal message-metadata key for tool output that must not persist."""
 
 
-class LLMMessageRole(str, Enum):
+class LLMMessageRole(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"

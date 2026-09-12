@@ -14,7 +14,7 @@ import inspect
 import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Protocol
 
 from protolink.core.actions import RunAction
@@ -24,7 +24,7 @@ from protolink.utils import utc_now
 from protolink.utils.id_generator import IDGenerator
 
 
-class PolicyEffect(str, Enum):
+class PolicyEffect(StrEnum):
     """Possible outcomes of evaluating one runtime action."""
 
     ALLOW = "allow"
