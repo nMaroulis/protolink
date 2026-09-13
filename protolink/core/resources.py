@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -141,6 +142,24 @@ class CheckpointStore(Protocol):
         """Read one recovery record without executing a continuation."""
         ...
 
+    def list_changes(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        state: str | None = None,
+        resource_id: str | None = None,
+        run_id: str | None = None,
+        task_id: str | None = None,
+    ) -> list[ResourceChange]:
+        """List recovery records in reverse insertion order with exact, combined filters.
+
+        Pagination applies after filtering. Run/task filters refer to the original
+        write, not a later restoration. Results include protected recovery bytes;
+        reading them never resolves uncertainty or executes a continuation.
+        """
+        ...
+
 
 class StorageCheckpointStore:
     """Resource recovery adapter over a dedicated existing ``Storage`` namespace.
@@ -163,4 +182,45 @@ class StorageCheckpointStore:
     def get(self, change_id: str) -> ResourceChange | None:
         """Load a detached change record, preserving interrupted states for inspection."""
         data = (self.storage.load() or {}).get(change_id)
-        return ResourceChange.from_dict(data) if data is not None else None
+        return ResourceChange.from_dict(deepcopy(data)) if data is not None else None
+
+    def list_changes(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        state: str | None = None,
+        resource_id: str | None = None,
+        run_id: str | None = None,
+        task_id: str | None = None,
+    ) -> list[ResourceChange]:
+        """Return detached recovery records, most recently inserted first.
+
+        All supplied filters match exactly and are combined with AND. ``run_id``
+        and ``task_id`` identify the original write. ``limit`` and ``offset`` must
+        be nonnegative; pagination applies after filtering. Updating a record does
+        not change its position. The underlying namespace is loaded once per call.
+
+        Results contain raw recovery bytes and require the same access protection
+        as ``get()``. Inspection never mutates a resource or changes a record state.
+        """
+        if limit < 0 or offset < 0:
+            raise ValueError("limit and offset must be non-negative")
+        if limit == 0:
+            return []
+        result: list[ResourceChange] = []
+        for data in reversed((self.storage.load() or {}).values()):
+            if any(
+                expected is not None and data.get(key) != expected
+                for key, expected in (("state", state), ("run_id", run_id), ("task_id", task_id))
+            ):
+                continue
+            if resource_id is not None and data["before"]["revision"]["resource_id"] != resource_id:
+                continue
+            if offset:
+                offset -= 1
+                continue
+            result.append(ResourceChange.from_dict(deepcopy(data)))
+            if len(result) == limit:
+                break
+        return result

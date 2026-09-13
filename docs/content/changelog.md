@@ -34,10 +34,34 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.7.1] - Unreleased
+## [0.7.1] - 2026-09-15
+
+:::note Latest Release
+
+**ProtoLink 0.7.1 makes live execution easier to follow and its results easier to inspect**, improving model streaming while bringing delegated evidence, persistence redaction, and checkpoint inventory into the library. Applications can show progress as generation happens, evaluate work performed by delegated agents from the parent's report, configure secret masking at the storage boundary, and inspect recovery records through a public API. These changes build on the execution and recovery facilities introduced in 0.7.0 and reduce the application code needed to connect them to a frontend or operator workflow.
+
+Model output now reaches stream consumers while generation is still running. Ollama and the OpenAI-compatible server clients use asynchronous HTTP reads, so a pending response does not prevent the event loop from delivering chunks or handling cancellation. This covers llama.cpp server, vLLM, LM Studio, and generic compatible endpoints. OpenAI, Anthropic, Gemini, DeepSeek, Hugging Face, and local llama.cpp move synchronous iterator creation and reads onto a worker, while application callbacks remain on the application's event loop. Both JSON-action and native-tool streaming retain their existing behavior: `llm_chunk` carries incremental text, `llm_final` carries the complete answer, and the terminal task status establishes the run's final state.
+
+Streaming also handles interruptions and protocol boundaries more consistently. HTTP readers recognize completion markers, assemble fragmented UTF-8 and lines, and surface malformed responses and provider errors. Responses, clients, and nested generators close on completion or interruption; synchronous SDK iterators close on their worker after any in-progress operation returns. Native tool calls are still assembled before execution, and Ollama chat requests retain configured headers and authentication. Regression tests verify that consumers receive early output before generation finishes, alongside cancellation, failure, and cleanup behavior. The `llms` extra now explicitly includes `httpx`, while the base package continues to require only Pydantic.
+
+Delegation now contributes worker events and execution receipts directly to the parent's stream, task snapshots, and `RunReport`, including work delegated through multiple agents. Events preserve the worker's run, task, and action identities, with links back to the calling action. Receipts arriving through both a live stream and a final snapshot are deduplicated, and a child's terminal marker cannot finish the parent run. Streaming is selected according to the peer's advertised capability; custom workers that provide only a request/response handler keep that execution path. Parent completion checks can inspect actual worker tool outcomes without joining separate stored runs. Delegation-only receipts remain distinct from tool execution evidence, and failures or interrupted streams preserve observed effects without automatically resubmitting the work.
+
+Persistence redaction is configured once through `SQLiteRunStore(..., redaction_policy=...)` and applied before every task, report, and caller metadata payload is written, including intermediate snapshots. Alongside recursive masking of sensitive fields, `RedactionPolicy.sensitive_values` removes known credentials from free text such as command output and error messages. Default sensitive keys also cover recovery `data_base64` fields in presentation copies. Redaction operates on copies, preserving live model and tool inputs and the separate protected approval and recovery records required for execution and restoration. The policy is optional; existing rows and relational index columns are unchanged, and unknown secrets in arbitrary text still require application-specific handling.
+
+Checkpoint inventory is available through `list_changes()`, with combined filters for state, resource, originating run, and originating task, plus pagination. Applications can find uncertain writes, inspect recent changes, or present recovery history without reading the underlying Storage namespace directly. Results are detached records in reverse insertion order, and querying them does not inspect or modify files, resolve uncertainty, or resume execution. Because inventory includes the original recovery bytes, it retains the same access requirements as individual checkpoint lookup. Together with updated API documentation and explanatory docstrings, these additions give applications a clearer path from live progress to recorded evidence and recovery inspection.
+
+:::
+
+### Added
+
+- **Delegated evidence:** Model-driven delegation forwards native worker events into the parent's stream and task receipts, including nested work. Worker event/run/task/action IDs remain intact, receipts are deduplicated against final snapshots, and child terminal markers cannot close the parent. Failed or interrupted delegations retain observed effects without resubmission. `Agent.call_agent(..., event_sink=...)` exposes optional native streaming to direct callers; transports without streaming contribute returned snapshots.
+- **Storage redaction:** `SQLiteRunStore(..., redaction_policy=...)` applies one optional policy to every saved task, report, and caller metadata payload without changing live execution or separate approval/recovery storage. `RedactionPolicy.sensitive_values` masks known secrets in free text; default sensitive keys now include recovery `data_base64` fields.
+- **Checkpoint inventory:** `CheckpointStore.list_changes()` and `StorageCheckpointStore.list_changes()` return detached recovery records with combined state/resource/run/task filters and pagination, without accessing resources or changing recovery state.
 
 ### Fixed
 
+- Completion checks exclude delegation-only receipts from executed tool evidence. Parent checks can use actual worker outcomes directly, without composing separate RunStore snapshots.
+- Delegation honors the peer's streaming capability. Custom unary task handlers are advertised without streaming unless they also provide a streaming handler, preserving existing execution behavior.
 - **Live LLM streaming:** Ollama now uses asynchronous HTTP reads for both JSON-action and native-tool streams, allowing `RunHandle.events()` consumers to receive `llm_chunk` while generation is still running. The same fix covers llama.cpp server, vLLM, LM Studio, and generic OpenAI-compatible servers.
 - **SDK and local streaming:** OpenAI, Anthropic, Gemini, DeepSeek, Hugging Face, and local llama.cpp open and read synchronous iterators on a worker, keeping the event loop available for consumers and cancellation. Callbacks stay on the application's event loop; native tool assembly is preserved.
 - **Stream cleanup:** HTTP responses and clients close on completion, cancellation, provider errors, and callback failures. The JSON-action fallback closes nested streams when interrupted. Synchronous SDK iterators close on their worker after any in-progress operation returns.
@@ -51,7 +75,7 @@ uv add --upgrade protolink
 
 ## [0.7.0] - 2026-09-11
 
-:::note Latest Release
+:::note Release Summary
 
 **ProtoLink 0.7.0 provides a more complete execution engine for agent applications**, bringing command execution, recoverable file changes, managed agent groups, approval lifecycles, and completion checks into the existing runtime. These capabilities are particularly useful for coding agents that need to run commands, edit files, request permission, and verify results. The same building blocks support research assistants, data processing, and operational automation. Applications continue to define their own roles, models, domain knowledge, workflows, and interfaces.
 

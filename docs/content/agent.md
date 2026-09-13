@@ -580,6 +580,12 @@ Read or replace the communication transport used for both outbound client calls 
   Reassigning this property configures objects and routes but does not start the new server. Avoid swapping transports while an Agent is serving; stop it first so connection ownership and open ports remain deterministic.
 </ApiCallout>
 
+<ApiCallout label="Streaming capability">
+  The card advertises streaming when the selected transport supports it, except when the Agent overrides only
+  <code>handle_task()</code>. Such a worker must also implement <code>handle_task_streaming()</code> to advertise
+  streaming. Model-driven delegation uses the advertised capability to preserve custom request/response handlers.
+</ApiCallout>
+
 </ApiReference>
 
 ### Agent.a2a
@@ -1075,10 +1081,12 @@ writer = Agent(
     task: Task,
     *,
     protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    event_sink: EventSink | None = None,
 ) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
-Send a complete Task to a peer through this Agent's configured client. Before dispatch, ProtoLink ensures that the task carries a RunContext and extends its agent chain for trace and delegation correlation.
+Send a complete Task to a peer through this Agent's configured client. Before dispatch, ProtoLink ensures that the task carries a RunContext. A delegated child keeps its prepared agent chain; standalone calls include the sending agent.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="call agent parameters">
+  <ApiField name="event_sink" type="EventSink | None" defaultValue="None">Optional observer with async <code>emit(RunEvent)</code>. A native peer advertising streaming on a capable transport delivers worker events while executing. Other peers use the normal task response. Observer failures do not invalidate effects. A failed or incomplete stream is never resubmitted. Model-driven delegation supplies its own sink to collect parent evidence automatically.</ApiField>
   <ApiField name="agent_url" type="str" required>Reachable peer URL or runtime URI.</ApiField>
   <ApiField name="task" type="Task" required>Mutable Task envelope to send. Transport serialization does not strip its native metadata when ProtoLink protocol is used.</ApiField>
   <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}><code>"auto"</code> preserves the richer native contract and discovers A2A-only peers when A2A is enabled. The other values force one boundary.</ApiField>
@@ -1086,7 +1094,7 @@ Send a complete Task to a peer through this Agent's configured client. Before di
 
 <ApiSection title="Returns"><ApiFields ariaLabel="call agent return value"><ApiField name="task" type="Task">Peer response task with its updated lifecycle and outputs.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="call agent errors"><ApiField name="RuntimeError">This Agent has no configured transport/client.</ApiField><ApiField name="transport or protocol error">Connection, authentication, translation, and peer errors propagate from <code>AgentClient</code>.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="call agent errors"><ApiField name="RuntimeError">This Agent has no configured transport/client, or a delegated stream ends without its terminal task. A missing terminal task leaves remote effects unknown.</ApiField><ApiField name="transport or protocol error">Connection, authentication, translation, and peer errors propagate from <code>AgentClient</code>.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 

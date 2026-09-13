@@ -118,6 +118,8 @@ class CompletionValidator:
                 continue
             action = event.payload.get("action", {})
             metadata = event.payload.get("metadata", {})
+            if not isinstance(action, dict) or action.get("kind") == "agent.call":
+                continue
             name = action.get("name") or metadata.get("tool")
             if name:
                 outcomes[event.action_id] = ToolOutcome(

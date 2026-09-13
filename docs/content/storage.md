@@ -25,6 +25,8 @@ Protolink currently supports the following storage implementations:
   time-to-live expiration.
 - **`SQLiteRunStore`** - indexed task snapshots and run reports for replay,
   audit, and regression workflows.
+- **`StorageCheckpointStore`** - recovery records and filtered inventory over a dedicated `Storage` namespace,
+  imported from `protolink` or `protolink.core.resources`.
 
 You can implement a custom state backend by subclassing `Storage`, or implement
 the structural `RunStore` protocol when execution records belong in an
@@ -931,16 +933,25 @@ protocol itself cannot be instantiated.
     db_path: str | Path = "runs.db",
     *,
     table_prefix: str = "protolink",
+    read_only: bool = False,
+    redaction_policy: RedactionPolicy | None = None,
 )`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L156"
 >
 
 Implement `RunStore` with two SQLite tables: one for task snapshots and one for
-run reports. JSON payload columns retain complete serialized objects, while
+run reports. JSON payload columns retain serialized objects after the optional redaction policy is applied, while
 relational columns index common lookup fields.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SQLiteRunStore constructor parameters">
+    <ApiField name="read_only" type="bool" defaultValue="False">
+      Open an existing database for inspection without creating tables or permitting writes.
+    </ApiField>
+    <ApiField name="redaction_policy" type="RedactionPolicy | None" defaultValue="None">
+      Apply this policy to every saved task/report payload and caller metadata before writing. Live objects,
+      index columns, and existing rows remain unchanged. Reads return the stored representation.
+    </ApiField>
     <ApiField name="db_path" type="str | Path" defaultValue={'"runs.db"'}>
       SQLite database path, converted to <code>str</code>. The database file and
       schema are created when missing; parent directories are not created.
@@ -1021,8 +1032,7 @@ Serialize and upsert one task snapshot together with indexed run correlation.
       Optional indexed agent identity.
     </ApiField>
     <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">
-      Optional record metadata. A shallow dictionary copy is made before
-      serialization.
+      Optional record metadata. The store copies it and applies its configured redaction policy before serialization.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1401,6 +1411,110 @@ Delete one run report by primary key.
 
 ---
 
+## Checkpoint recovery records
+
+### StorageCheckpointStore
+
+<ApiReference
+  kind="class"
+  path="protolink.StorageCheckpointStore"
+  signature={`StorageCheckpointStore(storage: Storage)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py"
+>
+
+Adapt a dedicated Storage namespace to the `CheckpointStore` protocol for durable resource recovery.
+One live writer owns the namespace. SQLiteStorage survives process exit; InMemoryStorage does not.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="StorageCheckpointStore parameters">
+    <ApiField name="storage" type="Storage" required>
+      Namespace used exclusively for resource changes. The adapter exposes it as <code>storage</code>.
+      Protect its original bytes and keep it separate from redacted run snapshots and mutable Agent state.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="CheckpointStore contract">
+  <ApiFields ariaLabel="CheckpointStore methods">
+    <ApiField name="save(change: ResourceChange)" type="None">
+      Persist a complete record under its <code>change_id</code>. Repeated saves replace that record while keeping
+      its insertion position. A durable save must complete before resource mutation begins.
+    </ApiField>
+    <ApiField name="get(change_id: str)" type="ResourceChange | None">
+      Return a detached recovery record, or <code>None</code> when absent. Bytes and nested metadata remain intact.
+    </ApiField>
+    <ApiField name="list_changes(...)" type="list[ResourceChange]">
+      Query detached records using the filters and pagination described below.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+`CheckpointStore` is a structural protocol in `protolink.core.resources`. Custom backends implement these methods;
+inventory never executes a continuation or changes the recovery state. Storage and decoding errors propagate.
+
+</ApiReference>
+
+### StorageCheckpointStore.list_changes
+
+<ApiReference
+  kind="method"
+  path="protolink.StorageCheckpointStore.list_changes"
+  signature={`list_changes(
+    *,
+    limit: int = 100,
+    offset: int = 0,
+    state: str | None = None,
+    resource_id: str | None = None,
+    run_id: str | None = None,
+    task_id: str | None = None,
+) -> list[ResourceChange]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py"
+>
+
+Load the namespace once and list records in reverse insertion order. All supplied filters match exactly and combine
+with AND. Pagination applies after filtering. Updating a record does not move it, and separate page requests are
+independent reads of the namespace.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Checkpoint inventory parameters">
+    <ApiField name="limit" type="int" defaultValue="100">Maximum returned records. Zero returns an empty list.</ApiField>
+    <ApiField name="offset" type="int" defaultValue="0">Matching records to skip before collecting results.</ApiField>
+    <ApiField name="state" type="str | None" defaultValue="None">
+      Exact stored state, such as <code>prepared</code>, <code>applied</code>, <code>restoring</code>,
+      <code>restored</code>, <code>failed</code>, or <code>uncertain</code>. Inspection preserves the stored state.
+    </ApiField>
+    <ApiField name="resource_id" type="str | None" defaultValue="None">
+      Exact resource identity in <code>before.revision.resource_id</code>; the query does not resolve or inspect paths.
+    </ApiField>
+    <ApiField name="run_id" type="str | None" defaultValue="None">Run that performed the original write.</ApiField>
+    <ApiField name="task_id" type="str | None" defaultValue="None">Task that performed the original write.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Checkpoint inventory return value">
+    <ApiField name="changes" type="list[ResourceChange]">
+      Detached records containing before/after snapshots, state, change/action/run/task IDs, optional errors,
+      and restoration correlation fields. Snapshots include original bytes and POSIX modes. Restoration IDs are
+      available as <code>restore_run_id</code> and <code>restore_task_id</code>; run/task filters target the original write.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Checkpoint inventory errors">
+    <ApiField name="ValueError">A limit or offset is negative.</ApiField>
+    <ApiField name="storage or decoding error">Backend read failures and invalid stored recovery records propagate.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Recovery data">
+  Results require the same access protection as <code>get()</code>. Apply redaction only to presentation copies;
+  raw records remain necessary for restoration. Inventory neither resolves uncertainty nor resumes interrupted work.
+</ApiCallout>
+
+</ApiReference>
+
 ## Usage Examples
 
 ### Standalone Usage
@@ -1468,6 +1582,30 @@ record = run_store.save_task(
 
 recent = run_store.list_task_records(session_id="release", limit=20)
 ```
+
+### Redaction at persistence
+
+```python
+from protolink import RedactionPolicy, SQLiteRunStore
+
+policy = RedactionPolicy(sensitive_values=frozenset({"known-credential-value"}))
+run_store = SQLiteRunStore("runs.db", redaction_policy=policy)
+# Pass run_store=run_store to every Agent that should save protected snapshots.
+```
+
+The configured policy masks copies of all task/report payloads and caller metadata before SQLite writes, including
+intermediate Agent snapshots, nested events, tool output, errors, and final task data. Returned index records contain
+the same masked payloads. Live Tasks, Reports, and model/tool inputs are unchanged. With `redaction_policy=None`,
+the existing raw persistence contract remains available. Policies are supplied when opening the store and are not
+saved in the database.
+
+Sensitive field names are masked recursively. `sensitive_values` additionally masks literal, case-sensitive occurrences
+of known secrets in free text, with longer matches first and before optional truncation. The default policy masks
+`data_base64` recovery fields in presentation copies. It does not discover unknown secrets in arbitrary text.
+
+Run/task/session/trace identifiers and other relational index columns remain stable, so keep secrets out of those
+fields. Existing database rows are not retroactively sanitized. ApprovalBroker and StorageCheckpointStore retain
+their separate protected storage: do not redact recovery bytes or the exact approval specification used for execution.
 
 ### Agent Memory Integration
 

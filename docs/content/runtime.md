@@ -136,6 +136,11 @@ Three IDs serve different purposes:
 
 When work is delegated, `RunContext.child()` creates a new run identity while preserving the session, trace, workspace, permissions, budget, and application metadata. `parent_run_id` and `agent_chain` then describe how execution reached that child.
 
+Model-driven delegation includes worker events and receipts in the parent's stream and report, preserving worker
+identities and nested action links. The parent can validate actual worker outcomes without joining stored runs.
+See [delegated worker evidence](./execution-tools.md#delegated-worker-evidence) for sequence, terminal-state,
+transport, and interruption behavior.
+
 ### RunContext API
 
 <ApiReference
@@ -2174,6 +2179,7 @@ Read-only view that never calls an agent, tool, model, transport, or external se
     sensitive_keys: frozenset[str] = DEFAULT_SENSITIVE_KEYS,
     replacement: str = "[REDACTED]",
     max_string_length: int | None = None,
+    sensitive_values: frozenset[str] = frozenset(),
 )`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/redaction.py#L32"
 >
@@ -2182,8 +2188,12 @@ Immutable recursive masking policy shared by runtime observability objects.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="RedactionPolicy parameters">
+    <ApiField name="sensitive_values" type="frozenset[str]" defaultValue="frozenset()">
+      Nonempty known secrets masked literally in text, case-sensitively, longest match first and before truncation.
+      Values are omitted from the policy's representation. This does not discover unknown secrets in free text.
+    </ApiField>
     <ApiField name="sensitive_keys" type="frozenset[str]" defaultValue="DEFAULT_SENSITIVE_KEYS">
-      Case-insensitive names normalized by lowercasing and replacing hyphens with underscores. Defaults include API keys, authorization, credentials, passwords, secrets, and tokens.
+      Case-insensitive names normalized by lowercasing and replacing hyphens with underscores. Defaults include API keys, authorization, credentials, passwords, secrets, tokens, and recovery `data_base64` fields.
     </ApiField>
     <ApiField name="replacement" type="str" defaultValue={'"[REDACTED]"'}>
       Value substituted for a sensitive field's complete value.
@@ -2208,7 +2218,7 @@ Immutable recursive masking policy shared by runtime observability objects.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="RedactionPolicy errors">
     <ApiField name="ValueError">
-      Raised when `max_string_length` is negative.
+      Raised when `max_string_length` is negative or a sensitive value is empty or is not a string.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2819,7 +2829,8 @@ Immutable index records returned by `RunStore`. Payload dictionaries remain ordi
 <ApiSection title="Methods">
   <ApiFields ariaLabel="Run store record methods">
     <ApiField name="to_dict()" type="dict[str, Any]">
-      Each record returns its complete raw mapping without automatic redaction.
+      Each record returns its stored mapping without further redaction. Payloads already reflect any redaction
+      policy configured on the saving SQLiteRunStore.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2886,6 +2897,8 @@ Synchronous structural persistence contract for task snapshots and reports.
     db_path: str | pathlib.Path = "runs.db",
     *,
     table_prefix: str = "protolink",
+    read_only: bool = False,
+    redaction_policy: RedactionPolicy | None = None,
 )`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L156"
 >
@@ -2894,6 +2907,12 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SQLiteRunStore parameters">
+    <ApiField name="read_only" type="bool" defaultValue="False">
+      Inspect an existing database without creating tables or permitting writes.
+    </ApiField>
+    <ApiField name="redaction_policy" type="RedactionPolicy | None" defaultValue="None">
+      Mask every saved task/report and caller metadata payload before persistence. Live objects and index columns are unchanged.
+    </ApiField>
     <ApiField name="db_path" type="str | pathlib.Path" defaultValue={'"runs.db"'}>
       SQLite database path, converted to `str`. Construction immediately creates tables and indexes when missing.
     </ApiField>
@@ -2920,7 +2939,10 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
 </ApiSection>
 
 <ApiCallout label="Security and redaction">
-  The store serializes raw task/report dictionaries. Apply `RedactionPolicy` before saving data that may contain secrets. The table prefix is validated, while record values are parameterized SQL inputs.
+  Configure `redaction_policy=RedactionPolicy(...)` to protect every saved task/report payload and caller metadata.
+  Omission preserves raw persistence. Existing rows and relational identifiers are unchanged, and recovery/approval
+  storage is separate. See [redaction at persistence](./storage.md#redaction-at-persistence).
+  The table prefix is validated, while record values are parameterized SQL inputs.
 </ApiCallout>
 
 </ApiReference>
@@ -3021,7 +3043,7 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SQLiteRunStore save_report parameters">
-    <ApiField name="report" type="RunReport" required>Report serialized without implicit redaction.</ApiField>
+    <ApiField name="report" type="RunReport" required>Report serialized with the store's optional redaction policy.</ApiField>
     <ApiField name="run_id" type="str | None" defaultValue="None">
       Explicit primary key, taking precedence over `report.context.run_id`.
     </ApiField>

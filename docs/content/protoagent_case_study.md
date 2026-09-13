@@ -80,7 +80,7 @@ ProtoAgent applies those lessons with the runtime pieces a real CLI needs:
 | Read worker | Coder read tools | Explorer, a stateless read-only worker |
 | Write worker | Coder write tools | Coder, a stateless diff-producing worker |
 | Safety | Workspace sandboxing | ProtoLink `CapabilityPolicy`, `RunAction`, approval requests, and diff preview artifacts |
-| Completion | Model produces final text | RunContract validates whether required workers and artifacts appeared |
+| Completion | Model produces final text | Native CompletionCheck/CompletionValidator evaluate executed outcomes and current resource revisions |
 | Runtime state | Task history | ProtoLink `RunContext`, `RunEvent`, cancellation, budgets, reports, and replayable traces |
 | Model memory | Ad hoc prompt history | ProtoLink per-agent conversation storage and compaction |
 
@@ -144,13 +144,19 @@ The article's core lesson is that the model is only one component. ProtoAgent sh
 
 The most important difference between a demo and a tool is that the runtime must be allowed to say "not complete."
 
-Before a ProtoAgent run starts, the core infers a small RunContract from the original request. For a workspace-change task, completion requires one of these terminal conditions:
+The original design described in the article used a RunContract to check whether work reached Coder, an approval
+checkpoint, a diff preview, or an explicit blocker. Those signals show workflow progress; they do not establish that
+a requested write executed.
 
-1. Coder delegation happened.
-2. A write approval request or diff preview artifact exists.
-3. The model reported an explicit blocker.
+ProtoAgent's 0.2.2 migration to ProtoLink 0.7.0 uses native `CompletionCheck` and `CompletionValidator` over executed
+outcomes and current resource revisions. Approval, previews, and delegation alone do not count as a completed write.
+An explicit blocker preserves the reason work could not finish. The application defines its acceptance predicates
+and permits an initial attempt with at most two repairs through native Graph limits.
 
-If the model answers a write request with prose but never reaches Coder, approval, a diff preview, or a blocker, ProtoAgent returns the run as incomplete. This is intentionally outside the prompt. The model proposes actions; the ProtoLink-powered runtime validates whether the trace satisfied the contract.
+ProtoLink 0.7.1 adds worker events and execution receipts to the parent's report, so applications can evaluate worker
+outcomes without composing separate RunStore snapshots. Its optional persistence redaction and checkpoint inventory
+also replace the corresponding application adapters. These library additions are unreleased; adopting them is a
+separate downstream migration. See [completion evidence](./execution-tools.md#completion-evidence-and-bounded-workflows).
 
 That pattern is broadly reusable. Any ProtoLink application can define domain-specific completion contracts: a support agent must cite a ticket, a data agent must attach a query result, a browser agent must produce a screenshot, or a deployment agent must emit a policy-reviewed change plan.
 
