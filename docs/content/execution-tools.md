@@ -115,6 +115,8 @@ Configure each Agent normally, including its LLM, transport, policy, approval ha
 Transport-free agents use direct invocation; `runtime://` supports local discovery and delegation without sockets.
 Network transports use their existing implementations. The group adds no global registry or orchestration roles.
 
+For live model output, enable `capabilities={"streaming": True}` on the Agent card and inspect `event.payload.get("llm_event_type")`. `llm_chunk` carries incremental text in `event.payload["content"]`; `llm_final` carries the complete answer. JSON-action models stream raw JSON fragments, while native-tool models stream ordinary text and assemble tool calls separately. Continue to the terminal task status before treating the whole run as complete. See the [embedded streaming example](./llm.md#stream-into-your-application).
+
 `RunHandle.start(agent_or_url, task, *, client=None, store=None, redaction_policy=None)` is also usable without a
 group. URL targets require an existing `AgentClient`. The handle consumes the task once, even when only `result()`
 is awaited. `events()` yields typed `RunEvent` objects, including history for later subscribers. `cancel(reason)`

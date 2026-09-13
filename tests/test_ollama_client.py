@@ -1,6 +1,7 @@
 import json
 from typing import ClassVar
 
+import httpx
 import pytest
 
 from protolink.llms.actions import ToolCallAction
@@ -34,38 +35,6 @@ class _FakeOllamaConnection:
 
     def getresponse(self):
         return _FakeOllamaResponse()
-
-    def close(self):
-        return None
-
-
-class _FakeOllamaStreamResponse:
-    status = 200
-
-    def __iter__(self):
-        yield json.dumps(
-            {
-                "message": {
-                    "tool_calls": [
-                        {"function": {"name": "lookup", "arguments": {"key": "alpha"}}},
-                    ]
-                }
-            }
-        ).encode()
-
-    def read(self):
-        return b""
-
-
-class _FakeOllamaStreamConnection:
-    def __init__(self):
-        self.body = None
-
-    def request(self, *args, **kwargs):
-        self.body = args[2] if len(args) >= 3 else kwargs["body"]
-
-    def getresponse(self):
-        return _FakeOllamaStreamResponse()
 
     def close(self):
         return None
@@ -123,14 +92,26 @@ async def test_ollama_native_call_action_stream_is_explicit_opt_in(monkeypatch):
         model="qwen",
         supports_tool_calling=True,
     )
-    fake_connection = _FakeOllamaStreamConnection()
-    llm._client = fake_connection
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        chunk = {
+            "message": {"tool_calls": [{"function": {"name": "lookup", "arguments": {"key": "alpha"}}}]},
+            "done": True,
+        }
+        return httpx.Response(200, content=json.dumps(chunk) + "\n")
+
+    client_type = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx, "AsyncClient", lambda **kwargs: client_type(transport=httpx.MockTransport(respond), **kwargs)
+    )
 
     history = ConversationHistory()
     history.add_user("Find alpha")
 
     result = await llm.call_action_stream(history, tools={"lookup": DummyTool()})
-    payload = json.loads(fake_connection.body)
+    payload = json.loads(requests[0].content)
 
     assert "format" not in payload
     assert payload["tools"][0]["function"]["name"] == "lookup"

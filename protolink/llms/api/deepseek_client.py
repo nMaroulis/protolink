@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_openai
+from protolink.llms._streaming import threaded_stream
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
@@ -86,18 +87,24 @@ class DeepSeekLLM(APILLM):
         return response.choices[0].message.content
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        stream = self._client.chat.completions.create(
-            model=self.model,
-            messages=history.messages,
-            stream=True,
-            **self._model_params,
-        )
+        """Yield text while synchronous SDK reads run on a dedicated worker.
 
-        for event in stream:
-            # Only yield text deltas
-            delta = getattr(event.choices[0].delta, "content", None)
-            if delta:
-                yield delta
+        The event loop stays available to consumers. Close this iterator when
+        stopping early; cleanup waits for any in-progress SDK operation to
+        return on the worker. Text parsing happens on the caller's event loop.
+        """
+        async with threaded_stream(
+            lambda: self._client.chat.completions.create(
+                model=self.model,
+                messages=history.messages,
+                stream=True,
+                **self._model_params,
+            )
+        ) as stream:
+            async for event in stream:
+                text, _ = chat_completion_stream_delta(event)
+                if text:
+                    yield text
 
     def call_action(
         self,
@@ -165,23 +172,24 @@ class DeepSeekLLM(APILLM):
         if tool_specs:
             params["tools"] = tool_specs
             params["tool_choice"] = "auto"
-        stream = self._client.chat.completions.create(
-            model=self.model,
-            messages=history.messages,
-            stream=True,
-            **params,
-        )
-
         output_text: list[str] = []
         tool_accumulator = ChatCompletionStreamAccumulator()
-        for event in stream:
-            text, tool_call_deltas = chat_completion_stream_delta(event)
-            if text:
-                output_text.append(text)
-                if chunk_callback is not None:
-                    await chunk_callback(text)
-            for tool_call_delta in tool_call_deltas:
-                tool_accumulator.add_delta(tool_call_delta)
+        async with threaded_stream(
+            lambda: self._client.chat.completions.create(
+                model=self.model,
+                messages=history.messages,
+                stream=True,
+                **params,
+            )
+        ) as stream:
+            async for event in stream:
+                text, tool_call_deltas = chat_completion_stream_delta(event)
+                if text:
+                    output_text.append(text)
+                    if chunk_callback is not None:
+                        await chunk_callback(text)
+                for tool_call_delta in tool_call_deltas:
+                    tool_accumulator.add_delta(tool_call_delta)
 
         action = tool_accumulator.to_action()
         if action is not None:

@@ -7,6 +7,7 @@ import urllib.request
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
+from protolink.llms._streaming import http_stream
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
@@ -106,7 +107,12 @@ class OpenAICompatibleLLM(ServerLLM):
         return self._extract_message_content(result)
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        """Generate a streaming chat completion."""
+        """Yield text as it arrives without blocking the event loop.
+
+        Uses request-scoped async HTTP; completion, cancellation, and explicit
+        iterator closure release the connection. JSON-action mode yields raw
+        JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
+        """
         params = dict(self._model_params)
         if "response_format" not in params:
             params["response_format"] = {"type": "json_object"}
@@ -116,30 +122,17 @@ class OpenAICompatibleLLM(ServerLLM):
             "stream": True,
             **params,
         }
-        request = urllib.request.Request(
+        async with http_stream(
             self._chat_completions_url,
-            data=json.dumps(payload).encode("utf-8"),
+            payload,
             headers=self.headers,
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=self.REQUEST_TIMEOUT) as response:
-                for raw_line in response:
-                    line = raw_line.decode("utf-8", errors="replace").strip()
-                    if not line or line == "data: [DONE]":
-                        continue
-                    if line.startswith("data: "):
-                        line = line[6:]
-                    try:
-                        chunk = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    content = self._extract_delta_content(chunk)
-                    if content:
-                        yield content
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"OpenAI-compatible stream failed with HTTP {exc.code}: {detail}") from exc
+            timeout=self.REQUEST_TIMEOUT,
+            provider="OpenAI-compatible",
+        ) as stream:
+            async for chunk in stream:
+                content, _ = chat_completion_stream_delta(chunk)
+                if content:
+                    yield content
 
     def call_action(
         self,
@@ -220,36 +213,23 @@ class OpenAICompatibleLLM(ServerLLM):
             payload["tools"] = tool_specs
             payload["tool_choice"] = "auto"
 
-        request = urllib.request.Request(
-            self._chat_completions_url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers=self.headers,
-            method="POST",
-        )
         output_text: list[str] = []
         tool_accumulator = ChatCompletionStreamAccumulator()
-        try:
-            with urllib.request.urlopen(request, timeout=self.REQUEST_TIMEOUT) as response:
-                for raw_line in response:
-                    line = raw_line.decode("utf-8", errors="replace").strip()
-                    if not line or line == "data: [DONE]":
-                        continue
-                    if line.startswith("data: "):
-                        line = line[6:]
-                    try:
-                        chunk = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    text, tool_call_deltas = chat_completion_stream_delta(chunk)
-                    if text:
-                        output_text.append(text)
-                        if chunk_callback is not None:
-                            await chunk_callback(text)
-                    for tool_call_delta in tool_call_deltas:
-                        tool_accumulator.add_delta(tool_call_delta)
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"OpenAI-compatible stream failed with HTTP {exc.code}: {detail}") from exc
+        async with http_stream(
+            self._chat_completions_url,
+            payload,
+            headers=self.headers,
+            timeout=self.REQUEST_TIMEOUT,
+            provider="OpenAI-compatible",
+        ) as stream:
+            async for chunk in stream:
+                text, tool_call_deltas = chat_completion_stream_delta(chunk)
+                if text:
+                    output_text.append(text)
+                    if chunk_callback is not None:
+                        await chunk_callback(text)
+                for tool_call_delta in tool_call_deltas:
+                    tool_accumulator.add_delta(tool_call_delta)
 
         action = tool_accumulator.to_action()
         if action is not None:

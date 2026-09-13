@@ -97,6 +97,22 @@ print(agent.sync.invoke("Say hello"))
 
 `invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect, and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
 
+## Stream model output into your app
+
+For an embedded Agent with `capabilities={"streaming": True}` on its card:
+
+```python
+from protolink import RunHandle, Task
+
+handle = RunHandle.start(agent, Task.create_infer(prompt="Explain this project."))
+async for event in handle.events():
+    if event.payload.get("llm_event_type") == "llm_chunk":
+        print(event.payload["content"], end="", flush=True)
+result = await handle.result()
+```
+
+`llm_chunk` delivers incremental text; `llm_final` carries the complete answer. Default JSON-action models stream raw JSON fragments. Ollama and other HTTP server streams require `httpx` (`uv add protolink httpx`), also included in the `llms` and `http` extras. Use `await handle.cancel()` to stop a run. See the [complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
+
 ## Your first agent mesh
 
 Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:

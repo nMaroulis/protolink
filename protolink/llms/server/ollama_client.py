@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
+from protolink.llms._streaming import http_stream
 from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
@@ -35,6 +36,7 @@ class OllamaLLM(ServerLLM):
         "num_ctx": 8192,  # Prevent truncated JSON output
     }
     REQUEST_TIMEOUT: ClassVar[int] = 90
+    _CHAT_TIMEOUT: ClassVar[int] = 300
 
     def __init__(
         self,
@@ -68,6 +70,8 @@ class OllamaLLM(ServerLLM):
             api_key = os.getenv("OLLAMA_API_KEY")
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
+        self.headers = {"Content-Type": "application/json", **headers}
+
         # Initialize the client
         parsed = urlparse(self.base_url)
 
@@ -82,7 +86,7 @@ class OllamaLLM(ServerLLM):
 
         self._client: http.client.HTTPConnection | None = None
         try:
-            self._client = http.client.HTTPConnection(self._host, self._port, timeout=300)
+            self._client = http.client.HTTPConnection(self._host, self._port, timeout=self._CHAT_TIMEOUT)
         except Exception:
             logger.exception("LLM Client initilization failed :: Ollama connection failed: {e}")
 
@@ -111,7 +115,7 @@ class OllamaLLM(ServerLLM):
             "options": options,
         }
 
-        headers = {"Content-Type": "application/json"}
+        headers = self.headers
 
         try:
             self._client.request(
@@ -148,10 +152,12 @@ class OllamaLLM(ServerLLM):
         return str(result["message"]["content"])
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        """Generate a streaming response from Ollama."""
-        if self._client is None:
-            raise ValueError("Ollama client not connected")
+        """Yield text as it arrives without blocking the event loop.
 
+        Uses request-scoped async HTTP; completion, cancellation, and explicit
+        iterator closure release the connection. JSON-action mode yields raw
+        JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
+        """
         # Translate max_tokens to num_predict for Ollama options compatibility
         options = dict(self._model_params)
         if "max_tokens" in options:
@@ -165,34 +171,17 @@ class OllamaLLM(ServerLLM):
             "options": options,
         }
 
-        headers = {"Content-Type": "application/json"}
-
-        self._client.request("POST", "/api/chat", json.dumps(payload), headers)
-
-        response = self._client.getresponse()
-
-        if response.status != 200:
-            error_data = response.read().decode("utf-8")
-            self._client.close()
-            raise RuntimeError(f"Ollama API streaming request failed with status {response.status}: {error_data}")
-
-        try:
-            for line in response:
-                if not line:
-                    continue
-
-                try:
-                    chunk = json.loads(line.decode("utf-8"))
-                except json.JSONDecodeError:
-                    continue
-
-                if "error" in chunk:
-                    raise RuntimeError(f"Ollama API returned an error during stream: {chunk['error']}")
-
-                if "message" in chunk and "content" in chunk["message"]:
-                    yield chunk["message"]["content"]
-        finally:
-            self._client.close()
+        async with http_stream(
+            f"{self.base_url.rstrip('/')}/api/chat",
+            payload,
+            headers=self.headers,
+            timeout=self._CHAT_TIMEOUT,
+            provider="Ollama",
+        ) as stream:
+            async for chunk in stream:
+                content = (chunk.get("message") or {}).get("content")
+                if content:
+                    yield content
 
     def call_action(
         self,
@@ -247,7 +236,7 @@ class OllamaLLM(ServerLLM):
         }
         if tool_specs:
             payload["tools"] = tool_specs
-        headers = {"Content-Type": "application/json"}
+        headers = self.headers
         try:
             self._client.request(
                 method="POST",
@@ -282,7 +271,8 @@ class OllamaLLM(ServerLLM):
         method sends Ollama ``tools`` declarations and watches streamed
         ``message.tool_calls`` events. Text deltas are forwarded immediately,
         while the first tool call is normalized into the typed action protocol
-        once the response has been drained.
+        once the response has been drained. Both modes use async HTTP reads;
+        callback failures and cancellation close the response immediately.
         """
         if not self._supports_tool_calling:
             return await super().call_action_stream(
@@ -292,9 +282,6 @@ class OllamaLLM(ServerLLM):
                 agent_cards=agent_cards,
                 chunk_callback=chunk_callback,
             )
-        if self._client is None:
-            raise ValueError("Ollama client not connected")
-
         options = dict(self._model_params)
         if "max_tokens" in options:
             options["num_predict"] = options.pop("max_tokens")
@@ -315,42 +302,25 @@ class OllamaLLM(ServerLLM):
         if tool_specs:
             payload["tools"] = tool_specs
 
-        headers = {"Content-Type": "application/json"}
         output_text: list[str] = []
         native_action: ToolCallAction | AgentCallAction | None = None
-
-        self._client.request("POST", "/api/chat", json.dumps(payload), headers)
-        response = self._client.getresponse()
-
-        if response.status != 200:
-            error_data = response.read().decode("utf-8")
-            self._client.close()
-            raise RuntimeError(f"Ollama API streaming request failed with status {response.status}: {error_data}")
-
-        try:
-            for line in response:
-                if not line:
-                    continue
-                try:
-                    chunk = json.loads(line.decode("utf-8"))
-                except json.JSONDecodeError:
-                    continue
-
-                if "error" in chunk:
-                    raise RuntimeError(f"Ollama API returned an error during stream: {chunk['error']}")
-
+        async with http_stream(
+            f"{self.base_url.rstrip('/')}/api/chat",
+            payload,
+            headers=self.headers,
+            timeout=self._CHAT_TIMEOUT,
+            provider="Ollama",
+        ) as stream:
+            async for chunk in stream:
                 message = chunk.get("message") or {}
                 content = str(message.get("content") or "")
                 if content:
                     output_text.append(content)
                     if chunk_callback is not None:
                         await chunk_callback(content)
-
                 tool_calls = message.get("tool_calls") or []
                 if tool_calls and native_action is None:
                     native_action = self._action_from_tool_call(tool_calls[0])
-        finally:
-            self._client.close()
 
         if native_action is not None:
             return LLMActionResult(

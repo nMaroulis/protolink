@@ -34,6 +34,21 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.7.1] - Unreleased
+
+### Fixed
+
+- **Live LLM streaming:** Ollama now uses asynchronous HTTP reads for both JSON-action and native-tool streams, allowing `RunHandle.events()` consumers to receive `llm_chunk` while generation is still running. The same fix covers llama.cpp server, vLLM, LM Studio, and generic OpenAI-compatible servers.
+- **SDK and local streaming:** OpenAI, Anthropic, Gemini, DeepSeek, Hugging Face, and local llama.cpp open and read synchronous iterators on a worker, keeping the event loop available for consumers and cancellation. Callbacks stay on the application's event loop; native tool assembly is preserved.
+- **Stream cleanup:** HTTP responses and clients close on completion, cancellation, provider errors, and callback failures. The JSON-action fallback closes nested streams when interrupted. Synchronous SDK iterators close on their worker after any in-progress operation returns.
+- **HTTP stream handling:** Respect protocol completion markers, decode fragmented UTF-8 and lines, surface malformed JSON and provider errors, and forward Ollama custom headers or `OLLAMA_API_KEY` authentication to chat requests.
+
+### Changed
+
+- Include `httpx` explicitly in the `llms` extra. Minimal server-streaming installations can use `pip install protolink httpx`; the core package still requires only Pydantic.
+- Keep the existing API and event contract: `llm_chunk` carries incremental text, `llm_final` carries the complete answer, and terminal task status completes the run. Add explanatory docstrings, an embedded streaming guide, and corrected Hugging Face streaming documentation.
+- Add gated HTTP and SDK regression tests covering early delivery through `RunHandle.events()`, JSON-action and native-tool modes, tool assembly, cancellation, errors, and resource cleanup.
+
 ## [0.7.0] - 2026-09-11
 
 :::note Latest Release
