@@ -1526,7 +1526,7 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
 </ApiCallout>
 
 <ApiCallout label="Override compatibility">
-  The new <code>budget_enforcer</code> parameter is optional. When an Agent uses a custom <code>LLM.infer()</code> override with the pre-0.6.7 signature, it supplies the shared enforcer only if the override declares that keyword or accepts arbitrary keyword arguments.
+  The <code>budget_enforcer</code> parameter is optional. When an Agent uses a custom <code>LLM.infer()</code> override, it supplies the shared enforcer only if the override declares that keyword or accepts arbitrary keyword arguments.
 </ApiCallout>
 
 <ApiSection title="Examples">

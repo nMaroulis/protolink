@@ -7,7 +7,7 @@ import ApiReference, {
 
 # Flows
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
 
 Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact`, and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
 

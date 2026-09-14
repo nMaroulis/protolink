@@ -148,15 +148,15 @@ The original design described in the article used a RunContract to check whether
 checkpoint, a diff preview, or an explicit blocker. Those signals show workflow progress; they do not establish that
 a requested write executed.
 
-ProtoAgent's 0.2.2 migration to ProtoLink 0.7.0 uses native `CompletionCheck` and `CompletionValidator` over executed
+ProtoAgent uses native `CompletionCheck` and `CompletionValidator` over executed
 outcomes and current resource revisions. Approval, previews, and delegation alone do not count as a completed write.
 An explicit blocker preserves the reason work could not finish. The application defines its acceptance predicates
 and permits an initial attempt with at most two repairs through native Graph limits.
 
-ProtoLink 0.7.1 adds worker events and execution receipts to the parent's report, so applications can evaluate worker
+ProtoLink includes worker events and execution receipts in the parent's report, so applications can evaluate worker
 outcomes without composing separate RunStore snapshots. Its optional persistence redaction and checkpoint inventory
-also replace the corresponding application adapters. These library additions are unreleased; adopting them is a
-separate downstream migration. See [completion evidence](./execution-tools.md#completion-evidence-and-bounded-workflows).
+provide library APIs for the corresponding application adapters. Downstream applications can adopt these APIs
+through their own integration work. See [completion evidence](./execution-tools.md#completion-evidence-and-bounded-workflows).
 
 That pattern is broadly reusable. Any ProtoLink application can define domain-specific completion contracts: a support agent must cite a ticket, a data agent must attach a query result, a browser agent must produce a screenshot, or a deployment agent must emit a policy-reviewed change plan.
 

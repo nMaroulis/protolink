@@ -8,7 +8,7 @@ import ApiReference, {
 
 # Runtime
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
 
 Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part`, and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools, and any other agent application.
 
@@ -2181,7 +2181,7 @@ Read-only view that never calls an agent, tool, model, transport, or external se
     max_string_length: int | None = None,
     sensitive_values: frozenset[str] = frozenset(),
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/redaction.py#L32"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/redaction.py#L33"
 >
 
 Immutable recursive masking policy shared by runtime observability objects.
@@ -2794,7 +2794,7 @@ RunReportRecord(
     metadata: dict[str, Any] = {},
     created_at: str = <UTC timestamp>,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L24"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L69"
 >
 
 Immutable index records returned by `RunStore`. Payload dictionaries remain ordinary mutable values.
@@ -2851,7 +2851,7 @@ Immutable index records returned by `RunStore`. Payload dictionaries remain ordi
     def get_report(run_id: str) -> RunReport | None: ...
     def get_report_record(run_id: str) -> RunReportRecord | None: ...
     def list_report_records(...) -> list[RunReportRecord]: ...`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L92"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L93"
 >
 
 Synchronous structural persistence contract for task snapshots and reports.
@@ -2900,7 +2900,7 @@ Synchronous structural persistence contract for task snapshots and reports.
     read_only: bool = False,
     redaction_policy: RedactionPolicy | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L156"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L157"
 >
 
 Dependency-free SQLite implementation using a fresh synchronous connection per operation and JSON payload columns with relational lookup indexes.
@@ -2959,7 +2959,7 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
     agent_name: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> TaskRecord`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L230"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L256"
 >
 
 <ApiSection title="Parameters">
@@ -3003,7 +3003,7 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
     state: str | TaskState | None = None,
     agent_name: str | None = None,
 ) -> list[TaskRecord]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L289"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L315"
 >
 
 <ApiSection title="Parameters">
@@ -3038,7 +3038,7 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
     agent_name: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> RunReportRecord`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L323"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L363"
 >
 
 <ApiSection title="Parameters">
@@ -3090,7 +3090,7 @@ store.list_report_records(
 ) -> list[RunReportRecord]
 store.delete_task(task_id: str) -> None
 store.delete_report(run_id: str) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L278"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L157"
 >
 
 <ApiSection title="Parameters">

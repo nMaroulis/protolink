@@ -67,7 +67,7 @@ agent = Agent(
 )
 ```
 
-The default `a2a=False` is the pre-0.6.6 behavior: HTTP serves ProtoLink's
+With the default `a2a=False`, HTTP serves ProtoLink's
 native task, card, status, health, chat, and control endpoints, and outbound
 calls use the native contract. `a2a=True` requires the exact HTTP transport and
 adds both:
@@ -257,7 +257,7 @@ canceled through this client while the initial call is still blocked. In
 `A2AClientError` when no mapping exists; it never guesses by sending the local
 ID to ProtoLink's native cancellation route.
 
-## Roadmap beyond 0.6.6
+## Roadmap
 
 The following A2A 1.0 capabilities remain future work and are advertised as
 disabled today:

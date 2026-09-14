@@ -8,7 +8,7 @@ import ApiReference, {
 
 # Storage
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
 
 ProtoLink provides pluggable storage for Agent state, process-local caches, and
 durable execution records. Persistence depends on the selected backend:
@@ -724,7 +724,7 @@ Open a local run store with `protolink dashboard --store runs.db --open`.
     created_at: str | None = None,
     updated_at: str = field(default_factory=utc_now),
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L24"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L25"
 >
 
 Represent the searchable index fields and serialized payload for one persisted
@@ -778,7 +778,7 @@ task snapshot.
   kind="method"
   path="protolink.storage.TaskRecord.to_dict"
   signature={`to_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L51"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L52"
 >
 
 Return all task-record fields in a serialization-friendly mapping.
@@ -808,7 +808,7 @@ Return all task-record fields in a serialization-friendly mapping.
     metadata: dict[str, Any] = field(default_factory=dict),
     created_at: str = field(default_factory=utc_now),
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L68"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L69"
 >
 
 Represent the indexed identity and serialized payload for one persisted
@@ -853,7 +853,7 @@ Represent the indexed identity and serialized payload for one persisted
   kind="method"
   path="protolink.storage.RunReportRecord.to_dict"
   signature={`to_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L79"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L80"
 >
 
 Return all run-report record fields in a new outer mapping.
@@ -875,7 +875,7 @@ Return all run-report record fields in a new outer mapping.
   kind="protocol"
   path="protolink.storage.RunStore"
   signature={`class RunStore(Protocol)`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L92"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L93"
 >
 
 Define the structural interface an Agent can use for durable task and report
@@ -936,7 +936,7 @@ protocol itself cannot be instantiated.
     read_only: bool = False,
     redaction_policy: RedactionPolicy | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L156"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L157"
 >
 
 Implement `RunStore` with two SQLite tables: one for task snapshots and one for
@@ -1013,7 +1013,7 @@ relational columns index common lookup fields.
     agent_name: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> TaskRecord`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L230"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L256"
 >
 
 Serialize and upsert one task snapshot together with indexed run correlation.
@@ -1066,7 +1066,7 @@ Serialize and upsert one task snapshot together with indexed run correlation.
   signature={`get_task(
     task_id: str,
 ) -> Task | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L278"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L304"
 >
 
 Load a task record and reconstruct its domain model.
@@ -1106,7 +1106,7 @@ Load a task record and reconstruct its domain model.
   signature={`get_task_record(
     task_id: str,
 ) -> TaskRecord | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L283"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L309"
 >
 
 Load the indexed record without reconstructing a `Task`.
@@ -1142,7 +1142,7 @@ Load the indexed record without reconstructing a `Task`.
     state: str | TaskState | None = None,
     agent_name: str | None = None,
 ) -> list[TaskRecord]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L289"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L315"
 >
 
 Query task records with conjunctive optional filters, ordered by newest
@@ -1192,7 +1192,7 @@ Query task records with conjunctive optional filters, ordered by newest
     agent_name: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> RunReportRecord`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L323"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L363"
 >
 
 Serialize and upsert one complete run report.
@@ -1252,7 +1252,7 @@ Serialize and upsert one complete run report.
   signature={`get_report(
     run_id: str,
 ) -> RunReport | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L367"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L411"
 >
 
 Load a report record and reconstruct the `RunReport`.
@@ -1284,7 +1284,7 @@ Load a report record and reconstruct the `RunReport`.
   signature={`get_report_record(
     run_id: str,
 ) -> RunReportRecord | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L372"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L416"
 >
 
 Load the indexed and serialized record without reconstructing a `RunReport`.
@@ -1318,7 +1318,7 @@ Load the indexed and serialized record without reconstructing a `RunReport`.
     session_id: str | None = None,
     agent_name: str | None = None,
 ) -> list[RunReportRecord]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L378"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L422"
 >
 
 Query recent run-report records with optional session and agent filters.
@@ -1355,7 +1355,7 @@ Query recent run-report records with optional session and agent filters.
   signature={`delete_task(
     task_id: str,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L403"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L461"
 >
 
 Delete one task snapshot by primary key.
@@ -1386,7 +1386,7 @@ Delete one task snapshot by primary key.
   signature={`delete_report(
     run_id: str,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L409"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L467"
 >
 
 Delete one run report by primary key.
@@ -1419,7 +1419,7 @@ Delete one run report by primary key.
   kind="class"
   path="protolink.StorageCheckpointStore"
   signature={`StorageCheckpointStore(storage: Storage)`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py#L164"
 >
 
 Adapt a dedicated Storage namespace to the `CheckpointStore` protocol for durable resource recovery.
@@ -1468,7 +1468,7 @@ inventory never executes a continuation or changes the recovery state. Storage a
     run_id: str | None = None,
     task_id: str | None = None,
 ) -> list[ResourceChange]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py#L187"
 >
 
 Load the namespace once and list records in reverse insertion order. All supplied filters match exactly and combine
@@ -1630,9 +1630,9 @@ class PersistentAgent(Agent):
         return await super().handle_task(task)
 ```
 
-### State System Integration (v0.5.5+)
+### State System Integration
 
-Starting with version **v0.5.5**, ProtoLink includes a unified **State** system.
+ProtoLink includes a unified **State** system.
 When you provide a `storage` instance and enable `conversation`, the
 conversation module automatically performs whole-payload `load()` and `save()`
 operations. The `tools`, `task`, and `flow` modules currently expose

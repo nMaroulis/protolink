@@ -1,9 +1,8 @@
 # Execution, approvals, and recovery
 
-The core primitives were introduced in **0.7.0**. **0.7.1 (unreleased)** adds delegated worker evidence,
-storage redaction, and checkpoint inventory, alongside live streaming fixes. These optional, dependency-free primitives let applications supply their own roles,
-workflows, policies, storage, credentials, and UI while ProtoLink handles execution and lifecycle. The `Agent`
-constructor and ordinary tool and delegation contracts remain compatible with 0.6.9.
+These optional primitives let applications supply their own roles, workflows, policies, storage, credentials,
+and UI while ProtoLink handles execution and lifecycle. They cover command execution, recoverable file changes,
+approvals, delegated evidence, completion checks, and checkpoint inventory without adding base-package dependencies.
 
 ## Command execution
 
