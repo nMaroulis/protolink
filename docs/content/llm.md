@@ -110,7 +110,7 @@ ProtoLink groups model backends into hosted APIs, model servers, and in-process 
     - `GeminiLLM`: Google GenAI API, including native function declarations.
     - `DeepSeekLLM`: DeepSeek Chat Completions API, with optional native tools.
     - `GrokLLM`: xAI Chat Completions API, with optional native tools.
-    - `HuggingFaceLLM`: Hugging Face Inference API for non-streaming direct calls.
+    - `HuggingFaceLLM`: Hugging Face Inference API for direct and streamed text, with JSON-action inference.
 
 - **Server** - connects to a model server that you run locally or remotely:
     - `OllamaLLM`: connects to an Ollama `/api/chat` endpoint.
@@ -148,7 +148,7 @@ Configuration varies by backend, but the first successful model interaction foll
 
 :::info[Choosing LLM extras]
 
-If you only need a subset of providers, install their SDKs directly instead of the `llms` extra, which installs every supported integration. Server and local adapters may not need a hosted-provider SDK.
+If you only need a subset of providers, install their SDKs directly instead of the `llms` extra, which installs every supported integration. For Ollama or an OpenAI-compatible server, `uv add protolink httpx` is enough for streaming; HTTPX is also included in `protolink[llms]` and `protolink[http]`. Core Protolink still requires only Pydantic.
 
 :::
 
@@ -258,6 +258,66 @@ Direct inference is available for custom runtimes, but passing a `tools` diction
 - `infer(streaming=True)` still returns one final `Part`. Intermediate model text is emitted as `llm_chunk` events through the inference event callback while the runtime waits for a complete, validated action.
 
 This distinction lets an Agent show live progress without dispatching a partial or malformed tool request.
+
+### Stream into your application
+
+`RunHandle` starts an Agent task and exposes live, typed events. No network transport is required for an embedded Agent:
+
+```python
+import asyncio
+
+from protolink import Agent, RunHandle, Task, create_llm
+
+
+async def main():
+    agent = Agent(
+        {
+            "name": "assistant",
+            "description": "Embedded assistant",
+            "url": "runtime://assistant",
+            "capabilities": {"streaming": True},
+        },
+        llm=create_llm("ollama", base_url="http://localhost:11434", model="gemma4:e4b"),
+        verbosity=0,
+    )
+    handle = RunHandle.start(agent, Task.create_infer(prompt="Explain streaming briefly."))
+    try:
+        async for event in handle.events():
+            kind = event.payload.get("llm_event_type")
+            if kind == "llm_chunk":
+                print(event.payload["content"], end="", flush=True)
+            elif kind == "llm_final":
+                print("\nComplete answer:", event.payload["content"])
+        result = await handle.result()
+        print("Task status:", result.status)
+    finally:
+        await handle.cancel()  # No-op when the task has already completed.
+
+
+asyncio.run(main())
+```
+
+`llm_chunk` carries each text fragment immediately. In default JSON-action mode, those fragments are raw action JSON, so a UI should show them as generation progress and use `llm_final` for the complete answer. With a model configured for native tools (`supports_tool_calling=True` on Ollama and other server adapters), text chunks are ordinary model text; tool arguments are accumulated separately and dispatched only after a complete action is validated. A tool-only response can have no text chunks.
+
+`llm_final` remains the model's completion event. Continue reading until the terminal task status to receive artifacts and the final task state. `handle.result()` returns the completed result; it does not provide incremental output. Each `handle.events()` subscriber receives recorded history followed by new events. Closing a subscriber leaves the shared run active; use `await handle.cancel()` when the application wants to stop generation.
+
+### Streaming lifecycle and provider behavior
+
+Ollama, llama.cpp server, vLLM, LM Studio, and generic OpenAI-compatible streams use asynchronous HTTP reads. Requests preserve custom headers, HTTPS URLs, and base-path prefixes. Responses and their request-scoped clients close on completion, cancellation, callback failure, or provider errors. Ollama's `done` and SSE's `[DONE]` markers end the response without waiting for the server to close its connection. Invalid JSON and provider error frames fail the stream rather than silently discarding output.
+
+OpenAI, Anthropic, Gemini, DeepSeek, Hugging Face, and local llama.cpp use their existing synchronous SDK iterators on a dedicated worker per stream. Opening, reading, and closing happen on that worker; text callbacks run on the application's event loop. Only the next item is requested, so the adapter does not accumulate a background queue. Cancellation stops the async consumer promptly, but Python cannot interrupt an SDK read or model evaluation already executing: the worker closes the iterator after that operation returns or times out. Grok already uses asynchronous HTTP streaming.
+
+For direct streams, close the iterator if the consumer stops early:
+
+```python
+from contextlib import aclosing
+
+async with aclosing(llm.chat("Hello", streaming=True)) as chunks:
+    async for chunk in chunks:
+        print(chunk, end="", flush=True)
+```
+
+Custom adapters must also avoid synchronous network reads inside `async def` methods. Awaiting an unbounded queue's `put()` does not guarantee that event consumers can run. `call_action_stream()` must await each text callback and assemble a complete action before returning it. See the [HTTPX async streaming](https://www.python-httpx.org/async/#streaming-responses) and [Ollama streaming](https://docs.ollama.com/api/streaming) protocol references.
 
 ### Tools and delegated Agents stay behind a runtime boundary
 
@@ -1466,7 +1526,7 @@ Run the controlled multi-step inference loop used by `Agent`. The model declares
 </ApiCallout>
 
 <ApiCallout label="Override compatibility">
-  The new <code>budget_enforcer</code> parameter is optional. When an Agent uses a custom <code>LLM.infer()</code> override with the pre-0.6.7 signature, it supplies the shared enforcer only if the override declares that keyword or accepts arbitrary keyword arguments.
+  The <code>budget_enforcer</code> parameter is optional. When an Agent uses a custom <code>LLM.infer()</code> override, it supplies the shared enforcer only if the override declares that keyword or accepts arbitrary keyword arguments.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -1908,7 +1968,7 @@ Check whether the provider client, server, or local model can respond.
 
 Hosted-provider adapters read credentials from their conventional environment variable when `api_key` is omitted. They all implement direct `call()`, `call_stream()`, and `validate_connection()` methods and inherit `chat()`, history management, compaction, metrics, and the controlled `infer()` loop.
 
-OpenAI, Anthropic, and Gemini always acquire actions through their provider-native function interface. DeepSeek and Grok use native Chat Completions tools by default but can be forced into portable JSON mode. Hugging Face currently supports non-streaming text generation only, so it is best suited to direct `call()` or `chat(..., streaming=False)` usage.
+OpenAI, Anthropic, and Gemini always acquire actions through their provider-native function interface. DeepSeek and Grok use native Chat Completions tools by default but can be forced into portable JSON mode. Hugging Face supports direct and streamed text and uses the portable JSON-action protocol for inference.
 
 - **OpenAI** - `OpenAILLM`, default model `gpt-4o-mini`, credential `OPENAI_API_KEY`.
 - **Anthropic** - `AnthropicLLM`, default model `claude-sonnet-4-20250514`, credential `ANTHROPIC_API_KEY`.
@@ -2196,9 +2256,9 @@ llm = GrokLLM(model="grok-4-latest")
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/hugging_face_client.py#L16"
 >
 
-Hugging Face Inference API adapter for non-streaming direct calls. It is useful when a hosted Hub model is available through the inference service and you want that model behind the same `LLM` interface.
+Hugging Face Inference API adapter for direct and streamed chat completions. It is useful when a hosted Hub model is available through the inference service and you want that model behind the same `LLM` interface.
 
-Pass an explicit Hub model identifier. The current adapter does not implement a usable text stream or provider-native actions, and only part of `model_params` is forwarded by `call()`, so choose another adapter when streaming or agent tool loops are required.
+Pass an explicit Hub model identifier. The adapter streams text deltas and uses JSON-action fallback for Agent inference; it does not send native tool declarations. The selected model must support chat completions and follow the JSON action prompt. Only part of `model_params` is forwarded by `call()` and `call_stream()`.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="HuggingFaceLLM parameters">
@@ -2214,8 +2274,8 @@ Pass an explicit Hub model identifier. The current adapter does not implement a 
   </ApiFields>
 </ApiSection>
 
-<ApiCallout label="Streaming limitation">
-  <code>HuggingFaceLLM.call_stream()</code> is not implemented yet and currently yields one empty string. Do not use <code>chat(..., streaming=True)</code> or <code>infer(streaming=True)</code> with this adapter.
+<ApiCallout label="Streaming">
+  <code>chat(..., streaming=True)</code> yields text deltas. Agent inference forwards the same deltas as <code>llm_chunk</code> events and parses one JSON action after the stream finishes.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -2264,7 +2324,7 @@ JSON action mode is the default because local-model tool reliability depends on 
       Ollama server root. Falls back to <code>OLLAMA_URL</code>; if neither is supplied, construction raises <code>ValueError</code>.
     </ApiField>
     <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
-      Accepted by the constructor, but the current request path does not forward custom headers.
+      Headers forwarded to chat requests. When omitted, <code>OLLAMA_API_KEY</code> supplies a bearer token if set. Pass an explicit dictionary to override that environment-based authentication.
     </ApiField>
     <ApiField name="model" type="str | None" defaultValue="None">
       Ollama model name. <code>None</code> resolves to <code>gemma4:e4b</code>.

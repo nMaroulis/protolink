@@ -1,8 +1,8 @@
 # Execution, approvals, and recovery
 
-Available in **0.7.0**. These optional, dependency-free primitives let applications supply their own roles,
-workflows, policies, storage, credentials, and UI while ProtoLink handles execution and lifecycle. The `Agent`
-constructor and ordinary tool and delegation contracts remain compatible with 0.6.9.
+These optional primitives let applications supply their own roles, workflows, policies, storage, credentials,
+and UI while ProtoLink handles execution and lifecycle. They cover command execution, recoverable file changes,
+approvals, delegated evidence, completion checks, and checkpoint inventory without adding base-package dependencies.
 
 ## Command execution
 
@@ -115,6 +115,8 @@ Configure each Agent normally, including its LLM, transport, policy, approval ha
 Transport-free agents use direct invocation; `runtime://` supports local discovery and delegation without sockets.
 Network transports use their existing implementations. The group adds no global registry or orchestration roles.
 
+For live model output, enable `capabilities={"streaming": True}` on the Agent card and inspect `event.payload.get("llm_event_type")`. `llm_chunk` carries incremental text in `event.payload["content"]`; `llm_final` carries the complete answer. JSON-action models stream raw JSON fragments, while native-tool models stream ordinary text and assemble tool calls separately. Continue to the terminal task status before treating the whole run as complete. See the [embedded streaming example](./llm.md#stream-into-your-application).
+
 `RunHandle.start(agent_or_url, task, *, client=None, store=None, redaction_policy=None)` is also usable without a
 group. URL targets require an existing `AgentClient`. The handle consumes the task once, even when only `result()`
 is awaited. `events()` yields typed `RunEvent` objects, including history for later subscribers. `cancel(reason)`
@@ -128,6 +130,25 @@ permits retries for other operations. The handle never retries or replays that o
 streaming return a final task and its
 recorded native events; streaming transports provide live events. `handle.report` provides an interim or final
 `RunReport`. Reports use an explicit `store` or the local Agent's existing `run_store` when configured.
+
+### Delegated worker evidence
+
+Model-driven delegation automatically includes worker events and execution receipts in the parent's stream,
+`task.metadata["run_events"]`, and `RunReport`. Native peers advertising streaming on a capable transport deliver
+events while the worker runs. A worker overriding only `handle_task()` is advertised without streaming so its
+custom handler remains authoritative. Other peers and older `call_agent()` overrides contribute receipts from the returned task snapshot.
+A2A peers contribute only the evidence present in their mapped task response.
+
+Worker `event_id`, `run_id`, `task_id`, `agent_name`, and `action_id` stay intact. `parent_action_id` and
+`delegation_id` link worker events to the calling action; existing links from nested delegation are preserved.
+The parent stream assigns its own sequence numbers and retains `source_sequence`, `source_final`, and
+`parent_run_id` in envelope metadata. Forwarded child events have `final=False`; the original payload is unchanged.
+Only the parent's terminal task status closes the parent run. Returned artifacts are also retained on the parent.
+
+Streamed events and final snapshot receipts are deduplicated by event ID. Failed and canceled workers retain
+observed evidence. A disconnected stream or missing terminal task fails the delegation with unknown remote effects
+and is never resubmitted. `CompletionValidator` can inspect executed worker outcomes directly from the parent;
+an `agent.call` receipt by itself does not count as a tool execution.
 
 ## Approval adapters and reconnects
 
@@ -226,6 +247,27 @@ Recovery storage is a dedicated namespace with one live writer. Keep it outside 
 It contains lossless original bytes, so protect it as application data. Resource recovery, conversation history, and
 execution suspension/resumption are separate concepts. Multiple file writes are not an atomic transaction, and
 arbitrary process/tool effects are not reversible.
+
+### Checkpoint inventory
+
+```python
+recent = checkpoints.list_changes(limit=20)
+uncertain = checkpoints.list_changes(state="uncertain", resource_id="/absolute/workspace/note.txt")
+run_changes = checkpoints.list_changes(run_id=run_id, task_id=task_id, limit=20, offset=20)
+```
+
+`list_changes(*, limit=100, offset=0, state=None, resource_id=None, run_id=None, task_id=None)` returns detached
+`ResourceChange` records, most recently inserted first. Filters match exactly and combine with AND; pagination
+applies after filtering. Negative limits or offsets raise `ValueError`; a zero limit returns an empty list.
+Updating or restoring a record does not move it. Run/task filters identify the original write, with restoration
+identifiers available on each result. The Storage adapter loads its dedicated namespace once per query.
+
+Inventory does not inspect files, alter states, or resume work. Results contain original recovery bytes and need
+the same protection as `get(change_id)`. Use a redacted presentation copy for a UI; preserve the protected record
+for restoration. Existing custom checkpoint stores need to implement `list_changes()` to expose inventory.
+
+See the [checkpoint storage API reference](./storage.md#checkpoint-recovery-records) for the constructor, method
+signatures, individual parameters, returned fields, and errors.
 
 ## Completion evidence and bounded workflows
 

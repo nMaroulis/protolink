@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_anthropic
+from protolink.llms._streaming import threaded_stream
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
@@ -95,17 +96,24 @@ class AnthropicLLM(APILLM):
         return self._parse_output(response)
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        """Generate a streaming response using Anthropic Messages API."""
+        """Yield text while synchronous SDK reads run on a dedicated worker.
+
+        The event loop stays available to consumers. Close this iterator when
+        stopping early; cleanup waits for any in-progress SDK operation to
+        return on the worker. Text parsing happens on the caller's event loop.
+        """
         params = dict(self._model_params)
         system_prompt, messages = self._to_anthropic_request_parts(history)
 
-        with self._client.messages.stream(
-            model=self.model,
-            system=system_prompt,
-            messages=messages,
-            **params,
+        async with threaded_stream(
+            lambda: self._client.messages.stream(
+                model=self.model,
+                system=system_prompt,
+                messages=messages,
+                **params,
+            )
         ) as stream:
-            for event in stream:
+            async for event in stream:
                 if event.type != "content_block_delta":
                     continue
 
@@ -194,8 +202,8 @@ class AnthropicLLM(APILLM):
         tool_input_chunks: list[str] = []
         tool_input_obj: dict[str, Any] | None = None
 
-        with self._client.messages.stream(**request) as stream:
-            for event in stream:
+        async with threaded_stream(lambda: self._client.messages.stream(**request)) as stream:
+            async for event in stream:
                 event_type = str(getattr(event, "type", ""))
                 if event_type == "content_block_start":
                     block = getattr(event, "content_block", None)

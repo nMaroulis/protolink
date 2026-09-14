@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_gemini
+from protolink.llms._streaming import threaded_stream
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
@@ -94,20 +95,26 @@ class GeminiLLM(APILLM):
         return response.text  # The SDK exposes a .text attribute
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        """Generate a streaming response using Gemini's streaming endpoint."""
+        """Yield text while synchronous SDK reads run on a dedicated worker.
+
+        The event loop stays available to consumers. Close this iterator when
+        stopping early; cleanup waits for any in-progress SDK operation to
+        return on the worker. Text parsing happens on the caller's event loop.
+        """
         prompt = "\n".join(msg["content"] for msg in history.messages)
 
         params = dict(self._model_params)
         config = self._GenerateContentConfig(**params)
-        stream = self._client.models.generate_content_stream(
-            model=self.model,
-            contents=prompt,
-            config=config,
-        )
-
-        for chunk in stream:
-            # Each chunk has a `.text` field with incremental text
-            yield chunk.text
+        async with threaded_stream(
+            lambda: self._client.models.generate_content_stream(
+                model=self.model,
+                contents=prompt,
+                config=config,
+            )
+        ) as stream:
+            async for chunk in stream:
+                if chunk.text:
+                    yield chunk.text
 
     def call_action(
         self,
@@ -167,30 +174,31 @@ class GeminiLLM(APILLM):
             params["tools"] = [{"function_declarations": declarations}]
 
         config = self._GenerateContentConfig(**params)
-        stream = self._client.models.generate_content_stream(
-            model=self.model,
-            contents=prompt,
-            config=config,
-        )
-
         output_text: list[str] = []
         function_name: str | None = None
         function_args: dict[str, Any] | None = None
 
-        for chunk in stream:
-            for candidate in getattr(chunk, "candidates", []) or []:
-                content = getattr(candidate, "content", None)
-                for part in getattr(content, "parts", []) or []:
-                    function_call = getattr(part, "function_call", None)
-                    if function_call is not None:
-                        function_name = str(function_call.name)
-                        function_args = dict(getattr(function_call, "args", {}) or {})
+        async with threaded_stream(
+            lambda: self._client.models.generate_content_stream(
+                model=self.model,
+                contents=prompt,
+                config=config,
+            )
+        ) as stream:
+            async for chunk in stream:
+                for candidate in getattr(chunk, "candidates", []) or []:
+                    content = getattr(candidate, "content", None)
+                    for part in getattr(content, "parts", []) or []:
+                        function_call = getattr(part, "function_call", None)
+                        if function_call is not None:
+                            function_name = str(function_call.name)
+                            function_args = dict(getattr(function_call, "args", {}) or {})
 
-            text = str(getattr(chunk, "text", "") or "")
-            if text:
-                output_text.append(text)
-                if chunk_callback is not None:
-                    await chunk_callback(text)
+                text = str(getattr(chunk, "text", "") or "")
+                if text:
+                    output_text.append(text)
+                    if chunk_callback is not None:
+                        await chunk_callback(text)
 
         if function_name:
             action = native_tool_call_to_action(function_name, function_args or {})

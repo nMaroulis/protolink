@@ -1714,7 +1714,10 @@ Coarse capability and capacity declaration carried by an `AgentCard`. These valu
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="AgentCapabilities constructor parameters">
     <ApiField name="streaming" type="bool" defaultValue="False">
-      Advertises that the agent can produce task events through a streaming-capable transport. The selected transport must also support streaming.
+      Advertises that the agent can produce task events through a streaming-capable transport. Assigning an Agent's
+      transport derives this flag from transport support and handler compatibility: overriding only
+      <code>handle_task()</code> leaves it false until a streaming handler is also supplied. Model-driven delegation
+      checks this flag before choosing a native subscription.
     </ApiField>
     <ApiField name="push_notifications" type="bool" defaultValue="False">
       Advertises webhook or other push delivery for task updates. The flag is descriptive and does not configure a callback endpoint.

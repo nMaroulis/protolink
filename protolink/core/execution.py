@@ -71,6 +71,20 @@ def current_task() -> Task | None:
     return _scope.get()[0]
 
 
+@contextmanager
+def isolate_event_sink() -> Iterator[None]:
+    """Keep unary in-process peers from inheriting a caller's live event observer.
+
+    Worker task receipts still persist normally and can be merged from the
+    response, just as they are across a network transport boundary.
+    """
+    token = _scope.set((current_task(), None))
+    try:
+        yield
+    finally:
+        _scope.reset(token)
+
+
 @asynccontextmanager
 async def closing_stream(source: AsyncIterator[Any]) -> AsyncIterator[AsyncIterator[Any]]:
     """Close nested generators promptly when a stream consumer leaves."""
@@ -86,7 +100,7 @@ async def emit_runtime_event(
     event_type: str, context: RunContext, *, action_id: str | None = None, **payload: Any
 ) -> RunEvent:
     """Record a native event and notify an optional, non-authoritative observer."""
-    task, sink = _scope.get()
+    task = current_task()
     try:
         serialized = Serializer.serialize_to_dict(payload)
     except (TypeError, ValueError):
@@ -101,6 +115,13 @@ async def emit_runtime_event(
     )
     if _events_suppressed.get():
         return event
+    await publish_runtime_event(event)
+    return event
+
+
+async def publish_runtime_event(event: RunEvent) -> None:
+    """Retain an existing event's identity when recording it in the active task."""
+    task, sink = _scope.get()
     if task is not None:
         task.metadata.setdefault("run_events", []).append(event.to_dict())
     if sink is not None:
@@ -109,7 +130,6 @@ async def emit_runtime_event(
         except Exception:
             # An observer failure cannot invalidate an already committed effect.
             pass
-    return event
 
 
 @dataclass(frozen=True)

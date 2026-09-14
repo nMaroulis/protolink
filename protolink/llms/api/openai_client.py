@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_openai
+from protolink.llms._streaming import threaded_stream
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
@@ -83,22 +84,28 @@ class OpenAILLM(APILLM):
         return self._parse_output(response)
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        """Generate a streaming response using OpenAI Responses API."""
+        """Yield text while synchronous SDK reads run on a dedicated worker.
+
+        The event loop stays available to consumers. Close this iterator when
+        stopping early; cleanup waits for any in-progress SDK operation to
+        return on the worker. Text parsing happens on the caller's event loop.
+        """
         params = dict(self._model_params)
-        stream = self._client.responses.create(
-            model=self.model,
-            input=history.messages,
-            stream=True,
-            **params,
-        )
+        async with threaded_stream(
+            lambda: self._client.responses.create(
+                model=self.model,
+                input=history.messages,
+                stream=True,
+                **params,
+            )
+        ) as stream:
+            async for event in stream:
+                # We only care about output text deltas
+                if event.type != "response.output_text.delta":
+                    continue
 
-        for event in stream:
-            # We only care about output text deltas
-            if event.type != "response.output_text.delta":
-                continue
-
-            # event.delta is a string chunk - yield only the new chunk
-            yield event.delta
+                # event.delta is a string chunk - yield only the new chunk
+                yield event.delta
 
     def call_action(
         self,
@@ -162,37 +169,39 @@ class OpenAILLM(APILLM):
             params.setdefault("tool_choice", "auto")
             params.setdefault("parallel_tool_calls", False)
 
-        stream = self._client.responses.create(model=self.model, input=history.messages, stream=True, **params)
         output_text: list[str] = []
         function_name: str | None = None
         function_args: list[str] = []
         call_id: str | None = None
 
-        for event in stream:
-            event_type = str(getattr(event, "type", ""))
-            if event_type == "response.output_text.delta":
-                delta = str(getattr(event, "delta", "") or "")
-                if delta:
-                    output_text.append(delta)
-                    if chunk_callback is not None:
-                        await chunk_callback(delta)
-                continue
+        async with threaded_stream(
+            lambda: self._client.responses.create(model=self.model, input=history.messages, stream=True, **params)
+        ) as stream:
+            async for event in stream:
+                event_type = str(getattr(event, "type", ""))
+                if event_type == "response.output_text.delta":
+                    delta = str(getattr(event, "delta", "") or "")
+                    if delta:
+                        output_text.append(delta)
+                        if chunk_callback is not None:
+                            await chunk_callback(delta)
+                    continue
 
-            if "function_call_arguments" in event_type:
-                delta = getattr(event, "delta", None)
-                if delta:
-                    function_args.append(str(delta))
-                arguments = getattr(event, "arguments", None)
-                if arguments:
-                    function_args = [str(arguments)]
+                if "function_call_arguments" in event_type:
+                    delta = getattr(event, "delta", None)
+                    if delta:
+                        function_args.append(str(delta))
+                    arguments = getattr(event, "arguments", None)
+                    if arguments:
+                        function_args = [str(arguments)]
 
-            item = getattr(event, "item", None)
-            if getattr(item, "type", None) == "function_call":
-                function_name = str(getattr(item, "name", "") or function_name or "")
-                call_id = getattr(item, "call_id", call_id)
-                arguments = getattr(item, "arguments", None)
-                if arguments:
-                    function_args = [str(arguments)]
+                item = getattr(event, "item", None)
+                if getattr(item, "type", None) == "function_call":
+                    function_name = str(getattr(item, "name", "") or function_name or "")
+                    call_id = getattr(item, "call_id", call_id)
+                    arguments = getattr(item, "arguments", None)
+                    if arguments:
+                        function_args = [str(arguments)]
 
         if function_name:
             action = native_tool_call_to_action(function_name, parse_json_arguments("".join(function_args) or "{}"))

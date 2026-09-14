@@ -16,9 +16,11 @@ from typing import Any
 from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError
 from protolink.core.cancellation import ActiveTaskExecution, CancellationToken, mark_task_canceled
+from protolink.core.delegation import DelegationRecorder
 from protolink.core.execution import (
     ToolExecution,
     closing_stream,
+    current_task,
     execute_authorized_tool,
     execution_scope,
     record_task_blocker,
@@ -430,7 +432,14 @@ class AgentExecutionMixin(_AgentMixinBase):
             self._finalize_task_state(task, outputs)
             self._persist_task_snapshot(task)
 
+            emitted_artifacts = {
+                event.get("payload", {}).get("artifact", {}).get("id")
+                for event in task.metadata.get("run_events", [])
+                if event.get("type") == "task.artifact"
+            }
             for artifact in task.artifacts:
+                if artifact.id in emitted_artifacts:
+                    continue
                 yield TaskArtifactUpdateEvent(task_id=task.id, artifact=artifact)
 
             yield TaskStatusUpdateEvent(
@@ -1194,9 +1203,12 @@ class AgentExecutionMixin(_AgentMixinBase):
             )
 
         external_observer_disabled = False
+        delegation_action_id: str | None = None
 
         async def emit_inference_event(event: dict[str, Any]) -> None:
-            nonlocal external_observer_disabled
+            nonlocal external_observer_disabled, delegation_action_id
+            if event.get("type") == "agent_call_start":
+                delegation_action_id = event.get("action_id")
             public_event = self._sanitize_knowledge_tool_event(event)
             self._record_inference_action_result(task, public_event)
             if self.telemetry:
@@ -1317,6 +1329,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 action,
                 payload,
                 parent_context=active_context,
+                parent_action_id=delegation_action_id,
             )
 
         infer_kwargs: dict[str, Any] = {
@@ -1797,6 +1810,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         payload: dict[str, Any],
         *,
         parent_context: RunContext | None = None,
+        parent_action_id: str | None = None,
     ) -> Any:
         """
         Handle agent delegation from the LLM inference loop.
@@ -1811,6 +1825,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 remote agent to generate a response).
             payload: The full agent_call payload from the LLM, containing tool/args or prompt.
             parent_context: Optional active context used to create a correlated child run for delegated work.
+            parent_action_id: Runtime delegation action linked to the child's events.
 
         Returns:
             The result from the delegated agent (typically the last part content from the response task).
@@ -1846,10 +1861,16 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         async def call_delegated_task(task: Task) -> Any:
             request_item_ids = frozenset(item.id for item in (*task.messages, *task.artifacts))
-            if parent_context is not None:
-                parent_context.child(agent_name=agent_name).attach_to_task(task)
+            child_context = (parent_context or RunContext(agent_chain=[self.card.name])).child(agent_name=agent_name)
+            child_context.attach_to_task(task)
+            parent_task = current_task()
+            recorder = DelegationRecorder(parent_task, child_context, parent_action_id)
+            result_task = task
             try:
-                result_task = await self.call_agent(agent_url, task)
+                if _accepts_keyword_argument(self.call_agent, "event_sink"):
+                    result_task = await self.call_agent(agent_url, task, event_sink=recorder)
+                else:
+                    result_task = await self.call_agent(agent_url, task)
             except asyncio.CancelledError:
                 self._schedule_delegated_cancellation(
                     agent_url,
@@ -1857,6 +1878,10 @@ class AgentExecutionMixin(_AgentMixinBase):
                     "Parent task was canceled",
                 )
                 raise
+            finally:
+                await recorder.capture(result_task)
+                if parent_task is not None:
+                    self._persist_task_snapshot(parent_task)
             return self._require_completed_delegation(
                 result_task,
                 agent_name,

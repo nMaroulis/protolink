@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from protolink.core.actions import RunAction
     from protolink.core.budget import BudgetEnforcer
     from protolink.core.cancellation import CancellationToken, TaskCancellationRequest, TaskExecutionRegistry
+    from protolink.core.events import EventSink
     from protolink.core.policy import ActionAuthorization, ActionAuthorizer
     from protolink.core.run_context import RunContext
     from protolink.llms.base import LLM
@@ -112,6 +113,7 @@ class _AgentMixinBase(Protocol):
         task: Task,
         *,
         protocol: Literal["auto", "protolink", "a2a"] = "auto",
+        event_sink: EventSink | None = None,
     ) -> Task: ...
 
     async def run_task(self, task: Task) -> Task: ...

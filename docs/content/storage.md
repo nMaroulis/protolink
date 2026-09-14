@@ -8,7 +8,7 @@ import ApiReference, {
 
 # Storage
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional 0.7.0 process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
 
 ProtoLink provides pluggable storage for Agent state, process-local caches, and
 durable execution records. Persistence depends on the selected backend:
@@ -25,6 +25,8 @@ Protolink currently supports the following storage implementations:
   time-to-live expiration.
 - **`SQLiteRunStore`** - indexed task snapshots and run reports for replay,
   audit, and regression workflows.
+- **`StorageCheckpointStore`** - recovery records and filtered inventory over a dedicated `Storage` namespace,
+  imported from `protolink` or `protolink.core.resources`.
 
 You can implement a custom state backend by subclassing `Storage`, or implement
 the structural `RunStore` protocol when execution records belong in an
@@ -722,7 +724,7 @@ Open a local run store with `protolink dashboard --store runs.db --open`.
     created_at: str | None = None,
     updated_at: str = field(default_factory=utc_now),
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L24"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L25"
 >
 
 Represent the searchable index fields and serialized payload for one persisted
@@ -776,7 +778,7 @@ task snapshot.
   kind="method"
   path="protolink.storage.TaskRecord.to_dict"
   signature={`to_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L51"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L52"
 >
 
 Return all task-record fields in a serialization-friendly mapping.
@@ -806,7 +808,7 @@ Return all task-record fields in a serialization-friendly mapping.
     metadata: dict[str, Any] = field(default_factory=dict),
     created_at: str = field(default_factory=utc_now),
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L68"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L69"
 >
 
 Represent the indexed identity and serialized payload for one persisted
@@ -851,7 +853,7 @@ Represent the indexed identity and serialized payload for one persisted
   kind="method"
   path="protolink.storage.RunReportRecord.to_dict"
   signature={`to_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L79"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L80"
 >
 
 Return all run-report record fields in a new outer mapping.
@@ -873,7 +875,7 @@ Return all run-report record fields in a new outer mapping.
   kind="protocol"
   path="protolink.storage.RunStore"
   signature={`class RunStore(Protocol)`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L92"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L93"
 >
 
 Define the structural interface an Agent can use for durable task and report
@@ -931,16 +933,25 @@ protocol itself cannot be instantiated.
     db_path: str | Path = "runs.db",
     *,
     table_prefix: str = "protolink",
+    read_only: bool = False,
+    redaction_policy: RedactionPolicy | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L156"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L157"
 >
 
 Implement `RunStore` with two SQLite tables: one for task snapshots and one for
-run reports. JSON payload columns retain complete serialized objects, while
+run reports. JSON payload columns retain serialized objects after the optional redaction policy is applied, while
 relational columns index common lookup fields.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SQLiteRunStore constructor parameters">
+    <ApiField name="read_only" type="bool" defaultValue="False">
+      Open an existing database for inspection without creating tables or permitting writes.
+    </ApiField>
+    <ApiField name="redaction_policy" type="RedactionPolicy | None" defaultValue="None">
+      Apply this policy to every saved task/report payload and caller metadata before writing. Live objects,
+      index columns, and existing rows remain unchanged. Reads return the stored representation.
+    </ApiField>
     <ApiField name="db_path" type="str | Path" defaultValue={'"runs.db"'}>
       SQLite database path, converted to <code>str</code>. The database file and
       schema are created when missing; parent directories are not created.
@@ -1002,7 +1013,7 @@ relational columns index common lookup fields.
     agent_name: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> TaskRecord`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L230"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L256"
 >
 
 Serialize and upsert one task snapshot together with indexed run correlation.
@@ -1021,8 +1032,7 @@ Serialize and upsert one task snapshot together with indexed run correlation.
       Optional indexed agent identity.
     </ApiField>
     <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">
-      Optional record metadata. A shallow dictionary copy is made before
-      serialization.
+      Optional record metadata. The store copies it and applies its configured redaction policy before serialization.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1056,7 +1066,7 @@ Serialize and upsert one task snapshot together with indexed run correlation.
   signature={`get_task(
     task_id: str,
 ) -> Task | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L278"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L304"
 >
 
 Load a task record and reconstruct its domain model.
@@ -1096,7 +1106,7 @@ Load a task record and reconstruct its domain model.
   signature={`get_task_record(
     task_id: str,
 ) -> TaskRecord | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L283"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L309"
 >
 
 Load the indexed record without reconstructing a `Task`.
@@ -1132,7 +1142,7 @@ Load the indexed record without reconstructing a `Task`.
     state: str | TaskState | None = None,
     agent_name: str | None = None,
 ) -> list[TaskRecord]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L289"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L315"
 >
 
 Query task records with conjunctive optional filters, ordered by newest
@@ -1182,7 +1192,7 @@ Query task records with conjunctive optional filters, ordered by newest
     agent_name: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> RunReportRecord`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L323"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L363"
 >
 
 Serialize and upsert one complete run report.
@@ -1242,7 +1252,7 @@ Serialize and upsert one complete run report.
   signature={`get_report(
     run_id: str,
 ) -> RunReport | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L367"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L411"
 >
 
 Load a report record and reconstruct the `RunReport`.
@@ -1274,7 +1284,7 @@ Load a report record and reconstruct the `RunReport`.
   signature={`get_report_record(
     run_id: str,
 ) -> RunReportRecord | None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L372"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L416"
 >
 
 Load the indexed and serialized record without reconstructing a `RunReport`.
@@ -1308,7 +1318,7 @@ Load the indexed and serialized record without reconstructing a `RunReport`.
     session_id: str | None = None,
     agent_name: str | None = None,
 ) -> list[RunReportRecord]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L378"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L422"
 >
 
 Query recent run-report records with optional session and agent filters.
@@ -1345,7 +1355,7 @@ Query recent run-report records with optional session and agent filters.
   signature={`delete_task(
     task_id: str,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L403"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L461"
 >
 
 Delete one task snapshot by primary key.
@@ -1376,7 +1386,7 @@ Delete one task snapshot by primary key.
   signature={`delete_report(
     run_id: str,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L409"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/storage/run_store.py#L467"
 >
 
 Delete one run report by primary key.
@@ -1400,6 +1410,110 @@ Delete one run report by primary key.
 </ApiReference>
 
 ---
+
+## Checkpoint recovery records
+
+### StorageCheckpointStore
+
+<ApiReference
+  kind="class"
+  path="protolink.StorageCheckpointStore"
+  signature={`StorageCheckpointStore(storage: Storage)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py#L164"
+>
+
+Adapt a dedicated Storage namespace to the `CheckpointStore` protocol for durable resource recovery.
+One live writer owns the namespace. SQLiteStorage survives process exit; InMemoryStorage does not.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="StorageCheckpointStore parameters">
+    <ApiField name="storage" type="Storage" required>
+      Namespace used exclusively for resource changes. The adapter exposes it as <code>storage</code>.
+      Protect its original bytes and keep it separate from redacted run snapshots and mutable Agent state.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="CheckpointStore contract">
+  <ApiFields ariaLabel="CheckpointStore methods">
+    <ApiField name="save(change: ResourceChange)" type="None">
+      Persist a complete record under its <code>change_id</code>. Repeated saves replace that record while keeping
+      its insertion position. A durable save must complete before resource mutation begins.
+    </ApiField>
+    <ApiField name="get(change_id: str)" type="ResourceChange | None">
+      Return a detached recovery record, or <code>None</code> when absent. Bytes and nested metadata remain intact.
+    </ApiField>
+    <ApiField name="list_changes(...)" type="list[ResourceChange]">
+      Query detached records using the filters and pagination described below.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+`CheckpointStore` is a structural protocol in `protolink.core.resources`. Custom backends implement these methods;
+inventory never executes a continuation or changes the recovery state. Storage and decoding errors propagate.
+
+</ApiReference>
+
+### StorageCheckpointStore.list_changes
+
+<ApiReference
+  kind="method"
+  path="protolink.StorageCheckpointStore.list_changes"
+  signature={`list_changes(
+    *,
+    limit: int = 100,
+    offset: int = 0,
+    state: str | None = None,
+    resource_id: str | None = None,
+    run_id: str | None = None,
+    task_id: str | None = None,
+) -> list[ResourceChange]`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/resources.py#L187"
+>
+
+Load the namespace once and list records in reverse insertion order. All supplied filters match exactly and combine
+with AND. Pagination applies after filtering. Updating a record does not move it, and separate page requests are
+independent reads of the namespace.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Checkpoint inventory parameters">
+    <ApiField name="limit" type="int" defaultValue="100">Maximum returned records. Zero returns an empty list.</ApiField>
+    <ApiField name="offset" type="int" defaultValue="0">Matching records to skip before collecting results.</ApiField>
+    <ApiField name="state" type="str | None" defaultValue="None">
+      Exact stored state, such as <code>prepared</code>, <code>applied</code>, <code>restoring</code>,
+      <code>restored</code>, <code>failed</code>, or <code>uncertain</code>. Inspection preserves the stored state.
+    </ApiField>
+    <ApiField name="resource_id" type="str | None" defaultValue="None">
+      Exact resource identity in <code>before.revision.resource_id</code>; the query does not resolve or inspect paths.
+    </ApiField>
+    <ApiField name="run_id" type="str | None" defaultValue="None">Run that performed the original write.</ApiField>
+    <ApiField name="task_id" type="str | None" defaultValue="None">Task that performed the original write.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Returns">
+  <ApiFields ariaLabel="Checkpoint inventory return value">
+    <ApiField name="changes" type="list[ResourceChange]">
+      Detached records containing before/after snapshots, state, change/action/run/task IDs, optional errors,
+      and restoration correlation fields. Snapshots include original bytes and POSIX modes. Restoration IDs are
+      available as <code>restore_run_id</code> and <code>restore_task_id</code>; run/task filters target the original write.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiSection title="Raises">
+  <ApiFields ariaLabel="Checkpoint inventory errors">
+    <ApiField name="ValueError">A limit or offset is negative.</ApiField>
+    <ApiField name="storage or decoding error">Backend read failures and invalid stored recovery records propagate.</ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Recovery data">
+  Results require the same access protection as <code>get()</code>. Apply redaction only to presentation copies;
+  raw records remain necessary for restoration. Inventory neither resolves uncertainty nor resumes interrupted work.
+</ApiCallout>
+
+</ApiReference>
 
 ## Usage Examples
 
@@ -1469,6 +1583,30 @@ record = run_store.save_task(
 recent = run_store.list_task_records(session_id="release", limit=20)
 ```
 
+### Redaction at persistence
+
+```python
+from protolink import RedactionPolicy, SQLiteRunStore
+
+policy = RedactionPolicy(sensitive_values=frozenset({"known-credential-value"}))
+run_store = SQLiteRunStore("runs.db", redaction_policy=policy)
+# Pass run_store=run_store to every Agent that should save protected snapshots.
+```
+
+The configured policy masks copies of all task/report payloads and caller metadata before SQLite writes, including
+intermediate Agent snapshots, nested events, tool output, errors, and final task data. Returned index records contain
+the same masked payloads. Live Tasks, Reports, and model/tool inputs are unchanged. With `redaction_policy=None`,
+the existing raw persistence contract remains available. Policies are supplied when opening the store and are not
+saved in the database.
+
+Sensitive field names are masked recursively. `sensitive_values` additionally masks literal, case-sensitive occurrences
+of known secrets in free text, with longer matches first and before optional truncation. The default policy masks
+`data_base64` recovery fields in presentation copies. It does not discover unknown secrets in arbitrary text.
+
+Run/task/session/trace identifiers and other relational index columns remain stable, so keep secrets out of those
+fields. Existing database rows are not retroactively sanitized. ApprovalBroker and StorageCheckpointStore retain
+their separate protected storage: do not redact recovery bytes or the exact approval specification used for execution.
+
 ### Agent Memory Integration
 
 Agents can use the storage field to persist their state, conversation context, or learned information.
@@ -1492,9 +1630,9 @@ class PersistentAgent(Agent):
         return await super().handle_task(task)
 ```
 
-### State System Integration (v0.5.5+)
+### State System Integration
 
-Starting with version **v0.5.5**, ProtoLink includes a unified **State** system.
+ProtoLink includes a unified **State** system.
 When you provide a `storage` instance and enable `conversation`, the
 conversation module automatically performs whole-payload `load()` and `save()`
 operations. The `tools`, `task`, and `flow` modules currently expose

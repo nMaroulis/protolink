@@ -170,7 +170,15 @@ class RunHandle:
         return result
 
     async def events(self) -> AsyncIterator[RunEvent]:
-        """Yield all observed events once per subscriber, including existing history."""
+        """Yield recorded history, then live events as the run produces them.
+
+        Model text arrives in ``event.payload["content"]`` when
+        ``event.payload.get("llm_event_type") == "llm_chunk"``. JSON-action
+        models emit raw JSON fragments; native tools are assembled separately.
+        ``llm_final`` carries the complete answer, and the terminal task status
+        ends the run. Leaving this iterator does not cancel the shared run;
+        call ``await handle.cancel()`` to stop it explicitly.
+        """
         index = 0
         while True:
             events = self._recorder.events

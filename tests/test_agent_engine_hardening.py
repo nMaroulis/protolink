@@ -368,7 +368,7 @@ async def test_delegation_accepts_completed_response_only_task():
 
 @pytest.mark.asyncio
 async def test_delegation_rejects_completed_request_echo_without_new_output():
-    async def echo_completed(_url, request_task):
+    async def echo_completed(_url, request_task, **_kwargs):
         request_task.begin()
         request_task.update_state(TaskState.COMPLETED)
         return request_task

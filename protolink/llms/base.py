@@ -84,6 +84,7 @@ if TYPE_CHECKING:
 from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError, BudgetPolicy
 from protolink.core.cancellation import CancellationToken
+from protolink.core.execution import closing_stream
 from protolink.core.part import Part
 from protolink.core.policy import (
     ActionAuthorization,
@@ -563,11 +564,16 @@ class LLM(ABC):
             synchronously. Defining this as 'def' in the base class allows subclasses to be used interchangeably
             without requiring an inconsistent 'await' on the initial call, maintaining type-system integrity.
 
+        Implementations must keep blocking network reads and model evaluation off
+        the event loop, and release their stream on exhaustion, cancellation or
+        explicit closure. Consumers that stop early should close the iterator
+        (for example, with ``contextlib.aclosing``).
+
         Args:
             history: Conversation history containing system, user, assistant, and tool messages
 
         Returns:
-            AsyncIterator[str]: An asynchronous iterator yielding response chunks.
+            AsyncIterator[str]: Incremental text, which may be JSON action fragments.
         """
         raise NotImplementedError
 
@@ -655,14 +661,19 @@ class LLM(ABC):
         The base implementation is intentionally simple and local-model friendly: stream text chunks, emit them to the
         optional callback, join the chunks, and parse the final text as one Protolink JSON action. API providers with
         native streaming tool-call events override this method and normalize those events into the same
-        ``LLMActionResult`` contract.
+        ``LLMActionResult`` contract. ``chunk_callback`` is awaited for every text
+        chunk before reading the next one. It runs on the caller's event loop;
+        callback failure or cancellation closes the underlying stream. Chunks
+        may contain incomplete JSON and must not be dispatched as actions.
+        ``infer()`` emits ``llm_final`` only after a final action is assembled.
         """
         _ = agent_callback_available
         chunks: list[str] = []
-        async for chunk in self.call_stream(history):
-            chunks.append(chunk)
-            if chunk_callback is not None:
-                await chunk_callback(chunk)
+        async with closing_stream(self.call_stream(history)) as stream:
+            async for chunk in stream:
+                chunks.append(chunk)
+                if chunk_callback is not None:
+                    await chunk_callback(chunk)
         raw_response = "".join(chunks)
         action = self._parse_infer_response(raw_response, tools=tools, agent_cards=agent_cards)
         return LLMActionResult(action=action, raw_response=raw_response, native=False)

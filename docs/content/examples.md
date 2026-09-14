@@ -85,15 +85,15 @@ Run it without a query to inspect the CLI without making a network request.
 
 - [`run_regression_diff.py`](https://github.com/nMaroulis/protolink/blob/main/examples/run_regression_diff.py) creates provider-free baseline and candidate reports with different known runtime IDs, timestamps, sequence counters, and bounded latency, proves that schema-aware normalization plus an explicit tolerance remove that noise, and then detects a real final-output change with `diff_run_reports()` and `assert_run_matches()`. Real candidate runs must be executed and recorded separately.
 
-### 🧩 Protolink 0.6.3 runtime-control examples
+### 🧩 Runtime-control examples
 
-The 0.6.3 examples are small, provider-free scripts intended for application integrators:
+These small, provider-free scripts demonstrate runtime controls for application integrators:
 
-- [`v063_context_budget.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_context_budget.py) shows `ContextManifest`, `LLMModelProfile`, and enforced `RunBudget` behavior before a model call.
-- [`v063_history_compaction.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_history_compaction.py) shows local `recent`, `tokens`, and isolated `summary` compaction plus remote `AgentClient.compact_history()` over the request-spec endpoint.
-- [`v063_state_control.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_state_control.py) shows client/server state `describe`, `compact`, and `reset` requests for one persistent conversation session.
-- [`v063_run_reports.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `RunRecorder`, `RunReport`, `RunReplay`, golden-run assertions, and redaction.
-- [`v063_protoagent_policy_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/v063_protoagent_policy_mesh.py) sketches the ProtoAgent Explorer/Coder/Architect structure abstractly. The prompts are intentionally tiny; the example focuses on tool capabilities, `CapabilityPolicy`, diff-preview `action_builder`s, and approval-gated workspace writes.
+- [Context budgets](https://github.com/nMaroulis/protolink/blob/main/examples/v063_context_budget.py) shows `ContextManifest`, `LLMModelProfile`, and enforced `RunBudget` behavior before a model call.
+- [History compaction](https://github.com/nMaroulis/protolink/blob/main/examples/v063_history_compaction.py) shows local `recent`, `tokens`, and isolated `summary` compaction plus remote `AgentClient.compact_history()` over the request-spec endpoint.
+- [State controls](https://github.com/nMaroulis/protolink/blob/main/examples/v063_state_control.py) shows client/server state `describe`, `compact`, and `reset` requests for one persistent conversation session.
+- [Run reports](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `RunRecorder`, `RunReport`, `RunReplay`, golden-run assertions, and redaction.
+- [ProtoAgent policy mesh](https://github.com/nMaroulis/protolink/blob/main/examples/v063_protoagent_policy_mesh.py) sketches the ProtoAgent Explorer/Coder/Architect structure abstractly. The prompts are intentionally tiny; the example focuses on tool capabilities, `CapabilityPolicy`, diff-preview `action_builder`s, and approval-gated workspace writes.
 
 ### Production case study: [ProtoAgent](protoagent_case_study.md)
 

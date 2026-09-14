@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from protolink.core.redaction import RedactionPolicy
 from protolink.core.report import RunReport
 from protolink.core.run_context import RunContext
 from protolink.core.task import Task, TaskState
@@ -169,6 +170,7 @@ class SQLiteRunStore:
         *,
         table_prefix: str = "protolink",
         read_only: bool = False,
+        redaction_policy: RedactionPolicy | None = None,
     ) -> None:
         """Initialize a SQLite run store.
 
@@ -178,6 +180,10 @@ class SQLiteRunStore:
                 identifier so table names cannot inject SQL.
             read_only: Open an existing database without creating tables or
                 permitting writes. Intended for inspection surfaces.
+            redaction_policy: Optional policy applied to every saved task/report
+                payload and caller metadata before writing. Live objects and index
+                columns are unchanged. Existing rows are not rewritten; recovery
+                and approval storage remain separate.
         """
         if not table_prefix.isidentifier():
             raise ValueError(f"Invalid table_prefix: {table_prefix!r}")
@@ -186,6 +192,7 @@ class SQLiteRunStore:
         self.tasks_table = f"{table_prefix}_tasks"
         self.reports_table = f"{table_prefix}_run_reports"
         self.read_only = bool(read_only)
+        self.redaction_policy = redaction_policy
         if self.read_only:
             path = Path(self.db_path).expanduser()
             if not path.is_file():
@@ -265,8 +272,8 @@ class SQLiteRunStore:
             session_id=active_context.session_id,
             trace_id=active_context.trace_id,
             agent_name=agent_name,
-            task=task_payload,
-            metadata=dict(metadata or {}),
+            task=self._redact_payload(task_payload),
+            metadata=self._redact_payload(dict(metadata or {})),
             created_at=task.created_at,
             updated_at=utc_now(),
         )
@@ -373,8 +380,8 @@ class SQLiteRunStore:
             session_id=context.session_id if context else None,
             trace_id=context.trace_id if context else None,
             agent_name=agent_name,
-            report=report_payload,
-            metadata=dict(metadata or {}),
+            report=self._redact_payload(report_payload),
+            metadata=self._redact_payload(dict(metadata or {})),
             created_at=utc_now(),
         )
         with closing(self._connect()) as conn:
@@ -396,6 +403,10 @@ class SQLiteRunStore:
             )
             conn.commit()
         return record
+
+    def _redact_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Apply the configured policy before persistence without modifying live data."""
+        return self.redaction_policy.redact(payload) if self.redaction_policy is not None else payload
 
     def get_report(self, run_id: str) -> RunReport | None:
         """Load one run report by run ID."""

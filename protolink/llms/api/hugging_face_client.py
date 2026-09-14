@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_hugging_face
+from protolink.llms._streaming import threaded_stream
 from protolink.llms.api.base import APILLM
 from protolink.llms.history import ConversationHistory
 from protolink.types import LLMProvider
@@ -89,30 +90,39 @@ class HuggingFaceLLM(APILLM):
             raise
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
+        """Yield text while synchronous SDK reads run on a dedicated worker.
+
+        The event loop stays available to consumers. Close this iterator when
+        stopping early; cleanup waits for any in-progress SDK operation to
+        return on the worker. Text parsing happens on the caller's event loop.
+        """
         messages = [{"role": msg["role"], "content": msg["content"]} for msg in history.messages]
 
         try:
             logger.info(f"Calling HuggingFace streaming API with model: {self.model}")
-            stream = self._client.chat_completion(
-                messages,
-                model=self.model,
-                stream=True,
-                temperature=self._model_params.get("temperature", 1.0),
-            )
-
-            for chunk in stream:
-                if hasattr(chunk, "choices") and chunk.choices:
-                    delta = getattr(chunk.choices[0], "delta", None)
-                    content = getattr(delta, "content", None) if delta is not None else None
-                    if content:
-                        yield content
-                elif isinstance(chunk, dict) and "choices" in chunk:
-                    choices = chunk.get("choices", [])
-                    if choices and isinstance(choices[0], dict):
-                        delta = choices[0].get("delta", {})
-                        content = delta.get("content") if isinstance(delta, dict) else getattr(delta, "content", None)
+            async with threaded_stream(
+                lambda: self._client.chat_completion(
+                    messages,
+                    model=self.model,
+                    stream=True,
+                    temperature=self._model_params.get("temperature", 1.0),
+                )
+            ) as stream:
+                async for chunk in stream:
+                    if hasattr(chunk, "choices") and chunk.choices:
+                        delta = getattr(chunk.choices[0], "delta", None)
+                        content = getattr(delta, "content", None) if delta is not None else None
                         if content:
                             yield content
+                    elif isinstance(chunk, dict) and "choices" in chunk:
+                        choices = chunk.get("choices", [])
+                        if choices and isinstance(choices[0], dict):
+                            delta = choices[0].get("delta", {})
+                            content = (
+                                delta.get("content") if isinstance(delta, dict) else getattr(delta, "content", None)
+                            )
+                            if content:
+                                yield content
         except StopIteration as e:
             logger.error(
                 f"StopIteration error in HuggingFace API call. "

@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
+from protolink.llms._streaming import http_stream
 from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
@@ -33,6 +34,7 @@ class LlamaCPPServerLLM(ServerLLM):
         "temperature": 1.0,
     }
     REQUEST_TIMEOUT: ClassVar[int] = 90
+    _CHAT_TIMEOUT: ClassVar[int] = 300
 
     def __init__(
         self,
@@ -71,7 +73,7 @@ class LlamaCPPServerLLM(ServerLLM):
         self._client: http.client.HTTPConnection | None = None
 
         try:
-            self._client = http.client.HTTPConnection(self._host, self._port, timeout=300)
+            self._client = http.client.HTTPConnection(self._host, self._port, timeout=self._CHAT_TIMEOUT)
         except Exception as e:
             logger.exception(f"LLM Client initilization failed :: Llama.cpp connection failed: {e}")
 
@@ -111,10 +113,12 @@ class LlamaCPPServerLLM(ServerLLM):
         raise RuntimeError(f"Unexpected response from llama-server: {result}")
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        """Generate a streaming response from `llama-server`."""
-        if self._client is None:
-            raise ValueError("Llama.cpp client not connected")
+        """Yield text as it arrives without blocking the event loop.
 
+        Uses request-scoped async HTTP; completion, cancellation, and explicit
+        iterator closure release the connection. JSON-action mode yields raw
+        JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
+        """
         payload = {
             "model": self.model,
             "messages": history.messages,
@@ -122,27 +126,17 @@ class LlamaCPPServerLLM(ServerLLM):
             **self._model_params,
         }
 
-        self._client.request("POST", "/v1/chat/completions", json.dumps(payload), self.headers)
-
-        response = self._client.getresponse()
-
-        for line in response:
-            line_str = line.decode("utf-8").strip()
-            if not line_str or line_str == "data: [DONE]":
-                continue
-
-            if line_str.startswith("data: "):
-                chunk_str = line_str[6:]
-                try:
-                    chunk = json.loads(chunk_str)
-                    if "choices" in chunk and len(chunk["choices"]) > 0:
-                        delta = chunk["choices"][0].get("delta", {})
-                        if "content" in delta:
-                            yield delta["content"]
-                except json.JSONDecodeError:
-                    pass
-
-        self._client.close()
+        async with http_stream(
+            f"{self.base_url.rstrip('/')}/v1/chat/completions",
+            payload,
+            headers=self.headers,
+            timeout=self._CHAT_TIMEOUT,
+            provider="llama.cpp server",
+        ) as stream:
+            async for chunk in stream:
+                content, _ = chat_completion_stream_delta(chunk)
+                if content:
+                    yield content
 
     def call_action(
         self,
@@ -221,9 +215,6 @@ class LlamaCPPServerLLM(ServerLLM):
                 agent_cards=agent_cards,
                 chunk_callback=chunk_callback,
             )
-        if self._client is None:
-            raise ValueError("Llama.cpp client not connected")
-
         tool_specs = chat_completion_tools(
             tools,
             include_agent_tools=should_include_agent_tools(
@@ -241,22 +232,16 @@ class LlamaCPPServerLLM(ServerLLM):
             payload["tools"] = tool_specs
             payload["tool_choice"] = "auto"
 
-        self._client.request("POST", "/v1/chat/completions", json.dumps(payload), self.headers)
-        response = self._client.getresponse()
-
         output_text: list[str] = []
         tool_accumulator = ChatCompletionStreamAccumulator()
-        try:
-            for line in response:
-                line_str = line.decode("utf-8").strip()
-                if not line_str or line_str == "data: [DONE]":
-                    continue
-                if line_str.startswith("data: "):
-                    line_str = line_str[6:]
-                try:
-                    chunk = json.loads(line_str)
-                except json.JSONDecodeError:
-                    continue
+        async with http_stream(
+            f"{self.base_url.rstrip('/')}/v1/chat/completions",
+            payload,
+            headers=self.headers,
+            timeout=self._CHAT_TIMEOUT,
+            provider="llama.cpp server",
+        ) as stream:
+            async for chunk in stream:
                 text, tool_call_deltas = chat_completion_stream_delta(chunk)
                 if text:
                     output_text.append(text)
@@ -264,8 +249,6 @@ class LlamaCPPServerLLM(ServerLLM):
                         await chunk_callback(text)
                 for tool_call_delta in tool_call_deltas:
                     tool_accumulator.add_delta(tool_call_delta)
-        finally:
-            self._client.close()
 
         action = tool_accumulator.to_action()
         if action is not None:

@@ -8,6 +8,7 @@ share the same behavior without coupling to a particular telemetry backend.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any
@@ -19,6 +20,7 @@ DEFAULT_SENSITIVE_KEYS = frozenset(
         "authorization",
         "client_secret",
         "credentials",
+        "data_base64",
         "password",
         "secret",
         "token",
@@ -36,6 +38,9 @@ class RedactionPolicy:
             replacing ``-`` with ``_``.
         replacement: Value written in place of secret-bearing fields.
         max_string_length: Optional maximum length for non-secret strings.
+        sensitive_values: Known nonempty secrets to mask wherever they occur in
+            text, including command output and error messages. Matching is literal
+            and case-sensitive, before optional string truncation.
 
     The policy also redacts keys ending in common secret suffixes such as ``"_api_key"``, ``"_secret"``, ``"_token"``,
     ``"_password"``, and ``"_credentials"``.
@@ -44,11 +49,20 @@ class RedactionPolicy:
     sensitive_keys: frozenset[str] = field(default_factory=lambda: DEFAULT_SENSITIVE_KEYS)
     replacement: str = "[REDACTED]"
     max_string_length: int | None = None
+    sensitive_values: frozenset[str] = field(default_factory=frozenset, repr=False)
+    _value_pattern: re.Pattern[str] | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        """Normalize configured sensitive keys."""
+        """Normalize keys and compile literal secret matches with longest values first."""
         normalized = frozenset(_normalize_key(key) for key in self.sensitive_keys)
         object.__setattr__(self, "sensitive_keys", normalized)
+        values = frozenset(self.sensitive_values)
+        if any(not isinstance(value, str) or not value for value in values):
+            raise ValueError("sensitive_values must contain nonempty strings")
+        object.__setattr__(self, "sensitive_values", values)
+        if values:
+            pattern = "|".join(re.escape(value) for value in sorted(values, key=lambda value: (-len(value), value)))
+            object.__setattr__(self, "_value_pattern", re.compile(pattern))
         if self.max_string_length is not None and self.max_string_length < 0:
             raise ValueError("max_string_length must be non-negative")
 
@@ -89,8 +103,10 @@ def _redact_value(value: Any, policy: RedactionPolicy) -> Any:
         return tuple(_redact_value(item, policy) for item in value)
     if isinstance(value, set):
         return [_redact_value(item, policy) for item in value]
-    if isinstance(value, str) and policy.max_string_length is not None:
-        if len(value) > policy.max_string_length:
+    if isinstance(value, str):
+        if policy._value_pattern is not None:
+            value = policy._value_pattern.sub(lambda _: policy.replacement, value)
+        if policy.max_string_length is not None and len(value) > policy.max_string_length:
             return value[: policy.max_string_length] + "..."
     return value
 

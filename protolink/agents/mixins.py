@@ -17,6 +17,8 @@ from typing import Any, Literal, TypeVar, cast, overload
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
 from protolink.core.cancellation import CancellationToken, TaskCancellationRequest
+from protolink.core.events import EventSink, RunEvent
+from protolink.core.execution import closing_stream, isolate_event_sink
 from protolink.core.policy import ActionAuthorization, CapabilityPolicy
 from protolink.core.run_context import RunContext
 from protolink.discovery.registry import Registry
@@ -631,6 +633,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
         task: Task,
         *,
         protocol: Literal["auto", "protolink", "a2a"] = "auto",
+        event_sink: EventSink | None = None,
     ) -> Task:
         """Send a task to another agent.
 
@@ -640,6 +643,10 @@ class AgentCommunicationMixin(_AgentMixinBase):
             protocol: Peer protocol selection. ``"auto"`` preserves native
                 ProtoLink calls and discovers A2A-only peers when this agent
                 was created with ``a2a=True``.
+            event_sink: Optional observer for native worker events. When supplied,
+                a native peer advertising streaming on a capable transport is consumed once; otherwise
+                the usual task response is used. Observer failures do not invalidate
+                execution. A failed or incomplete stream is never resubmitted.
 
         Returns:
             Task with updated state and response messages
@@ -652,11 +659,39 @@ class AgentCommunicationMixin(_AgentMixinBase):
         RunContext.ensure_task_context(
             task,
             default_session_id=task.metadata.get("session_id", task.id),
-            agent_name=self.card.name,
+            agent_name=None if RunContext.from_task(task).parent_run_id else self.card.name,
         )
         self._logger.debug(f"Sending to agent {agent_url} the task: {task.to_dict()}")
-        result: Task = await self._client.send_task(agent_url, task, protocol=protocol)
+        selected_protocol = protocol
+        if event_sink is not None and self._client.transport.supports_streaming:
+            selected_protocol, _ = await self._client._select_protocol(agent_url, protocol)
+            if selected_protocol == "protolink":
+                card = await self._client.get_agent_card(agent_url)
+                if card.capabilities.streaming:
+                    return await self._stream_agent_task(agent_url, task, event_sink)
+        with isolate_event_sink():
+            result: Task = await self._client.send_task(agent_url, task, protocol=selected_protocol)
         self._logger.debug(f"Received response Task from agent {agent_url}: {result.to_dict()}")
+        return result
+
+    async def _stream_agent_task(self, agent_url: str, task: Task, sink: EventSink) -> Task:
+        """Forward a single native subscription and require the child's terminal task."""
+        assert self._client is not None
+        result: Task | None = None
+        context = RunContext.from_task(task)
+        async with closing_stream(self._client.send_task_streaming(agent_url, task)) as stream:
+            async for raw in stream:
+                event = RunEvent.from_task_event(raw, context=context)
+                data = event.payload.get("metadata", {}).get("task")
+                if event.type == "task.status" and event.final and event.task_id == task.id and isinstance(data, dict):
+                    result = Task.from_dict(data)
+                try:
+                    await sink.emit(event)
+                except Exception:
+                    # Observation cannot turn a completed worker effect into failure.
+                    pass
+        if result is None:
+            raise RuntimeError("Delegated stream ended without a final task; remote effects are unknown")
         return result
 
     async def send_message_to(
@@ -1310,7 +1345,15 @@ class AgentConfigurationMixin(_AgentMixinBase):
             raise ValueError("a2a=True requires an HTTP transport (transport='http' or HTTPTransport)")
 
         self._transport = transport
-        self.card.capabilities.streaming = bool(getattr(transport, "supports_streaming", False))
+        from .engine import AgentExecutionMixin
+
+        # A custom unary handler does not acquire a matching streaming handler
+        # merely by selecting a streaming-capable transport.
+        unary_only = (
+            type(self).handle_task is not AgentExecutionMixin.handle_task
+            and type(self).handle_task_streaming is AgentExecutionMixin.handle_task_streaming
+        )
+        self.card.capabilities.streaming = bool(getattr(transport, "supports_streaming", False)) and not unary_only
         if transport_type:
             self.card.transport = transport_type
         # Initialize Agent-to-Agent Client

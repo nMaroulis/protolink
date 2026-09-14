@@ -349,7 +349,7 @@ python -c "import protolink; print(protolink.__file__)"
 Maintainers can follow this process for releases:
 
 1. **Update Python version sources** in `pyproject.toml` and `protolink/__version__.py`, then regenerate `uv.lock`.
-2. **Update documentation versions** in `docs/package.json`, regenerate `docs/package-lock.json`, and update the current-release labels in the documentation.
+2. **Update documentation package metadata** in `docs/package.json` and regenerate `docs/package-lock.json`. Keep guides and API references focused on current behavior; record ProtoLink release numbers and feature history in the changelog. Retain version numbers where they identify actual dependency requirements or protocol contracts.
 3. **Finalize the changelog** in `docs/content/changelog.md`: replace `Unreleased` with the publication date and move the latest-release note to the new version.
 4. **Run release gates**: formatting, linting, type checking, the full test suite, the Docusaurus production build, `python -m build`, and `python -m twine check dist/*`.
    Check that the wheel and source distribution include `protolink/py.typed`, that installed metadata and `protolink.__version__` agree, and that the first getting-started example runs using only the base dependencies.
