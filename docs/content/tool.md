@@ -421,12 +421,21 @@ result = await tool(location="Tokyo", units="celsius")
 
 ## Built-in Tools
 
-ProtoLink includes four dependency-free tool factories for common agent tasks:
+ProtoLink includes these parameterless, dependency-free factories:
 
 - `web_search()` creates `web_search`, which requires `network.read` and returns normalized ranked source snippets.
 - `fetch_url()` creates `fetch_url`, which requires `network.read` and returns bounded readable text from one public URL.
 - `calculator()` creates `calculator`, a pure bounded arithmetic evaluator with no protected capability.
 - `current_datetime()` creates `current_datetime`, a timezone-aware clock tool with no protected capability.
+
+Configured tools add shell, Git, user questions, calendar, and email. Import `shell_tool`, `git_tool`,
+`ask_user_tool`, `calendar_tools`, and `email_tools` from `protolink.tools`. See the
+[execution guide](execution-tools.md#shell-and-git-tools) and [assistant/service API](builtin-assistants.md).
+These are `PreparedTool` instances that must execute through an Agent; their configuration and callbacks
+must be reattached after restoring an Agent. `GoogleCalendar`, `Gmail`, `OutlookCalendar`, and
+`OutlookEmail` require the optional `integrations` extra. `IMAPEmail` uses the standard library for
+TLS IMAP/SMTP. Each backend supplies search guidance in its tool descriptions; all use the same
+`calendar_tools()`/`email_tools()` and `Assistant` APIs.
 
 Factories return fresh native `Tool` instances. Nothing is enabled automatically: register only the capabilities an agent needs.
 
@@ -461,7 +470,7 @@ The default `CapabilityPolicy` is allow-by-default for backward compatibility. D
 
 Calling a `Tool` object directly, such as `await web_search()(query="...")`, invokes the tool without the Agent and therefore bypasses Agent policy and approval. Use `agent.call_tool(...)` for Agent validation and policy, or let the inference loop invoke a registered tool when the task's full runtime controls should apply.
 
-Agent dict/YAML serialization preserves each built-in's stable identity and the declarative rules, default effect, and name of ProtoLink's first-party `CapabilityPolicy`. Custom policy implementations and approval callbacks are executable application objects and are not embedded; pass them explicitly when restoring, for example `Agent.from_yaml("agent.yaml", policy=custom_policy, approval_handler=approve)`. An explicit policy override takes precedence over serialized first-party policy data.
+Agent dict/YAML serialization preserves each parameterless built-in's stable identity and the declarative rules, default effect, and name of ProtoLink's first-party `CapabilityPolicy`. Custom policy implementations and approval callbacks are executable application objects and are not embedded; pass them explicitly when restoring, for example `Agent.from_yaml("agent.yaml", policy=custom_policy, approval_handler=approve)`. An explicit policy override takes precedence over serialized first-party policy data.
 
 :::
 

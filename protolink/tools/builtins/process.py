@@ -200,6 +200,89 @@ class LocalExecutionBackend:
                 transport.close()
 
 
+def _prepare_process_action(
+    arguments: dict[str, Any],
+    executor: ExecutionBackend,
+    *,
+    name: str,
+    capabilities: tuple[str, ...],
+    max_timeout_seconds: float,
+    max_output_bytes: int,
+    implicit_shell: bool = False,
+) -> RunAction:
+    """Resolve a bounded command and attach its exact authorization preview."""
+    args = dict(arguments)
+    argv = args["argv"]
+    if not argv or any("\x00" in value for value in argv) or not argv[0]:
+        raise ValueError("argv must contain a nonempty executable and no NUL bytes")
+    directory = Path(args["cwd"]).resolve(strict=True)
+    if not directory.is_dir():
+        raise ValueError("cwd must be an existing directory")
+    env = dict(args["env"])
+    if any(
+        not isinstance(key, str)
+        or not isinstance(value, str)
+        or not key
+        or "=" in key
+        or "\x00" in key
+        or "\x00" in value
+        for key, value in env.items()
+    ):
+        raise ValueError("Invalid environment entry")
+    args["env"] = env
+    executable = argv[0]
+    if not os.path.isabs(executable):
+        if os.path.dirname(executable):
+            executable = str(directory / executable)
+        else:
+            executable = shutil.which(executable, path=env.get("PATH", "")) or ""
+    if not executable:
+        raise ValueError("Executable requires an absolute path or an explicit env PATH")
+    args["argv"] = [str(Path(executable).resolve(strict=True)), *argv[1:]]
+    args["cwd"] = str(directory)
+    duration = args.get("timeout_seconds", 60.0)
+    output_limit = args.get("max_output_bytes", 65536)
+    if not math.isfinite(duration) or not 0 < duration <= max_timeout_seconds:
+        raise ValueError("timeout_seconds exceeds the configured execution limit")
+    if isinstance(output_limit, bool) or not isinstance(output_limit, int) or not 0 <= output_limit <= max_output_bytes:
+        raise ValueError("max_output_bytes exceeds the configured output limit")
+    args.update(timeout_seconds=duration, max_output_bytes=output_limit)
+    action = RunAction(
+        kind="tool.call",
+        name=name,
+        payload={"arguments": args, "boundary": executor.boundary},
+        capabilities=frozenset(capabilities),
+    )
+    preview = Artifact(
+        kind="preview",
+        name="Command execution",
+        parts=[
+            Part.json(
+                {
+                    **args,
+                    "boundary": executor.boundary,
+                    "implicit_shell": implicit_shell,
+                }
+            )
+        ],
+    )
+    return action.with_artifacts([preview])
+
+
+async def _execute_process(execution: ToolExecution, executor: ExecutionBackend) -> ProcessResult:
+    """Execute only the resolved command retained by native authorization."""
+    payload = execution.authorization.action.payload
+    args = payload.get("process", payload["arguments"])
+    spec = ProcessSpec(
+        argv=tuple(args["argv"]),
+        cwd=args["cwd"],
+        env=dict(args["env"]),
+        timeout_seconds=args["timeout_seconds"],
+        max_output_bytes=args["max_output_bytes"],
+    )
+    return await executor.execute(spec, execution)
+
+
 def process_tool(
     *, backend: ExecutionBackend | None = None, max_timeout_seconds: float = 300.0, max_output_bytes: int = 1048576
 ) -> PreparedTool:
@@ -210,7 +293,13 @@ def process_tool(
     human decision should use ``{"process.execute": "require_approval"}``.
     Factory limits are ceilings that command arguments cannot increase.
     """
-    if not math.isfinite(max_timeout_seconds) or max_timeout_seconds <= 0 or max_output_bytes < 0:
+    if (
+        not math.isfinite(max_timeout_seconds)
+        or max_timeout_seconds <= 0
+        or isinstance(max_output_bytes, bool)
+        or not isinstance(max_output_bytes, int)
+        or max_output_bytes < 0
+    ):
         raise ValueError("Process limits must be finite and positive (output may be zero)")
     executor = backend if backend is not None else LocalExecutionBackend()
 
@@ -221,64 +310,16 @@ def process_tool(
         raise AssertionError("Signature only")
 
     def prepare(arguments: dict[str, Any], context: RunContext) -> RunAction:
-        del context
-        args = dict(arguments)
-        argv = args["argv"]
-        if not argv or any("\x00" in value for value in argv) or not argv[0]:
-            raise ValueError("argv must contain a nonempty executable and no NUL bytes")
-        directory = Path(args["cwd"]).resolve(strict=True)
-        if not directory.is_dir():
-            raise ValueError("cwd must be an existing directory")
-        env = args["env"]
-        if any(not key or "=" in key or "\x00" in key or "\x00" in value for key, value in env.items()):
-            raise ValueError("Invalid environment entry")
-        executable = argv[0]
-        if not os.path.isabs(executable):
-            if os.path.dirname(executable):
-                executable = str(directory / executable)
-            else:
-                executable = shutil.which(executable, path=env.get("PATH", "")) or ""
-        if not executable:
-            raise ValueError("Executable requires an absolute path or an explicit env PATH")
-        args["argv"] = [str(Path(executable).resolve(strict=True)), *argv[1:]]
-        args["cwd"] = str(directory)
-        duration = args.get("timeout_seconds", 60.0)
-        output_limit = args.get("max_output_bytes", 65536)
-        if not math.isfinite(duration) or not 0 < duration <= max_timeout_seconds:
-            raise ValueError("timeout_seconds exceeds the configured execution limit")
-        if not 0 <= output_limit <= max_output_bytes:
-            raise ValueError("max_output_bytes exceeds the configured output limit")
-        args.update(timeout_seconds=duration, max_output_bytes=output_limit)
-        action = RunAction(
-            kind="tool.call",
+        return _prepare_process_action(
+            arguments,
+            executor,
             name="execute_command",
-            payload={"arguments": args, "boundary": executor.boundary},
-            capabilities=frozenset({"process.execute"}),
+            capabilities=("process.execute",),
+            max_timeout_seconds=max_timeout_seconds,
+            max_output_bytes=max_output_bytes,
         )
-        preview = Artifact(
-            kind="preview",
-            name="Command execution",
-            parts=[
-                Part.json(
-                    {
-                        **args,
-                        "boundary": executor.boundary,
-                        "implicit_shell": False,
-                    }
-                )
-            ],
-        )
-        return action.with_artifacts([preview])
 
     async def execute(execution: ToolExecution) -> ProcessResult:
-        args = execution.authorization.action.payload["arguments"]
-        spec = ProcessSpec(
-            argv=tuple(args["argv"]),
-            cwd=args["cwd"],
-            env=dict(args["env"]),
-            timeout_seconds=args["timeout_seconds"],
-            max_output_bytes=args["max_output_bytes"],
-        )
-        return await executor.execute(spec, execution)
+        return await _execute_process(execution, executor)
 
     return PreparedTool(execute_command, prepare=prepare, execute=execute, capabilities=("process.execute",))

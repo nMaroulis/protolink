@@ -34,9 +34,63 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.7.1] - 2026-09-15
+## [0.7.2] - 2026-09-21
 
 :::note Latest Release
+
+**ProtoLink 0.7.2 focuses on introducing built-in tools and simple assistant presets for everyday agent work.** Agents can run shell commands, work with Git repositories, ask the user for feedback, and manage calendars and email through small, configurable APIs. These additions use the existing Agent runtime, including capability policies, approval previews, execution budgets, cancellation, and events.
+
+The new shell and Git tools support practical coding workflows, from inspecting a repository and running checks to staging and committing changes. The user interaction tool lets a model ask a question, await an application-provided response, and continue its task with that feedback. Applications supply the working directory, environment, and interaction handler, keeping setup explicit and tool calls straightforward.
+
+Calendar and email tools bring the same execution model to personal assistant workflows. Google Calendar, Gmail, Outlook Calendar, Outlook Email, and standard IMAP/SMTP backends support calendar listing and event creation, mailbox search and reading, draft creation, and email submission. Backends share simple interfaces, provide search guidance to the model, and leave credentials and authentication with the application. Writes require explicit tool opt-ins, and uncertain submissions are never automatically retried.
+
+`Assistant` and `CodeAssistant` combine these tools into small, ordinary `Agent` subclasses. Applications choose their models, accounts, callbacks, and policies while retaining the familiar invocation, streaming, state, and transport APIs. The presets require approval for mutation capabilities by default. Updated documentation and runnable offline examples demonstrate every new tool family and all five service backends, with regression tests covering their execution and failure behavior.
+
+:::
+
+### Added
+
+- `shell_tool()` exposes `run_shell(command)` with an application-configured working directory, copied environment,
+  executable, time/output limits, and optional execution backend. It uses native previews, process events, budgets,
+  and cancellation. Each call starts a fresh noninteractive shell.
+- `git_tool()` provides structured status, diff, log, show, add, and commit operations. Reading is enabled by default;
+  staging/committing require an explicit factory opt-in and a separate `git.write` capability. Literal paths and
+  option validation prevent model arguments from becoming arbitrary Git flags. Hooks, fsmonitor, signing,
+  external diff, and textconv are disabled; staging filters and host execution remain application trust decisions.
+- `ask_user_tool(handler)` lets a model ask for clarification and await the application's async UI callback before
+  continuing. Typed requests/results include unique correlation IDs, suggested choices, and free-text answers;
+  declines and timeouts never invent an answer. Events, cancellation, and runtime budgets cover the live wait.
+- `calendar_tools()` and `email_tools()` expose small async backend contracts with first-party `GoogleCalendar`
+  and `Gmail` adapters. Calendar listing/personal event creation and mailbox search/read/draft/send use native
+  policy, previews, pagination, explicit write opt-ins, bounded HTTP responses, and no automatic retries.
+  OAuth credentials and token refresh remain application-owned. Optional `integrations` extra installs HTTPX.
+- `OutlookCalendar` and `OutlookEmail` use Microsoft Graph with selected-user/calendar support, refreshed tokens,
+  recurring calendar views, bounded plain-text mail reads, drafts, and sending. Continuations stay on the selected
+  collection; send results report acceptance without inventing a message ID or claiming delivery.
+- `IMAPEmail` adds dependency-free IMAP/SMTP with verified TLS, app-password callbacks, account/folder-scoped
+  UID pagination, read-only `BODY.PEEK` reads, bounded MIME, explicit draft folders, and optional SMTP submission.
+  Worker cancellation interrupts sockets; send results distinguish accepted and refused recipients without retries.
+  All five backends fit the same tools and `Assistant` API, with provider-specific search guidance in tool descriptions.
+- `examples/service_backends.py` exercises all five service backends through `Assistant` with offline transport
+  fixtures. Regression tests cover pagination isolation, MIME limits, TLS ordering, partial rejection, and cancellation.
+- `Assistant` and `CodeAssistant` are small `Agent` subclasses that compose these tools and default policies.
+  Models, accounts, callbacks, and standard Agent settings remain caller-supplied; mutation capabilities require
+  approval by default. Public imports are available from `protolink` and `protolink.agents.builtins`.
+- One provider-free `examples/builtin_assistants.py` walkthrough verifies every new tool family and both presets
+  using a temporary Git repository, mock model, and in-memory calendar/mailbox. Added host, integration-contract,
+  inference-continuation, policy, validation, and lifecycle regression tests and a complete API guide.
+
+### Changed
+
+- Share process preparation/execution between argv, shell, and Git tools while preserving `process_tool()`'s API.
+  Reject noninteger output limits and defensively copy explicit environments.
+- Export configured tool factories and integration contracts through `protolink.tools` as well as
+  `protolink.tools.builtins`. Configured backends/callbacks must be explicitly reattached after Agent restoration.
+- Align package, lockfile, and documentation metadata for the next 0.7.2 release.
+
+## [0.7.1] - 2026-09-15
+
+:::note Release Summary
 
 **ProtoLink 0.7.1 makes live execution easier to follow and its results easier to inspect**, improving model streaming while bringing delegated evidence, persistence redaction, and checkpoint inventory into the library. Applications can show progress as generation happens, evaluate work performed by delegated agents from the parent's report, configure secret masking at the storage boundary, and inspect recovery records through a public API. These changes build on the execution and recovery facilities introduced in 0.7.0 and reduce the application code needed to connect them to a frontend or operator workflow.
 

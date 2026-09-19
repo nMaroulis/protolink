@@ -2,6 +2,7 @@
 
 from protolink.__version__ import __version__
 from protolink.agents import Agent
+from protolink.agents.builtins import Assistant, CodeAssistant
 from protolink.core import (
     ALL_RUN_REPORT_SECTIONS,
     DEFAULT_REDACTION_POLICY,
@@ -123,6 +124,7 @@ __all__ = [
     "ApprovalRequiredError",
     "ApprovalScope",
     "Artifact",
+    "Assistant",
     "BaseTool",
     "BudgetDecision",
     "BudgetDecisionEffect",
@@ -133,6 +135,7 @@ __all__ = [
     "CancellationToken",
     "CapabilityPolicy",
     "Citation",
+    "CodeAssistant",
     "CompletionCheck",
     "CompletionEvidence",
     "CompletionValidator",

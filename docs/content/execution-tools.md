@@ -79,6 +79,102 @@ serialization preserves configured limits, not live execution counters. Delegate
 parent's tool budget and the recipient enforces inherited task limits. These are task-local limits, not a distributed
 atomic accounting service for arbitrary parallel agent graphs.
 
+## Shell and Git tools
+
+```python
+from protolink.tools import shell_tool, git_tool
+
+agent.add_tool(shell_tool(cwd="/absolute/workspace"))
+agent.add_tool(git_tool(cwd="/absolute/workspace", allow_write=True))
+output = await agent.call_tool("run_shell", command="printf 'hello\n' | sort")
+changes = await agent.call_tool("git", operation="diff", staged=True)
+```
+
+| Factory | Model-facing arguments | Capabilities |
+| --- | --- | --- |
+| `shell_tool(*, cwd, env=None, shell="/bin/sh", timeout_seconds=60, max_output_bytes=65536, backend=None)` | `run_shell(command)` | `process.execute`, `shell.execute` |
+| `git_tool(*, cwd, allow_write=False, env=None, executable="git", timeout_seconds=60, max_output_bytes=65536, backend=None)` | `git(operation, paths=None, revision=None, staged=False, message=None, max_count=10)` | `process.execute` and either `git.read` or `git.write` |
+
+Both factories resolve the directory/executable at registration without launching a process. The application
+owns these settings; the model cannot increase limits or replace the environment. `env=None` supplies only
+`PATH=os.defpath`; an explicit mapping is the complete copied environment. Both return the same `ProcessResult`
+and emit the same process events as `process_tool()`. Exact resolved argv, cwd, environment, and limits appear
+in the approval preview. Runtime action payloads keep model arguments in `arguments` and the resolved process
+specification in `process`. Denial prevents execution; timeout/cancellation reuse native process cleanup.
+
+Shell scripts support pipelines, redirects, and ordinary shell syntax. Each call starts a fresh noninteractive
+POSIX-compatible shell (`-c`); changes to working directory or variables do not persist. Windows users need
+an installed compatible shell and its executable path. `cwd` is not an access boundary: scripts can access
+other host paths and the network. For finer argv control, keep using `process_tool()`.
+
+Git exposes these operations:
+
+| Operation | Supported options |
+| --- | --- |
+| `status` | Optional literal `paths`; short output with branch information. |
+| `diff` | Optional `paths`, `revision`, and `staged=True` for index changes. |
+| `log` | Optional `paths`, `revision` (default HEAD), and `max_count` from 1–100. |
+| `show` | Optional `paths` and `revision` (default HEAD). |
+| `add` | Required nonempty `paths`; stages those paths, including deletions. |
+| `commit` | Required nonblank `message`; commits **all staged changes**, including existing ones. |
+
+Paths are literal, relative to the configured directory; absolute paths and `..` components are rejected.
+Revisions cannot inject command options. Unsupported option combinations fail before authorization. Writing
+needs `allow_write=True` and a policy permitting `git.write`; disabled writes are absent from the advertised
+operation enum. Nonzero Git exit codes remain typed results. The tool does not roll back commits/index edits
+or expose push, reset, checkout, or arbitrary flags. Repository state can change during approval: previews
+bind commands, not a transaction over the index/HEAD, so inspect staged changes before committing.
+
+The adapter disables system/global Git configuration, terminal prompts, optional locks, hooks, fsmonitor,
+signing, external diff, and textconv. Repository configuration still applies, and staging clean filters may
+execute code. Read/write capabilities classify requested operations; they do not sandbox untrusted repositories.
+These switches follow the [Git](https://git-scm.com/docs/git) and
+[diff](https://git-scm.com/docs/git-diff) command contracts.
+
+## User questions and continuation
+
+```python
+from protolink.tools import UserInputRequest, ask_user_tool
+
+
+async def handle_question(request: UserInputRequest) -> str | None:
+    # Application UI returns text, or None when the user declines.
+    return await application_ui.ask(request.to_dict())
+
+
+agent.add_tool(ask_user_tool(handle_question, timeout_seconds=300))
+answer = await agent.call_tool("ask_user", question="Which format?", options=["JSON", "CSV"])
+print(answer.status, answer.answer)
+```
+
+`application_ui` is your UI adapter. The model-facing API is `ask_user(question, options=None)`.
+When invoked by the inference loop, the tool awaits your async callback, then puts its result in normal
+tool history before the next model step. The task stays working during the wait. This does not suspend
+or resume a task across process restarts and does not use `input-required` as a durable checkpoint.
+
+`UserInputRequest` has `request_id`, `question`, immutable suggested `options`, `run_id`, `task_id`, and
+`action_id`; standalone tool calls have no task ID. IDs correlate simultaneous calls but do not authenticate
+responders. `UserInputResult` contains `request_id`, `status`, and `answer`. Suggested answers never restrict
+free text. Questions are limited to 8,000 characters and ten distinct nonblank options of up to 500 characters.
+The callback returns nonblank text (up to `max_answer_chars=16384`) or `None` to decline.
+
+`answered` retains the exact answer. `declined` and `timed_out` have no answer; neither selects a default or
+gives consent. A callback exception is a tool failure. Native task cancellation interrupts the callback;
+run-budget expiry raises the existing budget error. The question timeout defaults to 300 seconds and is
+bounded by the remaining run budget. Callbacks should release pending UI state in `finally`; they must not
+block the event loop. For a simple terminal adapter, offload `input()` to a thread and serialize prompts,
+noting that cancellation cannot interrupt a blocking stdin read in that thread.
+
+Events are `user_input.requested` with a request, `user_input.answered`/`user_input.declined` with a result,
+and `user_input.timed_out`, `user_input.canceled`, or `user_input.failed` with the request ID. Existing
+run/task/action correlation remains available. Questions and answers enter history/events, so use an
+appropriate redaction policy for sensitive content. The capability is `user.interact`; answering a question
+does not approve shell execution, sending email, or other side effects.
+
+The [offline assistant example](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_assistants.py)
+shows the model receiving feedback and continuing. See [built-in assistants](builtin-assistants.md) for
+calendar/email adapters and the small agent presets that compose all these tools.
+
 ## Embedded groups and run handles
 
 ```python
