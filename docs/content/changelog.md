@@ -42,6 +42,8 @@ uv add --upgrade protolink
 
 The new shell and Git tools support practical coding workflows, from inspecting a repository and running checks to staging and committing changes. The user interaction tool lets a model ask a question, await an application-provided response, and continue its task with that feedback. Applications supply the working directory, environment, and interaction handler, keeping setup explicit and tool calls straightforward.
 
+General-purpose tool factories add scoped filesystem reads and recoverable edits, JSON storage, configured HTTP requests, document extraction, and read-only database queries. Developers can register these capabilities on any Agent and supply their own policies, storage, API credentials, and database backends. Optional format libraries support PDF, Word, and spreadsheet extraction while the base package remains lightweight.
+
 Calendar and email tools bring the same execution model to personal assistant workflows. Google Calendar, Gmail, Outlook Calendar, Outlook Email, and standard IMAP/SMTP backends support calendar listing and event creation, mailbox search and reading, draft creation, and email submission. Backends share simple interfaces, provide search guidance to the model, and leave credentials and authentication with the application. Writes require explicit tool opt-ins, and uncertain submissions are never automatically retried.
 
 `Assistant` and `CodeAssistant` combine these tools into small, ordinary `Agent` subclasses. Applications choose their models, accounts, callbacks, and policies while retaining the familiar invocation, streaming, state, and transport APIs. The presets require approval for mutation capabilities by default. Updated documentation and runnable offline examples demonstrate every new tool family and all five service backends, with regression tests covering their execution and failure behavior.
@@ -50,6 +52,17 @@ Calendar and email tools bring the same execution model to personal assistant wo
 
 ### Added
 
+- General-purpose `storage_tools()`, `http_tool()`, `document_tools()`, and `database_tools()` factories,
+  composing with any Agent through native validation, capabilities, previews, and execution events.
+  Storage reuses a dedicated existing `Storage` namespace; HTTP fixes the API origin/path and selects
+  read/write capabilities per request; database access has an async backend contract and bounded,
+  cancellable read-only `SQLiteDatabase` implementation.
+- Filesystem `read_file`, `list_files`, `search_files`, and exact `edit_file` operations. Omitting
+  `checkpoints` now exposes only reads; supplying it retains existing writes/recovery and adds targeted
+  edits with preimage checks. Reads enforce existing roots, reject symlinks, and bound output/traversal.
+- Optional `documents` extra for PDF/DOCX/XLSX extraction; text and CSV/TSV need no extra dependency.
+  Located text/table results and literal search report truncation. Added one offline `generic_tools.py`
+  example covering all five tool families and regression tests with real document formats and SQLite.
 - `shell_tool()` exposes `run_shell(command)` with an application-configured working directory, copied environment,
   executable, time/output limits, and optional execution backend. It uses native previews, process events, budgets,
   and cancellation. Each call starts a fresh noninteractive shell.

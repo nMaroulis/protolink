@@ -442,6 +442,13 @@ baseline comparison, filtering, and CI thresholds.
 
 ## Built-in assistants
 
+General-purpose tools also work on any ordinary `Agent`: `filesystem_tools()` for scoped reads and
+recoverable edits, `storage_tools()` for JSON values, `http_tool()` for configured APIs,
+`document_tools()` for text/tables, and `database_tools(SQLiteDatabase(...))` for read-only SQL.
+See the [general-purpose tools guide](https://nmaroulis.github.io/protolink/docs/generic-tools/) and run
+`python examples/generic_tools.py` for one complete offline example. PDF/Word/spreadsheet parsers are
+available through the optional `protolink[documents]` extra.
+
 ```python
 from protolink import Assistant, CodeAssistant
 from protolink.tools import Gmail, GoogleCalendar

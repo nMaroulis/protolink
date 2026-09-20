@@ -37,6 +37,7 @@ const sidebars = {
         'registry',
         'runtime',
         'execution-tools',
+        'generic-tools',
         'builtin-assistants',
         'server',
         'state',

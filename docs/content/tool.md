@@ -421,6 +421,10 @@ result = await tool(location="Tokyo", units="celsius")
 
 ## Built-in Tools
 
+For reusable filesystem, JSON storage, HTTP API, document extraction, and database capabilities, see
+the [general-purpose tools guide](generic-tools.md). These factories register on any Agent and use
+developer-configured resources and policies.
+
 ProtoLink includes these parameterless, dependency-free factories:
 
 - `web_search()` creates `web_search`, which requires `network.read` and returns normalized ranked source snippets.

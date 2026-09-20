@@ -16,13 +16,17 @@ from ._oauth import OAuthToken
 from .calculator import calculator
 from .calendar import CalendarBackend, GoogleCalendar, calendar_tools
 from .clock import current_datetime
+from .database import DatabaseBackend, SQLiteDatabase, database_tools
+from .documents import document_tools
 from .email import EmailBackend, Gmail, email_tools
 from .filesystem import filesystem_tools
 from .git import git_tool
+from .http import HTTPHeaders, http_tool
 from .imap_email import IMAPEmail, MailBackendError, MailPassword
 from .outlook import MicrosoftGraphError, OutlookCalendar, OutlookEmail
 from .process import process_tool
 from .shell import shell_tool
+from .storage import storage_tools
 from .user_input import UserInputHandler, UserInputRequest, UserInputResult, ask_user_tool
 from .web import fetch_url, web_search
 
@@ -44,11 +48,13 @@ def _create_builtin(builtin_id: str) -> Tool:
 
 __all__ = [
     "CalendarBackend",
+    "DatabaseBackend",
     "EmailBackend",
     "Gmail",
     "GoogleAPIError",
     "GoogleCalendar",
     "GoogleToken",
+    "HTTPHeaders",
     "IMAPEmail",
     "MailBackendError",
     "MailPassword",
@@ -56,6 +62,7 @@ __all__ = [
     "OAuthToken",
     "OutlookCalendar",
     "OutlookEmail",
+    "SQLiteDatabase",
     "UserInputHandler",
     "UserInputRequest",
     "UserInputResult",
@@ -63,11 +70,15 @@ __all__ = [
     "calculator",
     "calendar_tools",
     "current_datetime",
+    "database_tools",
+    "document_tools",
     "email_tools",
     "fetch_url",
     "filesystem_tools",
     "git_tool",
+    "http_tool",
     "process_tool",
     "shell_tool",
+    "storage_tools",
     "web_search",
 ]

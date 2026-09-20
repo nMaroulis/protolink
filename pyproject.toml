@@ -49,6 +49,8 @@ allowed-unresolved-imports = [
     "mcp.**",
     "openai.**",
     "pypdf.**",
+    "docx.**",
+    "openpyxl.**",
     "qdrant_client.**",
 ]
 
@@ -61,6 +63,8 @@ protolink = "protolink.cli:main"
 
 [project.optional-dependencies]
 integrations = ["httpx>=0.28.1"]
+
+documents = ["pypdf>=5.0.0", "python-docx>=1.2.0", "openpyxl>=3.1.0"]
 
 http = [
     "fastapi>=0.137.2",
@@ -111,6 +115,7 @@ all = [
     "protolink[grpc]",
     "protolink[http]",
     "protolink[integrations]",
+    "protolink[documents]",
     "protolink[llms]",
     "protolink[mcp]",
     "protolink[db]",
@@ -130,6 +135,7 @@ test = [
     "pre-commit>=4.4.0",
     "protolink[grpc]", # For testing gRPC transport
     "protolink[http]", # For testing HTTP transport
+    "protolink[documents]", # For testing document extraction
 ]
 
 # Jupyter Notebook dependencies
