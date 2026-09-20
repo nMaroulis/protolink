@@ -440,12 +440,12 @@ The benchmark is source-checkout tooling under `benchmarks/`, not part of the in
 [infer-loop benchmark guide](benchmarks/infer_loop/README.md) for suite sizes, scoring, Ollama configuration, timing,
 baseline comparison, filtering, and CI thresholds.
 
-## Built-in assistants
+## Built-in tools and agents
 
 General-purpose tools also work on any ordinary `Agent`: `filesystem_tools()` for scoped reads and
 recoverable edits, `storage_tools()` for JSON values, `http_tool()` for configured APIs,
 `document_tools()` for text/tables, and `database_tools(SQLiteDatabase(...))` for read-only SQL.
-See the [general-purpose tools guide](https://nmaroulis.github.io/protolink/docs/generic-tools/) and run
+See the [Built-in Tools](https://nmaroulis.github.io/protolink/docs/builtin-tools/) and run
 `python examples/generic_tools.py` for one complete offline example. PDF/Word/spreadsheet parsers are
 available through the optional `protolink[documents]` extra.
 
@@ -464,7 +464,7 @@ calendar/email reads are enabled by default, while writes need explicit opt-ins 
 Google and Microsoft adapters need `pip install 'protolink[integrations]'`; IMAP/SMTP uses the standard
 library. Add `ask_user=handle_question` to await user feedback
 inside the inference loop. Shell, Git, calendar, email, and question tools can also be registered separately.
-See the [API guide](https://nmaroulis.github.io/protolink/docs/builtin-assistants/).
+See the [Built-in Agents](https://nmaroulis.github.io/protolink/docs/builtin-agents/).
 
 Run `python examples/builtin_assistants.py` for one complete offline test using a temporary repository,
 mock model, and in-memory calendar/mailbox. Run `python examples/service_backends.py` to exercise all

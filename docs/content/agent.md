@@ -13,6 +13,9 @@ import registryStatusCard from '@site/assets/registry_status_card.png';
 
 Agents are the core building blocks in Protolink.
 
+For optional `Assistant`, `CodeAssistant`, and `EchoAgent` classes, see [Built-in Agents](builtin-agents.md).
+For reusable capabilities to register on any Agent, see [Built-in Tools](builtin-tools.md).
+
 ## Concepts
 
 An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**.
@@ -1524,7 +1527,7 @@ agent.add_tool(current_datetime())
 agent.add_tool(web_search())  # Brave by default; calls may select engine="duckduckgo".
 ```
 
-Built-ins are never enabled automatically. Registered built-ins follow the same validation, policy, telemetry, cancellation, and skill-advertising path as native tools. See [Tools](tool.md#built-in-tools) for the complete built-in API and network-safety contract.
+Built-ins are never enabled automatically. Registered built-ins follow the same validation, policy, telemetry, cancellation, and skill-advertising path as native tools. See [Built-in Tools](builtin-tools.md) for the complete catalog, configuration, and access boundaries.
 
 ## Registry & Discovery
 
@@ -1860,11 +1863,3 @@ The `Agent` class includes several error handling patterns:
 - **Tool Errors**: Direct `call_tool()` calls propagate validation, policy, approval, and tool errors. Task-based tool execution converts ordinary tool failures into an error-bearing `tool_output` part; policy failures remain raised.
 - **Convenience Calls**: `invoke()` and `ask()` raise the top-level `TaskExecutionError` when the returned task is failed or canceled. Its `.task` attribute preserves the complete task. Use `run_task()` to inspect returned states directly or add `raise_for_status()` explicitly; the check leaves nonterminal states unchanged.
 - **Task Processing**: Non-streaming engine errors mark the task failed and are re-raised through direct handler calls. The streaming engine emits a `TaskErrorEvent` and a final failed status event.
-
-## Built-in agent presets
-
-`from protolink import Assistant, CodeAssistant` provides two small `Agent` subclasses. `Assistant`
-composes optional calendar/email backends, clock, calculator, and user feedback. `CodeAssistant`
-composes shell, Git, calculator, and optional feedback. Both accept caller-selected models and standard
-Agent options; their default policies require approval for mutation capabilities. Use `invoke()` for
-general conversation. See [presets and integration APIs](builtin-assistants.md).

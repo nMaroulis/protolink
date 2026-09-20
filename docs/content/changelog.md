@@ -95,6 +95,9 @@ Calendar and email tools bring the same execution model to personal assistant wo
 
 ### Changed
 
+- Consolidate all built-in tool references in [Built-in Tools](builtin-tools.md) and agent presets in [Built-in Agents](builtin-agents.md),
+  with direct links from the Tool/Agent APIs and sidebar. The agents catalog includes a note about future additions.
+
 - Share process preparation/execution between argv, shell, and Git tools while preserving `process_tool()`'s API.
   Reject noninteger output limits and defensively copy explicit environments.
 - Export configured tool factories and integration contracts through `protolink.tools` as well as

@@ -8,7 +8,8 @@ import ApiReference, {
 
 # Tools
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Built-in Tools](builtin-tools.md) for the complete built-in catalog.
+[Execution, approvals, and recovery](execution-tools.md) covers run handles, approval brokers, and completion checks.
 
 Tools extend agent capabilities with additional functions. They enable LLMs and agents to interact with external systems, execute code, access data, and perform specialized tasks that go beyond pure text generation.
 
@@ -16,7 +17,7 @@ Tools extend agent capabilities with additional functions. They enable LLMs and 
 
 Protolink provides a flexible tool system with three approaches:
 
-- **Built-in Tools**: Opt-in, dependency-free factories for common read-only and pure operations
+- **Built-in Tools**: Opt-in factories for general capabilities and configured integrations; see [Built-in Tools](builtin-tools.md)
 - **Native Tools**: Python functions decorated directly on an agent
 - **MCP Tools**: Tools from external MCP (Model Context Protocol) servers
 
@@ -44,7 +45,7 @@ from protolink.tools.adapters import MCPToolAdapter
 | Module | Description |
 |--------|-------------|
 | `protolink.tools` | Core interfaces, native implementation, and public built-in factories |
-| `protolink.tools.builtins` | Implementations for the dependency-free built-in tools |
+| `protolink.tools.builtins` | Built-in factories and configurable backends |
 | `protolink.tools.adapters` | Adapters for integrating external tool systems |
 
 ---
@@ -64,7 +65,7 @@ from protolink.tools.adapters import MCPToolAdapter
   cards={[
     {
       title: "Built-in tools",
-      text: "Explicitly register dependency-free web search, safe URL fetch, calculator, and current-datetime tools.",
+      text: "Register general-purpose capabilities and configured integrations from the Built-in Tools catalog.",
       code: "agent.add_tool(web_search())",
     },
     {
@@ -421,318 +422,13 @@ result = await tool(location="Tokyo", units="celsius")
 
 ## Built-in Tools
 
-For reusable filesystem, JSON storage, HTTP API, document extraction, and database capabilities, see
-the [general-purpose tools guide](generic-tools.md). These factories register on any Agent and use
-developer-configured resources and policies.
-
-ProtoLink includes these parameterless, dependency-free factories:
-
-- `web_search()` creates `web_search`, which requires `network.read` and returns normalized ranked source snippets.
-- `fetch_url()` creates `fetch_url`, which requires `network.read` and returns bounded readable text from one public URL.
-- `calculator()` creates `calculator`, a pure bounded arithmetic evaluator with no protected capability.
-- `current_datetime()` creates `current_datetime`, a timezone-aware clock tool with no protected capability.
-
-Configured tools add shell, Git, user questions, calendar, and email. Import `shell_tool`, `git_tool`,
-`ask_user_tool`, `calendar_tools`, and `email_tools` from `protolink.tools`. See the
-[execution guide](execution-tools.md#shell-and-git-tools) and [assistant/service API](builtin-assistants.md).
-These are `PreparedTool` instances that must execute through an Agent; their configuration and callbacks
-must be reattached after restoring an Agent. `GoogleCalendar`, `Gmail`, `OutlookCalendar`, and
-`OutlookEmail` require the optional `integrations` extra. `IMAPEmail` uses the standard library for
-TLS IMAP/SMTP. Each backend supplies search guidance in its tool descriptions; all use the same
-`calendar_tools()`/`email_tools()` and `Assistant` APIs.
-
-Factories return fresh native `Tool` instances. Nothing is enabled automatically: register only the capabilities an agent needs.
-
-```python
-from protolink import Agent, AgentCard, CapabilityPolicy
-from protolink.tools import calculator, current_datetime, fetch_url, web_search
-
-agent = Agent(
-    card=AgentCard(
-        name="researcher",
-        description="Finds and summarizes public information",
-        url="runtime://researcher",
-    ),
-    transport="runtime",
-    policy=CapabilityPolicy(
-        {"network.read": "allow"},
-        default_effect="deny",
-    ),
-)
-
-agent.add_tool(web_search())
-agent.add_tool(fetch_url())
-agent.add_tool(calculator())
-agent.add_tool(current_datetime())
-```
-
-Registered tools participate in schema validation, runtime policy, and AgentSkill advertising. When the inference loop invokes one during a task, the task's cancellation, telemetry, and tool-call budget controls apply as well. `network.read` identifies the authority required by `web_search` and `fetch_url`; `calculator` and `current_datetime` declare no protected capability.
-
-:::warning[Default policy and direct calls]
-
-The default `CapabilityPolicy` is allow-by-default for backward compatibility. Declaring `network.read` makes authority visible and configurable, but does not deny it by itself. Pass a restrictive policy when network access should be denied or approval-gated.
-
-Calling a `Tool` object directly, such as `await web_search()(query="...")`, invokes the tool without the Agent and therefore bypasses Agent policy and approval. Use `agent.call_tool(...)` for Agent validation and policy, or let the inference loop invoke a registered tool when the task's full runtime controls should apply.
-
-Agent dict/YAML serialization preserves each parameterless built-in's stable identity and the declarative rules, default effect, and name of ProtoLink's first-party `CapabilityPolicy`. Custom policy implementations and approval callbacks are executable application objects and are not embedded; pass them explicitly when restoring, for example `Agent.from_yaml("agent.yaml", policy=custom_policy, approval_handler=approve)`. An explicit policy override takes precedence over serialized first-party policy data.
-
-:::
-
-### Web Search
-
-`web_search()` has one normalized result contract across three explicit engines:
-
-- `engine="brave"` is the default. It uses the [Brave Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get) and reads `BRAVE_SEARCH_API_KEY` from the environment only when invoked. The key is not captured by the Tool, stored in Agent configuration, or required merely to import or register the factory.
-- `engine="duckduckgo"` needs no API key or additional dependency. It reads DuckDuckGo's published [non-JavaScript HTML search](https://duckduckgo.com/duckduckgo-help-pages/features/non-javascript) as a best-effort interface.
-- `engine="wikipedia"` needs no API key or additional dependency. It uses English Wikipedia's documented [REST page-search API](https://www.mediawiki.org/wiki/API:REST_API/Reference#Search_pages), which is the reliable keyless choice for encyclopedia and factual discovery. It supports `freshness="any"` only.
-
-Engine selection is per call and there is no silent fallback. A missing Brave key therefore remains a clear configuration error instead of unexpectedly sending the query to another provider.
-
-```bash
-export BRAVE_SEARCH_API_KEY="your-key"
-```
-
-```python
-result = await agent.call_tool(
-    "web_search",
-    query="Python 3.14 release notes",
-    max_results=5,
-)
-
-keyless_result = await agent.call_tool(
-    "web_search",
-    query="What is the capital of Greece?",
-    engine="wikipedia",
-)
-
-best_effort_result = await agent.call_tool(
-    "web_search",
-    query="Python structured concurrency",
-    engine="duckduckgo",
-    freshness="month",
-)
-```
-
-For a complete Agent-path CLI, see [`examples/builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py). It registers the built-in with an explicit `network.read` policy, supports all three engines, and prints the normalized JSON result:
-
-```bash
-# Keyless search through Wikipedia's documented API (example default)
-python examples/builtin_web_search.py "What is the capital of Greece?"
-
-# Documented Brave API
-export BRAVE_SEARCH_API_KEY="your-key"
-python examples/builtin_web_search.py "Python structured concurrency" --engine brave
-
-# Keyless, best-effort DuckDuckGo HTML search
-python examples/builtin_web_search.py "Python structured concurrency" --engine duckduckgo
-```
-
-Running the example without a query only prints its CLI help, so it is safe to inspect without credentials or a network request.
-
-<ApiReference
-  kind="factory"
-  path="protolink.tools.web_search"
-  signature={`web_search() -> Tool`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/web.py#L766"
->
-
-Create a fresh `Tool` named `web_search`. The factory does not make a request and does not read the Brave credential; provider selection and credential lookup happen only when the returned tool is invoked.
-
-<ApiSection title="Returns">
-  <ApiFields ariaLabel="web_search factory return value">
-    <ApiField name="tool" type="Tool">
-      A native tool tagged <code>builtin</code>, <code>web</code>, <code>search</code>, and <code>read-only</code>, with the <code>network.read</code> capability and a bounded provider-neutral output schema.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Generated tool call">
-  <ApiFields ariaLabel="web_search generated tool arguments">
-    <ApiField name="query" type="str" required>
-      Search text after surrounding whitespace is removed. It must contain 1–400 characters and no more than 50 whitespace-separated words.
-    </ApiField>
-    <ApiField name="max_results" type="int" defaultValue="5">
-      Maximum normalized results returned to the model. Accepted range: 1–10.
-    </ApiField>
-    <ApiField name="freshness" type={'"any" | "day" | "week" | "month" | "year"'} defaultValue={'"any"'}>
-      Optional result-age filter. Wikipedia accepts only <code>"any"</code>; requesting another value with that engine raises <code>ValueError</code>.
-    </ApiField>
-    <ApiField name="engine" type={'"brave" | "duckduckgo" | "wikipedia"'} defaultValue={'"brave"'}>
-      Explicit provider. Brave requires <code>BRAVE_SEARCH_API_KEY</code>; DuckDuckGo and Wikipedia are keyless and never selected as a silent fallback.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Returns from invocation">
-  <ApiFields ariaLabel="web_search generated tool result">
-    <ApiField name="result" type="dict[str, Any]">
-      Contains the normalized query, selected provider, ranked result objects, <code>more_results_available</code>, and <code>untrusted_content=True</code>. Each result includes title, URL, snippet, and an explicit sponsored marker.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Raises">
-  <ApiFields ariaLabel="web_search errors">
-    <ApiField name="ValueError">
-      Invalid query length, word count, result limit, freshness, provider selection, or missing Brave credential.
-    </ApiField>
-    <ApiField name="RuntimeError">
-      Provider response, content, challenge, HTTP, decoding, or bounded-transfer failures.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-</ApiReference>
-
-The tool normalizes all three engines into provider-neutral JSON-compatible data and bounds the result count and text placed into model context. Every result includes `sponsored`; Brave and Wikipedia results use `False`, while recognized DuckDuckGo advertisements stay in provider order with `sponsored=True`. Every engine uses a fixed HTTPS endpoint with DNS validation, a 2,000,000-byte response limit, a 10-second transport deadline, and no redirects. Wikipedia excerpts are converted from bounded provider markup to plain text. DuckDuckGo organic redirect links are decoded locally and validated; sponsored click URLs remain intact. Results also include the selected `provider`, `more_results_available`, and the explicit marker `untrusted_content=True`.
-
-DuckDuckGo's HTML page is a human-facing interface rather than a versioned developer API. It can change markup, rate-limit automated requests, or return a human-verification challenge. ProtoLink does not spoof a browser, suppress or discard recognized advertising, retry a challenge, or attempt to bypass one; it raises a clear error that points to Wikipedia as the keyless alternative. Applications distributing a DuckDuckGo-backed integration should review DuckDuckGo's [URL-parameter and partnership guidance](https://duckduckgo.com/duckduckgo-help-pages/settings/params). Use Wikipedia for reliable keyless encyclopedia search or Brave when a documented, general-web provider contract is required. With every engine, search queries leave the process, and titles, URLs, snippets, and page content are untrusted external data. Do not treat search output as instructions, executable content, or proof that a claim is correct.
-
-### URL Fetch
-
-`fetch_url()` retrieves bounded textual content from a public HTTP or HTTPS URL. It rejects credentials in URLs, non-HTTP schemes, and private, loopback, link-local, reserved, or otherwise non-public targets. Redirect destinations are resolved and validated again before they are followed. Responses are subject to redirect, timeout, byte, character, and supported-text-content limits; the result reports when extracted text was truncated.
-
-```python
-page = await agent.call_tool("fetch_url", url="https://example.com/")
-```
-
-<ApiReference
-  kind="factory"
-  path="protolink.tools.fetch_url"
-  signature={`fetch_url() -> Tool`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/web.py#L831"
->
-
-Create a fresh `Tool` named `fetch_url`. Construction is side-effect free; DNS resolution and network access begin only when the returned tool is invoked.
-
-<ApiSection title="Returns">
-  <ApiFields ariaLabel="fetch_url factory return value">
-    <ApiField name="tool" type="Tool">
-      A native read-only web tool with the <code>network.read</code> capability, public-destination validation, bounded redirects and bytes, and an explicit output schema.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Generated tool call">
-  <ApiFields ariaLabel="fetch_url generated tool arguments">
-    <ApiField name="url" type="str" required>
-      Public HTTP or HTTPS URL of at most 2,048 characters. Embedded credentials, nonstandard ports, unsafe address ranges, HTTPS downgrades, and non-public redirect targets are rejected.
-    </ApiField>
-    <ApiField name="max_chars" type="int" defaultValue="12000">
-      Maximum readable text characters returned after download and decoding. Accepted range: 1–50,000; transfer bytes are bounded separately.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Returns from invocation">
-  <ApiFields ariaLabel="fetch_url generated tool result">
-    <ApiField name="result" type="dict[str, Any]">
-      Final validated URL, HTTP status, normalized content type, extracted title, bounded text, truncation flag, and <code>untrusted_content=True</code>.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Raises">
-  <ApiFields ariaLabel="fetch_url errors">
-    <ApiField name="ValueError">
-      Invalid URL shape, scheme, credentials, port, address, redirect destination, or character limit.
-    </ApiField>
-    <ApiField name="RuntimeError">
-      HTTP, redirect, timeout, response-size, content-type, charset, or HTML-decoding failures.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-</ApiReference>
-
-After each destination is DNS-validated, the transfer is limited to 1,000,000 bytes, four validated redirects, and a 10-second transport deadline for each request or redirect before the `max_chars` return bound is applied. DNS lookup uses the host operating system's resolver and is not included in that transport deadline. These restrictions reduce accidental server-side request forgery and context exhaustion; they do not make remote content trustworthy. Treat returned text as untrusted input and keep application-specific authorization at the Agent policy boundary.
-
-### Calculator and Current Datetime
-
-`calculator()` evaluates a deliberately small arithmetic grammar rather than Python code. It never uses `eval`, rejects names and function calls, and enforces expression-complexity, exponent, magnitude, and finite-result limits.
-
-`current_datetime()` returns structured current-time data for the requested timezone. UTC works without a host timezone database; other IANA zones use the system database, or the `tzdata` package when a host does not provide one. Invalid or unavailable timezone identifiers raise a clear tool error rather than silently falling back to local machine time.
-
-```python
-calculation = await calculator()(expression="(18 + 6) / 3")
-now = await current_datetime()(timezone="Europe/Zurich")
-```
-
-#### calculator
-
-<ApiReference
-  kind="factory"
-  path="protolink.tools.calculator"
-  signature={`calculator() -> Tool`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/calculator.py#L104"
->
-
-Create a fresh pure arithmetic tool. The returned callable parses a restricted Python expression AST; it never uses `eval` and cannot resolve names, attributes, calls, booleans, or complex values.
-
-<ApiSection title="Generated tool call">
-  <ApiFields ariaLabel="calculator generated tool arguments">
-    <ApiField name="expression" type="str" required>
-      Arithmetic expression of 1–256 characters using numbers, parentheses, unary signs, and <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>//</code>, <code>%</code>, or <code>**</code>. Syntax-tree size, exponent size, numeric magnitude, and finite-result limits prevent resource-heavy evaluation.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Returns">
-  <ApiFields ariaLabel="calculator result">
-    <ApiField name="result" type="dict[str, int | float | str]">
-      The trimmed original <code>expression</code> and its finite numeric <code>result</code>.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Raises">
-  <ApiFields ariaLabel="calculator errors">
-    <ApiField name="ValueError">
-      Empty or invalid arithmetic, unsupported syntax, division by zero, oversized powers or values, excessive complexity, and non-finite results.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-</ApiReference>
-
-#### current_datetime
-
-<ApiReference
-  kind="factory"
-  path="protolink.tools.current_datetime"
-  signature={`current_datetime() -> Tool`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/builtins/clock.py#L67"
->
-
-Create a fresh timezone-aware clock tool. UTC requires no external service or timezone database; other IANA identifiers are resolved through the host database or the optional `tzdata` package.
-
-<ApiSection title="Generated tool call">
-  <ApiFields ariaLabel="current_datetime generated tool arguments">
-    <ApiField name="timezone" type="str" defaultValue={'"UTC"'}>
-      IANA timezone name of at most 100 characters. The tool never silently substitutes host-local time for an unknown zone.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Returns">
-  <ApiFields ariaLabel="current_datetime result">
-    <ApiField name="result" type="dict[str, Any]">
-      Requested timezone, ISO-8601 timestamp, date, time, weekday, UTC offset, and Unix timestamp.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-<ApiSection title="Raises">
-  <ApiFields ariaLabel="current_datetime errors">
-    <ApiField name="ValueError">
-      Empty, oversized, unknown, or unavailable timezone identifiers.
-    </ApiField>
-  </ApiFields>
-</ApiSection>
-
-</ApiReference>
-
----
+ProtoLink provides optional web search/fetch, calculator/clock, process/shell/Git, user feedback,
+filesystem, storage, HTTP, document, database, calendar, and email tools. Register the factories on
+any Agent and supply the resources, backends, and policies your application needs.
+
+See [Built-in Tools](builtin-tools.md) for the complete catalog, generated calls, configuration,
+authentication, limits, and examples. The [Built-in Agents](builtin-agents.md) page documents the
+small agent presets that compose these capabilities.
 
 ## Native Tools
 
@@ -1779,12 +1475,10 @@ Print cached or freshly discovered names, descriptions, input schemas, and shall
 
 ## Best Practices
 
-### Built-in Tools
+### Registering built-ins
 
-1. **Register selectively**: Built-ins are opt-in; add only the tools an agent needs.
-2. **Configure policy**: Use `CapabilityPolicy` to allow, deny, or approval-gate `network.read` explicitly.
-3. **Treat external data as untrusted**: Search results and fetched pages can contain incorrect or adversarial text.
-4. **Use the Agent execution path**: Direct Tool calls are convenient for low-level tests but bypass Agent runtime controls.
+Register selectively, configure capabilities explicitly, and use the Agent execution path. See
+[Built-in Tools](builtin-tools.md#registration-and-policy) for policy, direct-call, and serialization behavior.
 
 ### Tool Design
 
