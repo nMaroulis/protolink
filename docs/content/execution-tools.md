@@ -4,80 +4,12 @@ These optional primitives let applications supply their own roles, workflows, po
 and UI while ProtoLink handles execution and lifecycle. They cover command execution, recoverable file changes,
 approvals, delegated evidence, completion checks, and checkpoint inventory without adding base-package dependencies.
 
-## Command execution
+## Built-in execution tools
 
-```python
-import sys
-from protolink import Agent, AgentCard, ApprovalDecision, CapabilityPolicy
-from protolink.tools.builtins import process_tool
-
-
-async def approve(request, context):
-    # Present request.action.artifacts in your application's authenticated UI.
-    approved = await application_ui.confirm(request.to_dict())
-    return ApprovalDecision(approved=approved, request_id=request.request_id)
-
-
-agent = Agent(
-    AgentCard(name="commands", description="Command execution", url="runtime://commands"),
-    policy=CapabilityPolicy({"process.execute": "require_approval"}),
-    approval_handler=approve,
-)
-agent.add_tool(process_tool())
-result = await agent.call_tool(
-    "execute_command",
-    argv=[sys.executable, "-c", "print('hello')"],
-    cwd="/absolute/working/directory",
-    env={},
-    timeout_seconds=10,
-    max_output_bytes=4096,
-)
-print(result.exit_code, result.stdout, result.truncated)
-```
-
-`application_ui` is application code. For a runnable, harmless approval callback, see
-[`command_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_capabilities/command_agent.py).
-No LLM or server is required. Registration does not launch a process, and calling the prepared tool directly raises:
-execution must pass through an Agent's authorization pipeline.
-
-### Public interfaces
-
-| Interface | Purpose |
-| --- | --- |
-| `process_tool(*, backend=None, max_timeout_seconds=300, max_output_bytes=1048576)` | Factory for the `execute_command` tool; factory limits are ceilings. |
-| `execute_command(argv, cwd, env, timeout_seconds=60, max_output_bytes=65536)` | Tool arguments. `argv`, `cwd`, and `env` are required. |
-| `ProcessSpec` | Exact argv, resolved cwd, environment mapping, timeout, and combined output-byte cap. |
-| `ProcessResult` | `exit_code`, `stdout`, `stderr`, `truncated`, `timed_out`, `canceled`, `duration_seconds`, `budget_exceeded`. |
-| `ExecutionBackend` | `boundary: str` and `async execute(spec, execution) -> ProcessResult`. |
-| `LocalExecutionBackend` | The first-party host implementation. |
-| `ProcessCancelledError` | Native `asyncio.CancelledError` subclass with a partial typed `.result`. |
-
-Backend/result types are in `protolink.tools.builtins.process`. A future remote or container backend can implement this
-protocol; ProtoLink does not implement those backends in this release. Backend implementations are trusted application
-code and must honor the approved specification and live execution limits.
-
-The local backend uses an argument array without an implicit shell. Environment inheritance is explicit: `env={}`
-starts with no inherited environment variables; pass a deliberately selected mapping to allow others. Supply an
-absolute executable, an explicit relative executable path, or a `PATH` entry in `env`. Preparation resolves the
-executable and directory before presenting their exact values, limits, and execution boundary for authorization.
-An explicitly requested shell executable can still interpret its own arguments.
-
-**This is host execution, not a sandbox.** It does not restrict filesystem or network access. POSIX process groups
-are killed and reaped on timeout, cancellation, and normal exit to clean up ordinary descendants. Descendants that
-create their own session can escape group cleanup. Windows cleanup covers the immediate child only. These limits
-bound wall time and captured output, not CPU, memory, disk writes, or arbitrary external effects.
-
-Stdout and stderr are drained concurrently. Their combined retained/emitted output is capped in bytes; excess bytes
-are discarded while pipes continue draining. Text uses UTF-8 replacement decoding. `process.output` events carry
-`channel` and `text`; `process.finished` includes termination facts, including partial output on cancellation.
-Task cancellation retains its native `canceled` lifecycle state. Nonzero exit codes and command timeouts are typed
-results; an application completion predicate determines whether those outcomes satisfy its task.
-
-Native task budgets are checked before launch, including time spent awaiting approval. Process time is also bounded
-by the remaining runtime budget. Multiple direct calls with the same live `RunContext` share their tool budget;
-serialization preserves configured limits, not live execution counters. Delegated tool dispatch counts against its
-parent's tool budget and the recipient enforces inherited task limits. These are task-local limits, not a distributed
-atomic accounting service for arbitrary parallel agent graphs.
+The [Built-in Tools](builtin-tools.md) catalog documents [command execution](builtin-tools.md#command-execution),
+[shell and Git](builtin-tools.md#shell-and-git-tools), [user feedback](builtin-tools.md#user-questions-and-continuation),
+and [filesystem access and recovery](builtin-tools.md#filesystem-access). Register those optional tools on any
+Agent; this page explains the runtime facilities shared by built-in and application-defined tools.
 
 ## Embedded groups and run handles
 
@@ -194,61 +126,10 @@ Reopening durable storage is inspection only. Orphan pending requests become `un
 action. Approval records carry `effect_state="unknown"`: approval itself cannot prove that an effect happened.
 Consult execution receipts and the actual resource. Duplicate requests or reconnects never resume execution.
 
-## Filesystem changes and restoration
+## Checkpoint inventory
 
-```python
-from protolink import StorageCheckpointStore
-from protolink.storage import SQLiteStorage
-from protolink.tools.builtins import filesystem_tools
-
-checkpoints = StorageCheckpointStore(SQLiteStorage("application.db", namespace="file-changes"))
-for tool in filesystem_tools(roots=["/absolute/workspace"], checkpoints=checkpoints):
-    agent.add_tool(tool)
-
-change = await agent.call_tool("replace_file", path="/absolute/workspace/note.txt", content="new content\n")
-preview = await agent.call_tool("preview_change", change_id=change["change_id"])
-restored = await agent.call_tool("restore_change", change_id=change["change_id"])
-```
-
-Configure `filesystem.write` and `filesystem.restore` with `require_approval` for separately approved mutation and
-restoration. Recovery preview uses `filesystem.read`. ProtoLink's backward-compatible default capability policy allows
-actions, so installing a tool alone does not require a human approval. The runnable
-[`recoverable_files.py`](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_capabilities/recoverable_files.py)
-shows both successful restoration and a conflict.
-
-| Tool | Preconditions and result |
-| --- | --- |
-| `create_file(path, content)` | Target must remain absent; creates UTF-8 bytes with mode `0600`. |
-| `replace_file(path, content)` | Existing regular file must match the approved bytes, mode, identity, and parent directory. |
-| `preview_change(change_id)` | Returns a restoration diff, current conflict flag, saved state, and uncertainty flag. |
-| `restore_change(change_id)` | Requires a saved `applied` change and the exact expected postimage; restores bytes/mode or removes a created file. |
-
-`filesystem_tools(*, roots, checkpoints, max_file_bytes=8388608)` returns four `PreparedTool` objects. All paths must be
-absolute and beneath explicit roots; `..`, symlinks beneath roots, and nonregular files are rejected. Missing parent
-directories are not created. Prepared diff artifacts are tied to the canonical target and preimage; both are checked
-again after approval. Files are replaced atomically using a temporary file in the same directory, with fsync of
-the file and parent directory. Creation atomically refuses a concurrently created target.
-
-`FilesystemResource` implements the small `Resource` protocol: `read(resource_id)` and
-`replace(expected_snapshot, data, mode)`. `ResourceRevision`, `ResourceSnapshot`, `ResourceChange`, `CheckpointStore`,
-and `StorageCheckpointStore` live in `protolink.core.resources`. The filesystem implementation currently requires
-POSIX descriptor-relative APIs and rejects Windows. Regular file bytes and mode bits are preserved; ownership,
-ACLs, extended attributes, and timestamps are not restored. An OS sandbox is required to defend against hostile
-concurrent filesystem manipulation; the final compare/rename is not a lock respected by arbitrary external writers.
-
-Recovery information is persisted **before** mutation. Records correlate the resource with an action, task, and run;
-states include `prepared`, `applied`, `restoring`, `restored`, `failed`, and `uncertain`. If an interrupted mutation
-leaves a `prepared` or `restoring` record, inspection reports uncertainty. Failure to save the initial record prevents
-mutation. Failure after a possible write leaves an uncertainty marker; no automatic replay or restoration occurs.
-Restoration conflicts raise `ResourceConflictError`. Recovery of an uncertain operation requires application-led
-inspection; this release deliberately does not guess whether its effect occurred.
-
-Recovery storage is a dedicated namespace with one live writer. Keep it outside mutable allowed roots where practical.
-It contains lossless original bytes, so protect it as application data. Resource recovery, conversation history, and
-execution suspension/resumption are separate concepts. Multiple file writes are not an atomic transaction, and
-arbitrary process/tool effects are not reversible.
-
-### Checkpoint inventory
+The filesystem tools use checkpoints to record recoverable changes. See
+[write recovery](builtin-tools.md#write-recovery) for configuration, mutation, conflict checks, and restoration.
 
 ```python
 recent = checkpoints.list_changes(limit=20)

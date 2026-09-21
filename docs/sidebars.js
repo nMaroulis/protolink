@@ -27,6 +27,7 @@ const sidebars = {
       collapsed: false,
       items: [
         'agent',
+        'builtin-agents',
         'authentication',
         'client',
         'flows',
@@ -42,6 +43,7 @@ const sidebars = {
         'storage',
         'telemetry',
         'tool',
+        'builtin-tools',
         'transport',
         'types',
       ],

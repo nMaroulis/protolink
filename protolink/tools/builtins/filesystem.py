@@ -1,4 +1,4 @@
-"""Explicit-root file mutation tools with durable, conflict-aware recovery."""
+"""Explicit-root filesystem tools with optional conflict-aware write recovery."""
 
 from __future__ import annotations
 
@@ -48,22 +48,37 @@ class FilesystemResource:
         """Resolve allowed roots without creating files or recovery records."""
         if os.name != "posix":
             raise NotImplementedError("FilesystemResource currently requires POSIX descriptor-relative file APIs")
-        if not roots or max_file_bytes < 0:
+        if not roots or isinstance(max_file_bytes, bool) or not isinstance(max_file_bytes, int) or max_file_bytes < 0:
             raise ValueError("Configure at least one allowed root and a non-negative file size limit")
         self.roots = {Path(root).absolute(): Path(root).resolve(strict=True) for root in roots}
         if any(not root.is_dir() for root in self.roots.values()):
             raise ValueError("Allowed roots must be existing directories")
         self.max_file_bytes = max_file_bytes
 
-    def _target(self, resource_id: str) -> tuple[Path, Path]:
+    def _target(self, resource_id: str, *, allow_root: bool = False) -> tuple[Path, Path]:
         path = Path(resource_id)
         if not path.is_absolute() or ".." in path.parts:
             raise ValueError("File paths must be absolute and cannot contain '..'")
         for alias, root in sorted(self.roots.items(), key=lambda pair: len(pair[0].parts), reverse=True):
             for prefix in (alias, root):
-                if path.is_relative_to(prefix) and path != prefix:
+                if path.is_relative_to(prefix) and (allow_root or path != prefix):
                     return root, root / path.relative_to(prefix)
         raise ValueError("File path is outside the allowed roots")
+
+    @contextmanager
+    def directory(self, resource_id: str) -> Iterator[tuple[int, Path]]:
+        """Open a directory beneath a configured root without following symlinks."""
+        root, path = self._target(resource_id, allow_root=True)
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        fd = os.open(root, flags)
+        try:
+            for component in path.relative_to(root).parts:
+                child = os.open(component, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            yield fd, path
+        finally:
+            os.close(fd)
 
     @contextmanager
     def _parent(self, resource_id: str) -> Iterator[tuple[int, Path]]:
@@ -79,7 +94,8 @@ class FilesystemResource:
         finally:
             os.close(fd)
 
-    def _read_at(self, parent: int, path: Path) -> ResourceSnapshot:
+    def _read_at(self, parent: int, path: Path, *, max_bytes: int | None = None) -> ResourceSnapshot:
+        limit = min(self.max_file_bytes, max_bytes) if max_bytes is not None else self.max_file_bytes
         parent_stat = os.fstat(parent)
         metadata = {"parent_identity": [parent_stat.st_dev, parent_stat.st_ino]}
         try:
@@ -90,11 +106,11 @@ class FilesystemResource:
             before = os.fstat(handle.fileno())
             if not stat.S_ISREG(before.st_mode):
                 raise ValueError("Only regular files are supported")
-            if before.st_size > self.max_file_bytes:
+            if before.st_size > limit:
                 raise ValueError("File exceeds the configured size limit")
-            data = handle.read(self.max_file_bytes + 1)
+            data = handle.read(limit + 1)
             after = os.fstat(handle.fileno())
-            if len(data) > self.max_file_bytes or (before.st_mtime_ns, before.st_ctime_ns) != (
+            if len(data) > limit or (before.st_mtime_ns, before.st_ctime_ns) != (
                 after.st_mtime_ns,
                 after.st_ctime_ns,
             ):
@@ -104,10 +120,12 @@ class FilesystemResource:
         version = hashlib.sha256(data + repr(identity).encode()).hexdigest()
         return ResourceSnapshot(ResourceRevision(str(path), version), data, mode, metadata)
 
-    def read(self, resource_id: str) -> ResourceSnapshot:
-        """Read a regular file or its absence without following symlinks."""
+    def read(self, resource_id: str, *, max_bytes: int | None = None) -> ResourceSnapshot:
+        """Read a regular file or its absence, optionally lowering the configured byte cap."""
+        if max_bytes is not None and (isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0):
+            raise ValueError("max_bytes must be a non-negative integer")
         with self._parent(resource_id) as (parent, path):
-            return self._read_at(parent, path)
+            return self._read_at(parent, path, max_bytes=max_bytes)
 
     def replace(self, expected: ResourceSnapshot, data: bytes | None, mode: int | None) -> ResourceSnapshot:
         """Check the preimage, fsync new bytes, atomically replace, then fsync the directory."""
@@ -144,16 +162,33 @@ class FilesystemResource:
 
 
 def filesystem_tools(
-    *, roots: Sequence[str | Path], checkpoints: CheckpointStore, max_file_bytes: int = 8 * 1024 * 1024
+    *, roots: Sequence[str | Path], checkpoints: CheckpointStore | None = None, max_file_bytes: int = 8 * 1024 * 1024
 ) -> tuple[PreparedTool, ...]:
-    """Create file create/replace/preview/restore tools using explicit recovery storage.
+    """Create scoped read/list/search tools and optional recoverable write tools.
 
-    Writes require ``filesystem.write``, restoration ``filesystem.restore``,
-    and recovery previews ``filesystem.read``. Use capability policies to require
-    approval. No file is created by registration. Text inputs use UTF-8; original
-    bytes are preserved losslessly even when they were not valid text.
+    Args:
+        roots: Existing allowed directories; tool paths must be absolute. POSIX
+            only. Symlinks below these roots are never followed.
+        checkpoints: Supplying a CheckpointStore opts into create_file,
+            replace_file, edit_file, preview_change, and restore_change. Omitting
+            it exposes only read_file, list_files, and search_files.
+        max_file_bytes: Per-file byte cap for reads, preimages, and new content.
+
+    Reads and previews require ``filesystem.read``, writes ``filesystem.write``,
+    and restoration ``filesystem.restore``. Use policies to require approval.
+    Text uses UTF-8. edit_file requires a unique exact match unless replace_all is
+    explicit; stale previews fail before mutation. Original bytes are preserved
+    losslessly. Listing/search visit at most 10,000 entries and 20 directory levels;
+    search reads at most 32 MiB in total. Results report incomplete scans. Existing
+    callers supplying checkpoints retain their write/recovery tools.
     """
+    from protolink.tools.builtins._filesystem_read import reading_tools
+
     resource = FilesystemResource(roots, max_file_bytes=max_file_bytes)
+    reads = reading_tools(resource)
+    if checkpoints is None:
+        return reads
+    checkpoint_store = checkpoints
 
     def create_file(path: str, content: str) -> dict[str, Any]:
         """Create a UTF-8 file, only when the approved target is still absent."""
@@ -161,6 +196,10 @@ def filesystem_tools(
 
     def replace_file(path: str, content: str) -> dict[str, Any]:
         """Replace a file after approval of its exact preimage and proposed diff."""
+        raise AssertionError("Signature only")
+
+    def edit_file(path: str, old_text: str, new_text: str, *, replace_all: bool = False) -> dict[str, Any]:
+        """Replace exact UTF-8 text with a recoverable diff; require a unique match unless replace_all=true."""
         raise AssertionError("Signature only")
 
     def preview_change(change_id: str) -> dict[str, Any]:
@@ -172,7 +211,7 @@ def filesystem_tools(
         raise AssertionError("Signature only")
 
     def load_change(change_id: str) -> ResourceChange:
-        change = checkpoints.get(change_id)
+        change = checkpoint_store.get(change_id)
         if change is None:
             raise ValueError("Unknown resource change")
         # Reapply allowed roots even to durable records supplied by storage.
@@ -202,15 +241,25 @@ def filesystem_tools(
         def prepare(arguments: dict[str, Any], context: RunContext) -> RunAction:
             del context
             args = dict(arguments)
-            if name in {"create_file", "replace_file"}:
+            if name in {"create_file", "replace_file", "edit_file"}:
                 before = resource.read(args["path"])
                 if (before.data is None) != (name == "create_file"):
                     raise ResourceConflictError("Create requires absence; replace requires an existing file")
-                data = args["content"].encode("utf-8")
+                if name == "edit_file":
+                    old_text = args["old_text"]
+                    if not old_text:
+                        raise ValueError("old_text must not be empty")
+                    text = (before.data or b"").decode("utf-8")
+                    count = text.count(old_text)
+                    if not count or (count != 1 and not args.get("replace_all", False)):
+                        raise ValueError("old_text must match exactly once, or use replace_all for multiple matches")
+                    data = text.replace(old_text, args["new_text"]).encode("utf-8")
+                else:
+                    data = args["content"].encode("utf-8")
                 if len(data) > max_file_bytes:
                     raise ValueError("New content exceeds the configured size limit")
                 args["path"] = before.revision.resource_id
-                recovery: dict[str, Any] = {"before": before.to_dict()}
+                recovery: dict[str, Any] = {"before": before.to_dict(), "new_content": data.decode("utf-8")}
             else:
                 change = load_change(args["change_id"])
                 before = resource.read(change.before.revision.resource_id)
@@ -254,7 +303,7 @@ def filesystem_tools(
                     restore_task_id=execution.task_id,
                 )
             else:
-                data, mode = args["content"].encode("utf-8"), before.mode
+                data, mode = action.payload["recovery"]["new_content"].encode("utf-8"), before.mode
                 pending = ResourceChange(
                     before=before,
                     after=None,
@@ -265,7 +314,7 @@ def filesystem_tools(
                 )
             # These synchronous saves/I/O contain no cancellation await between
             # durable intent and mutation. Failure to save prevents the effect.
-            checkpoints.save(pending)
+            checkpoint_store.save(pending)
             try:
                 after = resource.replace(before, data, mode)
                 completed = (
@@ -273,13 +322,13 @@ def filesystem_tools(
                     if name == "restore_change"
                     else replace(pending, state="applied", after=after)
                 )
-                checkpoints.save(completed)
+                checkpoint_store.save(completed)
             except BaseException as exc:
                 failed = replace(
                     pending, state="failed" if isinstance(exc, ResourceConflictError) else "uncertain", error=str(exc)
                 )
                 try:
-                    checkpoints.save(failed)
+                    checkpoint_store.save(failed)
                 except Exception:
                     pass  # Existing durable prepared/restoring record remains an uncertainty marker.
                 raise
@@ -294,11 +343,12 @@ def filesystem_tools(
 
         return PreparedTool(signature, prepare=prepare, execute=execute, capabilities=(capability,))
 
-    return tuple(
+    return reads + tuple(
         make_tool(signature, capability)
         for signature, capability in (
             (create_file, "filesystem.write"),
             (replace_file, "filesystem.write"),
+            (edit_file, "filesystem.write"),
             (preview_change, "filesystem.read"),
             (restore_change, "filesystem.restore"),
         )

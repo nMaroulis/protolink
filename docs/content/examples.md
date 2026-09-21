@@ -226,3 +226,20 @@ fairness checks.
 - Shows conditional branching and multi-step review workflows
 - Examples include sequential processing, parallel execution, and dynamic routing
 - Illustrates integration of multiple agents in structured flow patterns
+
+## Built-in assistants and tools
+
+Run `python examples/generic_tools.py` to exercise filesystem reads/edits/recovery, storage CRUD,
+configured HTTP requests, document extraction, and database queries on one ordinary `Agent`.
+The example uses temporary files, in-memory storage, a mocked HTTP transport, CSV, and real SQLite.
+See [Built-in Tools](builtin-tools.md) for the APIs and optional document formats.
+
+Run `python examples/builtin_assistants.py` to verify shell, Git, user questions, calendar, and email
+through `Assistant` and `CodeAssistant`. The example uses a temporary repository, a mock model, and
+in-memory service adapters, so it needs no accounts or API keys and sends no real messages.
+See [Built-in Agents](builtin-agents.md) for the preset APIs.
+
+Run `python examples/service_backends.py` to exercise every concrete backend: `GoogleCalendar`,
+`Gmail`, `OutlookCalendar`, `OutlookEmail`, and `IMAPEmail`. Install `protolink[integrations]` first.
+The example replaces HTTP/IMAP/SMTP transports with offline fixtures while using real `Assistant`
+tools, approvals, serialization, and MIME handling. See the [service backend reference](builtin-tools.md#calendar-and-email-backends).

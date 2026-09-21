@@ -13,6 +13,9 @@ import registryStatusCard from '@site/assets/registry_status_card.png';
 
 Agents are the core building blocks in Protolink.
 
+For optional `Assistant`, `CodeAssistant`, and `EchoAgent` classes, see [Built-in Agents](builtin-agents.md).
+For reusable capabilities to register on any Agent, see [Built-in Tools](builtin-tools.md).
+
 ## Concepts
 
 An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part`, and `Artifact` primitives, and can act as both **client and server**.
@@ -1524,7 +1527,7 @@ agent.add_tool(current_datetime())
 agent.add_tool(web_search())  # Brave by default; calls may select engine="duckduckgo".
 ```
 
-Built-ins are never enabled automatically. Registered built-ins follow the same validation, policy, telemetry, cancellation, and skill-advertising path as native tools. See [Tools](tool.md#built-in-tools) for the complete built-in API and network-safety contract.
+Built-ins are never enabled automatically. Registered built-ins follow the same validation, policy, telemetry, cancellation, and skill-advertising path as native tools. See [Built-in Tools](builtin-tools.md) for the complete catalog, configuration, and access boundaries.
 
 ## Registry & Discovery
 

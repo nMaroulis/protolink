@@ -97,22 +97,6 @@ print(agent.sync.invoke("Say hello"))
 
 `invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect, and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
 
-## Stream model output into your app
-
-For an embedded Agent with `capabilities={"streaming": True}` on its card:
-
-```python
-from protolink import RunHandle, Task
-
-handle = RunHandle.start(agent, Task.create_infer(prompt="Explain this project."))
-async for event in handle.events():
-    if event.payload.get("llm_event_type") == "llm_chunk":
-        print(event.payload["content"], end="", flush=True)
-result = await handle.result()
-```
-
-`llm_chunk` delivers incremental text; `llm_final` carries the complete answer. Default JSON-action models stream raw JSON fragments. Ollama and other HTTP server streams require `httpx` (`uv add protolink httpx`), also included in the `llms` and `http` extras. Use `await handle.cancel()` to stop a run. See the [complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
-
 ## Your first agent mesh
 
 Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:
@@ -218,7 +202,7 @@ Install the integrations used here with `uv add "protolink[http,mcp]"`; the Olla
 | --- | --- |
 | [LLMs](https://nmaroulis.github.io/protolink/docs/llm/) | OpenAI, Anthropic, Gemini, Grok, DeepSeek, Hugging Face, Ollama, llama.cpp, LM Studio, vLLM, OpenAI-compatible servers, mock, custom |
 | [Knowledge and RAG](https://nmaroulis.github.io/protolink/docs/rag/) | Dependency-free memory and SQLite indexes, Chroma, Pinecone, Qdrant, custom vector stores and retrievers |
-| [Tools](https://nmaroulis.github.io/protolink/docs/tool/) | Built-in web search, URL fetch, calculator, current datetime, typed Python tools, MCP adapters, custom `BaseTool` implementations |
+| [Tools](https://nmaroulis.github.io/protolink/docs/tool/) | Built-in shell, Git, user feedback, calendar/email integrations, web search, URL fetch, calculator, clock, typed Python tools, MCP adapters, custom `BaseTool` implementations |
 | [Transports](https://nmaroulis.github.io/protolink/docs/transport/) | Runtime, HTTP, SSE JSON-RPC, WebSocket, gRPC, custom transports |
 | [Registry](https://nmaroulis.github.io/protolink/docs/registry/) | Local or network discovery through `Registry` and `RegistryClient` |
 | [State and storage](https://nmaroulis.github.io/protolink/docs/state/) | In-memory or SQLite state, conversation persistence, custom storage |
@@ -286,54 +270,6 @@ local_agent = Agent(
 
 Swap `"ollama"` for another built-in or custom `LLM`; the agent, tools, tasks, and flows do not change.
 
-## A2A primitives, standard wire compatibility
-
-ProtoLink uses A2A's core `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` concepts as first-class Python runtime primitives. Delegation, lifecycle transitions, structured flows, tool results, telemetry, and replay all operate on those explicit objects rather than escaping into a separate orchestration format.
-
-Standard wire compatibility is explicit and additive:
-
-```python
-a2a_agent = Agent(card=card, transport="http", a2a=True)
-
-# "auto" prefers the full ProtoLink contract and discovers A2A-only peers.
-result = await a2a_agent.call_agent(peer_url, task)
-
-# Select the protocol explicitly when the peer protocol is already known.
-result = await a2a_agent.call_agent(peer_url, task, protocol="a2a")
-result = await a2a_agent.call_agent(peer_url, task, protocol="protolink")
-```
-
-An explicit `protocol="a2a"` choice bypasses the native-vs-A2A selection step,
-but still fetches and validates the peer's standard Agent Card and compatible
-JSON-RPC interface before sending work.
-
-Agent-originated A2A discovery is always same-origin: an advertised interface
-must match the Agent Card's origin. For a split-origin deployment you explicitly
-trust, use a dedicated `AgentClient(..., a2a_allow_cross_origin=True)`; see
-[A2A compatibility](https://nmaroulis.github.io/protolink/docs/a2a/) for the operational limits.
-
-With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat, and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` JSON-RPC operations, and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
-
-Compatibility is versioned and testable: the official [A2A Technology Compatibility Kit](https://github.com/a2aproject/a2a-tck) measures the adapter against a pinned protocol surface. The [A2A compatibility page](https://nmaroulis.github.io/protolink/docs/a2a/) records the exact binding, TCK commit, commands, current result, and the remaining upstream harness limitation.
-
-## Structured flows
-
-Agents can choose their own next action, but not every workflow should be probabilistic. `Pipeline`, `Parallel`, `Router`, and `Graph` provide explicit, deterministic topology while keeping every step on the same `Task -> Task` contract.
-
-```python
-from protolink import Pipeline, Task
-
-review_flow = Pipeline(
-    steps=[researcher_agent, reviewer_agent, planner_agent],
-)
-
-result = review_flow.sync.execute(
-    Task.create_infer(prompt="Prepare the release plan"),
-)
-```
-
-Flows can contain local agents, registry-resolved remote agents, or other nested flows. Semantic context injection tells each agent what the next step expects without coupling that agent to the overall topology. See [structured flows](https://nmaroulis.github.io/protolink/docs/flows/) and the [runnable examples](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows).
-
 ## Progressive control
 
 The common path stays small:
@@ -377,6 +313,70 @@ agent = Agent(card=card, transport=transport)
 ```
 
 `AgentClient` and `Registry` follow the same rule: pass a string for built-in defaults or a concrete implementation for full control. The façade does not change as deployment requirements grow.
+
+## Structured flows
+
+Agents can choose their own next action, but not every workflow should be probabilistic. `Pipeline`, `Parallel`, `Router`, and `Graph` provide explicit, deterministic topology while keeping every step on the same `Task -> Task` contract.
+
+```python
+from protolink import Pipeline, Task
+
+review_flow = Pipeline(
+    steps=[researcher_agent, reviewer_agent, planner_agent],
+)
+
+result = review_flow.sync.execute(
+    Task.create_infer(prompt="Prepare the release plan"),
+)
+```
+
+Flows can contain local agents, registry-resolved remote agents, or other nested flows. Semantic context injection tells each agent what the next step expects without coupling that agent to the overall topology. See [structured flows](https://nmaroulis.github.io/protolink/docs/flows/) and the [runnable examples](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows).
+
+## A2A primitives, standard wire compatibility
+
+ProtoLink uses A2A's core `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` concepts as first-class Python runtime primitives. Delegation, lifecycle transitions, structured flows, tool results, telemetry, and replay all operate on those explicit objects rather than escaping into a separate orchestration format.
+
+Standard wire compatibility is explicit and additive:
+
+```python
+a2a_agent = Agent(card=card, transport="http", a2a=True)
+
+# "auto" prefers the full ProtoLink contract and discovers A2A-only peers.
+result = await a2a_agent.call_agent(peer_url, task)
+
+# Select the protocol explicitly when the peer protocol is already known.
+result = await a2a_agent.call_agent(peer_url, task, protocol="a2a")
+result = await a2a_agent.call_agent(peer_url, task, protocol="protolink")
+```
+
+An explicit `protocol="a2a"` choice bypasses the native-vs-A2A selection step,
+but still fetches and validates the peer's standard Agent Card and compatible
+JSON-RPC interface before sending work.
+
+Agent-originated A2A discovery is always same-origin: an advertised interface
+must match the Agent Card's origin. For a split-origin deployment you explicitly
+trust, use a dedicated `AgentClient(..., a2a_allow_cross_origin=True)`; see
+[A2A compatibility](https://nmaroulis.github.io/protolink/docs/a2a/) for the operational limits.
+
+With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat, and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` JSON-RPC operations, and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
+
+Compatibility is versioned and testable: the official [A2A Technology Compatibility Kit](https://github.com/a2aproject/a2a-tck) measures the adapter against a pinned protocol surface. The [A2A compatibility page](https://nmaroulis.github.io/protolink/docs/a2a/) records the exact binding, TCK commit, commands, current result, and the remaining upstream harness limitation.
+
+## Stream model output into your app
+
+For an embedded Agent with `capabilities={"streaming": True}` on its card:
+
+```python
+from protolink import RunHandle, Task
+
+handle = RunHandle.start(agent, Task.create_infer(prompt="Explain this project."))
+async for event in handle.events():
+    if event.payload.get("llm_event_type") == "llm_chunk":
+        print(event.payload["content"], end="", flush=True)
+result = await handle.result()
+```
+
+`llm_chunk` delivers incremental text; `llm_final` carries the complete answer. Default JSON-action models stream raw JSON fragments. Ollama and other HTTP server streams require `httpx` (`uv add protolink httpx`), also included in the `llms` and `http` extras. Use `await handle.cancel()` to stop a run. See the [complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
 
 ## Local telemetry and replay
 
@@ -440,6 +440,35 @@ The benchmark is source-checkout tooling under `benchmarks/`, not part of the in
 [infer-loop benchmark guide](benchmarks/infer_loop/README.md) for suite sizes, scoring, Ollama configuration, timing,
 baseline comparison, filtering, and CI thresholds.
 
+## Built-in tools and agents
+
+General-purpose tools also work on any ordinary `Agent`: `filesystem_tools()` for scoped reads and
+recoverable edits, `storage_tools()` for JSON values, `http_tool()` for configured APIs,
+`document_tools()` for text/tables, and `database_tools(SQLiteDatabase(...))` for read-only SQL.
+See the [Built-in Tools](https://nmaroulis.github.io/protolink/docs/builtin-tools/) and run
+`python examples/generic_tools.py` for one complete offline example. PDF/Word/spreadsheet parsers are
+available through the optional `protolink[documents]` extra.
+
+```python
+from protolink import Assistant, CodeAssistant
+from protolink.tools import Gmail, GoogleCalendar
+
+coder = CodeAssistant(llm=model, cwd=".", approval_handler=approve)
+assistant = Assistant(llm=another_model, calendar=GoogleCalendar(token), email=Gmail(token))
+answer = await assistant.invoke("What is on my calendar today?")
+```
+
+Supply your own models, OAuth token, and approval callback. These presets use the standard Agent API;
+calendar/email reads are enabled by default, while writes need explicit opt-ins and approval. Choose
+`GoogleCalendar`/`Gmail`, `OutlookCalendar`/`OutlookEmail`, or `IMAPEmail` for standard IMAP/SMTP.
+Google and Microsoft adapters need `pip install 'protolink[integrations]'`; IMAP/SMTP uses the standard
+library. Add `ask_user=handle_question` to await user feedback
+inside the inference loop. Shell, Git, calendar, email, and question tools can also be registered separately.
+See the [Built-in Agents](https://nmaroulis.github.io/protolink/docs/builtin-agents/).
+
+Run `python examples/builtin_assistants.py` for one complete offline test using a temporary repository,
+mock model, and in-memory calendar/mailbox. Run `python examples/service_backends.py` to exercise all
+five concrete service backends with offline HTTP and mail-server fixtures.
 
 ## More examples
 

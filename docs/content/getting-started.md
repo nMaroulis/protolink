@@ -208,7 +208,7 @@ def add(a: int, b: int) -> int:
 agent.start()
 ```
 
-`start()` runs the service until stopped. The same tool is now available to peers through the native task API. Add `a2a=True` for the supported A2A 1.0 boundary, or add an LLM for inference and browser chat. Registry discovery, [built-in tools](tool.md#built-in-tools), and [MCP tools](tool.md) can be attached independently as your application grows.
+`start()` runs the service until stopped. The same tool is now available to peers through the native task API. Add `a2a=True` for the supported A2A 1.0 boundary, or add an LLM for inference and browser chat. Registry discovery, [built-in tools](builtin-tools.md), and [MCP tools](tool.md) can be attached independently as your application grows.
 
 
 ### Using the CLI
