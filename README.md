@@ -102,7 +102,7 @@ print(agent.sync.invoke("Say hello"))
 Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:
 
 ```python
-from protolink import Agent, AgentCard, Task
+from protolink import Agent, AgentCard
 from protolink.discovery import Registry
 
 registry = Registry(url="http://127.0.0.1:9000", transport="http")
@@ -123,10 +123,8 @@ calculator.start(background=True)
 caller.start(background=True)
 
 try:
-    peer = caller.sync.discover_agents({"name": "calculator"})[0]
-    task = Task.create_tool_call(tool_name="add", args={"a": 2, "b": 3})
-    result = caller.sync.call_agent(peer.url, task).raise_for_status()
-    print(result.get_last_part_content().result)  # 5
+    peer = caller.peer("calculator")
+    print(peer.sync.call_tool("add", a=2, b=3))  # 5
 finally:
     caller.stop()
     calculator.stop()
@@ -151,7 +149,6 @@ from protolink.logging import FileLogger
 from protolink.security import APIKeyAuth
 from protolink.storage import SQLiteStorage
 from protolink.tools import web_search
-from protolink.tools.adapters import MCPToolAdapter
 
 planner_agent = Agent(
     card=AgentCard(
@@ -183,13 +180,11 @@ async def search_notes(query: str) -> str:
     return f"Results for {query}"
 
 
-mcp_adapter = MCPToolAdapter(
-    transport="stdio",
+planner_agent.sync.add_mcp(
     command="python",
     args=["mcp_server.py"],
+    prefix="mcp_",
 )
-for tool in mcp_adapter.get_tools():
-    planner_agent.add_tool(tool)
 
 planner_agent.start()
 ```
@@ -314,6 +309,54 @@ agent = Agent(card=card, transport=transport)
 
 `AgentClient` and `Registry` follow the same rule: pass a string for built-in defaults or a concrete implementation for full control. The façade does not change as deployment requirements grow.
 
+The pattern also applies to other components:
+
+| Start small | Add control |
+| --- | --- |
+| `Agent(card, registry="http", registry_url=url)` | Pass a configured `RegistryClient` or `Registry` |
+| `create_llm("mock")` | Pass provider options or your own `LLM` implementation |
+| `agent.add_tool(function)` | Pass `Tool.from_callable(function, name=..., capabilities=...)` |
+| `Agent(card, state=["conversation"])` | Supply storage and a configured `State` |
+| `create_knowledge("memory", sources=[...])` | Supply splitting, embedding, storage, or a retriever |
+| `Agent(card, verbosity=0)` | Supply a logger, telemetry, or a run store |
+
+Execution follows the same pattern:
+
+```python
+from protolink import RunBudget, RunContext
+
+answer = await agent.invoke("Prepare the plan")
+answer = await agent.invoke(
+    "Review the plan",
+    budget=RunBudget(max_llm_calls=3, max_tool_calls=5),
+    context=RunContext(session_id="planning", permissions={"filesystem.write": "deny"}),
+)
+```
+
+Keep a task when you also need its lifecycle, messages, and artifacts:
+
+```python
+from protolink import Task
+
+task = Task.create_infer("Review the plan", session_id="planning")
+result = await agent.run_task(task)
+answer = result.raise_for_status().get_output()
+```
+
+`Task.create("text")` wraps a plain user message; `Task.create_tool_call("add", {"a": 2,
+"b": 3})` requests a tool directly. All three factories accept run controls.
+`get_output()` unwraps successful tool results; `get_last_part()` retains the typed
+part and correlation/error fields. Inputs and previews return the output reader's
+default rather than an older answer.
+
+Use `add_tools(...)` for tool collections, `await add_mcp(...)` for MCP discovery,
+`peer(...).invoke(...)` for remote inference, and `flow.invoke(...)` for a simple flow
+call. `Step`, `ToolStep`, and `RepeatUntil` cover small deterministic workflows;
+`invoke_typed(prompt, ResponseModel)` validates structured answers. Explicit Task,
+transport, recorder, and Graph APIs remain available. See the
+[progressive-control guide](docs/content/progressive-control.md) and run
+`python examples/progressive_control.py` for a complete offline walkthrough.
+
 ## Structured flows
 
 Agents can choose their own next action, but not every workflow should be probabilistic. `Pipeline`, `Parallel`, `Router`, and `Graph` provide explicit, deterministic topology while keeping every step on the same `Task -> Task` contract.
@@ -364,19 +407,22 @@ Compatibility is versioned and testable: the official [A2A Technology Compatibil
 
 ## Stream model output into your app
 
-For an embedded Agent with `capabilities={"streaming": True}` on its card:
+For an embedded Agent inside an async application:
 
 ```python
-from protolink import RunHandle, Task
-
-handle = RunHandle.start(agent, Task.create_infer(prompt="Explain this project."))
-async for event in handle.events():
-    if event.payload.get("llm_event_type") == "llm_chunk":
-        print(event.payload["content"], end="", flush=True)
+handle = agent.start_run("Explain this project.")
+async for chunk in handle.chunks():
+    print(chunk, end="", flush=True)
 result = await handle.result()
+print(result.status, result.output)
 ```
 
-`llm_chunk` delivers incremental text; `llm_final` carries the complete answer. Default JSON-action models stream raw JSON fragments. Ollama and other HTTP server streams require `httpx` (`uv add protolink httpx`), also included in the `llms` and `http` extras. Use `await handle.cancel()` to stop a run. See the [complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
+`chunks()` delivers raw incremental model text; default JSON-action models stream JSON fragments.
+Use `handle.events()` for all typed events and `result.report` for the run report. Inspect the result
+status for failures, and use `await handle.cancel()` to stop a run. Remote subscriptions still require
+advertised streaming support. Ollama and other HTTP server streams require `httpx`
+(`uv add protolink httpx`), also included in the `llms` and `http` extras. See the
+[complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
 
 ## Local telemetry and replay
 
@@ -472,6 +518,7 @@ five concrete service backends with offline HTTP and mail-server fixtures.
 
 ## More examples
 
+- [Progressive control, from simple calls to bounded workflows](examples/progressive_control.py)
 - [Paired AI courtroom advocacy benchmark](examples/ai_courtroom_benchmark/)
 - [Built-in multi-engine web search](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py)
 - [Provider-free runtime mesh](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py)

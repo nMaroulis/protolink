@@ -34,6 +34,42 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.7.3] - Unreleased
+
+### Added
+
+- Task factories accept plain text (`Task.create`), positional inference prompts and
+  tool arguments, and copied `session_id`/`budget`/`context` controls. `get_last_part`
+  exposes typed parts; `get_output` unwraps successful tool results and reads the
+  latest answer without falling back to old answers after new input or previews.
+- Per-run `budget` and `context` options on `Agent.invoke` and `ask`, with sync parity,
+  explicit session precedence, and copied caller-owned controls.
+- `Agent.start_run(prompt_or_task)` and `RunHandle.chunks()` for one managed local run,
+  raw model fragments, typed events, cancellation, final results, and reports.
+- `Agent.add_tools` for native tool collections and async/sync `add_mcp` for stdio or
+  SSE discovery, tool selection, local prefixes, and collision checks. MCP adapters
+  now offer `list_tools_async` and `get_tools_async` for active event loops.
+- `Agent.peer` and `AgentClient.peer` with inference, typed inference, native tool calls,
+  full task execution, and blocking equivalents. Registry names require a unique match.
+- `Flow.invoke`/`sync.invoke`, `Step`, `ToolStep`, and `RepeatUntil` for short local
+  workflows and bounded acceptance over fresh execution evidence.
+- `Agent.invoke_typed` and peer equivalents validate JSON answers with Pydantic.
+  Repair requires an explicit attempt count, shares local workflow budgets, and never
+  retries execution failures or incomplete tasks. `StructuredResponseError` retains evidence.
+- One provider-free `progressive_control.py` example, an optional real MCP walkthrough,
+  a progressive-control guide, and regression coverage for budgets, cancellation,
+  peers, MCP registration, structured output, and bounded workflows.
+
+### Changed
+
+- Expand the progressive-control guide with default and explicit configurations for
+  cards, transports, clients, registries, models, tools, state, knowledge, and logging;
+  extend the runnable example with task creation/readers and a configured transport.
+- Simplify basic tool calls, local pipeline setup, runtime mesh lifecycle, state calls,
+  report capture, and the verified-workflow example using public convenience methods.
+- Align package and documentation metadata for v0.7.3. Existing explicit Task, transport,
+  registry, recorder, and Graph interfaces remain available.
+
 ## [0.7.2] - 2026-09-21
 
 :::note Latest Release

@@ -208,6 +208,9 @@ not retry denied actions or replay side effects after uncertain transport failur
 
 [`verified_workflow.py`](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_capabilities/verified_workflow.py)
 shows application-defined acceptance with at most three attempts and no model provider.
+It uses `RepeatUntil(ToolStep(agent, "measure"), check, max_attempts=3)`; checks receive
+fresh execution receipts on each attempt. See [progressive control](progressive-control.md#deterministic-steps-and-bounded-acceptance)
+for callable steps, bounded acceptance, and the explicit Graph alternative.
 
 ## Migration for an application such as ProtoAgent
 

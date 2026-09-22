@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 
-from protolink import Agent, AgentCard, Message, Task
+from protolink import Agent, AgentCard, AgentGroup, Message, Task
 from protolink.client import AgentClient
 
 
@@ -73,19 +73,13 @@ async def main() -> None:
         ),
     ]
 
-    for agent in agents:
-        agent.start(background=True)
-
-    try:
+    async with AgentGroup(agents):
         client = AgentClient("runtime", url="runtime://client")
         result = await client.send_task(
             "runtime://planner",
             Task.create(Message.user("ship v1")),
         )
         print(result.get_last_part_content())
-    finally:
-        for agent in reversed(agents):
-            agent.stop()
 
 
 if __name__ == "__main__":

@@ -11,16 +11,17 @@ import inspect
 import json
 import threading
 import time
-from collections.abc import Callable
-from typing import Any, Literal, TypeVar, cast, overload
+from collections.abc import Callable, Iterable, Sequence
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, overload
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
 from protolink.core.cancellation import CancellationToken, TaskCancellationRequest
 from protolink.core.events import EventSink, RunEvent
 from protolink.core.execution import closing_stream, isolate_event_sink
+from protolink.core.invocation import prepare_task, response_content
 from protolink.core.policy import ActionAuthorization, CapabilityPolicy
-from protolink.core.run_context import RunContext
+from protolink.core.run_context import RunBudget, RunContext
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult, HistoryCompactionStrategy
@@ -40,10 +41,19 @@ from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
 
 from ._typing import _AgentMixinBase
-from .helpers import _coerce_state_operation_request, _response_content
+from .helpers import _coerce_state_operation_request
+
+if TYPE_CHECKING:
+    from protolink.agents.base import Agent
+    from protolink.client.peer import AgentPeer
+    from protolink.core.redaction import RedactionPolicy
+    from protolink.runtime import RunHandle
+    from protolink.storage.run_store import RunStore
+    from protolink.tools.adapters import MCPToolAdapter
 
 AgentSerializationT = TypeVar("AgentSerializationT", bound="AgentSerializationMixin")
 ToolCallableT = TypeVar("ToolCallableT", bound=Callable[..., Any])
+ResponseT = TypeVar("ResponseT")
 
 
 class AgentLifecycleMixin(_AgentMixinBase):
@@ -723,7 +733,10 @@ class AgentCommunicationMixin(_AgentMixinBase):
         part_type: Literal["tool_call", "infer"] = "infer",
         tool_name: str | None = None,
         tool_args: dict[str, Any] | None = None,
-        session_id: str = "invocation_session_id",
+        session_id: str | None = None,
+        *,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> Any:
         """Process a message and return its final response content.
 
@@ -739,6 +752,10 @@ class AgentCommunicationMixin(_AgentMixinBase):
             session_id: Conversation partition. The default shares history
                 when conversation state is enabled; pass a distinct ID for
                 each independent conversation.
+            budget: Optional run limits, overriding the supplied context's budget.
+            context: Explicit permissions, tracing, and run controls. Copied before
+                use. An explicit session_id overrides its session; otherwise the
+                context session or legacy ``invocation_session_id`` is used.
 
         Returns:
             Final part content, including ``ToolOutput`` for tool calls.
@@ -759,14 +776,114 @@ class AgentCommunicationMixin(_AgentMixinBase):
         else:
             raise ValueError(f"Unsupported part type: {part_type}")
 
-        task.metadata["session_id"] = session_id
+        prepare_task(
+            task,
+            session_id=session_id,
+            budget=budget,
+            context=context,
+            default_session_id="invocation_session_id",
+        )
         request_item_ids = {item.id for item in [*task.messages, *task.artifacts]}
 
         # Process the task
         result_task = await self.run_task(task)
         result_task.raise_for_status()
-        last_part = _response_content(result_task, request_item_ids)
+        last_part = response_content(result_task, request_item_ids)
         return last_part if last_part is not None else "No response generated"
+
+    def start_run(
+        self,
+        prompt: str | Task,
+        *,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
+        store: RunStore | None = None,
+        redaction_policy: RedactionPolicy | None = None,
+    ) -> RunHandle:
+        """Start one local run and return its events, result, report, and cancellation handle.
+
+        Args:
+            prompt: Inference prompt, or a fully configured Task (including tool calls).
+            session_id: Conversation partition; prompt calls default to ``invocation_session_id``.
+            budget: Optional limits overriding the context budget.
+            context: Copied run controls; omitted controls retain an existing Task's context.
+            store: Report store; defaults to the agent's run_store.
+            redaction_policy: Optional redaction for recorded events and reports.
+
+        Requires an active asyncio loop. No server is started. ``handle.chunks()``
+        yields raw model fragments, which can be JSON; ``await handle.result()``
+        returns a RunResult with the terminal status, output, and report. Use
+        ``await handle.cancel()`` to stop work, even after leaving an iterator.
+        """
+        from protolink.runtime import RunHandle
+
+        task = Task.create_infer(prompt=prompt) if isinstance(prompt, str) else prompt
+        prepare_task(
+            task,
+            session_id=session_id,
+            budget=budget,
+            context=context,
+            default_session_id="invocation_session_id" if isinstance(prompt, str) else None,
+        )
+        return RunHandle.start(cast("Agent", self), task, store=store, redaction_policy=redaction_policy)
+
+    def peer(self, target: str | AgentCard, *, protocol: Literal["auto", "protolink", "a2a"] = "auto") -> AgentPeer:
+        """Bind a peer URL, card, or registry name without making a request.
+
+        The returned peer offers invoke, invoke_typed, call_tool, and run_task,
+        plus a sync facade. Registry names must resolve to exactly one agent.
+        Calls use this agent's existing transport, credentials, and protocol.
+        """
+        from protolink.client.peer import AgentPeer
+
+        if self._client is None:
+            raise RuntimeError("Agent.peer requires a configured transport")
+        return AgentPeer(
+            self._client,
+            target,
+            registry=self.registry_client,
+            protocol=protocol,
+            sender=self.call_agent,
+        )
+
+    async def invoke_typed(
+        self,
+        message: str,
+        response_model: type[ResponseT],
+        *,
+        max_attempts: int = 1,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
+    ) -> ResponseT:
+        """Request JSON and return a response validated against a Python type.
+
+        Args:
+            message: Prompt to augment with the response type's JSON schema.
+            response_model: Pydantic model or another type supported by TypeAdapter.
+            max_attempts: Total attempts, including the first; defaults to one.
+                Values above one explicitly permit another inference after a
+                response-validation failure, with corrective feedback. Tools may
+                run again. Execution errors and incomplete tasks are never retried.
+            session_id: Conversation partition, as in invoke.
+            budget: Shared local execution limits across all attempts.
+            context: Copied run controls, as in invoke.
+
+        Raises StructuredResponseError with the final task and validation error
+        when the response remains invalid. Normal execution exceptions propagate.
+        """
+        from protolink.flows.responses import invoke_typed
+
+        return await invoke_typed(
+            self.run_task,
+            message,
+            response_model,
+            max_attempts=max_attempts,
+            session_id=session_id,
+            budget=budget,
+            context=context,
+        )
 
     async def ask(
         self,
@@ -776,7 +893,9 @@ class AgentCommunicationMixin(_AgentMixinBase):
         k: int | None = None,
         where: dict[str, Any] | None = None,
         citations: bool = True,
-        session_id: str = "ask_session_id",
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> RAGAnswer:
         """Retrieve relevant knowledge before producing a grounded answer.
 
@@ -795,6 +914,9 @@ class AgentCommunicationMixin(_AgentMixinBase):
                 citation metadata.
             session_id: Conversation partition. Pass distinct IDs for
                 independent conversations when conversation state is enabled.
+            budget: Optional run limits overriding the context budget.
+            context: Copied run controls. Session defaults to its session or
+                ``ask_session_id``; an explicit session_id takes precedence.
 
         Returns:
             Grounded answer text plus the retrieved hits and citations.
@@ -825,11 +947,17 @@ class AgentCommunicationMixin(_AgentMixinBase):
             infer_metadata["where"] = dict(where)
 
         task = Task.create_infer(prompt=question, metadata=infer_metadata)
-        task.metadata["session_id"] = session_id
+        prepare_task(
+            task,
+            session_id=session_id,
+            budget=budget,
+            context=context,
+            default_session_id="ask_session_id",
+        )
         request_item_ids = {item.id for item in [*task.messages, *task.artifacts]}
         result_task = await self.run_task(task)
         result_task.raise_for_status()
-        content = _response_content(result_task, request_item_ids)
+        content = response_content(result_task, request_item_ids)
         if content is None:
             content = "No response generated"
         text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False, default=str)
@@ -889,6 +1017,70 @@ class AgentCommunicationMixin(_AgentMixinBase):
 
 class AgentToolMixin(_AgentMixinBase):
     """Manages tools, skills, and runtime action authorization."""
+
+    def add_tools(self, tools: Iterable[BaseTool | Callable[..., Any]]) -> None:
+        """Register an iterable of tools or typed functions in order.
+
+        Each item follows add_tool's metadata inference and replacement rules.
+        Registration executes no tool. If an item is invalid, earlier items stay
+        registered; use explicit Tool objects to configure policy or schemas.
+        """
+        for tool in tools:
+            self.add_tool(tool)
+
+    async def add_mcp(
+        self,
+        adapter: MCPToolAdapter | None = None,
+        *,
+        command: str | None = None,
+        args: list[str] | None = None,
+        url: str | None = None,
+        headers: dict[str, str] | None = None,
+        include: Sequence[str] | None = None,
+        prefix: str = "",
+    ) -> list[Tool]:
+        """Discover and register MCP tools, returning their native Tool wrappers.
+
+        Pass command/args for stdio, url/headers for SSE, or a configured adapter
+        for full control. Requires the optional ``mcp`` extra. Discovery contacts
+        the server (and starts its process for stdio) but calls no tool. The
+        adapter owns per-request sessions; no persistent connection is created.
+
+        ``include`` selects original server names; ``prefix`` changes only their
+        local names. Unknown selections and existing local names raise ValueError
+        before registration. Use add_tools for deliberate replacement instead.
+        Configuration arguments cannot be combined with a supplied adapter.
+        """
+        from protolink.tools.adapters import MCPToolAdapter
+
+        if adapter is not None and any(value is not None for value in (command, args, url, headers)):
+            raise ValueError("Pass an MCP adapter or connection options, not both")
+        if adapter is None:
+            if (command is None) == (url is None):
+                raise ValueError("Specify exactly one of command or url")
+            adapter = MCPToolAdapter(
+                transport="stdio" if command is not None else "sse",
+                command=command,
+                args=args,
+                url=url,
+                headers=headers,
+            )
+        tools = await adapter.get_tools_async()
+        if include is not None:
+            selected = set(include)
+            unknown = selected - {tool.name for tool in tools}
+            if unknown:
+                raise ValueError(f"Unknown MCP tools: {sorted(unknown)}")
+            tools = [tool for tool in tools if tool.name in selected]
+        from dataclasses import replace
+
+        tools = [replace(tool, name=prefix + tool.name) for tool in tools]
+        names = [tool.name for tool in tools]
+        if len(set(names)) != len(names) or any(name in self.tools for name in names):
+            raise ValueError("MCP tool names conflict; choose a prefix or a smaller selection")
+        for tool in tools:
+            self.add_tool(tool)
+        return tools
 
     def add_tool(self, tool: BaseTool | Callable[..., Any]) -> None:
         """Register a tool or Python callable and synchronize its advertised skill.

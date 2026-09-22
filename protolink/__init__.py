@@ -3,6 +3,7 @@
 from protolink.__version__ import __version__
 from protolink.agents import Agent
 from protolink.agents.builtins import Assistant, CodeAssistant
+from protolink.client import AgentPeer
 from protolink.core import (
     ALL_RUN_REPORT_SECTIONS,
     DEFAULT_REDACTION_POLICY,
@@ -64,7 +65,18 @@ from protolink.core.validation import (
     ToolOutcome,
     ValidationResult,
 )
-from protolink.flows import Flow, Graph, Parallel, Pipeline, Router
+from protolink.flows import (
+    Flow,
+    Graph,
+    Parallel,
+    Pipeline,
+    RepeatUntil,
+    Router,
+    Step,
+    StructuredResponseError,
+    ToolStep,
+    WorkflowLimitError,
+)
 from protolink.llms import (
     ContextItem,
     ContextManifest,
@@ -116,6 +128,7 @@ __all__ = [
     "AgentCard",
     "AgentGroup",
     "AgentInterface",
+    "AgentPeer",
     "AgentSkill",
     "ApprovalBroker",
     "ApprovalDecision",
@@ -164,6 +177,7 @@ __all__ = [
     "PolicyEffect",
     "RAGAnswer",
     "RedactionPolicy",
+    "RepeatUntil",
     "ResourceConflictError",
     "ResourceRevision",
     "RetryPolicy",
@@ -191,7 +205,9 @@ __all__ = [
     "StateOperationRequest",
     "StateOperationResult",
     "StateStoreReport",
+    "Step",
     "StorageCheckpointStore",
+    "StructuredResponseError",
     "TLSConfig",
     "Task",
     "TaskAlreadyRunningError",
@@ -204,6 +220,7 @@ __all__ = [
     "TaskState",
     "Tool",
     "ToolOutcome",
+    "ToolStep",
     "TransportConfig",
     "TransportConnectionError",
     "TransportError",
@@ -214,6 +231,7 @@ __all__ = [
     "TransportRemoteError",
     "TransportTimeoutError",
     "ValidationResult",
+    "WorkflowLimitError",
     "__version__",
     "assert_budget_under",
     "assert_no_denied_actions",

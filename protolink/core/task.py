@@ -5,6 +5,7 @@ from typing import Any
 from protolink.core.artifact import Artifact
 from protolink.core.message import Message
 from protolink.core.part import Part
+from protolink.core.run_context import RunBudget, RunContext
 from protolink.utils import utc_now
 from protolink.utils.id_generator import IDGenerator
 
@@ -282,28 +283,64 @@ class Task:
         )
 
     @classmethod
-    def create(cls, message: Message) -> "Task":
-        """Create a new task with an initial message.
+    def create(
+        cls,
+        message: Message | str,
+        *,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
+    ) -> "Task":
+        """Create a submitted task from a message or plain user text.
 
-        Time: O(1)
+        Text is wrapped in ``Message.user``; it does not request inference.
+        Use :meth:`create_infer` when the receiving agent should invoke its LLM.
+
+        Args:
+            message: Initial message, or text for a user message.
+            session_id: Conversation partition, overriding the context's session.
+            budget: Execution limits, replacing the context's budget when supplied.
+            context: Run controls to copy onto the task. Caller-owned contexts
+                and budgets are never mutated. Omitted controls leave metadata empty.
+
+        Returns:
+            A new task; creation does not submit it or execute any operation.
         """
+        if isinstance(message, str):
+            message = Message.user(message)
         task = cls(messages=[message])
         task._last_item = message
+        if session_id is not None or budget is not None or context is not None:
+            from protolink.core.invocation import prepare_task
+
+            prepare_task(task, session_id=session_id, budget=budget, context=context)
         return task
 
     @classmethod
     def create_infer(
         cls,
-        *,
         prompt: str | None = None,
+        *,
         user: str | None = None,
         output_schema: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> "Task":
-        """
-        Create a new task initialized with an infer message.
+        """Create a submitted task requesting inference from an agent's LLM.
 
-        Time: O(1)
+        Args:
+            prompt: Model instruction; may be passed positionally or by keyword.
+            user: Optional user context included in the inference payload.
+            output_schema: Optional JSON schema included in the inference payload.
+            metadata: Inference metadata, separate from ``Task.metadata``.
+            session_id: Conversation partition, overriding the context's session.
+            budget: Execution limits, replacing the context's budget when supplied.
+            context: Run controls copied onto the new task, as in :meth:`create`.
+
+        Returns:
+            A new task containing one infer part. No model call occurs until execution.
         """
         message = Message.infer(
             prompt=prompt,
@@ -311,27 +348,40 @@ class Task:
             output_schema=output_schema,
             metadata=metadata,
         )
-        return cls.create(message)
+        return cls.create(message, session_id=session_id, budget=budget, context=context)
 
     @classmethod
     def create_tool_call(
         cls,
-        *,
         tool_name: str,
         args: dict[str, Any] | None = None,
+        *,
         call_id: str | None = None,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> "Task":
-        """
-        Create a new task initialized with a tool_call message.
+        """Create a submitted task requesting one registered tool call.
 
-        Time: O(1)
+        Args:
+            tool_name: Registered tool or capability name; positional or keyword.
+            args: Tool arguments; positional or keyword. Defaults to an empty mapping.
+            call_id: Optional correlation ID; generated when omitted.
+            session_id: Conversation partition, overriding the context's session.
+            budget: Execution limits, replacing the context's budget when supplied.
+            context: Run controls copied onto the new task, as in :meth:`create`.
+
+        Returns:
+            A new task containing one tool-call part. Tool arguments stay inside
+            ``args``, so names such as ``budget`` never collide with run controls.
+            Creation neither calls the tool nor performs inference.
         """
         message = Message.tool_call(
             tool_name=tool_name,
             args=args or {},
             call_id=call_id,
         )
-        return cls.create(message)
+        return cls.create(message, session_id=session_id, budget=budget, context=context)
 
     def get_last_item(self) -> Message | Artifact | None:
         """
@@ -384,18 +434,61 @@ class Task:
     # Helper funcs
     # ----------------------------------------------------------------------
 
-    def get_last_part_content(self) -> Any | None:
+    def get_last_part(self) -> Part | None:
+        """Return the last part of the latest message or artifact, or ``None``.
+
+        Includes inputs, errors, and previews. This O(1) accessor preserves the
+        part's type and typed content for applications handling the full protocol.
+        It does not search older items when the latest item has no parts.
         """
-        Get the content of the last part in the most recent Message or Artifact.
+        last_item = self.get_last_item()
+        return last_item.parts[-1] if last_item is not None and last_item.parts else None
+
+    def get_last_part_content(self) -> Any | None:
+        """Return the latest part's content, or ``None`` when there is no part.
+
+        Includes inputs and preserves typed envelopes such as ``ToolOutput``.
+        Use :meth:`get_output` to read an answer and unwrap a successful tool result.
 
         Time: O(1)
         """
-        last_item = self.get_last_item()
-        if last_item is None:
-            return None
+        part = self.get_last_part()
+        return part.content if part is not None else None
 
-        # Get the last part from the last item
-        if last_item.parts:
-            last_part = last_item.parts[-1]
-            return last_part.content
-        return None
+    def get_output(self, default: Any = None) -> Any:
+        """Read the latest answer, unwrapping a successful tool result.
+
+        Accepts ``infer_output`` and successful ``tool_output`` parts, plus text
+        or JSON in agent/assistant messages or ``kind="result"`` artifacts.
+        Only the last part of the latest item is considered: a new request,
+        preview, diagnostic, error, or empty item returns ``default`` rather
+        than an older answer. Other part types remain available via
+        :meth:`get_last_part`.
+
+        Falsey outputs, including ``None``, are returned unchanged. This method
+        does not wait for completion or check task status. Use
+        ``task.raise_for_status().get_output()`` to reject failed/canceled tasks,
+        and inspect ``task.state`` when completion is required. To inspect a
+        tool error, use ``task.get_last_part().as_tool_output().error``.
+
+        Args:
+            default: Value to return when the latest part is not an answer.
+
+        Returns:
+            Answer content, the raw tool result, or ``default``. Returned values
+            are not copied. Reading does not mutate the task.
+        """
+        item = self.get_last_item()
+        part = self.get_last_part()
+        if part is None or (isinstance(item, Artifact) and item.kind != "result"):
+            return default
+        if part.type == "tool_output":
+            output = part.as_tool_output()
+            return output.result if output.error is None else default
+        if part.type == "infer_output":
+            return part.content
+        if part.type in {"text", "json"} and (
+            isinstance(item, Artifact) or (isinstance(item, Message) and item.role in {"agent", "assistant"})
+        ):
+            return part.content
+        return default

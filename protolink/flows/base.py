@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 import copy
 from abc import ABC, abstractmethod
+from typing import Any
 
 from protolink.client import AgentClient, RegistryClient
+from protolink.core.invocation import prepare_task, response_content
+from protolink.core.run_context import RunBudget, RunContext
 from protolink.discovery import Registry
 from protolink.models import AgentCard, Task
 from protolink.types import FlowTarget
@@ -67,6 +70,33 @@ class Flow(ABC):
             The Task will contain appended Messages and Artifacts from the journey.
         """
         pass
+
+    async def invoke(
+        self,
+        prompt: str,
+        *,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
+    ) -> Any:
+        """Execute an inference prompt and return its new final part content.
+
+        Optional session/budget override the copied context, as on Agent.invoke.
+        Failed or canceled tasks raise TaskExecutionError; execution exceptions
+        propagate. Falsey results are preserved. Use execute(task) to inspect all
+        task state, intermediate results, or non-inference instructions.
+        """
+        task = prepare_task(
+            Task.create_infer(prompt=prompt),
+            session_id=session_id,
+            budget=budget,
+            context=context,
+            default_session_id="invocation_session_id",
+        )
+        request_ids = {item.id for item in task.messages}
+        result = (await self.execute(task)).raise_for_status()
+        content = response_content(result, request_ids)
+        return content if content is not None else "No response generated"
 
     async def _build_flow_prompt(self, next_target: FlowTarget | None = None, *, is_final: bool = False) -> str:
         """Build the semantic context instructions for the LLM based on the next target.
@@ -346,6 +376,26 @@ class SyncFlow:
     def __init__(self, flow: Flow):
         self._flow = flow
 
+    def invoke(
+        self,
+        prompt: str,
+        *,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
+    ) -> Any:
+        """Blocking Flow.invoke; use await flow.invoke inside an active event loop."""
+        self._check_loop()
+        return asyncio.run(self._flow.invoke(prompt, session_id=session_id, budget=budget, context=context))
+
+    @staticmethod
+    def _check_loop() -> None:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        raise RuntimeError("Use await flow.invoke/execute inside an active event loop")
+
     def execute(self, task: Task) -> Task:
         """Synchronously execute the flow on a given task.
 
@@ -357,4 +407,5 @@ class SyncFlow:
             >>> flow = Pipeline([...])
             >>> result = flow.sync.execute(task)
         """
+        self._check_loop()
         return asyncio.run(self._flow.execute(task))

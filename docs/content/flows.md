@@ -7,6 +7,16 @@ import ApiReference, {
 
 # Flows
 
+## Simple flow calls and steps
+
+All flows expose `await flow.invoke(prompt, session_id=None, budget=None, context=None)` and
+`flow.sync.invoke(...)` for final content. `execute(task)` still exposes the complete task.
+`Step(handler)` adapts a Task-to-Task function, `ToolStep(agent, tool_name, args=None)` performs
+a validated tool task, and `RepeatUntil(step, checks, max_attempts=...)` adds bounded acceptance.
+See [deterministic steps](progressive-control.md#deterministic-steps-and-bounded-acceptance) for
+full signatures, execution evidence, budget sharing, and stop conditions.
+
+
 See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
 
 Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact`, and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
@@ -58,7 +68,7 @@ This lets you build hierarchical workflows out of small, reusable pieces. For ex
 
 Every flow step, branch, route, or graph node supports three target types:
 
-- **Local Agent Instance**: Executes directly in the same process through `agent.handle_task(task)`.
+- **Local Agent Instance**: Executes directly in the same process through `agent.run_task(task)`.
 - **URL / Registry Name (string)**: Resolves an agent name through a registry, or dispatches directly to a URL such as `http://...`, `ws://...`, or `runtime://...`.
 - **Flow Instance**: Executes a nested sub-flow by calling its own `execute(task)` method.
 

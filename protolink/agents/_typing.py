@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from protolink.core.cancellation import CancellationToken, TaskCancellationRequest, TaskExecutionRegistry
     from protolink.core.events import EventSink
     from protolink.core.policy import ActionAuthorization, ActionAuthorizer
-    from protolink.core.run_context import RunContext
+    from protolink.core.run_context import RunBudget, RunContext
     from protolink.llms.base import LLM
     from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
     from protolink.logging import BaseLogger
@@ -148,7 +148,10 @@ class _AgentMixinBase(Protocol):
         part_type: Literal["tool_call", "infer"] = "infer",
         tool_name: str | None = None,
         tool_args: dict[str, Any] | None = None,
-        session_id: str = "invocation_session_id",
+        session_id: str | None = None,
+        *,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> Any: ...
 
     def add_tool(self, tool: BaseTool | Callable[..., Any]) -> None: ...
@@ -163,7 +166,9 @@ class _AgentMixinBase(Protocol):
         k: int | None = None,
         where: dict[str, Any] | None = None,
         citations: bool = True,
-        session_id: str = "ask_session_id",
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> RAGAnswer: ...
 
     def _add_skill_to_agent_card(self, skill: AgentSkill) -> None: ...
