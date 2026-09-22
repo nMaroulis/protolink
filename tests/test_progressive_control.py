@@ -403,15 +403,18 @@ async def test_new_sync_methods_reject_active_loop_before_creating_coroutines(re
 @pytest.mark.asyncio
 async def test_mcp_async_discovery_selection_and_prefix_keep_remote_names(monkeypatch):
     pytest.importorskip("mcp")
+    from mcp.types import CallToolResult, ListToolsResult, TextContent
+    from mcp.types import Tool as MCPTool
+
     from protolink.tools.adapters import MCPToolAdapter, mcp_adapter
 
     adapter = MCPToolAdapter(command="unused")
     session = SimpleNamespace(
         initialize=AsyncMock(),
         list_tools=AsyncMock(
-            return_value=SimpleNamespace(
+            return_value=ListToolsResult(
                 tools=[
-                    SimpleNamespace(
+                    MCPTool(
                         name="echo",
                         description="echo",
                         inputSchema={
@@ -423,7 +426,7 @@ async def test_mcp_async_discovery_selection_and_prefix_keep_remote_names(monkey
                 ]
             )
         ),
-        call_tool=AsyncMock(return_value=SimpleNamespace(content=[SimpleNamespace(text="ok")])),
+        call_tool=AsyncMock(return_value=CallToolResult(content=[TextContent(type="text", text="ok")])),
     )
 
     @asynccontextmanager

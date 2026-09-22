@@ -1032,6 +1032,7 @@ class AgentToolMixin(_AgentMixinBase):
         self,
         adapter: MCPToolAdapter | None = None,
         *,
+        transport: Literal["stdio", "sse", "streamable_http"] | None = None,
         command: str | None = None,
         args: list[str] | None = None,
         url: str | None = None,
@@ -1041,10 +1042,11 @@ class AgentToolMixin(_AgentMixinBase):
     ) -> list[Tool]:
         """Discover and register MCP tools, returning their native Tool wrappers.
 
-        Pass command/args for stdio, url/headers for SSE, or a configured adapter
-        for full control. Requires the optional ``mcp`` extra. Discovery contacts
+        Pass command/args for stdio, url/headers for legacy SSE, or select
+        transport="streamable_http" with a URL. A configured adapter provides
+        full control. Requires the optional ``mcp`` extra. Discovery contacts
         the server (and starts its process for stdio) but calls no tool. The
-        adapter owns per-request sessions; no persistent connection is created.
+        adapter owns per-request sessions unless inside adapter.session().
 
         ``include`` selects original server names; ``prefix`` changes only their
         local names. Unknown selections and existing local names raise ValueError
@@ -1053,13 +1055,15 @@ class AgentToolMixin(_AgentMixinBase):
         """
         from protolink.tools.adapters import MCPToolAdapter
 
-        if adapter is not None and any(value is not None for value in (command, args, url, headers)):
+        if adapter is not None and any(value is not None for value in (transport, command, args, url, headers)):
             raise ValueError("Pass an MCP adapter or connection options, not both")
         if adapter is None:
             if (command is None) == (url is None):
                 raise ValueError("Specify exactly one of command or url")
+            if transport is not None and (transport == "stdio") != (command is not None):
+                raise ValueError("Use command with stdio and url with HTTP transports")
             adapter = MCPToolAdapter(
-                transport="stdio" if command is not None else "sse",
+                transport=transport or ("stdio" if command is not None else "sse"),
                 command=command,
                 args=args,
                 url=url,

@@ -119,6 +119,7 @@ class SyncAgent:
         self,
         adapter: MCPToolAdapter | None = None,
         *,
+        transport: Literal["stdio", "sse", "streamable_http"] | None = None,
         command: str | None = None,
         args: list[str] | None = None,
         url: str | None = None,
@@ -128,13 +129,15 @@ class SyncAgent:
     ) -> list[Tool]:
         """Discover/register MCP tools with Agent.add_mcp's options and collision checks.
 
-        Pass a configured adapter, stdio command/args, or SSE url/headers. Include
+        Pass a configured adapter, stdio command/args, or HTTP url/headers with
+        transport="streamable_http" (omitted transport retains legacy SSE). Include
         selects server names and prefix changes local names. Discovery contacts
         the server but invokes no tool. Use await agent.add_mcp in an active loop.
         """
         return _run_sync(
             self._agent.add_mcp,
             adapter,
+            transport=transport,
             command=command,
             args=args,
             url=url,

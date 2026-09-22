@@ -47,6 +47,8 @@ allowed-unresolved-imports = [
     "huggingface_hub.**",
     "llama_cpp.**",
     "mcp.**",
+    "jsonschema.**",
+    "referencing.**",
     "openai.**",
     "pypdf.**",
     "docx.**",
@@ -91,6 +93,9 @@ llms = [
 
 mcp = [
     "mcp>=1.28.0",
+    "httpx>=0.28.1",
+    "jsonschema>=4.20.0",
+    "referencing>=0.28.4",
 ]
 
 telemetry = [

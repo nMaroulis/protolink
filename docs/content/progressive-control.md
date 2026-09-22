@@ -385,17 +385,32 @@ registered = await agent.add_mcp(
 print(await agent.call_tool("math_add", a=2, b=3))
 ```
 
-`add_mcp(adapter=None, *, command=None, args=None, url=None, headers=None, include=None,
+`add_mcp(adapter=None, *, transport=None, command=None, args=None, url=None, headers=None, include=None,
 prefix="")` accepts either a configured `MCPToolAdapter`, stdio command/arguments,
-or an SSE URL/headers. `include` contains original server names; `prefix` only changes
+or an HTTP URL/headers. Set `transport="streamable_http"` for Streamable HTTP;
+an omitted transport with a URL retains legacy SSE behavior. `include` contains original server names; `prefix` only changes
 local registration names. Unknown selections, duplicate discovered names, or existing
 local names fail before registration. An empty selection registers nothing.
 
 Discovery contacts the server and may start its process, but invokes no tool. Sessions
-open and close per request; the helper does not create a long-lived connection.
+open and close per request unless you pass an adapter inside its `session()` context.
 Use `agent.sync.add_mcp(...)` in blocking scripts. For lower-level control, use
 `await adapter.list_tools_async()` or `await adapter.get_tools_async()`; the existing
 blocking adapter methods remain available. Install the optional `mcp` extra first.
+
+```python
+from protolink.tools.adapters import MCPToolAdapter
+
+adapter = MCPToolAdapter("streamable_http", url="https://example.com/mcp")
+async with adapter.session():
+    await agent.add_mcp(adapter, include=["search"], prefix="remote_")
+    result = await agent.call_tool("remote_search", query="agent protocols")
+```
+
+Single plain text results return strings. Rich results are dictionaries with MCP
+fields such as `content`, `structuredContent`, and `_meta`; for structured output,
+read `result["structuredContent"]`. MCP tool failures raise `MCPToolError` on direct
+calls and become failed tool outputs through task execution. See [MCP tools](tool.md#mcp-tools).
 
 ## Call a peer
 

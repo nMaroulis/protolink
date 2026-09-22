@@ -34,6 +34,39 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.7.4] - Unreleased
+
+MCP tools now preserve complete results and their original JSON schemas, report
+tool failures correctly, and support Streamable HTTP with optional connection reuse.
+
+### Added
+
+- `streamable_http` transport for `MCPToolAdapter` and async/sync `Agent.add_mcp`,
+  including configured HTTP headers. Existing URL-only registration retains legacy SSE.
+- `async with adapter.session()` to share one initialized connection across discovery
+  and registered tool calls, with cleanup on completion, failure, or cancellation.
+- Paginated MCP tool discovery, with repeated-cursor detection and complete-list caching.
+- MCP regression coverage in CI, including real Streamable HTTP and stdio server tests.
+
+### Fixed
+
+- MCP responses with `isError=True` raise `MCPToolError` instead of returning successful
+  text. The exception retains the tool name and complete result; task execution records
+  a failed tool output without automatically retrying the call.
+- Rich MCP results retain all content blocks, structured data, annotations, metadata,
+  and null values. A single plain text block still returns a string; rich responses
+  return a dictionary with MCP fields such as `content` and `structuredContent`.
+- Nullable and union schemas no longer crash discovery. MCP input and output schemas
+  retain recursive references and JSON Schema defaults, with argument validation that
+  does not coerce values or change `additionalProperties`.
+- Blocking MCP callables reject active event loops before creating a coroutine, and
+  individual errors retain their exception type through MCP session cleanup.
+
+### Changed
+
+- Document MCP result handling, schema validation, Streamable HTTP, and session lifetime.
+- Declare the adapter's HTTP and JSON Schema dependencies explicitly in the `mcp` extra.
+
 ## [0.7.3] - 2026-09-22
 
 :::note Latest Release

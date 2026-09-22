@@ -1,3 +1,3 @@
-from .mcp_adapter import MCPToolAdapter
+from .mcp_adapter import MCPToolAdapter, MCPToolError
 
-__all__ = ["MCPToolAdapter"]
+__all__ = ["MCPToolAdapter", "MCPToolError"]

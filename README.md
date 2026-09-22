@@ -191,7 +191,13 @@ planner_agent.start()
 
 Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. Registering the tool performs no network request. Remove any constructor argument or tool you do not need, or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies, and observability backends.
 
-`MCPToolAdapter` supports local stdio and remote SSE servers. Once registered, MCP tools follow the same schema validation, policy, execution, and telemetry path as native Python tools.
+`MCPToolAdapter` supports local stdio, Streamable HTTP, and legacy SSE servers. Use
+`await agent.add_mcp(transport="streamable_http", url="https://example.com/mcp")`
+for Streamable HTTP. MCP tools retain their JSON schemas and follow the same policy,
+execution, and telemetry path as native tools. Plain text results remain strings;
+rich results preserve all content blocks, structured data, and metadata. Tool errors
+raise `MCPToolError`. Use `async with adapter.session()` to reuse a connection.
+See the [MCP guide](docs/content/tool.md#mcp-tools) for result and lifecycle details.
 
 | Plug-in surface | Built-in choices |
 | --- | --- |

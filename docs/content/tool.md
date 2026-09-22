@@ -844,7 +844,7 @@ Protolink integrates seamlessly with **MCP (Model Context Protocol)** servers, a
 The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standard for connecting AI assistants to external tools and data sources. MCP servers can be:
 
 - Local Python scripts running as subprocesses
-- Remote web services exposing SSE endpoints
+- Remote web services exposing Streamable HTTP or legacy SSE endpoints
 - Third-party tool providers
 
 ### MCPToolAdapter
@@ -856,7 +856,8 @@ The `MCPToolAdapter` class connects to MCP servers and exposes their tools as ca
 | Transport | Description | Use Case |
 |-----------|-------------|----------|
 | `stdio` | Local subprocess via stdin/stdout | Local Python/Node.js MCP servers |
-| `sse` | Server-Sent Events over HTTP | Remote MCP web services |
+| `streamable_http` | Streamable HTTP | Remote MCP web services |
+| `sse` | Legacy Server-Sent Events over HTTP | Older MCP web services |
 
 #### Constructor
 
@@ -874,12 +875,12 @@ The `MCPToolAdapter` class connects to MCP servers and exposes their tools as ca
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L96"
 >
 
-Store the connection configuration for an MCP server and provide discovery and wrapping helpers. Construction does not open a subprocess, network connection, or MCP session; each discovery or invocation operation creates and initializes a session for that operation.
+Store the connection configuration for an MCP server and provide discovery and wrapping helpers. Construction does not open a subprocess, network connection, or MCP session. Each operation initializes its own session unless a managed `adapter.session()` context is active.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="MCPToolAdapter constructor parameters">
     <ApiField name="transport" type="str" defaultValue={'"stdio"'}>
-      MCP client transport. Supported values are <code>"stdio"</code> for a local subprocess and <code>"sse"</code> for a remote Server-Sent Events endpoint.
+      MCP client transport: <code>"stdio"</code>, <code>"streamable_http"</code>, or legacy <code>"sse"</code>.
     </ApiField>
     <ApiField name="command" type="str | None" defaultValue="None">
       Executable launched for <code>stdio</code>, such as <code>"python"</code>, <code>"node"</code>, or an MCP server binary. It is required when the first stdio operation runs.
@@ -888,10 +889,10 @@ Store the connection configuration for an MCP server and provide discovery and w
       Arguments passed unchanged to the stdio command. <code>None</code> becomes an empty list.
     </ApiField>
     <ApiField name="url" type="str | None" defaultValue="None">
-      SSE endpoint required when the first <code>sse</code> operation runs.
+      Endpoint URL required for either HTTP transport.
     </ApiField>
     <ApiField name="headers" type="dict[str, str] | None" defaultValue="None">
-      Headers forwarded by the SSE client, commonly for authentication. <code>None</code> becomes an empty dictionary.
+      Headers forwarded by the selected HTTP client, commonly for authentication. <code>None</code> becomes an empty dictionary.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -902,13 +903,13 @@ Store the connection configuration for an MCP server and provide discovery and w
       Importing <code>protolink.tools.adapters</code> fails when the optional MCP dependency is unavailable. Install <code>protolink[mcp]</code>.
     </ApiField>
     <ApiField name="ValueError">
-      Discovery or invocation raises for an unknown transport, missing stdio command, or missing SSE URL. Configuration is validated lazily, not by the constructor.
+      Discovery or invocation raises for an unknown transport, missing stdio command, or missing HTTP URL. Configuration is validated lazily, not by the constructor.
     </ApiField>
   </ApiFields>
 </ApiSection>
 
 <ApiCallout label="Session lifetime">
-  The current adapter does not keep one MCP session open across calls. It caches discovered metadata, but each uncached discovery or tool invocation opens, initializes, and closes its own stdio or SSE session.
+  By default, each uncached discovery or tool invocation opens and closes its own session. Use <code>async with adapter.session()</code> to share one connection across discovery and registered tools. Await all calls before leaving the context; open and close it in the same task. Nested contexts and calls from another event loop are rejected. Tool calls are never automatically retried.
 </ApiCallout>
 
 </ApiReference>
@@ -916,6 +917,71 @@ Store the connection configuration for an MCP server and provide discovery and w
 ---
 
 ### Connecting to MCP Servers
+
+#### Streamable HTTP and connection reuse
+
+```python
+from protolink.tools.adapters import MCPToolAdapter
+
+adapter = MCPToolAdapter(
+    "streamable_http",
+    url="https://example.com/mcp",
+    headers={"Authorization": "Bearer token"},
+)
+async with adapter.session():
+    await agent.add_mcp(adapter, include=["search"], prefix="remote_")
+    result = await agent.call_tool("remote_search", query="agent protocols")
+```
+
+The context owns the initialized session and closes it on exit, including on failure
+or cancellation. Native wrappers and `wrap_tool()` adapters share their parent's
+managed connection. Outside the context, they return to per-operation sessions.
+Discovery follows all `tools/list` pages and caches the complete list; use
+`await adapter.list_tools_async(refresh=True)` to refresh it.
+
+For per-operation connections, use the agent helper directly:
+
+```python
+await agent.add_mcp(transport="streamable_http", url="https://example.com/mcp")
+```
+
+Omitting `transport` with a URL retains legacy SSE behavior. The blocking
+`agent.sync.add_mcp(...)` accepts the same options.
+
+#### Results, schemas, and errors
+
+The adapter follows the [MCP tool result contract](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
+
+| Response | Python return value |
+| --- | --- |
+| One plain text block without metadata or structured content | `str`, including an empty string |
+| Empty content without other data | `None` |
+| Structured data, multiple blocks, non-text content, or metadata | Serializable dictionary with the complete MCP fields |
+| `isError=True` | Raises `MCPToolError` |
+
+Rich results preserve `content`, `structuredContent`, `_meta`, annotations, extension
+fields, and null values. Access structured data through `result["structuredContent"]`.
+An empty structured object remains a structured result. Images, audio, resource links,
+and embedded resources retain their original content blocks.
+
+Discovered tools retain their original input and output schemas, including nullable
+unions and local references. MCP arguments use JSON Schema validation without native
+Python coercion or changes to `additionalProperties`. `output_schema` describes the
+MCP `structuredContent` field, not the surrounding result dictionary. The MCP SDK
+validates structured outputs against the server's schema.
+
+```python
+from protolink.tools.adapters import MCPToolError
+
+try:
+    result = await agent.call_tool("remote_search", query="agent protocols")
+except MCPToolError as error:
+    print(error.tool_name, error.result)  # Complete failed MCP result
+```
+
+Direct calls raise `MCPToolError`; the existing task runtime records a failed tool
+output, and convenience inference follows its existing failure behavior. No failed
+call is silently converted into successful text or automatically resubmitted.
 
 #### Local MCP Server (stdio)
 
@@ -966,7 +1032,7 @@ for tool in tools:
     print(f"  Callable: {tool['callable']}")
 ```
 
-The returned dictionaries contain the MCP name, description, input schema, shallow Python input-type mapping, an output placeholder, and a synchronous callable. See [`MCPToolAdapter.list_tools`](#mcptooladapterlist_tools) for the exact result contract, caching behavior, and event-loop limitation.
+The returned dictionaries contain the MCP name, description, original input and output schemas, a shallow Python input-type mapping, and a synchronous callable. Nullable, union, referenced, and unsupported types use `Any` in the inspection mapping; validation still uses the original JSON Schema. See [`MCPToolAdapter.list_tools`](#mcptooladapterlist_tools) for caching and event-loop behavior.
 
 #### get_tools()
 
@@ -1262,11 +1328,11 @@ Discover tools synchronously and return metadata dictionaries. The first call op
     <ApiField name="input_types" type="dict[str, type]">
       Shallow mapping from top-level JSON Schema types to Python classes for display and introspection. Unsupported shapes become <code>Any</code>.
     </ApiField>
-    <ApiField name="output" type="None">
-      Reserved placeholder; the current adapter does not expose MCP output schemas.
+    <ApiField name="output_schema" type="dict | None">
+      Original MCP output schema describing structuredContent, when supplied. The legacy <code>output</code> key is an alias for this value.
     </ApiField>
     <ApiField name="callable" type="Callable[..., Any]">
-      Synchronous closure for this tool. It uses <code>asyncio.run()</code> and opens a new MCP session per invocation.
+      Synchronous closure for this tool. It uses <code>asyncio.run()</code> and opens a new MCP session per invocation. Use async tool wrappers inside a managed session.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1333,7 +1399,7 @@ Convert every discovered MCP definition into a native asynchronous `Tool`. Each 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="MCPToolAdapter get_tools return value">
     <ApiField name="tools" type="list[Tool]">
-      Native tools with the MCP name, description, input schema, <code>output_schema=None</code>, and <code>tags=["mcp"]</code>. Their async callables open a fresh MCP session for each invocation.
+      Native tools with the original MCP input and output schemas and <code>tags=["mcp"]</code>. Async callables reuse an active managed session or open a session for the operation.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1368,7 +1434,7 @@ Create a synchronous closure that invokes the named MCP tool. The name is not ch
 <ApiSection title="Returns">
   <ApiFields ariaLabel="MCPToolAdapter get_callable return value">
     <ApiField name="callable" type="Callable[..., Any]">
-      Keyword-only synchronous wrapper returning the first text content item when present, otherwise <code>None</code>.
+      Keyword-only synchronous wrapper returning plain text, an empty result, or a complete rich MCP result dictionary. Tool failures raise <code>MCPToolError</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1403,7 +1469,7 @@ Discover one tool and return a new adapter configured to act as that asynchronou
 <ApiSection title="Returns">
   <ApiFields ariaLabel="MCPToolAdapter wrap_tool return value">
     <ApiField name="wrapped" type="MCPToolAdapter">
-      New adapter with <code>name</code>, <code>description</code>, and <code>input_schema</code> populated. <code>output_schema</code> and <code>tags</code> remain <code>None</code>.
+      New adapter with the MCP name, description, input schema, and output schema. It shares the parent adapter's session context. Tags remain <code>None</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1442,7 +1508,7 @@ Invoke the MCP tool represented by a wrapped adapter. A plain connection adapter
 <ApiSection title="Returns">
   <ApiFields ariaLabel="MCPToolAdapter call return value">
     <ApiField name="result" type="Any">
-      Text from the first MCP content item when it has a <code>text</code> attribute; otherwise <code>None</code>.
+      Plain text string, <code>None</code> for empty content, or a rich MCP result dictionary preserving all content and metadata. Tool failures raise <code>MCPToolError</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1502,7 +1568,7 @@ Register selectively, configure capabilities explicitly, and use the Agent execu
 1. **Connection reuse**: Create one `MCPToolAdapter` and reuse it for multiple tool calls
 2. **Caching**: Use `list_tools()` without `refresh=True` to leverage caching
 3. **Error handling**: Wrap tool calls in try/except for network failures
-4. **Transport choice**: Use `stdio` for local servers, `sse` for remote services
+4. **Transport choice**: Use `stdio` for local servers, `streamable_http` for remote services, and `sse` for legacy endpoints
 
 ### Agent Registration
 
