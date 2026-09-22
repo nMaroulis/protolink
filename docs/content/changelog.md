@@ -34,7 +34,13 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.7.3] - Unreleased
+## [0.7.3] - 2026-09-22
+
+:::note Latest Release
+
+This release adds simpler APIs for creating and reading tasks, registering tools, discovering MCP tools, calling peers, streaming runs, and composing workflows. Optional budgets, run context, typed responses, and bounded acceptance checks bring more control to those same APIs. Updated documentation and a runnable example show how to start with defaults and introduce explicit configuration as your application grows.
+
+:::
 
 ### Added
 
@@ -72,7 +78,7 @@ uv add --upgrade protolink
 
 ## [0.7.2] - 2026-09-21
 
-:::note Latest Release
+:::note Release Summary
 
 **ProtoLink 0.7.2 focuses on introducing built-in tools and simple assistant presets for everyday agent work.** Agents can run shell commands, work with Git repositories, ask the user for feedback, and manage calendars and email through small, configurable APIs. These additions use the existing Agent runtime, including capability policies, approval previews, execution budgets, cancellation, and events.
 
