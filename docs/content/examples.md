@@ -38,6 +38,15 @@ The default registry listens on `localhost:9010`, WeatherAgent on `localhost:801
 
 **Run All also runs cleanup at the end.** Pause before the final cleanup cell to use the browser pages, then run cleanup when finished. To change the agents' transport, update `TRANSPORT` and their URLs together, rerun from the top after cleanup, and skip the two HTTP-only request cells. The registry can stay on HTTP. See the [example README](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/README.md) for the endpoint reference and rerun guidance.
 
+## Progressive control walkthrough
+
+[`progressive_control.py`](https://github.com/nMaroulis/protolink/blob/main/examples/progressive_control.py)
+shows bulk tools, task creation and output readers, controlled invocation, streaming/reporting,
+transport aliases and explicit configuration, managed peer calls, local flows, callable/tool
+steps, bounded acceptance, and typed responses in one offline script.
+Run `python examples/progressive_control.py`; add `--mcp` to include the bundled MCP server
+with the optional `protolink[mcp]` extra. See the [guide](progressive-control.md).
+
 ## Example Scripts
 
 The repository includes several **standalone example scripts** that demonstrate specific Protolink capabilities:
@@ -92,7 +101,7 @@ These small, provider-free scripts demonstrate runtime controls for application 
 - [Context budgets](https://github.com/nMaroulis/protolink/blob/main/examples/v063_context_budget.py) shows `ContextManifest`, `LLMModelProfile`, and enforced `RunBudget` behavior before a model call.
 - [History compaction](https://github.com/nMaroulis/protolink/blob/main/examples/v063_history_compaction.py) shows local `recent`, `tokens`, and isolated `summary` compaction plus remote `AgentClient.compact_history()` over the request-spec endpoint.
 - [State controls](https://github.com/nMaroulis/protolink/blob/main/examples/v063_state_control.py) shows client/server state `describe`, `compact`, and `reset` requests for one persistent conversation session.
-- [Run reports](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `RunRecorder`, `RunReport`, `RunReplay`, golden-run assertions, and redaction.
+- [Run reports](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `start_run`, `RunReport`, `RunReplay`, golden-run assertions, and redaction.
 - [ProtoAgent policy mesh](https://github.com/nMaroulis/protolink/blob/main/examples/v063_protoagent_policy_mesh.py) sketches the ProtoAgent Explorer/Coder/Architect structure abstractly. The prompts are intentionally tiny; the example focuses on tool capabilities, `CapabilityPolicy`, diff-preview `action_builder`s, and approval-gated workspace writes.
 
 ### Production case study: [ProtoAgent](protoagent_case_study.md)
@@ -182,10 +191,10 @@ fairness checks.
 ### ⚡ [`runtime_agents.py`](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_agents.py)
 **Purpose**: In-memory agent communication interoperability
 
-- Uses explicitly mapped URL `RuntimeTransport` instances for agent-to-agent communication without HTTP configuration
-- Demonstrates safe registry discovery enabling native message parsing safely inside isolated testing contexts
-- Shows how to build reliable agent networks safely running within a single process retaining production semantics
-- Useful for test pipelines scaling native workflow isolation
+- Uses the `transport="runtime"` alias and `runtime://` URLs without opening ports
+- Uses `AgentGroup` for readiness and cleanup without startup sleeps
+- Sends a task to a peer and reads its agent card through the public client API
+- Preserves the serialized task boundary used by network transports
 
 ### 📡 [`streaming_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/streaming_agent.py)
 **Purpose**: Real-time streaming with progress updates

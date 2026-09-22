@@ -8,6 +8,14 @@ import ApiReference, {
 
 # Client
 
+## Bound peers
+
+`client.peer(target, registry=None, protocol="auto")` binds a URL, card, or unique registry name without I/O.
+It provides `invoke`, `invoke_typed`, `call_tool`, and `run_task`, with matching `.sync` methods.
+`agent.peer(target)` also reuses the agent's configured registry and communication path.
+See [peer calls](progressive-control.md#call-a-peer) for resolution, native/A2A behavior, and errors.
+
+
 The **Client** layer in Protolink provides a high-level interface for agent-to-agent communication. It abstracts transport details and offers convenient methods for sending tasks, messages, and retrieving agent metadata.
 
 ## AgentClient

@@ -39,14 +39,14 @@ print("-----------------------------------------------")
 
 def tool_call_example():
     # Test the agent with direct processing
-    # The invoke(sync.invoke) is a convenience method that is used to directly invoke the agent to handle a task..
-    response = agent.sync.invoke("hello", part_type="tool_call", tool_name="echo_tool", tool_args={"message": "world"})
+    # Known tools return their raw result through validation and authorization.
+    response = agent.sync.call_tool("echo_tool", message="world")
     print("---------------- RESPONSE -----------------------")
     print(response)
 
 
 def llm_inference_example(message: str = "Hey, how are you doing today?"):
-    response = agent.sync.invoke(message=message, part_type="infer")
+    response = agent.sync.invoke(message)
     print("---------------- RESPONSE -----------------------")
     print(response)
 

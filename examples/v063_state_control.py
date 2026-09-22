@@ -13,16 +13,9 @@ from __future__ import annotations
 
 import asyncio
 
-from protolink import Agent, AgentCard, RunContext, Task, create_llm
+from protolink import Agent, AgentCard, AgentGroup, create_llm
 from protolink.client import AgentClient
 from protolink.transport import RuntimeTransport
-
-
-async def ask(agent: Agent, session_id: str, prompt: str) -> None:
-    """Send one task into a persistent conversation session."""
-    task = Task.create_infer(prompt=prompt)
-    RunContext(session_id=session_id).attach_to_task(task)
-    await agent.handle_task(task)
 
 
 async def main() -> None:
@@ -37,12 +30,9 @@ async def main() -> None:
         verbosity=0,
     )
     client = AgentClient(RuntimeTransport(url="runtime://v063-state-client"))
-    assert agent.server is not None
-    await agent.server.start()
-
-    try:
+    async with AgentGroup([agent]):
         for index in range(5):
-            await ask(agent, session_id, f"Remember repository fact {index}.")
+            await agent.invoke(f"Remember repository fact {index}.", session_id=session_id)
 
         described = await client.describe_state(url, session_id=session_id, include_data=False)
         compacted = await client.compact_state(
@@ -54,8 +44,6 @@ async def main() -> None:
         after_compact = await client.describe_state(url, session_id=session_id)
         reset = await client.reset_state(url, session_id=session_id)
         after_reset = await client.describe_state(url, session_id=session_id)
-    finally:
-        await agent.server.stop()
 
     print("Describe operation:", described.operation)
     print("Messages before compact:", described.stores[0].message_count)

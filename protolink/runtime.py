@@ -8,11 +8,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from protolink.agents import Agent
-from protolink.agents.helpers import _response_content
 from protolink.client import AgentClient
 from protolink.core.cancellation import TaskNotCancelableError, TaskNotFoundError, mark_task_canceled
 from protolink.core.events import RunEvent, TaskStatusUpdateEvent
 from protolink.core.execution import closing_stream
+from protolink.core.invocation import response_content
 from protolink.core.redaction import RedactionPolicy
 from protolink.core.report import RunRecorder, RunReport
 from protolink.core.run_context import RunContext
@@ -157,7 +157,7 @@ class RunHandle:
                 "message": final_task.metadata.get("error"),
                 "blockers": final_task.metadata.get("blockers", []),
             }
-        output = _response_content(final_task, request_ids) if final_task else None
+        output = response_content(final_task, request_ids) if final_task else None
         if final_task is not None:
             last = final_task.get_last_item()
             if last is not None and last.id not in request_ids and last.parts and last.parts[-1].type == "tool_output":
@@ -195,6 +195,20 @@ class RunHandle:
     async def result(self) -> RunResult:
         """Await the normalized result without propagating waiter cancellation to the run."""
         return await asyncio.shield(self._worker)
+
+    async def chunks(self) -> AsyncIterator[str]:
+        """Yield raw model text fragments from this run's recorded/live events.
+
+        JSON-action models emit JSON fragments, not just the final answer.
+        Tools and final-message events are omitted; no parsing or concatenation
+        is performed. Multiple consumers do not execute the run again. Inspect
+        result() for terminal failure; leaving this iterator does not cancel work.
+        """
+        async for event in self.events():
+            if event.payload.get("llm_event_type") == "llm_chunk":
+                content = event.payload.get("content")
+                if isinstance(content, str):
+                    yield content
 
     @property
     def report(self) -> RunReport:

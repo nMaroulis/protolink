@@ -8,6 +8,15 @@ import ApiReference, {
 
 # Runtime
 
+## Start a controlled run
+
+`agent.start_run(prompt_or_task, session_id=None, budget=None, context=None, store=None, redaction_policy=None)`
+returns the existing `RunHandle` in an active asyncio loop. `handle.chunks()` filters raw model
+text from the stream, while `events()`, `result()`, `report`, and `cancel()` retain full control.
+JSON-action chunks can contain raw JSON; inspect the final result status for failures.
+See [streaming, cancellation, and reports](progressive-control.md#streaming-cancellation-and-reports).
+
+
 See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
 
 Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part`, and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools, and any other agent application.

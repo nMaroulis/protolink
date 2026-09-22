@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Coroutine
-from typing import Any, Literal, TypeVar
+from collections.abc import Callable, Coroutine, Sequence
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
+from protolink.core.run_context import RunBudget, RunContext
 from protolink.models import AgentCard, Task
 from protolink.rag import RAGAnswer
+from protolink.tools import Tool
+
+if TYPE_CHECKING:
+    from protolink.tools.adapters import MCPToolAdapter
 
 ResultT = TypeVar("ResultT")
 
@@ -51,7 +56,10 @@ class SyncAgent:
         part_type: Literal["tool_call", "infer"] = "infer",
         tool_name: str | None = None,
         tool_args: dict[str, Any] | None = None,
-        session_id: str = "invocation_session_id",
+        session_id: str | None = None,
+        *,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> Any:
         """Synchronously process a message.
 
@@ -62,6 +70,8 @@ class SyncAgent:
             tool_args: Arguments for tool (if part_type is "tool_call")
             session_id: Conversation partition, shared by default when
                 conversation state is enabled.
+            budget: Optional limits, overriding context.budget.
+            context: Copied run controls, with the same precedence as Agent.invoke.
 
         Returns:
             Final response content, including ``ToolOutput`` in tool-call
@@ -73,7 +83,65 @@ class SyncAgent:
             RuntimeError: Called inside an active event loop; use
                 ``await agent.invoke(...)`` instead.
         """
-        return _run_sync(self._agent.invoke, message, part_type, tool_name, tool_args, session_id)
+        return _run_sync(
+            self._agent.invoke,
+            message,
+            part_type,
+            tool_name,
+            tool_args,
+            session_id,
+            budget=budget,
+            context=context,
+        )
+
+    def invoke_typed(
+        self,
+        message: str,
+        response_model: type[ResultT],
+        *,
+        max_attempts: int = 1,
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
+    ) -> ResultT:
+        """Blocking Agent.invoke_typed; validation, repair limits, and errors are identical."""
+        return _run_sync(
+            self._agent.invoke_typed,
+            message,
+            response_model,
+            max_attempts=max_attempts,
+            session_id=session_id,
+            budget=budget,
+            context=context,
+        )
+
+    def add_mcp(
+        self,
+        adapter: MCPToolAdapter | None = None,
+        *,
+        command: str | None = None,
+        args: list[str] | None = None,
+        url: str | None = None,
+        headers: dict[str, str] | None = None,
+        include: Sequence[str] | None = None,
+        prefix: str = "",
+    ) -> list[Tool]:
+        """Discover/register MCP tools with Agent.add_mcp's options and collision checks.
+
+        Pass a configured adapter, stdio command/args, or SSE url/headers. Include
+        selects server names and prefix changes local names. Discovery contacts
+        the server but invokes no tool. Use await agent.add_mcp in an active loop.
+        """
+        return _run_sync(
+            self._agent.add_mcp,
+            adapter,
+            command=command,
+            args=args,
+            url=url,
+            headers=headers,
+            include=include,
+            prefix=prefix,
+        )
 
     def call_tool(self, tool_name: str, **kwargs: Any) -> Any:
         """Validate, authorize, and call a tool, returning its raw result.
@@ -123,7 +191,9 @@ class SyncAgent:
         k: int | None = None,
         where: dict[str, Any] | None = None,
         citations: bool = True,
-        session_id: str = "ask_session_id",
+        session_id: str | None = None,
+        budget: RunBudget | None = None,
+        context: RunContext | None = None,
     ) -> RAGAnswer:
         """Retrieve knowledge and answer through the normal task lifecycle.
 
@@ -139,6 +209,8 @@ class SyncAgent:
             where=where,
             citations=citations,
             session_id=session_id,
+            budget=budget,
+            context=context,
         )
 
     def discover_agents(self, filter_by: dict[str, Any] | None = None) -> list[AgentCard]:

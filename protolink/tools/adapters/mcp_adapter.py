@@ -313,6 +313,21 @@ class MCPToolAdapter(BaseTool):
         if self._tools_cache is not None and not refresh:
             return self._tools_cache
 
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.list_tools_async(refresh=refresh))
+        raise RuntimeError("Use await adapter.list_tools_async() inside an active event loop")
+
+    async def list_tools_async(self, *, refresh: bool = False) -> list[dict]:
+        """Discover MCP descriptors without starting a nested event loop.
+
+        Uses the same cache as list_tools. Discovery opens and closes one server
+        session and performs no tool invocation. Set refresh to reload metadata.
+        """
+        if self._tools_cache is not None and not refresh:
+            return self._tools_cache
+
         async def _fetch_tools(session: ClientSession) -> list[dict]:
             result = await session.list_tools()
             tools = []
@@ -330,7 +345,7 @@ class MCPToolAdapter(BaseTool):
 
             return tools
 
-        self._tools_cache = asyncio.run(self._run_with_session(_fetch_tools))
+        self._tools_cache = await self._run_with_session(_fetch_tools)
         return self._tools_cache
 
     def get_tool(self, tool_name: str) -> dict | None:
@@ -388,7 +403,18 @@ class MCPToolAdapter(BaseTool):
             :meth:`wrap_tool`: Wrap a single tool by name.
             :meth:`list_tools`: Get tools as dictionaries with callables.
         """
-        tool_dicts = self.list_tools()
+        return self._wrap_tools(self.list_tools())
+
+    async def get_tools_async(self) -> list[ProtoTool]:
+        """Discover native Tool wrappers in async applications and notebooks.
+
+        Wrappers call the original server tool names and retain their schemas.
+        Register them with Agent.add_tools, or use await Agent.add_mcp directly.
+        """
+        return self._wrap_tools(await self.list_tools_async())
+
+    def _wrap_tools(self, tool_dicts: list[dict]) -> list[ProtoTool]:
+        """Build native wrappers from discovered descriptors."""
         wrapped_tools: list[ProtoTool] = []
 
         for tool_dict in tool_dicts:

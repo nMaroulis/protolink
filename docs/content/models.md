@@ -2603,17 +2603,32 @@ print(task.state)  # TaskState.WORKING
   kind="classmethod"
   path="protolink.Task.create"
   signature={`create(
-    message: Message,
+    message: Message | str,
+    *,
+    session_id: str | None = None,
+    budget: RunBudget | None = None,
+    context: RunContext | None = None,
 ) -> Task`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py#L256"
 >
 
-Create a submitted task with one initial message and initialize the last-item cache without a second scan.
+Create a submitted task with one initial message. A string is wrapped in
+`Message.user(text)`; it does not request inference. Use `Task.create_infer` for
+an LLM instruction. Creation performs no execution.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Task create parameters">
-    <ApiField name="message" type="Message" required>
-      Initial user, agent, infer, tool-call, or other message.
+    <ApiField name="message" type="Message | str" required>
+      An initial message, or plain text to wrap in a user message.
+    </ApiField>
+    <ApiField name="session_id" type="str | None" defaultValue="None">
+      Conversation partition; overrides the supplied context's session.
+    </ApiField>
+    <ApiField name="budget" type="RunBudget | None" defaultValue="None">
+      Copied execution limits; replaces the supplied context's budget.
+    </ApiField>
+    <ApiField name="context" type="RunContext | None" defaultValue="None">
+      Run controls copied into task metadata. Omitted controls leave task metadata empty.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2629,7 +2644,8 @@ Create a submitted task with one initial message and initialize the last-item ca
 <ApiSection title="Examples">
 
 ```python
-task = Task.create(Message.user("Analyze this data"))
+task = Task.create("Analyze this data", session_id="analysis")
+# Equivalent message: Task.create(Message.user("Analyze this data"), session_id="analysis")
 
 print(len(task.messages))  # 1
 print(task.state)  # TaskState.SUBMITTED
@@ -2645,11 +2661,14 @@ print(task.state)  # TaskState.SUBMITTED
   kind="classmethod"
   path="protolink.Task.create_infer"
   signature={`create_infer(
-    *,
     prompt: str | None = None,
+    *,
     user: str | None = None,
     output_schema: dict[str, Any] | None = None,
     metadata: dict[str, Any] | None = None,
+    session_id: str | None = None,
+    budget: RunBudget | None = None,
+    context: RunContext | None = None,
 ) -> Task`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py#L266"
 >
@@ -2659,7 +2678,7 @@ Create a submitted task containing one user-role message with an `infer` part. A
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Task create_infer parameters">
     <ApiField name="prompt" type="str | None" defaultValue="None">
-      Main inference instruction. Omitted values are removed from the part payload rather than serialized as <code>null</code>.
+      Main inference instruction, positional or keyword. Omitted values are removed from the part payload rather than serialized as <code>null</code>.
     </ApiField>
     <ApiField name="user" type="str | None" defaultValue="None">
       Optional user identity or user-specific context passed inside the infer payload. It does not change the enclosing message role.
@@ -2669,6 +2688,15 @@ Create a submitted task containing one user-role message with an `infer` part. A
     </ApiField>
     <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">
       Additional infer-operation metadata stored inside the part, separate from <code>Task.metadata</code>.
+    </ApiField>
+    <ApiField name="session_id" type="str | None" defaultValue="None">
+      Conversation partition; overrides the supplied context's session.
+    </ApiField>
+    <ApiField name="budget" type="RunBudget | None" defaultValue="None">
+      Copied execution limits; replaces the supplied context's budget.
+    </ApiField>
+    <ApiField name="context" type="RunContext | None" defaultValue="None">
+      Run controls copied into task metadata. Omitted controls leave task metadata empty.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2689,7 +2717,7 @@ Create a submitted task containing one user-role message with an `infer` part. A
 
 ```python
 task = Task.create_infer(
-    prompt="Extract the invoice total.",
+    "Extract the invoice total.",
     output_schema={
         "type": "object",
         "properties": {"total": {"type": "number"}},
@@ -2708,10 +2736,13 @@ task = Task.create_infer(
   kind="classmethod"
   path="protolink.Task.create_tool_call"
   signature={`create_tool_call(
-    *,
     tool_name: str,
     args: dict[str, Any] | None = None,
+    *,
     call_id: str | None = None,
+    session_id: str | None = None,
+    budget: RunBudget | None = None,
+    context: RunContext | None = None,
 ) -> Task`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py#L288"
 >
@@ -2721,13 +2752,22 @@ Create a submitted task containing one user-role `tool_call` message. This is th
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Task create_tool_call parameters">
     <ApiField name="tool_name" type="str" required>
-      Registered tool or capability name to invoke. Resolution happens when the receiving agent executes the task.
+      Registered tool or capability name, positional or keyword. Resolution happens when the receiving agent executes the task.
     </ApiField>
     <ApiField name="args" type="dict[str, Any] | None" defaultValue="None">
-      Keyword arguments for the tool. <code>None</code> and an empty dictionary both become a new empty argument mapping.
+      Tool argument mapping, positional or keyword. Arguments stay in this mapping, so names such as <code>budget</code> cannot collide with run controls. <code>None</code> and an empty dictionary both become a new empty mapping.
     </ApiField>
     <ApiField name="call_id" type="str | None" defaultValue="None">
       Optional correlation identifier. If omitted, <code>Part.tool_call()</code> generates a <code>tool_call_</code>-prefixed identifier.
+    </ApiField>
+    <ApiField name="session_id" type="str | None" defaultValue="None">
+      Conversation partition; overrides the supplied context's session.
+    </ApiField>
+    <ApiField name="budget" type="RunBudget | None" defaultValue="None">
+      Copied execution limits; replaces the supplied context's budget.
+    </ApiField>
+    <ApiField name="context" type="RunContext | None" defaultValue="None">
+      Run controls copied into task metadata. Omitted controls leave task metadata empty.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2743,10 +2783,11 @@ Create a submitted task containing one user-role `tool_call` message. This is th
 <ApiSection title="Examples">
 
 ```python
-task = Task.create_tool_call(
-    tool_name="get_weather",
-    args={"location": "Athens"},
-)
+from protolink import RunBudget
+
+task = Task.create_tool_call("get_weather", {"location": "Athens"}, budget=RunBudget(max_tool_calls=1))
+# Existing keyword arguments remain supported:
+task = Task.create_tool_call(tool_name="get_weather", args={"location": "Athens"})
 ```
 
 </ApiSection>
@@ -2862,6 +2903,73 @@ Create a standalone `infer` part without constructing a message or task. This de
 
 </ApiReference>
 
+#### Task.get_last_part
+
+<ApiReference
+  kind="method"
+  path="protolink.Task.get_last_part"
+  signature={`get_last_part() -> Part | None`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py"
+>
+
+Return the last part of the latest cached message or artifact, or `None` when that
+item is empty or absent. Includes inputs, errors, and previews; no older item is
+searched. Like `get_last_item()`, this is an O(1) lookup. Add items through
+`add_message()` and `add_artifact()` so the cache stays current.
+
+```python
+part = task.get_last_part()
+if part is not None and part.type == "tool_output":
+    output = part.as_tool_output()
+    print(output.call_id, output.result, output.error)
+```
+
+</ApiReference>
+
+#### Task.get_output
+
+<ApiReference
+  kind="method"
+  path="protolink.Task.get_output"
+  signature={`get_output(default: Any = None) -> Any`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py"
+>
+
+Read an answer from the last part of the latest cached item. A successful
+`tool_output` returns its raw `result`; `infer_output` returns its content.
+Text/JSON content is accepted from agent or assistant messages and `kind="result"`
+artifacts. Values are returned without copying or mutating the task.
+
+<ApiSection title="Parameters">
+  <ApiFields ariaLabel="Task get_output parameters">
+    <ApiField name="default" type="Any" defaultValue="None">
+      Returned for an absent or empty item, an input, error, preview, diagnostic,
+      unsupported part, or a tool output with an error. Older answers are never
+      used as a fallback. Falsey answers, including a successful tool result of
+      <code>None</code>, are returned unchanged.
+    </ApiField>
+  </ApiFields>
+</ApiSection>
+
+<ApiCallout label="Status and error handling">
+  Reading does not wait for completion or check task status. Use
+  <code>task.raise_for_status().get_output()</code> to reject failed/canceled tasks;
+  inspect <code>task.state</code> when your application requires completion.
+  Tool error details remain available on the full <code>ToolOutput</code> through
+  <code>get_last_part()</code> or <code>get_last_part_content()</code>.
+</ApiCallout>
+
+```python
+missing = object()
+value = task.raise_for_status().get_output(missing)
+if value is missing:
+    print("No answer in the latest item", task.state)
+else:
+    print(value)  # Includes valid 0, False, empty collections, and None.
+```
+
+</ApiReference>
+
 #### Task.get_last_part_content
 
 <ApiReference
@@ -2871,7 +2979,9 @@ Create a standalone `infer` part without constructing a message or task. This de
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py#L359"
 >
 
-Read the content of the final part on the cached most recent message or artifact. This is the concise result accessor used throughout examples and transport conformance tests.
+Read the content of the final part on the cached most recent message or artifact,
+including inputs, errors, and previews. Use `get_output()` for answer content with
+successful tool results unwrapped, or `get_last_part()` to retain the part type.
 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Task get_last_part_content return value">
@@ -2886,15 +2996,15 @@ Read the content of the final part on the cached most recent message or artifact
 <ApiSection title="Task example">
 
 ```python
-from protolink import Message, Task
+from protolink import Task
 
-task = Task.create(Message.user("What's the weather in New York?"))
+task = Task.create("What's the weather in New York?")
 
 task.begin()
 task.complete("It's 22°C and sunny in New York.")
 
 print(task.is_terminal)  # True
-print(task.get_last_part_content())  # "It's 22°C and sunny in New York."
+print(task.raise_for_status().get_output())  # "It's 22°C and sunny in New York."
 ```
 
 </ApiSection>

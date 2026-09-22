@@ -11,6 +11,7 @@ const sidebars = {
         'concept',
         'whitepaper',
         'getting-started',
+        'progressive-control',
         'cli',
         'devtools',
         {

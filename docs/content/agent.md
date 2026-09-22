@@ -11,6 +11,15 @@ import registryStatusCard from '@site/assets/registry_status_card.png';
 
 # Agents
 
+## Convenience methods
+
+Start with `invoke` or `ask`, then add `budget=RunBudget(...)` or `context=RunContext(...)`.
+`start_run(prompt_or_task)` returns a `RunHandle` for chunks, events, reports, and cancellation.
+`add_tools(iterable)` registers collections; `await add_mcp(...)` discovers selected MCP tools.
+`peer(target)` binds a remote agent, and `invoke_typed(prompt, ResponseModel)` validates structured answers.
+See [Progressive control](progressive-control.md) for signatures, examples, precedence, and failure behavior.
+
+
 Agents are the core building blocks in Protolink.
 
 For optional `Assistant`, `CodeAssistant`, and `EchoAgent` classes, see [Built-in Agents](builtin-agents.md).
@@ -885,7 +894,10 @@ Return an immutable snapshot of task IDs currently registered for live execution
     part_type: Literal["tool_call", "infer"] = "infer",
     tool_name: str | None = None,
     tool_args: dict[str, Any] | None = None,
-    session_id: str = "invocation_session_id",
+    session_id: str | None = None,
+    *,
+    budget: RunBudget | None = None,
+    context: RunContext | None = None,
 ) -> Any`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
 
 Create a one-step task, process it through <code>run_task()</code>, check its status, and return only the final response part's content. This includes active-task registration, cancellation, and configured persistence for custom handlers.
@@ -895,7 +907,9 @@ Create a one-step task, process it through <code>run_task()</code>, check its st
   <ApiField name="part_type" type={'Literal["tool_call", "infer"]'} defaultValue={'"infer"'}>Choose an LLM inference part or an explicit registered-tool call.</ApiField>
   <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name in tool-call mode. Omission becomes an empty name, producing a failed task and <code>TaskExecutionError</code>.</ApiField>
   <ApiField name="tool_args" type="dict[str, Any] | None" defaultValue="None">Keyword arguments encoded into the tool-call part.</ApiField>
-  <ApiField name="session_id" type="str" defaultValue={'"invocation_session_id"'}>Conversation-state partition attached to task metadata. The stable default shares history when conversation state is enabled; pass a distinct ID for each conversation.</ApiField>
+  <ApiField name="session_id" type="str | None" defaultValue="None">Explicit conversation partition. Otherwise use the context session or <code>invocation_session_id</code>.</ApiField>
+  <ApiField name="budget" type="RunBudget | None" defaultValue="None">Copied run limits overriding the supplied context budget.</ApiField>
+  <ApiField name="context" type="RunContext | None" defaultValue="None">Copied tracing, permission, and run controls; explicit session and budget take precedence.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="invoke return value"><ApiField name="response" type="Any">Final response part content, including <code>ToolOutput</code> for explicit tool calls. Empty strings, zero, false, and empty containers are preserved. Returns <code>"No response generated"</code> only when there is no new response part or its content is <code>None</code>.</ApiField></ApiFields></ApiSection>
@@ -915,7 +929,9 @@ Create a one-step task, process it through <code>run_task()</code>, check its st
     k: int | None = None,
     where: dict[str, Any] | None = None,
     citations: bool = True,
-    session_id: str = "ask_session_id",
+    session_id: str | None = None,
+    budget: RunBudget | None = None,
+    context: RunContext | None = None,
 ) -> RAGAnswer`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
 
 Run deterministic retrieve-then-answer through <code>run_task()</code> and the Agent's normal task,
@@ -929,7 +945,9 @@ before the first model call.
   <ApiField name="k" type="int | None" defaultValue="None">Maximum hits per selected source. Omission uses each source's <code>default_k</code>.</ApiField>
   <ApiField name="where" type="dict[str, Any] | None" defaultValue="None">Metadata filter passed to every selected source.</ApiField>
   <ApiField name="citations" type="bool" defaultValue="True">Request bracketed evidence labels and retain structured Citation values. When false, hits are still returned but <code>RAGAnswer.citations</code> is empty.</ApiField>
-  <ApiField name="session_id" type="str" defaultValue={'"ask_session_id"'}>Conversation-state partition attached to the generated task. Pass a distinct ID for each conversation when state is enabled.</ApiField>
+  <ApiField name="session_id" type="str | None" defaultValue="None">Explicit conversation partition. Otherwise use the context session or <code>ask_session_id</code>.</ApiField>
+  <ApiField name="budget" type="RunBudget | None" defaultValue="None">Copied run limits overriding the supplied context budget.</ApiField>
+  <ApiField name="context" type="RunContext | None" defaultValue="None">Copied tracing, permission, and run controls; explicit session and budget take precedence.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="ask return value">
@@ -1186,7 +1204,10 @@ Blocking form of <code>Agent.run_task()</code>. Runs the handler under active-ta
     part_type: Literal["tool_call", "infer"] = "infer",
     tool_name: str | None = None,
     tool_args: dict[str, Any] | None = None,
-    session_id: str = "invocation_session_id",
+    session_id: str | None = None,
+    *,
+    budget: RunBudget | None = None,
+    context: RunContext | None = None,
 ) -> Any`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
 Blocking form of <code>Agent.invoke()</code>. Arguments, final-part content, and <code>TaskExecutionError</code> behavior match the async method; the wrapper runs the coroutine with <code>asyncio.run()</code>.
 
@@ -1196,7 +1217,9 @@ Blocking form of <code>Agent.invoke()</code>. Arguments, final-part content, and
     <ApiField name="part_type" type={'Literal["tool_call", "infer"]'} defaultValue={'"infer"'}>Select direct inference or an explicit tool call. Other values are rejected by <code>Agent.invoke()</code>.</ApiField>
     <ApiField name="tool_name" type="str | None" defaultValue="None">Registered tool name for tool-call mode. Omission produces a failed tool-not-found task and raises <code>TaskExecutionError</code>.</ApiField>
     <ApiField name="tool_args" type="dict[str, Any] | None" defaultValue="None">Keyword arguments placed in the generated tool-call Part. <code>None</code> and an empty mapping are normalized to an empty argument mapping.</ApiField>
-    <ApiField name="session_id" type="str" defaultValue={'"invocation_session_id"'}>Session identifier written to task metadata before execution. The stable default shares conversation state across sequential invocations when conversation persistence is enabled.</ApiField>
+  <ApiField name="session_id" type="str | None" defaultValue="None">Explicit conversation partition. Otherwise use the context session or <code>invocation_session_id</code>.</ApiField>
+  <ApiField name="budget" type="RunBudget | None" defaultValue="None">Copied run limits overriding the supplied context budget.</ApiField>
+  <ApiField name="context" type="RunContext | None" defaultValue="None">Copied tracing, permission, and run controls; explicit session and budget take precedence.</ApiField>
   </ApiFields>
 </ApiSection>
 
@@ -1211,7 +1234,9 @@ Blocking form of <code>Agent.invoke()</code>. Arguments, final-part content, and
     k: int | None = None,
     where: dict[str, Any] | None = None,
     citations: bool = True,
-    session_id: str = "ask_session_id",
+    session_id: str | None = None,
+    budget: RunBudget | None = None,
+    context: RunContext | None = None,
 ) -> RAGAnswer`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/sync.py">
 
 Blocking form of <code>Agent.ask()</code> with the same retrieval, filter,
@@ -1706,7 +1731,7 @@ When an agent is initialized with the `state` parameter, it tracks internal stat
 
 :::tip[Session IDs]
 
-`invoke()` and `sync.invoke()` default to `session_id="invocation_session_id"`; `ask()` and `sync.ask()` use `"ask_session_id"`. Each method reuses its default conversation when `state=["conversation"]` is enabled. Pass an explicit `session_id` for every independent conversation, especially in applications serving multiple users. Use the same explicit ID across `invoke()` and `ask()` when they should share history.
+When neither an explicit session nor a context session is supplied, `invoke()` and `sync.invoke()` use `"invocation_session_id"`; `ask()` and `sync.ask()` use `"ask_session_id"`. Each method reuses its default conversation when `state=["conversation"]` is enabled. Pass an explicit `session_id` for every independent conversation, especially in applications serving multiple users. Use the same explicit ID across `invoke()` and `ask()` when they should share history.
 
 If no `session_id` is provided in the task metadata (for non-invoke calls), the agent falls back to using the `task.id`, effectively making that specific task stateless unless further responses are sent to it.
 

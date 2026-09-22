@@ -21,7 +21,7 @@ Welcome to the Protolink documentation.
 
 This site provides an overview of the framework, its concepts, and how to use it in your projects.
 
-_Documentation version: **0.7.2** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
+_Documentation version: **0.7.3** ([PyPI](https://pypi.org/project/protolink/) | [Changelog](changelog))._
 
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/protolink)](https://pypi.org/project/protolink/)

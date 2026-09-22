@@ -1,6 +1,6 @@
 """Protolink 0.6.3 run reports, replay, assertions, and redaction.
 
-``RunRecorder`` turns a live application stream into a durable ``RunReport``.
+``Agent.start_run`` records a live application stream as a durable ``RunReport``.
 ``RunReplay`` and assertion helpers make the same report useful for CLI UIs,
 debug snapshots, and golden-run integration tests.
 
@@ -12,15 +12,14 @@ Run it with:
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 from protolink import (
     Agent,
     AgentCard,
     RedactionPolicy,
     RunContext,
-    RunRecorder,
     RunReplay,
-    Task,
     assert_budget_under,
     assert_no_denied_actions,
     assert_run_events,
@@ -40,19 +39,14 @@ async def main() -> None:
         llm=create_llm("mock", default_response="reportable response"),
         verbosity=0,
     )
-    task = Task.create_infer(prompt="produce a concise response")
     context = RunContext(
         run_id="run_v063_report",
         session_id="session_v063_report",
         agent_chain=["example-client"],
     )
-    context.attach_to_task(task)
-
-    recorder = RunRecorder(context=context)
-    async for event in agent.handle_task_streaming(task):
-        await recorder.record_task_event(event)
-
-    report = recorder.to_report(metadata={"api_key": "secret-demo-key"})
+    result = await agent.start_run("produce a concise response", context=context).result()
+    report = replace(result.report, metadata={"api_key": "secret-demo-key"})
+    # Use RunRecorder directly when adapting an application-owned event stream.
     replay = RunReplay(report.to_dict())
 
     assert_run_events(

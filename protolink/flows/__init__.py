@@ -26,23 +26,31 @@ All flow primitives implement the :class:`Flow` abstract contract, guaranteeing 
 behavior. Because of this uniformity, flows are highly composable. A `Graph` can utilize an `Pipeline` as a
 computational Node, which can subsequently branch execution using a `Router`.
 
-Integration
+Convenience
 -----------
-To construct entirely autonomous microservices out of predefined flows, wrap any instantiated flow sequence inside a
-:class:`StructuredAgent` (`protolink.agents.builtins.StructuredAgent`). The resulting agent automatically inherits
-network discovery and exposes the flow through the configured ProtoLink transports.
+Use ``flow.invoke(prompt)`` for final content, or ``execute(task)`` for complete task
+history. ``Step`` adapts a Task-to-Task callable, ``ToolStep`` executes a registered
+tool through its agent, and ``RepeatUntil`` bounds repetition by completion checks.
 """
 
 from .base import Flow
 from .graph import Graph
+from .limits import WorkflowLimitError
 from .parallel import Parallel
 from .pipeline import Pipeline
+from .responses import StructuredResponseError
 from .router import Router
+from .steps import RepeatUntil, Step, ToolStep
 
 __all__ = [
     "Flow",
     "Graph",
     "Parallel",
     "Pipeline",
+    "RepeatUntil",
     "Router",
+    "Step",
+    "StructuredResponseError",
+    "ToolStep",
+    "WorkflowLimitError",
 ]

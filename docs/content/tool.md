@@ -8,6 +8,16 @@ import ApiReference, {
 
 # Tools
 
+## Register a collection or MCP server
+
+`agent.add_tools(iterable)` applies ordinary `add_tool` registration to tools and typed functions.
+`await agent.add_mcp(command=..., args=..., include=[...], prefix="...")` discovers and registers
+selected stdio tools; pass `url=...` for SSE or a configured `MCPToolAdapter` for full control.
+Blocking scripts use `agent.sync.add_mcp(...)`. The adapter also exposes `list_tools_async` and
+`get_tools_async`. See [collection and MCP registration](progressive-control.md#register-collections-and-mcp-tools)
+for collision handling, discovery side effects, and connection ownership.
+
+
 See [Built-in Tools](builtin-tools.md) for the complete built-in catalog.
 [Execution, approvals, and recovery](execution-tools.md) covers run handles, approval brokers, and completion checks.
 

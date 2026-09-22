@@ -1,23 +1,15 @@
-"""Runtime Transport Example - Zero-Overhead Multi-Agent Collaboration.
+"""Communicate through runtime:// endpoints without opening network ports.
 
-This script demonstrates how to leverage `RuntimeTransport` to orchestrate
-communication between completely isolated agent instances within the same OS process.
-
-Unlike `HTTPTransport` or `WebSocketTransport`, which serialize data over physical
-network sockets, `RuntimeTransport` mimics network abstractions (using `runtime://` URIs)
-while performing direct, in-memory object passing. This enables developers to build,
-test, and iterate on complex multi-agent flows without the latency or complexity
-of standing up genuine HTTP servers, while ensuring the agents remain structurally
-compatible with distributed environments later.
+AgentGroup manages readiness and cleanup. Task serialization preserves the
+same boundary used by distributed transports.
 """
 
 from __future__ import annotations
 
 import asyncio
 
-from protolink.agents import Agent
+from protolink import Agent, AgentGroup
 from protolink.models import AgentCard, Message, Task
-from protolink.transport import RuntimeTransport
 
 
 class AssistantAgent(Agent):
@@ -75,18 +67,7 @@ class TranslatorAgent(Agent):
 
 
 async def main() -> None:
-    """Orchestrate the multi-agent lifecycle and demonstrate zero-overhead RPCs.
-
-    This function acts as the central control plane:
-    1. It instantiates two completely disjoint agents (`assistant` and `translator`).
-    2. It assigns each a `RuntimeTransport` bound to a unique `runtime://` URI.
-    3. It invokes `.start(background=True)` on both agents, offloading their server
-       lifecycles to isolated background threads.
-    4. It demonstrates the ability for the `assistant` to perform a remote procedure
-       call (`call_agent`) directly to the `translator`'s URI using the shared,
-       thread-safe memory registry dynamically populated by `RuntimeTransport`.
-    5. It tears down the background threads synchronously using `.stop()`.
-    """
+    """Call a local peer through the runtime transport with managed lifecycle."""
     print("=" * 50)
     print("  RuntimeTransport Multi-Agent Demo")
     print("=" * 50)
@@ -99,7 +80,7 @@ async def main() -> None:
             description="A helpful assistant",
             url="runtime://assistant",
         ),
-        transport=RuntimeTransport(url="runtime://assistant"),
+        transport="runtime",
     )
 
     translator = TranslatorAgent(
@@ -108,17 +89,11 @@ async def main() -> None:
             description="Translates to pig latin",
             url="runtime://translator",
         ),
-        transport=RuntimeTransport(url="runtime://translator"),
+        transport="runtime",
     )
 
-    # Boot the servers (which internally mounts the transports)
-    assistant.start(background=True)
-    translator.start(background=True)
-    await asyncio.sleep(0.2)
-
-    print(f"\n📋 Active runtime transports: {list(RuntimeTransport._registry.keys())}")
-
-    try:
+    # Start, await readiness, and clean up as one owned group.
+    async with AgentGroup([assistant, translator]):
         # Agent-to-agent communication
         print("\n--- Assistant → Translator ---")
         task = Task.create(Message.user("Hello world"))
@@ -131,10 +106,6 @@ async def main() -> None:
         print(f"Found: {card.name} - {card.description}")
 
         print("\n✅ Demo complete!")
-    finally:
-        # Shutdown
-        assistant.stop()
-        translator.stop()
 
 
 if __name__ == "__main__":

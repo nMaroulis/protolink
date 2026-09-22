@@ -15,12 +15,14 @@ Example:
     >>> result = await client.send_task("http://localhost:8010", task)
 """
 
+from __future__ import annotations
+
 import asyncio
 import queue
 import threading
 import time
 from collections.abc import AsyncIterator, Iterator
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from protolink.a2a.v1 import A2AClientError, A2AInterface, A2AJSONRPCClientAdapter
 from protolink.llms.compaction import HistoryCompactionStrategy
@@ -37,6 +39,10 @@ from protolink.models import (
 )
 from protolink.transport import Transport, TransportRemoteError, get_transport
 from protolink.types import TransportType
+
+if TYPE_CHECKING:
+    from protolink.client.peer import AgentPeer
+    from protolink.client.registry import RegistryClient
 
 
 class AgentClient:
@@ -77,6 +83,23 @@ class AgentClient:
         >>> task = Task.create_infer(prompt="Hello")
         >>> result = client.sync.send_task("http://agent:8001", task)
     """
+
+    def peer(
+        self,
+        target: str | AgentCard,
+        *,
+        registry: RegistryClient | None = None,
+        protocol: Literal["auto", "protolink", "a2a"] = "auto",
+    ) -> AgentPeer:
+        """Bind a remote URL/card or unique registry name without performing I/O.
+
+        The peer supplies invoke, invoke_typed, call_tool, run_task, and sync
+        equivalents using this client's configured transport and credentials.
+        Pass registry only when resolving names instead of URLs or cards.
+        """
+        from protolink.client.peer import AgentPeer
+
+        return AgentPeer(self, target, registry=registry, protocol=protocol)
 
     TASK_REQUEST = ClientRequestSpec(
         name="send_task",
