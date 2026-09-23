@@ -34,12 +34,16 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.7.4] - Unreleased
+## [0.7.4] - 2026-09-24
+
+:::note Latest Release
 
 MCP tools now preserve complete results and their original JSON schemas, report
 tool failures correctly, and support Streamable HTTP with optional connection reuse.
 Agent setup now supports names, model strings, and initial tools, with explicit
 network endpoints and smaller provider-specific installations. This shows a focus on progressive control and simple and intuitive API.
+
+:::note
 
 ### Added
 
@@ -111,7 +115,7 @@ network endpoints and smaller provider-specific installations. This shows a focu
 
 ## [0.7.3] - 2026-09-22
 
-:::note Latest Release
+:::note Release Summary
 
 This release adds simpler APIs for creating and reading tasks, registering tools, discovering MCP tools, calling peers, streaming runs, and composing workflows. Optional budgets, run context, typed responses, and bounded acceptance checks bring more control to those same APIs. Updated documentation and a runnable example show how to start with defaults and introduce explicit configuration as your application grows.
 

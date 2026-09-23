@@ -317,7 +317,7 @@ answer = await agent.invoke(
 
 context = RunContext(
     session_id="planning",
-    trace_id="release-0.7.3",
+    trace_id="release-0.7.4",
     permissions={"filesystem.write": "deny"},
 )
 answer = await agent.invoke("Review the plan", context=context)

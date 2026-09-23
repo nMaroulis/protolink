@@ -112,7 +112,7 @@ async def main(*, mcp: bool = False) -> None:
     measurement = await measurements.invoke("Find a measurement", budget=RunBudget(max_tool_calls=3))
     print("Accepted measurement:", measurement.result)
 
-    agent.llm = create_llm("mock", default_response='{"version":"0.7.3","steps":["test","document"]}')
+    agent.llm = create_llm("mock", default_response='{"version":"0.7.4","steps":["test","document"]}')
     plan = await agent.invoke_typed("Prepare a release plan", ReleasePlan)
     print("Typed response:", plan.version, plan.steps)
     # max_attempts=2 explicitly permits one validation repair, which may rerun tools.
