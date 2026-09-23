@@ -13,8 +13,9 @@ import pytest
 
 pytest.importorskip("mcp")
 
-import httpx
-from mcp.server.fastmcp import FastMCP
+import httpx2
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult, ListToolsResult, TextContent
 from mcp.types import Tool as MCPTool
 
@@ -31,7 +32,7 @@ def server(monkeypatch):
     session = SimpleNamespace(
         initialize=AsyncMock(),
         list_tools=AsyncMock(
-            return_value=ListToolsResult(tools=[MCPTool(name="lookup", inputSchema={"type": "object"})])
+            return_value=ListToolsResult(tools=[MCPTool(name="lookup", input_schema={"type": "object"})])
         ),
         call_tool=AsyncMock(return_value=text_result()),
     )
@@ -46,10 +47,7 @@ def server(monkeypatch):
         state.opens += 1
         state.connections.append((args, kwargs))
         try:
-            if "http_client" in kwargs:
-                yield None, None, lambda: "session-id"
-            else:
-                yield None, None
+            yield None, None
         finally:
             state.closes += 1
 
@@ -96,7 +94,7 @@ async def test_all_call_paths_preserve_rich_results(server, transport, form):
         (text_result(""), ""),
         (text_result("ok"), "ok"),
         (CallToolResult(content=[]), None),
-        (CallToolResult(content=[], structuredContent={}), {"content": [], "structuredContent": {}, "isError": False}),
+        (CallToolResult(content=[], structured_content={}), {"content": [], "structuredContent": {}, "isError": False}),
         (
             CallToolResult.model_validate({"content": [{"type": "text", "text": "x", "annotations": {"priority": 0}}]}),
             {"content": [{"type": "text", "text": "x", "annotations": {"priority": 0}}], "isError": False},
@@ -113,7 +111,7 @@ async def test_plain_text_compatibility_and_falsey_rich_values(server, result, e
 @pytest.mark.parametrize("form", ["native", "wrapped", "sync"])
 async def test_tool_errors_raise_with_full_result_without_retry(server, form):
     result = CallToolResult(
-        content=[TextContent(type="text", text="denied")], isError=True, structuredContent={"code": 7}
+        content=[TextContent(type="text", text="denied")], is_error=True, structured_content={"code": 7}
     )
     server.session.call_tool.return_value = result
     adapter = MCPToolAdapter(command="unused")
@@ -134,7 +132,7 @@ async def test_tool_errors_raise_with_full_result_without_retry(server, form):
 @pytest.mark.asyncio
 async def test_agent_task_records_mcp_failure_instead_of_success(server):
     server.session.call_tool.return_value = CallToolResult(
-        content=[TextContent(type="text", text="denied")], isError=True
+        content=[TextContent(type="text", text="denied")], is_error=True
     )
     agent = Agent(AgentCard(name="mcp", description="MCP test", url="runtime://mcp"), verbosity=0)
     await agent.add_mcp(MCPToolAdapter(command="unused"))
@@ -157,8 +155,8 @@ async def test_discovery_preserves_nullable_and_output_schemas_across_pages(serv
     }
     output = {"type": "object", "properties": {"count": {"type": "integer"}}, "required": ["count"]}
     server.session.list_tools.side_effect = [
-        ListToolsResult(tools=[MCPTool(name="lookup", inputSchema=schema, outputSchema=output)], nextCursor="page2"),
-        ListToolsResult(tools=[MCPTool(name="other", inputSchema={"type": "object"})]),
+        ListToolsResult(tools=[MCPTool(name="lookup", input_schema=schema, output_schema=output)], next_cursor="page2"),
+        ListToolsResult(tools=[MCPTool(name="other", input_schema={"type": "object"})]),
     ]
     adapter = MCPToolAdapter(command="unused")
     descriptors = await adapter.list_tools_async()
@@ -178,7 +176,7 @@ async def test_discovery_preserves_nullable_and_output_schemas_across_pages(serv
 
 @pytest.mark.asyncio
 async def test_repeated_page_cursor_fails_without_caching_partial_tools(server):
-    server.session.list_tools.return_value = ListToolsResult(tools=[], nextCursor="same")
+    server.session.list_tools.return_value = ListToolsResult(tools=[], next_cursor="same")
     adapter = MCPToolAdapter(command="unused")
     with pytest.raises(ValueError, match="repeated pagination"):
         await adapter.list_tools_async()
@@ -202,7 +200,7 @@ async def test_mcp_schema_defaults_recursive_refs_and_validation_survive_registr
         "properties": {"root": {"$ref": "#/$defs/node"}},
         "required": ["root"],
     }
-    server.session.list_tools.return_value = ListToolsResult(tools=[MCPTool(name="lookup", inputSchema=schema)])
+    server.session.list_tools.return_value = ListToolsResult(tools=[MCPTool(name="lookup", input_schema=schema)])
     adapter = MCPToolAdapter(command="unused")
     agent = Agent(AgentCard(name="mcp", description="MCP test", url="runtime://mcp"), verbosity=0)
     tool = (await agent.add_mcp(adapter, prefix="remote_"))[0]
@@ -286,9 +284,10 @@ def test_agent_sync_http_registration_forwards_auth_and_transport(server, transp
 
 
 @pytest.mark.asyncio
-async def test_real_streamable_http_discovery_call_and_error(monkeypatch):
+@pytest.mark.parametrize("anticipated", [False, True])
+async def test_real_streamable_http_discovery_call_and_error(monkeypatch, anticipated):
     """Exercise actual MCP framing and SDK session management against an ASGI server."""
-    server = FastMCP("adapter-test", stateless_http=True, json_response=True)
+    server = MCPServer("adapter-test")
 
     @server.tool()
     def count(query: str | None = None) -> dict[str, object]:
@@ -296,31 +295,41 @@ async def test_real_streamable_http_discovery_call_and_error(monkeypatch):
 
     @server.tool()
     def fail() -> str:
-        raise ValueError("intentional MCP failure")
+        error = ToolError if anticipated else ValueError
+        raise error("intentional MCP failure")
 
-    app = server.streamable_http_app()
-    client_class = httpx.AsyncClient
+    @server.tool()
+    def plain() -> CallToolResult:
+        return text_result("plain text")
+
+    app = server.streamable_http_app(stateless_http=True, json_response=True)
+    client_class = httpx2.AsyncClient
     requests = []
 
     async def record(request):
         requests.append(request)
 
     def local_client(**kwargs):
-        return client_class(transport=httpx.ASGITransport(app=app), event_hooks={"request": [record]}, **kwargs)
+        return client_class(transport=httpx2.ASGITransport(app=app), event_hooks={"request": [record]}, **kwargs)
 
-    monkeypatch.setattr(mcp_adapter.httpx, "AsyncClient", local_client)
+    monkeypatch.setattr(mcp_adapter.httpx2, "AsyncClient", local_client)
     adapter = MCPToolAdapter(
         "streamable_http", url="http://localhost:8000/mcp", headers={"Authorization": "Bearer test"}
     )
-    async with server.session_manager.run():
+    async with app.router.lifespan_context(app):
+        message = "intentional MCP failure" if anticipated else "Error executing tool fail"
         async with adapter.session():
             tools = {tool.name: tool for tool in await adapter.get_tools_async()}
             result = await tools["count"](query=None)
             assert result["structuredContent"] == {"count": 7, "query": None}
-            with pytest.raises(MCPToolError, match="intentional MCP failure"):
+            assert await tools["plain"]() == "plain text"
+            with pytest.raises(MCPToolError, match=message) as raised:
                 await tools["fail"]()
+            assert raised.value.result["isError"] is True
+            if not anticipated:
+                assert "intentional MCP failure" not in str(raised.value.result)
         # An error escaping the context must retain its type after SDK cleanup.
-        with pytest.raises(MCPToolError, match="intentional MCP failure"):
+        with pytest.raises(MCPToolError, match=message):
             async with adapter.session():
                 await tools["fail"]()
     assert requests
@@ -331,8 +340,9 @@ async def test_real_streamable_http_discovery_call_and_error(monkeypatch):
 async def test_real_stdio_session_reuses_process_and_recovers_after_tool_error(tmp_path):
     script = tmp_path / "server.py"
     script.write_text(
-        "from mcp.server.fastmcp import FastMCP\n"
-        "server = FastMCP('session-test')\n"
+        "from mcp.server.mcpserver import MCPServer\n"
+        "from mcp.server.mcpserver.exceptions import ToolError\n"
+        "server = MCPServer('session-test')\n"
         "calls = 0\n"
         "@server.tool()\n"
         "def count() -> dict[str, int]:\n"
@@ -341,7 +351,7 @@ async def test_real_stdio_session_reuses_process_and_recovers_after_tool_error(t
         "    return {'count': calls}\n"
         "@server.tool()\n"
         "def fail() -> str:\n"
-        "    raise ValueError('intentional failure')\n"
+        "    raise ToolError('intentional failure')\n"
         "server.run()\n"
     )
     adapter = MCPToolAdapter(command=sys.executable, args=[str(script)])
@@ -353,3 +363,47 @@ async def test_real_stdio_session_reuses_process_and_recovers_after_tool_error(t
                 assert (await tools["count"]())["structuredContent"] == {"count": 2}
                 await tools["fail"]()
         assert (await tools["count"]())["structuredContent"] == {"count": 1}
+
+
+@pytest.mark.asyncio
+async def test_real_legacy_sse_session_preserves_auth_and_plain_text(unused_tcp_port):
+    """Legacy SSE remains usable with the SDK 2 HTTP client and server."""
+    import uvicorn
+
+    server = MCPServer("legacy-sse-test")
+
+    @server.tool()
+    def echo(text: str) -> CallToolResult:
+        return text_result(text)
+
+    app = server.sse_app()
+    authorizations = []
+
+    async def record_headers(scope, receive, send):
+        if scope["type"] == "http":
+            authorizations.append(dict(scope["headers"]).get(b"authorization"))
+        await app(scope, receive, send)
+
+    service = uvicorn.Server(
+        uvicorn.Config(record_headers, host="127.0.0.1", port=unused_tcp_port, log_level="critical", access_log=False)
+    )
+    task = asyncio.create_task(service.serve())
+    try:
+        async with asyncio.timeout(10):
+            while not service.started:
+                if task.done():
+                    await task
+                    pytest.fail("SSE server exited before startup")
+                await asyncio.sleep(0.01)
+            adapter = MCPToolAdapter(
+                "sse", url=f"http://127.0.0.1:{unused_tcp_port}/sse", headers={"Authorization": "Bearer test"}
+            )
+            async with adapter.session():
+                tools = {tool.name: tool for tool in await adapter.get_tools_async()}
+                assert await tools["echo"](text="first") == "first"
+                assert await tools["echo"](text="second") == "second"
+        assert authorizations and all(value == b"Bearer test" for value in authorizations)
+    finally:
+        service.should_exit = True
+        async with asyncio.timeout(10):
+            await task

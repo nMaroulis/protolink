@@ -275,6 +275,9 @@ One JSONL line represents one completed Agent task record. A `trace_id` is a cor
 
 Trace files can be observed while another process is appending to them. Blank or malformed lines are reported and skipped instead of making the whole source unreadable. An incomplete final line is treated as a partial write; it is ignored for the current page and can become visible after the writer completes it and the dashboard refreshes.
 
+The server reader also treats JSON deeper than 256 object or array levels as
+malformed, consistently across supported Python versions.
+
 Each server page has a byte and line scan budget, each detail record has a 16 MB safety limit, and span/event/JSON rendering is separately capped. If one physical line is larger than a scan page, the reader returns an opaque continuation cursor and skips across that line over bounded requests, so an unusually large payload cannot make every older record unreachable. The source diagnostics show malformed lines, oversized records, partial tails, and pages that reached a scan budget.
 
 :::caution[Local traces can contain application data]

@@ -141,8 +141,13 @@ ty check .
 Run tests with:
 
 ```bash
-pytest -v tests
+uv pip install -e ".[test,mcp]"
+python -m pytest -v tests
 ```
+
+The test extra includes `pytest-asyncio`; installing `pytest` alone is not enough
+to run the async tests. Pytest checks for that plugin before collecting tests.
+The `mcp` extra enables the MCP 2 adapter and integration tests.
 
 If your change requires additional test fixtures or helper utilities, place them in the appropriate `tests/` module.
 

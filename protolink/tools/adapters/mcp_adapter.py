@@ -43,7 +43,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, ClassVar
 
 try:
-    import httpx
+    import httpx2
     from jsonschema import ValidationError
     from jsonschema.validators import validator_for
     from mcp import ClientSession
@@ -119,8 +119,8 @@ def _normalize_result(tool_name: str, result: CallToolResult) -> Any:
     # exclude_unset preserves nulls inside structuredContent and extension data.
     payload = result.model_dump(mode="json", by_alias=True, exclude_unset=True)
     payload["content"] = payload.get("content", [])
-    payload["isError"] = result.isError
-    if result.isError:
+    payload["isError"] = result.is_error
+    if result.is_error:
         raise MCPToolError(tool_name, payload)
     if payload.keys() <= {"content", "isError"}:
         content = payload["content"]
@@ -149,11 +149,11 @@ def _parse_tool_arguments(tool: Tool) -> dict[str, type]:
         Union, nullable, referenced, and unsupported schemas use ``typing.Any``.
         This shallow mapping is for inspection only; the original schema is retained.
     """
-    if not tool.inputSchema:
+    if not tool.input_schema:
         return {}
 
     args: dict[str, type] = {}
-    properties = tool.inputSchema.get("properties", {})
+    properties = tool.input_schema.get("properties", {})
 
     type_map = {
         "integer": int,
@@ -348,9 +348,11 @@ class MCPToolAdapter(BaseTool):
             else:
                 assert self.url is not None
                 client = await stack.enter_async_context(
-                    httpx.AsyncClient(headers=self.headers, timeout=httpx.Timeout(30, read=300), follow_redirects=False)
+                    httpx2.AsyncClient(
+                        headers=self.headers, timeout=httpx2.Timeout(30, read=300), follow_redirects=False
+                    )
                 )
-                read, write, _ = await stack.enter_async_context(streamable_http_client(self.url, http_client=client))
+                read, write = await stack.enter_async_context(streamable_http_client(self.url, http_client=client))
             session = await stack.enter_async_context(ClientSession(read, write))
             await session.initialize()
             yield session
@@ -464,14 +466,14 @@ class MCPToolAdapter(BaseTool):
                         {
                             "name": tool.name,
                             "description": tool.description or "",
-                            "input_schema": tool.inputSchema,
+                            "input_schema": tool.input_schema,
                             "input_types": _parse_tool_arguments(tool),
-                            "output_schema": tool.outputSchema,
-                            "output": tool.outputSchema,
+                            "output_schema": tool.output_schema,
+                            "output": tool.output_schema,
                             "callable": self._make_callable(tool.name),
                         }
                     )
-                cursor = result.nextCursor
+                cursor = result.next_cursor
                 if not cursor:
                     break
                 if cursor in seen_cursors:

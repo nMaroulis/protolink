@@ -65,6 +65,15 @@ network endpoints and smaller provider-specific installations. This shows a focu
 
 ### Fixed
 
+- Migrate MCP discovery, tool calls, and HTTP sessions to MCP SDK 2.2, including
+  snake_case Python fields, `httpx2`, and the two-stream transport context.
+  Public result dictionaries retain MCP wire names such as `structuredContent`
+  and `isError`. Server examples and integration tests now use `MCPServer`.
+- Require the `pytest-asyncio` test plugin at collection time so incomplete test
+  installations report the missing dependency directly. Test setup documentation
+  includes the extras needed for pytest 9.1 and MCP integration tests.
+- Bound trace JSON nesting explicitly to 256 container levels, preserving the
+  malformed-record safeguard on Python 3.14 without relying on decoder recursion limits.
 - MCP responses with `isError=True` raise `MCPToolError` instead of returning successful
   text. The exception retains the tool name and complete result; task execution records
   a failed tool output without automatically retrying the call.

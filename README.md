@@ -106,7 +106,7 @@ agent = Agent(name="helper", url="http://127.0.0.1:8010", transport="http", llm=
 
 agent.add_tool(add)
 
-agent.start() # That's it !
+agent.start()  # That's it !
 ```
 
 Pass configured objects to the same constructor when you need more control:

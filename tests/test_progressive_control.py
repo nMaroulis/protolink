@@ -417,7 +417,7 @@ async def test_mcp_async_discovery_selection_and_prefix_keep_remote_names(monkey
                     MCPTool(
                         name="echo",
                         description="echo",
-                        inputSchema={
+                        input_schema={
                             "type": "object",
                             "properties": {"text": {"type": "string"}},
                             "required": ["text"],

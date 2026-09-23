@@ -1205,13 +1205,20 @@ for tool in mcp_tools:
 
 Here's a complete example showing how to create an MCP server and use it with Protolink:
 
+The `protolink[mcp]` extra uses MCP SDK 2.2 or newer. Server examples use
+`MCPServer`, the SDK 2 replacement for `FastMCP`. Python SDK fields use snake_case;
+ProtoLink's rich result dictionaries retain the MCP wire names, including
+`structuredContent` and `isError`. In server tools, raise
+`mcp.server.mcpserver.exceptions.ToolError` for an expected error whose message
+should reach the caller; the SDK hides the details of unexpected exceptions.
+
 #### MCP Server (mcp_server.py)
 
 ```python
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 # Create the MCP server
-mcp = FastMCP(name="math-tools", instructions="Simple MCP server with math tools")
+mcp = MCPServer(name="math-tools", instructions="Simple MCP server with math tools")
 
 
 @mcp.tool()

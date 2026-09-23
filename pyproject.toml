@@ -45,6 +45,7 @@ allowed-unresolved-imports = [
     "grpc_health.**",
     "grpc_reflection.**",
     "huggingface_hub.**",
+    "httpx2.**",
     "llama_cpp.**",
     "mcp.**",
     "jsonschema.**",
@@ -108,7 +109,7 @@ llms = [
 
 mcp = [
     "mcp>=2.2.0",
-    "httpx>=0.28.1",
+    "httpx2>=2.5.0",
     "jsonschema>=4.20.0",
     "referencing>=0.28.4",
 ]
@@ -182,6 +183,7 @@ build = [
 ]
 
 [tool.pytest.ini_options]
+required_plugins = ["pytest-asyncio>=1.4.0"]
 testpaths = ["tests"]
 pythonpath = ["."]
 python_files = "test_*.py"
