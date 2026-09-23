@@ -142,13 +142,31 @@ Configuration varies by backend, but the first successful model interaction foll
 1. **Install the relevant extras**:
 
    ```bash
-   # All supported LLM backends
-   uv add "protolink[llms]"
+   # Choose your provider
+   uv add "protolink[openai]"
    ```
 
 :::info[Choosing LLM extras]
 
-If you only need a subset of providers, install their SDKs directly instead of the `llms` extra, which installs every supported integration. For Ollama or an OpenAI-compatible server, `uv add protolink httpx` is enough for streaming; HTTPX is also included in `protolink[llms]` and `protolink[http]`. Core Protolink still requires only Pydantic.
+Each provider has a focused extra. Combine it with a transport as needed, for
+example `uv add "protolink[http,openai]"`. The existing `protolink[llms]` bundle
+still installs every integration, including local llama.cpp bindings. Core
+ProtoLink requires only Pydantic; `mock` needs no extra.
+
+| Provider alias | Installation extra | Direct dependency |
+| --- | --- | --- |
+| `openai` | `protolink[openai]` | `openai` |
+| `anthropic` | `protolink[anthropic]` | `anthropic` |
+| `gemini` | `protolink[gemini]` | `google-genai` |
+| `huggingface` | `protolink[huggingface]` | `huggingface-hub` |
+| `deepseek` | `protolink[deepseek]` | `openai` |
+| `grok` | `protolink[grok]` | `httpx` |
+| `ollama` | `protolink[ollama]` | `httpx` |
+| `openai-compatible` | `protolink[openai-compatible]` | `httpx` |
+| `lmstudio` | `protolink[lmstudio]` | `httpx` |
+| `vllm` | `protolink[vllm]` | `httpx` |
+| `llama.cpp-server` | `protolink[llama-cpp-server]` | `httpx` |
+| `llama.cpp-local` | `protolink[llama-cpp-local]` | `llama-cpp-python` |
 
 :::
 
@@ -622,11 +640,16 @@ Each callable below keeps the scikit-learn-style layout: exact signature, explan
 >
 
 Create an LLM adapter without importing the selected provider until it is needed.
+Both `create_llm("ollama:qwen3:4b")` and
+`create_llm("ollama", model="qwen3:4b")` select the same model. Only the first
+colon separates provider and model; case, paths, and additional colons are kept.
+Do not combine an inline model with `model=`. `Agent(name="helper", llm="mock")`
+and `Agent(name="helper", llm="ollama:qwen3:4b")` use this same factory.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="create_llm parameters">
     <ApiField name="provider" type="str | LLMProvider" required>
-      Provider selector. Supported string values are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, <code>openai-compatible</code>, and <code>vllm</code>.
+      Provider alias or <code>provider:model</code> string. Supported aliases are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, <code>openai-compatible</code>, and <code>vllm</code>.
     </ApiField>
     <ApiField name="**kwargs" type="Any">
       Forwarded to the selected adapter constructor. Three factory-only keywords are also recognized:
@@ -649,7 +672,7 @@ Create an LLM adapter without importing the selected provider until it is needed
 <ApiSection title="Raises">
   <ApiFields ariaLabel="create_llm errors">
     <ApiField name="ValueError">
-      Raised when the provider string is unknown or <code>max_parse_failures</code> is outside the supported range.
+      Raised when the provider string is unknown or empty, an inline model is empty or also supplied through <code>model=</code>, or <code>max_parse_failures</code> is outside the supported range.
     </ApiField>
     <ApiField name="TypeError">
       Raised when <code>max_parse_failures</code> is not an integer. Boolean values are not accepted as integers for

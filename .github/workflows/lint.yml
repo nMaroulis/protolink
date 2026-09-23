@@ -118,5 +118,8 @@ jobs:
             llm=create_llm("mock", default_response="Installed successfully"),
         )
         assert agent.sync.invoke("Hello") == "Installed successfully"
+        simple = Agent(name="simple-wheel", llm="mock")
+        assert simple.card.url == "runtime://simple-wheel"
+        assert simple.sync.invoke("Hello") == "Unprocessed generic mock response"
         PY
         "$RUNNER_TEMP/protolink-wheel/bin/protolink" --version

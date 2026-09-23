@@ -59,13 +59,43 @@ High‑level ideas:
 
 ## Creating an Agent
 
-A minimal agent consists of three pieces:
+A name is enough for an embedded agent. Add a model and typed functions when you
+need inference and tools:
 
-1. An `AgentCard` describing the agent.
-2. A `Transport` implementation.
-3. An optional LLM and tools.
+```python
+from protolink import Agent
 
-Example:
+
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+
+agent = Agent(name="helper", llm="mock", tools=[add])
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
+```
+
+This generates a card with description `"Agent helper"` and URL `runtime://helper`,
+without creating a transport. Set `description=` or `url=` to customize the
+identity. The `llm` argument also accepts `"provider:model"` (for example,
+`"ollama:qwen3:4b"`) or a configured LLM object. See [LLMs](llm.md) for provider
+extras and credentials.
+
+For networking, supply the endpoint explicitly:
+
+```python
+agent = Agent(name="helper", transport="http", url="http://127.0.0.1:8000")
+```
+
+Network aliases require a compatible URL scheme and an explicit bind port.
+`Agent(name="helper", transport="http")` raises `ValueError` before initializing
+an LLM. Passing a configured transport instead lets its URL provide the default;
+an explicit `url=` can advertise a different public address. Secure binds need a
+configured transport with a TLS certificate and key. Construction does not start
+the server. Use `transport="runtime"` for in-process peers with unique names.
+
+For full identity metadata, pass an `AgentCard` or dictionary instead of
+`name=`, `description=`, and `url=`:
 
 ```python
 from protolink.agents import Agent
@@ -230,11 +260,11 @@ Protolink's `Agent` combines client and server functionality in a single class. 
   kind="class"
   path="protolink.agents.Agent"
   signature={`Agent(
-    card: AgentCard | dict[str, Any],
+    card: AgentCard | dict[str, Any] | None = None,
     transport: TransportType | Transport | None = None,
     registry: TransportType | Registry | RegistryClient | None = None,
     registry_url: str | None = None,
-    llm: LLM | None = None,
+    llm: LLM | str | None = None,
     system_prompt: str | None = None,
     storage: Storage | None = None,
     state: list[StateMode] | State | None = None,
@@ -243,6 +273,10 @@ Protolink's `Agent` combines client and server functionality in a single class. 
     logger: BaseLogger | None = None,
     discovery_ttl: int = 0,
     *,
+    name: str | None = None,
+    description: str | None = None,
+    url: str | None = None,
+    tools: Iterable[BaseTool | Callable[..., Any]] | None = None,
     override_system_prompt: bool = False,
     verbosity: Literal[0, 1, 2] = 1,
     expose_chat: bool = True,
@@ -263,8 +297,20 @@ Create the stable Agent facade and wire its identity, execution engine, communic
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Agent constructor parameters">
-    <ApiField name="card" type="AgentCard | dict[str, Any]" required>
-      Identity and capability metadata for this Agent. Dictionaries are normalized with <code>AgentCard.from_dict()</code>. The card URL is also used when ProtoLink must construct a transport from a short alias, so it must match the address or runtime URI at which peers can reach the Agent.
+    <ApiField name="card" type="AgentCard | dict[str, Any] | None" defaultValue="None">
+      Explicit identity and capability metadata. Dictionaries are normalized with <code>AgentCard.from_dict()</code>. Provide either a card or the identity shorthand below. Existing card-based transport behavior is preserved.
+    </ApiField>
+    <ApiField name="name" type="str | None" defaultValue="None">
+      Required non-empty name when <code>card</code> is omitted. Generates a card; cannot be combined with an explicit card.
+    </ApiField>
+    <ApiField name="description" type="str | None" defaultValue="None">
+      Description for a generated card, defaulting to <code>"Agent &lt;name&gt;"</code>. Cannot be combined with an explicit card.
+    </ApiField>
+    <ApiField name="url" type="str | None" defaultValue="None">
+      Advertised URL for a generated card. Without a transport, or with the runtime alias, defaults to <code>runtime://&lt;URL-encoded name&gt;</code>. Network aliases require a URL with a matching scheme, explicit port, and no path prefix. A configured transport supplies its own URL when omitted and permits a separate public address when supplied. Cannot be combined with an explicit card.
+    </ApiField>
+    <ApiField name="tools" type="Iterable[BaseTool | Callable[..., Any]] | None" defaultValue="None">
+      Initial functions or tool instances registered through <code>add_tools()</code>, preserving schemas, policy metadata, and skill registration. Registration does not execute the tools.
     </ApiField>
     <ApiField name="transport" type="TransportType | Transport | None" defaultValue="None">
       Inbound and outbound communication layer. A registered alias such as <code>"http"</code>, <code>"runtime"</code>, <code>"websocket"</code>, or <code>"grpc"</code> creates a transport with defaults derived from <code>card.url</code>. A concrete instance preserves its TLS, retry, limits, keepalive, metrics, and ownership configuration. <code>None</code> creates a local facade with no client or server.
@@ -275,8 +321,8 @@ Create the stable Agent facade and wire its identity, execution engine, communic
     <ApiField name="registry_url" type="str | None" defaultValue="None">
       Registry address used only when <code>registry</code> is a transport alias. Put advanced TLS and capacity settings on a configured registry transport and pass its <code>RegistryClient</code> instead.
     </ApiField>
-    <ApiField name="llm" type="LLM | None" defaultValue="None">
-      Optional language model used for explicit <code>infer</code> parts. Assignment calls <code>llm.validate_connection()</code> and uses its result to update <code>card.capabilities.has_llm</code>. Depending on the adapter, validation may contact a provider or local server during Agent construction.
+    <ApiField name="llm" type="LLM | str | None" defaultValue="None">
+      Optional language model used for explicit <code>infer</code> parts. Strings use <code>create_llm()</code> and accept provider aliases or <code>provider:model</code>. Pass an object for custom parameters, credentials, or server URLs. Assignment calls <code>llm.validate_connection()</code> and uses its result to update <code>card.capabilities.has_llm</code>. Depending on the adapter, validation may contact a provider or local server during Agent construction.
     </ApiField>
     <ApiField name="system_prompt" type="str | None" defaultValue="None">
       Agent-specific role and behavior instructions appended to ProtoLink's runtime prompt. Tool, delegation, flow, and action instructions are compiled separately. Set <code>override_system_prompt=True</code> only when the supplied text should replace that built-in blueprint.

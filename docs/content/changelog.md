@@ -38,9 +38,24 @@ uv add --upgrade protolink
 
 MCP tools now preserve complete results and their original JSON schemas, report
 tool failures correctly, and support Streamable HTTP with optional connection reuse.
+Agent setup now supports names, model strings, and initial tools, with explicit
+network endpoints and smaller provider-specific installations. This shows a focus on progressive control and simple and intuitive API.
 
 ### Added
 
+- `Agent(name=..., description=..., url=..., llm="provider:model", tools=[...])`
+  as an alternative to explicit card construction. Local agents default to a
+  `runtime://` identity without creating a transport. Network aliases require a
+  compatible URL and bind port; configured transports supply their own URL and
+  support a separate advertised address. Invalid shorthand endpoints fail before
+  provider initialization, including missing TLS server identity for secure binds.
+- Provider aliases and model strings on the `llm` property and `create_llm`.
+  Parsing preserves model-name case, paths, and additional colons such as Ollama
+  tags. Configured LLM instances and existing factory calls remain supported.
+- Provider-specific installation extras: `openai`, `anthropic`, `gemini`,
+  `huggingface`, `deepseek`, `grok`, `ollama`, `openai-compatible`, `lmstudio`,
+  `vllm`, `llama-cpp-server`, and `llama-cpp-local`. The `llms` bundle remains
+  available; hosted-provider extras do not pull in local llama.cpp bindings.
 - `streamable_http` transport for `MCPToolAdapter` and async/sync `Agent.add_mcp`,
   including configured HTTP headers. Existing URL-only registration retains legacy SSE.
 - `async with adapter.session()` to share one initialized connection across discovery
@@ -64,6 +79,10 @@ tool failures correctly, and support Streamable HTTP with optional connection re
 
 ### Changed
 
+- Treat an omitted transport or registry as normal local configuration, logging
+  at debug level. Constructor tools reuse `add_tools`; execution continues through
+  the existing `invoke`, `.sync`, and task APIs.
+- Update setup guides and provider dependency errors for the new shorthand and extras.
 - Document MCP result handling, schema validation, Streamable HTTP, and session lifetime.
 - Declare the adapter's HTTP and JSON Schema dependencies explicitly in the `mcp` extra.
 

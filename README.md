@@ -31,7 +31,7 @@ The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hoste
 ## Why ProtoLink?
 
 - **Pluggable by design** - compose an agent from independent modules instead of adopting a mandatory stack.
-- **A small, stable API** - string aliases cover the common path; concrete implementations expose full control when needed.
+- **Progressive control** - start with names and aliases, then configure or replace individual components through the same API.
 - **Local first, distributed when needed** - develop with no network or provider, then move the same task contract to HTTP, SSE JSON-RPC, WebSocket, or gRPC.
 - **Friendly to smaller models** - one-action-at-a-time inference, schema validation, JSON fallback, and deterministic flows reduce reliance on hidden prompt behavior.
 - **Explicit and inspectable** - tool calls, delegation, task state, policy decisions, approvals, runtime events, traces, and reports have typed representations.
@@ -52,29 +52,19 @@ uv add protolink
 Register an ordinary typed function and call it:
 
 ```python
-from protolink import Agent, AgentCard
-
-agent = Agent(
-    card=AgentCard(
-        name="calculator",
-        description="Adds numbers",
-        url="runtime://calculator",
-    ),
-    transport="runtime",
-    verbosity=0,
-)
+from protolink import Agent
 
 
-@agent.tool
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
 
 
+agent = Agent(name="calculator", tools=[add])
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-This example needs no model, API key, server, or network connection. The function name, docstring, and type hints become the tool's public metadata and argument schema. `@agent.tool()` also works; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
+This example needs no model, API key, server, or network connection. The function name, docstring, and type hints become the tool's public metadata and argument schema. `@agent.tool` and `@agent.tool()` also work; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
 
 Choose the result you need:
 
@@ -96,6 +86,55 @@ print(agent.sync.invoke("Say hello"))
 ```
 
 `invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect, and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
+
+## Progressive control
+
+Progressive control is central to ProtoLink's plug-and-play design: start with shortcuts, then configure or replace each component as needed. 
+
+> ProtoLink is built from the ground up around this philosophy: make it fast and simple to get started, with the API flexibility to take full control whenever you need it.
+
+Reuse `add` above:
+
+```python
+agent = Agent(name="helper", llm="gemini", tools=[add])
+```
+
+Let's build an Agent that comminicates through HTTP:
+
+```python
+agent = Agent(name="helper", url="http://127.0.0.1:8010", transport="http", llm="gemini")
+
+agent.add_tool(add)
+
+agent.start() # That's it !
+```
+
+Pass configured objects to the same constructor when you need more control:
+
+```python
+from protolink import AgentCard
+from protolink.llms.api import GeminiLLM
+from protolink.transport import HTTPTransport
+
+card = AgentCard(name="helper", description="A helpful agent", url="http://127.0.0.1:8000")
+llm = GeminiLLM(model="gemini-3.8-flash", model_params={"temperature": 0.2})
+transport = HTTPTransport(url=card.url, timeout=30)
+
+agent = Agent(card=card, llm=llm, transport=transport, tools=[add])
+```
+
+`card=card.to_dict()` works too, since card also accepts dictionaries. Mix defaults and configured objects independently,
+for example `Agent(name="helper", llm=llm)`, or supply your own implementations of
+LLM, tool, and transport interfaces. The same pattern extends to storage, state,
+knowledge, and observability; execution stays on `invoke`, `.sync`, and task APIs.
+
+These Gemini examples need `uv add "protolink[gemini]"` and `GEMINI_API_KEY` as an environment variable or pass api key directly into the constructor.
+Name-only agents need no transport; network aliases such as `transport="http"`
+require an explicit `url=` with a port. A configured transport can supply its own
+URL. Construction does not start a server.
+
+See the [progressive-control guide](docs/content/progressive-control.md) for
+component configuration, per-run budgets, and complete task control.
 
 ## Your first agent mesh
 
@@ -135,7 +174,7 @@ Agents register automatically, discover each other, and exchange tasks directly.
 
 ## Plug in only what the agent needs
 
-The constructor is the composition surface. This expanded example uses a local Ollama model, registry discovery, SQLite state and run storage, local telemetry, authentication, file logging, dependency-free built-in web search, a native Python tool, and tools from an MCP server:
+**The constructor is the composition surface**. This expanded example uses a local Ollama model, registry discovery, SQLite state and run storage, local telemetry, authentication, file logging, dependency-free built-in web search, a native Python tool, and tools from an **MCP server**:
 
 ```python
 from protolink import (
@@ -270,98 +309,6 @@ local_agent = Agent(
 ```
 
 Swap `"ollama"` for another built-in or custom `LLM`; the agent, tools, tasks, and flows do not change.
-
-## Progressive control
-
-The common path stays small:
-
-```python
-agent = Agent(card=card, transport="http")
-```
-
-The alias selects the communication boundary without changing the agent API:
-
-| If you need... | Start with | Why |
-| --- | --- | --- |
-| Agents in one Python process | `"runtime"` | Lowest transport overhead, streaming, and no ports |
-| A network service or optional A2A 1.0 endpoint | `"http"` | Status, health, optional chat, and dashboard utilities; add `a2a=True` for A2A routes and outbound translation |
-| Live progress for a browser or CLI | `"sse"` | HTTP utilities plus a one-way event stream; no A2A adapter today |
-| A persistent interactive connection | `"websocket"` | Bidirectional streaming with low per-frame overhead after connection setup |
-| Internal gRPC infrastructure | `"grpc"` | Pooled RPCs, streaming, deadlines, standard health, and reflection |
-
-These are qualitative protocol-overhead profiles, not benchmark results; model and tool latency commonly dominate an agent call. See the [transport guide](https://nmaroulis.github.io/protolink/docs/transport/) for the complete performance, utility, and deployment comparison.
-
-When a boundary needs TLS, resource limits, retries, keepalive settings, or other operational controls, construct the transport and pass it to the same API:
-
-```python
-from protolink import RetryPolicy, TLSConfig, TransportConfig, TransportLimits
-from protolink.transport import HTTPTransport
-
-transport = HTTPTransport(
-    url=card.url,
-    tls=TLSConfig(
-        certfile="certs/agent.pem",
-        keyfile="certs/agent-key.pem",
-        cafile="certs/ca.pem",
-    ),
-    config=TransportConfig(
-        limits=TransportLimits(max_concurrent_requests=200),
-        retry=RetryPolicy(max_attempts=3),
-    ),
-)
-
-agent = Agent(card=card, transport=transport)
-```
-
-`AgentClient` and `Registry` follow the same rule: pass a string for built-in defaults or a concrete implementation for full control. The façade does not change as deployment requirements grow.
-
-The pattern also applies to other components:
-
-| Start small | Add control |
-| --- | --- |
-| `Agent(card, registry="http", registry_url=url)` | Pass a configured `RegistryClient` or `Registry` |
-| `create_llm("mock")` | Pass provider options or your own `LLM` implementation |
-| `agent.add_tool(function)` | Pass `Tool.from_callable(function, name=..., capabilities=...)` |
-| `Agent(card, state=["conversation"])` | Supply storage and a configured `State` |
-| `create_knowledge("memory", sources=[...])` | Supply splitting, embedding, storage, or a retriever |
-| `Agent(card, verbosity=0)` | Supply a logger, telemetry, or a run store |
-
-Execution follows the same pattern:
-
-```python
-from protolink import RunBudget, RunContext
-
-answer = await agent.invoke("Prepare the plan")
-answer = await agent.invoke(
-    "Review the plan",
-    budget=RunBudget(max_llm_calls=3, max_tool_calls=5),
-    context=RunContext(session_id="planning", permissions={"filesystem.write": "deny"}),
-)
-```
-
-Keep a task when you also need its lifecycle, messages, and artifacts:
-
-```python
-from protolink import Task
-
-task = Task.create_infer("Review the plan", session_id="planning")
-result = await agent.run_task(task)
-answer = result.raise_for_status().get_output()
-```
-
-`Task.create("text")` wraps a plain user message; `Task.create_tool_call("add", {"a": 2,
-"b": 3})` requests a tool directly. All three factories accept run controls.
-`get_output()` unwraps successful tool results; `get_last_part()` retains the typed
-part and correlation/error fields. Inputs and previews return the output reader's
-default rather than an older answer.
-
-Use `add_tools(...)` for tool collections, `await add_mcp(...)` for MCP discovery,
-`peer(...).invoke(...)` for remote inference, and `flow.invoke(...)` for a simple flow
-call. `Step`, `ToolStep`, and `RepeatUntil` cover small deterministic workflows;
-`invoke_typed(prompt, ResponseModel)` validates structured answers. Explicit Task,
-transport, recorder, and Graph APIs remain available. See the
-[progressive-control guide](docs/content/progressive-control.md) and run
-`python examples/progressive_control.py` for a complete offline walkthrough.
 
 ## Structured flows
 

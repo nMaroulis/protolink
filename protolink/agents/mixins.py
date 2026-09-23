@@ -1511,12 +1511,23 @@ class AgentConfigurationMixin(_AgentMixinBase):
         if transport is None:
             raise ValueError("transport must not be None")
 
+        if not isinstance(transport, str | Transport):
+            raise ValueError("Invalid transport type")
+        candidate_url = self.card.url
+        automatic_url = getattr(self, "_automatic_identity_url", None)
+        if getattr(self, "_identity_shorthand", False):
+            from .identity import validate_identity_transport
+
+            if isinstance(transport, Transport) and candidate_url == automatic_url:
+                candidate_url = transport.url
+            validate_identity_transport(candidate_url, transport)
+
         authenticator = getattr(self, "authenticator", None)
         credentials = getattr(self, "credentials", None)
 
         if isinstance(transport, str):
             transport_kwargs: dict[str, Any] = {
-                "url": self.card.url,
+                "url": candidate_url,
                 "authenticator": authenticator,
                 "credentials": credentials,
             }
@@ -1540,6 +1551,9 @@ class AgentConfigurationMixin(_AgentMixinBase):
         if self._a2a_enabled and transport_type != "http":
             raise ValueError("a2a=True requires an HTTP transport (transport='http' or HTTPTransport)")
 
+        if self.card.url == automatic_url:
+            self._automatic_identity_url = candidate_url
+        self.card.url = candidate_url
         self._transport = transport
         from .engine import AgentExecutionMixin
 
@@ -1574,11 +1588,15 @@ class AgentConfigurationMixin(_AgentMixinBase):
         return self._llm
 
     @llm.setter
-    def llm(self, llm: LLM | None) -> None:
-        """Set the agent's LLM, validate the connection and update capabilities."""
-        self._llm = llm
+    def llm(self, llm: LLM | str | None) -> None:
+        """Resolve an optional model string, validate it and update capabilities."""
+        if isinstance(llm, str):
+            from protolink.llms import create_llm
+
+            llm = create_llm(llm)
         # Update LLM capability in card (handles both object and dict formats)
         has_llm = bool(llm and llm.validate_connection())
+        self._llm = llm
         if hasattr(self.card.capabilities, "has_llm"):
             self.card.capabilities.has_llm = has_llm
         elif isinstance(self.card.capabilities, dict):

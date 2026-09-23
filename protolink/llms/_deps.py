@@ -8,7 +8,7 @@ def require_anthropic():
         from anthropic.types.message_stream_event import MessageStreamEvent
     except ImportError as exc:
         raise ImportError(
-            "Anthropic LLM backend requires the 'anthropic' library. Install it with: uv add anthropic or uv add protolink[llms]"  # noqa: E501
+            "Anthropic LLM backend requires the 'anthropic' library. Install it with: uv add 'protolink[anthropic]'"
         ) from exc
     return anthropic, MessageStreamEvent
 
@@ -20,8 +20,7 @@ def require_gemini():
         from google.genai.types import GenerateContentConfig
     except ImportError as exc:
         raise ImportError(
-            "Gemini LLM backend requires the 'google-genai' library. "
-            "Install it with: uv add google-genai or uv add protolink[llms]"
+            "Gemini LLM backend requires the 'google-genai' library. Install it with: uv add 'protolink[gemini]'"
         ) from exc
     return genai, GenerateContentConfig
 
@@ -32,7 +31,8 @@ def require_hugging_face():
         from huggingface_hub import InferenceClient
     except ImportError as exc:
         raise ImportError(
-            "HuggingFace LLM backend requires the 'huggingface-hub' library. Install it with: uv add huggingface-hub or uv add protolink[llms]"  # noqa: E501
+            "HuggingFace LLM backend requires the 'huggingface-hub' library. "
+            "Install it with: uv add 'protolink[huggingface]'"
         ) from exc
     return InferenceClient
 
@@ -44,7 +44,7 @@ def require_openai():
         from openai.types.chat import ChatCompletion, ChatCompletionChunk
     except ImportError as exc:
         raise ImportError(
-            "OpenAI LLM backend requires the 'openai' library. Install it with: uv add openai or uv add protolink[llms]"
+            "This LLM backend requires the 'openai' library. Install it with: uv add 'protolink[openai]'"
         ) from exc
     return openai, ChatCompletion, ChatCompletionChunk
 
@@ -56,6 +56,6 @@ def require_llama_cpp():
     except ImportError as exc:
         raise ImportError(
             "Local Llama.cpp backend requires the 'llama-cpp-python' library. "
-            "Install it with: uv add llama-cpp-python or uv add protolink[llms]"
+            "Install it with: uv add 'protolink[llama-cpp-local]'"
         ) from exc
     return llama_cpp

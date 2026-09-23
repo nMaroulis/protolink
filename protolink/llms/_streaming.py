@@ -32,7 +32,8 @@ async def http_stream(
         import httpx
     except ImportError as exc:
         raise ImportError(
-            "HTTP LLM streaming requires httpx. Install it with: pip install httpx or pip install 'protolink[llms]'"
+            "HTTP LLM streaming requires httpx. Install it with: pip install httpx "
+            "or your provider extra, for example pip install 'protolink[ollama]'"
         ) from exc
 
     async def chunks(response: Any) -> AsyncIterator[dict[str, Any]]:
