@@ -43,6 +43,10 @@ network endpoints and smaller provider-specific installations. This shows a focu
 
 ### Added
 
+- `protolink[yaml]` for optional Agent YAML configuration, with an actionable
+  installation error when PyYAML is absent. Dictionary configuration stays in the base package.
+- Locked contributor dependency groups and CI coverage for Python 3.14, minimum
+  direct dependencies, current dependencies, and the minimum supported build backend.
 - `Agent(name=..., description=..., url=..., llm="provider:model", tools=[...])`
   as an alternative to explicit card construction. Local agents default to a
   `runtime://` identity without creating a transport. Network aliases require a
@@ -65,6 +69,13 @@ network endpoints and smaller provider-specific installations. This shows a focu
 
 ### Fixed
 
+- Migrate Langfuse telemetry to SDK 4 observations, explicitly finish task/LLM/tool
+  spans, and preserve state across nested tasks, concurrent calls, and multiple trackers.
+  Real-SDK tests export in memory without a hosted account.
+- Require setuptools 77.0.3 or newer for SPDX license metadata. YAML export now
+  checks dependencies and serializes before opening the destination file.
+- Restore serialized LLM reasoning separately from provider constructor arguments,
+  fixing dictionary and YAML round trips for agents configured with an LLM.
 - Migrate MCP discovery, tool calls, and HTTP sessions to MCP SDK 2.2, including
   snake_case Python fields, `httpx2`, and the two-stream transport context.
   Public result dictionaries retain MCP wire names such as `structuredContent`
@@ -88,6 +99,9 @@ network endpoints and smaller provider-specific installations. This shows a focu
 
 ### Changed
 
+- Compose the `llms` bundle from provider extras to keep requirements aligned.
+  Existing `test`, `build`, `dev`, and empty compatibility extras remain available;
+  the default contributor setup uses focused groups without all provider SDKs or notebooks.
 - Treat an omitted transport or registry as normal local configuration, logging
   at debug level. Constructor tools reuse `add_tools`; execution continues through
   the existing `invoke`, `.sync`, and task APIs.

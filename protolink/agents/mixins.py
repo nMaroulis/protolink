@@ -40,6 +40,7 @@ from protolink.types import TransportType
 from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
 
+from ._deps import require_yaml
 from ._typing import _AgentMixinBase
 from .helpers import _coerce_state_operation_request
 
@@ -2165,12 +2166,18 @@ class AgentSerializationMixin(_AgentMixinBase):
                 l_kwargs = {
                     "model": llm_config.get("model"),
                     "model_params": llm_config.get("model_params", {}),
-                    "reasoning": llm_config.get("reasoning", "none"),
                 }
+                reasoning = llm_config.get("reasoning", "none")
+                if reasoning not in ("none", "low", "medium", "high"):
+                    raise ValueError("Serialized LLM reasoning must be none, low, medium, or high")
                 base_url = llm_config.get("base_url")
                 if base_url:
                     l_kwargs["base_url"] = base_url
                 llm = create_llm(provider, **l_kwargs)
+                # Concrete providers do not accept the base LLM's reasoning
+                # constructor argument. Restore runtime configuration separately.
+                llm._reasoning = reasoning
+                llm.build_system_prompt()
 
         storage = overrides.get("storage")
         state = overrides.get("state")
@@ -2267,7 +2274,7 @@ class AgentSerializationMixin(_AgentMixinBase):
 
     def to_yaml_string(self) -> str:
         """Serialize the agent configuration to a YAML string."""
-        import yaml
+        yaml = require_yaml()
 
         return yaml.safe_dump(self.to_dict(), sort_keys=False)
 
@@ -2277,8 +2284,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             filepath: Absolute or relative path to the YAML file.
         """
+        yaml_str = self.to_yaml_string()
         with open(filepath, "w", encoding="utf-8") as f:
-            f.write(self.to_yaml_string())
+            f.write(yaml_str)
 
     @classmethod
     def from_yaml_string(cls: type[AgentSerializationT], yaml_str: str, **overrides) -> AgentSerializationT:
@@ -2290,7 +2298,7 @@ class AgentSerializationMixin(_AgentMixinBase):
                 precedence over serialized first-party policy data; custom policies and ``approval_handler`` values are
                 runtime-only.
         """
-        import yaml
+        yaml = require_yaml()
 
         data = yaml.safe_load(yaml_str)
         if not isinstance(data, dict):

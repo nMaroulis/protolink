@@ -47,8 +47,8 @@ uv add "protolink[llms]"
 # Optional local PDF ingestion for RAG
 uv add "protolink[rag-pdf]"
 
-# Development (all extras + testing tools)
-uv add "protolink[dev]"
+# YAML agent configuration
+uv add "protolink[yaml]"
 ```
 
 </TabItem>
@@ -70,8 +70,8 @@ pip install "protolink[llms]"
 # Optional local PDF ingestion for RAG
 pip install "protolink[rag-pdf]"
 
-# Development (all extras + testing tools)
-pip install "protolink[dev]"
+# YAML agent configuration
+pip install "protolink[yaml]"
 ```
 
 </TabItem>
@@ -82,7 +82,7 @@ git clone https://github.com/nmaroulis/protolink.git
 cd protolink
 
 # Editable install for local development
-uv pip install -e ".[dev]"
+uv sync --locked
 ```
 
 </TabItem>
@@ -92,13 +92,9 @@ uv pip install -e ".[dev]"
 Choose the extras that match your use case, such as `protolink[openai]`, `protolink[anthropic]`, or `protolink[ollama]`. Combine them with a transport when needed: `protolink[http,openai]`. The existing `protolink[llms]` bundle still installs every supported LLM SDK, including local llama.cpp bindings. See [LLMs](llm.md) for the full provider list. Dependency-free in-memory and SQLite [RAG](rag.md) are part of the base package; `protolink[rag-pdf]` is needed only when the built-in loader reads local PDF files.
 
 :::
-For development from source:
-
-```bash
-git clone https://github.com/nmaroulis/protolink.git
-cd protolink
-uv pip install -e ".[dev]"
-```
+For development, the source-checkout command installs the locked test and tooling groups.
+Add a provider only when needed, for example `uv sync --locked --extra openai`.
+The existing `protolink[dev]` extra remains available as the full installation.
 
 :::info[A2A from the first agent]
 

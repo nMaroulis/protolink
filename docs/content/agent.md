@@ -1818,6 +1818,9 @@ The `/status` page shows the agent's operational health and metadata. The `/chat
 :::
 ## YAML Import and Export
 
+Install `protolink[yaml]` to use the YAML methods. Dictionary serialization (`to_dict()` and `from_dict()`)
+is included in the base package.
+
 Protolink supports exporting an agent's configuration (identity card, capabilities, transport, TLS file references, LLM, security/authenticator, registered tools, and non-default first-party capability policy) to a YAML file, and importing it back to reconstruct a functional `Agent` instance. TLS serialization stores certificate paths and settings, never certificate or private-key contents.
 
 ### Agent serialization methods

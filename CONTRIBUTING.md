@@ -23,17 +23,31 @@ cd protolink
 
 ### Install dependencies
 
-For development (includes optional deps and tooling):
+Install the locked development environment:
 
 ```bash
-# Using uv (recommended)
-uv pip install -e ".[dev]"
-
-# Or with pip
-pip install -e ".[dev]"
+uv sync --locked
+source .venv/bin/activate
 ```
 
-This will install the library in editable mode along with the development extras defined in `pyproject.toml`.
+This installs editable ProtoLink, test integrations, Ruff, ty, and pre-commit. Model-provider SDKs,
+local llama.cpp bindings, and notebooks are opt-in: for example, `uv sync --locked --extra openai`.
+Focused groups are available with `uv sync --locked --no-default-groups --group test`
+(or `lint`, `typing`, `build`).
+
+For an existing pip workflow:
+
+```bash
+python -m pip install -e ".[test,mcp,telemetry]"
+```
+
+The published `test`, `build`, and full `dev` extras remain supported for compatibility.
+Use the dependency groups for new contributor workflows.
+
+Commit `uv.lock` changes alongside dependency changes. Run `uv lock` after editing requirements;
+use `uv lock --upgrade` for an intentional refresh. Runtime requirements remain flexible for library users.
+CI tests the lock on Python 3.11, 3.13, and 3.14, and separately resolves the minimum direct and latest
+dependencies to detect compatibility problems. Dependency minimums should reflect tested API requirements.
 
 ---
 
@@ -127,7 +141,7 @@ This project follows **PEP 604**. Please use the `X | Y` union type syntax (e.g.
 Protolink uses **ty** for type checking. Run type checks with:
 
 ```bash
-ty check .
+ty check protolink
 ```
 
 ---
@@ -141,13 +155,14 @@ ty check .
 Run tests with:
 
 ```bash
-uv pip install -e ".[test,mcp]"
-python -m pytest -v tests
+uv sync --locked --no-default-groups --group test
+uv run --no-sync pytest tests
 ```
 
-The test extra includes `pytest-asyncio`; installing `pytest` alone is not enough
+The test group includes `pytest-asyncio`; installing `pytest` alone is not enough
 to run the async tests. Pytest checks for that plugin before collecting tests.
-The `mcp` extra enables the MCP 2 adapter and integration tests.
+It also includes MCP, YAML, and telemetry integrations. Langfuse compatibility tests use the real SDK
+with an in-memory exporter; no account or network export is required.
 
 If your change requires additional test fixtures or helper utilities, place them in the appropriate `tests/` module.
 

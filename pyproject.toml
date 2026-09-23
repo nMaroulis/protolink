@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -16,56 +16,18 @@ authors = [
     {name = "Nikolaos Maroulis", email = "nikolaos@maroulis.dev"},
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["protolink*"]
-
-[tool.setuptools.package-data]
-protolink = ["py.typed"]
-
-# Type Checking - ty setup
-[tool.ty.src]
-include = ["protolink", "benchmarks"]
-exclude = ["build", "tests"]
-
-[tool.ty.rules]
-# strong rule set
-unresolved-reference = "error"
-invalid-assignment = "error"
-invalid-return-type = "error"
-missing-argument = "error"
-possibly-unresolved-reference = "warn"
-
-[tool.ty.analysis]
-# These imports are behind optional extras. Keep core type checks independent of
-# heavyweight provider SDKs while still using their types when locally installed.
-allowed-unresolved-imports = [
-    "anthropic.**",
-    "google.genai.**",
-    "grpc_health.**",
-    "grpc_reflection.**",
-    "huggingface_hub.**",
-    "httpx2.**",
-    "llama_cpp.**",
-    "mcp.**",
-    "jsonschema.**",
-    "referencing.**",
-    "openai.**",
-    "pypdf.**",
-    "docx.**",
-    "openpyxl.**",
-    "qdrant_client.**",
-]
-
 [project.urls]
 Documentation = "https://nmaroulis.github.io/protolink/"
 Repository = "https://github.com/nMaroulis/protolink"
+Issues = "https://github.com/nMaroulis/protolink/issues"
+Changelog = "https://nmaroulis.github.io/protolink/docs/changelog/"
 
 [project.scripts]
 protolink = "protolink.cli:main"
 
 [project.optional-dependencies]
 integrations = ["httpx>=0.28.1"]
+yaml = ["PyYAML>=6.0.2"]
 
 documents = ["pypdf>=5.0.0", "python-docx>=1.2.0", "openpyxl>=3.1.0"]
 
@@ -99,12 +61,8 @@ llama-cpp-local = ["llama-cpp-python>=0.3.30"]
 
 # Existing all-provider bundle, including local llama.cpp bindings.
 llms = [
-    "httpx>=0.28.1",
-    "anthropic>=0.109.2",
-    "huggingface-hub>=1.3.3",
-    "google-genai>=1.60.0",
-    "llama-cpp-python>=0.3.30",
-    "openai>=2.43.0",
+    "protolink[openai,anthropic,gemini,huggingface,deepseek,grok,ollama]",
+    "protolink[openai-compatible,lmstudio,vllm,llama-cpp-server,llama-cpp-local]",
 ]
 
 mcp = [
@@ -115,7 +73,7 @@ mcp = [
 ]
 
 telemetry = [
-    "langfuse",
+    "langfuse>=4.0.0,<5",
     "langsmith",
 ]
 
@@ -127,9 +85,8 @@ rag-pdf = [
     "pypdf>=5.0.0",
 ]
 
-# Database Drivers
-db = [
-]
+# Retained for existing installation commands; no database driver is bundled.
+db = []
 
 # All optional dependencies
 all = [
@@ -143,9 +100,10 @@ all = [
     "protolink[telemetry]",
     "protolink[metrics]",
     "protolink[rag-pdf]",
+    "protolink[yaml]",
 ]
 
-# Only for testing
+# Compatibility extras for existing pip workflows. Contributors use the groups below.
 test = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
@@ -157,6 +115,7 @@ test = [
     "protolink[grpc]", # For testing gRPC transport
     "protolink[http]", # For testing HTTP transport
     "protolink[documents]", # For testing document extraction
+    "protolink[yaml]",
 ]
 
 # Jupyter Notebook dependencies
@@ -179,7 +138,66 @@ docs = []
 build = [
     "build>=1.5.0",
     "twine>=6.2.0",
-    "wheel>=0.45.0",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.14.1",
+    "protolink[grpc,http,documents,mcp,yaml,telemetry]",
+]
+lint = ["ruff==0.16.7"]
+typing = ["ty==0.0.80", "protolink[grpc,http,documents,mcp,yaml,telemetry]"]
+build = ["protolink[build]"]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "typing"},
+    "pre-commit>=4.4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["protolink*"]
+
+[tool.setuptools.package-data]
+protolink = ["py.typed"]
+
+[tool.ty.src]
+include = ["protolink", "benchmarks"]
+exclude = ["build", "tests"]
+
+[tool.ty.rules]
+unresolved-reference = "error"
+invalid-assignment = "error"
+invalid-return-type = "error"
+missing-argument = "error"
+possibly-unresolved-reference = "warn"
+
+[tool.ty.analysis]
+# These imports are behind optional extras. Keep core type checks independent of
+# heavyweight provider SDKs while still using their types when locally installed.
+allowed-unresolved-imports = [
+    "anthropic.**",
+    "google.genai.**",
+    "grpc_health.**",
+    "grpc_reflection.**",
+    "huggingface_hub.**",
+    "httpx2.**",
+    "llama_cpp.**",
+    "langfuse.**",
+    "langsmith.**",
+    "mcp.**",
+    "jsonschema.**",
+    "referencing.**",
+    "openai.**",
+    "pypdf.**",
+    "docx.**",
+    "openpyxl.**",
+    "qdrant_client.**",
+    "yaml.**",
 ]
 
 [tool.pytest.ini_options]
