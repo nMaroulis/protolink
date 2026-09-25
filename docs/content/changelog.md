@@ -34,10 +34,11 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.7.4] - 2026-09-24
+## [0.7.4] - 2026-09-25
 
 :::note Latest Release
 
+This release focuses on MCP adapter updates and bug fixes. Adding simpler API to Agent, further expanding the progressive control design in the API. Simplifying dependencies and configs.
 MCP tools now preserve complete results and their original JSON schemas, report
 tool failures correctly, and support Streamable HTTP with optional connection reuse.
 Agent setup now supports names, model strings, and initial tools, with explicit
