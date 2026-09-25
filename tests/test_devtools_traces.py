@@ -21,6 +21,7 @@ from protolink.devtools.server import (
     serve_dashboard,
 )
 from protolink.devtools.traces import (
+    MAX_TRACE_JSON_DEPTH,
     InvalidTraceTokenError,
     StaleTraceTokenError,
     TraceJsonlReader,
@@ -141,9 +142,10 @@ def test_trace_reader_rejects_finite_range_overflow_at_any_depth(tmp_path: Path)
     json.dumps(page, allow_nan=False)
 
 
-def test_trace_reader_counts_excessively_nested_json_as_malformed(tmp_path: Path):
+@pytest.mark.parametrize(("opening", "closing"), [("[", "]"), ('{"child":', "}")])
+def test_trace_reader_counts_excessively_nested_json_as_malformed(tmp_path: Path, opening, closing):
     trace_path = tmp_path / "traces.jsonl"
-    deeply_nested = '{"trace_id":"deep","payload":' + "[" * 10_000 + "0" + "]" * 10_000 + "}\n"
+    deeply_nested = '{"trace_id":"deep","payload":' + opening * 10_000 + "0" + closing * 10_000 + "}\n"
     trace_path.write_text(
         deeply_nested + json.dumps(_trace_record(1)) + "\n",
         encoding="utf-8",
@@ -153,6 +155,23 @@ def test_trace_reader_counts_excessively_nested_json_as_malformed(tmp_path: Path
 
     assert [record["task_id"] for record in page["records"]] == ["task_1"]
     assert page["malformed_count"] == 1
+
+
+@pytest.mark.parametrize("depth", [MAX_TRACE_JSON_DEPTH - 1, MAX_TRACE_JSON_DEPTH])
+def test_trace_reader_enforces_depth_bound_without_counting_string_contents(tmp_path: Path, depth: int):
+    trace_path = tmp_path / "traces.jsonl"
+    payload = "[" * depth + json.dumps("[" * 10_000) + "]" * depth
+    trace_path.write_text('{"trace_id":"deep","payload":' + payload + "}\n", encoding="utf-8")
+
+    page = list_trace_records(trace_path, limit=10)
+
+    if depth < MAX_TRACE_JSON_DEPTH:  # The enclosing record is also one level.
+        assert len(page["records"]) == 1
+        assert page["malformed_count"] == 0
+        assert load_trace_record(trace_path, page["records"][0]["record_id"])["trace"]["trace_id"] == "deep"
+    else:
+        assert page["records"] == []
+        assert page["malformed_count"] == 1
 
 
 def test_trace_reader_requires_newline_before_exposing_final_record(tmp_path: Path):

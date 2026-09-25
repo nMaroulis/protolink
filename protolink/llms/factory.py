@@ -55,7 +55,9 @@ class LLMFactory:
 
         Args:
             provider (str | LLMProvider): The name of the LLM provider
-                (e.g., "openai", "ollama", "lmstudio", "vllm").
+                (e.g., "openai", "ollama", "lmstudio", "vllm"), or a
+                "provider:model" string. Only the first colon separates the
+                provider; the model's case, tags, paths, and further colons are retained.
             **kwargs: Additional provider constructor arguments. ProtoLink
                 runtime options such as ``metrics_profile``,
                 ``metrics_enabled``, and ``max_parse_failures`` are consumed by
@@ -71,10 +73,16 @@ class LLMFactory:
         metrics_enabled: bool | None = kwargs.pop("metrics_enabled", None)
         max_parse_failures: int | None = kwargs.pop("max_parse_failures", None)
 
-        try:
-            provider_key = str(provider).lower()
-        except Exception as err:
-            raise ValueError(f"Invalid provider type: {type(provider)}") from err
+        if not isinstance(provider, str):
+            raise ValueError("provider must be a provider alias or 'provider:model' string")
+        provider_name, separator, model = provider.partition(":")
+        provider_key = provider_name.strip().lower()
+        if not provider_key or (separator and not model.strip()):
+            raise ValueError("Use a non-empty provider alias or 'provider:model' string")
+        if separator:
+            if "model" in kwargs:
+                raise ValueError("Specify the model either in 'provider:model' or model=, not both")
+            kwargs["model"] = model
 
         client_class = cls._resolve_client(provider_key)
         llm = client_class(**kwargs)

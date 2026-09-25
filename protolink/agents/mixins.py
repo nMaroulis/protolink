@@ -40,6 +40,7 @@ from protolink.types import TransportType
 from protolink.utils.renderers.chat import to_chat_html
 from protolink.utils.renderers.status import to_status_html
 
+from ._deps import require_yaml
 from ._typing import _AgentMixinBase
 from .helpers import _coerce_state_operation_request
 
@@ -1032,6 +1033,7 @@ class AgentToolMixin(_AgentMixinBase):
         self,
         adapter: MCPToolAdapter | None = None,
         *,
+        transport: Literal["stdio", "sse", "streamable_http"] | None = None,
         command: str | None = None,
         args: list[str] | None = None,
         url: str | None = None,
@@ -1041,10 +1043,11 @@ class AgentToolMixin(_AgentMixinBase):
     ) -> list[Tool]:
         """Discover and register MCP tools, returning their native Tool wrappers.
 
-        Pass command/args for stdio, url/headers for SSE, or a configured adapter
-        for full control. Requires the optional ``mcp`` extra. Discovery contacts
+        Pass command/args for stdio, url/headers for legacy SSE, or select
+        transport="streamable_http" with a URL. A configured adapter provides
+        full control. Requires the optional ``mcp`` extra. Discovery contacts
         the server (and starts its process for stdio) but calls no tool. The
-        adapter owns per-request sessions; no persistent connection is created.
+        adapter owns per-request sessions unless inside adapter.session().
 
         ``include`` selects original server names; ``prefix`` changes only their
         local names. Unknown selections and existing local names raise ValueError
@@ -1053,13 +1056,15 @@ class AgentToolMixin(_AgentMixinBase):
         """
         from protolink.tools.adapters import MCPToolAdapter
 
-        if adapter is not None and any(value is not None for value in (command, args, url, headers)):
+        if adapter is not None and any(value is not None for value in (transport, command, args, url, headers)):
             raise ValueError("Pass an MCP adapter or connection options, not both")
         if adapter is None:
             if (command is None) == (url is None):
                 raise ValueError("Specify exactly one of command or url")
+            if transport is not None and (transport == "stdio") != (command is not None):
+                raise ValueError("Use command with stdio and url with HTTP transports")
             adapter = MCPToolAdapter(
-                transport="stdio" if command is not None else "sse",
+                transport=transport or ("stdio" if command is not None else "sse"),
                 command=command,
                 args=args,
                 url=url,
@@ -1507,12 +1512,23 @@ class AgentConfigurationMixin(_AgentMixinBase):
         if transport is None:
             raise ValueError("transport must not be None")
 
+        if not isinstance(transport, str | Transport):
+            raise ValueError("Invalid transport type")
+        candidate_url = self.card.url
+        automatic_url = getattr(self, "_automatic_identity_url", None)
+        if getattr(self, "_identity_shorthand", False):
+            from .identity import validate_identity_transport
+
+            if isinstance(transport, Transport) and candidate_url == automatic_url:
+                candidate_url = transport.url
+            validate_identity_transport(candidate_url, transport)
+
         authenticator = getattr(self, "authenticator", None)
         credentials = getattr(self, "credentials", None)
 
         if isinstance(transport, str):
             transport_kwargs: dict[str, Any] = {
-                "url": self.card.url,
+                "url": candidate_url,
                 "authenticator": authenticator,
                 "credentials": credentials,
             }
@@ -1536,6 +1552,9 @@ class AgentConfigurationMixin(_AgentMixinBase):
         if self._a2a_enabled and transport_type != "http":
             raise ValueError("a2a=True requires an HTTP transport (transport='http' or HTTPTransport)")
 
+        if self.card.url == automatic_url:
+            self._automatic_identity_url = candidate_url
+        self.card.url = candidate_url
         self._transport = transport
         from .engine import AgentExecutionMixin
 
@@ -1570,11 +1589,15 @@ class AgentConfigurationMixin(_AgentMixinBase):
         return self._llm
 
     @llm.setter
-    def llm(self, llm: LLM | None) -> None:
-        """Set the agent's LLM, validate the connection and update capabilities."""
-        self._llm = llm
+    def llm(self, llm: LLM | str | None) -> None:
+        """Resolve an optional model string, validate it and update capabilities."""
+        if isinstance(llm, str):
+            from protolink.llms import create_llm
+
+            llm = create_llm(llm)
         # Update LLM capability in card (handles both object and dict formats)
         has_llm = bool(llm and llm.validate_connection())
+        self._llm = llm
         if hasattr(self.card.capabilities, "has_llm"):
             self.card.capabilities.has_llm = has_llm
         elif isinstance(self.card.capabilities, dict):
@@ -2143,12 +2166,18 @@ class AgentSerializationMixin(_AgentMixinBase):
                 l_kwargs = {
                     "model": llm_config.get("model"),
                     "model_params": llm_config.get("model_params", {}),
-                    "reasoning": llm_config.get("reasoning", "none"),
                 }
+                reasoning = llm_config.get("reasoning", "none")
+                if reasoning not in ("none", "low", "medium", "high"):
+                    raise ValueError("Serialized LLM reasoning must be none, low, medium, or high")
                 base_url = llm_config.get("base_url")
                 if base_url:
                     l_kwargs["base_url"] = base_url
                 llm = create_llm(provider, **l_kwargs)
+                # Concrete providers do not accept the base LLM's reasoning
+                # constructor argument. Restore runtime configuration separately.
+                llm._reasoning = reasoning
+                llm.build_system_prompt()
 
         storage = overrides.get("storage")
         state = overrides.get("state")
@@ -2245,7 +2274,7 @@ class AgentSerializationMixin(_AgentMixinBase):
 
     def to_yaml_string(self) -> str:
         """Serialize the agent configuration to a YAML string."""
-        import yaml
+        yaml = require_yaml()
 
         return yaml.safe_dump(self.to_dict(), sort_keys=False)
 
@@ -2255,8 +2284,9 @@ class AgentSerializationMixin(_AgentMixinBase):
         Args:
             filepath: Absolute or relative path to the YAML file.
         """
+        yaml_str = self.to_yaml_string()
         with open(filepath, "w", encoding="utf-8") as f:
-            f.write(self.to_yaml_string())
+            f.write(yaml_str)
 
     @classmethod
     def from_yaml_string(cls: type[AgentSerializationT], yaml_str: str, **overrides) -> AgentSerializationT:
@@ -2268,7 +2298,7 @@ class AgentSerializationMixin(_AgentMixinBase):
                 precedence over serialized first-party policy data; custom policies and ``approval_handler`` values are
                 runtime-only.
         """
-        import yaml
+        yaml = require_yaml()
 
         data = yaml.safe_load(yaml_str)
         if not isinstance(data, dict):

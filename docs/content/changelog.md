@@ -34,9 +34,89 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.7.3] - 2026-09-22
+## [0.7.4] - 2026-09-25
 
 :::note Latest Release
+
+This release focuses on MCP adapter updates and bug fixes. Adding simpler API to Agent, further expanding the progressive control design in the API. Simplifying dependencies and configs.
+MCP tools now preserve complete results and their original JSON schemas, report
+tool failures correctly, and support Streamable HTTP with optional connection reuse.
+Agent setup now supports names, model strings, and initial tools, with explicit
+network endpoints and smaller provider-specific installations. This shows a focus on progressive control and simple and intuitive API.
+
+:::note
+
+### Added
+
+- `protolink[yaml]` for optional Agent YAML configuration, with an actionable
+  installation error when PyYAML is absent. Dictionary configuration stays in the base package.
+- Locked contributor dependency groups and CI coverage for Python 3.14, minimum
+  direct dependencies, current dependencies, and the minimum supported build backend.
+- `Agent(name=..., description=..., url=..., llm="provider:model", tools=[...])`
+  as an alternative to explicit card construction. Local agents default to a
+  `runtime://` identity without creating a transport. Network aliases require a
+  compatible URL and bind port; configured transports supply their own URL and
+  support a separate advertised address. Invalid shorthand endpoints fail before
+  provider initialization, including missing TLS server identity for secure binds.
+- Provider aliases and model strings on the `llm` property and `create_llm`.
+  Parsing preserves model-name case, paths, and additional colons such as Ollama
+  tags. Configured LLM instances and existing factory calls remain supported.
+- Provider-specific installation extras: `openai`, `anthropic`, `gemini`,
+  `huggingface`, `deepseek`, `grok`, `ollama`, `openai-compatible`, `lmstudio`,
+  `vllm`, `llama-cpp-server`, and `llama-cpp-local`. The `llms` bundle remains
+  available; hosted-provider extras do not pull in local llama.cpp bindings.
+- `streamable_http` transport for `MCPToolAdapter` and async/sync `Agent.add_mcp`,
+  including configured HTTP headers. Existing URL-only registration retains legacy SSE.
+- `async with adapter.session()` to share one initialized connection across discovery
+  and registered tool calls, with cleanup on completion, failure, or cancellation.
+- Paginated MCP tool discovery, with repeated-cursor detection and complete-list caching.
+- MCP regression coverage in CI, including real Streamable HTTP and stdio server tests.
+
+### Fixed
+
+- Migrate Langfuse telemetry to SDK 4 observations, explicitly finish task/LLM/tool
+  spans, and preserve state across nested tasks, concurrent calls, and multiple trackers.
+  Real-SDK tests export in memory without a hosted account.
+- Require setuptools 77.0.3 or newer for SPDX license metadata. YAML export now
+  checks dependencies and serializes before opening the destination file.
+- Restore serialized LLM reasoning separately from provider constructor arguments,
+  fixing dictionary and YAML round trips for agents configured with an LLM.
+- Migrate MCP discovery, tool calls, and HTTP sessions to MCP SDK 2.2, including
+  snake_case Python fields, `httpx2`, and the two-stream transport context.
+  Public result dictionaries retain MCP wire names such as `structuredContent`
+  and `isError`. Server examples and integration tests now use `MCPServer`.
+- Require the `pytest-asyncio` test plugin at collection time so incomplete test
+  installations report the missing dependency directly. Test setup documentation
+  includes the extras needed for pytest 9.1 and MCP integration tests.
+- Bound trace JSON nesting explicitly to 256 container levels, preserving the
+  malformed-record safeguard on Python 3.14 without relying on decoder recursion limits.
+- MCP responses with `isError=True` raise `MCPToolError` instead of returning successful
+  text. The exception retains the tool name and complete result; task execution records
+  a failed tool output without automatically retrying the call.
+- Rich MCP results retain all content blocks, structured data, annotations, metadata,
+  and null values. A single plain text block still returns a string; rich responses
+  return a dictionary with MCP fields such as `content` and `structuredContent`.
+- Nullable and union schemas no longer crash discovery. MCP input and output schemas
+  retain recursive references and JSON Schema defaults, with argument validation that
+  does not coerce values or change `additionalProperties`.
+- Blocking MCP callables reject active event loops before creating a coroutine, and
+  individual errors retain their exception type through MCP session cleanup.
+
+### Changed
+
+- Compose the `llms` bundle from provider extras to keep requirements aligned.
+  Existing `test`, `build`, `dev`, and empty compatibility extras remain available;
+  the default contributor setup uses focused groups without all provider SDKs or notebooks.
+- Treat an omitted transport or registry as normal local configuration, logging
+  at debug level. Constructor tools reuse `add_tools`; execution continues through
+  the existing `invoke`, `.sync`, and task APIs.
+- Update setup guides and provider dependency errors for the new shorthand and extras.
+- Document MCP result handling, schema validation, Streamable HTTP, and session lifetime.
+- Declare the adapter's HTTP and JSON Schema dependencies explicitly in the `mcp` extra.
+
+## [0.7.3] - 2026-09-22
+
+:::note Release Summary
 
 This release adds simpler APIs for creating and reading tasks, registering tools, discovering MCP tools, calling peers, streaming runs, and composing workflows. Optional budgets, run context, typed responses, and bounded acceptance checks bring more control to those same APIs. Updated documentation and a runnable example show how to start with defaults and introduce explicit configuration as your application grows.
 

@@ -183,6 +183,7 @@ Protolink does not ship a fixed provider pricing catalog. Prices and context win
 ### Langfuse Example
 
 The `LangfuseTelemetry` tracks tasks as traces, and LLM/Tool executions as spans/generations.
+Install `protolink[telemetry]` for the supported Langfuse Python SDK 4.x and LangSmith integrations.
 
 ```python
 import os
@@ -1505,7 +1506,7 @@ Create a Langfuse client and map Agent tasks to traces, complete inference cycle
       Langfuse secret key. A truthy explicit value wins; otherwise the constructor reads <code>LANGFUSE_SECRET_KEY</code>.
     </ApiField>
     <ApiField name="host" type="str | None" defaultValue="None">
-      Langfuse endpoint. Resolution is a truthy explicit value, then <code>LANGFUSE_HOST</code>, then <code>"https://cloud.langfuse.com"</code>.
+      Langfuse endpoint. Resolution is a truthy explicit value, then <code>LANGFUSE_BASE_URL</code>, then <code>LANGFUSE_HOST</code>, then <code>"https://cloud.langfuse.com"</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1521,7 +1522,7 @@ Create a Langfuse client and map Agent tasks to traces, complete inference cycle
 <ApiSection title="Raises">
   <ApiFields ariaLabel="LangfuseTelemetry constructor errors">
     <ApiField name="ImportError">
-      The optional <code>langfuse</code> library is unavailable. Install <code>langfuse</code> directly or install <code>protolink[telemetry]</code>.
+      The optional <code>langfuse</code> library is unavailable. Install <code>protolink[telemetry]</code> for the supported SDK version.
     </ApiField>
     <ApiField name="Langfuse client error">
       Credential, host, configuration, or SDK-construction failures propagate from the constructor.
@@ -1558,15 +1559,15 @@ async on_llm_event(event: dict[str, Any]) -> Any`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/langfuse_telemetry.py#L46"
 >
 
-Translate the shared lifecycle into the Langfuse trace API. The six overridden methods return `None` implicitly. `on_llm_event()` is inherited from `Telemetry` and returns `None` without exporting its event.
+Translate the shared lifecycle into the Langfuse SDK 4 observation API. The six overridden methods return `None` implicitly. `on_llm_event()` is inherited from `Telemetry` and returns `None` without exporting its event.
 
 <ApiSection title="Task mapping">
   <ApiFields ariaLabel="Langfuse task mapping">
     <ApiField name="on_task_start">
-      Call <code>langfuse.trace()</code> with a <code>"Task: "</code>-prefixed agent name, the Task ID as the Langfuse trace ID, and agent-name metadata. It does not send the full task as trace input.
+      Create a root span with <code>start_observation()</code>, a <code>"Task: "</code>-prefixed agent name, and agent-name/task-ID metadata. Derive a valid trace ID with <code>create_trace_id(seed=task.id)</code>. The full task is not sent as input.
     </ApiField>
     <ApiField name="on_task_end">
-      If a trace exists, update its output with <code>result.to_dict()</code>, flush the client, and clear the current trace in a <code>finally</code> block. The original <code>task</code> and <code>agent_name</code> parameters are not otherwise used.
+      Update the root span output with <code>result.to_dict()</code>, explicitly end it, and flush the client. Restore the outer task's observations when a nested task completes, including after SDK failures.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1577,7 +1578,7 @@ Translate the shared lifecycle into the Langfuse trace API. The six overridden m
       If a trace exists, create a generation named <code>"LLM Call"</code> containing model, raw prompt input, and the supplied metadata. An empty or absent metadata mapping is sent as <code>None</code>.
     </ApiField>
     <ApiField name="on_llm_end">
-      If a generation exists, end it with <code>response.content</code>; objects without that attribute fall back to <code>str(response)</code>. Clear the current generation even when ending it fails.
+      Update the generation output with <code>response.content</code> and call <code>end()</code>; objects without that attribute fall back to <code>str(response)</code>. End is attempted even if updating fails, and the current generation is cleared.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1588,7 +1589,7 @@ Translate the shared lifecycle into the Langfuse trace API. The six overridden m
       If a trace exists, create a span with a <code>"Tool: "</code>-prefixed tool name and the arguments as input.
     </ApiField>
     <ApiField name="on_tool_end">
-      End the active span with <code>output=result</code> when <code>error</code> is falsey. A truthy error instead ends it with level <code>"ERROR"</code> and <code>status_message=error</code>. Clear the current span afterward.
+      Update the active span with <code>output=result</code> when <code>error</code> is falsey, or level <code>"ERROR"</code> and <code>status_message=error</code> otherwise. Explicitly end it, even if updating fails, and clear the current span.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1599,7 +1600,7 @@ Translate the shared lifecycle into the Langfuse trace API. The six overridden m
       LLM/tool starts and all matching ends return silently when their required trace, generation, or span is absent.
     </ApiField>
     <ApiField name="provider operation failure">
-      Every overridden hook catches <code>Exception</code> around SDK calls and logs a warning. End hooks still clear their corresponding context variable.
+      Every overridden hook catches <code>Exception</code> around SDK calls and logs a warning. State is isolated per tracker and async context. Failed task starts cannot attach child observations to an outer task.
     </ApiField>
     <ApiField name="detailed inference events">
       The inherited no-op hook does not forward <code>context_prepared</code>, per-call metrics, retries, LLM-loop tools, delegation, or budget events.
@@ -1608,7 +1609,7 @@ Translate the shared lifecycle into the Langfuse trace API. The six overridden m
 </ApiSection>
 
 <ApiCallout label="Trace correlation">
-  Langfuse uses <code>task.id</code> as its trace ID. It does not read the separate <code>task.metadata["trace_id"]</code> used by <code>LocalTraceTelemetry</code>, although that value is included in Agent-supplied LLM metadata when another tracker has already attached it.
+  Langfuse derives its 32-character hexadecimal trace ID deterministically from <code>task.id</code> and preserves the original ID in observation metadata. It does not read the separate <code>task.metadata["trace_id"]</code> used by <code>LocalTraceTelemetry</code>.
 </ApiCallout>
 
 </ApiReference>

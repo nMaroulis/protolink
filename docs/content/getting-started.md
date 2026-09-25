@@ -38,14 +38,17 @@ uv add "protolink[all]"
 # HTTP support (for web-based agents)
 uv add "protolink[http]"
 
-# All supported LLM libraries
+# One LLM provider (choose the one you use)
+uv add "protolink[openai]"
+
+# All supported LLM libraries, including local llama.cpp
 uv add "protolink[llms]"
 
 # Optional local PDF ingestion for RAG
 uv add "protolink[rag-pdf]"
 
-# Development (all extras + testing tools)
-uv add "protolink[dev]"
+# YAML agent configuration
+uv add "protolink[yaml]"
 ```
 
 </TabItem>
@@ -58,14 +61,17 @@ pip install "protolink[all]"
 # HTTP support (for web-based agents)
 pip install "protolink[http]"
 
-# All supported LLM libraries
+# One LLM provider (choose the one you use)
+pip install "protolink[openai]"
+
+# All supported LLM libraries, including local llama.cpp
 pip install "protolink[llms]"
 
 # Optional local PDF ingestion for RAG
 pip install "protolink[rag-pdf]"
 
-# Development (all extras + testing tools)
-pip install "protolink[dev]"
+# YAML agent configuration
+pip install "protolink[yaml]"
 ```
 
 </TabItem>
@@ -76,23 +82,19 @@ git clone https://github.com/nmaroulis/protolink.git
 cd protolink
 
 # Editable install for local development
-uv pip install -e ".[dev]"
+uv sync --locked
 ```
 
 </TabItem>
 </Tabs>
 :::info[Optional extras]
 
-You usually only need the extras that match your use case. `protolink[llms]` installs every supported LLM SDK, so production projects may prefer installing only the provider libraries they actually use. Dependency-free in-memory and SQLite [RAG](rag.md) are part of the base package; `protolink[rag-pdf]` is needed only when the built-in loader reads local PDF files.
+Choose the extras that match your use case, such as `protolink[openai]`, `protolink[anthropic]`, or `protolink[ollama]`. Combine them with a transport when needed: `protolink[http,openai]`. The existing `protolink[llms]` bundle still installs every supported LLM SDK, including local llama.cpp bindings. See [LLMs](llm.md) for the full provider list. Dependency-free in-memory and SQLite [RAG](rag.md) are part of the base package; `protolink[rag-pdf]` is needed only when the built-in loader reads local PDF files.
 
 :::
-For development from source:
-
-```bash
-git clone https://github.com/nmaroulis/protolink.git
-cd protolink
-uv pip install -e ".[dev]"
-```
+For development, the source-checkout command installs the locked test and tooling groups.
+Add a provider only when needed, for example `uv sync --locked --extra openai`.
+The existing `protolink[dev]` extra remains available as the full installation.
 
 :::info[A2A from the first agent]
 
@@ -105,29 +107,25 @@ Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares ident
 Save this as `agent.py` and run `python agent.py`. It uses only the base package:
 
 ```python
-from protolink import Agent, AgentCard
-
-agent = Agent(
-    card=AgentCard(
-        name="calculator",
-        description="Adds numbers",
-        url="runtime://calculator",
-    ),
-    transport="runtime",
-    verbosity=0,
-)
+from protolink import Agent
 
 
-@agent.tool
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
 
 
+agent = Agent(name="calculator", tools=[add])
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-No model, API key, server process, or network connection is needed. The decorator infers the tool name from `add`, the description from its cleaned docstring, and the schemas from its type hints. Both synchronous and asynchronous functions work. `@agent.tool()` and explicit metadata such as `@agent.tool(name="sum", description="Add two numbers")` are also supported.
+No model, API key, server process, or network connection is needed. Registration infers the tool name from `add`, the description from its cleaned docstring, and the schemas from its type hints. Both synchronous and asynchronous functions work. `@agent.tool`, `@agent.tool()`, and explicit metadata such as `@agent.tool(name="sum", description="Add two numbers")` are also supported.
+
+The agent gets a generated card with description `"Agent calculator"` and URL
+`runtime://calculator`. No transport is created unless you request one. Add
+`transport="runtime"` for communication within the same process, using a unique
+name for each endpoint. Use `description=` and `url=` to customize the generated
+identity, or pass an explicit `card=` instead.
 
 For an existing function, call `agent.add_tool(add)`. The same call works on another agent, and synchronous functions, asynchronous functions, bound methods, and callable objects all use the same metadata inference. Use `Tool.from_callable(add, ...)` when you need custom schemas, tags, or permission metadata; see [Native Tools](tool.md#native-tools).
 
@@ -167,6 +165,16 @@ print(agent.sync.invoke("Say hello"))  # Hello from ProtoLink
 
 Replace the mock with a configured [LLM backend](llm.md) for real inference. An LLM may require an installed SDK, a running local model server, or provider credentials; direct tool calls require none of them.
 
+Provider aliases and `provider:model` strings also work directly:
+
+```python
+# Requires protolink[ollama] and the model available on your Ollama server.
+agent = Agent(name="calculator", llm="ollama:qwen3:4b", tools=[add])
+```
+
+Strings use provider defaults, including credentials from the environment when
+supported. Pass a configured LLM object for custom parameters or server URLs.
+
 `invoke()` returns the final part's content and raises `TaskExecutionError` when its task is failed or canceled. It preserves structured results such as `ToolOutput` in explicit tool-call mode. Prefer `call_tool()` when you already know the tool and want its raw return value, or `run_task()` when your application needs the full task. `ask()` adds deterministic retrieval before inference and returns a `RAGAnswer`; see [RAG](rag.md).
 
 Conversation memory is opt-in with `state=["conversation"]`. Supply an explicit `session_id` for each conversation in `invoke()` and `ask()`, especially when serving multiple users. Their convenience defaults reuse a shared session per method; they do not create an isolated conversation for every call.
@@ -187,14 +195,12 @@ Calling `.sync` from an active event loop raises an actionable `RuntimeError` be
 Install the HTTP extra with `uv add "protolink[http]"`, then create a service:
 
 ```python
-from protolink import Agent, AgentCard
+from protolink import Agent
 
 agent = Agent(
-    card=AgentCard(
-        name="calculator",
-        description="Adds numbers",
-        url="http://127.0.0.1:8020",
-    ),
+    name="calculator",
+    description="Adds numbers",
+    url="http://127.0.0.1:8020",
     transport="http",
 )
 
@@ -209,6 +215,11 @@ agent.start()
 ```
 
 `start()` runs the service until stopped. The same tool is now available to peers through the native task API. Add `a2a=True` for the supported A2A 1.0 boundary, or add an LLM for inference and browser chat. Registry discovery, [built-in tools](builtin-tools.md), and [MCP tools](tool.md) can be attached independently as your application grows.
+
+Network aliases require an explicit URL with a compatible scheme and bind port.
+Omitting `url` with `transport="http"` raises an actionable `ValueError`. A
+configured `HTTPTransport(url=...)` can supply that URL instead. See
+[Progressive control](progressive-control.md) for public URLs, TLS, and explicit cards.
 
 
 ### Using the CLI

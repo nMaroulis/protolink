@@ -1,9 +1,11 @@
-from mcp.server.fastmcp import FastMCP
+import sys
+
+from mcp.server.mcpserver import MCPServer
 
 # -------------------------------------------------
 # Create the MCP application
 # -------------------------------------------------
-mcp = FastMCP(name="example-mcp", instructions="Simple MCP server exposing math and greeting tools")
+mcp = MCPServer(name="example-mcp", instructions="Simple MCP server exposing math and greeting tools")
 
 # -------------------------------------------------
 # Tools
@@ -32,5 +34,5 @@ async def multiply(a: int, b: int = 5.4) -> int:
 # Start MCP server (stdio transport)
 # -------------------------------------------------
 if __name__ == "__main__":
-    print("Starting MCP server...")
+    print("Starting MCP server...", file=sys.stderr)
     mcp.run()

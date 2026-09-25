@@ -119,9 +119,6 @@ cython_debug/
 # Mac OS
 .DS_Store
 
-# uv
-uv.lock
-
 #pypi
 .pypirc
 

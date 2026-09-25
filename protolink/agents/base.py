@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any, Literal, cast
 
 from protolink.client import RegistryClient
@@ -29,6 +29,7 @@ from protolink.types import StateMode, TransportType
 
 from .engine import AgentExecutionMixin
 from .helpers import _coerce_state_operation_request
+from .identity import resolve_identity
 from .mixins import (
     AgentCommunicationMixin,
     AgentConfigurationMixin,
@@ -60,11 +61,11 @@ class Agent(
 
     def __init__(
         self,
-        card: AgentCard | dict[str, Any],
+        card: AgentCard | dict[str, Any] | None = None,
         transport: TransportType | Transport | None = None,
         registry: TransportType | Registry | RegistryClient | None = None,
         registry_url: str | None = None,
-        llm: LLM | None = None,
+        llm: LLM | str | None = None,
         system_prompt: str | None = None,
         storage: Storage | None = None,
         state: list[StateMode] | State | None = None,
@@ -73,6 +74,10 @@ class Agent(
         logger: BaseLogger | None = None,
         discovery_ttl: int = 0,
         *,
+        name: str | None = None,
+        description: str | None = None,
+        url: str | None = None,
+        tools: Iterable[BaseTool | Callable[..., Any]] | None = None,
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
         expose_chat: bool = True,
@@ -89,7 +94,14 @@ class Agent(
         """Initialize agent with its identity card and transport layer.
 
         Args:
-            card: AgentCard or dict describing this agent's identity and capabilities.
+            card: Explicit AgentCard or dict. Alternatively provide name, description,
+                and url; those identity options cannot be combined with a card.
+            name: Name for a generated card. Required when card is omitted.
+            description: Generated card description; defaults to "Agent <name>".
+            url: Advertised URL. Local agents default to runtime://<encoded name>.
+                Network transport aliases require a URL with an explicit bind port.
+                A configured Transport supplies its own URL when this is omitted.
+            tools: Typed functions or tool instances registered through add_tools.
             transport: Transport instance or transport type string. If a Transport object is provided, it's used
                 directly. If a string is provided (e.g., "http", "websocket"), a new Transport instance is created
                 with default settings using the agent's card URL. Configure TLS, limits, retries, keepalive, and
@@ -99,7 +111,9 @@ class Agent(
                 If a string is provided, a new RegistryClient is created with default transport settings using
                 registry_url. Pass a configured RegistryClient for advanced registry transport behavior.
             registry_url: URL of registry when using string transport type for registry creation.
-            llm: Optional LLM instance for agent reasoning and inference.
+            llm: Optional LLM instance, provider alias, or "provider:model" string.
+                Strings use create_llm with provider defaults; pass an object for
+                custom credentials, model parameters, or server URLs.
             system_prompt: This is used as complementary text in the system prompt, which is responsible for explaining
                 the agent logic and role. Agent calling, tool calling, and other runtime actions are already predefined,
                 so the LLM already has the knowledge needed to interact with its environment.
@@ -140,8 +154,11 @@ class Agent(
                 additionally fails when retrieval finds no passages.
         """
 
-        # Field Validation is handled by the AgentCard dataclass.
-        self.card: AgentCard = AgentCard.from_dict(card) if isinstance(card, dict) else card
+        # Validate shorthand endpoints before provider initialization can perform I/O.
+        self._identity_shorthand = card is None
+        self.card, self._automatic_identity_url = resolve_identity(
+            card, name=name, description=description, url=url, transport=transport
+        )
         # LLM validation is handled by the @llm.setter property.
         self._llm: LLM | None = None
         self.llm = llm
@@ -199,16 +216,16 @@ class Agent(
         # Initialize client and server components
         if transport is None:
             self._transport, self._client, self._server = None, None, None
-            self._logger.warning(
+            self._logger.debug(
                 "No transport provided, agent will not be able to receive tasks. Set agent.transport property"
-                " (e.g. agent.transport = 'http') to configure."
+                " to a configured Transport with a reachable URL to enable communication."
             )
         else:
             self.transport = transport  # init _transport, _client, _server properties
         # Initialize Registry Client
         if not registry:
             self.registry_client = None
-            self._logger.warning(
+            self._logger.debug(
                 "No registry provided, agent will not be able to register to the registry or fetch agents.\n"
                 "Call set_registry() to configure."
             )
@@ -240,3 +257,5 @@ class Agent(
         self._expose_chat = expose_chat
         # Sync API
         self.sync = SyncAgent(self)
+        if tools is not None:
+            self.add_tools(tools)

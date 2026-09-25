@@ -1,6 +1,6 @@
 import contextvars
 import os
-import uuid
+from dataclasses import dataclass, replace
 from typing import Any
 
 from protolink.models import Part, Task
@@ -10,9 +10,12 @@ from protolink.utils.logging import get_logger
 
 logger = get_logger("protolink.telemetry.langfuse")
 
-_current_langfuse_trace = contextvars.ContextVar[Any | None]("langfuse_trace", default=None)
-_current_langfuse_generation = contextvars.ContextVar[Any | None]("langfuse_generation", default=None)
-_current_langfuse_span = contextvars.ContextVar[Any | None]("langfuse_span", default=None)
+
+@dataclass(frozen=True)
+class _TaskObservations:
+    span: Any = None
+    generation: Any = None
+    tool: Any = None
 
 
 class LangfuseTelemetry(Telemetry):
@@ -30,7 +33,7 @@ class LangfuseTelemetry(Telemetry):
         Args:
             public_key (str | None): The Langfuse public key. Defaults to the `LANGFUSE_PUBLIC_KEY` environment variable
             secret_key (str | None): The Langfuse secret key. Defaults to the `LANGFUSE_SECRET_KEY` environment variable
-            host (str | None): The Langfuse API host URL. Defaults to `LANGFUSE_HOST` or "https://cloud.langfuse.com".
+            host (str | None): API URL. Defaults to `LANGFUSE_BASE_URL`, then `LANGFUSE_HOST`, then Langfuse Cloud.
 
         Raises:
             ImportError: If the `langfuse` package is not installed.
@@ -40,8 +43,22 @@ class LangfuseTelemetry(Telemetry):
         self.langfuse = langfuse(
             public_key=public_key or os.environ.get("LANGFUSE_PUBLIC_KEY"),
             secret_key=secret_key or os.environ.get("LANGFUSE_SECRET_KEY"),
-            host=host or os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+            base_url=host
+            or os.environ.get("LANGFUSE_BASE_URL")
+            or os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
         )
+        # Immutable frames keep copied async contexts independent. A stack also
+        # restores the caller's observations after a nested agent task completes.
+        self._tasks = contextvars.ContextVar[tuple[_TaskObservations, ...]]("langfuse_tasks", default=())
+
+    def _current(self) -> _TaskObservations:
+        tasks = self._tasks.get()
+        return tasks[-1] if tasks else _TaskObservations()
+
+    def _update_current(self, **changes: Any) -> None:
+        tasks = self._tasks.get()
+        if tasks:
+            self._tasks.set((*tasks[:-1], replace(tasks[-1], **changes)))
 
     async def on_task_start(self, task: Task, agent_name: str) -> Any:
         """Starts a new Langfuse trace for the given task.
@@ -53,13 +70,16 @@ class LangfuseTelemetry(Telemetry):
         Returns:
             Any: None.
         """
+        # Push even if the SDK fails, so child hooks cannot attach to an outer task.
+        self._tasks.set((*self._tasks.get(), _TaskObservations()))
         try:
-            trace = self.langfuse.trace(
+            trace = self.langfuse.start_observation(
                 name=f"Task: {agent_name}",
-                id=task.id if hasattr(task, "id") else str(uuid.uuid4()),
-                metadata={"agent_name": agent_name},
+                as_type="span",
+                trace_context={"trace_id": self.langfuse.create_trace_id(seed=task.id)},
+                metadata={"agent_name": agent_name, "task_id": task.id},
             )
-            _current_langfuse_trace.set(trace)
+            self._update_current(span=trace)
         except Exception as e:
             logger.warning(f"Failed to start Langfuse trace: {e}")
 
@@ -74,16 +94,21 @@ class LangfuseTelemetry(Telemetry):
         Returns:
             Any: None.
         """
-        trace = _current_langfuse_trace.get()
-        if not trace:
+        tasks = self._tasks.get()
+        if not tasks:
+            return
+        trace = tasks[-1].span
+        self._tasks.set(tasks[:-1])
+        if trace is None:
             return
         try:
-            trace.update(output=result.to_dict() if hasattr(result, "to_dict") else str(result))
+            try:
+                trace.update(output=result.to_dict() if hasattr(result, "to_dict") else str(result))
+            finally:
+                trace.end()
             self.langfuse.flush()
         except Exception as e:
             logger.warning(f"Failed to end Langfuse trace: {e}")
-        finally:
-            _current_langfuse_trace.set(None)
 
     async def on_llm_start(
         self,
@@ -100,17 +125,19 @@ class LangfuseTelemetry(Telemetry):
         Returns:
             Any: None.
         """
-        trace = _current_langfuse_trace.get()
-        if not trace:
+        trace = self._current().span
+        if trace is None:
             return
+        self._update_current(generation=None)
         try:
-            generation = trace.generation(
+            generation = trace.start_observation(
                 name="LLM Call",
+                as_type="generation",
                 model=model,
                 input=prompt,
                 metadata=metadata or None,
             )
-            _current_langfuse_generation.set(generation)
+            self._update_current(generation=generation)
         except Exception as e:
             logger.warning(f"Failed to start Langfuse LLM generation: {e}")
 
@@ -123,16 +150,18 @@ class LangfuseTelemetry(Telemetry):
         Returns:
             Any: None.
         """
-        generation = _current_langfuse_generation.get()
-        if not generation:
+        generation = self._current().generation
+        if generation is None:
             return
+        self._update_current(generation=None)
         try:
-            output = response.content if hasattr(response, "content") else str(response)
-            generation.end(output=output)
+            try:
+                output = response.content if hasattr(response, "content") else str(response)
+                generation.update(output=output)
+            finally:
+                generation.end()
         except Exception as e:
             logger.warning(f"Failed to end Langfuse LLM generation: {e}")
-        finally:
-            _current_langfuse_generation.set(None)
 
     async def on_tool_start(self, tool_name: str, args: dict[str, Any]) -> Any:
         """Starts a new tool execution span within the active Langfuse trace.
@@ -144,15 +173,17 @@ class LangfuseTelemetry(Telemetry):
         Returns:
             Any: None.
         """
-        trace = _current_langfuse_trace.get()
-        if not trace:
+        trace = self._current().span
+        if trace is None:
             return
+        self._update_current(tool=None)
         try:
-            span = trace.span(
+            span = trace.start_observation(
                 name=f"Tool: {tool_name}",
+                as_type="span",
                 input=args,
             )
-            _current_langfuse_span.set(span)
+            self._update_current(tool=span)
         except Exception as e:
             logger.warning(f"Failed to start Langfuse tool span: {e}")
 
@@ -167,15 +198,17 @@ class LangfuseTelemetry(Telemetry):
         Returns:
             Any: None.
         """
-        span = _current_langfuse_span.get()
-        if not span:
+        span = self._current().tool
+        if span is None:
             return
+        self._update_current(tool=None)
         try:
-            if error:
-                span.end(level="ERROR", status_message=error)
-            else:
-                span.end(output=result)
+            try:
+                if error:
+                    span.update(level="ERROR", status_message=error)
+                else:
+                    span.update(output=result)
+            finally:
+                span.end()
         except Exception as e:
             logger.warning(f"Failed to end Langfuse tool span: {e}")
-        finally:
-            _current_langfuse_span.set(None)

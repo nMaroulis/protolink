@@ -23,6 +23,7 @@ MAX_TRACE_PAGE_LIMIT = 200
 DEFAULT_MAX_TRACE_LINE_BYTES = 16 * 1024 * 1024
 DEFAULT_MAX_TRACE_SCAN_BYTES = 64 * 1024 * 1024
 DEFAULT_MAX_TRACE_SCAN_LINES = 5000
+MAX_TRACE_JSON_DEPTH = 256
 _REVERSE_READ_CHUNK_BYTES = 64 * 1024
 
 
@@ -754,7 +755,7 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 
 def _strict_json_loads(raw: bytes) -> Any:
-    """Decode standards-compliant JSON and reject NaN/Infinity constants."""
+    """Decode finite JSON with a nesting bound independent of Python's decoder."""
 
     def reject_constant(value: str) -> None:
         raise ValueError(f"Non-finite JSON number: {value}")
@@ -765,8 +766,23 @@ def _strict_json_loads(raw: bytes) -> Any:
             raise ValueError(f"Non-finite JSON number: {value}")
         return parsed
 
-    return json.loads(
+    result = json.loads(
         raw,
         parse_constant=reject_constant,
         parse_float=parse_finite_float,
     )
+    # Python 3.14's decoder accepts nesting that previously raised RecursionError.
+    # Walk iteratively, retaining one iterator per level rather than every child.
+    stack = [(iter([result]), 0)]
+    while stack:
+        children, depth = stack[-1]
+        try:
+            value = next(children)
+        except StopIteration:
+            stack.pop()
+            continue
+        if isinstance(value, dict | list):
+            if depth >= MAX_TRACE_JSON_DEPTH:
+                raise ValueError(f"Trace JSON exceeds {MAX_TRACE_JSON_DEPTH} levels of nesting")
+            stack.append((iter(value.values() if isinstance(value, dict) else value), depth + 1))
+    return result

@@ -47,6 +47,7 @@ class _AgentMixinBase(Protocol):
     _client: AgentClient | None
     _server: AgentServer | None
     _llm: LLM | None
+    _automatic_identity_url: str | None
     _storage: Storage
     _state: State
     _telemetry: Telemetry | None
@@ -76,7 +77,7 @@ class _AgentMixinBase(Protocol):
     def llm(self) -> LLM | None: ...
 
     @llm.setter
-    def llm(self, llm: LLM | None) -> None: ...
+    def llm(self, llm: LLM | str | None) -> None: ...
 
     @property
     def telemetry(self) -> Telemetry | None: ...

@@ -1,9 +1,14 @@
 # Progressive control
 
-Start with a prompt or a typed function. Add controls to the same operation as your
-application grows, and use explicit `Task`, `RunContext`, transport, and flow objects
-when you need the complete runtime contract. These convenience methods use the
-existing execution paths for validation, policy, approvals, cancellation, and reporting.
+Progressive control is a core design principle of ProtoLink: start with a small
+call, configure the parts that need attention, and plug in your own components
+through the same API. It applies to agent setup, execution, and deployment.
+
+Identity, models, tools, transport, storage, and observability are independent
+choices. A model string resolves to an LLM object; a transport alias resolves to a
+transport instance. You can configure or replace either while keeping the rest
+of the agent. Short and explicit forms share the same execution paths for
+validation, policy, approvals, cancellation, and reporting.
 
 Run the complete, provider-free walkthrough:
 
@@ -14,20 +19,44 @@ python examples/progressive_control.py
 It needs only the base package. `--mcp` also starts the bundled MCP example server
 and requires `protolink[mcp]`.
 
+## Start with names and functions
+
+```python
+from protolink import Agent
+
+
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+
+agent = Agent(name="helper", llm="mock", tools=[add])
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
+print(agent.sync.invoke("Hello"))
+```
+
+This example needs no provider credentials or server. The name creates an agent
+card, `"mock"` selects the built-in offline model, and the typed function becomes
+a tool. In async programs and notebooks use `await agent.invoke(...)` and
+`await agent.call_tool(...)`. Blocking facades reject calls inside an active event
+loop before creating a coroutine.
+
 ## Choose how much to configure
 
-Progressive control applies to setup as well as execution. Start with defaults,
-configure individual options, then pass your own components when you need them.
-The explicit forms use the same public interfaces as the shortcuts.
+Use a shorthand for defaults, a configured object for specific options, or your
+own implementation of the component's public interface. Choose independently
+for each argument: `Agent(name="helper", llm=llm, transport=transport)` is just
+as valid as an explicit card with `llm="gemini"`. Adding a transport does not
+require changing tools; changing a model does not require changing task handling.
 
 | Boundary | Start small | Add control |
 | --- | --- | --- |
-| Agent identity | `Agent(card={...})` | Supply an `AgentCard` with skills and capabilities |
-| Transport | `Agent(card, transport="http")` | Pass `HTTPTransport(...)` with timeouts, TLS, and limits |
+| Agent identity | `Agent(name="helper")` | Pass a card dictionary or an `AgentCard` with skills and capabilities |
+| Transport | `Agent(name="helper", transport="http", url="http://127.0.0.1:8001")` | Pass `HTTPTransport(...)` with timeouts, TLS, and limits |
 | Standalone client | `AgentClient("http")` | Pass a configured transport |
 | Registry | `registry="http", registry_url=url` | Pass a `RegistryClient` or `Registry` |
-| Model | `create_llm("mock")` | Configure the provider or supply an `LLM` implementation |
-| Tools | `agent.add_tool(function)` or `@agent.tool` | Supply a `Tool` with schemas, names, and capabilities |
+| Model | `llm="gemini"` or `llm="ollama:qwen3:4b"` | Pass `GeminiLLM(...)`, `create_llm(...)`, or your own `LLM` |
+| Tools | `tools=[function]` or `@agent.tool` | Supply a `Tool` with schemas, names, and capabilities |
 | State | `state=["conversation"]` | Supply storage and a configured `State` |
 | Knowledge | `create_knowledge("memory", sources=[...])` | Choose components or supply a retriever |
 | Logs | `verbosity=0`, `1`, or `2` | Supply a logger; attach telemetry and a run store separately |
@@ -38,16 +67,25 @@ The explicit forms use the same public interfaces as the shortcuts.
 
 ### Agent cards and transports
 
-A dictionary works for a small identity. A typed card makes capabilities and skills
-available for explicit configuration:
+A name is enough for a local agent. Network aliases require a URL with a matching
+scheme and an explicit port; ProtoLink does not invent a listening address:
 
 ```python
 from protolink import Agent, AgentCard
 
-identity = {"name": "helper", "description": "A helpful agent", "url": "http://127.0.0.1:8001"}
-simple = Agent(card=identity, transport="http")
+local = Agent(name="helper", llm="mock")  # runtime://helper identity, no transport
+simple = Agent(name="helper", transport="http", url="http://127.0.0.1:8001")
+```
 
+For explicit identity metadata, pass a dictionary or a typed card:
+
+```python
+identity = {"name": "helper", "description": "A helpful agent", "url": "http://127.0.0.1:8001"}
 card = AgentCard(**identity)
+
+with_dict = Agent(card=identity, transport="http")
+# Equivalent identity:
+with_card = Agent(card=card, transport="http")
 ```
 
 `transport="http"` creates an HTTP transport with defaults using `card.url`. To
@@ -67,10 +105,20 @@ transport = HTTPTransport(
 configured = Agent(card, transport=transport)
 ```
 
-Both forms require an agent card. Construction configures the agent; it does not
-start a server. HTTP needs `protolink[http]`; use `transport="runtime"` and a
-`runtime://helper` card URL for communication within one process. An embedded
-agent can omit transport altogether. Retries apply only to requests declared
+You can also use `Agent(name="helper", transport=transport)` to derive the card's
+URL from the configured transport. An explicit `url=` can advertise a public
+address while that transport binds locally, for example behind a reverse proxy.
+Secure bind URLs require a configured transport with a `TLSConfig` containing a
+certificate and key. Shorthand validates these settings before creating the LLM.
+
+An explicit `card=` accepts an `AgentCard` or dictionary and cannot be combined
+with `name=`, `description=`, or `url=`. Existing card-based construction keeps its
+behavior. Construction does not start a server. HTTP needs `protolink[http]`;
+`Agent(name="helper", transport="runtime")` enables communication within one
+process. Use unique names for runtime endpoints. To add HTTP later to a name-only
+agent, assign a configured `HTTPTransport(url="http://127.0.0.1:8001")` to
+`agent.transport`; the automatically generated card URL follows it. An explicit
+card URL stays under your control. Retries apply only to requests declared
 idempotent. See [Transports](transport.md) for TLS and the other transport aliases.
 
 ### Clients and registries
@@ -107,21 +155,35 @@ a registry client lets discovery use different transport settings from agent cal
 
 ### Models
 
-The model factory returns an ordinary provider object, so you can move between
-factory configuration and an explicit implementation:
+Start with a provider alias or `provider:model` string. Pass a provider instance
+when you need to configure its credentials, model, or request parameters. For
+Gemini, install `protolink[gemini]` and set `GEMINI_API_KEY`:
 
 ```python
 from protolink import create_llm
-from protolink.llms import MockLLM
+from protolink.llms.api import GeminiLLM
 
-simple = Agent(card, llm=create_llm("mock", default_response="Ready."))
-configured = Agent(card, llm=MockLLM(sequential_responses=["Draft.", "Revised draft."]))
+simple = Agent(name="helper", llm="gemini")
+
+llm = GeminiLLM(model_params={"temperature": 0.2})
+configured = Agent(name="helper", llm=llm)
 ```
 
-For a real provider, pass its options through `create_llm`, for example
-`create_llm("ollama", model="qwen3:4b", base_url="http://127.0.0.1:11434")`.
-The `llm` argument receives an object; provider aliases belong to `create_llm`.
+The configured object is used directly. You can also pass provider options through
+`create_llm`, which returns the same concrete adapters, for example
+`create_llm("ollama:qwen3:4b", base_url="http://127.0.0.1:11434")`.
+`Agent(name="helper", llm="ollama:qwen3:4b")` uses the same factory with provider
+defaults. Only the first colon separates the provider from the model, preserving
+model tags and case. Existing `create_llm("ollama", model="qwen3:4b")` calls still
+work; do not supply a model both inline and through `model=`.
+
+Pass typed functions or configured tools through `Agent(name="helper", tools=[...])`
+or register them later with `add_tools`. Both paths use the existing validation,
+policy, and skill-registration behavior. Continue to execute through `invoke`,
+`.sync`, and the task APIs.
 See [LLMs](llm.md) for provider extras and implementing the `LLM` contract.
+Provider construction or connection validation may contact the model service;
+use `"mock"` or a configured `MockLLM` for an offline setup.
 
 ### Conversation state and storage
 
@@ -160,7 +222,7 @@ configured_knowledge = create_knowledge(
     embedder=HashEmbedder(),
     store=InMemoryVectorStore(),
 )
-agent = Agent(card, llm=create_llm("mock"), knowledge=configured_knowledge)
+with_knowledge = Agent(card, llm=create_llm("mock"), knowledge=configured_knowledge)
 ```
 
 Sources are indexed on first search, or explicitly with `await knowledge.ready()`.
@@ -183,32 +245,6 @@ configured = Agent(card, logger=FileLogger("agent.json"))
 A supplied logger owns its level and formatting. Add telemetry for tracing or
 `run_store=SQLiteRunStore("runs.db")` for retained run reports independently of
 console verbosity. [Runtime](runtime.md) covers those explicit interfaces.
-
-## A small starting point
-
-```python
-from protolink import Agent, AgentCard, create_llm
-
-agent = Agent(
-    AgentCard(name="helper", description="A helpful agent", url="runtime://helper"),
-    llm=create_llm("mock", default_response="Ready to help."),
-    verbosity=0,
-)
-
-
-def add(a: int, b: int) -> int:
-    """Add two integers."""
-    return a + b
-
-
-agent.add_tools([add])
-print(agent.sync.call_tool("add", a=2, b=3))
-print(agent.sync.invoke("Hello"))
-```
-
-An embedded agent does not need a transport or a running server. In async programs
-and notebooks use `await agent.invoke(...)` and `await agent.call_tool(...)`.
-Blocking facades reject calls inside an active event loop before creating a coroutine.
 
 ## Create and read tasks
 
@@ -281,7 +317,7 @@ answer = await agent.invoke(
 
 context = RunContext(
     session_id="planning",
-    trace_id="release-0.7.3",
+    trace_id="release-0.7.4",
     permissions={"filesystem.write": "deny"},
 )
 answer = await agent.invoke("Review the plan", context=context)
@@ -385,17 +421,32 @@ registered = await agent.add_mcp(
 print(await agent.call_tool("math_add", a=2, b=3))
 ```
 
-`add_mcp(adapter=None, *, command=None, args=None, url=None, headers=None, include=None,
+`add_mcp(adapter=None, *, transport=None, command=None, args=None, url=None, headers=None, include=None,
 prefix="")` accepts either a configured `MCPToolAdapter`, stdio command/arguments,
-or an SSE URL/headers. `include` contains original server names; `prefix` only changes
+or an HTTP URL/headers. Set `transport="streamable_http"` for Streamable HTTP;
+an omitted transport with a URL retains legacy SSE behavior. `include` contains original server names; `prefix` only changes
 local registration names. Unknown selections, duplicate discovered names, or existing
 local names fail before registration. An empty selection registers nothing.
 
 Discovery contacts the server and may start its process, but invokes no tool. Sessions
-open and close per request; the helper does not create a long-lived connection.
+open and close per request unless you pass an adapter inside its `session()` context.
 Use `agent.sync.add_mcp(...)` in blocking scripts. For lower-level control, use
 `await adapter.list_tools_async()` or `await adapter.get_tools_async()`; the existing
 blocking adapter methods remain available. Install the optional `mcp` extra first.
+
+```python
+from protolink.tools.adapters import MCPToolAdapter
+
+adapter = MCPToolAdapter("streamable_http", url="https://example.com/mcp")
+async with adapter.session():
+    await agent.add_mcp(adapter, include=["search"], prefix="remote_")
+    result = await agent.call_tool("remote_search", query="agent protocols")
+```
+
+Single plain text results return strings. Rich results are dictionaries with MCP
+fields such as `content`, `structuredContent`, and `_meta`; for structured output,
+read `result["structuredContent"]`. MCP tool failures raise `MCPToolError` on direct
+calls and become failed tool outputs through task execution. See [MCP tools](tool.md#mcp-tools).
 
 ## Call a peer
 

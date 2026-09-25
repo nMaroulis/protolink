@@ -24,8 +24,9 @@ def test_release_versions_match() -> None:
 
 def test_ruff_version_matches_precommit() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    requirements = project["project"]["optional-dependencies"]["test"]
+    requirements = project["dependency-groups"]["lint"]
     ruff = next(requirement for requirement in requirements if requirement.startswith("ruff=="))
     version = ruff.removeprefix("ruff==")
 
     assert f"rev: v{version}" in (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    assert ruff in project["project"]["optional-dependencies"]["test"]

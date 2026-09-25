@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import sys
 from typing import Any, ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -17,6 +18,32 @@ from protolink.llms.base import LLM
 from protolink.llms.history import ConversationHistory
 from protolink.tools import BaseTool
 from protolink.transport import Transport
+
+
+def test_yaml_missing_dependency_has_install_hint_and_preserves_files(monkeypatch, tmp_path):
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    agent = Agent(name="missing-yaml")
+    destination = tmp_path / "agent.yaml"
+    destination.write_text("existing configuration", encoding="utf-8")
+    with pytest.raises(ImportError, match=r"protolink\[yaml\]"):
+        agent.to_yaml(str(destination))
+    assert destination.read_text(encoding="utf-8") == "existing configuration"
+    with pytest.raises(ImportError, match=r"protolink\[yaml\]"):
+        Agent.from_yaml_string("name: missing-yaml")
+
+
+@pytest.mark.parametrize("serialization", ["dict", "yaml"])
+def test_agent_llm_configuration_round_trip(serialization):
+    agent = Agent(name="configured", llm="mock:custom-model")
+    agent.llm._reasoning = "high"
+    if serialization == "yaml":
+        restored = Agent.from_yaml_string(agent.to_yaml_string())
+    else:
+        restored = Agent.from_dict(agent.to_dict())
+    assert restored.card.name == "configured"
+    assert restored.llm.model == "custom-model"
+    assert restored.llm._reasoning == "high"
+    assert restored.sync.invoke("Hello") == "Unprocessed generic mock response"
 
 
 class DummyTransport(Transport):
