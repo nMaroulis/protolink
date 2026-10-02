@@ -1,7 +1,9 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
+import protolink.llms.metrics as metrics_module
 from protolink import Agent, AgentCard, LLMModelProfile, LocalTraceTelemetry, Task, create_llm
 from protolink.llms.base import LLM
 from protolink.llms.history import ConversationHistory
@@ -26,6 +28,30 @@ class MetricsMockLLM(LLM):
 
     def validate_connection(self) -> bool:
         return True
+
+
+@pytest.mark.parametrize("availability", ["missing", "available"])
+def test_tokenizer_resolution_is_cached_per_model(monkeypatch, availability: str) -> None:
+    imports = 0
+    encoder = SimpleNamespace(encode=lambda _text: [1, 2, 3])
+
+    def import_tokenizer(name: str):
+        nonlocal imports
+        assert name == "tiktoken"
+        imports += 1
+        if availability == "missing":
+            raise ImportError("optional tokenizer missing")
+        return SimpleNamespace(encoding_for_model=lambda _model: encoder)
+
+    metrics_module._optional_tiktoken_encoder.cache_clear()
+    monkeypatch.setattr(metrics_module.importlib, "import_module", import_tokenizer)
+    try:
+        expected = 3 if availability == "available" else 2
+        assert metrics_module.estimate_token_count("abcdef", model="cache-test") == expected
+        assert metrics_module.estimate_token_count("abcdef", model="cache-test") == expected
+        assert imports == 1
+    finally:
+        metrics_module._optional_tiktoken_encoder.cache_clear()
 
 
 def test_create_llm_accepts_optional_metrics_profile():

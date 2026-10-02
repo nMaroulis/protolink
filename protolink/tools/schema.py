@@ -38,9 +38,8 @@ JSON_SCHEMA_KEYS = {
 def _safe_get_type_hints(func: Callable[..., Any]) -> dict[str, Any]:
     """Safely extract type hints from a callable.
 
-    Python callable instances store their annotations on ``__call__``. Their
-    original signature still determines the accepted argument names and defaults.
-    Unresolvable annotations fall back to schema inference from the signature.
+    Python callable instances store their annotations on ``__call__``. Their original signature still determines the
+    accepted argument names and defaults. Unresolvable annotations fall back to schema inference from the signature.
     """
     target = func
     if callable(func) and not inspect.isroutine(func) and not inspect.isclass(func):
@@ -214,8 +213,7 @@ def normalize_schema(schema: Any, title: str | None = None) -> dict[str, Any]:
     Accepted inputs:
     - Full JSON Schema objects.
     - Pydantic models and Python type annotations.
-    - Legacy flat maps such as ``{"city": str}`` or
-      ``{"city": {"type": "string", "required": True}}``.
+    - Legacy flat maps such as ``{"city": str}`` or ``{"city": {"type": "string", "required": True}}``.
     """
     if schema is None:
         return _with_title(

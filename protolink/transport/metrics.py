@@ -11,10 +11,9 @@ from typing import Any
 class TransportMetricsSnapshot:
     """Immutable counters and latency totals for one transport instance.
 
-    Request and stream counters describe logical operations, while ``retries``
-    counts additional wire attempts. Byte counters measure serialized payloads.
-    ``total_latency_ms`` is cumulative request latency so callers can derive an
-    average without the transport imposing a metrics backend.
+    Request and stream counters describe logical operations, while ``retries`` counts additional wire attempts.
+    Byte counters measure serialized payloads. ``total_latency_ms`` is cumulative request latency so callers can derive
+    an average without the transport imposing a metrics backend.
     """
 
     requests_started: int = 0

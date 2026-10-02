@@ -12,13 +12,48 @@ import pytest
 from protolink import Agent, AgentCard, RunContext, Task
 from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
 from protolink.llms.base import LLM
-from protolink.llms.history import ConversationHistory
+from protolink.llms.history import ConversationHistory, LLMMessage
 from protolink.tools import BaseTool
 
 
 def _user_messages(history: ConversationHistory) -> list[str]:
     """Return serialized user messages from a conversation history."""
     return [str(message["content"]) for message in history.messages if message.get("role") == "user"]
+
+
+def test_history_copy_preserves_fields_and_isolates_message_maps() -> None:
+    history = ConversationHistory()
+    history.add_user("hello", source="test")
+    original = history.messages_raw()[0]
+    original.tool_calls["call"] = {"name": "example"}
+    copied = history.copy()
+    duplicate = copied.messages_raw()[0]
+
+    assert duplicate.to_dict() == original.to_dict()
+    assert duplicate is not original
+    duplicate.metadata["source"] = "copy"
+    duplicate.tool_calls["other"] = "copy"
+    assert original.metadata == {"source": "test"}
+    assert "other" not in original.tool_calls
+
+
+def test_message_from_dict_keeps_existing_id() -> None:
+    message = LLMMessage.from_dict({"role": "user", "content": "hello", "id": "known"})
+    assert message.id == "known"
+
+
+@pytest.mark.parametrize("system_prompt", [None, "instructions"])
+def test_history_truncate_preserves_only_a_system_prefix(system_prompt: str | None) -> None:
+    history = ConversationHistory(system_prompt)
+    for index in range(5):
+        history.add_user(f"message-{index}")
+
+    history.truncate(3)
+
+    expected = ["message-2", "message-3", "message-4"]
+    if system_prompt:
+        expected = [system_prompt, "message-3", "message-4"]
+    assert [message.content for message in history] == expected
 
 
 class PausingEchoLLM(LLM):

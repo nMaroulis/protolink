@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -61,7 +61,7 @@ class LLMMessage:
             content=data["content"],
             name=data.get("name"),
             metadata=data.get("metadata", {}),
-            id=data.get("id", str(uuid4())),
+            id=data["id"] if "id" in data else str(uuid4()),
             created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(UTC),
             tool_calls=data.get("tool_calls", {}),
             tool_name=data.get("tool_name"),
@@ -243,11 +243,18 @@ class ConversationHistory:
         The copied history preserves every canonical message field, including
         provider-specific metadata such as tool-call payloads. Agents use this
         when a run needs an isolated working history without mutating the
-        LLM's default history object.
+        LLM's default history object. Message objects and their top-level
+        metadata and tool-call dictionaries are copied; nested values retain
+        their original references.
 
         Time: O(N)
         """
-        return ConversationHistory.from_list(self.to_list())
+        history = ConversationHistory()
+        history._messages = deque(
+            replace(message, metadata=message.metadata.copy(), tool_calls=message.tool_calls.copy())
+            for message in self._messages
+        )
+        return history
 
     def replace(self, messages_data: Iterable[dict[str, Any]]) -> None:
         """Replace all messages while preserving this history object's identity.
@@ -286,8 +293,7 @@ class ConversationHistory:
     # ----------------------------------------------------------------------
 
     def truncate(self, max_messages: int) -> None:
-        """
-        Truncate history while ALWAYS preserving the system prompt.
+        """Keep the newest messages, preserving a leading system prompt.
 
         Args:
             max_messages: Maximum number of messages to retain (including system prompt).
@@ -300,9 +306,8 @@ class ConversationHistory:
         if len(self._messages) <= max_messages:
             return
 
-        system = self._messages.popleft()
-        # Keep only the last (max_messages - 1) messages
-        while len(self._messages) >= max_messages:
+        system = self._messages.popleft() if self._messages[0].role == LLMMessageRole.SYSTEM else None
+        while len(self._messages) > max_messages - (system is not None):
             self._messages.popleft()
-
-        self._messages.appendleft(system)
+        if system is not None:
+            self._messages.appendleft(system)

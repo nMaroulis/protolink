@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib
 import json
 from dataclasses import asdict, dataclass, field, is_dataclass
+from functools import lru_cache
 from typing import Any
 
 from protolink.llms.serialization import json_history_default
@@ -362,8 +363,13 @@ def _fill_missing_usage(provider_usage: LLMUsage | None, estimated_usage: LLMUsa
     )
 
 
+@lru_cache(maxsize=128)
 def _optional_tiktoken_encoder(model: str | None) -> Any | None:
-    """Return a tiktoken encoder when the optional package is installed."""
+    """Resolve and cache the optional encoder once per model name.
+
+    Context estimation calls this for every message. Caching also avoids
+    repeated failed imports when ``tiktoken`` is not installed.
+    """
     try:
         tiktoken = importlib.import_module("tiktoken")
     except ImportError:

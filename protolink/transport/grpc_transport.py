@@ -1,13 +1,10 @@
 """gRPC transport for Protolink agent communication.
 
-This module implements :class:`GRPCTransport`, a physical network transport
-that exposes Protolink's transport-neutral ``EndpointSpec`` objects through a
-single generic gRPC service. It deliberately avoids generated protobuf files:
-requests and responses are compact JSON envelopes carried as gRPC byte
-messages. That keeps the public ``AgentClient`` and ``AgentServer`` contracts
-identical to HTTP, SSE, WebSocket, and Runtime transports while still using
-gRPC's binary framing, deadlines, metadata, connection pooling, and unary-stream
-support.
+This module implements :class:`GRPCTransport`, a physical network transport that exposes Protolink's transport-neutral
+``EndpointSpec`` objects through a single generic gRPC service. It deliberately avoids generated protobuf files:
+requests and responses are compact JSON envelopes carried as gRPC byte messages. That keeps the public ``AgentClient``
+and ``AgentServer`` contracts identical to HTTP, SSE, WebSocket, and Runtime transports while still using gRPC's binary
+framing, deadlines, metadata, connection pooling, and unary-stream support.
 """
 
 from __future__ import annotations

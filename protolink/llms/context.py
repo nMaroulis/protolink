@@ -150,15 +150,15 @@ def build_context_manifest(
         A provider-neutral, JSON-serializable manifest.
     """
     messages = history.messages_raw()
-    tool_prompt_tokens = estimate_token_count(
-        {
-            "tools": [_tool_descriptor(name, tool) for name, tool in sorted((tools or {}).items())],
-            "agents": [_agent_descriptor(card) for card in agent_cards or []],
-        },
-        model=model,
-    )
-    if not tools and not agent_cards:
-        tool_prompt_tokens = 0
+    tool_prompt_tokens = 0
+    if tools or agent_cards:
+        tool_prompt_tokens = estimate_token_count(
+            {
+                "tools": [_tool_descriptor(name, tool) for name, tool in sorted((tools or {}).items())],
+                "agents": [_agent_descriptor(card) for card in agent_cards or []],
+            },
+            model=model,
+        )
 
     system_raw_tokens = 0
     history_tokens = 0
@@ -187,7 +187,7 @@ def build_context_manifest(
             kind="history",
             name="conversation_history",
             tokens=history_tokens,
-            metadata={"message_count": len([msg for msg in messages if msg is not current_user_message])},
+            metadata={"message_count": len(messages) - (current_user_message is not None)},
         ),
         ContextItem(kind="user", name="current_user_query", tokens=user_tokens),
     ]

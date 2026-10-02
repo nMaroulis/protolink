@@ -1354,7 +1354,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         ):
             infer_kwargs["budget_enforcer"] = active_budget_enforcer
 
-        history_start = len(self.llm.history.messages_raw())
+        history_start = len(self.llm.history)
         try:
             response: Part = await self.llm.infer(**infer_kwargs)
         finally:

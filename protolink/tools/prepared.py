@@ -11,8 +11,8 @@ class PreparedTool(Tool):
     """A tool with a typed input signature and an authorization-aware executor.
 
     The signature callable describes arguments only; it is never invoked.
-    Register this tool on an Agent. Calling it directly fails closed because no
-    prepared authorization, cancellation token, or budget is available.
+    Register this tool on an Agent. Calling it directly fails closed because no prepared authorization, cancellation
+    token, or budget is available.
     """
 
     def __init__(

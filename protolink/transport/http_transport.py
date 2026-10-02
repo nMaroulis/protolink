@@ -30,6 +30,7 @@ from protolink.transport.base import Transport, TransportRequestContext
 from protolink.transport.config import TransportCapabilities, TransportConfig
 from protolink.transport.errors import (
     TransportConnectionError,
+    TransportLimitError,
     TransportProtocolError,
     TransportRemoteError,
     TransportTimeoutError,
@@ -168,7 +169,11 @@ class HTTPTransport(Transport):
         # example, an A2A AgentInterface). Preserve it byte-for-byte apart from
         # surrounding whitespace, including a potentially significant slash.
         url = base_url.strip() if request_spec.path == "" else f"{base_url.rstrip('/')}{request_spec.path}"
-        request_size = self.check_payload_limit({"data": data, "params": params}, kind="request", url=url)
+        # Normalize the body once; retries reuse the same wire payload.
+        wire_data = (
+            self._serialize_payload(data) if request_spec.request_source == "body" and data is not None else data
+        )
+        request_size = self.check_payload_limit({"data": wire_data, "params": params}, kind="request", url=url)
         context = self.new_request_context(request_spec, data)
 
         async def operation(attempt: TransportRequestContext) -> Any:
@@ -194,7 +199,7 @@ class HTTPTransport(Transport):
             if params:
                 kwargs["params"] = params
             if request_spec.request_source == "body" and data is not None:
-                kwargs["json"] = self._serialize_payload(data)
+                kwargs["json"] = wire_data
             elif request_spec.request_source == "query_params" and data is not None:
                 kwargs["params"] = data if isinstance(data, dict) else {"data": str(data)}
 
@@ -234,8 +239,13 @@ class HTTPTransport(Transport):
                 ) from exc
 
             response_size = len(response.content)
-            if response_size > self.config.limits.max_response_bytes:
-                self.check_payload_limit(response.text, kind="response", url=url)
+            maximum = self.config.limits.max_response_bytes
+            if response_size > maximum:
+                raise TransportLimitError(
+                    f"Transport response payload is {response_size} bytes; configured maximum is {maximum} bytes",
+                    url=url,
+                    request_id=attempt.request_id,
+                )
             self._metrics.add(bytes_received=response_size)
             try:
                 payload = response.json()
@@ -432,10 +442,5 @@ class HTTPTransport(Transport):
 
     @timeout.setter
     def timeout(self, value: float) -> None:
-        """Dynamically reconfigure the maximum duration for outbound network operations.
-
-        Note: Currently, mutating this property will only affect newly instantiated connection
-        pools. Existing, active ``httpx.AsyncClient`` instances tied to active event loops
-        will retain their original configuration.
-        """
+        """Set the timeout passed explicitly to each subsequent outbound request."""
         self._timeout = value

@@ -75,8 +75,7 @@ class RetryPolicy:
         initial_backoff: Delay before the first retry in seconds.
         max_backoff: Maximum delay between attempts in seconds.
         jitter: Random delay added to each backoff in seconds.
-        retryable_methods: HTTP-style methods eligible for retry when the
-            request spec is also marked idempotent.
+        retryable_methods: HTTP-style methods eligible for retry when the request spec is also marked idempotent.
     """
 
     max_attempts: int = 1

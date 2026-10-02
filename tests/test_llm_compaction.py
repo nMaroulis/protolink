@@ -5,6 +5,7 @@ from typing import ClassVar
 
 import pytest
 
+import protolink.llms.compaction as compaction_module
 from protolink import (
     Agent,
     AgentCard,
@@ -127,6 +128,27 @@ def test_token_compaction_keeps_protected_recent_suffix_within_budget() -> None:
     ]
     assert result.after_tokens <= budget
     assert result.removed_messages == 4
+
+
+def test_token_compaction_bounds_full_history_estimates(monkeypatch) -> None:
+    llm = CompactionLLM()
+    _seed_history(llm, count=256)
+    budget = estimate_token_count(llm.history.messages[-8:], model=llm.model)
+    estimates = 0
+    original_estimator = compaction_module.estimate_token_count
+
+    def count_estimates(value, *, model=None):
+        nonlocal estimates
+        estimates += 1
+        return original_estimator(value, model=model)
+
+    monkeypatch.setattr(compaction_module, "estimate_token_count", count_estimates)
+    result = llm.compact_history("tokens", max_tokens=budget, preserve_recent=2)
+
+    assert result.after_tokens <= budget
+    assert result.after_messages < result.before_messages
+    assert llm.history.messages[-2:][0]["content"].startswith("message-254")
+    assert estimates <= 12  # before/after counts plus logarithmic candidate search
 
 
 def test_summary_compaction_uses_isolated_call_and_preserves_recent_messages() -> None:

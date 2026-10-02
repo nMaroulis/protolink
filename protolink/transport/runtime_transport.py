@@ -308,8 +308,8 @@ class RuntimeTransport(Transport):
                 )
 
             # Resolve an endpoint explicitly designed for streaming
-            stream_endpoints: list[EndpointSpec] = [ep for ep in target._endpoints.values() if ep.streaming]
-            if not stream_endpoints:
+            endpoint = next((ep for ep in target._endpoints.values() if ep.streaming), None)
+            if endpoint is None:
                 # Fallback wrapper enabling non-streaming endpoints to mock a final stream response
                 fallback_spec = ClientRequestSpec(
                     name="task",
@@ -326,8 +326,6 @@ class RuntimeTransport(Transport):
                 self._metrics.add(bytes_sent=request_size, bytes_received=event_size)
                 yield event
                 return
-
-            endpoint: EndpointSpec = stream_endpoints[0]
 
             # Emulate boundary validation across streaming task delivery
             payload: Any = task

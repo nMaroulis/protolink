@@ -554,11 +554,11 @@ class TaskStatusUpdateEvent:
     def from_dict(cls, data: dict) -> "TaskStatusUpdateEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             previous_state=data.get("previous_state"),
             new_state=data.get("new_state", ""),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             final=data.get("final", False),
             metadata=data.get("metadata", {}),
         )
@@ -604,10 +604,10 @@ class TaskArtifactUpdateEvent:
     def from_dict(cls, data: dict) -> "TaskArtifactUpdateEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             artifact=data.get("artifact"),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )
 
@@ -651,11 +651,11 @@ class TaskProgressEvent:
     def from_dict(cls, data: dict) -> "TaskProgressEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             progress=data.get("progress", 0),
             message=data.get("message"),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )
 
@@ -697,14 +697,14 @@ class TaskLLMStreamEvent:
     def from_dict(cls, data: dict) -> "TaskLLMStreamEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             agent_name=data.get("agent_name", ""),
             llm_event_type=data.get("llm_event_type", ""),
             step=data.get("step"),
             content=data.get("content"),
             final=data.get("final", False),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )
 
@@ -750,11 +750,11 @@ class TaskErrorEvent:
     def from_dict(cls, data: dict) -> "TaskErrorEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             error_code=data.get("error_code", ""),
             error_message=data.get("error_message", ""),
             recoverable=data.get("recoverable", False),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )

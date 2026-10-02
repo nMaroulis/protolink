@@ -25,9 +25,8 @@ class BackendInterface(ABC):
     ) -> None:
         """Register all abstract endpoints onto the physical ASGI routing table.
 
-        Subclasses must implement this to iterate over the provided `EndpointSpec` models
-        and mount them as concrete HTTP routes within their specific web framework
-        (e.g., Starlette or FastAPI).
+        Subclasses must implement this to iterate over the provided `EndpointSpec` models and mount them as concrete
+        HTTP routes within their specific web framework (e.g., Starlette or FastAPI).
         """
         raise NotImplementedError()
 
@@ -35,9 +34,8 @@ class BackendInterface(ABC):
     async def start(self, url: str, tls: TLSConfig | None = None) -> None:
         """Initialize and spin up the underlying ASGI HTTP server daemon.
 
-        Implementations should bind to the parsed host/port from the provided `url`
-        and execute the server loop inside an isolated `asyncio.Task`. ``https://``
-        URLs must apply the supplied TLS certificate configuration.
+        Implementations should bind to the parsed host/port from the provided `url` and execute the server loop inside
+        an isolated `asyncio.Task`. ``https://`` URLs must apply the supplied TLS certificate configuration.
         """
         ...
 
@@ -45,8 +43,8 @@ class BackendInterface(ABC):
     async def stop(self) -> None:
         """Gracefully terminate the ASGI HTTP server daemon.
 
-        Implementations must signal the server to exit, gracefully complete any
-        in-flight connections, and safely `await` the background server task until closure.
+        Implementations must signal the server to exit, gracefully complete any in-flight connections, and safely
+        `await` the background server task until closure.
         """
         ...
 

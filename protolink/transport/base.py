@@ -309,9 +309,19 @@ class Transport(ABC):
             future.exception()
 
     def payload_size(self, payload: Any) -> int:
-        """Estimate serialized payload size using ProtoLink's normal serializer."""
+        """Measure the compact JSON byte length of a transport payload.
+
+        Ordinary JSON data is encoded directly. Domain objects and extended
+        values such as datetimes fall back to ProtoLink's recursive serializer.
+        This avoids copying an already normalized request or event tree.
+        """
         if payload is None:
             return 0
+        if isinstance(payload, (dict, list, tuple, str, int, float, bool)):
+            try:
+                return len(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+            except TypeError:
+                pass
         normalized = Serializer.serialize_to_dict(payload)
         return len(json.dumps(normalized, separators=(",", ":"), default=str).encode("utf-8"))
 

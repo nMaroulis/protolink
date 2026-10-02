@@ -34,6 +34,38 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.7.5] - Unreleased
+
+### Changed
+
+- Reuse the normalized HTTP request body across size checks and retries, avoiding repeated domain model serialization.
+- Check incoming HTTP response limits against the received byte length directly.
+- Copy LLM conversation messages without serializing and reparsing timestamps; copied message metadata and tool-call maps are independent.
+- Skip tool prompt tokenization when a model call has no tools or delegation targets.
+- Stop searching local streaming routes at the first matching endpoint.
+- Use a bounded binary search when compacting history by token budget, reducing repeated full-history token estimates for long conversations.
+- Measure already JSON-compatible transport payloads without recursively copying their data first.
+- Cache optional tokenizer resolution per model during repeated context and usage estimates.
+- Generate core task, message, artifact, tool-call, and event IDs and timestamps only when serialized fields are missing.
+- Format ID timestamps directly from UTC date fields, avoiding the locale formatter on each new ID.
+- Read the agent's inference history length directly without allocating a message list.
+
+### Local benchmarks
+
+Measured on Python 3.14; timings depend on the machine and workload.
+
+- Copying a 201-message conversation 1,000 times: **0.269s → 0.185s**.
+- Compacting a 512-message conversation 100 times while retaining about 400 messages: **4.95s → 0.19s**.
+- Sizing a JSON-compatible 500-message transport payload 1,000 times: **0.806s → 0.166s**.
+- Estimating 10,000 short messages without the optional tokenizer installed: **0.288s → 0.0013s** after the first encoder lookup.
+- Restoring a task containing 100 messages and 100 tool-output artifacts 1,000 times: **18.435s → 0.184s** with lazy defaults (best of three runs).
+- Formatting 10,000 compact UTC ID timestamps: **0.526s → 0.0067s** with numeric date fields (best of three runs).
+
+### Fixed
+
+- Truncate histories without a system prompt to their newest messages instead of retaining their oldest message.
+- Correct the HTTP timeout setter documentation to match per-request timeout behavior.
+
 ## [0.7.4] - 2026-09-25
 
 :::note Latest Release
