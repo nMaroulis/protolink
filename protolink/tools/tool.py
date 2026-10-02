@@ -64,7 +64,7 @@ class Tool(BaseTool):
         """Create a reusable tool from a typed Python callable.
 
         The callable's name and cleaned docstring supply default metadata. Callables without a docstring use
-        ``"Call <name>."``. Explicit metadata takes precedence, and missing schemas are inferred as in the regular
+        ``"Call <name>."``. Explicit metadata takes precedence and missing schemas are inferred as in the regular
         constructor. Use ``agent.add_tool(func)`` for inferred defaults, or register this configured wrapper with
         ``agent.add_tool(tool)`` to keep explicit metadata when invoking through Agent policy and task execution.
 
@@ -80,7 +80,7 @@ class Tool(BaseTool):
             action_builder: Optional callback enriching the prepared runtime action.
 
         Returns:
-            A tool with the same schema, validation, and policy metadata as one constructed explicitly.
+            A tool with the same schema, validation and policy metadata as one constructed explicitly.
 
         Raises:
             TypeError: ``func`` is not callable or cannot be inspected, or the explicit or inferred name is not a

@@ -6,7 +6,7 @@ ProtoLink is a Python framework for building distributed multi-agent systems
 where agents are not just function calls wrapped around a model. In ProtoLink,
 an agent is an autonomous runtime entity: it has an identity, a lifecycle, an
 LLM if it needs one, tools if it exposes capabilities, state if it needs memory,
-telemetry if it must be observed, policy if it can cause side effects, and
+telemetry if it must be observed, policy if it can cause side effects and
 transports if it must communicate with other agents or applications.
 
 The core idea is deliberately simple:
@@ -15,13 +15,13 @@ The core idea is deliberately simple:
 > autonomous agents that communicate through A2A-derived tasks.
 
 ProtoLink was originally built natively on the A2A 0.3 agent model: agent cards,
-tasks, messages, parts, artifacts, task states, and discovery became the
+tasks, messages, parts, artifacts, task states and discovery became the
 vocabulary of the runtime, not a bolt-on integration. ProtoLink adds the
 substrate needed to make those primitives useful in real systems: LLM
 execution, tools and MCP, delegation, transports, registry discovery,
-structured flows, state, policy, telemetry, and replay. The A2A 1.0 adapter maps
+structured flows, state, policy, telemetry and replay. The A2A 1.0 adapter maps
 this extended native runtime model to canonical wire shapes for the capabilities
-it advertises, and its verification remains independent from the native runtime.
+it advertises and its verification remains independent from the native runtime.
 
 The result is a framework for treating agent systems as distributed programs,
 not as opaque prompt graphs.
@@ -29,23 +29,23 @@ not as opaque prompt graphs.
 ## Abstract
 
 Modern agent applications need more than a model call. They need identity,
-communication, tool execution, delegation, state, policy, observability, and a
+communication, tool execution, delegation, state, policy, observability and a
 way to move from local experiments to distributed deployments without rewriting
 the system.
 
 Many frameworks begin with the model and build orchestration outward. ProtoLink
 begins with the agent. The model is one pluggable module inside an autonomous
-entity. Tools, transports, storage, telemetry, authentication, and runtime
+entity. Tools, transports, storage, telemetry, authentication and runtime
 policy are also modules. The native runtime contract between agents stays stable:
-a `Task` is exchanged, `Message` and `Artifact` objects carry content, and
+a `Task` is exchanged, `Message` and `Artifact` objects carry content and
 `Part` objects describe atomic actions or outputs.
 
 ProtoLink builds a deterministic runtime around those A2A-derived models:
 
 - LLMs declare one typed action at a time.
-- The runtime validates, authorizes, executes, observes, and records that action.
+- The runtime validates, authorizes, executes, observes and records that action.
 - Tool calls and agent delegations are explicit `Part` and action records.
-- `RunContext` carries session, trace, permission, budget, cancellation, and
+- `RunContext` carries session, trace, permission, budget, cancellation and
   parent-child execution metadata.
 - `RunEvent` and `RunReport` provide stable application-facing streams and
   replayable summaries.
@@ -70,7 +70,7 @@ Agent applications often start as a single script:
 That is enough for a demo, but it becomes fragile as soon as the system grows.
 The application needs multiple specialized agents, different model providers,
 streaming progress, persistence, cancellation, tool schemas, approvals, traces,
-state cleanup, deployment topology, and tests that can prove what happened.
+state cleanup, deployment topology and tests that can prove what happened.
 
 Without a shared runtime layer, each application invents private conventions:
 
@@ -94,10 +94,10 @@ ProtoLink's design starts from five principles.
 
 An agent is not a callback. It is a runtime entity that can receive work, initiate
 work, discover peers, maintain state, expose tools, call its model, delegate to
-other agents, stream progress, and shut down cleanly.
+other agents, stream progress and shut down cleanly.
 
 This matters because real multi-agent systems are not just nested function calls.
-A weather agent, a booking agent, a code-reading agent, and an approval-gated
+A weather agent, a booking agent, a code-reading agent and an approval-gated
 file-writing agent should be able to exist as separate processes, local in-memory
 actors, or remote services without changing their business logic.
 
@@ -110,16 +110,16 @@ ProtoLink keeps A2A's core primitives at the center:
 - `Task` is the shared unit of work.
 - `Message` carries communication.
 - `Part` is the atomic action or content unit.
-- `Artifact` records outputs, previews, and generated results.
+- `Artifact` records outputs, previews and generated results.
 - `TaskState` tracks lifecycle.
 
 This gives agents a portable, serializable language. A workflow step, a remote
-task submission, a streaming update, and a replay report all point back to the
+task submission, a streaming update and a replay report all point back to the
 same task model.
 
 ### 3. Pluggability Is A Runtime Property
 
-LLMs, tools, transports, storage, telemetry, authentication, logging, and policy
+LLMs, tools, transports, storage, telemetry, authentication, logging and policy
 are not special cases scattered through application code. They are modules
 plugged into the agent.
 
@@ -134,7 +134,7 @@ contract.
 ProtoLink treats LLM output as a proposal, not as authority. The LLM can propose
 a `final`, `tool_call`, or `agent_call` action. The runtime parses and validates
 that action, checks cancellation and budgets, authorizes side effects, executes
-the operation, records events, and feeds the result back to the model.
+the operation, records events and feeds the result back to the model.
 
 This separation lets the system use provider-native tool calling when available
 and JSON action fallback when a smaller or local model is better served by a
@@ -142,7 +142,7 @@ simple text contract. The runtime-facing behavior remains the same.
 
 ### 5. Production Control Should Be Domain-Neutral
 
-`RunContext`, `RunAction`, `PolicyDecision`, `ApprovalRequest`, `RunEvent`, and
+`RunContext`, `RunAction`, `PolicyDecision`, `ApprovalRequest`, `RunEvent` and
 `RunReport` do not assume that the application is a coding assistant, a browser
 agent, a support bot, a booking system, or a data pipeline. They carry generic
 execution metadata and structured action records. The application supplies the
@@ -157,7 +157,7 @@ At the top level, ProtoLink is centered on the `Agent` facade. The agent owns
 its identity and wires together the subsystems that make the entity operational.
 Client/server layers provide intent-level communication APIs. Transports handle
 protocol and runtime details. The registry provides discovery. The runtime layer
-normalizes execution context, policy, events, and reports.
+normalizes execution context, policy, events and reports.
 
 ```mermaid
 flowchart TB
@@ -191,7 +191,7 @@ The architectural dependency direction is important:
 
 - The agent owns client and server components.
 - The client and server use transports.
-- Transports know about protocols, routes, serialization, event loops, and I/O.
+- Transports know about protocols, routes, serialization, event loops and I/O.
 - Agent logic does not need to know whether a peer is local, HTTP, SSE, or
   WebSocket.
 
@@ -211,7 +211,7 @@ versioned HTTP adapter.
 The starting point was the [A2A 0.3
 specification](https://a2a-protocol.org/v0.3.0/specification/), not a ProtoLink
 release numbered 0.3. ProtoLink implemented its agent, task, message, part,
-artifact, state, and discovery concepts as native Python runtime objects. A2A
+artifact, state and discovery concepts as native Python runtime objects. A2A
 was therefore present below the public API from the beginning rather than added
 later as a network connector.
 
@@ -219,23 +219,23 @@ That native model is deliberately small. One task contract can move through an
 in-process agent, a network transport, a deterministic flow, storage, telemetry,
 or replay without making the application depend on an LLM provider or transport
 implementation. That is what makes conveniences such as `Task.create_infer()`,
-`@agent.tool`, and `transport="http"` small without limiting what can be plugged
+`@agent.tool` and `transport="http"` small without limiting what can be plugged
 into the agent.
 
 ProtoLink extended the A2A 0.3 foundation with execution concerns, including
-inference and tool actions, flow state, runtime context, policy, and events, that
+inference and tool actions, flow state, runtime context, policy and events, that
 the communication protocol does not prescribe. Keeping those concerns in the
 runtime lets ProtoLink evolve agent execution without presenting
 framework-specific behavior as standard A2A semantics.
 
 When A2A evolved to [A2A
 1.0](https://a2a-protocol.org/latest/specification/), its canonical cards,
-operations, and wire shapes also evolved. ProtoLink kept its established native
+operations and wire shapes also evolved. ProtoLink kept its established native
 runtime model and added explicit two-way translation at the HTTP boundary. A
 standard peer sees canonical Agent Cards, JSON-RPC operations, tasks, messages,
-parts, artifacts, and states for the surface ProtoLink advertises. The ProtoLink
+parts, artifacts and states for the surface ProtoLink advertises. The ProtoLink
 executor sees its normal `Task` and runs the same LLM, tool, MCP, flow, storage,
-policy, and telemetry machinery as a native call.
+policy and telemetry machinery as a native call.
 
 Compatibility therefore comes from a versioned and independently tested
 translation boundary, not from claiming that the A2A 0.3-based runtime models
@@ -263,13 +263,13 @@ boundary.
 
 | Concern | A2A concept | ProtoLink runtime |
 | --- | --- | --- |
-| Identity | Agent card | Runtime `Agent` entity with card, lifecycle, modules, state, and policy |
+| Identity | Agent card | Runtime `Agent` entity with card, lifecycle, modules, state and policy |
 | Work unit | Task | Deterministic task execution over explicit `Part` actions |
-| Capability declaration | Skills/capabilities | Native tools, MCP tools, schemas, tags, examples, and runtime capabilities |
+| Capability declaration | Skills/capabilities | Native tools, MCP tools, schemas, tags, examples and runtime capabilities |
 | Communication | Protocol objects | Agent-owned client/server and pluggable transports |
 | Discovery | Agent metadata | Registry service with indexed lookup and dynamic capability injection |
 | LLMs | Out of scope | Provider-agnostic LLM wrappers and controlled inference loop |
-| Runtime metadata | Task metadata | Typed `RunContext` with session, trace, permissions, budget, and cancellation |
+| Runtime metadata | Task metadata | Typed `RunContext` with session, trace, permissions, budget and cancellation |
 | Side effects | Out of scope | `RunAction`, policies, approval checkpoints, preview artifacts |
 | Observability | Out of scope | `RunEvent`, telemetry, `RunReport`, `RunReplay`, redaction |
 | Workflows | Out of scope | Structured flows over `Task` input/output |
@@ -284,7 +284,7 @@ ProtoLink's core data model is small but expressive.
 ### Task
 
 A `Task` is the unit of work exchanged between agents. It contains messages,
-artifacts, metadata, flow state, creation time, and lifecycle state. The default
+artifacts, metadata, flow state, creation time and lifecycle state. The default
 lifecycle is:
 
 ```text
@@ -307,7 +307,7 @@ assistant-style participant. Messages contain ordered `Part` objects.
 
 A `Part` is the atomic unit. It can be plain text, JSON, a tool call, a tool
 output, an inference request, an inference result, an error, a status, a route
-decision, media, and other serializable content.
+decision, media and other serializable content.
 
 The executable parts are especially important:
 
@@ -321,18 +321,18 @@ the default agent handler does not invent one.
 ### Artifact
 
 An `Artifact` contains produced output. Tool outputs, inference outputs,
-approval previews, generated files, intermediate results, and final reports can
+approval previews, generated files, intermediate results and final reports can
 be represented as artifacts. Artifacts also carry descriptors such as `kind`,
-`name`, `uri`, `media_type`, metadata, and action IDs.
+`name`, `uri`, `media_type`, metadata and action IDs.
 
 This is important for approvals and replay. A side effect can attach a preview
-artifact before execution, and a UI can render it without running the operation.
+artifact before execution and a UI can render it without running the operation.
 
 ## The Agent As Autonomous Runtime Entity
 
 The public `Agent` class is the stable facade. Internally, the implementation is
 split across mixins and an execution engine so that lifecycle, communication,
-tool registration, configuration, control-plane operations, serialization, and
+tool registration, configuration, control-plane operations, serialization and
 task execution remain separable.
 
 An agent can be:
@@ -369,7 +369,7 @@ agent = Agent(
 ```
 
 The exact LLM, storage backend, telemetry backend, transport, authentication
-strategy, and policy can change. The agent contract stays the same.
+strategy and policy can change. The agent contract stays the same.
 
 ### AgentCard: Identity And Capability
 
@@ -390,7 +390,7 @@ strategy, and policy can change. The agent contract stays the same.
 
 ProtoLink extends the base identity concept with runtime-relevant capability
 flags such as `has_llm`, `tool_calling`, `delegation`, `streaming`,
-`multi_step_reasoning`, `rag`, `code_execution`, and `max_concurrency`.
+`multi_step_reasoning`, `rag`, `code_execution` and `max_concurrency`.
 
 Tools registered on the agent can become advertised skills. That lets peer
 agents discover not only that an agent exists, but what it can do and how to
@@ -401,7 +401,7 @@ call it.
 The lifecycle is intentionally straightforward:
 
 1. Instantiate the agent with a card and modules.
-2. Configure transport, client, server, registry, tools, state, and policy.
+2. Configure transport, client, server, registry, tools, state and policy.
 3. Start the agent.
 4. Register with the registry if configured.
 5. Receive and execute tasks.
@@ -409,12 +409,12 @@ The lifecycle is intentionally straightforward:
 7. Stop cleanly and unregister.
 
 `start(background=True)` isolates runtime execution in a background thread or
-event loop when useful for notebooks, tests, and multi-agent scripts.
+event loop when useful for notebooks, tests and multi-agent scripts.
 `background=False` lets the agent own the main process for standalone services.
 
 ## The LLM Runtime
 
-ProtoLink's LLM layer supports API models, server-hosted models, and local
+ProtoLink's LLM layer supports API models, server-hosted models and local
 models behind a consistent interface. The agent runtime does not care whether a
 model is OpenAI, Anthropic, Gemini, DeepSeek, Grok, Hugging Face, Ollama,
 llama.cpp, LM Studio, vLLM, OpenAI-compatible, mock, or custom.
@@ -461,7 +461,7 @@ The model can produce:
 
 Every action is validated before dispatch. Tool arguments are checked against
 schemas. Agent names are resolved through discovery or URLs. Repeated actions
-are detected. Parse failures trigger corrective feedback, and a parse circuit
+are detected. Parse failures trigger corrective feedback and a parse circuit
 breaker stops runaway correction loops. A hard inference step limit protects
 against infinite loops.
 
@@ -528,7 +528,7 @@ Tools carry:
 - `capabilities`
 
 Native tools can infer JSON Schema from Python type hints, dataclasses, typed
-dictionaries, enums, and Pydantic models. At runtime, ProtoLink validates and
+dictionaries, enums and Pydantic models. At runtime, ProtoLink validates and
 lightly coerces arguments before user code runs. Invalid arguments become
 structured tool errors instead of unchecked exceptions inside application code.
 
@@ -552,7 +552,7 @@ async def book_hotel(booking: BookingRequest) -> dict[str, str]:
 ```
 
 The tool is local Python code, but it becomes part of the agent's public
-capability surface. Another agent can discover it, ask for it, and receive a
+capability surface. Another agent can discover it, ask for it and receive a
 structured `tool_output`.
 
 ### MCP Integration
@@ -596,9 +596,9 @@ Important fields include:
 | `metadata` | Application-owned runtime metadata |
 
 The agent runtime calls `RunContext.ensure_task_context()` before normal
-execution, streaming execution, and outbound agent calls. When work is delegated,
+execution, streaming execution and outbound agent calls. When work is delegated,
 `RunContext.child()` creates a child run identity while preserving the session,
-trace, workspace, permissions, budget, and metadata.
+trace, workspace, permissions, budget and metadata.
 
 This gives a distributed run continuity:
 
@@ -612,12 +612,12 @@ client run
 Every participant can remain independent while still contributing to a coherent
 trace.
 
-## Runtime Actions, Policy, And Approvals
+## Runtime Actions, Policy and Approvals
 
 ProtoLink separates model intent from runtime action. A model may propose a
 tool call. The runtime then prepares a `RunAction`: a concrete operation with
 validated arguments, a stable action ID, kind, name, payload, capabilities,
-metadata, and optional artifacts.
+metadata and optional artifacts.
 
 Policy evaluates the `RunAction`, not raw model text.
 
@@ -634,7 +634,7 @@ flowchart LR
     Execute --> Events["RunEvents and artifacts"]
 ```
 
-`CapabilityPolicy` supports `allow`, `deny`, and `require_approval`, including
+`CapabilityPolicy` supports `allow`, `deny` and `require_approval`, including
 namespace wildcards such as `workspace.*`. Runtime-owned policy and
 `RunContext.permissions` are combined using the most restrictive result. A task
 can narrow its permissions, but it cannot grant itself more authority than the
@@ -659,8 +659,8 @@ The action contract stays domain-neutral.
 ## Budgets And Context Manifests
 
 LLM applications need to understand context pressure, token usage, cost
-estimates, and execution limits. ProtoLink models this with `ContextManifest`,
-`RunBudget`, `BudgetPolicy`, and `BudgetEnforcer`.
+estimates and execution limits. ProtoLink models this with `ContextManifest`,
+`RunBudget`, `BudgetPolicy` and `BudgetEnforcer`.
 
 Before a model call, ProtoLink can build a `ContextManifest` that estimates:
 
@@ -673,10 +673,10 @@ Before a model call, ProtoLink can build a `ContextManifest` that estimates:
 - provider and model identity.
 
 `RunBudget` can limit steps, LLM calls, tool calls, runtime seconds, input
-tokens, and output tokens. Warnings and hard denials are emitted as runtime
+tokens and output tokens. Warnings and hard denials are emitted as runtime
 events. Hard budget denials happen before protected execution proceeds.
 
-This is useful for user-facing CLIs, dashboards, hosted services, and tests. A
+This is useful for user-facing CLIs, dashboards, hosted services and tests. A
 UI can show context pressure while a run is active. A test can assert that a
 golden run stayed under a token budget. A service can fail closed before a
 runaway tool loop becomes expensive.
@@ -692,7 +692,7 @@ ProtoLink distinguishes serialized task state from live cancellation control.
   `asyncio.Task` objects while work is running.
 
 Cancellation can be requested locally or remotely by task ID. The same public
-client method works across HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport.
+client method works across HTTP, SSE JSON-RPC, WebSocket, gRPC and RuntimeTransport.
 WebSocket uses a separate control connection so cancellation does not wait
 behind the stream it is trying to interrupt.
 
@@ -718,7 +718,7 @@ requests handled by the agent/server/client layer.
 ## Transports: Same Agent, Different Mediums
 
 ProtoLink transports are protocol adapters. They normalize wire formats into
-the same `Task`, `Message`, `Part`, and event objects.
+the same `Task`, `Message`, `Part` and event objects.
 
 Supported runtime transports include:
 
@@ -776,12 +776,12 @@ still agent cards.
 
 Discovery matters for autonomy. A coordinator agent should not need hardcoded
 URLs for every specialist. It can discover agents, inject their card
-descriptions into the LLM prompt, and delegate using `agent_call` actions. A
+descriptions into the LLM prompt and delegate using `agent_call` actions. A
 structured flow can resolve named steps through the same registry. A dashboard
 can inspect live cards and status endpoints.
 
 The registry also maintains secondary indexes for common filters such as agent
-name, role, and tags, while preserving a full-scan fallback for correctness.
+name, role and tags, while preserving a full-scan fallback for correctness.
 
 ## Structured Flows
 
@@ -845,7 +845,7 @@ but structured `Part.route(...)` is the inspectable path.
 ### Graph
 
 `Graph` supports state-machine workflows with named nodes, edges, conditional
-edges, loops, and an entry point. It is useful for deterministic enterprise
+edges, loops and an entry point. It is useful for deterministic enterprise
 processes where the flow topology should be auditable in code.
 
 ### Why Flows Keep The A2A Model
@@ -854,22 +854,22 @@ Structured flows solve a different problem than autonomous delegation. They
 remove LLMs from routing when the process is known. But every step still
 receives and returns a task. Every intermediate result remains a message or
 artifact. Route decisions are parts and metadata. The same transports, events,
-state, and replay surfaces apply.
+state and replay surfaces apply.
 
 That keeps deterministic orchestration on the same A2A-based model as the rest
 of the agent mesh.
 
-## Telemetry, Events, Reports, Replay, And Regression Diffing
+## Telemetry, Events, Reports, Replay and Regression Diffing
 
 ProtoLink separates live application events from observability traces.
 
-Telemetry backends such as `LocalTraceTelemetry`, Langfuse, and LangSmith
-capture traces, spans, LLM metrics, tool calls, retries, redacted payloads, and
+Telemetry backends such as `LocalTraceTelemetry`, Langfuse and LangSmith
+capture traces, spans, LLM metrics, tool calls, retries, redacted payloads and
 provider metadata. They are useful for debugging and long-term analysis.
 
 `RunEvent` is the stable application-facing event envelope. Existing transport
 events remain available for wire compatibility, but `RunEvent` gives UIs,
-CLIs, tests, and replay tools one normalized shape:
+CLIs, tests and replay tools one normalized shape:
 
 - version,
 - type,
@@ -952,11 +952,11 @@ Replay does not re-execute tools or model calls. It lets applications inspect
 what happened through a durable, structured summary that can be redacted before
 persistence or rendering. Regression diffing also operates only on already
 recorded data: it canonicalizes known ProtoLink runtime-envelope identifiers,
-timestamps, sequence counters, and derived timing fields, then compares event,
-action, approval, artifact, metric, and final-task content. Application-owned
+timestamps, sequence counters and derived timing fields, then compares event,
+action, approval, artifact, metric and final-task content. Application-owned
 payloads remain exact. Final reports are the normal regression input, although
 the comparison API does not enforce a task lifecycle state. Deterministic tests
-still require controlled or captured model, tool, and external-service
+still require controlled or captured model, tool and external-service
 responses.
 
 ## State And Memory
@@ -1014,7 +1014,7 @@ tools. The holiday advisor is reasoning-only. The registry lets them discover
 each other.
 
 This is not just a chain inside one process. Each participant can be a separate
-runtime entity with its own model, tools, state, transport, telemetry, and
+runtime entity with its own model, tools, state, transport, telemetry and
 policy. The coordinator can use `agent_call` to request reasoning from the
 advisor or a tool execution from the hotel agent. Results return as structured
 task artifacts and parts.
@@ -1052,7 +1052,7 @@ agent contract.
 
 ### Local Single-Process Mesh
 
-Use `RuntimeTransport` for tests, notebooks, local demos, and tightly-coupled
+Use `RuntimeTransport` for tests, notebooks, local demos and tightly-coupled
 agent systems. Agents communicate through an in-process runtime transport while
 preserving agent boundaries and task semantics.
 
@@ -1065,19 +1065,19 @@ progress.
 ### Mixed Systems
 
 A single application can combine local agents, remote agents, tool-only workers,
-LLM-backed specialists, and registry discovery. Flow targets can be local
+LLM-backed specialists and registry discovery. Flow targets can be local
 objects, remote URLs, names resolved through the registry, or nested flows.
 
 ### UI And CLI Integration
 
 Use streaming task events for immediate transport compatibility. Normalize to
 `RunEvent` when a UI or CLI wants stable event types, sequence numbers,
-summaries, causal IDs, and replay compatibility.
+summaries, causal IDs and replay compatibility.
 
 ### Testing
 
 Use `MockLLM`, `RuntimeTransport`, `InMemoryEventSink`, `RunRecorder`,
-`diff_run_reports()`, and golden-run assertions to test agent behavior without
+`diff_run_reports()` and golden-run assertions to test agent behavior without
 live providers or network ports. This is especially valuable because the
 runtime records concrete action and policy events rather than relying on text
 snapshots alone.
@@ -1088,7 +1088,7 @@ ProtoLink's value is the combination of an A2A foundation and runtime control.
 
 ### A2A-First Runtime And A2A 1.0 Interoperability
 
-Agents use A2A-derived task, message, part, artifact, and card models throughout
+Agents use A2A-derived task, message, part, artifact and card models throughout
 the runtime rather than framework-private graph objects. At an interoperable
 HTTP boundary, the versioned adapter converts those models to A2A 1.0 JSON-RPC
 operations and canonical wire shapes for its advertised scope, keeping that
@@ -1097,19 +1097,19 @@ boundary visible and independently testable.
 ### Autonomous Agent Entities
 
 Each agent is a runtime object with identity, lifecycle, communication,
-execution, and modules. It can be local or remote, simple or complex, LLM-backed
+execution and modules. It can be local or remote, simple or complex, LLM-backed
 or deterministic.
 
 ### Plug-And-Play Runtime Modules
 
 LLMs, tools, MCP adapters, transport, storage, state, telemetry, authentication,
-logging, policy, and approval handlers plug into the agent.
+logging, policy and approval handlers plug into the agent.
 
 ### Deterministic Execution Semantics
 
 The default agent handler processes explicit parts from the latest task item.
 The LLM loop validates one action at a time. Tool calls and agent calls are
-runtime-executed, observable, and replayable.
+runtime-executed, observable and replayable.
 
 ### Provider Independence
 
@@ -1119,20 +1119,20 @@ application architecture.
 
 ### Structured Flows Without Leaving The A2A Model
 
-Pipelines, parallel fan-out, routers, and graphs remain `Task -> Task`. Flow
+Pipelines, parallel fan-out, routers and graphs remain `Task -> Task`. Flow
 state and route decisions are serialized into the same task model used
 elsewhere.
 
 ### Production Control Plane
 
 Cancellation, state inspection/reset/compaction, history compaction, budgets,
-permissions, and approvals are typed runtime operations, not prompt hacks.
+permissions and approvals are typed runtime operations, not prompt hacks.
 
 ### Observability And Replay
 
 Telemetry captures detailed traces. `RunEvent` and `RunReport` provide stable
 application-facing progress and replay surfaces. Redaction is shared across
-events, approvals, reports, and local telemetry.
+events, approvals, reports and local telemetry.
 
 ## Relationship To Other Ecosystem Pieces
 
@@ -1141,7 +1141,7 @@ piece a clean place.
 
 | Ecosystem idea | ProtoLink stance |
 | --- | --- |
-| A2A | Core runtime model for identity, capabilities, discovery, and task exchange, plus a versioned A2A 1.0 JSON-RPC adapter |
+| A2A | Core runtime model for identity, capabilities, discovery and task exchange, plus a versioned A2A 1.0 JSON-RPC adapter |
 | MCP | A tool integration layer that can be adapted into agent capabilities |
 | Langfuse and LangSmith | Observability backends, not execution engines |
 | LangChain-style model composition | Useful inspiration, but ProtoLink starts from autonomous agents rather than chains around model calls |
@@ -1162,26 +1162,26 @@ Plan a five-night trip to Santorini and book a hotel if the weather is good.
 A ProtoLink run can proceed like this:
 
 1. The application creates a `Task` with `Part.infer(...)`.
-2. The application attaches a `RunContext` with session, trace, budget, and
+2. The application attaches a `RunContext` with session, trace, budget and
    permissions.
 3. The coordinator starts handling the task and moves it to `working`.
 4. The coordinator discovers peer agents from the registry.
 5. The coordinator builds its LLM prompt with tool schemas, peer agent cards,
    and runtime action instructions.
 6. The LLM proposes an `agent_call` to the weather agent.
-7. ProtoLink validates the action, creates a child `RunContext`, and sends a
+7. ProtoLink validates the action, creates a child `RunContext` and sends a
    child task.
 8. The weather agent executes a deterministic tool and returns `tool_output`.
 9. The coordinator injects that observation into its LLM history.
 10. The LLM proposes an `agent_call` to the hotel agent.
-11. ProtoLink prepares a `RunAction` for booking, checks policy, and may request
+11. ProtoLink prepares a `RunAction` for booking, checks policy and may request
     approval with a preview artifact.
 12. If approved, the hotel tool executes.
 13. The LLM receives the booking result and returns a `final` action.
 14. The coordinator attaches an `infer_output` artifact and completes the task.
 15. Streaming clients receive final status and artifacts.
 16. Telemetry and run reports contain the trace, context manifest, tool events,
-    approvals, artifacts, and final task.
+    approvals, artifacts and final task.
 
 Every meaningful step has a typed representation. That is what makes the system
 debuggable.
@@ -1228,15 +1228,15 @@ application the hooks and data structures it needs to build one.
 ## Philosophy In One Sentence
 
 ProtoLink treats agents as autonomous, A2A-first runtime entities whose
-LLMs, tools, transports, state, telemetry, and policies are pluggable modules,
-while every meaningful action remains explicit, typed, observable, and
+LLMs, tools, transports, state, telemetry and policies are pluggable modules,
+while every meaningful action remains explicit, typed, observable and
 replayable.
 
 ## Conclusion
 
 The future of agent systems is not one giant prompt wrapped around one model. It
 is a mesh of specialized entities: some reason, some act, some coordinate, some
-observe, some guard side effects, and some execute deterministic workflows.
+observe, some guard side effects and some execute deterministic workflows.
 
 ProtoLink provides the runtime substrate for that mesh. It uses A2A as the
 shared runtime model and maps its advertised HTTP capabilities to canonical A2A
@@ -1244,10 +1244,10 @@ shared runtime model and maps its advertised HTTP capabilities to canonical A2A
 provides the practical machinery needed for real agent applications: LLM
 integration, tool execution, MCP adaptation, transport abstraction, registry
 discovery, structured flows, state, runtime context, budgets, cancellation, policy,
-approvals, telemetry, events, reports, and replay.
+approvals, telemetry, events, reports and replay.
 
 In ProtoLink, you do not build agents by burying behavior inside orchestration
-glue. You build autonomous entities, plug in the modules they need, and let them
+glue. You build autonomous entities, plug in the modules they need and let them
 communicate through explicit protocol-native tasks.
 
 That is the core architectural promise: minimal boilerplate, maximum clarity,

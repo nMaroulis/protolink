@@ -2,7 +2,7 @@
 Agent YAML Export and Import Example
 
 This example demonstrates how to:
-1. Initialize an Agent with a card, transport, and a native tool.
+1. Initialize an Agent with a card, transport and a native tool.
 2. Export the agent configuration to a YAML file.
 3. Import the agent configuration from the YAML file to reconstruct the Agent.
 4. Verify the imported agent's state and capabilities.

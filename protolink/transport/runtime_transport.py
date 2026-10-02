@@ -1,7 +1,7 @@
 """In-memory transport for local agent communication.
 
 This module provides :class:`RuntimeTransport`, an in-memory transport that enables agents to communicate directly
-without network overhead. Perfect for testing, local multi-agent setups, and rapid prototyping.
+without network overhead. Perfect for testing, local multi-agent setups and rapid prototyping.
 
 Unlike network transports (HTTP, WebSocket), RuntimeTransport:
 - Routes messages directly in-memory, avoiding TCP overhead.
@@ -54,7 +54,7 @@ class RuntimeTransport(Transport):
         URL identifying this transport endpoint. Must use the ``runtime://`` scheme
         (e.g., ``"runtime://alice"``).
     config : TransportConfig, optional
-        Shared limits, retry, shutdown, idempotency, and metrics settings.
+        Shared limits, retry, shutdown, idempotency and metrics settings.
     """
 
     transport_type: ClassVar[TransportType] = "runtime"
@@ -126,7 +126,7 @@ class RuntimeTransport(Transport):
            back through standard serialization layers before yielding it to the caller.
 
         Args:
-            request_spec: The high-level specification detailing HTTP verb, path, and serializers.
+            request_spec: The high-level specification detailing HTTP verb, path and serializers.
             base_url: The exact URI of the target agent.
             data: The request payload (typically a `Task` or `Message`).
             params: Optional query parameters (mimicked for API symmetry).
@@ -282,7 +282,7 @@ class RuntimeTransport(Transport):
         circumvents WebSocket infrastructure and natively consumes the target agent's `AsyncIterator`.
 
         It resolves the `base_url`, locates an endpoint flagged for `streaming`, enforces the
-        Pydantic serialization boundary, and then seamlessly yields deserialized dictionaries
+        Pydantic serialization boundary and then seamlessly yields deserialized dictionaries
         from the underlying Python generator directly into the caller's event loop context.
 
         Args:

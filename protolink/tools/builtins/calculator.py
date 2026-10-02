@@ -22,7 +22,7 @@ _Expression = Annotated[
     Field(
         min_length=1,
         max_length=256,
-        description="Arithmetic expression using numbers, parentheses, and +, -, *, /, //, %, or **.",
+        description="Arithmetic expression using numbers, parentheses and +, -, *, /, //, %, or **.",
     ),
 ]
 
@@ -106,7 +106,7 @@ def calculator() -> Tool:
 
     The tool accepts a single arithmetic expression. It uses a restricted AST
     evaluator rather than ``eval`` and rejects names, calls, attributes,
-    booleans, complex values, non-finite values, and resource-heavy powers.
+    booleans, complex values, non-finite values and resource-heavy powers.
 
     Returns:
         A fresh :class:`~protolink.tools.Tool` named ``calculator``.
@@ -114,7 +114,7 @@ def calculator() -> Tool:
     tool = Tool(
         name="calculator",
         description=(
-            "Evaluate bounded arithmetic with numbers, parentheses, and +, -, *, /, //, %, or **. "
+            "Evaluate bounded arithmetic with numbers, parentheses and +, -, *, /, //, %, or **. "
             "This tool never executes Python names or functions."
         ),
         input_schema=None,

@@ -1,4 +1,4 @@
-"""JSON Schema inference, normalization, and validation utilities for tools."""
+"""JSON Schema inference, normalization and validation utilities for tools."""
 
 from __future__ import annotations
 

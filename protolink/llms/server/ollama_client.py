@@ -154,7 +154,7 @@ class OllamaLLM(ServerLLM):
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Yield text as it arrives without blocking the event loop.
 
-        Uses request-scoped async HTTP; completion, cancellation, and explicit
+        Uses request-scoped async HTTP; completion, cancellation and explicit
         iterator closure release the connection. JSON-action mode yields raw
         JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
         """

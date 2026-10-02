@@ -1,6 +1,6 @@
 # AI Courtroom Advocacy Benchmark
 
-> Put two LLMs on opposite sides of the same case, swap their roles, and replay
+> Put two LLMs on opposite sides of the same case, swap their roles and replay
 > how a fixed jury responds to every argument.
 
 This example is a portable, paired benchmark for model-to-model persuasion. It
@@ -16,7 +16,7 @@ Only Aster Vale Mobility is the defendant. The two model roles are advocates:
 
 The judge and independent jurors are also ProtoLink agents. They stay fixed
 while Model A and Model B exchange sides. Every public argument, evidence
-citation, juror update, vote change, retry, and A2A task is saved for replay.
+citation, juror update, vote change, retry and A2A task is saved for replay.
 
 The included case and every person in it are fictional. This is a software
 experiment, not legal analysis, legal advice, or a validated measure of human
@@ -33,7 +33,7 @@ paired run therefore performs two legs:
 | 2 | Model B | Model A |
 
 Both legs use the same case file, admitted evidence, stage order, judge, juror
-personas, control backend, temperature, and seed. Each leg creates fresh agents
+personas, control backend, temperature and seed. Each leg creates fresh agents
 so no conversation history crosses the role swap.
 
 The default jury is independent. Jurors update after each public argument but
@@ -41,13 +41,13 @@ do not communicate with one another. This keeps the opinion pipeline focused
 on advocacy rather than adding a second persuasion treatment inside the jury.
 
 `single` mode runs one controlled assignment for debugging or exploration. It
-does not swap roles, does not control side advantage, and does not produce a
+does not swap roles, does not control side advantage and does not produce a
 role-balanced candidate score. Use paired mode for candidate comparisons.
 
 There are no witness agents in this benchmark. A live witness would add another
-stochastic model between an advocate's words and the jury's response, and its
+stochastic model between an advocate's words and the jury's response and its
 answers could change across legs. Both advocates instead receive the same
-complete admitted record and get the same opening, rebuttal, and closing
+complete admitted record and get the same opening, rebuttal and closing
 opportunities.
 
 ## Quick start
@@ -60,8 +60,8 @@ python examples/ai_courtroom_benchmark/run.py
 
 The default run is offline and deterministic. It compares the
 `reference-evidence` and `reference-narrative` fixtures in paired mode, uses the
-bundled C-91 case, and requires no API key or network connection. The fixtures
-exist to exercise the benchmark, role swap, metrics, traces, and HTML report.
+bundled C-91 case and requires no API key or network connection. The fixtures
+exist to exercise the benchmark, role swap, metrics, traces and HTML report.
 They are not real language models and their result is not a leaderboard.
 
 The command prints the exact output directory and the path to the standalone
@@ -94,7 +94,7 @@ python examples/ai_courtroom_benchmark/run.py \
   --plan
 ```
 
-Plan mode prints the evidence, juror, stage, argument, trial, and scheduled A2A
+Plan mode prints the evidence, juror, stage, argument, trial and scheduled A2A
 exchange counts. It also validates reference fixture names and requires exact
 model IDs for live providers. Because it makes no live calls, `--plan` does not
 require `--allow-live`, even when live providers are selected.
@@ -197,7 +197,7 @@ the fixed control agents.
 
 The runner accepts strict JSON so the example needs no YAML dependency. Unknown
 keys, duplicate participant IDs, duplicate evidence IDs, invalid side
-references, and inconsistent vote mappings are rejected before any agents are
+references and inconsistent vote mappings are rejected before any agents are
 started.
 
 [`cases/c91_incident.json`](cases/c91_incident.json) contains the full bundled
@@ -213,9 +213,9 @@ The top-level fields are:
 | `summary` | Shared orientation delivered before advocacy begins. |
 | `question`, `charge`, `burden` | The exact binary decision and its fictional rule. |
 | `elements` | Requirements the positive side is trying to establish. |
-| `decision` | Positive, negative, and tie vote policy plus the two side mappings. |
-| `evidence` | Ordered admitted exhibits with an ID, title, and public text. |
-| `sides` | Exactly two advocate roles, objectives, target votes, and prompts. |
+| `decision` | Positive, negative and tie vote policy plus the two side mappings. |
+| `evidence` | Ordered admitted exhibits with an ID, title and public text. |
+| `sides` | Exactly two advocate roles, objectives, target votes and prompts. |
 | `judge` | The fixed neutral procedural agent. |
 | `jurors` | Fixed independent evaluator personas. |
 | `procedure.stages` | Ordered speaking stages and their side order. |
@@ -254,9 +254,9 @@ arguments are included in the next prompt:
 To create a case:
 
 1. Copy `cases/template.json` to a new filename.
-2. Give every case, side, judge, juror, and stage a stable lowercase ID.
-3. Write one precise binary question, burden, and set of elements.
-4. Add admitted evidence. Evidence IDs do not have to be `E1`, `E2`, and so on,
+2. Give every case, side, judge, juror and stage a stable lowercase ID.
+3. Write one precise binary question, burden and set of elements.
+4. Add admitted evidence. Evidence IDs do not have to be `E1`, `E2` and so on,
    but they must be unique.
 5. Define exactly two sides and map each one to a different configured vote.
 6. Choose the required `tie_vote`, even when the configured jury has an odd
@@ -266,16 +266,16 @@ To create a case:
 8. Run the new file with `--case` and inspect the validation error if a
    cross-reference is inconsistent.
 
-Invalid JSON, unsupported schema versions, and inconsistent cross-references
+Invalid JSON, unsupported schema versions and inconsistent cross-references
 produce a concise CLI error before an output directory or agent is created.
 
 Do not put API keys, personal data, confidential evidence, or untrusted private
-material in a case file. Case text, prompts, public outputs, and traces are
+material in a case file. Case text, prompts, public outputs and traces are
 written to disk and may appear in the HTML report.
 
 ### Offline reference controls
 
-`reference_prior`, `reference_receptiveness`, and `reference_threshold` are
+`reference_prior`, `reference_receptiveness` and `reference_threshold` are
 fixture parameters for deterministic offline runs. They are not inserted into
 the juror's natural-language persona prompt. `reference_fixture.evidence_signals`
 assigns each admitted evidence ID a signed deterministic signal: positive
@@ -299,7 +299,7 @@ evaluated by jurors is exactly the validated public treatment.
 An advocacy citation counts as grounded only when an admitted evidence ID is
 visibly present as a complete token in the public statement. The validator
 separately records valid declared IDs, valid declarations that never appear in
-the statement, and unknown declared IDs. It also finds admitted IDs that are
+the statement and unknown declared IDs. It also finds admitted IDs that are
 visible in the statement but omitted from the declaration and emits a mismatch
 warning. This makes `E1` distinct from text such as `E10`.
 
@@ -316,38 +316,38 @@ or external JavaScript. It is organized around the paired role swap:
 - verdicts and categorical vote tallies;
 - every juror's probability trajectory after each public argument;
 - opinion changes aligned to the side each model was advocating;
-- the exact opening, rebuttal, and closing statements;
-- evidence citations and coverage by model, role, and stage;
+- the exact opening, rebuttal and closing statements;
+- evidence citations and coverage by model, role and stage;
 - vote flips toward and away from each advocate's target;
 - configured providers and exact model IDs, plus runtime-resolved IDs when the
   adapter exposes them;
-- retries, validation warnings, estimated tokens, and latency;
-- a fairness audit for case, procedure, seed, temperature, and control models.
+- retries, validation warnings, estimated tokens and latency;
+- a fairness audit for case, procedure, seed, temperature and control models.
 
 The public event ledger remains available in the generated data even when
 JavaScript is disabled. No private chain-of-thought is requested or displayed.
-Candidate IDs, report labels, provider names, and model IDs are removed from
-juror payloads, and recognized explicit disclosures in either the public
+Candidate IDs, report labels, provider names and model IDs are removed from
+juror payloads and recognized explicit disclosures in either the public
 statement or thesis are rejected before delivery. This is not complete
 blinding: wording, style, or characteristic behavior can still let an evaluator
 infer identity.
 
 Each run writes a timestamped directory beneath `output/` unless
 `--output-dir` is supplied. Its root contains `report.html`, `benchmark.json`,
-`summary.json`, and `transcript.md`. Each trial directory contains its own
+`summary.json` and `transcript.md`. Each trial directory contains its own
 `result.json` and `traces.jsonl`. Before a rerun, root report artifacts and
 known `result.json` and `traces.jsonl` files inside recognized trial directories
 are cleaned so stale data cannot enter a new report. Unrelated files in a
 reused output directory are preserved.
 
 If a leg fails, the runner preserves its partial result, completed event ledger,
-trace file, error, and root-level report, then continues with the remaining
+trace file, error and root-level report, then continues with the remaining
 scheduled legs. Failed legs appear in the fairness audit and reliability
-counts. In paired mode, outcome wins, movement, and vote flips are calculated
+counts. In paired mode, outcome wins, movement and vote flips are calculated
 only from replicates where both reciprocal legs completed, so an orphaned leg
 cannot create an apparently balanced comparison. Grounding and reliability
 still include every attempted leg. The aggregate records `complete_pairs` and
-`scored_trials`, and the CLI returns a nonzero exit code after writing artifacts
+`scored_trials` and the CLI returns a nonzero exit code after writing artifacts
 so automated runs cannot mistake a partial benchmark for a clean result.
 
 ## Metrics and interpretation
@@ -355,7 +355,7 @@ so automated runs cannot mistake a partial benchmark for a clean result.
 The benchmark reports dimensions separately rather than hiding them inside one
 opaque score:
 
-- **Outcome:** verdict, vote margin, and side wins in each role-swapped leg.
+- **Outcome:** verdict, vote margin and side wins in each role-swapped leg.
 - **Observed aligned movement:** mean juror probability change after a model's
   public arguments. Movement toward `positive_vote` is positive for the
   positive advocate; movement toward `negative_vote` is positive for the
@@ -363,10 +363,10 @@ opaque score:
 - **Vote conversion:** categorical flips toward and away from the model's
   current target vote.
 - **Grounding:** admitted IDs visibly cited in public text, declared-only IDs,
-  unsupported declarations, and unique evidence coverage. Zero attempts are
+  unsupported declarations and unique evidence coverage. Zero attempts are
   reported as `N/A`.
 - **Protocol reliability:** first-attempt success, application-schema repairs,
-  warnings, blocked metadata disclosures, and failed exchanges.
+  warnings, blocked metadata disclosures and failed exchanges.
 - **Efficiency:** application-task token estimates and latency, kept separate
   from quality.
 - **Role balance:** the same candidate's results from complete reciprocal pairs
@@ -395,14 +395,14 @@ evaluators, then report that rubric separately from persuasion.
 For results intended for publication:
 
 1. Freeze the case JSON, prompts, stage order, control provider and model,
-   temperature, retry budgets, and code revision.
+   temperature, retry budgets and code revision.
 2. Use paired role swaps for every seed.
 3. Repeat every matchup enough times to show variance. Reference seeds change
    the deterministic fixture; live seeds are labels unless the provider has a
    separately verified seeded-generation contract.
 4. Record runtime-resolved model IDs when available and retain the exact model
    IDs supplied on the CLI.
-5. Include failures, invalid citations, repairs, latency, and token estimates.
+5. Include failures, invalid citations, repairs, latency and token estimates.
 6. Inspect the fairness audit before comparing scores. Different public-record
    hashes are expected because the candidates wrote different arguments;
    different case or control fingerprints are not.
@@ -410,7 +410,7 @@ For results intended for publication:
    you want stronger causal evidence.
 8. Consider multiple fixed jury models or a balanced evaluator rotation. Five
    LLM jurors are a synthetic evaluator panel, not a sample of people.
-9. Report persuasion, grounding, reliability, and any external reasoning rubric
+9. Report persuasion, grounding, reliability and any external reasoning rubric
    on separate axes.
 10. Describe the result as performance in this protocol and case set, not as a
     universal ranking of intelligence or truthfulness.

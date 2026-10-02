@@ -1,7 +1,7 @@
-"""Run reports, replay helpers, and golden-run assertions.
+"""Run reports, replay helpers and golden-run assertions.
 
 ``RunEvent`` is the live application-facing stream. ``RunReport`` is the durable summary built from that stream: compact
-enough for JSONL or SQLite, but structured enough for trace UIs, replay tools, and integration tests.
+enough for JSONL or SQLite, but structured enough for trace UIs, replay tools and integration tests.
 """
 
 from __future__ import annotations
@@ -167,7 +167,7 @@ class RunRecorder:
     """In-memory recorder for building ``RunReport`` objects from run events.
 
     ``RunRecorder`` intentionally mirrors ``InMemoryEventSink`` while adding the report-building API. It is suitable for
-    tests, command-line apps, and local traces that need a durable summary after streaming has finished.
+    tests, command-line apps and local traces that need a durable summary after streaming has finished.
     """
 
     def __init__(self, *, context: RunContext | dict[str, Any] | None = None) -> None:
@@ -205,7 +205,7 @@ class RunRecorder:
         *,
         context: RunContext | dict[str, Any] | None = None,
     ) -> RunEvent:
-        """Normalize, record, and return one task-stream event."""
+        """Normalize, record and return one task-stream event."""
         return await self.emit_task_event(event, context=context)
 
     def to_report(
@@ -236,7 +236,7 @@ class RunReplay:
     """Read-only replay view over a ``RunReport``.
 
     Replay helpers do not execute tools or model calls. They provide a stable way to iterate over recorded events,
-    filter by event type, and run the same assertion helpers used by golden tests.
+    filter by event type and run the same assertion helpers used by golden tests.
     """
 
     def __init__(self, report: RunReport | dict[str, Any] | Iterable[RunEvent | dict[str, Any]]) -> None:
@@ -348,7 +348,7 @@ def assert_budget_under(
     """Assert aggregate usage stays under supplied limits.
 
     Returns:
-        A usage summary with ``input_tokens``, ``output_tokens``, ``total_tokens``, and ``runtime_seconds`` for
+        A usage summary with ``input_tokens``, ``output_tokens``, ``total_tokens`` and ``runtime_seconds`` for
         additional test assertions or reporting.
     """
     report = _report_from_source(source)

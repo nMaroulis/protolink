@@ -1,4 +1,4 @@
-"""Dynamic application schemas for advocacy, juror state, and judgments."""
+"""Dynamic application schemas for advocacy, juror state and judgments."""
 
 from __future__ import annotations
 

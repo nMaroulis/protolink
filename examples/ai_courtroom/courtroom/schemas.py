@@ -407,7 +407,7 @@ class InteractionEvent:
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize one event for JSON, reporting, and comparison."""
+        """Serialize one event for JSON, reporting and comparison."""
         return asdict(self)
 
 

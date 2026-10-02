@@ -1,7 +1,7 @@
 """Typed data models shared by ProtoLink retrieval components.
 
 The RAG module keeps its values deliberately provider-neutral. Loaders, splitters, vector databases, custom retrievers,
-agent tools, and citations all exchange these small dataclasses instead of leaking a vendor SDK's response types through
+agent tools and citations all exchange these small dataclasses instead of leaking a vendor SDK's response types through
 the public API.
 """
 

@@ -23,7 +23,7 @@ def ping_agent(agent_url: str, *, timeout: float = 3.0) -> dict[str, Any]:
         timeout: HTTP timeout in seconds.
 
     Returns:
-        JSON-compatible probe details including success state, status code, measured latency, and the status URL that
+        JSON-compatible probe details including success state, status code, measured latency and the status URL that
         was called.
 
     Raises:

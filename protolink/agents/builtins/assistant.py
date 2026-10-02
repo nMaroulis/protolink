@@ -15,7 +15,7 @@ from protolink.tools.builtins.user_input import UserInputHandler
 
 
 class Assistant(Agent):
-    """An ordinary Agent with calendar, email, clock, calculator, and optional feedback.
+    """An ordinary Agent with calendar, email, clock, calculator and optional feedback.
 
     Only supplied services are installed. Reading is enabled by default; pass
     ``allow_write=True`` for calendar creation/email drafts and ``allow_send=True``
@@ -29,7 +29,7 @@ class Assistant(Agent):
         answer = await assistant.invoke("What is on my calendar today?")
 
     This class only composes Agent tools and defaults; it adds no execution loop.
-    Inherited invoke, call_tool, streaming, state, and transport APIs behave normally.
+    Inherited invoke, call_tool, streaming, state and transport APIs behave normally.
     Restore serialized configurations with ``Agent.from_dict/from_yaml`` and
     explicitly reattach configured tools/backends; credentials are not serialized.
     """
@@ -57,7 +57,7 @@ class Assistant(Agent):
             allow_send: Independently enable sending email.
             card: Optional custom agent identity and transport URL.
             **agent_options: Normal Agent settings, including policy, approval_handler,
-                system_prompt, transport, state, storage, and run_store.
+                system_prompt, transport, state, storage and run_store.
         """
         if agent_options.get("policy") is None:
             agent_options["policy"] = CapabilityPolicy(

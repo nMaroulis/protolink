@@ -43,7 +43,7 @@ class SSEJSONRPCTransport(HTTPTransport):
         The client sends a normal task payload with ``Accept: text/event-stream``
         and a request id header. The server replies with SSE ``data:`` frames
         containing JSON-RPC-style envelopes. This method validates the envelope,
-        unwraps the ``result`` payload, and stops when an envelope is marked
+        unwraps the ``result`` payload and stops when an envelope is marked
         ``final``.
         """
         if self.authenticator and self.credentials and not self.security_context:
@@ -127,7 +127,7 @@ class SSEJSONRPCTransport(HTTPTransport):
         """Parse one SSE event block into ``(result, final)``.
 
         Empty event blocks are ignored. Non-empty blocks must contain JSON with
-        the current request id, an ``ok`` flag, and either a ``result`` payload
+        the current request id, an ``ok`` flag and either a ``result`` payload
         or an ``error`` object.
         """
         if not event_lines:

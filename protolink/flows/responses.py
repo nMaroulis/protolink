@@ -23,7 +23,7 @@ ResponseT = TypeVar("ResponseT")
 class StructuredResponseError(ValueError):
     """An answer was incomplete or invalid after the configured attempt limit.
 
-    ``task`` retains execution evidence, ``attempts`` counts submissions, and
+    ``task`` retains execution evidence, ``attempts`` counts submissions and
     ``validation_error`` holds Pydantic's final error (None for an incomplete task).
     """
 

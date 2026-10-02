@@ -1,9 +1,9 @@
-"""Provider-agnostic LLM usage, context, latency, and cost helpers.
+"""Provider-agnostic LLM usage, context, latency and cost helpers.
 
 The helpers in this module keep observability concerns out of provider
 adapters and the inference loop. They intentionally avoid mandatory tokenizer
 or pricing dependencies: provider-reported usage is preferred when available,
-``tiktoken`` is used only if it is already installed, and a small character
+``tiktoken`` is used only if it is already installed and a small character
 heuristic is used as the final fallback.
 """
 
@@ -25,7 +25,7 @@ class LLMModelProfile:
 
     Prices and context windows change over time, so Protolink does not require
     or assume a global pricing catalog. Applications can pass a profile for the
-    model they selected, and Protolink will compute percentages and estimated
+    model they selected and Protolink will compute percentages and estimated
     costs from normalized usage metadata. Capability fields are intentionally
     descriptive rather than catalog-backed: applications can tell Protolink what
     the selected model supports without requiring a live pricing/model database.

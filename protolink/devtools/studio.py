@@ -1,4 +1,4 @@
-"""Blueprint validation, code generation, and local execution for Studio.
+"""Blueprint validation, code generation and local execution for Studio.
 
 Studio deliberately stores only declarative JSON.  The generator turns that
 data into ordinary, editable Python that uses Protolink's public APIs; it never
@@ -325,7 +325,7 @@ def default_studio_blueprint() -> dict[str, Any]:
                     "url": "runtime://planner",
                     "transport": "runtime",
                     "role": "worker",
-                    "system_prompt": "Be concise, practical, and use tools when they help.",
+                    "system_prompt": "Be concise, practical and use tools when they help.",
                     "skills": "auto",
                     "state": ["conversation"],
                     "verbosity": 1,
@@ -515,7 +515,7 @@ def validate_studio_blueprint(value: Any) -> dict[str, Any]:
 
 
 def load_studio_blueprint(path: str | Path) -> dict[str, Any]:
-    """Load, parse, and validate a Studio blueprint from a JSON file.
+    """Load, parse and validate a Studio blueprint from a JSON file.
 
     Args:
         path: Path to the Studio blueprint JSON file.

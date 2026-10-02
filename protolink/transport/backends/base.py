@@ -43,7 +43,7 @@ class BackendInterface(ABC):
     async def stop(self) -> None:
         """Gracefully terminate the ASGI HTTP server daemon.
 
-        Implementations must signal the server to exit, gracefully complete any in-flight connections, and safely
+        Implementations must signal the server to exit, gracefully complete any in-flight connections and safely
         `await` the background server task until closure.
         """
         ...

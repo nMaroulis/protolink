@@ -38,7 +38,7 @@ Rules:
 - Do NOT mix multiple action types in a single response
 - Do NOT invent tools or agents
 - Do NOT infer intent beyond what is explicitly stated in the Task
-- The output MUST be valid, structured, and machine-parseable
+- The output MUST be valid, structured and machine-parseable
 
 Allowed Response Types:
 1. tool_call   - Invoke an external tool
@@ -63,22 +63,22 @@ Example final response:
 
 LOW_REASONING_PROMPT: str = """
 Use brief internal reasoning to determine the correct action.
-Quickly identify user intent, decide if a tool or agent is needed, and produce the appropriate JSON action.
+Quickly identify user intent, decide if a tool or agent is needed and produce the appropriate JSON action.
 Do not reveal reasoning. Output only the final JSON action.
 """
 
 MEDIUM_REASONING_PROMPT: str = """
 Use structured internal reasoning to determine the correct action.
-Understand the user's objective, decide whether a direct response or tool or agent is required, and select appropriate
+Understand the user's objective, decide whether a direct response or tool or agent is required and select appropriate
 parameters. Validate coherence and correctness before responding.
 Do not reveal reasoning. Output only the final JSON action.
 """
 
 HIGH_REASONING_PROMPT: str = """
 Use deep and methodical internal reasoning to plan the correct action.
-Carefully analyze the user's intent, evaluate whether a response or tool or agent is required, and select the most
+Carefully analyze the user's intent, evaluate whether a response or tool or agent is required and select the most
 appropriate action and parameters.
-Check for edge cases, inconsistencies, and invalid assumptions.
+Check for edge cases, inconsistencies and invalid assumptions.
 Verify the action is logically sound and aligned with the user's request.
 Do not reveal reasoning or intermediate analysis. Output only the final JSON action.
 """

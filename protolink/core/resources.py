@@ -47,7 +47,7 @@ class ResourceSnapshot:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ResourceSnapshot:
-        """Restore bytes, mode, and revision from a recovery record."""
+        """Restore bytes, mode and revision from a recovery record."""
         encoded = data.get("data_base64")
         return cls(
             ResourceRevision(**data["revision"]),
@@ -61,7 +61,7 @@ class Resource(Protocol):
     """Small compare-and-replace interface for a recoverable resource backend."""
 
     def read(self, resource_id: str) -> ResourceSnapshot:
-        """Read the current bytes, permission metadata, and revision."""
+        """Read the current bytes, permission metadata and revision."""
         ...
 
     def replace(self, expected: ResourceSnapshot, data: bytes | None, mode: int | None) -> ResourceSnapshot:

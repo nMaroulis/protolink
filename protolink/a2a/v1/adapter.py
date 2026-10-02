@@ -1,6 +1,6 @@
 """A2A 1.0 JSON-RPC adapter for a ProtoLink Agent.
 
-The adapter owns protocol validation, wire translation, and the minimal task index required by A2A task operations.
+The adapter owns protocol validation, wire translation and the minimal task index required by A2A task operations.
 Agent authors still implement the same ``handle_task(Task)`` method and do not need A2A-specific business logic.
 """
 

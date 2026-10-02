@@ -49,7 +49,7 @@ def main() -> None:
     """Start an HTTPS agent and perform one verified client round trip."""
     args = parse_args()
     if args.certfile is None or args.keyfile is None or args.cafile is None:
-        print("Pass --certfile, --keyfile, and --cafile to run the TLS example.")
+        print("Pass --certfile, --keyfile and --cafile to run the TLS example.")
         return
     agent_url = f"https://127.0.0.1:{find_free_port()}"
     server_tls = TLSConfig(

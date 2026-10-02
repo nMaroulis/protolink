@@ -1,7 +1,7 @@
 """Persistent task and run-report storage.
 
 The run store is intentionally separate from the generic ``Storage`` key/value interface. Agents use it for durable
-execution snapshots: final or intermediate ``Task`` state, correlated ``RunContext`` identifiers, and optional
+execution snapshots: final or intermediate ``Task`` state, correlated ``RunContext`` identifiers and optional
 ``RunReport`` documents for replay/debugging.
 """
 
@@ -158,8 +158,8 @@ class SQLiteRunStore:
     """SQLite-backed ``RunStore`` implementation.
 
     The store uses two JSON payload tables with relational indexes for common
-    queries. It is intentionally dependency-free, process-local, and suitable
-    for local CLIs, notebooks, tests, and lightweight services. Larger systems
+    queries. It is intentionally dependency-free, process-local and suitable
+    for local CLIs, notebooks, tests and lightweight services. Larger systems
     can implement the same ``RunStore`` protocol against Postgres, object
     storage, or an application database.
     """

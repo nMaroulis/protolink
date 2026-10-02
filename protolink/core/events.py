@@ -50,7 +50,7 @@ class RunEvent:
 
     ``RunEvent`` is the stable application-facing envelope for task execution streams. Existing task stream events
     remain available for wire/backward compatibility; this type gives applications one normalized event shape with
-    sequence numbers, severity, summaries, run IDs, task IDs, agent names, step numbers, payloads, and final-result
+    sequence numbers, severity, summaries, run IDs, task IDs, agent names, step numbers, payloads and final-result
     markers.
 
     Attributes:
@@ -213,7 +213,7 @@ class EventSink(Protocol):
 class InMemoryEventSink:
     """Simple event sink that records run events in memory.
 
-    The sink is intentionally small and dependency-free so tests, CLIs, and local applications can capture a canonical
+    The sink is intentionally small and dependency-free so tests, CLIs and local applications can capture a canonical
     event stream without a telemetry backend. It assigns monotonic sequence numbers when incoming events do not already
     have one.
     """
@@ -665,7 +665,7 @@ class TaskLLMStreamEvent:
     """LLM inference event emitted while an agent is processing a task.
 
     This event carries provider-agnostic inference activity such as streamed chunks, parsed actions, tool
-    starts/results, delegated agent calls, and final inference content.
+    starts/results, delegated agent calls and final inference content.
     """
 
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))

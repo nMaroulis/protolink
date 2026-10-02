@@ -75,7 +75,7 @@ def current_datetime() -> Tool:
     tool = Tool(
         name="current_datetime",
         description=(
-            "Return the current date, time, weekday, UTC offset, and Unix timestamp for an IANA timezone. "
+            "Return the current date, time, weekday, UTC offset and Unix timestamp for an IANA timezone. "
             "Use this when the answer depends on the actual current time."
         ),
         input_schema=None,

@@ -7,7 +7,7 @@ coding assistant powered by three autonomous agents:
 
   1. ORCHESTRATOR (LLM) - receives user requests, coordinates the team
   2. PLANNER (LLM)       - analyzes code, creates plans, generates edits
-  3. CODER (Tools)       - reads, writes, lists, and searches files
+  3. CODER (Tools)       - reads, writes, lists and searches files
 
 ═══════════════════════════════════════════════════════════════════════════
 WHAT THIS DEMO SHOWS:
@@ -165,7 +165,7 @@ async def main():
 
         # ─── Step 2: Start Registry ──────────────────────────────────
         # The Registry is Protolink's discovery service. Agents register
-        # themselves here, and the Orchestrator queries it to find
+        # themselves here and the Orchestrator queries it to find
         # available agents at runtime.
         print("\n📡 Starting Registry...")
         registry = Registry(url=REGISTRY_URL, transport="http")
@@ -197,7 +197,7 @@ async def main():
 
         # ─── Step 5: Start Orchestrator Agent (LLM + Agent Calls) ────
         # The Orchestrator is the coordinator. It has an LLM to decide
-        # WHAT to do, and uses agent_call to delegate to Planner and Coder.
+        # WHAT to do and uses agent_call to delegate to Planner and Coder.
         print(f"\n🎯 Starting Orchestrator Agent (LLM: {LLM_PROVIDER})...")
         orchestrator = create_orchestrator_agent(
             registry=registry,

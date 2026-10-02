@@ -2,7 +2,7 @@
 """Dependency-free frontend assets for the Protolink Studio dashboard view.
 
 The dashboard renderer embeds these strings into its standalone HTML document.
-Studio intentionally uses browser-native CSS, DOM, pointer, file, clipboard, and
+Studio intentionally uses browser-native CSS, DOM, pointer, file, clipboard and
 download APIs so the standard Protolink package does not need a frontend build
 step or third-party JavaScript dependency.
 """
@@ -576,7 +576,7 @@ STUDIO_HTML = r"""
       <div class="studio-heading">
         <p class="kicker">Visual runtime builder</p>
         <h1 id="studio-title">Protolink Studio <span class="studio-beta">Local</span></h1>
-        <p class="lede">Compose agents, models, tools, registries, flows, and runtime modules on one canvas, then export the blueprint or generate ordinary Protolink Python.</p>
+        <p class="lede">Compose agents, models, tools, registries, flows and runtime modules on one canvas, then export the blueprint or generate ordinary Protolink Python.</p>
       </div>
       <div class="studio-commandbar" aria-label="Studio commands">
         <div class="studio-command-row">
@@ -718,7 +718,7 @@ const STUDIO_LLM_TOOL_CALLING_PROVIDERS = new Set([
   'llama.cpp-server', 'llama.cpp-local',
 ]);
 const STUDIO_KIND_META = {
-  agent: {label: 'Agent', short: 'A', description: 'Identity, prompting, state, transport, and runtime behavior.'},
+  agent: {label: 'Agent', short: 'A', description: 'Identity, prompting, state, transport and runtime behavior.'},
   llm: {label: 'LLM', short: 'L', description: 'Provider and model settings referenced by one or more agents.'},
   tool: {label: 'Tool', short: 'T', description: 'A built-in capability or an editable custom tool stub.'},
   registry: {label: 'Registry', short: 'R', description: 'Discovery boundary for agents and flows.'},

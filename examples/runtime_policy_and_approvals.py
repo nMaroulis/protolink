@@ -1,4 +1,4 @@
-"""Runtime actions, capability policy, approvals, and events.
+"""Runtime actions, capability policy, approvals and events.
 
 1. A mock model requests a tool call.
 2. Protolink validates the tool arguments and prepares a ``RunAction``.

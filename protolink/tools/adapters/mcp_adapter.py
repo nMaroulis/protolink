@@ -146,7 +146,7 @@ def _parse_tool_arguments(tool: Tool) -> dict[str, type]:
         For example: ``{"a": int, "b": str}``
 
     Note:
-        Union, nullable, referenced, and unsupported schemas use ``typing.Any``.
+        Union, nullable, referenced and unsupported schemas use ``typing.Any``.
         This shallow mapping is for inspection only; the original schema is retained.
     """
     if not tool.input_schema:
@@ -176,7 +176,7 @@ class MCPToolAdapter(BaseTool):
     Adapter that connects to MCP servers and exposes their tools as callables.
 
     This class provides a bridge between the Model Context Protocol (MCP) and Protolink's
-    tool system. It can discover tools from an MCP server, retrieve their schemas, and
+    tool system. It can discover tools from an MCP server, retrieve their schemas and
     create callable wrappers that invoke the tools.
 
     The adapter supports three transport mechanisms:
@@ -513,7 +513,7 @@ class MCPToolAdapter(BaseTool):
 
         Returns a list of ``Tool`` instances, each wrapping a specific MCP tool.
         These instances are native Protolink tools with ``name``, ``description``,
-        ``input_schema``, ``tags``, and ``__call__`` properly set.
+        ``input_schema``, ``tags`` and ``__call__`` properly set.
 
         Returns:
             A list of ``Tool`` instances, each representing one tool from the
@@ -732,7 +732,7 @@ class MCPToolAdapter(BaseTool):
         """
         Print all available tools in a human-readable format.
 
-        Displays tool information including name, description, JSON schema, and
+        Displays tool information including name, description, JSON schema and
         parsed Python types. Useful for debugging and exploration.
 
         Example:

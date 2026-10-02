@@ -4,7 +4,7 @@ Task lifecycle state and live execution control are deliberately separate. ``Tas
 are serializable facts about a run, while ``CancellationToken`` and ``TaskExecutionRegistry`` are process-local runtime
 objects used to interrupt work that is currently executing.
 
-Cancellation is best-effort. Async model calls, tools, and agent delegation can usually be interrupted at an await
+Cancellation is best-effort. Async model calls, tools and agent delegation can usually be interrupted at an await
 point. Synchronous functions and remote systems may not be immediately stoppable and must provide their own cooperative
 or process-level cancellation when stronger guarantees are required.
 """

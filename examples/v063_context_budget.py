@@ -1,4 +1,4 @@
-"""Protolink 0.6.3 context manifests, model profiles, and run budgets.
+"""Protolink 0.6.3 context manifests, model profiles and run budgets.
 
 This provider-free example shows the runtime data an application can inspect
 before a model call:

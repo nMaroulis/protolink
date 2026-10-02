@@ -59,7 +59,7 @@ def _resolve_juror_backend(args: argparse.Namespace) -> tuple[str, str | None, s
 
 
 async def run_condition(args: argparse.Namespace, condition: str, condition_dir: Path) -> dict[str, Any]:
-    """Construct explicit agents, run one condition, and stop every runtime."""
+    """Construct explicit agents, run one condition and stop every runtime."""
     condition_dir.mkdir(parents=True, exist_ok=True)
     for artifact_name in CONDITION_ARTIFACTS:
         (condition_dir / artifact_name).unlink(missing_ok=True)
@@ -275,7 +275,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
     juror_malik_agent = Agent(
         card=AgentCard(
             name="juror_malik",
-            description="Civil-rights lawyer attentive to burden, power, and scapegoating.",
+            description="Civil-rights lawyer attentive to burden, power and scapegoating.",
             url=f"runtime://ai-liability/{namespace}/juror-malik",
             capabilities={"delegation": True, "has_llm": True},
             tags=["tribunal", "juror", "burden-of-proof"],
@@ -423,7 +423,7 @@ async def run_condition(args: argparse.Namespace, condition: str, condition_dir:
         )
         result = await simulation.run()
         summary = summary_from_result(result)
-        progress(1, "Writing result, transcript, trace, and interactive report artifacts")
+        progress(1, "Writing result, transcript, trace and interactive report artifacts")
         (condition_dir / "result.json").write_text(
             json.dumps(result, indent=2, ensure_ascii=False),
             encoding="utf-8",
@@ -545,7 +545,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="verbosity",
         action="store_const",
         const=2,
-        help="Show every A2A call, accepted response, repair, and elapsed time.",
+        help="Show every A2A call, accepted response, repair and elapsed time.",
     )
     parser.set_defaults(verbosity=None)
     parser.add_argument(

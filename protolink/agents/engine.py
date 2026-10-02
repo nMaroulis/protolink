@@ -121,7 +121,7 @@ def _accepts_keyword_argument(callback: Any, name: str) -> bool:
 
 
 class AgentExecutionMixin(_AgentMixinBase):
-    """Implements task execution, streaming, LLM calls, and delegation."""
+    """Implements task execution, streaming, LLM calls and delegation."""
 
     async def run_task(self, task: Task) -> Task:
         """Run the configured task handler under live cancellation control.
@@ -168,7 +168,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         """Stream a task handler under live cancellation control.
 
         A successfully canceled stream ends with one final ``TaskStatusUpdateEvent`` whose state is ``canceled``. This
-        keeps SSE, WebSocket, runtime, and direct consumers aligned on the same lifecycle.
+        keeps SSE, WebSocket, runtime and direct consumers aligned on the same lifecycle.
         """
         from protolink.core.events import TaskStatusUpdateEvent
 
@@ -566,7 +566,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         """Remove retrieved passages from an externally observable tool event.
 
         Knowledge output remains available to the active model loop, but
-        telemetry, task streams, and durable receipts receive only bounded
+        telemetry, task streams and durable receipts receive only bounded
         search statistics and opaque source identifiers.
         """
         if event.get("type") != "tool_result":
@@ -722,7 +722,7 @@ class AgentExecutionMixin(_AgentMixinBase):
     def _finalize_task_state(self, task: Task, outputs: list[Part | Message]) -> None:
         """Set the terminal or waiting state implied by agent outputs.
 
-        Errors win over all other outputs, an explicit status part can request more input, and otherwise successful
+        Errors win over all other outputs, an explicit status part can request more input and otherwise successful
         execution completes the task.
         """
         if task.is_terminal:
@@ -1154,7 +1154,7 @@ class AgentExecutionMixin(_AgentMixinBase):
 
         This method orchestrates a complete LLM inference cycle by:
         1. Discovering available agents from the registry
-        2. Building a system prompt with tools, agent cards, and user instructions (Semantic Context Injection)
+        2. Building a system prompt with tools, agent cards and user instructions (Semantic Context Injection)
         3. Invoking the LLM's inference loop with tool and agent delegation support
 
         The LLM may respond with:
@@ -1720,7 +1720,7 @@ class AgentExecutionMixin(_AgentMixinBase):
         """Invoke the agent LLM in streaming mode and yield task events.
 
         The returned iterator yields ``TaskLLMStreamEvent`` objects for provider activity such as chunks, tool calls,
-        delegated agent calls, and final inference content. A private final payload is used internally by
+        delegated agent calls and final inference content. A private final payload is used internally by
         ``handle_task_streaming()`` to attach the completed ``Part`` to the task before the final status event is
         emitted.
         """

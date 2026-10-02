@@ -14,7 +14,7 @@ export default function ExampleArticle({
       <header className={styles.intro}>
         <h2>✨ Want to explore the full story?</h2>
         <p>
-          I shared a deeper dive into the architecture, experiments, and lessons
+          I shared a deeper dive into the architecture, experiments and lessons
           learned behind this project in my original article on <strong>{source}</strong>:
         </p>
         <span className={styles.arrow} aria-hidden="true">

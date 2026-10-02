@@ -57,7 +57,7 @@ class _Session:
 
     def attach(self, connection: _C) -> _C:
         # Only socket shutdown happens on the event-loop thread. The worker owns
-        # protocol cleanup, file handles, and all normal protocol operations.
+        # protocol cleanup, file handles and all normal protocol operations.
         with self._lock:
             self._connection = connection
             if self._stopped.is_set():

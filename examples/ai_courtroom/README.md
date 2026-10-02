@@ -6,16 +6,16 @@ This ProtoLink showcase puts autonomous agents inside a fictional liability
 tribunal and makes their communication observable. The case is memorable, but
 the case is not the product. The product is the interaction:
 
-- agents with different roles, incentives, professions, and communication
+- agents with different roles, incentives, professions and communication
   habits;
 - direct ProtoLink agent-to-agent tasks;
 - jurors who choose whom to address and what to ask;
 - replayable opinion changes after every public message;
-- solo, independent, foreperson-star, and direct-mesh comparisons;
+- solo, independent, foreperson-star and direct-mesh comparisons;
 - provider/model experiments using the same application protocol.
 
 The default run is deterministic and offline. It produces JSON results,
-ProtoLink traces, a public transcript, and standalone interactive HTML reports.
+ProtoLink traces, a public transcript and standalone interactive HTML reports.
 
 Everything and everyone in this example is fictional. It is a software
 experiment, not legal analysis, legal advice, or a validated safety assessment.
@@ -45,7 +45,7 @@ The evidence creates an interacting-failures problem:
 | `E7` | Reconstruction shows both calibration and road layout materially changed the safe-stop rate. |
 
 The binary charge is deliberately narrower than the causal story. A not-guilty
-verdict does not mean nothing went wrong, and a guilty verdict does not mean
+verdict does not mean nothing went wrong and a guilty verdict does not mean
 Aster Vale was the only contributor.
 
 ## The agents
@@ -103,7 +103,7 @@ On a deliberation turn, a juror returns an observable public action:
 The application validates the target against the current topology, then the
 speaker sends the message directly to the selected agent through ProtoLink.
 The receiver returns an updated public register, categorical vote, concise
-reason, and public reply.
+reason and public reply.
 
 Peer messages never automatically expose another juror's private probability,
 confidence, or vote. An agent reveals only what it chooses to put in its public
@@ -115,7 +115,7 @@ message.
 
 One civic generalist receives the public record and decides without peers. This
 is an intuitive product baseline, not a clean communication treatment: it also
-changes panel size, persona composition, and inference budget.
+changes panel size, persona composition and inference budget.
 
 ### `independent`
 
@@ -130,7 +130,7 @@ information hub and possible bottleneck.
 ### `mesh`
 
 Every juror receives a turn with all other jurors as permitted targets. The
-agent authors the recipient, move, message, and public intent.
+agent authors the recipient, move, message and public intent.
 
 The primary communication comparison is `independent` versus `star` or `mesh`
 when their saved control fingerprints and public-record hashes match.
@@ -203,7 +203,7 @@ The runner reports work as it happens so a live model does not look stalled:
 
 - the offline `reference` provider uses compact phase and step updates;
 - live providers show each A2A exchange and its elapsed time by default;
-- `-v` or `--verbose` forces detailed message, acceptance, and repair updates;
+- `-v` or `--verbose` forces detailed message, acceptance and repair updates;
 - `-q` or `--quiet` suppresses application progress at the default agent log
   level, only run headers and final condition summaries remain;
 - `--agent-verbosity {0,1,2}` independently controls ProtoLink's own
@@ -247,11 +247,11 @@ Each condition writes:
 
 | File | Purpose |
 | --- | --- |
-| `result.json` | Full configuration, public record, agent models, decision histories, actions, events, metrics, and verdict |
+| `result.json` | Full configuration, public record, agent models, decision histories, actions, events, metrics and verdict |
 | `summary.json` | Compact outcome and comparison data |
 | `transcript.md` | Escaped public transcript |
 | `report.html` | Standalone interactive replay and analysis |
-| `traces.jsonl` | ProtoLink task, inference, and A2A telemetry |
+| `traces.jsonl` | ProtoLink task, inference and A2A telemetry |
 
 An all-condition run also writes `index.html`, which presents the
 solo → independent → star → mesh ladder.
@@ -259,11 +259,11 @@ solo → independent → star → mesh ladder.
 Saved metadata includes:
 
 - provider and exact resolved model for every agent;
-- seed, temperature, evidence order, rounds, and both retry limits;
+- seed, temperature, evidence order, rounds and both retry limits;
 - public-record hash;
 - baseline and pre-deliberation snapshot hashes;
 - a comparison control fingerprint;
-- message, retry, latency, estimated-token, grounding, and routing information.
+- message, retry, latency, estimated-token, grounding and routing information.
 
 ## Live models
 
@@ -315,7 +315,7 @@ python examples/ai_courtroom/run.py \
 ```
 
 If every actor uses the same Ollama backend, the juror-specific provider flags
-are unnecessary. Use `--juror-provider ollama`, `--juror-model`, and
+are unnecessary. Use `--juror-provider ollama`, `--juror-model` and
 `--juror-base-url` only when the jurors intentionally use a different model or
 endpoint.
 
@@ -326,7 +326,7 @@ Live responses cross two intentionally separate validation boundaries:
 2. `--max-attempts` controls how many bounded application-contract attempts the
    tribunal permits for each A2A message after it receives final content.
 
-Both default to `3`, accept `1..5`, and provide targeted validation feedback
+Both default to `3`, accept `1..5` and provide targeted validation feedback
 before another attempt. They are separate because a valid ProtoLink
 `FinalAction` can still contain malformed courtroom JSON. Increasing either
 limit can help a smaller local model recover, but it also increases run time.
@@ -340,7 +340,7 @@ than setting every limit to its maximum.
 
 Strict parsing and model self-correction remain the primary path. The outer
 parser adds two narrow normalizations for the response shapes exposed here: it
-can serialize an object/list placed inside `FinalAction.content`, and it can
+can serialize an object/list placed inside `FinalAction.content` and it can
 treat a direct application object as final content only when no ProtoLink
 action-envelope fields are present. It does not guess missing votes, evidence,
 targets, or arguments.
@@ -350,7 +350,7 @@ The application has one equally narrow last-resort fallback for the earlier
 a nonempty lawyer, witness, or judge public statement may be kept as its
 `statement`, with only exact admitted `E1`–`E7` references extracted. The event
 is marked with a recovery warning. Juror assessments, ballots, categorical
-verdict fields, and deliberation targets never use this prose fallback because
+verdict fields and deliberation targets never use this prose fallback because
 recovering them would require inventing decision data.
 
 An all-condition live run repeats the full hearing for each condition and may
@@ -368,7 +368,7 @@ python examples/ai_courtroom/run.py \
 
 ## Controlled juror-only model comparison
 
-An end-to-end provider switch changes the lawyers, witnesses, public record, and
+An end-to-end provider switch changes the lawyers, witnesses, public record and
 jury. That is visually interesting but scientifically confounded.
 
 For a cleaner comparison, keep tribunal actors deterministic and change only
@@ -387,13 +387,13 @@ python examples/ai_courtroom/run.py \
 For publishable comparisons:
 
 1. Freeze prompts, persona demographics, case, evidence order, topology, round
-   count, and temperature, or preregister a balanced rotation of demographic
+   count and temperature, or preregister a balanced rotation of demographic
    assignments.
 2. Pair runs by seed.
 3. Verify record hashes and control fingerprints.
 4. Repeat every cell.
-5. Include schema failures, warnings, and routing failures.
-6. Report outcome, calibration, grounding, volatility, latency, and cost
+5. Include schema failures, warnings and routing failures.
+6. Report outcome, calibration, grounding, volatility, latency and cost
    separately.
 7. Describe the result as a case study, not a general intelligence leaderboard.
 

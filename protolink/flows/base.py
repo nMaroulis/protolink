@@ -24,7 +24,7 @@ class Flow(ABC):
     Key features:
     - **Composability**: Flows can be nested within each other (e.g., a Parallel block inside a Pipeline).
     - **Centralized Dispatch**: Execution logic is handled by `_execute_target`, supporting local Agents, remote agent
-      URLs/names, and nested Flow instances.
+      URLs/names and nested Flow instances.
     - **Resource Propagation**: Parent flows automatically propagate their `AgentClient` and `RegistryClient` to
       nested flows if they are unconfigured.
     - **Semantic Context Injection**: Flows dynamically build instruction prompts based on their downstream topology

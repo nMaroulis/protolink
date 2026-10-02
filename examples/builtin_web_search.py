@@ -101,7 +101,7 @@ async def run_search(
 
 
 def main() -> None:
-    """Parse arguments, run one search when requested, and print JSON."""
+    """Parse arguments, run one search when requested and print JSON."""
     parser = build_parser()
     args = parser.parse_args()
     if args.query is None:

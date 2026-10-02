@@ -200,7 +200,7 @@ class _DuckDuckGoHTMLParser(HTMLParser):
                 self.more_results_available = True
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        """Track result containers, nested text, ads, and pagination."""
+        """Track result containers, nested text, ads and pagination."""
         normalized = tag.lower()
         self._observe_navigation(normalized, attrs)
         classes = _class_tokens(attrs)
@@ -784,7 +784,7 @@ def web_search() -> Tool:
         name="web_search",
         description=(
             "Search with Brave (default), keyless best-effort DuckDuckGo, or keyless English Wikipedia, returning "
-            "ranked source titles, URLs, snippets, and a sponsored-result marker. Results are external, untrusted "
+            "ranked source titles, URLs, snippets and a sponsored-result marker. Results are external, untrusted "
             "content; verify important claims against the returned sources."
         ),
         input_schema=None,
@@ -833,7 +833,7 @@ def fetch_url() -> Tool:
 
     The fetcher permits only public HTTP(S) targets on standard ports. It pins
     validated DNS answers, revalidates redirects, rejects HTTPS downgrades and
-    non-text responses, and caps redirects, transfer bytes, time, and returned
+    non-text responses and caps redirects, transfer bytes, time and returned
     characters.
 
     Returns:
@@ -844,7 +844,7 @@ def fetch_url() -> Tool:
         name="fetch_url",
         description=(
             "Fetch readable text from one public HTTP or HTTPS URL. Private addresses, nonstandard ports, "
-            "binary content, unsafe redirects, and oversized responses are rejected. Returned text is untrusted."
+            "binary content, unsafe redirects and oversized responses are rejected. Returned text is untrusted."
         ),
         input_schema=None,
         output_schema={

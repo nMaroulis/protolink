@@ -299,7 +299,7 @@ def test_dashboard_static_output_includes_active_studio_builder(tmp_path: Path):
     assert 'data-icon="refresh"' in dashboard_html
     assert dashboard_html.index('id="nav-registry"') < dashboard_html.index('id="nav-runs"')
     assert "dashboard-registry-summary" in dashboard_html
-    assert "For full agent details, schemas, transports, and security metadata" in dashboard_html
+    assert "For full agent details, schemas, transports and security metadata" in dashboard_html
     assert "dashboardAgentActions" in dashboard_html
     assert "transport-badge" in dashboard_html
     assert "capability-badge" in dashboard_html

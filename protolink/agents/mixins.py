@@ -1,7 +1,7 @@
 """Reusable behavior mixins for the public Agent class.
 
 These mixins keep the public :class:`protolink.agents.Agent` API stable while separating independent responsibilities
-such as lifecycle, control-plane operations, tools, registry communication, configuration, and serialization.
+such as lifecycle, control-plane operations, tools, registry communication, configuration and serialization.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ ResponseT = TypeVar("ResponseT")
 
 
 class AgentLifecycleMixin(_AgentMixinBase):
-    """Starts, stops, and tears down the embedded server runtime."""
+    """Starts, stops and tears down the embedded server runtime."""
 
     async def _serve(self, *, register: bool = True) -> None:
         """Initialize and start the agent runtime.
@@ -188,7 +188,7 @@ class AgentLifecycleMixin(_AgentMixinBase):
 
         1. **Deterministic Background Mode (``background=True``):** Starts a dedicated thread with its own ``asyncio``
            event loop. To prevent race conditions, this method utilizes a ``threading.Event`` to block the caller until
-           the background agent is fully initialized, registered, and ready to receive traffic. Any startup failures
+           the background agent is fully initialized, registered and ready to receive traffic. Any startup failures
            (e.g., port collisions) are captured and re-raised in the caller thread.
 
         2. **Blocking Mode (``background=False``):** Utilizes ``asyncio.run()`` to take over the main thread's
@@ -311,7 +311,7 @@ class AgentLifecycleMixin(_AgentMixinBase):
 
 
 class AgentControlPlaneMixin(_AgentMixinBase):
-    """Exposes cancellation, history compaction, and persistent-state controls."""
+    """Exposes cancellation, history compaction and persistent-state controls."""
 
     @property
     def active_task_ids(self) -> tuple[str, ...]:
@@ -492,7 +492,7 @@ class AgentControlPlaneMixin(_AgentMixinBase):
         """Compact persistent conversation state and return a state report.
 
         Conversation state is currently the built-in compactable store. The operation loads the selected session, runs
-        the LLM-owned ``HistoryCompactor``, saves the compacted session, and reports the before/after counts. Explicit
+        the LLM-owned ``HistoryCompactor``, saves the compacted session and reports the before/after counts. Explicit
         keyword arguments override fields on ``request``; omitted keywords preserve request-spec values delivered by
         remote clients.
         """
@@ -636,7 +636,7 @@ class AgentControlPlaneMixin(_AgentMixinBase):
 
 
 class AgentCommunicationMixin(_AgentMixinBase):
-    """Handles direct invocation, registry discovery, and agent-to-agent calls."""
+    """Handles direct invocation, registry discovery and agent-to-agent calls."""
 
     async def call_agent(
         self,
@@ -754,20 +754,20 @@ class AgentCommunicationMixin(_AgentMixinBase):
                 when conversation state is enabled; pass a distinct ID for
                 each independent conversation.
             budget: Optional run limits, overriding the supplied context's budget.
-            context: Explicit permissions, tracing, and run controls. Copied before
+            context: Explicit permissions, tracing and run controls. Copied before
                 use. An explicit session_id overrides its session; otherwise the
                 context session or legacy ``invocation_session_id`` is used.
 
         Returns:
             Final part content, including ``ToolOutput`` for tool calls.
-            Empty strings, zero, false, and empty collections are preserved.
+            Empty strings, zero, false and empty collections are preserved.
             Returns ``"No response generated"`` only when no response content
             was produced. Use ``call_tool`` for a tool's raw return value.
 
         Raises:
             ValueError: The part type is unsupported.
             TaskExecutionError: The returned task failed or was canceled.
-                Handler, provider, and policy exceptions propagate unchanged.
+                Handler, provider and policy exceptions propagate unchanged.
         """
         # Create a task with the user message
         if part_type == "infer":
@@ -802,7 +802,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
         store: RunStore | None = None,
         redaction_policy: RedactionPolicy | None = None,
     ) -> RunHandle:
-        """Start one local run and return its events, result, report, and cancellation handle.
+        """Start one local run and return its events, result, report and cancellation handle.
 
         Args:
             prompt: Inference prompt, or a fully configured Task (including tool calls).
@@ -814,7 +814,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
 
         Requires an active asyncio loop. No server is started. ``handle.chunks()``
         yields raw model fragments, which can be JSON; ``await handle.result()``
-        returns a RunResult with the terminal status, output, and report. Use
+        returns a RunResult with the terminal status, output and report. Use
         ``await handle.cancel()`` to stop work, even after leaving an iterator.
         """
         from protolink.runtime import RunHandle
@@ -832,9 +832,9 @@ class AgentCommunicationMixin(_AgentMixinBase):
     def peer(self, target: str | AgentCard, *, protocol: Literal["auto", "protolink", "a2a"] = "auto") -> AgentPeer:
         """Bind a peer URL, card, or registry name without making a request.
 
-        The returned peer offers invoke, invoke_typed, call_tool, and run_task,
+        The returned peer offers invoke, invoke_typed, call_tool and run_task,
         plus a sync facade. Registry names must resolve to exactly one agent.
-        Calls use this agent's existing transport, credentials, and protocol.
+        Calls use this agent's existing transport, credentials and protocol.
         """
         from protolink.client.peer import AgentPeer
 
@@ -902,7 +902,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
 
         Unlike :meth:`invoke`, which lets the model decide whether to use a
         knowledge tool, ``ask`` always retrieves first. The same task,
-        cancellation, policy, telemetry, history, and infer-loop boundaries are
+        cancellation, policy, telemetry, history and infer-loop boundaries are
         retained.
 
         Args:
@@ -926,7 +926,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
             RuntimeError: Knowledge or an LLM has not been configured.
             ValueError: The question is empty.
             TaskExecutionError: The returned task failed or was canceled.
-                Retrieval, handler, provider, and policy exceptions propagate
+                Retrieval, handler, provider and policy exceptions propagate
                 unchanged.
         """
         if not self.knowledge:
@@ -1017,7 +1017,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
 
 
 class AgentToolMixin(_AgentMixinBase):
-    """Manages tools, skills, and runtime action authorization."""
+    """Manages tools, skills and runtime action authorization."""
 
     def add_tools(self, tools: Iterable[BaseTool | Callable[..., Any]]) -> None:
         """Register an iterable of tools or typed functions in order.
@@ -1091,7 +1091,7 @@ class AgentToolMixin(_AgentMixinBase):
         """Register a tool or Python callable and synchronize its advertised skill.
 
         Plain synchronous and asynchronous callables are wrapped with
-        ``Tool.from_callable()`` to infer their name, cleaned docstring, and
+        ``Tool.from_callable()`` to infer their name, cleaned docstring and
         schemas. Existing tools are retained unchanged, including custom
         structural tools and MCP wrappers. Registration never calls the tool.
 
@@ -1106,7 +1106,7 @@ class AgentToolMixin(_AgentMixinBase):
 
         Registering an existing name replaces the runtime tool and updates its
         skill. Use ``agent.call_tool()`` or task execution to invoke it through
-        argument validation, policy, and approval checks.
+        argument validation, policy and approval checks.
         """
         if not callable(tool):
             raise TypeError("add_tool expects a tool instance or a Python callable")
@@ -1220,7 +1220,7 @@ class AgentToolMixin(_AgentMixinBase):
         """Register a function as a tool while preserving the original callable.
 
         Use ``@agent.tool`` or ``@agent.tool()`` to infer the name, cleaned
-        docstring, and schemas. Explicit metadata overrides those defaults;
+        docstring and schemas. Explicit metadata overrides those defaults;
         ``@agent.tool("name", "description")`` remains supported. Functions
         without a docstring use ``"Call <name>."`` as their description.
 
@@ -1262,11 +1262,11 @@ class AgentToolMixin(_AgentMixinBase):
         return decorator(name)
 
     async def call_tool(self, tool_name: str, **kwargs: Any) -> Any:
-        """Validate, authorize, and call a registered tool.
+        """Validate, authorize and call a registered tool.
 
         Direct calls use a fresh run context and return the raw tool result.
         Use ``run_task(Task.create_tool_call(...))`` when you also need task
-        lifecycle state, cancellation by task ID, and durable task snapshots.
+        lifecycle state, cancellation by task ID and durable task snapshots.
 
         Args:
             tool_name: Registered tool name.
@@ -1277,7 +1277,7 @@ class AgentToolMixin(_AgentMixinBase):
 
         Raises:
             ValueError: The tool is not registered or its arguments are invalid.
-                Tool, policy, and approval exceptions propagate unchanged.
+                Tool, policy and approval exceptions propagate unchanged.
         """
         tool = self.tools.get(tool_name, None)
         if not tool:
@@ -1297,7 +1297,7 @@ class AgentToolMixin(_AgentMixinBase):
         """Invoke a registered tool using an explicit run context.
 
         This variant is intended for application runtimes and deterministic flows that call tools directly while
-        preserving per-run permissions, cancellation, trace correlation, and approval behavior.
+        preserving per-run permissions, cancellation, trace correlation and approval behavior.
 
         Args:
             tool_name: Name of the registered tool to invoke.
@@ -1471,7 +1471,7 @@ class AgentToolMixin(_AgentMixinBase):
 
 
 class AgentConfigurationMixin(_AgentMixinBase):
-    """Owns transport, model, storage, registry, status, and chat configuration."""
+    """Owns transport, model, storage, registry, status and chat configuration."""
 
     @property
     def a2a(self) -> bool:

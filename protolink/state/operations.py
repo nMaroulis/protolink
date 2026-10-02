@@ -137,7 +137,7 @@ class StateStoreReport:
 
 @dataclass(frozen=True)
 class StateOperationResult:
-    """Structured result for state describe, reset, and compact operations."""
+    """Structured result for state describe, reset and compact operations."""
 
     operation: StateOperation
     session_id: str | None = None

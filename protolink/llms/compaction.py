@@ -180,7 +180,7 @@ class HistoryCompactor:
         Notes:
             Summary generation uses a temporary ``ConversationHistory``. The
             live history is replaced only after a non-empty summary returns.
-            The normal agent inference loop, tool registry, and system prompt
+            The normal agent inference loop, tool registry and system prompt
             are not involved.
         """
         summarizer = self._summarize_messages if strategy == "summary" else None
@@ -213,7 +213,7 @@ def _build_summary_history(
     summary_history = ConversationHistory(
         system_prompt=(
             "Compact the supplied conversation into durable context. Preserve decisions, requirements, "
-            "constraints, unresolved work, important facts, and named entities. Remove repetition and filler. "
+            "constraints, unresolved work, important facts and named entities. Remove repetition and filler. "
             f"Keep the summary under approximately {summary_max_tokens} tokens. Return exactly one JSON object "
             'with a non-empty string field named "summary".'
         )

@@ -1,4 +1,4 @@
-"""MCP wire results, schemas, and session lifetimes survive the tool boundary."""
+"""MCP wire results, schemas and session lifetimes survive the tool boundary."""
 
 from __future__ import annotations
 

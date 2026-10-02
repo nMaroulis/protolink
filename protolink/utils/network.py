@@ -1,7 +1,7 @@
 """Network-related utility functions.
 
 This module provides utilities for network operations such as finding available ports,
-handling sockets, and other network-related helper functions.
+handling sockets and other network-related helper functions.
 """
 
 import socket

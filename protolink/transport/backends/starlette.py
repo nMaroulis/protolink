@@ -289,7 +289,7 @@ class StarletteBackend(BackendInterface):
 
         This method serves as the architectural bridge between Protolink's `EndpointSpec` definitions and the Starlette
         routing engine. It dynamically constructs asynchronous endpoint handlers capable of extracting raw JSON body
-        payloads, invoking domain logic, and transmitting `JSONResponse` objects back over the wire.
+        payloads, invoking domain logic and transmitting `JSONResponse` objects back over the wire.
         """
         for ep in endpoints:
             self._register_endpoint(ep, authenticator=authenticator, transport=transport)
@@ -301,7 +301,7 @@ class StarletteBackend(BackendInterface):
     async def start(self, url: str, tls: TLSConfig | None = None) -> None:
         """Boot the Uvicorn ASGI server as an isolated background task.
 
-        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn `Server` instance, and
+        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn `Server` instance and
         schedules it within the current asyncio event loop. To prevent race conditions during agent startup, it actively
         polls `server.started` to ensure the TCP socket is bound before yielding control.
         """

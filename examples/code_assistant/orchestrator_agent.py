@@ -18,9 +18,9 @@ PROTOLINK CONCEPTS DEMONSTRATED:
    This means you can add/remove agents without changing any code.
 
 3. LLM-DRIVEN ORCHESTRATION: The Orchestrator's LLM reads its system
-   prompt, discovers available agents and their capabilities, and
+   prompt, discovers available agents and their capabilities and
    DECIDES which agent to call, in what order, with what arguments.
-   Protolink handles the routing, HTTP requests, and response parsing.
+   Protolink handles the routing, HTTP requests and response parsing.
 
 4. MULTI-STEP WORKFLOWS: The LLM can chain multiple agent_calls
    in sequence (read → plan → write), creating complex workflows
@@ -37,7 +37,7 @@ a structured response like:
       "payload": {"prompt": "Analyze this code and suggest improvements"}
     }
 Protolink intercepts this, resolves "planner" to its URL via the
-Registry, sends an HTTP request, gets the response, and feeds it
+Registry, sends an HTTP request, gets the response and feeds it
 back to the LLM as an observation. The loop continues until the
 LLM produces a "final" response for the user.
 ═══════════════════════════════════════════════════════════════════════════
@@ -62,7 +62,7 @@ from protolink.llms.factory import create_llm
 # ─────────────────────────────────────────────────────────────────────────
 ORCHESTRATOR_SYSTEM_PROMPT = """You are an AI coding assistant coordinator, similar to Claude Code.
 
-Your job is to help users modify, understand, and improve their code by coordinating
+Your job is to help users modify, understand and improve their code by coordinating
 a team of specialist agents. You do NOT write code yourself, you delegate to specialists.
 
 YOUR WORKFLOW:

@@ -1,7 +1,7 @@
 """Authentication and Security Example - Protolink.
 
 This script demonstrates and verifies all authentication options available in ProtoLink.
-It covers API Key, Bearer Token (JWT), and Basic Authentication, as well as lazy client-side credential signing and
+It covers API Key, Bearer Token (JWT) and Basic Authentication, as well as lazy client-side credential signing and
 server-side request verification. It also shows both success and failure scenarios for HTTP and WebSocket transports.
 """
 

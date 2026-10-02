@@ -40,7 +40,7 @@ class FilesystemResource:
     This protects cooperating applications from stale previews; it is not an
     OS sandbox. Uncooperative writers can still race the final compare/rename.
     Only regular files and their bytes/mode are supported; ACLs, ownership,
-    extended attributes, and timestamps are not restored. Windows is currently
+    extended attributes and timestamps are not restored. Windows is currently
     rejected because equivalent descriptor-relative guarantees are unavailable.
     """
 
@@ -170,9 +170,9 @@ def filesystem_tools(
         roots: Existing allowed directories; tool paths must be absolute. POSIX
             only. Symlinks below these roots are never followed.
         checkpoints: Supplying a CheckpointStore opts into create_file,
-            replace_file, edit_file, preview_change, and restore_change. Omitting
-            it exposes only read_file, list_files, and search_files.
-        max_file_bytes: Per-file byte cap for reads, preimages, and new content.
+            replace_file, edit_file, preview_change and restore_change. Omitting
+            it exposes only read_file, list_files and search_files.
+        max_file_bytes: Per-file byte cap for reads, preimages and new content.
 
     Reads and previews require ``filesystem.read``, writes ``filesystem.write``,
     and restoration ``filesystem.restore``. Use policies to require approval.
@@ -203,7 +203,7 @@ def filesystem_tools(
         raise AssertionError("Signature only")
 
     def preview_change(change_id: str) -> dict[str, Any]:
-        """Inspect an earlier change, its restoration diff, and current conflicts."""
+        """Inspect an earlier change, its restoration diff and current conflicts."""
         raise AssertionError("Signature only")
 
     def restore_change(change_id: str) -> dict[str, Any]:

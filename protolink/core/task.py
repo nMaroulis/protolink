@@ -45,7 +45,7 @@ class TaskExecutionError(RuntimeError):
     """A returned task failed or was canceled.
 
     Attributes:
-        task: The original task, including its state, error metadata, and any
+        task: The original task, including its state, error metadata and any
             partial outputs. Raised by :meth:`Task.raise_for_status`; exceptions
             raised directly by a handler retain their original types.
     """
@@ -149,7 +149,7 @@ class Task:
     def raise_for_status(self) -> "Task":
         """Raise for a failed or canceled task; otherwise return this task.
 
-        This check does not wait for completion. Submitted, working, and
+        This check does not wait for completion. Submitted, working and
         input-required tasks remain valid protocol responses; inspect ``state``
         when your application requires a completed result.
 
@@ -438,7 +438,7 @@ class Task:
     def get_last_part(self) -> Part | None:
         """Return the last part of the latest message or artifact, or ``None``.
 
-        Includes inputs, errors, and previews. This O(1) accessor preserves the
+        Includes inputs, errors and previews. This O(1) accessor preserves the
         part's type and typed content for applications handling the full protocol.
         It does not search older items when the latest item has no parts.
         """

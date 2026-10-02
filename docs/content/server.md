@@ -343,7 +343,7 @@ transport's server startup.
   <ApiFields ariaLabel="AgentServer.start side effects">
     <ApiField name="native routes" type="EndpointSpec[]">
       Registers task submission/cancellation, history and state controls, card,
-      status, health/readiness, and chat-page endpoints.
+      status, health/readiness and chat-page endpoints.
     </ApiField>
     <ApiField name="task stream" type="conditional route">
       Adds <code>POST /tasks/stream</code> only when the transport advertises
@@ -481,7 +481,7 @@ supplies route binding and networking.
   <ApiFields ariaLabel="RegistryServer constructor parameters">
     <ApiField name="registry" type="RegistryInterface" required>
       Structurally compatible object implementing register, unregister,
-      heartbeat, discovery, and HTML status handlers.
+      heartbeat, discovery and HTML status handlers.
     </ApiField>
     <ApiField name="transport" type="Transport" required>
       Concrete route-binding and server-lifecycle implementation.
@@ -534,7 +534,7 @@ Convert an inbound registration body into ProtoLink's runtime `AgentCard`.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="RegistryServer.register_parser errors">
     <ApiField name="deserialization error">
-      Mapping-shape, required-field, and nested model errors from
+      Mapping-shape, required-field and nested model errors from
       <code>AgentCard.from_dict()</code> propagate.
     </ApiField>
   </ApiFields>
@@ -674,7 +674,7 @@ handler.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/server/registry.py#L140"
 >
 
-Register all registry, status, health, and readiness routes, then await
+Register all registry, status, health and readiness routes, then await
 transport startup.
 
 <ApiSection title="Returns">
@@ -719,7 +719,7 @@ Await transport shutdown and mark the registry server idle.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="RegistryServer.stop errors">
     <ApiField name="transport error">
-      Shutdown exceptions propagate, and the running flag remains set when
+      Shutdown exceptions propagate and the running flag remains set when
       transport shutdown fails.
     </ApiField>
   </ApiFields>
@@ -750,7 +750,7 @@ Await transport shutdown and mark the registry server idle.
 
 Describe one transport-neutral route. Server classes create these immutable
 declarations; each transport interprets their path, extraction, parsing,
-invocation, serialization, and streaming fields for its own backend.
+invocation, serialization and streaming fields for its own backend.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="EndpointSpec constructor parameters">
@@ -770,7 +770,7 @@ invocation, serialization, and streaming fields for its own backend.
     </ApiField>
     <ApiField name="content_type" type={'"json" | "html"'} defaultValue={'"json"'}>
       Response rendering mode interpreted by the HTTP/ASGI backends.
-      WebSocket, gRPC, and Runtime transports serialize returned string values
+      WebSocket, gRPC and Runtime transports serialize returned string values
       through their normal protocol envelope instead.
     </ApiField>
     <ApiField name="streaming" type="bool" defaultValue="False">
@@ -806,7 +806,7 @@ invocation, serialization, and streaming fields for its own backend.
 <ApiCallout label="Request-source support">
   The shared type includes <code>form</code>, but current built-in transports do
   not extract form data. HTTP backends support body, query, headers, path
-  parameters, and the combined request view; WebSocket, gRPC, and Runtime
+  parameters and the combined request view; WebSocket, gRPC and Runtime
   currently bind body and query-parameter sources.
 </ApiCallout>
 

@@ -44,7 +44,7 @@ def create_knowledge(
     - ``"vector"``: caller-supplied ``store`` and ``embedder``.
     - ``"chroma"``: existing Chroma ``collection``.
     - ``"pinecone"``: existing Pinecone ``index`` and matching ``embedder``.
-    - ``"qdrant"``: existing Qdrant ``client``, ``collection_name``, and matching ``embedder``.
+    - ``"qdrant"``: existing Qdrant ``client``, ``collection_name`` and matching ``embedder``.
 
     A retriever object or callable may be passed directly instead of an alias.
     Staged ``sources`` are indexed lazily on the first search or explicitly via
@@ -56,7 +56,7 @@ def create_knowledge(
         if any(component is not None for component in (loader, splitter, embedder, store)):
             raise TypeError("Custom retrievers cannot use loader, splitter, embedder, or store factory arguments")
         if mode is not None or fetch_k is not None or mmr_lambda is not None:
-            raise TypeError("Custom retrievers control their own search mode, fetch size, and diversity")
+            raise TypeError("Custom retrievers control their own search mode, fetch size and diversity")
         _reject_kwargs("custom", kwargs)
         return Knowledge(
             backend,

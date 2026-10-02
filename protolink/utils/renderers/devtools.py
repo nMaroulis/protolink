@@ -610,7 +610,7 @@ __PROTOLINK_STUDIO_CSS__
       <button id="nav-studio" onclick="showView('studio')"><span class="nav-label" data-icon="studio">Studio</span></button>
     </nav>
     <div class="side-foot">
-      <span>Local devtools over registry cards, run reports, telemetry traces, agent status, and chat.</span>
+      <span>Local devtools over registry cards, run reports, telemetry traces, agent status and chat.</span>
       <span class="side-version" id="side-version">Protolink</span>
     </div>
   </aside>
@@ -620,13 +620,13 @@ __PROTOLINK_STUDIO_CSS__
         <div>
           <p class="kicker">Local runtime view</p>
           <h1>Dashboard</h1>
-          <p class="lede">Inspect persisted task snapshots, run reports, local telemetry, registry cards, agent health, and chat-ready HTTP agents from one local surface.</p>
+          <p class="lede">Inspect persisted task snapshots, run reports, local telemetry, registry cards, agent health and chat-ready HTTP agents from one local surface.</p>
         </div>
         <div class="actions"><button class="btn primary" data-icon="refresh" onclick="refresh()">Refresh</button><button class="btn" data-icon="ping" onclick="pingAll()">Ping all</button></div>
       </div>
       <div class="alerts" id="alerts"></div>
       <div class="grid" id="metrics"></div>
-      <div class="dashboard-stack"><div class="panel"><h2>Registry <span class="online-summary" id="dashboard-registry-summary"></span></h2><div class="panel-note">For full agent details, schemas, transports, and security metadata, open the Registry tab.</div><div id="health-table"></div></div></div>
+      <div class="dashboard-stack"><div class="panel"><h2>Registry <span class="online-summary" id="dashboard-registry-summary"></span></h2><div class="panel-note">For full agent details, schemas, transports and security metadata, open the Registry tab.</div><div id="health-table"></div></div></div>
     </section>
     <section id="view-runs" class="view">
       <div class="top"><div><p class="kicker">Execution archive</p><h1>Runs</h1><p class="lede">Search recent task snapshots and reports, then replay their event history from a read-only SQLite source.</p></div><div class="actions"><button class="btn" data-icon="refresh" onclick="refresh()">Refresh</button></div></div>
@@ -661,7 +661,7 @@ __PROTOLINK_STUDIO_CSS__
         <div>
           <p class="kicker">LocalTraceTelemetry</p>
           <h1>Telemetry</h1>
-          <p class="lede">Explore Protolink <code>traces.jsonl</code> as grouped task records, span waterfalls, and a playable event timeline. Only a bounded recent window is loaded at once.</p>
+          <p class="lede">Explore Protolink <code>traces.jsonl</code> as grouped task records, span waterfalls and a playable event timeline. Only a bounded recent window is loaded at once.</p>
         </div>
         <div class="actions">
           <button class="btn" data-icon="refresh" onclick="reloadTelemetry()">Latest</button>

@@ -63,7 +63,7 @@ class Transport(ABC):
 
     Concrete transports retain ownership of protocol I/O while this base class
     provides one contract for capabilities, configuration, limits, retries,
-    metrics, correlation identifiers, and health reporting.
+    metrics, correlation identifiers and health reporting.
     """
 
     transport_type: ClassVar[str] = "custom"
@@ -74,7 +74,7 @@ class Transport(ABC):
         """Initialize shared production behavior for a concrete transport.
 
         Args:
-            config: Limits, retries, keepalive, shutdown, idempotency, and
+            config: Limits, retries, keepalive, shutdown, idempotency and
                 metrics settings. Defaults to a new ``TransportConfig``.
         """
         self.config = config or TransportConfig()
@@ -161,7 +161,7 @@ class Transport(ABC):
         return bool(getattr(self, "_transport_running", False))
 
     def health(self) -> dict[str, Any]:
-        """Return transport state, capabilities, and metrics as JSON-safe data."""
+        """Return transport state, capabilities and metrics as JSON-safe data."""
         return {
             "status": "ready" if self.is_running else "stopped",
             "ready": self.is_running,

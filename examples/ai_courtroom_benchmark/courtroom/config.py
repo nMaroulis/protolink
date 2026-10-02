@@ -295,7 +295,7 @@ class CaseConfig(_ConfigModel):
 
         participant_ids = [self.judge.id, *side_ids, *(juror.id for juror in self.jurors)]
         if len(set(participant_ids)) != len(participant_ids):
-            raise ValueError("judge, side, and juror ids must be globally unique")
+            raise ValueError("judge, side and juror ids must be globally unique")
 
         side_id_set = set(side_ids)
         for stage in self.procedure.stages:

@@ -158,7 +158,7 @@ def _action_correction_message(
     """Build concise correction feedback from validation and runtime context.
 
     The runtime does not constrain a model's action choice in advance. After a failed response, however, it can state
-    which outer action was detected, whether that action is dispatchable in the current inference, and the canonical
+    which outer action was detected, whether that action is dispatchable in the current inference and the canonical
     shapes of the alternatives that are actually available.
 
     Args:
@@ -169,7 +169,7 @@ def _action_correction_message(
 
     Returns:
         A system-history message containing concise validation detail, the most specific capability explanation
-        supported by the failure, and only the canonical action forms available for the retry.
+        supported by the failure and only the canonical action forms available for the retry.
     """
     detail = error.feedback if isinstance(error, ActionParseError) else str(error)
     action_type = error.action_type if isinstance(error, ActionParseError) else None
@@ -190,7 +190,7 @@ def _action_correction_message(
             elif delegated_action == "tool_call":
                 lines.append(
                     "An `agent_call` with action `tool_call` requires a non-empty `agent`, "
-                    "a `tool`, and an `args` object; it cannot contain `prompt`."
+                    "a `tool` and an `args` object; it cannot contain `prompt`."
                 )
             else:
                 lines.append("The outer `agent_call.action` must be either `infer` or `tool_call`.")
@@ -298,7 +298,7 @@ class LLM(ABC):
             - Anthropic: temperature, top_p, max_tokens
             - Gemini: temperature, top_p, max_output_tokens
     - `history` (ConversationHistory): Tracks conversation messages for multi-turn interactions.
-    - `compactor` (HistoryCompactor): Owns provider-neutral history compaction, summary generation, and isolated
+    - `compactor` (HistoryCompactor): Owns provider-neutral history compaction, summary generation and isolated
       request-level compaction calls.
     - `system_prompt` (str): Optional system instructions used as context for the model when generating responses. Uses
       default prompts for agent, tool and llm calling.
@@ -464,7 +464,7 @@ class LLM(ABC):
 
         Metrics are purely observational. They do not change prompt generation, provider request payloads, retry
         behavior, or model responses. When an ``event_callback`` or telemetry backend is attached, Protolink emits
-        per-call latency, usage, context-pressure, and cost events. Provider token usage is preferred when available;
+        per-call latency, usage, context-pressure and cost events. Provider token usage is preferred when available;
         otherwise Protolink uses local estimates.
 
         Args:
@@ -544,7 +544,7 @@ class LLM(ABC):
         This is the core method that subclasses must implement to call their specific LLM (OpenAI, Anthropic, etc.).
 
         Args:
-            history: Conversation history containing system, user, assistant, and tool messages
+            history: Conversation history containing system, user, assistant and tool messages
 
         Returns:
             str: Raw text response from the LLM
@@ -565,12 +565,12 @@ class LLM(ABC):
             without requiring an inconsistent 'await' on the initial call, maintaining type-system integrity.
 
         Implementations must keep blocking network reads and model evaluation off
-        the event loop, and release their stream on exhaustion, cancellation or
+        the event loop and release their stream on exhaustion, cancellation or
         explicit closure. Consumers that stop early should close the iterator
         (for example, with ``contextlib.aclosing``).
 
         Args:
-            history: Conversation history containing system, user, assistant, and tool messages
+            history: Conversation history containing system, user, assistant and tool messages
 
         Returns:
             AsyncIterator[str]: Incremental text, which may be JSON action fragments.
@@ -626,7 +626,7 @@ class LLM(ABC):
 
         Subclasses with native tool/function-calling support should override this method and normalize provider-native
         results into :class:`~protolink.llms.actions.LLMActionResult`. The base implementation is the compatibility
-        path: call the model for text, parse the prompt-defined JSON action, validate it with Pydantic, and return the
+        path: call the model for text, parse the prompt-defined JSON action, validate it with Pydantic and return the
         same typed result shape as native adapters.
 
         Args:
@@ -659,7 +659,7 @@ class LLM(ABC):
         """Return one action from a streaming model call.
 
         The base implementation is intentionally simple and local-model friendly: stream text chunks, emit them to the
-        optional callback, join the chunks, and parse the final text as one Protolink JSON action. API providers with
+        optional callback, join the chunks and parse the final text as one Protolink JSON action. API providers with
         native streaming tool-call events override this method and normalize those events into the same
         ``LLMActionResult`` contract. ``chunk_callback`` is awaited for every text
         chunk before reading the next one. It runs on the caller's event loop;
@@ -682,7 +682,7 @@ class LLM(ABC):
     # Agent-LLM Interface - A2A Operations
     #
     # This is the interface that the Agent class will use to interact with the LLM. It is a controlled, multi-step
-    # inference loop that allows the LLM to invoke tools, delegate tasks to other Agents, and finally produce an
+    # inference loop that allows the LLM to invoke tools, delegate tasks to other Agents and finally produce an
     # ``infer_output`` Part.
     #
     # LLMs know how to produce these outputs for these actions (tool_calling, delegate_task, final_output) using
@@ -735,15 +735,15 @@ class LLM(ABC):
         4. **Action Dispatch**: Based on the validated action type:
 
            - ``final``: The loop terminates and returns the response content.
-           - ``tool_call``: The specified tool is executed, and its result is injected back into the conversation
+           - ``tool_call``: The specified tool is executed and its result is injected back into the conversation
              history for the LLM to observe.
-           - ``agent_call``: The request is delegated to another agent via the callback, and the result is similarly
+           - ``agent_call``: The request is delegated to another agent via the callback and the result is similarly
              injected into history.
 
         5. **Iteration**: Steps 2-4 repeat until the LLM produces a ``final`` action or safety limits are exceeded.
 
         This design ensures the LLM remains stateless and purely declarative. The runtime maintains full control over
-        execution, enabling observability, rate limiting, and consistent error handling across providers.
+        execution, enabling observability, rate limiting and consistent error handling across providers.
 
         Execution Model
         ---------------
@@ -768,7 +768,7 @@ class LLM(ABC):
 
                 async def callback(agent_name: str, action_type: str, payload: dict) -> Any
 
-            The callback receives the target agent's name, the action type (``tool_call`` or ``infer``), and the full
+            The callback receives the target agent's name, the action type (``tool_call`` or ``infer``) and the full
             payload. It should return the result from the delegated agent. If None, agent_call actions trigger
             self-correction guidance.
         agent_cards : list[Any], optional
@@ -780,7 +780,7 @@ class LLM(ABC):
             generator before parsing.
         event_callback : Callable[[dict[str, Any]], Awaitable[None]], optional
             Async observer called with normalized inference events. Events include LLM chunks, parsed actions, tool
-            execution results, delegated agent calls, final output, and recoverable errors. The callback is for
+            execution results, delegated agent calls, final output and recoverable errors. The callback is for
             observability only; the inference loop still returns a final ``Part``.
         event_metrics : bool, optional
             Whether an attached event callback should activate optional call metrics. The default preserves
@@ -789,12 +789,12 @@ class LLM(ABC):
             Call metrics prefer provider token counts and estimate only missing fields.
         action_authorizer : Callable[[RunAction], Awaitable[ActionAuthorization]], optional
             Runtime callback invoked after a model action has been validated but before a tool or delegated agent
-            operation executes. The callback may enrich the action, enforce capability policy, and obtain an
+            operation executes. The callback may enrich the action, enforce capability policy and obtain an
             application-owned approval decision. Direct LLM usage may omit it; the ``Agent`` runtime supplies its
             configured authorizer.
         cancellation_token : CancellationToken, optional
             Live process-local token checked before model calls and action dispatch. The owning Agent also cancels this
-            coroutine directly so awaited provider, tool, and delegation operations stop promptly.
+            coroutine directly so awaited provider, tool and delegation operations stop promptly.
         run_context : RunContext | dict, optional
             Active run context used to correlate context manifests and enforce ``RunBudget`` limits during the inference
             loop.
@@ -802,7 +802,7 @@ class LLM(ABC):
             Policy used by the built-in ``BudgetEnforcer``. Omit this to use the default allow/warn/deny policy.
         budget_enforcer : BudgetEnforcer, optional
             Existing task-scoped enforcer. The Agent runtime supplies one when several infer/tool parts share a task so
-            usage, warnings, and runtime accounting remain cumulative. Direct LLM callers may omit it.
+            usage, warnings and runtime accounting remain cumulative. Direct LLM callers may omit it.
 
         Returns
         -------
@@ -836,7 +836,7 @@ class LLM(ABC):
 
         - ``final``: Produce the final response. Requires ``content`` field.
         - ``tool_call``: Execute a local tool. Requires ``tool`` and ``args`` fields.
-        - ``agent_call``: Delegate to another agent. Requires ``agent``, ``action``, and action-specific fields
+        - ``agent_call``: Delegate to another agent. Requires ``agent``, ``action`` and action-specific fields
           (``tool``/``args`` or ``prompt``).
 
         Example valid responses::
@@ -855,11 +855,11 @@ class LLM(ABC):
            infinite loops.
 
         2. *Transient Error Resiliency*: API requests are protected by an exponential backoff handler with random
-           jitter. It retries on rate limits (429), server overloads (529), 5xx response codes, timeouts, and network
+           jitter. It retries on rate limits (429), server overloads (529), 5xx response codes, timeouts and network
            disconnects.
 
         3. *Granular Field-Level Self-Correction*: When Pydantic validation fails, the model receives field locations,
-           messages, and error types plus capability-aware guidance derived from the decoded outer action. Parsed
+           messages and error types plus capability-aware guidance derived from the decoded outer action. Parsed
            payload previews remain in bounded diagnostics instead of being copied into privileged correction history.
 
         4. *Parse Failure Circuit Breaker*: After the configured number of consecutive JSON parse or schema validation
@@ -1651,9 +1651,9 @@ class LLM(ABC):
         *args : Any
             Positional arguments forwarded to ``fn``.
         **kwargs : Any
-            Keyword arguments forwarded to ``fn``. The retry controls ``max_retries``, ``base_delay``, and ``max_delay``
+            Keyword arguments forwarded to ``fn``. The retry controls ``max_retries``, ``base_delay`` and ``max_delay``
             may be provided as keyword-only values and are consumed before calling ``fn``. Private runtime hooks
-            ``_before_attempt``, ``_on_retry``, and ``_retry_predicate`` are likewise consumed by this wrapper.
+            ``_before_attempt``, ``_on_retry`` and ``_retry_predicate`` are likewise consumed by this wrapper.
         max_retries : int
             Maximum number of retry attempts. Defaults to 3.
         base_delay : float
@@ -1729,7 +1729,7 @@ class LLM(ABC):
         Determine whether an exception represents a transient failure worth retrying.
 
         Checks for:
-        - HTTP status codes 429 (rate limit), 529 (overloaded), and 5xx (server errors)
+        - HTTP status codes 429 (rate limit), 529 (overloaded) and 5xx (server errors)
         - Connection-related errors (timeout, refused, reset)
         - Provider-specific rate limit / overloaded exception types
 
@@ -1740,7 +1740,7 @@ class LLM(ABC):
             True if the error is transient and the call should be retried.
         """
         # Check common direct and response-wrapped HTTP status fields used by
-        # provider SDKs (OpenAI, Anthropic, httpx, requests, and compatibles).
+        # provider SDKs (OpenAI, Anthropic, httpx, requests and compatibles).
         response = getattr(exc, "response", None)
         status_candidates = (
             getattr(exc, "status_code", None),

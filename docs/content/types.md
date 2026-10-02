@@ -8,13 +8,13 @@ import ApiReference, {
 
 # Type Aliases
 
-ProtoLink centralizes the small vocabularies shared by agents, transports, request specifications, LLM adapters, state modules, models, security declarations, and structured flows. These aliases make accepted values visible to type checkers and IDEs while keeping public signatures consistent across packages.
+ProtoLink centralizes the small vocabularies shared by agents, transports, request specifications, LLM adapters, state modules, models, security declarations and structured flows. These aliases make accepted values visible to type checkers and IDEs while keeping public signatures consistent across packages.
 
 <ApiSurface
   eyebrow="Typing layer"
   title="Type Aliases"
   path="protolink.types"
-  description="The literal and alias vocabulary used to keep roles, transports, backends, MIME types, auth schemes, state modules, and flow targets stable across public APIs."
+  description="The literal and alias vocabulary used to keep roles, transports, backends, MIME types, auth schemes, state modules and flow targets stable across public APIs."
   pills={[
     "Roles",
     "Transports",
@@ -36,12 +36,12 @@ ProtoLink centralizes the small vocabularies shared by agents, transports, reque
     },
     {
       title: "Content",
-      text: "Message roles, part types, MIME types, and reasoning levels make data models easier to inspect.",
+      text: "Message roles, part types, MIME types and reasoning levels make data models easier to inspect.",
       code: "MimeType",
     },
     {
       title: "Control",
-      text: "State modes, request sources, security schemes, and flow targets define runtime boundaries.",
+      text: "State modes, request sources, security schemes and flow targets define runtime boundaries.",
       code: "StateMode",
     },
   ]}
@@ -132,11 +132,11 @@ Agent roles describe why an agent exists in the system topology. They do not des
 
 | Role | Architectural purpose | Typical responsibilities |
 |------|-----------------------|--------------------------|
-| `gateway` | External trust and protocol boundary | Ingress/egress, authentication, authorization, validation, rate limits, redaction, and protocol translation |
-| `interface` | User- or application-facing interaction surface | Presenting input/output, adapting product interactions, and mediating a focused interface without owning global orchestration |
-| `observer` | Read-only system visibility | Logs, metrics, traces, evaluation, auditing, compliance, and human review |
-| `orchestrator` | Global coordination | Interpreting goals, selecting agents, managing branches/retries/termination, and aggregating results |
-| `worker` | Concrete task execution | Domain work, tool use, retrieval, computation, and producing outputs |
+| `gateway` | External trust and protocol boundary | Ingress/egress, authentication, authorization, validation, rate limits, redaction and protocol translation |
+| `interface` | User- or application-facing interaction surface | Presenting input/output, adapting product interactions and mediating a focused interface without owning global orchestration |
+| `observer` | Read-only system visibility | Logs, metrics, traces, evaluation, auditing, compliance and human review |
+| `orchestrator` | Global coordination | Interpreting goals, selecting agents, managing branches/retries/termination and aggregating results |
+| `worker` | Concrete task execution | Domain work, tool use, retrieval, computation and producing outputs |
 
 </ApiSection>
 
@@ -183,17 +183,17 @@ The role vocabulary is intentionally small and stable:
 - An **orchestrator** owns global flow, but should normally delegate domain execution.
 - A **worker** produces concrete results, but does not need authority over system-wide routing.
 - An **observer** watches or evaluates execution without being part of the decision path.
-- A **gateway** marks an external boundary where trust, policy, and protocol adaptation commonly belong.
+- A **gateway** marks an external boundary where trust, policy and protocol adaptation commonly belong.
 - An **interface** provides a user or application interaction surface without necessarily being the perimeter security boundary.
-- Tools, retrieval, code execution, model access, and memory remain capabilities or implementation details rather than roles.
+- Tools, retrieval, code execution, model access and memory remain capabilities or implementation details rather than roles.
 
 Systems may omit roles they do not need. Applications can maintain additional domain-specific role metadata, but the public alias remains the common ProtoLink vocabulary.
 
 #### Orchestrator
 
-An orchestrator owns the global flow of execution. It interprets high-level goals, selects and invokes workers, manages branching and retries, decides when work is complete, and aggregates intermediate results.
+An orchestrator owns the global flow of execution. It interprets high-level goals, selects and invokes workers, manages branching and retries, decides when work is complete and aggregates intermediate results.
 
-It normally should not perform every domain operation itself. Keeping planning and coordination separate from privileged or specialized execution makes policy, testing, and failure recovery easier to reason about.
+It normally should not perform every domain operation itself. Keeping planning and coordination separate from privileged or specialized execution makes policy, testing and failure recovery easier to reason about.
 
 #### Worker
 
@@ -203,13 +203,13 @@ Worker is the default `AgentCard` role because a focused execution unit is the m
 
 #### Observer
 
-An observer has visibility into execution for monitoring, evaluation, auditing, compliance, or human review. Typical observers collect events, metrics, traces, and outputs.
+An observer has visibility into execution for monitoring, evaluation, auditing, compliance, or human review. Typical observers collect events, metrics, traces and outputs.
 
 The role name alone does not make an agent read-only. Applications must still withhold write tools and enforce a policy that prevents the observer from changing runtime state.
 
 #### Gateway
 
-A gateway marks the boundary between external systems and the agent mesh. It commonly accepts inbound requests, translates protocols, authenticates principals, enforces authorization and limits, validates or redacts content, and returns the final external response.
+A gateway marks the boundary between external systems and the agent mesh. It commonly accepts inbound requests, translates protocols, authenticates principals, enforces authorization and limits, validates or redacts content and returns the final external response.
 
 A gateway is not automatically an orchestrator: it may hand accepted work to a coordinator without deciding the execution plan itself.
 
@@ -375,7 +375,7 @@ Names the HTTP authentication scheme inside a `SecurityScheme` whose top-level `
 </ApiSection>
 
 <ApiCallout label="Declaration versus implementation">
-  ProtoLink includes built-in bearer and basic authenticators. The wider literal set allows custom authenticators and discovery metadata; names such as digest, HMAC, Negotiate, NTLM, AWS4Auth, Hawk, and EdgeGrid do not imply a built-in implementation.
+  ProtoLink includes built-in bearer and basic authenticators. The wider literal set allows custom authenticators and discovery metadata; names such as digest, HMAC, Negotiate, NTLM, AWS4Auth, Hawk and EdgeGrid do not imply a built-in implementation.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -480,7 +480,7 @@ Describes which part of an inbound or outbound request supplies an operation's d
 | `form` | Form fields |
 | `headers` | Request-header mapping |
 | `path_params` | Route-parameter mapping |
-| `request` | Transport-neutral `EndpointRequest` containing body, query, path, headers, method, URL, and authenticated principal ID |
+| `request` | Transport-neutral `EndpointRequest` containing body, query, path, headers, method, URL and authenticated principal ID |
 
 </ApiSection>
 
@@ -496,7 +496,7 @@ Describes which part of an inbound or outbound request supplies an operation's d
 </ApiSection>
 
 <ApiCallout label="Backend coverage">
-  Current Starlette and FastAPI endpoint binders extract body, query parameters, headers, path parameters, and the complete request view. The alias includes <code>form</code>, but those binders do not currently implement form extraction; it falls through to no payload.
+  Current Starlette and FastAPI endpoint binders extract body, query parameters, headers, path parameters and the complete request view. The alias includes <code>form</code>, but those binders do not currently implement form extraction; it falls through to no payload.
 </ApiCallout>
 
 <ApiCallout label="Outbound coverage">
@@ -535,7 +535,7 @@ Top-level authentication scheme categories used by `AgentCard.security_schemes` 
 </ApiSection>
 
 <ApiCallout label="Exact spelling">
-  <code>apiKey</code>, <code>mutualTLS</code>, and <code>openIdConnect</code> are case-sensitive literal values. The alias does not accept snake-case alternatives such as <code>api_key</code>.
+  <code>apiKey</code>, <code>mutualTLS</code> and <code>openIdConnect</code> are case-sensitive literal values. The alias does not accept snake-case alternatives such as <code>api_key</code>.
 </ApiCallout>
 
 <ApiCallout label="Metadata, not activation">
@@ -584,7 +584,7 @@ card = AgentCard(
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/types/types.py#L142"
 >
 
-Built-in transport names used by agent configuration, discovery cards, registry clients, and the lazy transport factory.
+Built-in transport names used by agent configuration, discovery cards, registry clients and the lazy transport factory.
 
 <ApiSection title="Values">
 
@@ -619,7 +619,7 @@ Built-in transport names used by agent configuration, discovery cards, registry 
 </ApiCallout>
 
 <ApiCallout label="TLS keeps the transport name">
-  Secure deployments continue to use the same transport literal. Choose <code>https://</code> for HTTP, SSE, and JSON-RPC aliases; <code>wss://</code> for WebSocket; and <code>grpcs://</code> for gRPC.
+  Secure deployments continue to use the same transport literal. Choose <code>https://</code> for HTTP, SSE and JSON-RPC aliases; <code>wss://</code> for WebSocket; and <code>grpcs://</code> for gRPC.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -691,7 +691,7 @@ Provider identifier stored on concrete LLM adapters and mirrored by the lazy LLM
 <ApiSection title="Used by">
   <ApiFields ariaLabel="LLMProvider consumers">
     <ApiField name="LLM.provider" type="ClassVar[LLMProvider]">
-      Concrete adapter identifier used in metrics, events, prompts, and diagnostics.
+      Concrete adapter identifier used in metrics, events, prompts and diagnostics.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -701,7 +701,7 @@ Provider identifier stored on concrete LLM adapters and mirrored by the lazy LLM
 </ApiCallout>
 
 <ApiCallout label="Factory usage">
-  Pass provider names as strings to <code>create_llm()</code>. The current factory lowercases string input, rejects unknown names with <code>ValueError</code>, and lazily imports the selected adapter. Its separate enum instances are not currently normalized correctly.
+  Pass provider names as strings to <code>create_llm()</code>. The current factory lowercases string input, rejects unknown names with <code>ValueError</code> and lazily imports the selected adapter. Its separate enum instances are not currently normalized correctly.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -746,7 +746,7 @@ Classifies where an LLM adapter executes or connects. It is adapter metadata rat
 <ApiSection title="Used by">
   <ApiFields ariaLabel="LLMType consumers">
     <ApiField name="LLM.model_type" type="ClassVar[LLMType]">
-      Set by API, local, and server base classes for introspection and shared runtime behavior.
+      Set by API, local and server base classes for introspection and shared runtime behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -868,7 +868,7 @@ Sender roles for task-level `Message` objects. The alias preserves the distincti
 </ApiSection>
 
 <ApiCallout label="Runtime construction">
-  <code>Message</code> does not validate the literal at construction or deserialization. Prefer <code>Message.user()</code>, <code>Message.agent()</code>, and <code>Message.assistant()</code> when a convenience constructor matches the intended role.
+  <code>Message</code> does not validate the literal at construction or deserialization. Prefer <code>Message.user()</code>, <code>Message.agent()</code> and <code>Message.assistant()</code> when a convenience constructor matches the intended role.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -956,7 +956,7 @@ input_formats: list[MimeType] = [
 
 card = AgentCard(
     name="multimedia-agent",
-    description="Analyzes text, JSON, and PNG images.",
+    description="Analyzes text, JSON and PNG images.",
     url="http://localhost:8000",
     input_formats=input_formats,
     output_formats=["text/plain", "application/json"],
@@ -998,7 +998,7 @@ card = AgentCard(
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/types/types.py#L101"
 >
 
-Discriminator vocabulary for atomic `Part` content inside messages and artifacts. The selected value tells agents, flows, transports, and renderers how the accompanying `content` should be interpreted.
+Discriminator vocabulary for atomic `Part` content inside messages and artifacts. The selected value tells agents, flows, transports and renderers how the accompanying `content` should be interpreted.
 
 <ApiSection title="Core content">
 
@@ -1023,7 +1023,7 @@ Discriminator vocabulary for atomic `Part` content inside messages and artifacts
 
 | Type | Meaning | Typical content |
 |------|---------|-----------------|
-| `image` | Image content or reference | Screenshots, charts, and visual inputs |
+| `image` | Image content or reference | Screenshots, charts and visual inputs |
 | `audio` | Audio content or reference | Voice input and generated audio |
 | `video` | Video content or reference | Video messages and recordings |
 
@@ -1034,7 +1034,7 @@ Discriminator vocabulary for atomic `Part` content inside messages and artifacts
 | Type | Meaning | Typical content |
 |------|---------|-----------------|
 | `status` | Runtime status update | State plus optional message |
-| `error` | Structured failure | Code, message, and retryability |
+| `error` | Structured failure | Code, message and retryability |
 | `warning` | Non-fatal issue | Warning code or explanatory data |
 | `route` | Explicit flow route selection | Typed `RouteDecision` |
 | `decision` | General structured branching decision | Typed `RouteDecision` |
@@ -1045,7 +1045,7 @@ Discriminator vocabulary for atomic `Part` content inside messages and artifacts
 
 | Type | Meaning | Typical content |
 |------|---------|-----------------|
-| `infer` | Instruction to invoke the agent's LLM | Prompt, user context, output schema, and metadata |
+| `infer` | Instruction to invoke the agent's LLM | Prompt, user context, output schema and metadata |
 | `infer_output` | Result of an LLM inference | Text or structured output |
 
 </ApiSection>
@@ -1054,7 +1054,7 @@ Discriminator vocabulary for atomic `Part` content inside messages and artifacts
 
 | Type | Meaning | Typical content |
 |------|---------|-----------------|
-| `tool_call` | Tool invocation request | Typed tool name, arguments, and correlation ID |
+| `tool_call` | Tool invocation request | Typed tool name, arguments and correlation ID |
 | `tool_output` | Tool execution result | Correlated result or structured error |
 
 </ApiSection>
@@ -1086,7 +1086,7 @@ Discriminator vocabulary for atomic `Part` content inside messages and artifacts
 </ApiSection>
 
 <ApiCallout label="Type does not validate content">
-  <code>Part</code> preserves arbitrary content during direct construction. Factories such as <code>Part.error()</code>, <code>Part.route()</code>, <code>Part.tool_call()</code>, and <code>Part.infer()</code> create the expected shape, while <code>Part.from_dict()</code> hydrates selected structured types.
+  <code>Part</code> preserves arbitrary content during direct construction. Factories such as <code>Part.error()</code>, <code>Part.route()</code>, <code>Part.tool_call()</code> and <code>Part.infer()</code> create the expected shape, while <code>Part.from_dict()</code> hydrates selected structured types.
 </ApiCallout>
 
 <ApiCallout label="Extensibility boundary">
@@ -1121,9 +1121,9 @@ route = Part.route(
 
 - Use `text` for ordinary user-visible text and `json` for structured application data.
 - Use `tool_call` and `tool_output` for executable tool interactions rather than placing tool arguments in a generic JSON part.
-- Use `infer` when a task explicitly asks an agent to run its LLM, and `infer_output` for the resulting content.
+- Use `infer` when a task explicitly asks an agent to run its LLM and `infer_output` for the resulting content.
 - Use `route` or `decision` for structured flow branching instead of parsing labels from prose.
-- Use `error`, `warning`, and `status` for inspectable control information.
+- Use `error`, `warning` and `status` for inspectable control information.
 
 :::
 
@@ -1210,7 +1210,7 @@ agent = Agent(
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/types/types.py#L144"
 >
 
-Polymorphic execution target used by `Pipeline`, `Parallel`, `Router`, and `Graph`. A flow can call a local agent, dispatch to a remote or registry-discovered agent named by a string, or recursively execute another flow.
+Polymorphic execution target used by `Pipeline`, `Parallel`, `Router` and `Graph`. A flow can call a local agent, dispatch to a remote or registry-discovered agent named by a string, or recursively execute another flow.
 
 <ApiSection title="Variants">
   <ApiFields ariaLabel="FlowTarget variants">
@@ -1252,7 +1252,7 @@ Polymorphic execution target used by `Pipeline`, `Parallel`, `Router`, and `Grap
 </ApiCallout>
 
 <ApiCallout label="Direct URL recognition">
-  The current flow resolver recognizes <code>http://</code>, <code>https://</code>, <code>ws://</code>, <code>wss://</code>, and <code>runtime://</code> strings as direct URLs. Other strings are treated as registry names.
+  The current flow resolver recognizes <code>http://</code>, <code>https://</code>, <code>ws://</code>, <code>wss://</code> and <code>runtime://</code> strings as direct URLs. Other strings are treated as registry names.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -1334,9 +1334,9 @@ Use aliases for annotations and editor support. Use a validating constructor, pa
 
 ## See also
 
-- [Models](models.md) - fields that consume message, media, role, security, and transport aliases.
+- [Models](models.md) - fields that consume message, media, role, security and transport aliases.
 - [Transports](transport.md) - built-in transport implementations and registration.
 - [Authentication](authentication.md) - authenticators and security scheme models.
-- [LLMs](llm.md) - provider adapters, LLM types, and reasoning behavior.
+- [LLMs](llm.md) - provider adapters, LLM types and reasoning behavior.
 - [State](state.md) - persistent state modules.
 - [Flows](flows.md) - execution semantics for `FlowTarget`.

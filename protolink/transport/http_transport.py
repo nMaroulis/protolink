@@ -67,7 +67,7 @@ class HTTPTransport(Transport):
         Optional TLS certificate and trust configuration. Use an ``https://``
         server URL to enable TLS.
     config:
-        Shared limits, retry, keepalive, shutdown, idempotency, and metrics settings.
+        Shared limits, retry, keepalive, shutdown, idempotency and metrics settings.
     """
 
     transport_type: ClassVar[TransportType] = "http"
@@ -150,7 +150,7 @@ class HTTPTransport(Transport):
         """Dispatch an outbound HTTP request to a remote agent endpoint.
 
         This method marshals a high-level ``ClientRequestSpec`` (which encapsulates HTTP verb,
-        path, and expected payload schemas) into a physical HTTP request. It utilizes the loop-isolated
+        path and expected payload schemas) into a physical HTTP request. It utilizes the loop-isolated
         connection pool (via ``_ensure_client()``) to safely execute the request without event loop
         contamination.
 

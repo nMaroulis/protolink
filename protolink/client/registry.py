@@ -16,7 +16,7 @@ from protolink.transport import Transport
 class RegistryClient:
     """Call Registry endpoints through an already configured transport.
 
-    The transport owns its URL, TLS, authentication, limits, and retry policy. Registry operations declare idempotency
+    The transport owns its URL, TLS, authentication, limits and retry policy. Registry operations declare idempotency
     individually so transports can retry only those calls whose semantics are safe to repeat.
 
     Args:

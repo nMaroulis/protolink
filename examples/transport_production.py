@@ -2,7 +2,7 @@
 
 This provider-free example uses RuntimeTransport so it can run without opening
 a network port. The same ``TransportConfig`` works unchanged with HTTP, SSE
-JSON-RPC, WebSocket, and gRPC transports.
+JSON-RPC, WebSocket and gRPC transports.
 """
 
 from protolink import (

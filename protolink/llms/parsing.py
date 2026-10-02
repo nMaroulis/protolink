@@ -2,13 +2,13 @@
 
 This module sits on the critical path between a provider response and the
 deterministic Protolink runtime. The infer loop can execute tools, delegate to
-agents, emit run events, enforce budgets, and terminate with a final response
+agents, emit run events, enforce budgets and terminate with a final response
 only after the raw model output has been normalized into exactly one validated
 ``LLMAction``.
 
 The boundary is intentionally narrow:
 
-- The base ``LLM`` class owns orchestration, budgeting, history, telemetry, and
+- The base ``LLM`` class owns orchestration, budgeting, history, telemetry and
   dispatch.
 - Provider adapters own provider-specific request/stream parsing and native
   tool-call translation.
@@ -119,7 +119,7 @@ def parse_infer_response(
     tools: dict[str, BaseTool] | None = None,
     agent_cards: list[Any] | None = None,
 ) -> LLMAction:
-    """Parse, repair, and validate one raw model action response.
+    """Parse, repair and validate one raw model action response.
 
     ``LLM.infer`` treats the model as an action proposer rather than an implicit
     executor. This function enforces that contract for prompt-fallback models:
@@ -155,7 +155,7 @@ def parse_infer_response(
         ActionParseError: If no valid JSON object can be decoded or the decoded
             payload does not satisfy the strict ``LLMAction`` contract. The
             exception remains a ``ValueError`` for compatibility, separates
-            bounded log diagnostics from concise model feedback, and preserves
+            bounded log diagnostics from concise model feedback and preserves
             the exact raw response for terminal infer-loop diagnostics.
     """
     data = decode_json_response(response)
@@ -303,7 +303,7 @@ def parse_function_call_shorthand(value: str | None) -> tuple[str, dict[str, Any
     - ``planner.search({"query": "docs", "limit": 3})``
 
     Rejected examples include arithmetic expressions, variable references,
-    splatted keyword arguments, method chains beyond ``agent.tool(...)``, and
+    splatted keyword arguments, method chains beyond ``agent.tool(...)`` and
     positional arguments that are not a single dictionary literal. Returning
     ``None`` tells the caller to leave the payload unchanged and let strict
     action validation handle the error.
@@ -391,7 +391,7 @@ def format_validation_errors(exc: Any) -> str:
     the model can repair its next response. A useful error needs more than
     ``invalid JSON`` or ``validation failed``; it should point at the exact
     action branch and field that failed. This formatter extracts the Pydantic
-    location path, message, and error type into a stable bullet-list string.
+    location path, message and error type into a stable bullet-list string.
 
     Args:
         exc: Usually a Pydantic ``ValidationError``. The type is intentionally

@@ -2,7 +2,7 @@
 State management module for ProtoLink.
 
 This module provides a unified interface for managing persistent state across different components of a ProtoLink agent,
-including conversation history, tool state, task metadata, and flow context.
+including conversation history, tool state, task metadata and flow context.
 """
 
 from .conversation import ConversationState

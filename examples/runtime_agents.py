@@ -25,7 +25,7 @@ class AssistantAgent(Agent):
         """Process incoming task requests from the local runtime transport.
 
         This method intercepts the task payload, extracts the terminal user message
-        from the conversation history, and returns a fully completed task object.
+        from the conversation history and returns a fully completed task object.
         The underlying transport mechanism transparently returns this response
         back to the caller loop.
         """
@@ -43,7 +43,7 @@ class TranslatorAgent(Agent):
     """
 
     async def handle_task(self, task: Task) -> Task:
-        """Extract the message context, apply the domain logic, and respond.
+        """Extract the message context, apply the domain logic and respond.
 
         This asynchronous handler serves as the main entrypoint for task execution.
         It securely processes the input and packages the mutated state back into a
@@ -92,7 +92,7 @@ async def main() -> None:
         transport="runtime",
     )
 
-    # Start, await readiness, and clean up as one owned group.
+    # Start, await readiness and clean up as one owned group.
     async with AgentGroup([assistant, translator]):
         # Agent-to-agent communication
         print("\n--- Assistant → Translator ---")

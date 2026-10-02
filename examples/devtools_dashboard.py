@@ -8,7 +8,7 @@ By default the demo writes to a temporary directory. Pass ``--output-dir`` to ke
 SQLite run store in a project-local path.
 
 The example is provider-free. It creates a few mock-LLM agents, registers their agent cards in an in-process registry,
-runs a small task loop, persists task snapshots and run reports, and renders a dashboard snapshot that users can open
+runs a small task loop, persists task snapshots and run reports and renders a dashboard snapshot that users can open
 or serve with ``protolink dashboard``.
 
 The generated registry uses ``RuntimeTransport`` so it stays provider-free and does not bind ports. The dashboard's ping
@@ -94,7 +94,7 @@ async def main(
             print(f"Live registry: {registry_url}")
             print(f"Live dashboard: http://{host}:{dashboard_port}")
             print(f"Live Studio: http://{host}:{dashboard_port}/studio")
-            print("Press Ctrl-C to stop the demo agents, registry, dashboard, and any Studio project.")
+            print("Press Ctrl-C to stop the demo agents, registry, dashboard and any Studio project.")
             serve_dashboard(host=host, port=dashboard_port, registry_url=registry_url, store_path=store_path)
         else:
             print(f"  protolink dashboard --store {store_path} --open")
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--serve-live",
         action="store_true",
-        help="Start HTTP demo agents, a registry, and the dashboard so ping/chat actions are clickable.",
+        help="Start HTTP demo agents, a registry and the dashboard so ping/chat actions are clickable.",
     )
     parser.add_argument("--host", default="127.0.0.1", help="Host used for live demo services.")
     parser.add_argument("--dashboard-port", type=int, default=8877, help="Dashboard port for --serve-live.")

@@ -139,7 +139,7 @@ def reading_tools(resource: FilesystemResource) -> tuple[PreparedTool, ...]:
     async def search_files(
         path: str, query: str, *, pattern: str = "*", case_sensitive: bool = False, max_results: _Limit = 100
     ) -> dict[str, Any]:
-        """Recursively search literal text in UTF-8 files; return paths, line numbers, and bounded matching lines."""
+        """Recursively search literal text in UTF-8 files; return paths, line numbers and bounded matching lines."""
         return await asyncio.to_thread(
             scan, path, pattern, max_results, query, recursive=True, case_sensitive=case_sensitive
         )

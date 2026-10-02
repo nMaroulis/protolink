@@ -109,11 +109,11 @@ class TransportConfig:
     """Configure production behavior shared by every transport.
 
     The default configuration preserves existing behavior: requests are not
-    retried, metrics are collected locally, and conservative resource limits
+    retried, metrics are collected locally and conservative resource limits
     protect network and in-process transports alike.
 
     Args:
-        limits: Request, response, event, and concurrency limits.
+        limits: Request, response, event and concurrency limits.
         retry: Retry policy for explicitly idempotent requests.
         keepalive_interval: Optional connection keepalive interval in seconds.
         keepalive_timeout: Seconds to wait for a keepalive response.

@@ -183,7 +183,7 @@ class ApprovalBroker:
         """Resolve exactly one request without executing anything.
 
         Unknown and out-of-scope IDs both return ``unknown`` to avoid disclosing
-        another caller's requests. Stale fingerprints, conflicting repeats, and
+        another caller's requests. Stale fingerprints, conflicting repeats and
         expired/canceled/orphan requests never release an action.
         """
         key = decision.request_id

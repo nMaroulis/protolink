@@ -34,8 +34,8 @@ class _StoredRecord:
 class InMemoryVectorStore:
     """Exact-search vector store held in process memory.
 
-    The implementation supports vector, BM25-style keyword, and weighted hybrid ranking, metadata filters, score
-    thresholds, and maximal marginal relevance (MMR). It is a strong default for examples, tests, notebooks, and
+    The implementation supports vector, BM25-style keyword and weighted hybrid ranking, metadata filters, score
+    thresholds and maximal marginal relevance (MMR). It is a strong default for examples, tests, notebooks and
     small transient indexes.
     """
 
@@ -169,7 +169,7 @@ class InMemoryVectorStore:
 class SQLiteVectorStore:
     """Persistent exact-search vector store backed by the Python standard library.
 
-    SQLite stores chunk text, metadata, and vectors durably; ranking is intentionally performed in Python so no native
+    SQLite stores chunk text, metadata and vectors durably; ranking is intentionally performed in Python so no native
     vector extension is required. This is suitable for local and moderate indexes. Large production corpora should use
     a dedicated vector database through a ProtoLink retriever adapter.
 

@@ -1,7 +1,7 @@
 """Protolink 0.6.3 state inspection and control endpoints.
 
 This example uses ``RuntimeTransport`` so it behaves like a remote client/server
-flow without opening a network port. The client describes, compacts, and resets
+flow without opening a network port. The client describes, compacts and resets
 one persistent conversation session through typed request specs.
 
 Run it with:
@@ -19,7 +19,7 @@ from protolink.transport import RuntimeTransport
 
 
 async def main() -> None:
-    """Describe, compact, and reset state through AgentClient specs."""
+    """Describe, compact and reset state through AgentClient specs."""
     url = "runtime://v063-state-agent"
     session_id = "session_v063_state"
     agent = Agent(

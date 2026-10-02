@@ -98,7 +98,7 @@ class AdvocacyTrial:
         self.final_checkpoint: dict[str, dict[str, Any]] = {}
 
     async def run(self) -> dict[str, Any]:
-        """Execute baseline assessment, matched advocacy stages, and ballot."""
+        """Execute baseline assessment, matched advocacy stages and ballot."""
         self._progress(1, f"Baseline: collecting {len(self.jurors)} independent juror assessments")
         await self._collect_baseline()
         self.baseline_checkpoint = self._checkpoint()
@@ -987,7 +987,7 @@ def summary_from_result(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def stable_hash(payload: Any) -> str:
-    """Public helper for case, controls, and treatment fingerprints."""
+    """Public helper for case, controls and treatment fingerprints."""
     return _stable_hash(payload)
 
 

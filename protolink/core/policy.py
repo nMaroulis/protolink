@@ -1,7 +1,7 @@
 """Capability policy and approval primitives for runtime actions.
 
 The policy layer is deliberately independent of tools, language models,
-transports, and user interfaces. It evaluates a prepared ``RunAction`` against
+transports and user interfaces. It evaluates a prepared ``RunAction`` against
 its ``RunContext`` and either authorizes the operation, denies it, or creates a
 typed approval checkpoint for an application-provided handler.
 """
@@ -282,7 +282,7 @@ class CapabilityPolicy:
     such as ``"workspace.*"`` are supported. Runtime rules and compatible values from ``RunContext.permissions`` are
     combined using the most restrictive effect, so task metadata can narrow but cannot weaken runtime-owned policy.
 
-    Permission values may be effects, booleans, or mappings. ``True`` means allow, ``False`` means deny, and a mapping
+    Permission values may be effects, booleans, or mappings. ``True`` means allow, ``False`` means deny and a mapping
     without an explicit ``effect`` is treated as a scoped grant. Applications needing path-, row-, account-, or
     resource-level checks should implement the ``Policy`` protocol and inspect the full action payload.
     """
@@ -312,7 +312,7 @@ class CapabilityPolicy:
         application objects and are therefore intentionally outside this format.
 
         Returns:
-            A dictionary containing the stable policy type, rules, default effect, and name.
+            A dictionary containing the stable policy type, rules, default effect and name.
 
         Raises:
             TypeError: A capability name or nested rule value is not safe declarative data.
@@ -470,8 +470,8 @@ class ActionAuthorizer:
     """Coordinate policy evaluation and optional application approval.
 
     The authorizer is the only component that turns a policy decision into an execution authorization. It fails closed
-    when approval is required and no handler is installed, and it preserves every decision as typed data for events,
-    traces, tests, and user interfaces.
+    when approval is required and no handler is installed and it preserves every decision as typed data for events,
+    traces, tests and user interfaces.
     """
 
     def __init__(

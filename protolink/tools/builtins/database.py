@@ -26,9 +26,9 @@ _SQL = Annotated[str, Field(min_length=1, max_length=65536)]
 class DatabaseBackend(Protocol):
     """Async read-only database contract; adapters own connections and credentials.
 
-    query returns columns (names), rows (parallel arrays), and truncated. Preserve
+    query returns columns (names), rows (parallel arrays) and truncated. Preserve
     duplicate column names by keeping positional rows. Values must be JSON-safe.
-    Enforce read-only access in the backend, limit work/output, and honor cancellation.
+    Enforce read-only access in the backend, limit work/output and honor cancellation.
     """
 
     async def describe_schema(self) -> dict[str, Any]:
@@ -52,7 +52,7 @@ class SQLiteDatabase:
         max_tables: Maximum schema tables/views returned, default 100.
 
     Uses mode=ro and a SQLite authorizer: writes, ATTACH, PRAGMA statements,
-    transactions, and extension loading are denied. Parameter values are bound,
+    transactions and extension loading are denied. Parameter values are bound,
     never interpolated. Queries run on workers; cancellation uses interrupt() and
     a progress handler. Rows retain column order; blobs become {"base64": "..."}.
     Tables/views are read in one connection snapshot. This is a data-access adapter,
@@ -200,7 +200,7 @@ class SQLiteDatabase:
 def _validate_query(arguments: dict[str, Any]) -> None:
     sql, parameters = arguments["sql"], arguments["parameters"]
     if not sql.strip() or len(sql.encode()) > 65536 or "\x00" in sql:
-        raise ValueError("SQL must be nonblank, contain no NUL, and fit in 65536 bytes")
+        raise ValueError("SQL must be nonblank, contain no NUL and fit in 65536 bytes")
     values = parameters.values() if isinstance(parameters, dict) else parameters or []
     if len(values) > 1000:
         raise ValueError("At most 1000 SQL parameters are supported")
@@ -226,7 +226,7 @@ def database_tools(backend: DatabaseBackend, *, timeout_seconds: float = 30) -> 
     async def query_database(
         sql: _SQL, parameters: list[Any] | dict[str, Any] | None = None, max_rows: _Rows = 100
     ) -> dict[str, Any]:
-        """Run one read-only query using bound parameters; return columns, positional rows, and truncated."""
+        """Run one read-only query using bound parameters; return columns, positional rows and truncated."""
         return await backend.query(sql=sql, parameters=parameters, max_rows=max_rows)
 
     return (

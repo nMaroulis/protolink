@@ -1,4 +1,4 @@
-"""Convenience paths retain execution, validation, ownership, and failure boundaries."""
+"""Convenience paths retain execution, validation, ownership and failure boundaries."""
 
 from __future__ import annotations
 

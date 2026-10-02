@@ -1,4 +1,4 @@
-"""IMAP UID identity, MIME limits, verified TLS, SMTP outcomes, and cancellation."""
+"""IMAP UID identity, MIME limits, verified TLS, SMTP outcomes and cancellation."""
 
 import asyncio
 import imaplib

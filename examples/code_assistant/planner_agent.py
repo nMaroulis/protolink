@@ -41,7 +41,7 @@ from protolink.llms.factory import create_llm
 # ─────────────────────────────────────────────────────────────────────────
 # This prompt shapes the Planner's "personality" and output format.
 # In Protolink, this is APPENDED to the built-in system prompt that
-# already explains agent_call, tool_call, and A2A protocol mechanics.
+# already explains agent_call, tool_call and A2A protocol mechanics.
 # So we only need to define the agent's ROLE, not the protocol.
 # ─────────────────────────────────────────────────────────────────────────
 PLANNER_SYSTEM_PROMPT = """You are an expert software engineer and code planner.
@@ -78,7 +78,7 @@ def create_planner_agent(
 
     The Planner is a pure LLM agent, it has a "brain" but no "hands".
     Other agents call it via `agent_call` with action `infer` to get
-    reasoning, analysis, and code generation.
+    reasoning, analysis and code generation.
 
     Parameters
     ----------
@@ -140,7 +140,7 @@ def create_planner_agent(
             "name": "planner",
             "description": (
                 "Expert code planner and analyzer. Analyzes coding tasks, "
-                "creates implementation plans, reviews code, and generates "
+                "creates implementation plans, reviews code and generates "
                 "precise code modifications. Ask this agent for reasoning "
                 "about code changes."
             ),

@@ -1,4 +1,4 @@
-"""Runtime action, capability policy, and approval regression tests."""
+"""Runtime action, capability policy and approval regression tests."""
 
 from __future__ import annotations
 

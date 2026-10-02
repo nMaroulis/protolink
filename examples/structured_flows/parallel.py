@@ -45,7 +45,7 @@ async def main():
     print("🚀 Protolink Flow: Parallel Execution (Fan-out / Fan-in)")
     print("=" * 70)
     print("This example demonstrates running multiple specialized agents")
-    print("concurrently on the same task, and merging their outputs safely.\n")
+    print("concurrently on the same task and merging their outputs safely.\n")
 
     # 1. Start Registry
     registry = Registry(url=REGISTRY_URL, transport="http")

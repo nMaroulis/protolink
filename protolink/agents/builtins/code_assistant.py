@@ -15,10 +15,10 @@ from protolink.tools.builtins.user_input import UserInputHandler
 
 
 class CodeAssistant(Agent):
-    """An ordinary Agent with shell, Git, calculator, and optional user questions.
+    """An ordinary Agent with shell, Git, calculator and optional user questions.
 
     The default policy allows Git reads and feedback, requires approval for shell
-    execution/Git writes, and denies undeclared capabilities. Git writes also need
+    execution/Git writes and denies undeclared capabilities. Git writes also need
     ``allow_git_write=True``. Shell execution can change any host resource accessible
     to the process: ``cwd`` is a working directory, not a sandbox or write restriction.
 
@@ -53,7 +53,7 @@ class CodeAssistant(Agent):
             allow_git_write: Expose staging and committing behind Agent policy.
             card: Optional custom identity and transport URL.
             **agent_options: Normal Agent settings, including policy, approval_handler,
-                system_prompt, state, storage, transport, and run_store.
+                system_prompt, state, storage, transport and run_store.
         """
         if agent_options.get("policy") is None:
             agent_options["policy"] = CapabilityPolicy(
@@ -69,10 +69,10 @@ class CodeAssistant(Agent):
         agent_options.setdefault(
             "system_prompt",
             (
-                "Help the user inspect, change, and test code in the configured working directory. "
+                "Help the user inspect, change and test code in the configured working directory. "
                 "Inspect existing changes before editing. Preserve unrelated work. Use structured Git "
                 "tools where possible. "
-                "Check command exit codes, timeouts, and truncation; report evidence from tests before "
+                "Check command exit codes, timeouts and truncation; report evidence from tests before "
                 "claiming success. "
                 "Use ask_user when available for missing requirements. Never infer consent from a "
                 "declined or timed-out "

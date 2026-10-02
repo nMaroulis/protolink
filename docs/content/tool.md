@@ -15,13 +15,13 @@ import ApiReference, {
 selected stdio tools; pass `url=...` for SSE or a configured `MCPToolAdapter` for full control.
 Blocking scripts use `agent.sync.add_mcp(...)`. The adapter also exposes `list_tools_async` and
 `get_tools_async`. See [collection and MCP registration](progressive-control.md#register-collections-and-mcp-tools)
-for collision handling, discovery side effects, and connection ownership.
+for collision handling, discovery side effects and connection ownership.
 
 
 See [Built-in Tools](builtin-tools.md) for the complete built-in catalog.
-[Execution, approvals, and recovery](execution-tools.md) covers run handles, approval brokers, and completion checks.
+[Execution, approvals and recovery](execution-tools.md) covers run handles, approval brokers and completion checks.
 
-Tools extend agent capabilities with additional functions. They enable LLMs and agents to interact with external systems, execute code, access data, and perform specialized tasks that go beyond pure text generation.
+Tools extend agent capabilities with additional functions. They enable LLMs and agents to interact with external systems, execute code, access data and perform specialized tasks that go beyond pure text generation.
 
 ## Overview
 
@@ -54,7 +54,7 @@ from protolink.tools.adapters import MCPToolAdapter
 
 | Module | Description |
 |--------|-------------|
-| `protolink.tools` | Core interfaces, native implementation, and public built-in factories |
+| `protolink.tools` | Core interfaces, native implementation and public built-in factories |
 | `protolink.tools.builtins` | Built-in factories and configurable backends |
 | `protolink.tools.adapters` | Adapters for integrating external tool systems |
 
@@ -64,7 +64,7 @@ from protolink.tools.adapters import MCPToolAdapter
   eyebrow="Tool module"
   title="Tools"
   path="protolink.tools"
-  description="The callable capability layer for native Python functions, MCP-backed tools, JSON schemas, examples, capability policies, and approval-aware action metadata."
+  description="The callable capability layer for native Python functions, MCP-backed tools, JSON schemas, examples, capability policies and approval-aware action metadata."
   pills={[
     "Native decorators",
     "MCP adapters",
@@ -80,7 +80,7 @@ from protolink.tools.adapters import MCPToolAdapter
     },
     {
       title: "Base contract",
-      text: "Tools are async callables with a name, description, input schema, output schema, tags, examples, and capabilities.",
+      text: "Tools are async callables with a name, description, input schema, output schema, tags, examples and capabilities.",
       code: "BaseTool",
     },
     {
@@ -123,12 +123,12 @@ All tools in ProtoLink conform structurally to `BaseTool`. It is a typing protoc
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/base.py#L5"
 >
 
-The protocol is the smallest contract understood by Agent registration and execution. Metadata describes the tool to models, discovery clients, and policy; `__call__()` performs the actual operation.
+The protocol is the smallest contract understood by Agent registration and execution. Metadata describes the tool to models, discovery clients and policy; `__call__()` performs the actual operation.
 
 <ApiSection title="Attributes">
   <ApiFields ariaLabel="BaseTool protocol attributes">
     <ApiField name="name" type="str">
-      Stable identifier used in model tool declarations, task parts, registry skills, policy actions, and <code>agent.call_tool()</code>. Names should be unique within one Agent because registering the same name replaces the runtime tool.
+      Stable identifier used in model tool declarations, task parts, registry skills, policy actions and <code>agent.call_tool()</code>. Names should be unique within one Agent because registering the same name replaces the runtime tool.
     </ApiField>
     <ApiField name="description" type="str">
       Human-readable purpose shown to the model and copied to the advertised <code>AgentSkill</code>. Explain when to call the tool, not only what its Python function is named.
@@ -163,7 +163,7 @@ The protocol is the smallest contract understood by Agent registration and execu
 </ApiSection>
 
 <ApiCallout label="Runtime boundary">
-  Calling a tool object directly bypasses Agent authorization and approvals. Register it and use <code>agent.call_tool()</code> or <code>agent.sync.call_tool()</code> for those controls. Use task execution for the full cancellation, telemetry, budget, and persistence lifecycle.
+  Calling a tool object directly bypasses Agent authorization and approvals. Register it and use <code>agent.call_tool()</code> or <code>agent.sync.call_tool()</code> for those controls. Use task execution for the full cancellation, telemetry, budget and persistence lifecycle.
 </ApiCallout>
 
 </ApiReference>
@@ -188,9 +188,9 @@ The protocol is the smallest contract understood by Agent registration and execu
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L17"
 >
 
-Adapt a synchronous or asynchronous Python callable to the `BaseTool` contract. Construction inspects the callable signature and resolved type hints, infers any missing schemas, normalizes explicit schemas, and converts missing tags, examples, and capabilities into empty collections.
+Adapt a synchronous or asynchronous Python callable to the `BaseTool` contract. Construction inspects the callable signature and resolved type hints, infers any missing schemas, normalizes explicit schemas and converts missing tags, examples and capabilities into empty collections.
 
-For ordinary functions, use `agent.add_tool(func)` or `@agent.tool` to infer name, description, and schemas. Use `Tool.from_callable(func, ...)` for a reusable definition with explicit metadata overrides, and the constructor when restoring or assembling a complete tool definition.
+For ordinary functions, use `agent.add_tool(func)` or `@agent.tool` to infer name, description and schemas. Use `Tool.from_callable(func, ...)` for a reusable definition with explicit metadata overrides and the constructor when restoring or assembling a complete tool definition.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Tool constructor parameters">
@@ -262,7 +262,7 @@ Create a reusable tool from a synchronous or asynchronous callable. The default 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Tool from_callable parameters">
   <ApiField name="func" type="Callable[..., Any]" required>Original callable retained as <code>tool.func</code>. The factory does not replace or execute it.</ApiField>
   <ApiField name="name, description" type="str | None" defaultValue="None">Optional public metadata overrides. All arguments after <code>func</code> are keyword-only.</ApiField>
-  <ApiField name="input_schema, output_schema, tags, examples, capabilities, action_builder">The same schema, discovery, permission, and preview metadata accepted by the explicit constructor.</ApiField>
+  <ApiField name="input_schema, output_schema, tags, examples, capabilities, action_builder">The same schema, discovery, permission and preview metadata accepted by the explicit constructor.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Tool from_callable return value">
@@ -301,12 +301,12 @@ agent.add_tool(add_tool)
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L76"
 >
 
-Validate proposed keyword arguments with the normalized input schema, wrapped callable signature, and resolved type hints. Custom execution paths can call this method to perform the same coercion as `Tool.__call__()` before preparing policy metadata.
+Validate proposed keyword arguments with the normalized input schema, wrapped callable signature and resolved type hints. Custom execution paths can call this method to perform the same coercion as `Tool.__call__()` before preparing policy metadata.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Tool validate_args parameters">
     <ApiField name="kwargs" type="dict[str, Any] | None" required>
-      Untrusted argument mapping. <code>None</code> becomes an empty dictionary, and the supplied mapping is copied before coercion.
+      Untrusted argument mapping. <code>None</code> becomes an empty dictionary and the supplied mapping is copied before coercion.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -322,7 +322,7 @@ Validate proposed keyword arguments with the normalized input schema, wrapped ca
 <ApiSection title="Raises">
   <ApiFields ariaLabel="Tool validate_args errors">
     <ApiField name="ValueError">
-      Schema violations, missing or unexpected fields, incompatible values, and annotation-validation failures.
+      Schema violations, missing or unexpected fields, incompatible values and annotation-validation failures.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -387,7 +387,7 @@ Validate keyword arguments and invoke the wrapped Python callable. A synchronous
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L98"
 >
 
-Build the runtime action evaluated before this tool executes. Without a custom builder, the action has kind `tool.call`, the tool name and description, validated arguments as payload, and the tool's declared capability set.
+Build the runtime action evaluated before this tool executes. Without a custom builder, the action has kind `tool.call`, the tool name and description, validated arguments as payload and the tool's declared capability set.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Tool prepare_action parameters">
@@ -395,7 +395,7 @@ Build the runtime action evaluated before this tool executes. Without a custom b
       Already validated keyword arguments proposed for execution.
     </ApiField>
     <ApiField name="context" type="RunContext" required>
-      Active run identity, permissions, session, cancellation, and budget context supplied to a custom builder.
+      Active run identity, permissions, session, cancellation and budget context supplied to a custom builder.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -433,11 +433,11 @@ result = await tool(location="Tokyo", units="celsius")
 ## Built-in Tools
 
 ProtoLink provides optional web search/fetch, calculator/clock, process/shell/Git, user feedback,
-filesystem, storage, HTTP, document, database, calendar, and email tools. Register the factories on
-any Agent and supply the resources, backends, and policies your application needs.
+filesystem, storage, HTTP, document, database, calendar and email tools. Register the factories on
+any Agent and supply the resources, backends and policies your application needs.
 
 See [Built-in Tools](builtin-tools.md) for the complete catalog, generated calls, configuration,
-authentication, limits, and examples. The [Built-in Agents](builtin-agents.md) page documents the
+authentication, limits and examples. The [Built-in Agents](builtin-agents.md) page documents the
 small agent presets that compose these capabilities.
 
 ## Native Tools
@@ -446,7 +446,7 @@ small agent presets that compose these capabilities.
 
 ### Registering Native Tools
 
-Pass an existing function to `agent.add_tool()` or decorate a function with `@agent.tool`. Both infer the public name, cleaned docstring, and schemas from the callable:
+Pass an existing function to `agent.add_tool()` or decorate a function with `@agent.tool`. Both infer the public name, cleaned docstring and schemas from the callable:
 
 ```python
 from protolink import Agent, AgentCard
@@ -484,9 +484,9 @@ print(agent.sync.call_tool("add", a=2, b=3))  # 5
 # output_schema: {"type": "integer"}
 ```
 
-Synchronous functions, asynchronous functions, bound methods, and callable objects can all be passed directly to `add_tool()`. To reuse `add` on another agent, call `other_agent.add_tool(add)`. Registration inspects the callable without executing it; the registered wrapper is available as `agent.tools["add"]`.
+Synchronous functions, asynchronous functions, bound methods and callable objects can all be passed directly to `add_tool()`. To reuse `add` on another agent, call `other_agent.add_tool(add)`. Registration inspects the callable without executing it; the registered wrapper is available as `agent.tools["add"]`.
 
-Existing `Tool`, built-in, MCP, and custom tool objects retain their metadata and behavior when passed to `add_tool()`. For explicit schemas, tags, capabilities, or approval previews, create a configured `Tool.from_callable(add, ...)` first. See [Agent.add_tool](agent.md#agentadd_tool) for replacement rules.
+Existing `Tool`, built-in, MCP and custom tool objects retain their metadata and behavior when passed to `add_tool()`. For explicit schemas, tags, capabilities, or approval previews, create a configured `Tool.from_callable(add, ...)` first. See [Agent.add_tool](agent.md#agentadd_tool) for replacement rules.
 
 ### Agent.tool
 
@@ -506,7 +506,7 @@ Existing `Tool`, built-in, MCP, and custom tool objects retain their metadata an
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py#L783"
 >
 
-Wrap a Python callable in `Tool`, register it immediately on this Agent, and synchronize the corresponding advertised `AgentSkill`. The decorated name remains bound to the original function and retains its type signature, while the runtime wrapper is available through `agent.tools[name]`. `ToolCallableT` represents the decorated callable's type. Bare decoration, empty parentheses, explicit keywords, and the existing `@agent.tool("name", "description")` form are supported.
+Wrap a Python callable in `Tool`, register it immediately on this Agent and synchronize the corresponding advertised `AgentSkill`. The decorated name remains bound to the original function and retains its type signature, while the runtime wrapper is available through `agent.tools[name]`. `ToolCallableT` represents the decorated callable's type. Bare decoration, empty parentheses, explicit keywords and the existing `@agent.tool("name", "description")` form are supported.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Agent tool decorator parameters">
@@ -514,7 +514,7 @@ Wrap a Python callable in `Tool`, register it immediately on this Agent, and syn
       Stable public identifier, inferred from the function name when omitted. Bare decoration passes the callable here. Reusing an existing runtime name replaces the tool and its matching skill.
     </ApiField>
     <ApiField name="description" type="str | None" defaultValue="None">
-      Selection guidance shown to the LLM and discovery clients. Defaults to the cleaned docstring, or <code>Call &lt;name&gt;.</code> when the function has none. Include the operation's purpose, prerequisites, and relevant side effects in your docstring or explicit description.
+      Selection guidance shown to the LLM and discovery clients. Defaults to the cleaned docstring, or <code>Call &lt;name&gt;.</code> when the function has none. Include the operation's purpose, prerequisites and relevant side effects in your docstring or explicit description.
     </ApiField>
     <ApiField name="input_schema" type="dict[str, Any] | None" defaultValue="None">
       Explicit JSON Schema or legacy field map. <code>None</code> infers a schema from the decorated function's signature and type hints.
@@ -553,7 +553,7 @@ Wrap a Python callable in `Tool`, register it immediately on this Agent, and syn
 
 ### JSON Schema and Runtime Validation
 
-Tool schemas are first-class JSON Schema objects. Native tools infer nested schemas from Python type hints, dataclasses, enums, typed dictionaries, and Pydantic models. Before execution, Protolink validates and lightly coerces tool arguments against the schema, then applies Python annotation validation where available.
+Tool schemas are first-class JSON Schema objects. Native tools infer nested schemas from Python type hints, dataclasses, enums, typed dictionaries and Pydantic models. Before execution, Protolink validates and lightly coerces tool arguments against the schema, then applies Python annotation validation where available.
 
 ```python
 from pydantic import BaseModel, Field
@@ -573,7 +573,7 @@ async def book_hotel(booking: BookingRequest) -> dict[str, str]:
     return {"location": booking.location, "status": "confirmed"}
 ```
 
-The inferred input schema is a JSON Schema object with a nested `booking` property. Runtime calls such as `{"booking": {"location": "Athens", "guests": "2"}}` are coerced before the function receives a `BookingRequest` instance. Missing required fields, unexpected fields, invalid enums, and incompatible scalar values return a structured tool error instead of reaching user code.
+The inferred input schema is a JSON Schema object with a nested `booking` property. Runtime calls such as `{"booking": {"location": "Athens", "guests": "2"}}` are coerced before the function receives a `BookingRequest` instance. Missing required fields, unexpected fields, invalid enums and incompatible scalar values return a structured tool error instead of reaching user code.
 
 ### Schema helper API
 
@@ -591,7 +591,7 @@ The helpers below are public for applications that build custom tool wrappers or
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/schema.py#L206"
 >
 
-Normalize a full JSON Schema, a Pydantic model, a Python annotation, or a legacy `{field: type}` map into one JSON Schema dictionary. Object schemas receive stable defaults for `properties`, `required`, and `additionalProperties`, and local `$ref` definitions are inlined for provider portability.
+Normalize a full JSON Schema, a Pydantic model, a Python annotation, or a legacy `{field: type}` map into one JSON Schema dictionary. Object schemas receive stable defaults for `properties`, `required` and `additionalProperties` and local `$ref` definitions are inlined for provider portability.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="normalize_schema parameters">
@@ -627,7 +627,7 @@ Normalize a full JSON Schema, a Pydantic model, a Python annotation, or a legacy
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/schema.py#L266"
 >
 
-Inspect a callable and build a closed object schema for its named parameters. `self`, `cls`, `*args`, and `**kwargs` are omitted; parameters without Python defaults become required and parameters with defaults include that value in their property schema.
+Inspect a callable and build a closed object schema for its named parameters. `self`, `cls`, `*args` and `**kwargs` are omitted; parameters without Python defaults become required and parameters with defaults include that value in their property schema.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="infer_input_schema parameters">
@@ -701,7 +701,7 @@ Convert a callable's resolved return annotation to JSON Schema. Missing or unres
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/schema.py#L478"
 >
 
-Validate and coerce untrusted keyword arguments before tool code runs. JSON Schema validation happens first, Python signature checks catch missing and unexpected fields next, and resolved annotations can finally reconstruct typed values through Pydantic `TypeAdapter`.
+Validate and coerce untrusted keyword arguments before tool code runs. JSON Schema validation happens first, Python signature checks catch missing and unexpected fields next and resolved annotations can finally reconstruct typed values through Pydantic `TypeAdapter`.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="validate_tool_args parameters">
@@ -709,7 +709,7 @@ Validate and coerce untrusted keyword arguments before tool code runs. JSON Sche
       Proposed arguments. <code>None</code> is normalized to an empty dictionary and the caller's mapping is copied.
     </ApiField>
     <ApiField name="input_schema" type="dict[str, Any] | None" required>
-      Schema used for structural validation and conservative coercion of strings, numbers, booleans, arrays, and nested objects.
+      Schema used for structural validation and conservative coercion of strings, numbers, booleans, arrays and nested objects.
     </ApiField>
     <ApiField name="type_hints" type="dict[str, Any] | None" defaultValue="None">
       Resolved annotations keyed by parameter name. When supplied, matching values are validated and reconstructed after schema checks.
@@ -731,7 +731,7 @@ Validate and coerce untrusted keyword arguments before tool code runs. JSON Sche
 <ApiSection title="Raises">
   <ApiFields ariaLabel="validate_tool_args errors">
     <ApiField name="ValueError">
-      Schema violations, missing fields, unexpected fields, incompatible scalar values, invalid enums or constants, and annotation-validation failures.
+      Schema violations, missing fields, unexpected fields, incompatible scalar values, invalid enums or constants and annotation-validation failures.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -766,13 +766,13 @@ async def publish_record(record_id: str) -> dict[str, str]:
     return {"record_id": record_id, "status": "published"}
 ```
 
-Policy is evaluated after argument validation and immediately before the callable runs. See [Runtime](runtime.md#capability-policy) for wildcard rules, `RunContext.permissions`, approval handlers, and preview artifacts.
+Policy is evaluated after argument validation and immediately before the callable runs. See [Runtime](runtime.md#capability-policy) for wildcard rules, `RunContext.permissions`, approval handlers and preview artifacts.
 
-Use `agent.call_tool_in_context(name, context, **arguments)` to supply explicit per-run permissions and approval context. `agent.call_tool()` and `agent.sync.call_tool()` create a fresh context and return the raw result. These direct calls do not register a task or create its lifecycle, telemetry, and persistence records; use `run_task(Task.create_tool_call(...))` when the full task boundary is needed.
+Use `agent.call_tool_in_context(name, context, **arguments)` to supply explicit per-run permissions and approval context. `agent.call_tool()` and `agent.sync.call_tool()` create a fresh context and return the raw result. These direct calls do not register a task or create its lifecycle, telemetry and persistence records; use `run_task(Task.create_tool_call(...))` when the full task boundary is needed.
 
 ### Tool Cancellation
 
-Tools invoked by a running task participate in that task's live cancellation automatically. Protolink checks the token before authorization, before calling the tool, and after the awaited result returns. It also cancels the owning task, so an async tool normally receives `asyncio.CancelledError` at its current `await` point.
+Tools invoked by a running task participate in that task's live cancellation automatically. Protolink checks the token before authorization, before calling the tool and after the awaited result returns. It also cancels the owning task, so an async tool normally receives `asyncio.CancelledError` at its current `await` point.
 
 ```python
 @agent.tool(name="build_report", description="Build a report in stages")
@@ -948,7 +948,7 @@ await agent.add_mcp(transport="streamable_http", url="https://example.com/mcp")
 Omitting `transport` with a URL retains legacy SSE behavior. The blocking
 `agent.sync.add_mcp(...)` accepts the same options.
 
-#### Results, schemas, and errors
+#### Results, schemas and errors
 
 The adapter follows the [MCP tool result contract](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
 
@@ -960,7 +960,7 @@ The adapter follows the [MCP tool result contract](https://modelcontextprotocol.
 | `isError=True` | Raises `MCPToolError` |
 
 Rich results preserve `content`, `structuredContent`, `_meta`, annotations, extension
-fields, and null values. Access structured data through `result["structuredContent"]`.
+fields and null values. Access structured data through `result["structuredContent"]`.
 An empty structured object remains a structured result. Images, audio, resource links,
 and embedded resources retain their original content blocks.
 
@@ -980,7 +980,7 @@ except MCPToolError as error:
 ```
 
 Direct calls raise `MCPToolError`; the existing task runtime records a failed tool
-output, and convenience inference follows its existing failure behavior. No failed
+output and convenience inference follows its existing failure behavior. No failed
 call is silently converted into successful text or automatically resubmitted.
 
 #### Local MCP Server (stdio)
@@ -1032,7 +1032,7 @@ for tool in tools:
     print(f"  Callable: {tool['callable']}")
 ```
 
-The returned dictionaries contain the MCP name, description, original input and output schemas, a shallow Python input-type mapping, and a synchronous callable. Nullable, union, referenced, and unsupported types use `Any` in the inspection mapping; validation still uses the original JSON Schema. See [`MCPToolAdapter.list_tools`](#mcptooladapterlist_tools) for caching and event-loop behavior.
+The returned dictionaries contain the MCP name, description, original input and output schemas, a shallow Python input-type mapping and a synchronous callable. Nullable, union, referenced and unsupported types use `Any` in the inspection mapping; validation still uses the original JSON Schema. See [`MCPToolAdapter.list_tools`](#mcptooladapterlist_tools) for caching and event-loop behavior.
 
 #### get_tools()
 
@@ -1350,7 +1350,7 @@ Discover tools synchronously and return metadata dictionaries. The first call op
       Calling this synchronous method inside an active event loop fails because it uses <code>asyncio.run()</code>.
     </ApiField>
     <ApiField name="MCP or transport error">
-      Subprocess startup, SSE connection, initialization, protocol, and discovery failures propagate.
+      Subprocess startup, SSE connection, initialization, protocol and discovery failures propagate.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1476,7 +1476,7 @@ Discover one tool and return a new adapter configured to act as that asynchronou
 <ApiSection title="Returns">
   <ApiFields ariaLabel="MCPToolAdapter wrap_tool return value">
     <ApiField name="wrapped" type="MCPToolAdapter">
-      New adapter with the MCP name, description, input schema, and output schema. It shares the parent adapter's session context. Tags remain <code>None</code>.
+      New adapter with the MCP name, description, input schema and output schema. It shares the parent adapter's session context. Tags remain <code>None</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1542,7 +1542,7 @@ Invoke the MCP tool represented by a wrapped adapter. A plain connection adapter
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/adapters/mcp_adapter.py#L599"
 >
 
-Print cached or freshly discovered names, descriptions, input schemas, and shallow Python input types to standard output.
+Print cached or freshly discovered names, descriptions, input schemas and shallow Python input types to standard output.
 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="MCPToolAdapter print_tools return value">
@@ -1560,8 +1560,8 @@ Print cached or freshly discovered names, descriptions, input schemas, and shall
 
 ### Registering built-ins
 
-Register selectively, configure capabilities explicitly, and use the Agent execution path. See
-[Built-in Tools](builtin-tools.md#registration-and-policy) for policy, direct-call, and serialization behavior.
+Register selectively, configure capabilities explicitly and use the Agent execution path. See
+[Built-in Tools](builtin-tools.md#registration-and-policy) for policy, direct-call and serialization behavior.
 
 ### Tool Design
 
@@ -1575,7 +1575,7 @@ Register selectively, configure capabilities explicitly, and use the Agent execu
 1. **Connection reuse**: Create one `MCPToolAdapter` and reuse it for multiple tool calls
 2. **Caching**: Use `list_tools()` without `refresh=True` to leverage caching
 3. **Error handling**: Wrap tool calls in try/except for network failures
-4. **Transport choice**: Use `stdio` for local servers, `streamable_http` for remote services, and `sse` for legacy endpoints
+4. **Transport choice**: Use `stdio` for local servers, `streamable_http` for remote services and `sse` for legacy endpoints
 
 ### Agent Registration
 

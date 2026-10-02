@@ -2,7 +2,7 @@
 
 ``ContextManifest`` describes the prompt budget that is about to enter a model
 without depending on a provider SDK or tokenizer catalog. It is designed for
-CLIs, dashboards, tests, policy hooks, and local runtimes that need a stable
+CLIs, dashboards, tests, policy hooks and local runtimes that need a stable
 pre-call view before the model produces any usage metadata.
 """
 

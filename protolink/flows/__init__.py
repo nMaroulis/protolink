@@ -18,7 +18,7 @@ Core Primitives
         mapping the result directly to the designated downstream path.
     * :class:`Graph`:
         Creates LangGraph-style robust state machines. Define discrete execution nodes, setup cyclic boundaries with
-        deterministic or dynamically computed edges, and tightly control flow limits.
+        deterministic or dynamically computed edges and tightly control flow limits.
 
 Composition
 -----------
@@ -30,7 +30,7 @@ Convenience
 -----------
 Use ``flow.invoke(prompt)`` for final content, or ``execute(task)`` for complete task
 history. ``Step`` adapts a Task-to-Task callable, ``ToolStep`` executes a registered
-tool through its agent, and ``RepeatUntil`` bounds repetition by completion checks.
+tool through its agent and ``RepeatUntil`` bounds repetition by completion checks.
 """
 
 from .base import Flow

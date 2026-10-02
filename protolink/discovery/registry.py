@@ -24,7 +24,7 @@ from protolink.utils.renderers.status import to_registry_status_html
 class Registry:
     """Centralized Registry with server and client components.
 
-    The registry maintains secondary indexes for agent names, roles, and tags to optimize discovery performance.
+    The registry maintains secondary indexes for agent names, roles and tags to optimize discovery performance.
 
     Time Complexity:
         - handle_register: O(T) where T is the number of tags (index updates are O(1))
@@ -255,7 +255,7 @@ class Registry:
         """Stop the registry runtime and orchestrate a graceful teardown.
 
         This method handles shutdown across all supported execution environments (scripts, async loops, background
-        threads, and notebooks). It is specifically designed to safely terminate registries started with
+        threads and notebooks). It is specifically designed to safely terminate registries started with
         ``background=True``.
 
         **Technical Note on Thread-Safe Teardown:**

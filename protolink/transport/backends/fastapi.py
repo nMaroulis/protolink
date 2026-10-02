@@ -294,7 +294,7 @@ class FastAPIBackend(BackendInterface):
 
         This method acts as the architectural bridge between Protolink's internal `EndpointSpec` definitions and the
         external ASGI routing engine. It dynamically constructs asynchronous HTTP handlers capable of extracting JSON
-        payloads, validating them (if enabled), and marshaling the result back over the wire via FastAPI's
+        payloads, validating them (if enabled) and marshaling the result back over the wire via FastAPI's
         `JSONResponse`.
         """
         for ep in endpoints:
@@ -307,7 +307,7 @@ class FastAPIBackend(BackendInterface):
     async def start(self, url: str, tls: TLSConfig | None = None) -> None:
         """Boot the Uvicorn ASGI server as an isolated background task.
 
-        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn `Server` instance, and
+        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn `Server` instance and
         schedules it within the current asyncio event loop. To prevent race conditions, it actively polls
         `server.started` to ensure the TCP socket is bound before yielding control back to the caller.
         """

@@ -14,7 +14,7 @@ FLOW_TERMINAL_PROMPT: str = """
 --- FLOW PIPELINE CONTEXT ---
 This is the final step in the structured Flow/Pipeline.
 Your output will be returned directly to the human user.
-Please ensure your response is polished, user-friendly, and complete.
+Please ensure your response is polished, user-friendly and complete.
 """
 FLOW_ROUTER_PROMPT: str = """
 --- FLOW ROUTING DECISION ---

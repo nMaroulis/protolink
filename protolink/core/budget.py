@@ -2,7 +2,7 @@
 
 This module turns :class:`~protolink.core.run_context.RunBudget` from a typed metadata carrier into an enforceable
 runtime contract. The default policy is small and deterministic: it allows work under budget, emits warning decisions
-near configured limits, and denies work that would exceed hard limits.
+near configured limits and denies work that would exceed hard limits.
 
 Applications can subclass ``BudgetPolicy`` or provide their own policy object with the same ``evaluate()`` method when
 they want compaction, truncation, approval, or custom callback behavior instead of the default allow/warn/deny semantics
@@ -20,7 +20,7 @@ from protolink.utils import utc_now
 BudgetDecisionEffect = Literal["allow", "warn", "deny", "compact", "truncate", "require_approval"]
 """Supported budget decision effects.
 
-The default policy emits only ``"allow"``, ``"warn"``, and ``"deny"``. Additional effects are reserved for application
+The default policy emits only ``"allow"``, ``"warn"`` and ``"deny"``. Additional effects are reserved for application
 policies that want to handle context pressure through compaction, truncation, approval, or another callback before a
 model call proceeds.
 """

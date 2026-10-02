@@ -100,7 +100,7 @@ class Knowledge:
         self._pending_sources = _as_sources(pending_sources) if pending_sources is not None else []
         if self._pending_sources and not self.managed:
             raise UnsupportedKnowledgeOperationError(
-                "Staged sources require managed Knowledge with loader, splitter, embedder, and store components"
+                "Staged sources require managed Knowledge with loader, splitter, embedder and store components"
             )
         self._ready_lock = asyncio.Lock()
         self.sync = SyncKnowledge(self)
@@ -213,7 +213,7 @@ class Knowledge:
         *,
         metadata: Mapping[str, Any] | None = None,
     ) -> IndexReport:
-        """Load, chunk, embed, and upsert one or more managed sources."""
+        """Load, chunk, embed and upsert one or more managed sources."""
         await self.ready()
         return await self._add_sources(_as_sources(source), metadata=metadata)
 
@@ -232,7 +232,7 @@ class Knowledge:
         self,
         documents: Document | Sequence[Document],
     ) -> IndexReport:
-        """Chunk, embed, and replace normalized documents."""
+        """Chunk, embed and replace normalized documents."""
         await self.ready()
         values = [documents] if isinstance(documents, Document) else list(documents)
         if any(not isinstance(document, Document) for document in values):
@@ -588,7 +588,7 @@ class Knowledge:
         if not self.managed:
             raise UnsupportedKnowledgeOperationError(
                 f"Knowledge '{self.name}' is retrieval-only. "
-                "Provide loader, splitter, embedder, and store components to manage its index."
+                "Provide loader, splitter, embedder and store components to manage its index."
             )
 
 

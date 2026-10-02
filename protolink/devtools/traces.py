@@ -2,7 +2,7 @@
 
 Local trace files are append-only in normal operation and may grow for the
 entire lifetime of an application.  The helpers in this module therefore read
-recent records from the end of the file, return compact summaries, and expose
+recent records from the end of the file, return compact summaries and expose
 full records only through an opaque offset token.
 """
 

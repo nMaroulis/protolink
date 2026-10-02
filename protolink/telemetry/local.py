@@ -1,7 +1,7 @@
 """Local replayable telemetry for Protolink task execution.
 
 This module provides an observability backend that does not depend on a hosted
-service. It mirrors the same task, LLM, tool, and delegation lifecycle used by
+service. It mirrors the same task, LLM, tool and delegation lifecycle used by
 external providers, but stores traces locally as structured Python objects and,
 optionally, JSONL records. The implementation uses ``contextvars`` so nested
 spans remain associated with the correct task even when execution crosses async
@@ -68,7 +68,7 @@ def _to_jsonable(value: Any) -> Any:
 
     Trace persistence should never fail simply because a provider or tool
     returned a rich Python object. This helper recursively normalizes common
-    Protolink models, dataclasses, containers, and fallback values.
+    Protolink models, dataclasses, containers and fallback values.
     """
     if hasattr(value, "to_dict") and callable(value.to_dict):
         return value.to_dict()
@@ -100,7 +100,7 @@ class TraceEvent:
     """A point-in-time event emitted during task execution.
 
     Events capture detailed activity that does not need its own duration, such
-    as parsed LLM actions, streamed chunks, parse retries, and final outputs.
+    as parsed LLM actions, streamed chunks, parse retries and final outputs.
     When a span is active, the event stores that span ID for replay tooling.
     """
 
@@ -118,7 +118,7 @@ class TraceEvent:
 class TraceSpan:
     """A timed execution span inside a local Protolink trace.
 
-    Spans represent operations with duration: tasks, LLM calls, tool calls, and
+    Spans represent operations with duration: tasks, LLM calls, tool calls and
     delegated agent calls. Parent IDs form a replayable hierarchy without
     needing provider-specific trace objects.
     """
@@ -156,7 +156,7 @@ class TraceRecord:
 
     A trace record is the top-level artifact produced by
     ``LocalTraceTelemetry``. It contains task metadata, a flat span list with
-    parent IDs, and a chronological event list suitable for local inspection or
+    parent IDs and a chronological event list suitable for local inspection or
     JSONL persistence.
     """
 
@@ -270,7 +270,7 @@ class LocalTraceTelemetry(Telemetry):
 
     It records trace IDs, parent/child spans, model metadata, token estimates,
     cost fields when supplied by providers, raw action payloads, retry counts,
-    redacted inputs/outputs, and replayable JSON records.
+    redacted inputs/outputs and replayable JSON records.
     """
 
     def __init__(
@@ -290,7 +290,7 @@ class LocalTraceTelemetry(Telemetry):
             path: Optional JSONL output path used when ``recorder`` is not
                 provided.
             redactor: Optional callable applied after default secret masking.
-            capture_payloads: Whether inputs, outputs, and event payloads are
+            capture_payloads: Whether inputs, outputs and event payloads are
                 stored. Disable this for metadata-only traces.
             max_traces: Maximum in-memory trace count for the default recorder.
         """
@@ -610,7 +610,7 @@ class LocalTraceTelemetry(Telemetry):
 
         This hook turns action-level events into replayable observability data:
         tool calls and delegated agent calls become child spans, parse failures
-        update retry metadata, and all events are appended chronologically to
+        update retry metadata and all events are appended chronologically to
         the trace.
         """
         event_type = str(event.get("type", "llm_event"))

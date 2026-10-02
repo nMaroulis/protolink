@@ -2,7 +2,7 @@
 Coder Agent - The "Hands" of the Coding Assistant (Tools-Only)
 
 This agent is the file system interface. It exposes deterministic tools for
-reading, writing, listing, and searching files - no LLM needed.
+reading, writing, listing and searching files - no LLM needed.
 
 ═══════════════════════════════════════════════════════════════════════════
 PROTOLINK CONCEPTS DEMONSTRATED:
@@ -82,7 +82,7 @@ def create_coder_agent(registry: Registry | None = None) -> Agent:
         card={
             "name": "coder",
             "description": (
-                "File system operations agent. Reads, writes, lists, and searches "
+                "File system operations agent. Reads, writes, lists and searches "
                 "project files. Use this agent for all file interactions."
             ),
             "url": os.getenv("CODER_AGENT_URL", "http://localhost:8030"),
