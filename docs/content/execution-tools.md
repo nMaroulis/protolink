@@ -1,8 +1,8 @@
-# Execution, approvals, and recovery
+# Execution, approvals and recovery
 
 These optional primitives let applications supply their own roles, workflows, policies, storage, credentials,
 and UI while ProtoLink handles execution and lifecycle. They cover command execution, recoverable file changes,
-approvals, delegated evidence, completion checks, and checkpoint inventory without adding base-package dependencies.
+approvals, delegated evidence, completion checks and checkpoint inventory without adding base-package dependencies.
 
 ## Built-in execution tools
 
@@ -37,13 +37,13 @@ The runnable [`embedded_group.py`](https://github.com/nMaroulis/protolink/blob/m
 cancels a harmless process after its first output.
 
 `AgentGroup(agents, *, external_agents=(), registry=None, own_registry=False, client=None, startup_timeout=10)` starts
-and stops the agents in `agents`. It waits for transport/card readiness and successful configured registration, and
+and stops the agents in `agents`. It waits for transport/card readiness and successful configured registration and
 rolls back partially started resources if startup fails. Shutdown cancels runs submitted through the group and
-stops owned resources in reverse order. Externally supplied agents, the client, and the registry are left running;
+stops owned resources in reverse order. Externally supplied agents, the client and the registry are left running;
 set `own_registry=True` to include the registry in the group's lifecycle. Ownership of an agent includes its server
 and transport. Avoid sharing an owned transport with resources whose lifecycle is external to the group.
 
-Configure each Agent normally, including its LLM, transport, policy, approval handler, credentials, and storage.
+Configure each Agent normally, including its LLM, transport, policy, approval handler, credentials and storage.
 Transport-free agents use direct invocation; `runtime://` supports local discovery and delegation without sockets.
 Network transports use their existing implementations. The group adds no global registry or orchestration roles.
 
@@ -55,7 +55,7 @@ is awaited. `events()` yields typed `RunEvent` objects, including history for la
 uses native cancellation; cancellation of a waiter on `result()` does not cancel the underlying run.
 
 `RunResult` exposes `status`, the normalized `task`, `output` (unwrapped tool result or final response), `report`,
-and an optional structured `error`. Task statuses include `completed`, `failed`, `canceled`, and `input_required`.
+and an optional structured `error`. Task statuses include `completed`, `failed`, `canceled` and `input_required`.
 If a remote stream closes without a terminal task, status is `uncertain`: the effect may already have occurred.
 Task submission keeps response deduplication but disables automatic transport retries, including when a RetryPolicy
 permits retries for other operations. The handle never retries or replays that operation. HTTP transports without
@@ -66,14 +66,14 @@ recorded native events; streaming transports provide live events. `handle.report
 ### Delegated worker evidence
 
 Model-driven delegation automatically includes worker events and execution receipts in the parent's stream,
-`task.metadata["run_events"]`, and `RunReport`. Native peers advertising streaming on a capable transport deliver
+`task.metadata["run_events"]` and `RunReport`. Native peers advertising streaming on a capable transport deliver
 events while the worker runs. A worker overriding only `handle_task()` is advertised without streaming so its
 custom handler remains authoritative. Other peers and older `call_agent()` overrides contribute receipts from the returned task snapshot.
 A2A peers contribute only the evidence present in their mapped task response.
 
-Worker `event_id`, `run_id`, `task_id`, `agent_name`, and `action_id` stay intact. `parent_action_id` and
+Worker `event_id`, `run_id`, `task_id`, `agent_name` and `action_id` stay intact. `parent_action_id` and
 `delegation_id` link worker events to the calling action; existing links from nested delegation are preserved.
-The parent stream assigns its own sequence numbers and retains `source_sequence`, `source_final`, and
+The parent stream assigns its own sequence numbers and retains `source_sequence`, `source_final` and
 `parent_run_id` in envelope metadata. Forwarded child events have `final=False`; the original payload is unchanged.
 Only the parent's terminal task status closes the parent run. Returned artifacts are also retained on the parent.
 
@@ -129,7 +129,7 @@ Consult execution receipts and the actual resource. Duplicate requests or reconn
 ## Checkpoint inventory
 
 The filesystem tools use checkpoints to record recoverable changes. See
-[write recovery](builtin-tools.md#write-recovery) for configuration, mutation, conflict checks, and restoration.
+[write recovery](builtin-tools.md#write-recovery) for configuration, mutation, conflict checks and restoration.
 
 ```python
 recent = checkpoints.list_changes(limit=20)
@@ -148,7 +148,7 @@ the same protection as `get(change_id)`. Use a redacted presentation copy for a 
 for restoration. Existing custom checkpoint stores need to implement `list_changes()` to expose inventory.
 
 See the [checkpoint storage API reference](./storage.md#checkpoint-recovery-records) for the constructor, method
-signatures, individual parameters, returned fields, and errors.
+signatures, individual parameters, returned fields and errors.
 
 ## Completion evidence and bounded workflows
 
@@ -169,7 +169,7 @@ assert all(check.passed for check in checks)
 updated_report = RunReport.from_task(final_task)
 ```
 
-`CompletionEvidence` supplies the typed `Task`, executed `ToolOutcome` records, artifacts, and `RunReport` to each
+`CompletionEvidence` supplies the typed `Task`, executed `ToolOutcome` records, artifacts and `RunReport` to each
 predicate. Predicates return `bool` or `ValidationResult`, synchronously or asynchronously. A check requires an
 execution receipt by default; use explicit `action_ids` to bind it to particular operations. A proposed action,
 preview, or approval alone produces `blocked / execution_evidence_missing`. Pure answer predicates may explicitly
@@ -181,26 +181,26 @@ For resource-dependent evidence, provide `revisions=(ResourceRevision(...),)` an
 the predicate; changed resources yield `stale / resource_revision_changed`. `ValidationResult.is_current(revisions)`
 allows an adapter to assess stored evidence later. A historical `passed` result is not a permanent assertion of freshness.
 
-Validation emits `validation.completed`, appears in `RunReport.validations`, and participates in existing report
-comparisons. Results distinguish `passed`, `failed`, `blocked`, and `stale`, with optional structured codes/messages.
+Validation emits `validation.completed`, appears in `RunReport.validations` and participates in existing report
+comparisons. Results distinguish `passed`, `failed`, `blocked` and `stale`, with optional structured codes/messages.
 Validation records its result without changing terminal task state or choosing a repair policy. Native runtime events
 separate `action.requested`, `approval.required`, `approval.decided`, `action.approved`, `action.started`,
-`action.completed`, and `validation.completed`. Policy-allowed actions proceed without a human approval event.
+`action.completed` and `validation.completed`. Policy-allowed actions proceed without a human approval event.
 
-Use the existing `Graph`, `Pipeline`, and `Router` to choose your workflow:
+Use the existing `Graph`, `Pipeline` and `Router` to choose your workflow:
 
 ```python
 from protolink import Graph, Pipeline
 
 graph = Graph(max_iterations=8, max_node_visits={"repair": 3})
-# Add application nodes, conditions, and edges normally.
+# Add application nodes, conditions and edges normally.
 pipeline = Pipeline(application_steps, max_steps=5)
 ```
 
 Graph retains its default 50-iteration bound; `max_node_visits` may be a per-node mapping or one limit for all nodes.
 Pipeline optionally caps executed steps. Nested bounded flows share `RunBudget` counters and runtime limits;
 workflow dispatches and ordinary agent/tool/model steps count toward `max_steps`. A limit raises `WorkflowLimitError`
-or `BudgetExceededError`, records a structured blocker, and prevents the next dispatch. Cancellation stops traversal.
+or `BudgetExceededError`, records a structured blocker and prevents the next dispatch. Cancellation stops traversal.
 Workflow nodes use separate task identities while the enclosing task stays cancelable and retains its ID and partial
 outputs. Denied, failed, canceled, or input-required work does not
 silently become a new attempt. Limits on repair visits are independent of transport `RetryPolicy`; the runtime does
@@ -210,7 +210,7 @@ not retry denied actions or replay side effects after uncertain transport failur
 shows application-defined acceptance with at most three attempts and no model provider.
 It uses `RepeatUntil(ToolStep(agent, "measure"), check, max_attempts=3)`; checks receive
 fresh execution receipts on each attempt. See [progressive control](progressive-control.md#deterministic-steps-and-bounded-acceptance)
-for callable steps, bounded acceptance, and the explicit Graph alternative.
+for callable steps, bounded acceptance and the explicit Graph alternative.
 
 ## Migration for an application such as ProtoAgent
 
@@ -224,12 +224,12 @@ for callable steps, bounded acceptance, and the explicit Graph alternative.
 | Treating preview or approval as execution success | `CompletionValidator` over action receipts and current resource revisions. |
 | Unbounded repair loops | Existing Graph/Pipeline with explicit visit/step limits. |
 
-Keep roles, prompts, domain knowledge, task routing, configuration, credentials, user interface, and acceptance criteria
+Keep roles, prompts, domain knowledge, task routing, configuration, credentials, user interface and acceptance criteria
 in the application. Existing `RunStore`/`SQLiteRunStore`, `RunRecorder`, `RunReport`, report assertions/comparisons,
-`CapabilityPolicy`, task cancellation, transports, and per-agent LLM configuration remain the underlying facilities.
+`CapabilityPolicy`, task cancellation, transports and per-agent LLM configuration remain the underlying facilities.
 `RunReplay` remains read-only inspection. Full task suspension/resumption and conversation branching are outside this release.
 
-Use existing `RedactionPolicy` when exporting approval requests, events, and reports. Environment values retain their
+Use existing `RedactionPolicy` when exporting approval requests, events and reports. Environment values retain their
 original keys so sensitive-key masking works. Output strings can contain arbitrary secrets: configure output fields
 as sensitive or supply an application redaction policy where needed. Redaction does not mutate execution arguments or
-lossless recovery storage, and the library does not automatically discover secrets embedded in command/output text.
+lossless recovery storage and the library does not automatically discover secrets embedded in command/output text.

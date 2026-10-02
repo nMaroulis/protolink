@@ -1,17 +1,17 @@
 # Built-in Agents
 
 Built-in agents are small, configurable classes using the standard [Agent API](agent.md). Developers
-choose their models, instructions, tools, backends, policies, and application interfaces. The presets
-reuse Agent's execution loop, invocation, streaming, state, storage, and transport behavior.
+choose their models, instructions, tools, backends, policies and application interfaces. The presets
+reuse Agent's execution loop, invocation, streaming, state, storage and transport behavior.
 
 | Agent | Built-in behavior | Import |
 | --- | --- | --- |
-| [`Assistant`](#assistant) | Clock/calculator plus optional calendar, email, and user feedback | `from protolink import Assistant` |
-| [`CodeAssistant`](#codeassistant) | Shell, Git, calculator, and optional user feedback | `from protolink import CodeAssistant` |
+| [`Assistant`](#assistant) | Clock/calculator plus optional calendar, email and user feedback | `from protolink import Assistant` |
+| [`CodeAssistant`](#codeassistant) | Shell, Git, calculator and optional user feedback | `from protolink import CodeAssistant` |
 | [`EchoAgent`](#echoagent) | Currently inherits Agent unchanged | `from protolink.agents.builtins import EchoAgent` |
 
 All three are exported from `protolink.agents.builtins`. The complete tool catalog, backend setup,
-authentication requirements, and individual tool APIs are in [Built-in Tools](builtin-tools.md).
+authentication requirements and individual tool APIs are in [Built-in Tools](builtin-tools.md).
 
 :::info[More agents are coming]
 
@@ -54,16 +54,16 @@ assistant = Assistant(
 )
 ```
 
-`model`, `handle_question`, `approve`, and `token` are application-supplied dependencies.
+`model`, `handle_question`, `approve` and `token` are application-supplied dependencies.
 Choose Google, Microsoft, IMAP/SMTP, or your own service adapters from the
 [backend catalog](builtin-tools.md#calendar-and-email-backends). Clock and calculator
 are always included. Reads and user questions are allowed by the preset's default policy; calendar
-creation, drafts, and delivery require approval. Both write flags default to `False`. Omitting an
+creation, drafts and delivery require approval. Both write flags default to `False`. Omitting an
 approval handler leaves approval-gated calls blocked by the existing runtime; it never auto-approves.
 Question answers clarify intent; they do not authorize a write.
 
 Pass a custom `card=AgentCard(...)` for a different name/URL. Other constructor keywords pass directly
-to `Agent`, including `policy`, `system_prompt`, `transport`, `knowledge`, `storage`, and `run_store`.
+to `Agent`, including `policy`, `system_prompt`, `transport`, `knowledge`, `storage` and `run_store`.
 A supplied policy replaces the preset policy. New capabilities are denied by the preset's default policy;
 explicitly configure them when adding more tools.
 
@@ -83,15 +83,15 @@ coder = CodeAssistant(
 print(await coder.invoke("Inspect the changes and run the relevant tests."))
 ```
 
-The preset includes `run_shell`, `git`, and `calculator`, plus `ask_user` when a callback is supplied.
+The preset includes `run_shell`, `git` and `calculator`, plus `ask_user` when a callback is supplied.
 Git reads and questions are allowed; shell commands and Git writes require approval. Git writes also
 need `allow_git_write=True` (default `False`). Shell execution can mutate host resources even when
 Git writes are disabled. A working directory does not provide filesystem or network isolation.
 
 `env=None` supplies only `PATH=os.defpath`; it does not copy the parent environment. Configure
 credentials and author identity explicitly when needed. Tool factories offer timeout, output-limit,
-executable, and backend settings; replace a preset's tool with a configured factory for those options.
-See [shell, Git, and user interaction](builtin-tools.md#shell-and-git-tools).
+executable and backend settings; replace a preset's tool with a configured factory for those options.
+See [shell, Git and user interaction](builtin-tools.md#shell-and-git-tools).
 
 ## EchoAgent
 
@@ -113,10 +113,10 @@ an ordinary `Agent`. Their default policies deny capabilities beyond the preset,
 the policy when adding capabilities. A supplied policy replaces the preset policy.
 
 Both accept `card` to change identity and standard Agent keyword options such as `system_prompt`,
-`approval_handler`, `transport`, `state`, `storage`, and `run_store`. Configure callbacks in your own
+`approval_handler`, `transport`, `state`, `storage` and `run_store`. Configure callbacks in your own
 application. User feedback clarifies intent; approval remains a separate policy decision.
 
-Configured backends, credentials, and callbacks are not serialized. Restore configurations through
+Configured backends, credentials and callbacks are not serialized. Restore configurations through
 `Agent.from_dict/from_yaml`, then re-register the configured tools and policies as needed. The
 [Tool catalog](builtin-tools.md#registration-and-policy) explains the parameterless/configured distinction.
 
@@ -128,6 +128,6 @@ python examples/builtin_assistants.py
 
 [`builtin_assistants.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_assistants.py)
 exercises Assistant and CodeAssistant, including model question/answer continuation, shell/Git,
-calendar/email, clock, and calculator. It uses a temporary repository, a mock model, and in-memory
+calendar/email, clock and calculator. It uses a temporary repository, a mock model and in-memory
 services. Its automatic approval callback is specific to the demo. See the
 [tool examples](builtin-tools.md#examples) for the general-purpose tools and concrete service backends.

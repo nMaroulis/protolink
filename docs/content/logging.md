@@ -8,7 +8,7 @@ import ApiReference, {
 
 # Logging
 
-Protolink provides a unified logging package to manage console, file-based, and intentionally silent logs consistently.
+Protolink provides a unified logging package to manage console, file-based and intentionally silent logs consistently.
 
 ## Overview
 
@@ -65,7 +65,7 @@ agent = Agent(
 
 :::note[Quiet vs. low verbosity]
 
-`verbosity=0` keeps the default console logger but suppresses Protolink's standard Agent log calls. `QuietLogger` is a reusable no-op `BaseLogger` that creates no handlers and drops every `debug()`, `info()`, `warning()`, `error()`, and `exception()` call wherever it is injected.
+`verbosity=0` keeps the default console logger but suppresses Protolink's standard Agent log calls. `QuietLogger` is a reusable no-op `BaseLogger` that creates no handlers and drops every `debug()`, `info()`, `warning()`, `error()` and `exception()` call wherever it is injected.
 
 :::
 ---
@@ -78,7 +78,7 @@ All Protolink loggers must implement the `BaseLogger` interface.
   eyebrow="Logging module"
   title="Logger Interfaces"
   path="protolink.logging"
-  description="The injectable logging surface for colorful console output, file-based logs, structured JSON rows, and intentionally silent production or test runs."
+  description="The injectable logging surface for colorful console output, file-based logs, structured JSON rows and intentionally silent production or test runs."
   pills={[
     "BaseLogger contract",
     "ConsoleLogger",
@@ -89,12 +89,12 @@ All Protolink loggers must implement the `BaseLogger` interface.
   cards={[
     {
       title: "Common methods",
-      text: "Every logger exposes debug, info, warning, error, and exception methods.",
+      text: "Every logger exposes debug, info, warning, error and exception methods.",
       code: "BaseLogger",
     },
     {
       title: "Console",
-      text: "Human-readable local output for development, CLIs, and examples.",
+      text: "Human-readable local output for development, CLIs and examples.",
       code: "ConsoleLogger",
     },
     {
@@ -383,7 +383,7 @@ exception traceback.
 
 Write formatted, ANSI-colored records to `sys.stdout`. Each instance wraps a
 standard logger named `console.&lt;name&gt;`, disables propagation to the root
-logger, and replaces existing handlers on that standard logger to prevent
+logger and replaces existing handlers on that standard logger to prevent
 duplicate output after reconfiguration.
 
 <ApiSection title="Parameters">
@@ -394,7 +394,7 @@ duplicate output after reconfiguration.
     </ApiField>
     <ApiField name="level" type="int | log-level string" defaultValue="logging.INFO">
       Minimum emitted severity. Recognized strings are <code>DEBUG</code>,
-      <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, and
+      <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code> and
       <code>CRITICAL</code>. String matching is case-insensitive; an unknown
       string silently falls back to <code>INFO</code>.
     </ApiField>
@@ -559,7 +559,7 @@ a different mechanism.
   <ApiFields ariaLabel="QuietLogger method behavior">
     <ApiField name="debug / info / warning / error / exception" type="method">
       Accept the same <code>message</code> and arbitrary keyword arguments as
-      <code>BaseLogger</code>, ignore all values, and return
+      <code>BaseLogger</code>, ignore all values and return
       <code>None</code>.
     </ApiField>
   </ApiFields>

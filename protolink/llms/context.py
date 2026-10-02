@@ -164,11 +164,11 @@ def build_context_manifest(
     history_tokens = 0
     current_user_message = _find_current_user_message(messages, query)
     for message in messages:
+        if message is current_user_message:
+            continue
         message_tokens = estimate_token_count(message.content, model=model)
         if message.role == LLMMessageRole.SYSTEM:
             system_raw_tokens += message_tokens
-        elif message is current_user_message:
-            continue
         else:
             history_tokens += message_tokens
 

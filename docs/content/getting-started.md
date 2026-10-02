@@ -98,7 +98,7 @@ The existing `protolink[dev]` extra remains available as the full installation.
 
 :::info[A2A from the first agent]
 
-Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares identity and capabilities, while `Task`, `Message`, `Part`, and `Artifact` carry work and results. `transport="http"` serves ProtoLink's native API by default. Add `a2a=True` when the agent should also expose and consume the [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary. This is additive: native endpoints and native peer calls remain available. See [A2A Core and 1.0 Compatibility](a2a.md) for the exact scope.
+Even the smallest ProtoLink agent uses the A2A model: `AgentCard` declares identity and capabilities, while `Task`, `Message`, `Part` and `Artifact` carry work and results. `transport="http"` serves ProtoLink's native API by default. Add `a2a=True` when the agent should also expose and consume the [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC boundary. This is additive: native endpoints and native peer calls remain available. See [A2A Core and 1.0 Compatibility](a2a.md) for the exact scope.
 
 :::
 
@@ -119,7 +119,7 @@ agent = Agent(name="calculator", tools=[add])
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-No model, API key, server process, or network connection is needed. Registration infers the tool name from `add`, the description from its cleaned docstring, and the schemas from its type hints. Both synchronous and asynchronous functions work. `@agent.tool`, `@agent.tool()`, and explicit metadata such as `@agent.tool(name="sum", description="Add two numbers")` are also supported.
+No model, API key, server process, or network connection is needed. Registration infers the tool name from `add`, the description from its cleaned docstring and the schemas from its type hints. Both synchronous and asynchronous functions work. `@agent.tool`, `@agent.tool()` and explicit metadata such as `@agent.tool(name="sum", description="Add two numbers")` are also supported.
 
 The agent gets a generated card with description `"Agent calculator"` and URL
 `runtime://calculator`. No transport is created unless you request one. Add
@@ -127,9 +127,9 @@ The agent gets a generated card with description `"Agent calculator"` and URL
 name for each endpoint. Use `description=` and `url=` to customize the generated
 identity, or pass an explicit `card=` instead.
 
-For an existing function, call `agent.add_tool(add)`. The same call works on another agent, and synchronous functions, asynchronous functions, bound methods, and callable objects all use the same metadata inference. Use `Tool.from_callable(add, ...)` when you need custom schemas, tags, or permission metadata; see [Native Tools](tool.md#native-tools).
+For an existing function, call `agent.add_tool(add)`. The same call works on another agent and synchronous functions, asynchronous functions, bound methods and callable objects all use the same metadata inference. Use `Tool.from_callable(add, ...)` when you need custom schemas, tags, or permission metadata; see [Native Tools](tool.md#native-tools).
 
-`call_tool()` validates arguments, applies the Agent's policy and approval rules, and returns the raw result. Calling `add(2, 3)` remains an ordinary Python call and bypasses those Agent controls. Registration never executes the function.
+`call_tool()` validates arguments, applies the Agent's policy and approval rules and returns the raw result. Calling `add(2, 3)` remains an ordinary Python call and bypasses those Agent controls. Registration never executes the function.
 
 ### Keep the complete task
 
@@ -214,12 +214,12 @@ def add(a: int, b: int) -> int:
 agent.start()
 ```
 
-`start()` runs the service until stopped. The same tool is now available to peers through the native task API. Add `a2a=True` for the supported A2A 1.0 boundary, or add an LLM for inference and browser chat. Registry discovery, [built-in tools](builtin-tools.md), and [MCP tools](tool.md) can be attached independently as your application grows.
+`start()` runs the service until stopped. The same tool is now available to peers through the native task API. Add `a2a=True` for the supported A2A 1.0 boundary, or add an LLM for inference and browser chat. Registry discovery, [built-in tools](builtin-tools.md) and [MCP tools](tool.md) can be attached independently as your application grows.
 
 Network aliases require an explicit URL with a compatible scheme and bind port.
 Omitting `url` with `transport="http"` raises an actionable `ValueError`. A
 configured `HTTPTransport(url=...)` can supply that URL instead. See
-[Progressive control](progressive-control.md) for public URLs, TLS, and explicit cards.
+[Progressive control](progressive-control.md) for public URLs, TLS and explicit cards.
 
 
 ### Using the CLI

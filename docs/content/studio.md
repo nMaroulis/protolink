@@ -176,7 +176,7 @@ A Registry node generates a transport and `Registry`. Configure its URL, transpo
 | `router` | `Router` | Each edge label becomes its route key; an unlabeled edge falls back to the target runtime name. The routing prompt configures selection. |
 | `graph` | `Graph` | Connected Agents/Flows become named nodes and directed edges. Set an optional entry node ID; otherwise the first connected node is used. |
 
-Flow nodes expose runtime name, type, router prompt, and—when the type is `graph`—entry node ID. Generated projects also include `run_flow(flow_name, prompt)` when at least one Flow exists.
+Flow nodes expose runtime name, type, router prompt  and, when the type is `graph`, entry node ID. Generated projects also include `run_flow(flow_name, prompt)` when at least one Flow exists.
 
 ### Modules
 

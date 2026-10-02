@@ -1,7 +1,7 @@
 ---
 title: Infer-loop benchmark
 sidebar_label: Benchmark
-description: Measure whether a ProtoLink prompt or infer-loop change improves correctness, reliability, and latency.
+description: Measure whether a ProtoLink prompt or infer-loop change improves correctness, reliability and latency.
 keywords:
   - infer loop
   - benchmark
@@ -18,16 +18,16 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 This benchmark is a repeatable health check for ProtoLink's infer loop. Run the
 same task suite before and after a prompt or code change to see whether Agents
-complete more tasks correctly—and whether they do it faster.
+complete more tasks correctly and whether they do it faster.
 
 The infer loop turns each model response into one validated next action: **finish
 with an answer**, **call a local tool**, or **delegate work to another Agent**.
 It must also decide which of those action modes fits the request, which
-capability to use, and—when delegation is appropriate—which discovered Agent
+capability to use and, when delegation is appropriate, which discovered Agent
 should receive the work. This repository benchmark lets you change that loop or
 its prompts and answer a practical question with comparable evidence:
 
-> Did the model complete more tasks correctly, recover less often, and finish
+> Did the model complete more tasks correctly, recover less often and finish
 > faster than it did before?
 
 <ApiSurface
@@ -35,7 +35,7 @@ its prompts and answer a practical question with comparable evidence:
   title="Turn infer-loop changes into comparable evidence"
   ariaLabel="Infer-loop benchmark overview"
   path="benchmarks/infer_loop"
-  description="Run generated tasks through the real AgentClient → Agent → LLM path, validate every action against deterministic evidence, and export correctness and timing results."
+  description="Run generated tasks through the real AgentClient → Agent → LLM path, validate every action against deterministic evidence and export correctness and timing results."
   pills={[
     "12-case smoke",
     "40-case core",
@@ -52,12 +52,12 @@ its prompts and answer a practical question with comparable evidence:
     },
     {
       title: "Prove",
-      text: "Check the final answer, independent execution ledger, runtime trace, and protocol path.",
+      text: "Check the final answer, independent execution ledger, runtime trace and protocol path.",
       code: "oracle + ledger + trace",
     },
     {
       title: "Measure",
-      text: "Keep correctness separate from first-try reliability, latency, and cache-sensitive repeats.",
+      text: "Keep correctness separate from first-try reliability, latency and cache-sensitive repeats.",
       code: "STRICT · FIRST TRY · timing",
     },
     {
@@ -77,19 +77,19 @@ its prompts and answer a practical question with comparable evidence:
 
 :::tip[The short version]
 
-Use `smoke` while editing, `core` for routine before/after comparisons, and
+Use `smoke` while editing, `core` for routine before/after comparisons and
 `full` for a fixed 200-case baseline. Treat `STRICT` as the headline
 correctness score and compare timing only between controlled runs on the same
 machine. Use the `routing_choice` category when you specifically want to test
 whether the model can choose between a direct answer, a local tool, delegated
-tool execution, and delegated inference without being told implementation
+tool execution and delegated inference without being told implementation
 names.
 
 :::
 
 ## How one case works
 
-The task catalog, synthetic specialist data, receipts, and validation oracle
+The task catalog, synthetic specialist data, receipts and validation oracle
 are deterministic for a given seed. The provider and model are not guaranteed
 to be deterministic, even with temperature zero. The benchmark controls the
 world around the model so that its decisions can be judged exactly.
@@ -119,11 +119,11 @@ jobs:
 
 | Part | What happens in the benchmark |
 | --- | --- |
-| **Real runtime path** | `AgentClient`, `Task`, coordinator `Agent`, provider adapter, LLM infer loop, tool registry, delegation, runtime events, and telemetry execute normally. |
-| **Controlled specialists** | `workspace_agent`, `travel_agent`, and `oracle_agent` return deterministic closed-world values. |
+| **Real runtime path** | `AgentClient`, `Task`, coordinator `Agent`, provider adapter, LLM infer loop, tool registry, delegation, runtime events and telemetry execute normally. |
+| **Controlled specialists** | `workspace_agent`, `travel_agent` and `oracle_agent` return deterministic closed-world values. |
 | **Overlapping decoys** | `workspace_archive_agent` and `travel_planning_agent` advertise overlapping tool names and schemas. They make the model identify the authoritative target instead of relying on unique-tool inference. |
 | **Controlled tools** | Coordinator and specialist tools do no external work; they return repeatable results and opaque `BENCH-...` receipts. |
-| **In-process transport** | `RuntimeTransport` exercises task serialization, registry discovery, Agents, and tools without adding network variability. |
+| **In-process transport** | `RuntimeTransport` exercises task serialization, registry discovery, Agents and tools without adding network variability. |
 | **Independent judge** | A hidden oracle knows the exact final text and expected action sequence. The execution ledger and local trace prove what actually ran. |
 
 ### A concrete multi-step case
@@ -141,7 +141,7 @@ jobs:
 The model sees the instruction and typed capabilities, but it does **not** see
 the receipt that the specialist will generate.
 
-1. The coordinator must select the correct Agent, tool, and typed arguments.
+1. The coordinator must select the correct Agent, tool and typed arguments.
 2. The specialist returns an authoritative observation such as a temperature
    and an opaque `BENCH-WX-...` receipt.
 3. The coordinator must copy that exact receipt into the dependent hotel call.
@@ -156,7 +156,7 @@ Agent was called cannot pass these checks.
 
 Directed delegation cases deliberately tell the coordinator which Agent and
 tool to call. They isolate action formatting, typed arguments, dispatch, result
-handling, and exact final output. Routing-choice cases ask a harder and
+handling and exact final output. Routing-choice cases ask a harder and
 different question: can the model infer the correct route from the task and
 the discovered capability descriptions?
 
@@ -206,7 +206,7 @@ routing-choice pass demonstrates all of the following:
 5. The ledger and trace independently confirmed the same route and execution.
 
 The routing catalog includes direct completion, both coordinator-owned tools,
-authoritative workspace and travel tools, and inference delegation to the
+authoritative workspace and travel tools and inference delegation to the
 deterministic reference analyst. The routine `core` suite includes at least one
 routing case for every action mode; the `full` suite exercises all routing
 variants with different deterministic inputs.
@@ -216,7 +216,7 @@ variants with different deterministic inputs.
 ### 1. Prepare the checkout and model
 
 Run the benchmark from the repository root. Install ProtoLink in editable
-development mode, start Ollama, and make sure the requested model is present:
+development mode, start Ollama and make sure the requested model is present:
 
 ```bash
 uv pip install -e ".[dev]"
@@ -238,7 +238,7 @@ python -m benchmarks.infer_loop \
 For Ollama, the base URL resolves from `--base-url`, then `OLLAMA_URL`, then
 `http://localhost:11434`. Defaults are chosen for repeatable local comparison:
 temperature `0`, model seed `1337`, context size `8192`, generation limit
-`2048`, JSON-prompt action mode, and one unscored warm-up.
+`2048`, JSON-prompt action mode and one unscored warm-up.
 
 :::note[JSON-prompt mode is part of the experiment]
 
@@ -264,7 +264,7 @@ WALL TIME  scored=29.40s warmup=1.20s; LLM CALLS median=0.78s
 RESULTS    benchmark_results/20260728-143000
 ```
 
-- `STRICT` is the headline score: correct task, exact actions, and a clean
+- `STRICT` is the headline score: correct task, exact actions and a clean
   protocol path.
 - `FUNCTIONAL` includes cases that reached the correct result after infer-loop
   self-correction.
@@ -281,17 +281,17 @@ browser without a server or external assets.
 The report is designed for both overview and diagnosis:
 
 - **Correctness by category** separates routing decisions from directed local,
-  delegated, multi-step, and grounding work.
+  delegated, multi-step and grounding work.
 - **Case latency and outcome** shows one selected-attempt bar per logical case
   repetition. When a run has hundreds or thousands of entries, the chart
   scrolls inside its own panel instead of widening the entire page.
 - **Attempt review** includes every logical case that had a non-strict fresh
-  attempt—not only cases that ultimately failed. A case that passes on a later
+  attempt, not only cases that ultimately failed. A case that passes on a later
   fresh attempt is marked `Rescued`, while a case with no strict attempt remains
   unresolved.
 - Each review card shows the original request, the expected final output and
   actions, the actual final output, normalized model decisions, successful
-  ledger actions, diagnostics, and the runtime error for every fresh attempt.
+  ledger actions, diagnostics and the runtime error for every fresh attempt.
 
 This distinction is useful when the visible answer is not the real failure.
 For example, a decoy specialist can return the same value as the authoritative
@@ -352,7 +352,7 @@ Each case asks the coordinator to demonstrate one or more infer-loop skills.
 | `delegated_infer` | Execute explicitly requested inference delegation with all required prompt evidence | Missing evidence, wrong specialist, or fabricated result |
 | `multi_step` | Use one action's receipt in a later dependent action | Wrong order or failure to carry authoritative evidence forward |
 | `grounding_trap` | Reject stale/untrusted prompt values in favor of an observation | The model repeated the trap instead of using the tool or Agent result |
-| `routing_choice` | Infer the action mode, capability, and authoritative Agent without implementation names | Unnecessary action, wrong local/remote mode, decoy selection, or otherwise incorrect semantic routing |
+| `routing_choice` | Infer the action mode, capability and authoritative Agent without implementation names | Unnecessary action, wrong local/remote mode, decoy selection, or otherwise incorrect semantic routing |
 
 Here, a **hallucinated action** has a narrow, testable meaning: an invalid or
 unexpected tool/Agent attempt, an action absent from the expected ledger, a
@@ -368,7 +368,7 @@ as the expected specialist: the tested mistake is the route, not the data.
     <span className="benchmark-score-kicker">Headline regression signal</span>
     <strong>STRICT</strong>
     <span className="benchmark-score-example">180 / 200</span>
-    <p>Exact final output, exact action evidence, and no protocol recovery or invalid action.</p>
+    <p>Exact final output, exact action evidence and no protocol recovery or invalid action.</p>
   </div>
   <div className="benchmark-score-card benchmark-score-card--functional">
     <span className="benchmark-score-kicker">Eventual task success</span>
@@ -392,7 +392,7 @@ selected cases × repetitions
 
 Therefore, `180/200` means 180 logical case repetitions achieved a strict pass.
 It does **not** mean 180 provider calls succeeded. One logical case may require
-multiple LLM calls, and `--attempts` may execute the task again.
+multiple LLM calls and `--attempts` may execute the task again.
 
 ### The four proof gates
 
@@ -408,7 +408,7 @@ A strict pass requires all four gates:
 :::info[Why exact output alone is insufficient]
 
 Suppose a routing-choice case asks for authoritative workspace data. The model
-calls `workspace_archive_agent.read_file`, and that decoy happens to return the
+calls `workspace_archive_agent.read_file` and that decoy happens to return the
 same digest and receipt as `workspace_agent.read_file`.
 
 - **Task result gate:** passes, because the final text matches.
@@ -425,7 +425,7 @@ answer-only benchmark.
 :::info[Worked recovery example]
 
 Suppose the model first delegates to an Agent that does not exist. The infer
-loop reports the error, the model retries with the correct Agent, and the task
+loop reports the error, the model retries with the correct Agent and the task
 finishes with the exact expected answer and action evidence.
 
 - `FUNCTIONAL`: **pass**
@@ -439,7 +439,7 @@ finishes with the exact expected answer and action evidence.
 
 ## Choose what you are measuring
 
-Attempts, repetitions, parse corrections, and provider retries answer different
+Attempts, repetitions, parse corrections and provider retries answer different
 questions:
 
 | Control or metric | What it changes | What it tells you |
@@ -471,7 +471,7 @@ improves `STRICT`.
 
 | Metric | Interpretation |
 | --- | --- |
-| `scored_wall_ms` | Elapsed wall time for scored tasks only; preflight, mesh startup, warm-up, and teardown are separate |
+| `scored_wall_ms` | Elapsed wall time for scored tasks only; preflight, mesh startup, warm-up and teardown are separate |
 | Attempt end-to-end | Complete task latency, including infer-loop and deterministic Agent/tool work |
 | LLM latency | Sum of completed logical model-call latency inside an attempt |
 | `non_llm_latency_ms` | End-to-end minus LLM latency, only when every started provider call completed |
@@ -480,8 +480,8 @@ improves `STRICT`.
 | Repeat speedup | Positive means the later adjacent repetition was faster; negative means it was slower |
 | Baseline `median-delta` | Current minus baseline in milliseconds; positive is slower and negative is faster |
 
-Runner-side wall, attempt, and logical-call durations use Python's monotonic
-`time.perf_counter` clock. Ollama's load, prompt-evaluation, generation, and
+Runner-side wall, attempt and logical-call durations use Python's monotonic
+`time.perf_counter` clock. Ollama's load, prompt-evaluation, generation and
 total durations come from Ollama. All exported timing fields are normalized to
 milliseconds.
 
@@ -503,7 +503,7 @@ python -m benchmarks.infer_loop \
 
 Identical case repetitions run next to each other. The repeat probe pairs only
 retry-free strict first attempts with the same number of model calls. It
-reports median end-to-end, model, first-call, and prompt-evaluation speedups
+reports median end-to-end, model, first-call and prompt-evaluation speedups
 when the required data exists.
 
 The first-call comparison is the cleanest controlled prompt signal because
@@ -516,7 +516,7 @@ calls.
 Ollama exposes prompt-evaluation and load timing, but not an unambiguous cache
 hit flag. A faster repeated prompt is useful evidence, not proof that a
 particular request hit a cache. Small suites are noisy: use `core` or `full`,
-repeat controlled runs, and compare on the same machine under similar load.
+repeat controlled runs and compare on the same machine under similar load.
 
 The default unscored Ollama warm-up is one direct-final task. Its outcome and
 timing are recorded. `--warmup 0` is only a cold-ish measurement because the
@@ -528,7 +528,7 @@ runner cannot unload an Ollama model or clear the server cache.
 
 Treat the comparison as a controlled experiment. Keep the machine, model
 build, provider URL, generation settings, suite, seed, filters, ordering,
-attempts, repetitions, action mode, timeout, and warm-up constant. Change only
+attempts, repetitions, action mode, timeout and warm-up constant. Change only
 the prompt or infer-loop behavior you intend to evaluate.
 
 ### 1. Record the baseline
@@ -558,14 +558,14 @@ python -m benchmarks.infer_loop \
   --baseline benchmark_results/infer-before/summary.json
 ```
 
-The report shows strict-score delta, fixed and regressed logical cases, and
+The report shows strict-score delta, fixed and regressed logical cases and
 paired timing deltas for retry-free strict first attempts that exist in both
 runs. Model and prompt-evaluation pairs also require the same infer-loop call
 count.
 
 A **performance-fingerprint warning** means a timing-relevant setting or
 warm-up outcome differs, so timing deltas are not directly comparable. Prompt
-hashes may differ—that is expected when the prompt is the variable under test.
+hashes may differ, that is expected when the prompt is the variable under test.
 Case identity may not differ: the suite hash and logical case keys must match.
 
 ### Test a prompt file without editing benchmark source
@@ -601,11 +601,11 @@ benchmark_results/<run-name>/
 
 | Open this file when you want to… | File |
 | --- | --- |
-| View headline strict/functional/first-try scores, category bars, contained latency charts, repetition/cache-sensitive metrics, optional baseline comparison, unresolved and rescued attempt diagnostics, and run configuration | `report.html` |
+| View headline strict/functional/first-try scores, category bars, contained latency charts, repetition/cache-sensitive metrics, optional baseline comparison, unresolved and rescued attempt diagnostics and run configuration | `report.html` |
 | Read the configuration, generated case definitions, hashes, score distributions, model decisions, repeat signal, or baseline comparison | `summary.json` |
 | Triage cases that never achieved a strict pass | `failures.csv` |
 | Analyze every executed fresh attempt, including later rescue attempts and normalized model-action decisions | `results.csv` |
-| Inspect per-call latency, physical attempts, tokens, and provider timing/cache fields | `llm_calls.csv` |
+| Inspect per-call latency, physical attempts, tokens and provider timing/cache fields | `llm_calls.csv` |
 | Audit the redacted runtime evidence used for validation | `traces.jsonl` |
 
 The default `benchmark_results/` directory is ignored by Git so local model
@@ -616,11 +616,11 @@ runs do not pollute commits.
 `summary.json` keeps case definitions separate from attempt outcomes:
 
 - `case_definitions` records each selected case once, including its prompt,
-  expected final output, expected action sequence, forbidden values, and action
+  expected final output, expected action sequence, forbidden values and action
   ordering rule.
 - `case_results` records every logical case repetition and all fresh attempts.
 - Each attempt includes `final_output`, `expected_actions`,
-  `observed_actions`, `trace_actions`, and `model_actions`.
+  `observed_actions`, `trace_actions` and `model_actions`.
 
 These fields answer different questions:
 
@@ -670,14 +670,14 @@ python -m benchmarks.infer_loop \
 ```
 
 `--shuffle` changes the selected order deterministically with `--seed`. Record
-the full command because seed, generated count, filters, and ordering define
+the full command because seed, generated count, filters and ordering define
 suite identity.
 
 For automation, `--fail-under 90` exits with status `2` when the strict
 percentage is below the threshold, after artifacts are written. Infrastructure
 failures exit `1`; interruption exits `130`.
 
-For every provider option, output field, schema detail, and advanced example,
+For every provider option, output field, schema detail and advanced example,
 see the repository's
 [detailed benchmark guide](https://github.com/nMaroulis/protolink/blob/main/benchmarks/infer_loop/README.md).
 
@@ -698,8 +698,8 @@ see the repository's
   currently enforced by the infer loop; the benchmark therefore uses its own
   exact deterministic oracle.
 - `RuntimeTransport` includes ProtoLink task serialization, registry,
-  delegation, tools, telemetry, and infer-loop work, but excludes HTTP,
-  WebSocket, gRPC, and real-network performance.
+  delegation, tools, telemetry and infer-loop work, but excludes HTTP,
+  WebSocket, gRPC and real-network performance.
 - Per-task timeouts are cooperative and best-effort. A blocking provider
   request or action already in progress may not stop exactly at the boundary.
 - Model execution can vary even at temperature zero. Repetitions and controlled

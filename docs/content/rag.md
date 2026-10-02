@@ -50,7 +50,7 @@ Python dependency.
 
 [`examples/rag_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/rag_agent.py)
 runs without an API key or network access. Its `MockLLM` chooses the generated
-knowledge tool, reads the real search result, and answers with a citation.
+knowledge tool, reads the real search result and answers with a citation.
 
 :::
 
@@ -120,13 +120,13 @@ For this object:
 knowledge = create_knowledge(
     "memory",
     name="company_policies",
-    description="HR, travel, expense, and security policies",
+    description="HR, travel, expense and security policies",
 )
 ```
 
 the generated tool is `search_company_policies(query, k=5, where=None)`. Its
 description explains when the source is useful. Its bounded result contains
-normalized passages, display sources, scores, and source-qualified labels such
+normalized passages, display sources, scores and source-qualified labels such
 as `[company_policies:1]`. Direct `SearchHit` and `RAGAnswer` values retain
 application metadata; the model-facing tool observation deliberately omits
 arbitrary metadata.
@@ -134,7 +134,7 @@ arbitrary metadata.
 The tool follows ProtoLink's normal inference path. Providers with native tool
 calling receive a native tool declaration; smaller and self-hosted models see
 the same capability through ProtoLink's JSON action fallback. Argument
-validation, policy, approval, cancellation, budgets, telemetry, and result
+validation, policy, approval, cancellation, budgets, telemetry and result
 injection work exactly as they do for another [Agent tool](tool.md).
 
 ## Choose Retrieval Behavior
@@ -143,8 +143,8 @@ The `retrieval` argument controls when pre-retrieval is mandatory:
 
 | Mode | Behavior | Good fit |
 | --- | --- | --- |
-| `"auto"` | The default. Knowledge tools are available, and the model decides whether and how often to call them. | General assistants that mix private knowledge with ordinary reasoning and other tools. |
-| `"always"` | ProtoLink searches the selected knowledge sources before the first model call and adds the passages to the request. Empty retrieval is allowed. | Support, documentation, and policy assistants where every answer should begin with retrieval. |
+| `"auto"` | The default. Knowledge tools are available and the model decides whether and how often to call them. | General assistants that mix private knowledge with ordinary reasoning and other tools. |
+| `"always"` | ProtoLink searches the selected knowledge sources before the first model call and adds the passages to the request. Empty retrieval is allowed. | Support, documentation and policy assistants where every answer should begin with retrieval. |
 | `"required"` | Works like `"always"`, but raises `KnowledgeNotFoundError` when no usable passage fits the filters and bounded model context. | Workflows that must not continue without model-visible supporting evidence. |
 
 ```python
@@ -202,7 +202,7 @@ result = await agent.handle_task(task)
 ```
 
 The `knowledge` selection accepts one name or a sequence of names. `k` is the
-maximum result count **per selected source**, and the same `where` filter is
+maximum result count **per selected source** and the same `where` filter is
 passed to each source. Names must exactly match attached knowledge. Task
 metadata may strengthen an Agent's mode (`"auto"` → `"always"` →
 `"required"`), but it cannot weaken the configured default.
@@ -210,12 +210,12 @@ metadata may strengthen an Agent's mode (`"auto"` → `"always"` →
 ## Create Managed Knowledge
 
 Managed knowledge gives ProtoLink responsibility for loading, splitting,
-embedding, storing, searching, and synchronizing a corpus.
+embedding, storing, searching and synchronizing a corpus.
 
 ### In-memory knowledge
 
 The dependency-free `"memory"` backend is suitable for examples, tests,
-notebooks, and small transient indexes:
+notebooks and small transient indexes:
 
 ```python
 from protolink import Document, create_knowledge
@@ -242,7 +242,7 @@ with `await knowledge.ready()` / `knowledge.sync.ready()`.
 ### Persistent SQLite knowledge
 
 The `"sqlite"` backend uses only Python's standard-library SQLite support. It
-stores text, metadata, and vectors durably, then performs exact ranking in
+stores text, metadata and vectors durably, then performs exact ranking in
 Python:
 
 ```python
@@ -288,16 +288,16 @@ The default `AutoLoader` accepts:
 
 | Source | Behavior |
 | --- | --- |
-| `Document` | Preserves its text, source, ID, media type, and metadata. |
+| `Document` | Preserves its text, source, ID, media type and metadata. |
 | `Path` or an existing path string | Loads one supported file or recursively traverses a directory. |
 | HTTP or HTTPS URL | Downloads text, HTML, or JSON with a bounded request timeout. |
 | `bytes` | Decodes UTF-8 with replacement for malformed bytes. |
 | Any other string | Treats the value as inline text. |
 
 Text-like file support includes Markdown, HTML, JSON, JSONL, CSV, TSV, RST,
-Python, TOML, YAML, configuration files, logs, and plain text. HTML is reduced
-to visible text, and JSON is formatted when it parses successfully. Directory
-loading ignores common VCS, cache, and `node_modules` directories.
+Python, TOML, YAML, configuration files, logs and plain text. HTML is reduced
+to visible text and JSON is formatted when it parses successfully. Directory
+loading ignores common VCS, cache and `node_modules` directories.
 
 Local PDFs use the optional `pypdf` package and preserve the one-based page
 number in metadata:
@@ -312,10 +312,10 @@ provide a custom `Loader`.
 
 :::caution[Validate application-provided sources]
 
-An HTTP source performs a network request, and a local path reads from the
+An HTTP source performs a network request and a local path reads from the
 filesystem. The default URL loader permits public HTTP(S) targets only,
 re-validates redirects, pins the resolved address, enforces a byte limit and
-timeout, and rejects private or loopback destinations. Still validate which
+timeout and rejects private or loopback destinations. Still validate which
 remote domains and local paths your application permits. Also note that a
 misspelled, non-existent path string is treated as inline text; use a `Path`
 when a missing path should be an error.
@@ -327,7 +327,7 @@ when a missing path should be an error.
 Managed backends use these defaults:
 
 - `RecursiveCharacterSplitter(chunk_size=1000, chunk_overlap=150)` prefers
-  paragraphs, lines, sentences, and words before hard character boundaries.
+  paragraphs, lines, sentences and words before hard character boundaries.
 - `HashEmbedder(dimensions=384)` creates deterministic lexical vectors from
   normalized word and adjacent-word features.
 - `mode="hybrid"` combines vector similarity and keyword relevance.
@@ -428,7 +428,7 @@ knowledge = create_knowledge("memory", reranker=MyReranker())
 
 ### Metadata filters
 
-The in-memory and SQLite stores support exact values, dotted metadata keys, and
+The in-memory and SQLite stores support exact values, dotted metadata keys and
 these operators:
 
 | Operator | Meaning |
@@ -458,7 +458,7 @@ Per-search filters can refine it but cannot override the configured keys.
 Managed `Knowledge` exposes explicit lifecycle operations:
 
 ```python
-# Load, split, embed, and index supported sources.
+# Load, split, embed and index supported sources.
 report = await knowledge.add(["docs/", "faq.md"])
 
 # Add one inline document.
@@ -493,7 +493,7 @@ report = await knowledge.refresh(
 available on `knowledge.sync`.
 
 `IndexReport` reports document and chunk counts, additions, deletions, skipped
-sources, and normalized source identifiers. Re-indexing a document with a
+sources and normalized source identifiers. Re-indexing a document with a
 non-empty `source` first removes the old chunks from that source. Stable
 document and chunk identifiers make repeated upserts deterministic.
 
@@ -506,7 +506,7 @@ from the call are deleted.
 :::
 
 Knowledge backed only by an existing retriever is **retrieval-only**.
-`add()`, `upsert()`, `delete()`, and synchronization methods raise
+`add()`, `upsert()`, `delete()` and synchronization methods raise
 `UnsupportedKnowledgeOperationError` because ProtoLink does not own that
 external index.
 
@@ -678,7 +678,7 @@ agent = Agent(
         Knowledge(
             policy_retriever,
             name="company_policies",
-            description="HR, expense, travel, and security policies",
+            description="HR, expense, travel and security policies",
         ),
     ],
 )
@@ -757,18 +757,18 @@ Knowledge search is a runtime action, not hidden prompt behavior:
 - Each deterministic source search consumes one tool-call budget step.
 - Cancellation is checked before retrieval.
 - Telemetry receives normal tool events plus `retrieval_start`,
-  `retrieval_result`, and `retrieval_error` inference events. Knowledge results
-  are represented by counts, scores, latency, and opaque source IDs rather than
+  `retrieval_result` and `retrieval_error` inference events. Knowledge results
+  are represented by counts, scores, latency and opaque source IDs rather than
   raw passages or source strings.
 
 Retrieved content is wrapped as untrusted reference data. The tool description,
-tool result, and deterministic prompt all tell the model not to follow
+tool result and deterministic prompt all tell the model not to follow
 instructions found inside passages. This reduces prompt-injection risk but does
 not replace access control or content review.
 
 Retrieved passages are ephemeral to the authorized model loop. Persistent
 conversation history keeps the original question and an omission receipt, not
-the raw evidence; task streams, task artifacts, and telemetry also omit the raw
+the raw evidence; task streams, task artifacts and telemetry also omit the raw
 knowledge observation. Application code can still request structured hits with
 `Knowledge.search()` or receive hits and citations in the `RAGAnswer` returned
 by `Agent.ask()`.
@@ -793,7 +793,7 @@ descriptors.
   eyebrow="Knowledge module"
   title="Retrieval-Augmented Generation"
   path="protolink.rag"
-  description="Provider-neutral ingestion, retrieval, vector storage, citations, existing-index adapters, and automatic Agent tool integration behind one Knowledge facade."
+  description="Provider-neutral ingestion, retrieval, vector storage, citations, existing-index adapters and automatic Agent tool integration behind one Knowledge facade."
   pills={[
     "Managed or retrieval-only",
     "Dependency-free local stack",
@@ -967,7 +967,7 @@ Unify one managed or retrieval-only knowledge source.
       Plain-language scope used in the generated tool description.
     </ApiField>
     <ApiField name="managed" type="bool">
-      Whether loader, splitter, embedder, and store components are all present.
+      Whether loader, splitter, embedder and store components are all present.
     </ApiField>
     <ApiField name="tool_name" type="str">
       Sanitized deterministic name in the form <code>search_&lt;name&gt;</code>.
@@ -993,7 +993,7 @@ Unify one managed or retrieval-only knowledge source.
       Index one inline text document.
     </ApiField>
     <ApiField name="upsert" type="async (Document | Sequence[Document]) -> IndexReport">
-      Chunk, embed, and replace normalized documents.
+      Chunk, embed and replace normalized documents.
     </ApiField>
     <ApiField name="delete" type="async (*, ids=None, document_ids=None, where=None, sources=None) -> int">
       Delete matching managed chunks.
@@ -1016,12 +1016,12 @@ Unify one managed or retrieval-only knowledge source.
 
 | Type | Purpose and principal fields |
 | --- | --- |
-| `Document` | Source text before chunking: `text`, `source`, `metadata`, stable `id`, and `media_type`. |
-| `Chunk` | Bounded passage: `text`, parent `document_id`, zero-based `index`, `source`, metadata, and stable `id`. |
-| `SearchHit` | Normalized retrieval result: `text`, optional `score`, `source`, metadata, IDs, and rank. |
-| `Citation` | Numbered reference with `label`, source, excerpt, score, IDs, and metadata. |
-| `RAGAnswer` | `text`, `citations`, `hits`, and original `query`; `str(answer)` returns the text. |
-| `IndexReport` | Counts for documents, chunks, additions, deletions, skips, and source identifiers. |
+| `Document` | Source text before chunking: `text`, `source`, `metadata`, stable `id` and `media_type`. |
+| `Chunk` | Bounded passage: `text`, parent `document_id`, zero-based `index`, `source`, metadata and stable `id`. |
+| `SearchHit` | Normalized retrieval result: `text`, optional `score`, `source`, metadata, IDs and rank. |
+| `Citation` | Numbered reference with `label`, source, excerpt, score, IDs and metadata. |
+| `RAGAnswer` | `text`, `citations`, `hits` and original `query`; `str(answer)` returns the text. |
+| `IndexReport` | Counts for documents, chunks, additions, deletions, skips and source identifiers. |
 
 Every value provides `to_dict()`. `Document`, `Chunk`, `SearchHit`, `Citation`,
 and `RAGAnswer` also provide `from_dict()`.
@@ -1035,7 +1035,7 @@ All RAG extension points are runtime-checkable structural protocols:
 | `Loader` | `async load(source, *, metadata=None) -> list[Document]` |
 | `Splitter` | `split(documents) -> list[Chunk]` |
 | `Embedder` | `async embed_documents(texts)` and `async embed_query(text)` |
-| `VectorStore` | `async upsert`, `delete`, `search`, and `list_sources` |
+| `VectorStore` | `async upsert`, `delete`, `search` and `list_sources` |
 | `AtomicVectorStore` | Optional `async replace(...)` extension for one-step source replacement |
 | `Retriever` | `async retrieve(query, *, k=5, where=None) -> list[SearchHit]` |
 | `Reranker` | `async rerank(query, hits, *, k) -> list[SearchHit]` |
@@ -1050,15 +1050,15 @@ delete-then-upsert fallback.
 
 | Component | Purpose |
 | --- | --- |
-| `AutoLoader` | Documents, paths, directories, URLs, bytes, inline text, and optional local PDFs. |
+| `AutoLoader` | Documents, paths, directories, URLs, bytes, inline text and optional local PDFs. |
 | `RecursiveCharacterSplitter` | Structure-preferring character chunks with configurable overlap. |
 | `HashEmbedder` | Dependency-free deterministic lexical embeddings. |
 | `CallableEmbedder` | Sync or async application embedding functions. |
 | `OpenAIEmbedder` | User-owned OpenAI-compatible embeddings client. |
-| `InMemoryVectorStore` | Process-local exact vector, keyword, and hybrid search. |
+| `InMemoryVectorStore` | Process-local exact vector, keyword and hybrid search. |
 | `SQLiteVectorStore` | Persistent namespaced exact search without a vector extension. |
 | `CallableRetriever` | Normalizes a sync or async search function. |
-| `VectorStoreRetriever` | Combines a `VectorStore`, embedder, ranking mode, filters, threshold, and MMR settings. |
+| `VectorStoreRetriever` | Combines a `VectorStore`, embedder, ranking mode, filters, threshold and MMR settings. |
 | `ChromaRetriever` | Existing Chroma collection adapter. |
 | `PineconeRetriever` | Existing Pinecone index adapter. |
 | `QdrantRetriever` | Existing Qdrant collection adapter. |
@@ -1076,7 +1076,7 @@ deterministic rather than model-selected.
 
 Call `knowledge.sync.ready()` and inspect its `IndexReport`, then call
 `knowledge.sync.search()` directly. Check metadata filters, score thresholds,
-source paths, and whether the query shares usable language with the default
+source paths and whether the query shares usable language with the default
 lexical embedder.
 
 ### An external index returns empty text

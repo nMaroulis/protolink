@@ -3,7 +3,7 @@
 The infer loop is the part of ProtoLink that turns a model response into one
 validated next action: a final answer, a local tool call, or a delegation to
 another agent. This benchmark is intended for comparing infer-loop and prompt
-changes with the same provider, model, and generation settings.
+changes with the same provider, model and generation settings.
 
 It runs the normal `AgentClient -> Agent -> LLM` path against a deterministic
 in-process mesh. The benchmark coordinator has local tools and can delegate
@@ -89,7 +89,7 @@ categories:
 
 - `direct_final`: finish without calling a tool or agent.
 - `local_tool`: select and execute a coordinator-owned tool.
-- `delegated_tool`: select an agent, tool, and exact typed arguments.
+- `delegated_tool`: select an agent, tool and exact typed arguments.
 - `delegated_infer`: send a constrained prompt to an inference specialist.
 - `multi_step`: consume one receipt in a later dependent action.
 - `grounding_trap`: ignore untrusted or stale values and use the authoritative
@@ -137,7 +137,7 @@ agent and later recovers may be functionally correct, but it does not receive a
 strict pass. Provider-level transient retries are reported as diagnostics and
 do not by themselves make an otherwise clean result non-strict.
 
-## Attempts, repetitions, and internal retries
+## Attempts, repetitions and internal retries
 
 These controls measure different things:
 
@@ -184,7 +184,7 @@ python -m benchmarks.infer_loop \
 
 `--limit N` keeps the first `N` cases after filtering. `--shuffle` shuffles the
 selection deterministically with `--seed`. Record the complete command because
-filters, ordering, generated count, and seed are part of suite identity.
+filters, ordering, generated count and seed are part of suite identity.
 
 To test alternative complementary coordinator instructions without editing the
 benchmark source:
@@ -198,7 +198,7 @@ python -m benchmarks.infer_loop \
 ## Results
 
 Each run creates a child directory under `benchmark_results/`. `--output-dir`
-changes that parent directory, and `--run-name` gives the child a stable name
+changes that parent directory and `--run-name` gives the child a stable name
 instead of the timestamped default.
 
 ```text
@@ -214,26 +214,26 @@ benchmark_results/<run-name>/
 - `report.html` is a self-contained visual report with headline scores,
   per-category correctness, reliability diagnostics, latency charts,
   repetition/cache-sensitive metrics, optional baseline comparison,
-  attempt-review details, and run configuration. Review cards include both
+  attempt-review details and run configuration. Review cards include both
   unresolved cases and first attempts rescued by a later fresh attempt. They
   show the original request, expected output/actions, every parsed model
-  decision, successful actions, actual final output, and runtime error for each
+  decision, successful actions, actual final output and runtime error for each
   attempt. Open it directly in a browser; it needs no server or external
   assets.
 - `summary.json` contains provider settings, suite identity and hash, prompt
   hashes, git metadata, generated case definitions, aggregate and per-category
-  scores, and every logical case result.
+  scores and every logical case result.
 - `results.csv` contains one row per executed fresh attempt.
 - `failures.csv` contains attempts belonging to logical cases that never
   achieved a strict pass.
 - `llm_calls.csv` contains one row per completed infer-loop model call, with
-  call latency, physical attempts, token counts, and provider timing/cache
+  call latency, physical attempts, token counts and provider timing/cache
   fields when the provider exposes them.
 - `traces.jsonl` contains redacted local runtime traces used for action and
   retry diagnostics.
 
 The terminal summary also reports parse recovery, hallucinated-action,
-crash/timeout, LLM-step, wall-clock, model-call, and repeat timing. Timing is
+crash/timeout, LLM-step, wall-clock, model-call and repeat timing. Timing is
 useful within a stable local environment but is not part of the correctness
 score.
 
@@ -245,13 +245,13 @@ nanoseconds and converted to milliseconds. All exported timing fields use
 milliseconds. The timing section separates:
 
 - `scored_wall_ms`: wall time for scored tasks only;
-- preflight, mesh startup, warm-up, and teardown wall time;
+- preflight, mesh startup, warm-up and teardown wall time;
 - end-to-end attempt latency;
 - summed model-call latency and non-model/runtime overhead;
 - first-attempt and strict-first-attempt median, mean, p95, minimum, maximum,
   and total latency;
 - timing by repetition and infer-loop step;
-- Ollama load, prompt-evaluation, generation, and total provider durations,
+- Ollama load, prompt-evaluation, generation and total provider durations,
   plus prompt and generation throughput, when those fields are returned;
 - explicit cached/cache-write input tokens for providers that expose them.
 
@@ -282,7 +282,7 @@ The default Ollama warm-up is `1`, which is appropriate for steady-state
 comparisons. Use `--warmup 0` for a cold-ish run, but note that the benchmark
 cannot force the provider to unload a model or clear its cache. Compare runs
 on the same machine under similar load with the same model build, provider
-settings, suite order, warm-up, and repetitions. Prefer the paired median and
+settings, suite order, warm-up and repetitions. Prefer the paired median and
 p95 over one isolated call.
 
 ## Comparing a prompt change with a baseline
@@ -316,14 +316,14 @@ python -m benchmarks.infer_loop \
 ```
 
 The comparison reports the strict-score delta, paired end-to-end/model/prompt
-evaluation timing deltas, and the logical cases that were fixed, regressed,
+evaluation timing deltas and the logical cases that were fixed, regressed,
 stable passes, or stable failures. Timing comparisons use retry-free strict
 first attempts that exist in both runs; model and prompt-evaluation pairs also
 require the same infer-loop call count. Baseline comparison
 requires the same suite hash and logical case keys, so use the same suite,
-seed, count, filters, shuffle setting, and repetitions. The benchmark only
+seed, count, filters, shuffle setting and repetitions. The benchmark only
 enforces case identity; keep provider, model, action mode, model parameters,
-attempts, warm-up, and system instructions controlled when attributing a delta
+attempts, warm-up and system instructions controlled when attributing a delta
 to one change. A performance-fingerprint warning is included when recorded
 provider, warm-up outcome, verbosity, or runner settings differ; prompt hashes
 may intentionally differ.
@@ -342,14 +342,14 @@ python -m benchmarks.infer_loop \
 ```
 
 The command exits with status `2` when the strict score is below the threshold,
-`1` for benchmark infrastructure failure, and `130` when interrupted. Choose a
+`1` for benchmark infrastructure failure and `130` when interrupted. Choose a
 threshold from a stable baseline on the same model and runner; do not assume
 that scores transfer between machines or model builds.
 
 ## Limitations
 
 - Hallucination checks are closed-world. The benchmark detects invented or
-  unexpected actions, incorrect routing, fabricated receipts, and failures to
+  unexpected actions, incorrect routing, fabricated receipts and failures to
   use authoritative synthetic observations. It does not judge the truth or
   quality of arbitrary open-domain prose.
 - Routing choices are synthetic and deliberately unambiguous. They verify
@@ -360,18 +360,18 @@ that scores transfer between machines or model builds.
   is not enforced by the infer loop. The benchmark therefore validates every
   final answer with its own deterministic oracle.
 - The mesh uses `RuntimeTransport`. It exercises ProtoLink task
-  serialization, registry discovery, agent delegation, tools, telemetry, and
+  serialization, registry discovery, agent delegation, tools, telemetry and
   the infer loop without binding ports, but it does not benchmark HTTP,
   WebSocket, gRPC, or real network behavior.
-- The per-task timeout is best-effort. Cancellation is cooperative, and a
+- The per-task timeout is best-effort. Cancellation is cooperative and a
   blocking provider request or an action already in progress may not stop at
   the timeout boundary. Benchmark tools are synthetic, but callers should not
   interpret this mechanism as a hard side-effect boundary.
 - Model execution can remain nondeterministic even with temperature zero.
   Repetitions and unchanged generation settings make regressions easier to
   interpret but do not provide a formal statistical guarantee.
-- Latency depends heavily on model loading, hardware, and host load. Compare it
+- Latency depends heavily on model loading, hardware and host load. Compare it
   only under controlled conditions and keep it separate from the strict score.
 - The full suite may require many model generations because delegated and
   multi-step cases use several infer-loop steps. Use `smoke` during iteration,
-  `core` for routine comparisons, and `full` for less frequent baselines.
+  `core` for routine comparisons and `full` for less frequent baselines.

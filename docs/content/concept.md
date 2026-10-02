@@ -4,15 +4,15 @@ After reading this page you should have a good understanding of the core concept
 
 ## Architecture Overview
 
-Protolink is an **A2A-first agent runtime** designed around explicit separation of concerns, pluggable transports, and low boilerplate for agent authors. At a high level, it models an agent as an autonomous actor that communicates through well-defined client/server interfaces.
+Protolink is an **A2A-first agent runtime** designed around explicit separation of concerns, pluggable transports and low boilerplate for agent authors. At a high level, it models an agent as an autonomous actor that communicates through well-defined client/server interfaces.
 
-[A2A](https://a2a-protocol.org/latest/specification/) supplies the core agent vocabulary: `AgentCard` for identity and capabilities; `Task` for work and lifecycle; `Message`, `Part`, and `Artifact` for communication and results; and discovery for finding peers. ProtoLink builds its pluggable execution runtime around those concepts without requiring a specific LLM, tool system, transport, storage backend, or deployment shape.
+[A2A](https://a2a-protocol.org/latest/specification/) supplies the core agent vocabulary: `AgentCard` for identity and capabilities; `Task` for work and lifecycle; `Message`, `Part` and `Artifact` for communication and results; and discovery for finding peers. ProtoLink builds its pluggable execution runtime around those concepts without requiring a specific LLM, tool system, transport, storage backend, or deployment shape.
 
 The core idea is simple:  
 
 > Agents express intent. Clients and servers handle communication. Transports handle protocols.  
 
-This separation keeps agent logic **clean, testable, and future-proof**.
+This separation keeps agent logic **clean, testable and future-proof**.
 
 ---
 
@@ -20,7 +20,7 @@ This separation keeps agent logic **clean, testable, and future-proof**.
 
 Protolink is built from the following **core components**:
 
-- **A2A-based models** - cards, tasks, messages, parts, artifacts, and lifecycle
+- **A2A-based models** - cards, tasks, messages, parts, artifacts and lifecycle
 - **Agent** - business logic and orchestration  
 - **Client** - outgoing communication  
 - **Server** - incoming communication  
@@ -35,7 +35,7 @@ Each layer has a **single responsibility** and a clear **dependency direction**.
 
 ProtoLink's API is designed to be **simple at the beginning without becoming restrictive later**. A user should be able to prototype an Agent without first learning transport internals, but production users should still be able to configure every network and runtime boundary explicitly.
 
-This creates two levels of control through one consistent rule. `Agent`, `AgentClient`, and `Registry` all accept either a registered transport name or a concrete `Transport` instance.
+This creates two levels of control through one consistent rule. `Agent`, `AgentClient` and `Registry` all accept either a registered transport name or a concrete `Transport` instance.
 
 ### Simple path: choose a transport
 
@@ -53,9 +53,9 @@ card = AgentCard(
 agent = Agent(card=card, transport="http")
 ```
 
-ProtoLink resolves the string through its transport factory, creates an `HTTPTransport` from `card.url`, applies bounded default limits, enables local metrics, and leaves retries disabled. The shortcut removes setup code; it does not select a reduced or separate runtime.
+ProtoLink resolves the string through its transport factory, creates an `HTTPTransport` from `card.url`, applies bounded default limits, enables local metrics and leaves retries disabled. The shortcut removes setup code; it does not select a reduced or separate runtime.
 
-This path is intended for prototypes, examples, tests, and deployments that accept the built-in operational defaults.
+This path is intended for prototypes, examples, tests and deployments that accept the built-in operational defaults.
 
 ### Advanced path: configure the boundary
 
@@ -111,16 +111,16 @@ client = AgentClient(HTTPTransport("https://agent.internal:8443", tls=client_tls
 registry = Registry(HTTPTransport("https://registry.internal:9000", tls=registry_tls))
 ```
 
-Each service boundary should receive its own transport instance. Sharing configuration values is safe, but sharing a live transport object between unrelated Agent, client, and Registry lifecycles would also share pools, metrics, idempotency caches, and shutdown ownership.
+Each service boundary should receive its own transport instance. Sharing configuration values is safe, but sharing a live transport object between unrelated Agent, client and Registry lifecycles would also share pools, metrics, idempotency caches and shutdown ownership.
 
 ### Why advanced settings live on Transport
 
-Putting every infrastructure option on `Agent` would make the common constructor grow whenever HTTP, WebSocket, gRPC, TLS, or resilience gained a feature. It would also blur ownership: TLS certificates, connection pools, message limits, retry timing, and keepalive behavior are properties of the communication boundary, not of Agent reasoning or task execution.
+Putting every infrastructure option on `Agent` would make the common constructor grow whenever HTTP, WebSocket, gRPC, TLS, or resilience gained a feature. It would also blur ownership: TLS certificates, connection pools, message limits, retry timing and keepalive behavior are properties of the communication boundary, not of Agent reasoning or task execution.
 
 Keeping these settings on Transport provides several concrete benefits:
 
-- **Clear ownership**: the object opening sockets also owns certificates, pools, limits, retries, and shutdown behavior.
-- **Independent boundaries**: an Agent transport and its Registry transport can use different trust roots, identities, capacities, and retry policies.
+- **Clear ownership**: the object opening sockets also owns certificates, pools, limits, retries and shutdown behavior.
+- **Independent boundaries**: an Agent transport and its Registry transport can use different trust roots, identities, capacities and retry policies.
 - **Stable facade APIs**: adding a gRPC channel option or HTTP backend option does not expand Agent, AgentClient, or Registry constructors.
 - **Protocol substitution**: application logic continues to depend on `Transport`, not on protocol-specific settings promoted into Agent.
 - **Reliable serialization**: `Agent.to_dict()` and YAML preserve advanced settings inside each serialized transport block.
@@ -133,7 +133,7 @@ Keeping these settings on Transport provides several concrete benefits:
 | Payload limits, retries, keepalive, connection pools | `TransportConfig` on a concrete `Transport` | Controls communication resources and failure behavior. |
 | Registry TLS and capacity policy | Registry transport / `RegistryClient` | The Registry is a separate service boundary with independent deployment requirements. |
 
-This is **progressive control**, not a beginner API and an unrelated expert API. Users can begin with a string, move to a configured object when requirements grow, and keep the surrounding Agent, client, and Registry code unchanged.
+This is **progressive control**, not a beginner API and an unrelated expert API. Users can begin with a string, move to a configured object when requirements grow and keep the surrounding Agent, client and Registry code unchanged.
 
 See [Agents](agent.md#simple-and-advanced-transports) for the constructor-level API and [Transport](transport.md#production-configuration) for every production setting.
 
@@ -155,7 +155,7 @@ The agent **does not perform networking** and **does not implement protocols**.
 ### Responsibilities
 
 - Define how tasks are handled (`handle_task`)  
-- Manage tools, skills, and optional LLMs  
+- Manage tools, skills and optional LLMs  
 - Coordinate startup and shutdown  
 - Orchestrate client/server components  
 - Register and discover peers via the registry  
@@ -380,7 +380,7 @@ A2A supplies the core agent model. The surrounding architecture also draws from:
 
 Most importantly:
 
-> **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory, and logging to Protolink.
+> **Care only about the logic.** Leave the communication, agent lifecycle, inference, tooling, authentication, memory and logging to Protolink.
 
 ---
 
@@ -740,8 +740,8 @@ The registry **never pushes behavior** to agents.
 ## A2A Core and the A2A 1.0 Boundary
 
 ProtoLink began as an A2A-based alternative to chain-centric frameworks. The
-agent, not a chain around an LLM, is the primary unit, and card, task, message,
-part, artifact, lifecycle, and discovery concepts are the common language
+agent, not a chain around an LLM, is the primary unit and card, task, message,
+part, artifact, lifecycle and discovery concepts are the common language
 across the runtime. These are ergonomic Python forms of A2A primitives; native
 ProtoLink transports are not presented as canonical A2A 1.0 wire bindings.
 
@@ -753,11 +753,11 @@ ProtoLink behavior:
 - `POST /` accepts the A2A 1.0 JSON-RPC operations implemented by the adapter.
 - `AgentClient` can discover a standard JSON-RPC 1.0 peer and translate
   `call_agent(..., protocol="a2a")` without replacing the native client path.
-- Serialization, version negotiation, standard errors, and TCK verification
+- Serialization, version negotiation, standard errors and TCK verification
   stay outside agent business logic.
 
 With `protocol="auto"`, native ProtoLink discovery is attempted first so two
-ProtoLink agents retain their richer task, flow, and control-plane semantics.
+ProtoLink agents retain their richer task, flow and control-plane semantics.
 Only an A2A-only peer uses wire translation. At that boundary, standard A2A user
 text remains a ProtoLink text part for custom handlers. The default Agent engine
 recognizes the inbound A2A metadata and treats that text as an inference request
@@ -767,7 +767,7 @@ framework-specific parts remain native semantics.
 This separation lets the Python runtime evolve without quietly changing a
 public protocol, while protocol work remains narrow enough to test against the
 official TCK. See [A2A compatibility](a2a.md) for the exact implemented scope,
-pinned commands, and current result.
+pinned commands and current result.
 
 ## Mental Model Summary
 
@@ -775,6 +775,6 @@ If you remember only one thing:
 
 > **Agents think. Clients talk. Servers listen. Transports move bytes. Registries coordinate.**
 
-Each layer is small, focused, and replaceable. The same progressive-control
+Each layer is small, focused and replaceable. The same progressive-control
 rule applies throughout: pass a compact alias for the normal path, or pass the
 concrete object when the boundary needs explicit configuration.

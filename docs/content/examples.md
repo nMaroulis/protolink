@@ -11,15 +11,15 @@ Start with the **Basic Example notebook** in `examples/notebooks/basic_example`.
 
 [`basic_example.ipynb`](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/basic_example.ipynb) is one detailed notebook built around short, direct ProtoLink calls. Run its cells in order to start the registry first, then WeatherAgent, then AlertAgent. Both are ordinary `Agent` instances with tools and an LLM; AlertAgent also enables conversation state. No `handle_task` override is needed.
 
-The default configuration uses HTTP, a small weather tool, and `MockLLM`. No API key, model server, or external weather service is required. Mock replies are configured text; the optional delegation example scripts a peer call but does not generate its final reply from the returned weather data.
+The default configuration uses HTTP, a small weather tool and `MockLLM`. No API key, model server, or external weather service is required. Mock replies are configured text; the optional delegation example scripts a peer call but does not generate its final reply from the returned weather data.
 
 ### What You'll Learn
 
-- **Core API:** start the services, then use `call_tool()`, `invoke()`, and `call_agent()`.
+- **Core API:** start the services, then use `call_tool()`, `invoke()` and `call_agent()`.
 - **Discovery and state:** use the agent's existing `client` to inspect peers and manage conversation state.
-- **Tools and knowledge:** add a calculator, attach a reusable `Tool`, replace a weather implementation, and attach knowledge.
-- **HTTP APIs:** open status and chat pages, send small JSON requests, and consult the endpoint tables for health, tasks, chat, and state controls.
-- **Replaceable components:** follow short configuration recipes for LLMs, storage, run stores, and HTTP, SSE JSON-RPC, WebSocket, runtime, or gRPC transports.
+- **Tools and knowledge:** add a calculator, attach a reusable `Tool`, replace a weather implementation and attach knowledge.
+- **HTTP APIs:** open status and chat pages, send small JSON requests and consult the endpoint tables for health, tasks, chat and state controls.
+- **Replaceable components:** follow short configuration recipes for LLMs, storage, run stores and HTTP, SSE JSON-RPC, WebSocket, runtime, or gRPC transports.
 - **Optional extensions:** explore declarative mock delegation and reference snippets for streaming and cancellation.
 - **Lifecycle:** stop the agents and registry before changing settings or rerunning the example.
 
@@ -34,16 +34,16 @@ python -m jupyter lab examples/notebooks/basic_example/basic_example.ipynb
 
 Select the environment where ProtoLink is installed as the notebook kernel and run from top to bottom. Jupyter supports the notebook's top-level `await`.
 
-The default registry listens on `localhost:9010`, WeatherAgent on `localhost:8010`, and AlertAgent on `localhost:8020`. Each has a `/status` page; the agents also expose `/chat`. The registry handles discovery, and tasks go directly to the discovered agent.
+The default registry listens on `localhost:9010`, WeatherAgent on `localhost:8010` and AlertAgent on `localhost:8020`. Each has a `/status` page; the agents also expose `/chat`. The registry handles discovery and tasks go directly to the discovered agent.
 
-**Run All also runs cleanup at the end.** Pause before the final cleanup cell to use the browser pages, then run cleanup when finished. To change the agents' transport, update `TRANSPORT` and their URLs together, rerun from the top after cleanup, and skip the two HTTP-only request cells. The registry can stay on HTTP. See the [example README](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/README.md) for the endpoint reference and rerun guidance.
+**Run All also runs cleanup at the end.** Pause before the final cleanup cell to use the browser pages, then run cleanup when finished. To change the agents' transport, update `TRANSPORT` and their URLs together, rerun from the top after cleanup and skip the two HTTP-only request cells. The registry can stay on HTTP. See the [example README](https://github.com/nMaroulis/protolink/blob/main/examples/notebooks/basic_example/README.md) for the endpoint reference and rerun guidance.
 
 ## Progressive control walkthrough
 
 [`progressive_control.py`](https://github.com/nMaroulis/protolink/blob/main/examples/progressive_control.py)
 shows bulk tools, task creation and output readers, controlled invocation, streaming/reporting,
 transport aliases and explicit configuration, managed peer calls, local flows, callable/tool
-steps, bounded acceptance, and typed responses in one offline script.
+steps, bounded acceptance and typed responses in one offline script.
 Run `python examples/progressive_control.py`; add `--mcp` to include the bundled MCP server
 with the optional `protolink[mcp]` extra. See the [guide](progressive-control.md).
 
@@ -57,7 +57,7 @@ The repository includes several **standalone example scripts** that demonstrate 
   builds a dependency-free in-memory knowledge base from two `Document` values
   and attaches it to an Agent in automatic retrieval mode. Its `MockLLM`
   selects the generated `search_handbook` tool, reads the actual retrieved
-  passage, and returns a citation-bearing answer through the normal inference
+  passage and returns a citation-bearing answer through the normal inference
   loop.
 
 ```bash
@@ -68,11 +68,11 @@ The example opens no port and needs no API key, model server, vector-database
 service, or network access. Read the
 [Retrieval-Augmented Generation guide](rag.md) for persistent SQLite
 knowledge, existing Chroma/Pinecone/Qdrant indexes, custom retrievers,
-deterministic `Agent.ask()`, filters, index lifecycle, and citation metadata.
+deterministic `Agent.ask()`, filters, index lifecycle and citation metadata.
 
 ### Built-in web search
 
-- [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) registers `web_search()` on a runtime Agent with an explicit `network.read` policy. It defaults to English Wikipedia's documented keyless search API and accepts `--engine`, `--freshness`, and `--max-results` options. DuckDuckGo remains an explicit best-effort HTML option; select Brave after exporting `BRAVE_SEARCH_API_KEY`.
+- [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) registers `web_search()` on a runtime Agent with an explicit `network.read` policy. It defaults to English Wikipedia's documented keyless search API and accepts `--engine`, `--freshness` and `--max-results` options. DuckDuckGo remains an explicit best-effort HTML option; select Brave after exporting `BRAVE_SEARCH_API_KEY`.
 
 ```bash
 python examples/builtin_web_search.py "What is the capital of Greece?"
@@ -87,57 +87,57 @@ Run it without a query to inspect the CLI without making a network request.
 
 ### A2A core and A2A 1.0 boundary
 
-- [`provider_free_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py) runs a deterministic three-agent mesh with no provider, API key, registry, or network port. It demonstrates the A2A-derived `AgentCard`, `Task`, and `Message` model through the in-process runtime transport.
+- [`provider_free_mesh.py`](https://github.com/nMaroulis/protolink/blob/main/examples/provider_free_mesh.py) runs a deterministic three-agent mesh with no provider, API key, registry, or network port. It demonstrates the A2A-derived `AgentCard`, `Task` and `Message` model through the in-process runtime transport.
 - [`a2a_tck_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/a2a_tck_agent.py) is the provider-free HTTP fixture for the official A2A 1.0 TCK. It explicitly uses `Agent(..., a2a=True)`; ordinary HTTP agents remain native-only by default. It is a compatibility test target, not a substitute for a published passing TCK result; follow the pinned instructions in [A2A Core and 1.0 Compatibility](a2a.md).
 
 ### Run regression diffing
 
-- [`run_regression_diff.py`](https://github.com/nMaroulis/protolink/blob/main/examples/run_regression_diff.py) creates provider-free baseline and candidate reports with different known runtime IDs, timestamps, sequence counters, and bounded latency, proves that schema-aware normalization plus an explicit tolerance remove that noise, and then detects a real final-output change with `diff_run_reports()` and `assert_run_matches()`. Real candidate runs must be executed and recorded separately.
+- [`run_regression_diff.py`](https://github.com/nMaroulis/protolink/blob/main/examples/run_regression_diff.py) creates provider-free baseline and candidate reports with different known runtime IDs, timestamps, sequence counters and bounded latency, proves that schema-aware normalization plus an explicit tolerance remove that noise and then detects a real final-output change with `diff_run_reports()` and `assert_run_matches()`. Real candidate runs must be executed and recorded separately.
 
 ### 🧩 Runtime-control examples
 
 These small, provider-free scripts demonstrate runtime controls for application integrators:
 
-- [Context budgets](https://github.com/nMaroulis/protolink/blob/main/examples/v063_context_budget.py) shows `ContextManifest`, `LLMModelProfile`, and enforced `RunBudget` behavior before a model call.
-- [History compaction](https://github.com/nMaroulis/protolink/blob/main/examples/v063_history_compaction.py) shows local `recent`, `tokens`, and isolated `summary` compaction plus remote `AgentClient.compact_history()` over the request-spec endpoint.
-- [State controls](https://github.com/nMaroulis/protolink/blob/main/examples/v063_state_control.py) shows client/server state `describe`, `compact`, and `reset` requests for one persistent conversation session.
-- [Run reports](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `start_run`, `RunReport`, `RunReplay`, golden-run assertions, and redaction.
-- [ProtoAgent policy mesh](https://github.com/nMaroulis/protolink/blob/main/examples/v063_protoagent_policy_mesh.py) sketches the ProtoAgent Explorer/Coder/Architect structure abstractly. The prompts are intentionally tiny; the example focuses on tool capabilities, `CapabilityPolicy`, diff-preview `action_builder`s, and approval-gated workspace writes.
+- [Context budgets](https://github.com/nMaroulis/protolink/blob/main/examples/v063_context_budget.py) shows `ContextManifest`, `LLMModelProfile` and enforced `RunBudget` behavior before a model call.
+- [History compaction](https://github.com/nMaroulis/protolink/blob/main/examples/v063_history_compaction.py) shows local `recent`, `tokens` and isolated `summary` compaction plus remote `AgentClient.compact_history()` over the request-spec endpoint.
+- [State controls](https://github.com/nMaroulis/protolink/blob/main/examples/v063_state_control.py) shows client/server state `describe`, `compact` and `reset` requests for one persistent conversation session.
+- [Run reports](https://github.com/nMaroulis/protolink/blob/main/examples/v063_run_reports.py) shows `start_run`, `RunReport`, `RunReplay`, golden-run assertions and redaction.
+- [ProtoAgent policy mesh](https://github.com/nMaroulis/protolink/blob/main/examples/v063_protoagent_policy_mesh.py) sketches the ProtoAgent Explorer/Coder/Architect structure abstractly. The prompts are intentionally tiny; the example focuses on tool capabilities, `CapabilityPolicy`, diff-preview `action_builder`s and approval-gated workspace writes.
 
 ### Production case study: [ProtoAgent](protoagent_case_study.md)
 
-ProtoAgent is a full local-first coding assistant built on ProtoLink. Read the case study to see how the runtime engine powers its Architect, Explorer, and Coder agent deck, approval-gated diffs, completion validation, Context Loom evidence, cancellation, history control, and run reports.
+ProtoAgent is a full local-first coding assistant built on ProtoLink. Read the case study to see how the runtime engine powers its Architect, Explorer and Coder agent deck, approval-gated diffs, completion validation, Context Loom evidence, cancellation, history control and run reports.
 
 ### Flagship experiment: [AI Courtroom](ai_courtroom_example.md)
 
 The AI Courtroom is a replayable multi-agent experiment built around a
 fictional autonomous-vehicle liability case. It compares one generalist, five
-independent specialists, a foreperson-star topology, and a direct
+independent specialists, a foreperson-star topology and a direct
 agent-selected mesh while keeping public evidence and observable decision
 contracts controlled. Read the example page to see how jurors author direct
 ProtoLink messages, how one communication topology produces a different
-deterministic verdict, and how every run automatically generates standalone
+deterministic verdict and how every run automatically generates standalone
 interactive HTML reports for replay and comparison.
 
 For a model-versus-model experiment, see the
 [`ai_courtroom_benchmark`](https://github.com/nMaroulis/protolink/tree/main/examples/ai_courtroom_benchmark)
 example. It runs two advocates on opposite sides of a portable JSON case,
-swaps their roles, keeps the judge and independent jury fixed, and generates a
-standalone replay report with opinion trajectories, citations, vote flips, and
+swaps their roles, keeps the judge and independent jury fixed and generates a
+standalone replay report with opinion trajectories, citations, vote flips and
 fairness checks.
 
 ### 🛠️ [`devtools_dashboard.py`](https://github.com/nMaroulis/protolink/blob/main/examples/devtools_dashboard.py)
-**Purpose**: Local devtools, run replay, registry snapshot, dashboard, and Studio
+**Purpose**: Local devtools, run replay, registry snapshot, dashboard and Studio
 
 - Uses `create_llm("mock")`, so it runs without provider credentials
 - Creates several agents and registers their cards in an in-process registry
 - Runs a small task loop and records each streamed run with `RunRecorder`
 - Saves durable task snapshots and `RunReport` records to `SQLiteRunStore`
 - Renders static dashboard HTML using `DevtoolsHtmlRenderer`, including the provider-free Studio starter blueprint and catalog
-- Prints follow-up commands for `protolink run list`, `protolink run replay`, and `protolink dashboard`
-- Supports `--serve-live` to start provider-free HTTP agents, an HTTP registry, and the dashboard so ping/chat and Studio Generate/Run/Stop actions are available
-- Static Studio supports visual editing plus JSON import/export; the served dashboard adds Python view/copy/download, runtime status, and local process controls
-- The dashboard also contains registry health, selected-agent detail, run replay, telemetry, and chat panels
+- Prints follow-up commands for `protolink run list`, `protolink run replay` and `protolink dashboard`
+- Supports `--serve-live` to start provider-free HTTP agents, an HTTP registry and the dashboard so ping/chat and Studio Generate/Run/Stop actions are available
+- Static Studio supports visual editing plus JSON import/export; the served dashboard adds Python view/copy/download, runtime status and local process controls
+- The dashboard also contains registry health, selected-agent detail, run replay, telemetry and chat panels
 
 ### 📝 [`basic_agent.py`](https://github.com/nMaroulis/protolink/blob/main/examples/basic_agent.py)
 **Purpose**: Minimal agent setup focused on core concepts
@@ -165,16 +165,16 @@ fairness checks.
 - Includes comprehensive error handling and cleanup
 
 ### 🔒 [`authentication.py`](https://github.com/nMaroulis/protolink/blob/main/examples/authentication.py)
-**Purpose**: Authentication, credentials propagation, and security verification
+**Purpose**: Authentication, credentials propagation and security verification
 
-- Demonstrates API key, Basic, and signed Bearer JWT authentication providers
+- Demonstrates API key, Basic and signed Bearer JWT authentication providers
 - Covers server-side route authentication (returning `401 Unauthorized` for failed requests)
 - Covers client-side lazy authentication (automatic signature/credential injection on outgoing requests)
 - Verifies both HTTP (Starlette and FastAPI backends) and WebSocket handshake verification
 - Demonstrates success and failure scenarios for both transports
 
 ### 🤖 [LLM notebooks](https://github.com/nMaroulis/protolink/tree/main/examples/notebooks/llm_test)
-**Purpose**: LLM backend integration, inference loops, and delegation
+**Purpose**: LLM backend integration, inference loops and delegation
 - Demonstrates direct API LLM usage
 - Shows `infer()` with local tool calling
 - Shows `agent_call` delegation between agents
@@ -233,22 +233,22 @@ fairness checks.
 
 - Demonstrates Graph flow for complex state machine topologies with cyclic loops
 - Shows conditional branching and multi-step review workflows
-- Examples include sequential processing, parallel execution, and dynamic routing
+- Examples include sequential processing, parallel execution and dynamic routing
 - Illustrates integration of multiple agents in structured flow patterns
 
 ## Built-in assistants and tools
 
 Run `python examples/generic_tools.py` to exercise filesystem reads/edits/recovery, storage CRUD,
-configured HTTP requests, document extraction, and database queries on one ordinary `Agent`.
-The example uses temporary files, in-memory storage, a mocked HTTP transport, CSV, and real SQLite.
+configured HTTP requests, document extraction and database queries on one ordinary `Agent`.
+The example uses temporary files, in-memory storage, a mocked HTTP transport, CSV and real SQLite.
 See [Built-in Tools](builtin-tools.md) for the APIs and optional document formats.
 
-Run `python examples/builtin_assistants.py` to verify shell, Git, user questions, calendar, and email
-through `Assistant` and `CodeAssistant`. The example uses a temporary repository, a mock model, and
+Run `python examples/builtin_assistants.py` to verify shell, Git, user questions, calendar and email
+through `Assistant` and `CodeAssistant`. The example uses a temporary repository, a mock model and
 in-memory service adapters, so it needs no accounts or API keys and sends no real messages.
 See [Built-in Agents](builtin-agents.md) for the preset APIs.
 
 Run `python examples/service_backends.py` to exercise every concrete backend: `GoogleCalendar`,
-`Gmail`, `OutlookCalendar`, `OutlookEmail`, and `IMAPEmail`. Install `protolink[integrations]` first.
+`Gmail`, `OutlookCalendar`, `OutlookEmail` and `IMAPEmail`. Install `protolink[integrations]` first.
 The example replaces HTTP/IMAP/SMTP transports with offline fixtures while using real `Assistant`
-tools, approvals, serialization, and MIME handling. See the [service backend reference](builtin-tools.md#calendar-and-email-backends).
+tools, approvals, serialization and MIME handling. See the [service backend reference](builtin-tools.md#calendar-and-email-backends).

@@ -786,10 +786,11 @@ class LLM(ABC):
             Whether an attached event callback should activate optional call metrics. The default preserves
             direct-caller behavior. Agent sets this to false when its callback exists only for internal action
             receipts, avoiding token-estimation overhead on unobserved runs.
+            Call metrics prefer provider token counts and estimate only missing fields.
         action_authorizer : Callable[[RunAction], Awaitable[ActionAuthorization]], optional
             Runtime callback invoked after a model action has been validated but before a tool or delegated agent
             operation executes. The callback may enrich the action, enforce capability policy, and obtain an
-            application-owned approval decision. Direct LLM usage may omit it;the ``Agent`` runtime supplies its
+            application-owned approval decision. Direct LLM usage may omit it; the ``Agent`` runtime supplies its
             configured authorizer.
         cancellation_token : CancellationToken, optional
             Live process-local token checked before model calls and action dispatch. The owning Agent also cancels this
@@ -1098,7 +1099,7 @@ class LLM(ABC):
                         provider=str(getattr(self, "provider", "")) or None,
                         model=self.model,
                         latency_ms=latency_ms,
-                        input_value=self.history.messages,
+                        input_value=self.history,
                         output_value=action_result.raw_response,
                         profile=self.metrics_profile,
                         provider_usage=response_metadata.get("usage"),

@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, field, is_dataclass
 from functools import lru_cache
 from typing import Any
 
+from protolink.llms.history import ConversationHistory
 from protolink.llms.serialization import json_history_default
 
 
@@ -177,6 +178,7 @@ def estimate_token_count(value: Any, *, model: str | None = None) -> int:
     If ``tiktoken`` is installed, Protolink uses it for a closer estimate. If
     not, a four-character heuristic is used. The fallback is intentionally not
     billing-grade, but it gives CLIs and local traces a useful signal.
+    Conversation histories are counted in their standard LLM message format.
     """
     text = _stringify_for_count(value)
     if not text:
@@ -308,12 +310,13 @@ def build_call_metrics(
     streaming: bool = False,
     native: bool = False,
 ) -> LLMCallMetrics:
-    """Build the canonical metrics payload for one LLM call."""
-    estimated = estimate_usage(input_value, output_value, model=model)
-    usage = _fill_missing_usage(normalize_provider_usage(provider_usage), estimated)
-    input_tokens = usage.input_tokens if usage.input_tokens is not None else estimated.input_tokens
-    if input_tokens is None:
-        input_tokens = 0
+    """Build call metrics, estimating only token counts the provider omits.
+
+    ``input_value`` may be a conversation history; its message dictionaries
+    are materialized only when input usage must be estimated.
+    """
+    usage = _fill_missing_usage(normalize_provider_usage(provider_usage), input_value, output_value, model=model)
+    input_tokens = usage.input_tokens if usage.input_tokens is not None else 0
     context = context_usage_from_tokens(input_tokens, profile, estimated=usage.estimated)
     return LLMCallMetrics(
         step=step,
@@ -328,10 +331,16 @@ def build_call_metrics(
     )
 
 
-def _fill_missing_usage(provider_usage: LLMUsage | None, estimated_usage: LLMUsage) -> LLMUsage:
-    """Fill partial provider usage with local estimates without discarding provenance."""
+def _fill_missing_usage(
+    provider_usage: LLMUsage | None,
+    input_value: Any,
+    output_value: Any,
+    *,
+    model: str | None = None,
+) -> LLMUsage:
+    """Estimate missing provider usage fields while retaining reported totals."""
     if provider_usage is None:
-        return estimated_usage
+        return estimate_usage(input_value, output_value, model=model)
 
     input_tokens = provider_usage.input_tokens
     output_tokens = provider_usage.output_tokens
@@ -339,11 +348,11 @@ def _fill_missing_usage(provider_usage: LLMUsage | None, estimated_usage: LLMUsa
     source = provider_usage.source
 
     if input_tokens is None:
-        input_tokens = estimated_usage.input_tokens
+        input_tokens = estimate_token_count(input_value, model=model)
         estimated = True
         source = "provider+estimate"
     if output_tokens is None:
-        output_tokens = estimated_usage.output_tokens
+        output_tokens = estimate_token_count(output_value, model=model) if output_value is not None else None
         estimated = True
         source = "provider+estimate"
 
@@ -351,7 +360,7 @@ def _fill_missing_usage(provider_usage: LLMUsage | None, estimated_usage: LLMUsa
     if total_tokens is None and input_tokens is not None and output_tokens is not None:
         total_tokens = input_tokens + output_tokens
     elif total_tokens is None:
-        total_tokens = estimated_usage.total_tokens
+        total_tokens = input_tokens
 
     return LLMUsage(
         input_tokens=input_tokens,
@@ -454,6 +463,8 @@ def _coerce_optional_bool(value: Any) -> bool | None:
 
 
 def _stringify_for_count(value: Any) -> str:
+    if isinstance(value, ConversationHistory):
+        value = value.messages
     if value is None:
         return ""
     if isinstance(value, str):

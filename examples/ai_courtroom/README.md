@@ -20,21 +20,6 @@ ProtoLink traces, a public transcript, and standalone interactive HTML reports.
 Everything and everyone in this example is fictional. It is a software
 experiment, not legal analysis, legal advice, or a validated safety assessment.
 
-<!--
-FIGURE SUGGESTION — README hero / social preview
-Placement: directly below the disclaimer above.
-Format: 1600×900 PNG, readable when cropped to a GitHub social card.
-Composition: a rain-dark autonomous-vehicle test scene on the left; on the
-right, five distinct juror silhouettes connected by bright directed message
-arcs; a slim replay timeline along the bottom. Keep the tribunal fictional and
-avoid photorealistic injury, real manufacturer logos, gavels, and robot faces.
-Palette: midnight navy, warm ivory, signal amber, restrained cyan.
-Headline in image: “Can AI agents talk themselves into a different verdict?”
-Small label: “An observable A2A experiment · powered by ProtoLink”.
-Alt text: “Five specialist AI jurors exchange messages while their verdict
-trajectories change in an autonomous-vehicle liability simulation.”
--->
-
 ## The case: The C-91 Incident
 
 At 21:47 on a rain-soaked evening, an autonomous Aster Vale robotaxi struck and

@@ -41,18 +41,18 @@ directly?**
 The complete example lives in
 [`examples/ai_courtroom`](https://github.com/nMaroulis/protolink/tree/main/examples/ai_courtroom).
 It includes the deterministic fixture, live-provider adapters, experiment
-runner, tests, comparison utility, public transcripts, traces, and standalone
+runner, tests, comparison utility, public transcripts, traces and standalone
 HTML reports.
 
 :::
 
 
 The AI Courtroom is a flagship ProtoLink showcase built as an experiment rather
-than a scripted roleplay. Lawyers, witnesses, a judge, and jurors are separate,
-addressable agents with their own model, role prompt, context, incentives, and
+than a scripted roleplay. Lawyers, witnesses, a judge and jurors are separate,
+addressable agents with their own model, role prompt, context, incentives and
 task history. Jurors do not merely answer a coordinator in sequence: under the
 communication conditions, they select another juror, author a message, cite
-evidence, and send a direct ProtoLink task.
+evidence and send a direct ProtoLink task.
 
 The example then records what happened:
 
@@ -78,12 +78,12 @@ The experiment begins with one controlled question:
 
 That question is more useful than simply asking whether several agents can
 produce an answer. A monolithic orchestrator can call five models, concatenate
-their responses, and summarize them. It is much harder to tell whether those
+their responses and summarize them. It is much harder to tell whether those
 agents influenced one another, which interaction mattered, or whether
 "multi-agent" meant little more than parallel prompting.
 
 The courtroom makes those differences visible because every agent has a clear
-role, every message has a sender and receiver, and every juror must publish an
+role, every message has a sender and receiver and every juror must publish an
 observable decision state.
 
 ## The C-91 Incident
@@ -115,9 +115,9 @@ Seven admitted exhibits describe an interacting-failures problem:
 | `E7` | What do the interaction tests show about calibration and road layout together? |
 
 There is no single clean cause. The victim's family argues that Aster Vale
-controlled the release, knew about warning signs, and deployed with inadequate
+controlled the release, knew about warning signs and deployed with inadequate
 safeguards. Aster Vale argues that an unforeseeable combination of road,
-mapping, network, and contractor failures caused the collision.
+mapping, network and contractor failures caused the collision.
 
 The charge is deliberately narrower than the causal story. A juror can believe
 the company made serious mistakes and still vote not guilty because one legal
@@ -145,7 +145,7 @@ Only the permitted peer communication changes:
 <figure className="doc-media-frame">
   <img
     src="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*4rsN-Sge8xDG8wfiKgK3rQ.png"
-    alt="Four communication conditions show one isolated generalist, five independent specialists, a foreperson star, and a decentralized direct-message mesh"
+    alt="Four communication conditions show one isolated generalist, five independent specialists, a foreperson star and a decentralized direct-message mesh"
   />
   <figcaption>
     Independent versus Star or Mesh is the clean communication comparison.
@@ -176,7 +176,7 @@ The juror's public application response names that choice `move`:
 ```
 
 The name is deliberate. `action` already belongs to ProtoLink's outer runtime
-protocol: `final`, `tool_call`, and `agent_call` describe what the runtime
+protocol: `final`, `tool_call` and `agent_call` describe what the runtime
 should do, while an `agent_call` also uses its own `action` field for `infer` or
 `tool_call`. Calling the courtroom-level choice a `move` keeps application
 meaning separate from runtime intent and helps smaller JSON models avoid
@@ -198,24 +198,24 @@ The five specialist jurors use recognizable professional perspectives:
 | Malik Thompson | Civil-rights lawyer attentive to burden of proof and institutional power |
 | Dr. Anika Rao | Human-factors psychologist watching for automation and hindsight bias |
 | Ruben Park | Site-reliability engineer focused on deployment controls and incident ownership |
-| Sofia Bell | Investigative journalist and foreperson connecting documents, incentives, and timelines |
+| Sofia Bell | Investigative journalist and foreperson connecting documents, incentives and timelines |
 
 Their prompts do not say "begin 61/100 convinced" or expose mechanical
 strategies such as `reinforce_ally`. They describe a role, professional habits,
-personality, knowledge boundary, and decision rule in natural language. The
+personality, knowledge boundary and decision rule in natural language. The
 agent authors its initial public position.
 
 The deterministic provider uses private fixture coefficients so the offline
 golden path is reproducible, but those coefficients never appear in the
 human-facing prompts. With a live provider, the model receives the character,
-case, admitted record, and output contract—not a prewritten opinion.
+case, admitted record and output contract, not a prewritten opinion.
 
 ## Explicit Agents and Direct Calls
 
 The example keeps every participant visible in
 [`run.py`](https://github.com/nMaroulis/protolink/blob/main/examples/ai_courtroom/run.py).
 There is intentionally no large factory hiding the composition. An agent is a
-normal ProtoLink `Agent` with a card, transport, model, and prompt:
+normal ProtoLink `Agent` with a card, transport, model and prompt:
 
 ```python
 software_engineer_agent = Agent(
@@ -244,14 +244,14 @@ task = Task.create_infer(prompt=prompt)
 result = await sender.call_agent(receiver.card.url, task)
 ```
 
-The full example adds run/session/trace metadata, application validation, and
+The full example adds run/session/trace metadata, application validation and
 bounded repair feedback around those calls. It does not replace the exchange
 with a hidden workflow graph pretending to be a conversation.
 
 The world engine acts as a procedural referee. It schedules the hearing,
 enforces evidence identifiers and the selected topology, validates observable
-application responses, freezes ballots, and writes artifacts. Agents author
-the arguments, testimony, juror decisions, recipients, and peer messages.
+application responses, freezes ballots and writes artifacts. Agents author
+the arguments, testimony, juror decisions, recipients and peer messages.
 
 ```mermaid
 sequenceDiagram
@@ -278,13 +278,13 @@ sequenceDiagram
     Note over Engine,Ledger: Private chain-of-thought is neither requested nor stored
 ```
 
-ProtoLink carries addressed tasks, public application responses, and transport
+ProtoLink carries addressed tasks, public application responses and transport
 telemetry. The application stores observable public state; it neither requests
 nor stores private chain-of-thought.
 
 ## What the Deterministic Replay Shows
 
-The default `reference` provider is offline, deterministic, and intentionally
+The default `reference` provider is offline, deterministic and intentionally
 designed to make the communication treatment visible in one quick run:
 
 | Condition | Verdict | Ballots (guilty–not guilty) | Mean final guilt | A2A events | Deliberation flips |
@@ -297,7 +297,7 @@ designed to make the communication treatment visible in one quick run:
 <figure className="doc-media-frame">
   <img
     src="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*YF1mOZRkxMHRe55e2sEQHw.png"
-    alt="Four tribunal panels compare verdicts, ballots, mean final guilt probabilities, A2A event counts, and vote flips for Solo, Independent, Star, and Mesh"
+    alt="Four tribunal panels compare verdicts, ballots, mean final guilt probabilities, A2A event counts and vote flips for Solo, Independent, Star and Mesh"
   />
   <figcaption>
     These are deterministic fixture results, not evidence that one topology is
@@ -308,7 +308,7 @@ designed to make the communication treatment visible in one quick run:
 The independent and mesh juries receive the same public record. In the mesh
 run, Sofia challenges Anika with the interaction between the unvalidated C-91
 calibration in `E3` and the interaction tests in `E7`. Anika's public guilt
-register moves from `77.90` to `81.41`, and her separately authored categorical
+register moves from `77.90` to `81.41` and her separately authored categorical
 vote changes from not guilty to guilty.
 
 That exchange precedes the only deliberation vote flip in the fixture. The
@@ -317,7 +317,7 @@ Establishing causality would require matched message-removal or replacement
 ablations.
 
 The star condition also raises the mean guilt register but does not change the
-2–3 verdict. More communication, more confidence, and more consensus are not
+2–3 verdict. More communication, more confidence and more consensus are not
 the same thing. The point of the experiment is that **who can address whom
 changes which assumptions can be challenged**.
 
@@ -365,7 +365,7 @@ python examples/ai_courtroom/run.py \
 The report lets a developer:
 
 - play or step through every A2A exchange;
-- see the active sender, receiver, communication move, and public intent;
+- see the active sender, receiver, communication move and public intent;
 - read the authored message and receiver's public reply;
 - inspect evidence citations and ProtoLink task metadata;
 - watch synchronized before/after guilt registers and votes;
@@ -404,7 +404,7 @@ The terminal prints the generated report path when the run finishes.
 
 ### Run with Ollama
 
-Install the ProtoLink LLM extras, start Ollama, and name the exact local model
+Install the ProtoLink LLM extras, start Ollama and name the exact local model
 tag:
 
 ```bash
@@ -452,17 +452,17 @@ Each condition writes:
 
 | File | Purpose |
 | --- | --- |
-| `result.json` | Full public record, configuration, decision histories, messages, metrics, and verdict |
+| `result.json` | Full public record, configuration, decision histories, messages, metrics and verdict |
 | `summary.json` | Compact outcome and comparison data |
 | `transcript.md` | Escaped public hearing and deliberation transcript |
 | `report.html` | Standalone interactive replay and analysis |
-| `traces.jsonl` | ProtoLink task, inference, and A2A telemetry |
+| `traces.jsonl` | ProtoLink task, inference and A2A telemetry |
 
 An all-condition run also writes the comparison `index.html`.
 
 Saved metadata includes the resolved provider and model for every agent,
 evidence order, round count, retry limits, public-record hash, comparison
-control fingerprint, latency, estimated tokens, grounding, routing, and repair
+control fingerprint, latency, estimated tokens, grounding, routing and repair
 information.
 
 ## Why This Is an Important ProtoLink Example
@@ -472,13 +472,13 @@ monolithic orchestrator:
 
 | ProtoLink property | What the experiment makes visible |
 | --- | --- |
-| Operational identity | Every participant has an address, role, model, prompt, and task history |
+| Operational identity | Every participant has an address, role, model, prompt and task history |
 | Direct communication | Messages travel from one named agent to another through a ProtoLink task |
 | Configurable topology | The same agents can be isolated, hub-connected, or directly connected |
 | Agent-authored routing | Mesh jurors choose recipients and communication moves themselves |
-| Interaction as data | Messages, citations, responses, state changes, and traces become replayable artifacts |
+| Interaction as data | Messages, citations, responses, state changes and traces become replayable artifacts |
 | Independent models | Tribunal actors and jurors can use different providers behind one protocol |
-| Visible failure | Invalid targets, malformed outputs, repairs, and routing fallbacks are measured |
+| Visible failure | Invalid targets, malformed outputs, repairs and routing fallbacks are measured |
 | Preserved disagreement | The runtime does not force every view into one synthetic consensus |
 
 The result is not merely an AI courtroom. It is a small laboratory for studying
@@ -491,30 +491,30 @@ The included fixture makes several stronger studies possible:
 - **Provider comparison:** keep the tribunal record fixed and change only the
   juror provider.
 - **Defence persuasion:** add a dedicated defence-counsel agent, keep the jury
-  fixed, and compare how often different models move jurors toward not guilty.
+  fixed and compare how often different models move jurors toward not guilty.
 - **Message ablation:** remove or replace one peer message to test whether an
   observed after-message change survives.
-- **Topology replication:** repeat Independent, Star, and Mesh across seeds,
-  model versions, evidence orders, and multiple cases.
+- **Topology replication:** repeat Independent, Star and Mesh across seeds,
+  model versions, evidence orders and multiple cases.
 - **Influence concentration:** measure whether a model depends too heavily on a
   foreperson or repeatedly targets aligned jurors.
 - **Protocol reliability:** compare grounding, invalid citations, repair rate,
-  routing fallbacks, latency, tokens, and cost—not only verdicts.
+  routing fallbacks, latency, tokens and cost, not only verdicts.
 
 A persuasive model is not necessarily a truthful or correct model. In the
 default fixture, stronger defence advocacy can move the jury away from the
 hidden synthetic answer. Persuasion, grounding, calibration, protocol
-reliability, and correctness therefore belong on separate axes.
+reliability and correctness therefore belong on separate axes.
 
 ## Create a Different Scenario
 
 The C-91 Incident is one configuration of the communication scaffold. The
 least-work extension keeps the binary tribunal and current cast shape:
 
-1. Replace `CASE`, admitted evidence, and the synthetic evaluator fixture in
+1. Replace `CASE`, admitted evidence and the synthetic evaluator fixture in
    `courtroom/case_data.py`.
-2. Rewrite `ACTOR_PROFILES`, `ROLE_PROMPTS`, and `JUROR_PROFILES`.
-3. Update the explicit `AgentCard` names, descriptions, and tags in `run.py`.
+2. Rewrite `ACTOR_PROFILES`, `ROLE_PROMPTS` and `JUROR_PROFILES`.
+3. Update the explicit `AgentCard` names, descriptions and tags in `run.py`.
 4. Keep evidence IDs in the `E1`, `E2`, … convention, or update the associated
    prompt and validation contracts.
 5. Update `courtroom/reference_llm.py` and the tests when the new case also
@@ -522,17 +522,17 @@ least-work extension keeps the binary tribunal and current cast shape:
 
 The reusable structure remains: addressable agents, a controlled public
 record, explicit communication topology, observable state, frozen decisions,
-an event ledger, comparisons, traces, and replayable HTML.
+an event ledger, comparisons, traces and replayable HTML.
 
 The same pattern can support an incident review, scientific peer-review panel,
 product-risk council, policy committee, negotiation, or other multi-agent
 decision environment. A non-courtroom domain also needs new decision schemas,
-procedure, metrics, and report language; this is a reference architecture, not
+procedure, metrics and report language; this is a reference architecture, not
 a generic one-file scenario loader.
 
 ## Limitations
 
-- The case, prompts, fixture coefficients, and synthetic truth are authored.
+- The case, prompts, fixture coefficients and synthetic truth are authored.
 - Solo changes more than communication and is not a topology-only control.
 - One case and one seed cannot establish that a topology or provider is better.
 - A public reason may be incomplete, simplified, or post-hoc.
@@ -543,14 +543,14 @@ a generic one-file scenario loader.
   products, or legal cases.
 
 The next serious experiment should preregister cases, providers, topologies,
-replicates, and message ablations, then publish failures and reversals as well
+replicates and message ablations, then publish failures and reversals as well
 as successful outcomes.
 
 ## See Also
 
 - [Examples](examples.md) - All runnable examples and learning paths
-- [Agents](agent.md) - Agent identity, lifecycle, tools, and delegation
+- [Agents](agent.md) - Agent identity, lifecycle, tools and delegation
 - [A2A](a2a.md) - ProtoLink's A2A model and compatibility boundary
-- [LLMs](llm.md) - Providers, inference, parsing, and bounded correction
+- [LLMs](llm.md) - Providers, inference, parsing and bounded correction
 - [Telemetry](telemetry.md) - Task and inference observability
-- [Runtime](runtime.md) - Run context, events, reports, replay, and policies
+- [Runtime](runtime.md) - Run context, events, reports, replay and policies

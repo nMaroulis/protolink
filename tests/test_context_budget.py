@@ -20,6 +20,27 @@ class DummyTool:
     capabilities = ("data.read",)
 
 
+def test_context_manifest_counts_current_query_once(monkeypatch):
+    history = ConversationHistory("system instructions")
+    history.add_user("current question")
+    history.add_assistant("previous answer")
+    history.add_user("current question")
+    counted = []
+
+    def estimate(value, *, model):
+        counted.append(value)
+        return len(value)
+
+    monkeypatch.setattr("protolink.llms.context.estimate_token_count", estimate)
+    manifest = build_context_manifest(history=history, query="current question")
+
+    # The earlier identical question remains part of history; only the newest
+    # matching user message is represented by the separately counted query.
+    assert counted == ["system instructions", "current question", "previous answer", "current question"]
+    assert manifest.history_tokens == len("current question") + len("previous answer")
+    assert manifest.user_tokens == len("current question")
+
+
 def test_context_manifest_splits_prompt_sections_and_round_trips():
     history = ConversationHistory("System instructions with tool affordances")
     history.add_user("older question")

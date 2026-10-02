@@ -1,4 +1,4 @@
-"""Attempt execution, trace parsing, and validation for the infer-loop benchmark."""
+"""Attempt execution, trace parsing and validation for the infer-loop benchmark."""
 
 from __future__ import annotations
 

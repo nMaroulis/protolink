@@ -11,12 +11,12 @@ import ApiReference, {
 ## Bound peers
 
 `client.peer(target, registry=None, protocol="auto")` binds a URL, card, or unique registry name without I/O.
-It provides `invoke`, `invoke_typed`, `call_tool`, and `run_task`, with matching `.sync` methods.
+It provides `invoke`, `invoke_typed`, `call_tool` and `run_task`, with matching `.sync` methods.
 `agent.peer(target)` also reuses the agent's configured registry and communication path.
-See [peer calls](progressive-control.md#call-a-peer) for resolution, native/A2A behavior, and errors.
+See [peer calls](progressive-control.md#call-a-peer) for resolution, native/A2A behavior and errors.
 
 
-The **Client** layer in Protolink provides a high-level interface for agent-to-agent communication. It abstracts transport details and offers convenient methods for sending tasks, messages, and retrieving agent metadata.
+The **Client** layer in Protolink provides a high-level interface for agent-to-agent communication. It abstracts transport details and offers convenient methods for sending tasks, messages and retrieving agent metadata.
 
 ## AgentClient
 
@@ -24,7 +24,7 @@ The `AgentClient` is the primary entry point for programmatic agent interactions
 
 The distinction is useful because application code should think in Agent operations such as “send this task” or “cancel that task,” not in HTTP headers, WebSocket frames, or gRPC metadata. `AgentClient` chooses the operation contract and parses the result; the selected transport only maps that contract onto its wire protocol. Changing from HTTP to gRPC therefore does not require rewriting task-level client code.
 
-AgentClient follows the same progressive-control rule as Agent and Registry: a transport name creates a default client quickly, while a concrete transport carries TLS, limits, retries, keepalive, and protocol-specific behavior. The read-only `client.transport` property exposes the resolved transport for health and metric inspection.
+AgentClient follows the same progressive-control rule as Agent and Registry: a transport name creates a default client quickly, while a concrete transport carries TLS, limits, retries, keepalive and protocol-specific behavior. The read-only `client.transport` property exposes the resolved transport for health and metric inspection.
 
 By default, `AgentClient` uses ProtoLink's native request contract. `AgentClient(..., a2a=True)` requires HTTP and adds outbound A2A 1.0 discovery and translation. It does not remove the native methods: `protocol="auto"` prefers a native ProtoLink peer and selects A2A only for an A2A-only peer, while `"protolink"` and `"a2a"` are explicit choices. Advertised A2A interfaces must share the discovered card's origin unless the application explicitly sets `a2a_allow_cross_origin=True` for a trusted split-origin deployment.
 
@@ -45,7 +45,7 @@ print(client.transport.metrics)
   eyebrow="Client module"
   title="AgentClient"
   path="protolink.client.AgentClient"
-  description="The typed application-facing client for sending tasks, messages, streaming requests, control-plane operations, registry calls, and LLM history actions over any supported transport."
+  description="The typed application-facing client for sending tasks, messages, streaming requests, control-plane operations, registry calls and LLM history actions over any supported transport."
   pills={[
     "Transport-backed",
     "Async first",
@@ -61,17 +61,17 @@ print(client.transport.metrics)
     },
     {
       title: "Stream progress",
-      text: "Yield live task events for SSE, WebSocket, JSON-RPC, and runtime transports.",
+      text: "Yield live task events for SSE, WebSocket, JSON-RPC and runtime transports.",
       code: "send_task_streaming()",
     },
     {
       title: "Control runtime",
-      text: "Cancel active work, inspect state, mutate state, and compact history through explicit request specs.",
+      text: "Cancel active work, inspect state, mutate state and compact history through explicit request specs.",
       code: "cancel_task()",
     },
     {
       title: "Use scripts",
-      text: "Access a blocking facade for CLIs, notebooks, and simple orchestration scripts.",
+      text: "Access a blocking facade for CLIs, notebooks and simple orchestration scripts.",
       code: "client.sync",
     },
   ]}
@@ -81,8 +81,8 @@ print(client.transport.metrics)
 
 Protolink's client architecture exposes two APIs to accommodate different workflows:
 
-1. **Async API (Recommended)**: The core implementation. Ideal for modern applications, web servers (e.g., FastAPI), and high-performance multi-agent orchestration where non-blocking I/O is crucial.
-2. **Sync API (`client.sync`)**: A thin, blocking wrapper over the async methods. Designed for simple scripts, CLI tools, and environments where managing an `asyncio` event loop is cumbersome.
+1. **Async API (Recommended)**: The core implementation. Ideal for modern applications, web servers (e.g., FastAPI) and high-performance multi-agent orchestration where non-blocking I/O is crucial.
+2. **Sync API (`client.sync`)**: A thin, blocking wrapper over the async methods. Designed for simple scripts, CLI tools and environments where managing an `asyncio` event loop is cumbersome.
 
 :::warning[Async Loop Constraint]
 
@@ -121,10 +121,10 @@ print(result.get_last_part_content())
 Create a high-level Agent client around one concrete transport. Construction also creates the per-instance blocking facade and, when requested, an A2A JSON-RPC adapter and bounded protocol-selection cache.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="AgentClient constructor parameters">
-  <ApiField name="transport" type="Transport | TransportType" required>Configured transport instance or registered alias such as <code>"http"</code>, <code>"websocket"</code>, <code>"sse"</code>, <code>"json-rpc"</code>, <code>"sse-json-rpc"</code>, <code>"grpc"</code>, or <code>"runtime"</code>. Existing instances are used directly and retain ownership of TLS, retries, limits, keepalive, and metrics.</ApiField>
+  <ApiField name="transport" type="Transport | TransportType" required>Configured transport instance or registered alias such as <code>"http"</code>, <code>"websocket"</code>, <code>"sse"</code>, <code>"json-rpc"</code>, <code>"sse-json-rpc"</code>, <code>"grpc"</code>, or <code>"runtime"</code>. Existing instances are used directly and retain ownership of TLS, retries, limits, keepalive and metrics.</ApiField>
   <ApiField name="url" type="str | None" defaultValue="None">Base address supplied to the transport factory when <code>transport</code> is an alias. It is ignored for an existing transport object.</ApiField>
   <ApiField name="timeout" type="int" defaultValue="300">Factory timeout in seconds for an alias-created transport. It does not overwrite a configured transport instance.</ApiField>
-  <ApiField name="a2a" type="bool" defaultValue="False">Enable outbound A2A card discovery, interface validation, task translation, and cancellation mapping while retaining native ProtoLink calls.</ApiField>
+  <ApiField name="a2a" type="bool" defaultValue="False">Enable outbound A2A card discovery, interface validation, task translation and cancellation mapping while retaining native ProtoLink calls.</ApiField>
   <ApiField name="a2a_allow_cross_origin" type="bool" defaultValue="False">Trust a standard Agent Card whose selected JSON-RPC interface has another origin. Keep the default unless that split-origin deployment is explicitly trusted.</ApiField>
 </ApiFields></ApiSection>
 
@@ -175,7 +175,7 @@ client = AgentClient(transport=transport)
 
 ### Transport Inspection
 
-The read-only `transport` property exposes the concrete transport used by the client. This is the supported path for health, readiness, capability, and metric inspection:
+The read-only `transport` property exposes the concrete transport used by the client. This is the supported path for health, readiness, capability and metric inspection:
 
 ```python
 snapshot = client.transport.metrics
@@ -185,7 +185,7 @@ health = client.transport.health()
 print(health["status"], health["ready"])
 ```
 
-See the [Shared Transport API Reference](./transport.md#shared-transport-api-reference) for every configuration field, snapshot counter, exception type, and lifecycle probe.
+See the [Shared Transport API Reference](./transport.md#shared-transport-api-reference) for every configuration field, snapshot counter, exception type and lifecycle probe.
 
 ---
 
@@ -206,12 +206,12 @@ Submit a complete task through the native request spec or the optional A2A adapt
 <ApiSection title="Parameters"><ApiFields ariaLabel="send task parameters">
   <ApiField name="agent_url" type="str" required>Peer base URL or transport-specific URI.</ApiField>
   <ApiField name="task" type="Task" required>Caller-created Task. Native submission is explicitly idempotent; A2A SendMessage is non-idempotent because the peer assigns its task ID.</ApiField>
-  <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}><code>"protolink"</code> skips discovery, <code>"a2a"</code> requires enabled A2A and validates a standard card, and <code>"auto"</code> probes the native card before falling back to A2A only on 404 or 405.</ApiField>
+  <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}><code>"protolink"</code> skips discovery, <code>"a2a"</code> requires enabled A2A and validates a standard card and <code>"auto"</code> probes the native card before falling back to A2A only on 404 or 405.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="send task return value"><ApiField name="task" type="Task">Remote task state, messages, artifacts, and metadata normalized into ProtoLink's model.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="send task return value"><ApiField name="task" type="Task">Remote task state, messages, artifacts and metadata normalized into ProtoLink's model.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="send task errors"><ApiField name="ValueError">Invalid protocol value.</ApiField><ApiField name="RuntimeError">A2A was explicitly requested but disabled.</ApiField><ApiField name="transport or A2A error">Discovery, origin validation, authentication, timeout, network, translation, and remote failures propagate.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="send task errors"><ApiField name="ValueError">Invalid protocol value.</ApiField><ApiField name="RuntimeError">A2A was explicitly requested but disabled.</ApiField><ApiField name="transport or A2A error">Discovery, origin validation, authentication, timeout, network, translation and remote failures propagate.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -241,9 +241,9 @@ result = await client.send_infer_task(
 With A2A enabled, automatic selection performs discovery before task
 submission. It probes `/.well-known/agent.json` first and falls back to
 `/.well-known/agent-card.json` only after a `404` or `405`; authentication,
-network, timeout, and server failures are propagated rather than retried through
+network, timeout and server failures are propagated rather than retried through
 another protocol. The process-local selection cache holds at most 1,024 peers,
-expires entries after five minutes, and removes the oldest entries when full.
+expires entries after five minutes and removes the oldest entries when full.
 A2A `SendMessage` itself is non-idempotent and is not automatically retried
 because the remote server assigns the task ID.
 
@@ -256,7 +256,7 @@ native_only = await client.send_task(peer_url, task, protocol="protolink")
 ```
 
 Outbound A2A translation keeps the caller's local task ID and records the
-remote task ID, context, state, status timestamp, and agent URL in namespaced
+remote task ID, context, state, status timestamp and agent URL in namespaced
 metadata. A fresh task does not send its local ID as an A2A `taskId`; that field
 is used only when continuing work previously returned by the same remote peer.
 The process-local local-to-remote mapping holds at most 1,024 tasks for one hour
@@ -279,7 +279,7 @@ and returns the processed task.
     metadata: dict[str, Any] | None = None,
     protocol: Literal["auto", "protolink", "a2a"] = "auto",
 ) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/agent.py">
-Build a new <code>Task</code> through <code>Task.create_infer(prompt=query, ...)</code>, delegate it to <code>send_task()</code>, and return the complete remote task result.
+Build a new <code>Task</code> through <code>Task.create_infer(prompt=query, ...)</code>, delegate it to <code>send_task()</code> and return the complete remote task result.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="send infer task parameters">
   <ApiField name="query" type="str" required>Prompt placed in the task's inference part.</ApiField>
@@ -290,7 +290,7 @@ Build a new <code>Task</code> through <code>Task.create_infer(prompt=query, ...)
   <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}>Same native/A2A selection used by <code>send_task()</code>.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="send infer task return value"><ApiField name="task" type="Task">Processed task including remote state, messages, artifacts, and metadata.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="send infer task return value"><ApiField name="task" type="Task">Processed task including remote state, messages, artifacts and metadata.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -314,7 +314,7 @@ parts, continuation state, or caller-defined task metadata.
 
 ### `send_task_streaming()`
 
-Sends a task and yields streamed events as they arrive. This is the public client API for live task progress, LLM chunks, tool events, and final task completion.
+Sends a task and yields streamed events as they arrive. This is the public client API for live task progress, LLM chunks, tool events and final task completion.
 
 <ApiReference kind="async generator" path="protolink.client.AgentClient.send_task_streaming" signature={`send_task_streaming(
     agent_url: str,
@@ -332,7 +332,7 @@ Delegate a live task subscription to the configured transport. Unlike <code>send
 
 :::warning[Transport Support]
 
-Requires a transport that advertises streaming support and implements `subscribe()`. Supported choices include `"sse"`, `"json-rpc"`, `"grpc"`, `"websocket"`, and `"runtime"`. Plain `"http"` remains request/response only and raises `NotImplementedError`.
+Requires a transport that advertises streaming support and implements `subscribe()`. Supported choices include `"sse"`, `"json-rpc"`, `"grpc"`, `"websocket"` and `"runtime"`. Plain `"http"` remains request/response only and raises `NotImplementedError`.
 
 :::
 **Example with SSE JSON-RPC:**
@@ -353,7 +353,7 @@ async for event in client.send_task_streaming("http://localhost:8010", task):
 
 Applications that need a stable UI or replay contract can normalize these transport events with `RunEvent.from_task_event(...)` or record them through `InMemoryEventSink`. See [Runtime](runtime.md) for the versioned run-event envelope.
 
-SSE, WebSocket, and gRPC transports recursively convert nested Protolink models and dataclasses into JSON-compatible values. Tool and delegated-agent events therefore preserve structured results such as `ToolOutput` inside `content` or `metadata`; clients do not need a custom encoder for these framework event payloads.
+SSE, WebSocket and gRPC transports recursively convert nested Protolink models and dataclasses into JSON-compatible values. Tool and delegated-agent events therefore preserve structured results such as `ToolOutput` inside `content` or `metadata`; clients do not need a custom encoder for these framework event payloads.
 
 ---
 
@@ -409,11 +409,11 @@ assert canceled.state.value == "canceled"
 assert result.state.value == "canceled"
 ```
 
-For native tasks, `cancel_task()` uses `POST /tasks/cancel` over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport. For a task previously returned through this client's A2A adapter, `protocol="auto"` uses the stored local-to-remote ID mapping and sends canonical A2A `CancelTask`; `protocol="a2a"` selects that path explicitly. The optional `reason` and `metadata` are translated into A2A cancellation metadata and reconstructed by a ProtoLink A2A server.
+For native tasks, `cancel_task()` uses `POST /tasks/cancel` over HTTP, SSE JSON-RPC, WebSocket, gRPC and RuntimeTransport. For a task previously returned through this client's A2A adapter, `protocol="auto"` uses the stored local-to-remote ID mapping and sends canonical A2A `CancelTask`; `protocol="a2a"` selects that path explicitly. The optional `reason` and `metadata` are translated into A2A cancellation metadata and reconstructed by a ProtoLink A2A server.
 
 A blocking outbound A2A `SendMessage` does not reveal its server-assigned task ID until a response is returned, so it cannot be canceled through this client while that initial call is still blocked. An A2A task unknown to this client has no safe local-to-remote mapping and raises `A2AClientError`. In `"auto"`, the client confirms an A2A peer and raises instead of sending the local ID to the native cancellation route. Cancellation remains a control-plane request: WebSocket sends native cancellation over a separate connection so it does not queue behind the active task stream.
 
-Cancellation is intentionally best-effort. Async work normally stops at an `await` boundary; synchronous work and external systems may need their own cooperative cancellation or rollback mechanism. See [Runtime cancellation](runtime.md#canceling-running-tasks) for lifecycle, custom-handler, and side-effect guidance.
+Cancellation is intentionally best-effort. Async work normally stops at an `await` boundary; synchronous work and external systems may need their own cooperative cancellation or rollback mechanism. See [Runtime cancellation](runtime.md#canceling-running-tasks) for lifecycle, custom-handler and side-effect guidance.
 
 ---
 
@@ -441,7 +441,7 @@ Request explicit LLM-history reduction through the non-idempotent control channe
   <ApiField name="max_tokens" type="int" defaultValue="4000">Estimated token budget.</ApiField>
   <ApiField name="preserve_recent" type="int" defaultValue="6">Recent messages protected from summarization.</ApiField>
   <ApiField name="summary_max_tokens" type="int" defaultValue="512">Requested summary output budget.</ApiField>
-  <ApiField name="session_id" type="str | None" defaultValue="None">Persisted conversation session to load, compact, and save; omission targets the Agent LLM's current history.</ApiField>
+  <ApiField name="session_id" type="str | None" defaultValue="None">Persisted conversation session to load, compact and save; omission targets the Agent LLM's current history.</ApiField>
   <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Application context attached to the control request.</ApiField>
 </ApiFields></ApiSection>
 
@@ -449,7 +449,7 @@ Request explicit LLM-history reduction through the non-idempotent control channe
 
 </ApiReference>
 
-This uses the built-in `COMPACT_HISTORY_REQUEST` spec (`POST /llm/history/compact`). It does not send a `Task`, does not create a model-visible tool, and does not add anything to the LLM prompt.
+This uses the built-in `COMPACT_HISTORY_REQUEST` spec (`POST /llm/history/compact`). It does not send a `Task`, does not create a model-visible tool and does not add anything to the LLM prompt.
 
 ```python
 report = await client.compact_history(
@@ -461,7 +461,7 @@ report = await client.compact_history(
 )
 ```
 
-When the target agent has `state=["conversation"]` and `session_id` is supplied, the agent loads that session history, compacts it, and saves it back.
+When the target agent has `state=["conversation"]` and `session_id` is supplied, the agent loads that session history, compacts it and saves it back.
 
 ---
 
@@ -484,7 +484,7 @@ Inspect selected persistent stores through an idempotent control request.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="describe state parameters"><ApiField name="agent_url" type="str" required>Target Agent.</ApiField><ApiField name="session_id" type="str | None" defaultValue="None">Optional logical session.</ApiField><ApiField name="stores" type="tuple[str, ...] | list[str] | None" defaultValue="None">Requested store names; omission serializes an empty tuple for the server's default scope.</ApiField><ApiField name="include_data" type="bool" defaultValue="False">Include store data when supported, not only existence and counts.</ApiField><ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Request context.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="describe state return"><ApiField name="result" type="StateOperationResult">Per-store enabled, missing, count, data, and error reports.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="describe state return"><ApiField name="result" type="StateOperationResult">Per-store enabled, missing, count, data and error reports.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -524,7 +524,7 @@ Compact one required persisted conversation session and return its structured st
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="compact state parameters"><ApiField name="agent_url" type="str" required>Target Agent.</ApiField><ApiField name="session_id" type="str" required>Existing persisted session.</ApiField><ApiField name="strategy" type={'Literal["recent", "tokens", "summary"]'} defaultValue={'"tokens"'}>Reduction strategy.</ApiField><ApiField name="max_messages" type="int" defaultValue="20">Message limit.</ApiField><ApiField name="max_tokens" type="int" defaultValue="4000">Estimated token limit.</ApiField><ApiField name="preserve_recent" type="int" defaultValue="6">Protected recent messages.</ApiField><ApiField name="summary_max_tokens" type="int" defaultValue="512">Summary budget.</ApiField><ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Control-request metadata.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="compact state return"><ApiField name="result" type="StateOperationResult">Compaction, missing-session, disabled-store, and error reports.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="compact state return"><ApiField name="result" type="StateOperationResult">Compaction, missing-session, disabled-store and error reports.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -549,14 +549,14 @@ compacted = await client.compact_state(
 
 These methods return `StateOperationResult`. They use control-channel request
 specs: `DESCRIBE_STATE_REQUEST` (`POST /state/describe`),
-`RESET_STATE_REQUEST` (`POST /state/reset`), and `COMPACT_STATE_REQUEST`
+`RESET_STATE_REQUEST` (`POST /state/reset`) and `COMPACT_STATE_REQUEST`
 (`POST /state/compact`).
 
 ---
 
 ### `send_message()`
 
-Convenience wrapper that creates a Task from a Message, sends it, and returns the response message.
+Convenience wrapper that creates a Task from a Message, sends it and returns the response message.
 
 <ApiReference kind="async method" path="protolink.client.AgentClient.send_message" signature={`async send_message(
     agent_url: str,
@@ -603,7 +603,7 @@ Fetch ProtoLink's native well-known card through an idempotent GET request and p
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="get agent card parameters"><ApiField name="agent_url" type="str" required>Peer base address.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="get agent card return"><ApiField name="card" type="AgentCard">Validated identity, skills, interfaces, security, and capabilities.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="get agent card return"><ApiField name="card" type="AgentCard">Validated identity, skills, interfaces, security and capabilities.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -655,7 +655,7 @@ The synchronous API should **NOT** be used inside an active event loop (e.g., in
 :::
 
 The facade mirrors the asynchronous client method by method. Its arguments,
-return values, protocol selection, and control-plane behavior are identical;
+return values, protocol selection and control-plane behavior are identical;
 only the calling convention changes from `await` to a blocking call.
 
 ### SyncAgentClient.send_task
@@ -670,7 +670,7 @@ Block until a remote agent finishes processing a complete Task. This is the sync
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="synchronous send task parameters">
   <ApiField name="agent_url" type="str" required>Peer base URL or transport-specific URI that should receive the task.</ApiField>
-  <ApiField name="task" type="Task" required>Caller-created task containing the request messages, metadata, and any continuation state.</ApiField>
+  <ApiField name="task" type="Task" required>Caller-created task containing the request messages, metadata and any continuation state.</ApiField>
   <ApiField name="protocol" type={'Literal["auto", "protolink", "a2a"]'} defaultValue={'"auto"'}>Select native ProtoLink, require A2A, or automatically probe the native card before falling back to A2A on a 404 or 405 response.</ApiField>
 </ApiFields></ApiSection>
 
@@ -768,7 +768,7 @@ Synchronously request best-effort cancellation of active remote work. Native can
     session_id: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> HistoryCompactionResult`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/agent.py#L686-L710">
-Block while the target agent reduces its LLM conversation history through the control plane. Supplying a persisted session loads, compacts, and saves that session; omitting it targets the agent LLM's current in-memory history.
+Block while the target agent reduces its LLM conversation history through the control plane. Supplying a persisted session loads, compacts and saves that session; omitting it targets the agent LLM's current in-memory history.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="synchronous compact history parameters">
   <ApiField name="agent_url" type="str" required>Address of the target agent.</ApiField>
@@ -805,7 +805,7 @@ Inspect selected persistent stores without mutating them. The blocking wrapper p
   <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Additional context sent with the control request.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="synchronous describe state return value"><ApiField name="result" type="StateOperationResult">Per-store enabled, missing, count, data, and error information.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="synchronous describe state return value"><ApiField name="result" type="StateOperationResult">Per-store enabled, missing, count, data and error information.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -827,7 +827,7 @@ Synchronously request deletion or reset of selected persistent state. A session 
   <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Application context attached to the reset request.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="synchronous reset state return value"><ApiField name="result" type="StateOperationResult">Structured per-store reset, missing-store, and error report.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="synchronous reset state return value"><ApiField name="result" type="StateOperationResult">Structured per-store reset, missing-store and error report.</ApiField></ApiFields></ApiSection>
 
 <ApiCallout label="Destructive operation">The remote agent's policy and approval handler authorize the mutation. This client wrapper does not prompt for confirmation.</ApiCallout>
 
@@ -859,7 +859,7 @@ Compact one persisted conversation session and return its state report. This ope
   <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">Application context attached to the control request.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="synchronous compact state return value"><ApiField name="result" type="StateOperationResult">Compaction, missing-session, disabled-store, and error information.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="synchronous compact state return value"><ApiField name="result" type="StateOperationResult">Compaction, missing-session, disabled-store and error information.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -871,7 +871,7 @@ Compact one persisted conversation session and return its state report. This ope
     *,
     protocol: Literal["auto", "protolink", "a2a"] = "auto",
 ) -> Message`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/agent.py#L776-L793">
-Wrap one Message in a new Task, wait for remote processing, and return the newest agent or assistant response. Use <code>send_task()</code> when the caller must retain artifacts, task state, context, or metadata.
+Wrap one Message in a new Task, wait for remote processing and return the newest agent or assistant response. Use <code>send_task()</code> when the caller must retain artifacts, task state, context, or metadata.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="synchronous send message parameters">
   <ApiField name="agent_url" type="str" required>Peer address that should receive the message.</ApiField>
@@ -894,7 +894,7 @@ Fetch ProtoLink's native well-known card through the configured transport and pa
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="synchronous get agent card parameters"><ApiField name="agent_url" type="str" required>Base address of the peer whose native ProtoLink card should be retrieved.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="synchronous get agent card return value"><ApiField name="card" type="AgentCard">Validated identity, skills, interfaces, security, and capability metadata.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="synchronous get agent card return value"><ApiField name="card" type="AgentCard">Validated identity, skills, interfaces, security and capability metadata.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -946,7 +946,7 @@ Normal users rarely need to create request specs; the built-in Agent and Registr
 Declare one transport-neutral operation. The dataclass is frozen so clients and transports can safely share a specification as a class-level constant.
 
 <ApiSection title="Fields"><ApiFields ariaLabel="ClientRequestSpec fields">
-  <ApiField name="name" type="str" required>Stable operation name used in request contexts, metrics, and diagnostics.</ApiField>
+  <ApiField name="name" type="str" required>Stable operation name used in request contexts, metrics and diagnostics.</ApiField>
   <ApiField name="path" type="str" required>Protocol-neutral endpoint path carried directly by HTTP or inside multiplexed envelopes.</ApiField>
   <ApiField name="method" type="HttpMethod" required>Logical GET, POST, DELETE, PUT, or PATCH method used by routing and retry-method filtering.</ApiField>
   <ApiField name="response_parser" type="Callable[[Any], Any] | None" defaultValue="None">Conversion from decoded wire data to a domain model.</ApiField>
@@ -987,7 +987,7 @@ When you call a method like `send_task()`:
 
 1. The client selects the appropriate `ClientRequestSpec` (for example, `TASK_REQUEST`).
 2. It passes the specification and task data to `transport.send()`.
-3. The transport creates correlation and idempotency metadata, applies limits, and constructs the protocol-specific request.
+3. The transport creates correlation and idempotency metadata, applies limits and constructs the protocol-specific request.
 4. The decoded response passes through `response_parser`, so the caller receives a `Task`, `AgentCard`, or another domain model rather than a raw wire dictionary.
 
 If the spec is idempotent and the configured retry policy permits its method, the transport preserves one request ID and idempotency key across attempts. This pattern allows new endpoints without modifying transport implementations while keeping retry safety explicit at the operation boundary.

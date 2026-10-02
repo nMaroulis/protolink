@@ -62,7 +62,7 @@ class _OracleAgent(Agent):
         request_match = re.search(r"\bREQUEST_ID=([A-Z0-9-]+)", prompt)
         evidence_match = re.search(r"\bEVIDENCE=([A-Z0-9-]+)", prompt)
         if not reference_match or not request_match or not evidence_match:
-            return task.fail("Oracle infer prompt must include REFERENCE, REQUEST_ID, and EVIDENCE")
+            return task.fail("Oracle infer prompt must include REFERENCE, REQUEST_ID and EVIDENCE")
 
         reference = reference_match.group(1)
         if reference not in _ORACLE_VERDICTS:
@@ -131,7 +131,7 @@ class BenchmarkMesh:
                 name="oracle_agent",
                 description=(
                     "Deterministic reference analyst. Use agent_call action=infer with a prompt containing "
-                    "REFERENCE, REQUEST_ID, and EVIDENCE fields."
+                    "REFERENCE, REQUEST_ID and EVIDENCE fields."
                 ),
                 url=f"{prefix}/oracle",
                 capabilities=AgentCapabilities(delegation=False, has_llm=True),

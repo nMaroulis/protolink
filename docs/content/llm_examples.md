@@ -78,7 +78,7 @@ await test_streaming()
 
 ## Automated Pipeline (Agent Integration)
 
-The automated pipeline uses the `Agent` class to coordinate identity, communication, and reasoning. This is where Protolink shines, enabling automated tool execution and multi-step reasoning through the **inference loop**.
+The automated pipeline uses the `Agent` class to coordinate identity, communication and reasoning. This is where Protolink shines, enabling automated tool execution and multi-step reasoning through the **inference loop**.
 
 ### The Inference Loop
 
@@ -121,7 +121,7 @@ In this example we:
 
 4. **Add a tool to the Agent** - We register a `weather_info` tool. Protolink automatically injects this tool's schema into the LLM's system prompt.
 
-5. **Ask the same question again (with tools)** - Now the LLM sees it has a tool available. It produces a `tool_call` action, Protolink executes it, and the result is fed back to the LLM to formulate the final response.
+5. **Ask the same question again (with tools)** - Now the LLM sees it has a tool available. It produces a `tool_call` action, Protolink executes it and the result is fed back to the LLM to formulate the final response.
 
 ### 1. Setup the Agent
 
@@ -239,7 +239,7 @@ In this example we:
 
 4. **Verify agent discovery** - The Coordinator discovers the Weather Agent and sees its available tools.
 
-5. **Send a weather query to the Coordinator** - The LLM recognizes it needs weather data, produces an `agent_call` to delegate to the Weather Agent, receives the result, and formulates the final response.
+5. **Send a weather query to the Coordinator** - The LLM recognizes it needs weather data, produces an `agent_call` to delegate to the Weather Agent, receives the result and formulates the final response.
 
 The key difference from Example 1: The tool lives on a **different agent**, requiring cross-agent communication via the transport layer.
 
