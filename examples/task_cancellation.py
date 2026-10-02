@@ -1,7 +1,7 @@
 """Cancel a running Protolink task without committing its side effect.
 
 This provider-free example starts a task containing a long-running async tool,
-waits until the tool is active, and cancels it from another coroutine. It shows
+waits until the tool is active and cancels it from another coroutine. It shows
 the three observable cancellation results:
 
 1. The tool coroutine is interrupted at an ``await`` point.

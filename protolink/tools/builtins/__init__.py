@@ -2,7 +2,7 @@
 
 Each factory returns a fresh :class:`protolink.tools.Tool`, so built-ins use the
 same schema validation, AgentSkill advertising, capability policy, telemetry,
-cancellation, and serialization paths as application-defined native tools.
+cancellation and serialization paths as application-defined native tools.
 Google/Microsoft backends optionally require HTTPX; imports and registration perform no
 network or process execution. Configured backends/callbacks are not serialized.
 """

@@ -8,7 +8,7 @@ import ApiReference, {
 
 # Models
 
-ProtoLink's models are the transport-neutral vocabulary shared by agents, clients, servers, flows, storage, telemetry, registries, and LLM adapters. They describe who an agent is, how work moves through its lifecycle, what a message contains, and how those values cross process boundaries.
+ProtoLink's models are the transport-neutral vocabulary shared by agents, clients, servers, flows, storage, telemetry, registries and LLM adapters. They describe who an agent is, how work moves through its lifecycle, what a message contains and how those values cross process boundaries.
 
 These are ProtoLink's ergonomic runtime forms of A2A's core agent primitives. The [A2A 1.0 adapter](a2a.md) maps the advertised subset to canonical wire models when interoperability is required; the classes on this page remain the native Python contract used inside ProtoLink.
 
@@ -16,7 +16,7 @@ These are ProtoLink's ergonomic runtime forms of A2A's core agent primitives. Th
   eyebrow="Protocol model layer"
   title="Core Data Models"
   path="protolink.models"
-  description="The stable dataclass and protocol vocabulary shared by agents, clients, servers, transports, registries, LLM wrappers, and storage-aware runtime features."
+  description="The stable dataclass and protocol vocabulary shared by agents, clients, servers, transports, registries, LLM wrappers and storage-aware runtime features."
   pills={[
     "A2A-derived cards and tasks",
     "Task lifecycle state",
@@ -27,12 +27,12 @@ These are ProtoLink's ergonomic runtime forms of A2A's core agent primitives. Th
   cards={[
     {
       title: "Identity",
-      text: "Agent cards, capabilities, skills, roles, tags, security schemes, and advertised IO formats.",
+      text: "Agent cards, capabilities, skills, roles, tags, security schemes and advertised IO formats.",
       code: "AgentCard",
     },
     {
       title: "Work units",
-      text: "Task state, messages, parts, artifacts, errors, metadata, and helper constructors for inference.",
+      text: "Task state, messages, parts, artifacts, errors, metadata and helper constructors for inference.",
       code: "Task",
     },
     {
@@ -42,7 +42,7 @@ These are ProtoLink's ergonomic runtime forms of A2A's core agent primitives. Th
     },
     {
       title: "Context",
-      text: "LLM messages, conversation history, compaction requests, and compaction reports.",
+      text: "LLM messages, conversation history, compaction requests and compaction reports.",
       code: "ConversationHistory",
     },
   ]}
@@ -61,14 +61,14 @@ from protolink.models import EndpointSpec, RouteDecision
 
 The source files are partitioned by runtime responsibility:
 
-- `protolink.core.agent_card` owns identity, capabilities, skills, and additional interfaces.
-- `protolink.core.task`, `message`, `part`, and `artifact` own the task envelope and its nested content.
+- `protolink.core.agent_card` owns identity, capabilities, skills and additional interfaces.
+- `protolink.core.task`, `message`, `part` and `artifact` own the task envelope and its nested content.
 - `protolink.server.endpoint_handler` owns transport-neutral server endpoint declarations.
 - `protolink.llms.history` owns the provider-neutral LLM context representation.
-- `protolink.llms.compaction` owns the request and result values used by direct, agent, and client compaction APIs.
+- `protolink.llms.compaction` owns the request and result values used by direct, agent and client compaction APIs.
 - `protolink.models` is a convenience re-export layer. It intentionally gathers models from those focused modules rather than defining a second set of classes.
 
-`AgentCapabilities`, `LLMMessage`, and `ConversationHistory` are lower-level implementation-facing types and are imported from their defining modules. They are documented here because they are important when customizing discovery cards or LLM state:
+`AgentCapabilities`, `LLMMessage` and `ConversationHistory` are lower-level implementation-facing types and are imported from their defining modules. They are documented here because they are important when customizing discovery cards or LLM state:
 
 ```python
 from protolink.core.agent_card import AgentCapabilities
@@ -109,7 +109,7 @@ from protolink.llms.history import ConversationHistory, LLMMessage, LLMMessageRo
 
 ## Messages and content
 
-Messages are the ordered communication units inside a task. Each message contains one or more `Part` values so plain text, structured control requests, tool calls, routes, errors, and media can share the same envelope. Artifacts use the same part model for durable outputs.
+Messages are the ordered communication units inside a task. Each message contains one or more `Part` values so plain text, structured control requests, tool calls, routes, errors and media can share the same envelope. Artifacts use the same part model for durable outputs.
 
 ### Message
 
@@ -125,7 +125,7 @@ Messages are the ordered communication units inside a task. Each message contain
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/message.py#L11"
 >
 
-One unit of communication between a user, agent, assistant model, or system layer. The message envelope supplies identity, sender role, and creation time; ordered `Part` values carry the actual text, structured data, control request, or result.
+One unit of communication between a user, agent, assistant model, or system layer. The message envelope supplies identity, sender role and creation time; ordered `Part` values carry the actual text, structured data, control request, or result.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Message constructor parameters">
@@ -180,7 +180,7 @@ Append plain text by constructing `Part.text(text)`.
 </ApiSection>
 
 <ApiCallout label="Side effect">
-  Appends one new part to <code>parts</code>. The message identifier, role, and timestamp remain unchanged.
+  Appends one new part to <code>parts</code>. The message identifier, role and timestamp remain unchanged.
 </ApiCallout>
 
 </ApiReference>
@@ -196,7 +196,7 @@ Append plain text by constructing `Part.text(text)`.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/message.py#L31"
 >
 
-Append an existing part to the message. Use this for structured JSON, media, tool calls, inference requests, route decisions, and custom part types.
+Append an existing part to the message. Use this for structured JSON, media, tool calls, inference requests, route decisions and custom part types.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Message add_part parameters">
@@ -230,7 +230,7 @@ Serialize the message and each nested part into the native task wire shape.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Message to_dict return value">
     <ApiField name="data" type="dict[str, Any]">
-      Dictionary containing <code>id</code>, <code>role</code>, serialized <code>parts</code>, and <code>timestamp</code>.
+      Dictionary containing <code>id</code>, <code>role</code>, serialized <code>parts</code> and <code>timestamp</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -265,7 +265,7 @@ Create a message from native serialized data and hydrate every nested part.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Message from_dict return value">
     <ApiField name="message" type="Message">
-      A new message whose nested tool calls, tool outputs, and route decisions are normalized by <code>Part.from_dict()</code>.
+      A new message whose nested tool calls, tool outputs and route decisions are normalized by <code>Part.from_dict()</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -319,7 +319,7 @@ Create a user-role message containing one text part. This is the normal construc
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Message user return value">
     <ApiField name="message" type="Message">
-      New message with role <code>user</code>, a generated identifier and timestamp, and one text part.
+      New message with role <code>user</code>, a generated identifier and timestamp and one text part.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -561,7 +561,7 @@ Atomic content unit within a message or artifact. The `type` is the dispatch key
 </ApiSection>
 
 <ApiCallout label="Prefer factories for structured parts">
-  Use <code>tool_call()</code>, <code>tool_output()</code>, <code>route()</code>, and <code>decision()</code> to obtain typed content with generated IDs and normalized metadata. A direct <code>Part(type="tool_call", content=dict(...))</code> remains dictionary-backed until explicitly converted.
+  Use <code>tool_call()</code>, <code>tool_output()</code>, <code>route()</code> and <code>decision()</code> to obtain typed content with generated IDs and normalized metadata. A direct <code>Part(type="tool_call", content=dict(...))</code> remains dictionary-backed until explicitly converted.
 </ApiCallout>
 
 </ApiReference>
@@ -580,7 +580,7 @@ Serialize a part into its two-field native representation.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Part to_dict return value">
     <ApiField name="data" type="dict[str, Any]">
-      Dictionary containing <code>type</code> and <code>content</code>. Dataclass content, including tool calls, tool outputs, and route decisions, is recursively converted with <code>dataclasses.asdict()</code>; other content is returned unchanged.
+      Dictionary containing <code>type</code> and <code>content</code>. Dataclass content, including tool calls, tool outputs and route decisions, is recursively converted with <code>dataclasses.asdict()</code>; other content is returned unchanged.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -602,7 +602,7 @@ Serialize a part into its two-field native representation.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/part.py#L124"
 >
 
-Rehydrate a serialized part. Tool-call, tool-output, route, and decision dictionaries become their typed dataclass representations; all other content remains as supplied.
+Rehydrate a serialized part. Tool-call, tool-output, route and decision dictionaries become their typed dataclass representations; all other content remains as supplied.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Part from_dict parameters">
@@ -835,7 +835,7 @@ Create a structured error part suitable for task failure detection and client di
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Part error return value">
     <ApiField name="part" type="Part">
-      Error part whose content contains <code>code</code>, <code>message</code>, and <code>retryable</code>.
+      Error part whose content contains <code>code</code>, <code>message</code> and <code>retryable</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -979,7 +979,7 @@ Create a structured decision part with the same `RouteDecision` content as `rout
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/part.py#L229"
 >
 
-Create a standardized tool or capability invocation. The typed content keeps the tool name, arguments, and correlation identifier together through task serialization.
+Create a standardized tool or capability invocation. The typed content keeps the tool name, arguments and correlation identifier together through task serialization.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Part tool_call parameters">
@@ -1162,7 +1162,7 @@ route_part = Part.route("quality", reason="Ready for review")
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/part.py#L46"
 >
 
-Typed content carried by `route` and `decision` parts. Keeping the selected key separate from explanatory text lets `Router` branch deterministically while retaining rationale, confidence, and application context for observability.
+Typed content carried by `route` and `decision` parts. Keeping the selected key separate from explanatory text lets `Router` branch deterministically while retaining rationale, confidence and application context for observability.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="RouteDecision constructor parameters">
@@ -1206,7 +1206,7 @@ Typed content carried by `route` and `decision` parts. Keeping the selected key 
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/artifact.py#L10"
 >
 
-Structured output or preview produced during a run. Artifacts carry the same flexible parts as messages while adding durable descriptors for resources, diagnostics, previews, and action-related results.
+Structured output or preview produced during a run. Artifacts carry the same flexible parts as messages while adding durable descriptors for resources, diagnostics, previews and action-related results.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Artifact constructor parameters">
@@ -1380,7 +1380,7 @@ Create an artifact from serialized data while remaining compatible with payloads
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Artifact from_dict parameters">
     <ApiField name="data" type="dict[str, Any]" required>
-      Artifact mapping. Missing identifiers and timestamps are generated, missing or falsy <code>kind</code> becomes <code>result</code>, and missing metadata becomes a fresh empty dictionary.
+      Artifact mapping. Missing identifiers and timestamps are generated, missing or falsy <code>kind</code> becomes <code>result</code> and missing metadata becomes a fresh empty dictionary.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1388,7 +1388,7 @@ Create an artifact from serialized data while remaining compatible with payloads
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Artifact from_dict return value">
     <ApiField name="artifact" type="Artifact">
-      New artifact with hydrated parts. Non-<code>None</code> values for <code>name</code>, <code>uri</code>, <code>media_type</code>, and <code>action_id</code> are converted with <code>str()</code>.
+      New artifact with hydrated parts. Non-<code>None</code> values for <code>name</code>, <code>uri</code>, <code>media_type</code> and <code>action_id</code> are converted with <code>str()</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1428,7 +1428,7 @@ artifact.metadata["version"] = "1.0"
 
 ## Agent identity
 
-Discovery starts with an `AgentCard`. The card identifies one logical agent, describes the work it can perform, and advertises how peers can reach it. Capabilities are coarse feature flags; skills provide task-level schemas and examples; interfaces describe alternate endpoints for the same identity.
+Discovery starts with an `AgentCard`. The card identifies one logical agent, describes the work it can perform and advertises how peers can reach it. Capabilities are coarse feature flags; skills provide task-level schemas and examples; interfaces describe alternate endpoints for the same identity.
 
 ### AgentCard
 
@@ -1454,12 +1454,12 @@ Discovery starts with an `AgentCard`. The card identifies one logical agent, des
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L132"
 >
 
-Agent identity and capability declaration used by ProtoLink discovery, registration, delegation prompts, and server metadata. The primary `url` and `transport` describe the normal route; `interfaces` advertises additional routes to the same logical agent.
+Agent identity and capability declaration used by ProtoLink discovery, registration, delegation prompts and server metadata. The primary `url` and `transport` describe the normal route; `interfaces` advertises additional routes to the same logical agent.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="AgentCard constructor parameters">
     <ApiField name="name" type="str" required>
-      Stable human-readable identity used by registries, delegation prompts, logs, and agent lookup. <code>from_dict()</code> rejects an absent, empty, or otherwise falsy name, although direct dataclass construction does not repeat that validation.
+      Stable human-readable identity used by registries, delegation prompts, logs and agent lookup. <code>from_dict()</code> rejects an absent, empty, or otherwise falsy name, although direct dataclass construction does not repeat that validation.
     </ApiField>
     <ApiField name="description" type="str" required>
       Clear explanation of the agent's purpose and when another agent should delegate work to it. This text is included in <code>get_prompt_format()</code>, so operational descriptions are more useful than marketing copy.
@@ -1468,7 +1468,7 @@ Agent identity and capability declaration used by ProtoLink discovery, registrat
       Primary service endpoint. ProtoLink stores the value as supplied; URL syntax and reachability are validated later by the selected transport rather than by the dataclass.
     </ApiField>
     <ApiField name="transport" type="TransportType" defaultValue={'"http"'}>
-      Registered transport for the primary URL. Supported annotations include <code>http</code>, <code>websocket</code>, <code>sse</code>, <code>json-rpc</code>, <code>sse-json-rpc</code>, <code>grpc</code>, and <code>runtime</code>. Runtime construction does not independently validate the literal.
+      Registered transport for the primary URL. Supported annotations include <code>http</code>, <code>websocket</code>, <code>sse</code>, <code>json-rpc</code>, <code>sse-json-rpc</code>, <code>grpc</code> and <code>runtime</code>. Runtime construction does not independently validate the literal.
     </ApiField>
     <ApiField name="version" type="str" defaultValue={'"1.0.0"'}>
       Application-defined version of the agent implementation. It lets clients distinguish behavior changes independently from the protocol version.
@@ -1515,7 +1515,7 @@ Agent identity and capability declaration used by ProtoLink discovery, registrat
 </ApiSection>
 
 <ApiCallout label="Independent defaults">
-  Lists, dictionaries, capabilities, and interfaces use dataclass default factories. Instances do not share their mutable default containers even though the concise signature displays familiar empty values.
+  Lists, dictionaries, capabilities and interfaces use dataclass default factories. Instances do not share their mutable default containers even though the concise signature displays familiar empty values.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -1564,18 +1564,18 @@ card = AgentCard(
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L185"
 >
 
-Serialize the card into ProtoLink's native discovery-card dictionary. Nested capabilities and skills become dictionaries, field names that belong to the wire contract use camel case, and additional interfaces are omitted when the list is empty.
+Serialize the card into ProtoLink's native discovery-card dictionary. Nested capabilities and skills become dictionaries, field names that belong to the wire contract use camel case and additional interfaces are omitted when the list is empty.
 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="AgentCard to_dict return value">
     <ApiField name="data" type="dict[str, Any]">
-      A new outer dictionary containing <code>protocolVersion</code>, <code>inputFormats</code>, <code>outputFormats</code>, <code>securitySchemes</code>, and optionally <code>additionalInterfaces</code>. Capability and skill dataclasses are recursively converted with <code>dataclasses.asdict()</code>.
+      A new outer dictionary containing <code>protocolVersion</code>, <code>inputFormats</code>, <code>outputFormats</code>, <code>securitySchemes</code> and optionally <code>additionalInterfaces</code>. Capability and skill dataclasses are recursively converted with <code>dataclasses.asdict()</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
 
 <ApiCallout label="Native card behavior">
-  The current serializer does not include <code>role</code>. It also returns the original tags, format lists, and security mapping rather than deep-copying those containers. The A2A 1.0 adapter uses a separate canonical serializer.
+  The current serializer does not include <code>role</code>. It also returns the original tags, format lists and security mapping rather than deep-copying those containers. The A2A 1.0 adapter uses a separate canonical serializer.
 </ApiCallout>
 
 <ApiSection title="Examples">
@@ -1608,7 +1608,7 @@ Construct an `AgentCard` from the native discovery dictionary. This is the valid
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="AgentCard from_dict parameters">
     <ApiField name="data" type="dict[str, Any]" required>
-      Native card mapping. <code>name</code>, <code>description</code>, and <code>url</code> must be present and truthy. Capabilities and skills are read from nested mappings; wire-facing names such as <code>protocolVersion</code> and <code>securitySchemes</code> are converted to Python attribute names.
+      Native card mapping. <code>name</code>, <code>description</code> and <code>url</code> must be present and truthy. Capabilities and skills are read from nested mappings; wire-facing names such as <code>protocolVersion</code> and <code>securitySchemes</code> are converted to Python attribute names.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1616,7 +1616,7 @@ Construct an `AgentCard` from the native discovery dictionary. This is the valid
 <ApiSection title="Returns">
   <ApiFields ariaLabel="AgentCard from_dict return value">
     <ApiField name="card" type="AgentCard">
-      A new card with normalized <code>AgentCapabilities</code>, <code>AgentSkill</code>, and <code>AgentInterface</code> values.
+      A new card with normalized <code>AgentCapabilities</code>, <code>AgentSkill</code> and <code>AgentInterface</code> values.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1671,7 +1671,7 @@ card = AgentCard.from_dict(data)
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L260"
 >
 
-Generate deterministic JSON metadata for an LLM delegation prompt. The object contains the agent's name, description, capabilities, and a skill-sorted `tools` array with each skill's description, schemas, and examples. It deliberately omits the transport URL so model output cannot select an arbitrary destination directly.
+Generate deterministic JSON metadata for an LLM delegation prompt. The object contains the agent's name, description, capabilities and a skill-sorted `tools` array with each skill's description, schemas and examples. It deliberately omits the transport URL so model output cannot select an arbitrary destination directly.
 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="AgentCard get_prompt_format return value">
@@ -1682,7 +1682,7 @@ Generate deterministic JSON metadata for an LLM delegation prompt. The object co
 </ApiSection>
 
 <ApiCallout label="Prompt representation">
-  This JSON is an LLM context representation, not the native discovery-card wire schema. Treat descriptions, schemas, examples, and capability values as untrusted metadata; use <code>to_dict()</code> for card serialization.
+  This JSON is an LLM context representation, not the native discovery-card wire schema. Treat descriptions, schemas, examples and capability values as untrusted metadata; use <code>to_dict()</code> for card serialization.
 </ApiCallout>
 
 </ApiReference>
@@ -1837,7 +1837,7 @@ print(capabilities.enabled())
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L63"
 >
 
-Task-level capability advertised by an agent. A skill combines a stable identifier with enough schema and example information for humans, registries, and delegating models to understand how to call it.
+Task-level capability advertised by an agent. A skill combines a stable identifier with enough schema and example information for humans, registries and delegating models to understand how to call it.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="AgentSkill constructor parameters">
@@ -1845,7 +1845,7 @@ Task-level capability advertised by an agent. A skill combines a stable identifi
       Human-readable operation identifier such as <code>weather_forecast</code>. The dataclass does not enforce uniqueness; cards and registries are responsible for avoiding ambiguous identifiers.
     </ApiField>
     <ApiField name="description" type="str" defaultValue={'""'}>
-      Detailed explanation of what the skill does, when to use it, and any important boundaries. It is included in delegation prompt material.
+      Detailed explanation of what the skill does, when to use it and any important boundaries. It is included in delegation prompt material.
     </ApiField>
     <ApiField name="input_schema" type="dict[str, Any]" defaultValue="{}">
       JSON Schema describing the accepted input payload. ProtoLink stores the mapping but does not validate that it is a complete or valid JSON Schema at construction time.
@@ -1984,7 +1984,7 @@ Serialize the interface using the field names expected inside `AgentCard.additio
 <ApiSection title="Returns">
   <ApiFields ariaLabel="AgentInterface to_dict return value">
     <ApiField name="data" type="dict[str, Any]">
-      Dictionary containing <code>url</code>, <code>transport</code>, and camel-cased <code>protocolVersion</code>.
+      Dictionary containing <code>url</code>, <code>transport</code> and camel-cased <code>protocolVersion</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2022,7 +2022,7 @@ Serialize the interface using the field names expected inside `AgentCard.additio
 
 ## Tasks and lifecycle
 
-A `Task` is the durable unit of work exchanged between agents. Messages record the conversation and control inputs, artifacts record produced outputs, and `TaskState` enforces how the work moves from submission to a terminal result.
+A `Task` is the durable unit of work exchanged between agents. Messages record the conversation and control inputs, artifacts record produced outputs and `TaskState` enforces how the work moves from submission to a terminal result.
 
 ### Task
 
@@ -2041,7 +2041,7 @@ A `Task` is the durable unit of work exchanged between agents. Messages record t
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py#L63"
 >
 
-State container for one agentic work unit. The model combines lifecycle state, chronological communication, produced artifacts, extensible metadata, and flow-local state. It also caches the most recently added message or artifact for constant-time access.
+State container for one agentic work unit. The model combines lifecycle state, chronological communication, produced artifacts, extensible metadata and flow-local state. It also caches the most recently added message or artifact for constant-time access.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Task constructor parameters">
@@ -2055,7 +2055,7 @@ State container for one agentic work unit. The model combines lifecycle state, c
       Ordered communication and control messages associated with the task. The constructor stores the supplied list and builds the last-item cache from its final element.
     </ApiField>
     <ApiField name="artifacts" type="list[Artifact]" defaultValue="[]">
-      Ordered outputs, previews, diagnostics, and resources produced during the run.
+      Ordered outputs, previews, diagnostics and resources produced during the run.
     </ApiField>
     <ApiField name="metadata" type="dict[str, Any]" defaultValue="{}">
       Extensible task metadata. Lifecycle helpers add <code>state_history</code>, <code>error</code>, or <code>cancel_reason</code> entries here.
@@ -2072,7 +2072,7 @@ State container for one agentic work unit. The model combines lifecycle state, c
 <ApiSection title="Attributes">
   <ApiFields ariaLabel="Task attributes">
     <ApiField name="is_terminal" type="bool">
-      Read-only property that is true for <code>COMPLETED</code>, <code>CANCELED</code>, and <code>FAILED</code>.
+      Read-only property that is true for <code>COMPLETED</code>, <code>CANCELED</code> and <code>FAILED</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2108,7 +2108,7 @@ input-required -> failed
 input-required -> canceled
 ```
 
-`completed`, `failed`, and `canceled` are terminal states. Once a task reaches one of them, it cannot transition further. `UNKNOWN` is primarily a compatibility state; the current transition graph permits it to move to any enum value.
+`completed`, `failed` and `canceled` are terminal states. Once a task reaches one of them, it cannot transition further. `UNKNOWN` is primarily a compatibility state; the current transition graph permits it to move to any enum value.
 
 Every successful state change is recorded in `task.metadata["state_history"]` when that key is a list:
 
@@ -2134,7 +2134,7 @@ The default `Agent.execute_task()` lifecycle is:
 
 :::tip[Performance]
 
-`add_message()`, `add_artifact()`, `update_state()`, and cached last-item lookup are constant-time operations. Serialization remains proportional to the number of nested messages and artifacts.
+`add_message()`, `add_artifact()`, `update_state()` and cached last-item lookup are constant-time operations. Serialization remains proportional to the number of nested messages and artifacts.
 
 :::
 
@@ -2498,7 +2498,7 @@ Move the task model to `CANCELED` and optionally retain a reason. This updates l
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py"
 >
 
-Raise <code>TaskExecutionError</code> for a failed or canceled task; otherwise return the same task unchanged. This is a status check, not a wait or a requirement that the task be completed. Submitted, working, input-required, and unknown states also pass through unchanged.
+Raise <code>TaskExecutionError</code> for a failed or canceled task; otherwise return the same task unchanged. This is a status check, not a wait or a requirement that the task be completed. Submitted, working, input-required and unknown states also pass through unchanged.
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Task raise_for_status return value">
   <ApiField name="self" type="Task">The original task, allowing <code>agent.sync.run_task(task).raise_for_status()</code> when the caller wants both the full task and explicit failure checking.</ApiField>
@@ -2528,7 +2528,7 @@ Serialize a task and all nested messages and artifacts into the native transport
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Task to_dict return value">
     <ApiField name="data" type="dict[str, Any]">
-      New outer dictionary containing the string state value, serialized nested objects, metadata, flow state, identifier, and creation timestamp.
+      New outer dictionary containing the string state value, serialized nested objects, metadata, flow state, identifier and creation timestamp.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2550,7 +2550,7 @@ Serialize a task and all nested messages and artifacts into the native transport
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py#L235"
 >
 
-Rehydrate a task from native serialized data, including nested `Message`, `Part`, and `Artifact` instances. Construction also rebuilds the cached last item by comparing the final message and artifact timestamps.
+Rehydrate a task from native serialized data, including nested `Message`, `Part` and `Artifact` instances. Construction also rebuilds the cached last item by comparing the final message and artifact timestamps.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Task from_dict parameters">
@@ -2563,7 +2563,7 @@ Rehydrate a task from native serialized data, including nested `Message`, `Part`
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Task from_dict return value">
     <ApiField name="task" type="Task">
-      A new task with enum state, hydrated nested content, and a reconstructed last-item cache.
+      A new task with enum state, hydrated nested content and a reconstructed last-item cache.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2913,7 +2913,7 @@ Create a standalone `infer` part without constructing a message or task. This de
 >
 
 Return the last part of the latest cached message or artifact, or `None` when that
-item is empty or absent. Includes inputs, errors, and previews; no older item is
+item is empty or absent. Includes inputs, errors and previews; no older item is
 searched. Like `get_last_item()`, this is an O(1) lookup. Add items through
 `add_message()` and `add_artifact()` so the cache stays current.
 
@@ -2965,7 +2965,7 @@ value = task.raise_for_status().get_output(missing)
 if value is missing:
     print("No answer in the latest item", task.state)
 else:
-    print(value)  # Includes valid 0, False, empty collections, and None.
+    print(value)  # Includes valid 0, False, empty collections and None.
 ```
 
 </ApiReference>
@@ -2980,7 +2980,7 @@ else:
 >
 
 Read the content of the final part on the cached most recent message or artifact,
-including inputs, errors, and previews. Use `get_output()` for answer content with
+including inputs, errors and previews. Use `get_output()` for answer content with
 successful tool results unwrapped, or `get_last_part()` to retain the part type.
 
 <ApiSection title="Returns">
@@ -3020,7 +3020,7 @@ print(task.raise_for_status().get_output())  # "It's 22°C and sunny in New York
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/task.py"
 >
 
-A returned task failed or was canceled. Import it from <code>protolink</code> or <code>protolink.models</code>. The message identifies the task and state, and includes the stored error or cancellation reason when available. The <code>task</code> attribute retains the original object, including partial outputs and metadata; it is not a copy.
+A returned task failed or was canceled. Import it from <code>protolink</code> or <code>protolink.models</code>. The message identifies the task and state and includes the stored error or cancellation reason when available. The <code>task</code> attribute retains the original object, including partial outputs and metadata; it is not a copy.
 
 ```python
 from protolink import Task, TaskExecutionError
@@ -3070,7 +3070,7 @@ Enumeration of task lifecycle states. In-memory tasks hold enum members; `Task.t
 </ApiSection>
 
 <ApiCallout label="Terminal states">
-  <code>COMPLETED</code>, <code>CANCELED</code>, and <code>FAILED</code> intentionally have no outgoing transitions.
+  <code>COMPLETED</code>, <code>CANCELED</code> and <code>FAILED</code> intentionally have no outgoing transitions.
 </ApiCallout>
 
 </ApiReference>
@@ -3079,7 +3079,7 @@ Enumeration of task lifecycle states. In-memory tasks hold enum members; `Task.t
 
 ## Server endpoints
 
-ProtoLink servers declare behavior through transport-neutral endpoint specifications. HTTP, WebSocket, gRPC, runtime-memory, and backend adapters consume the same declaration and decide how to bind a path, parse input, invoke the handler, and serialize its result.
+ProtoLink servers declare behavior through transport-neutral endpoint specifications. HTTP, WebSocket, gRPC, runtime-memory and backend adapters consume the same declaration and decide how to bind a path, parse input, invoke the handler and serialize its result.
 
 ### EndpointSpec
 
@@ -3256,7 +3256,7 @@ Serialize every canonical message field for persistence, compaction, copying, or
 <ApiSection title="Returns">
   <ApiFields ariaLabel="LLMMessage to_dict return value">
     <ApiField name="data" type="dict[str, Any]">
-      Dictionary containing the string role, content, names, metadata, identifier, ISO timestamp, and tool-call payload.
+      Dictionary containing the string role, content, names, metadata, identifier, ISO timestamp and tool-call payload.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -3278,12 +3278,12 @@ Serialize every canonical message field for persistence, compaction, copying, or
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/history.py#L53"
 >
 
-Rehydrate a full serialized context message. This is the canonical path used by history copy, replacement, and persistence.
+Rehydrate a full serialized context message. This is the canonical path used by history copy, replacement and persistence.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="LLMMessage from_dict parameters">
     <ApiField name="data" type="dict[str, Any]" required>
-      Mapping with required <code>role</code> and <code>content</code>. Optional metadata, tracing, and tool fields receive constructor defaults.
+      Mapping with required <code>role</code> and <code>content</code>. Optional metadata, tracing and tool fields receive constructor defaults.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -3336,7 +3336,7 @@ Provider-agnostic conversation container backed by `collections.deque`. It provi
 <ApiSection title="Attributes and protocols">
   <ApiFields ariaLabel="ConversationHistory attributes">
     <ApiField name="messages" type="list[dict[str, Any]]">
-      Read-only property returning a newly built simplified list with role, content, and optional name. It deliberately omits metadata, IDs, timestamps, tool calls, and <code>tool_name</code>.
+      Read-only property returning a newly built simplified list with role, content and optional name. It deliberately omits metadata, IDs, timestamps, tool calls and <code>tool_name</code>.
     </ApiField>
     <ApiField name="len(history)" type="int">
       Number of canonical messages currently stored.
@@ -3485,7 +3485,7 @@ Append a message from a simplified provider-style mapping.
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="ConversationHistory add_raw parameters">
     <ApiField name="message" type="dict[str, Any]" required>
-      Mapping with required <code>role</code>, optional <code>content</code>, and optional <code>tool_calls</code>. Missing content becomes an empty string.
+      Mapping with required <code>role</code>, optional <code>content</code> and optional <code>tool_calls</code>. Missing content becomes an empty string.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -3502,7 +3502,7 @@ Append a message from a simplified provider-style mapping.
 </ApiSection>
 
 <ApiCallout label="Lossy ingestion">
-  This helper copies only role, content, and tool calls. Input keys such as name, metadata, ID, creation time, and tool name are ignored. Use <code>replace()</code> or <code>from_list()</code> with full message dictionaries when every canonical field must survive.
+  This helper copies only role, content and tool calls. Input keys such as name, metadata, ID, creation time and tool name are ignored. Use <code>replace()</code> or <code>from_list()</code> with full message dictionaries when every canonical field must survive.
 </ApiCallout>
 
 </ApiReference>
@@ -3556,7 +3556,7 @@ Set the leading system instruction while preserving later conversation turns. If
 </ApiSection>
 
 <ApiCallout label="Replacement identity">
-  Replacing an existing system message creates a new <code>LLMMessage</code>, so its ID, creation time, metadata, and provider-specific fields are reset.
+  Replacing an existing system message creates a new <code>LLMMessage</code>, so its ID, creation time, metadata and provider-specific fields are reset.
 </ApiCallout>
 
 </ApiReference>
@@ -3602,7 +3602,7 @@ Serialize the complete history for persistence, copying, or a lossless transform
 </ApiSection>
 
 <ApiCallout label="Full versus provider view">
-  Unlike the <code>messages</code> property, this method preserves metadata, tracing IDs, timestamps, tool calls, and tool names.
+  Unlike the <code>messages</code> property, this method preserves metadata, tracing IDs, timestamps, tool calls and tool names.
 </ApiCallout>
 
 </ApiReference>
@@ -3643,7 +3643,7 @@ Create an independent history by round-tripping every canonical message through 
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/history.py#L251"
 >
 
-Replace every canonical message while preserving the `ConversationHistory` object's identity. History compaction uses this behavior so LLMs, agents, and state modules can keep existing references to the same history container.
+Replace every canonical message while preserving the `ConversationHistory` object's identity. History compaction uses this behavior so LLMs, agents and state modules can keep existing references to the same history container.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="ConversationHistory replace parameters">
@@ -3736,7 +3736,7 @@ Trim older history while preserving the first stored message and the newest suff
 </ApiCallout>
 
 <ApiCallout label="Prefer structured compaction">
-  For explicit recent-message limits, token budgets, summaries, and before/after reports, use [`LLM.compact_history()`](llm.md#history-compaction).
+  For explicit recent-message limits, token budgets, summaries and before/after reports, use [`LLM.compact_history()`](llm.md#history-compaction).
 </ApiCallout>
 
 </ApiReference>
@@ -3785,7 +3785,7 @@ Transport-neutral control payload used by `Agent.compact_history()` and `AgentCl
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="HistoryCompactionRequest constructor parameters">
     <ApiField name="strategy" type={'"recent" | "tokens" | "summary"'} defaultValue={'"recent"'}>
-      Compaction algorithm. <code>recent</code> keeps a bounded newest suffix, <code>tokens</code> keeps a newest suffix under a soft estimated-token ceiling, and <code>summary</code> replaces older turns with one generated summary.
+      Compaction algorithm. <code>recent</code> keeps a bounded newest suffix, <code>tokens</code> keeps a newest suffix under a soft estimated-token ceiling and <code>summary</code> replaces older turns with one generated summary.
     </ApiField>
     <ApiField name="max_messages" type="int" defaultValue="20">
       Retained-message limit for the <code>recent</code> strategy, including a leading system message when one exists.
@@ -3800,7 +3800,7 @@ Transport-neutral control payload used by `Agent.compact_history()` and `AgentCl
       Requested approximate maximum length of a generated summary.
     </ApiField>
     <ApiField name="session_id" type="str | None" defaultValue="None">
-      Optional persistent conversation session to load, compact, and save when the agent uses conversation state.
+      Optional persistent conversation session to load, compact and save when the agent uses conversation state.
     </ApiField>
     <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">
       Application metadata for logs or future control policy. The compactor itself ignores it.
@@ -3859,7 +3859,7 @@ Normalize a JSON-compatible compaction request received through the control plan
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="HistoryCompactionRequest from_dict parameters">
     <ApiField name="data" type="dict[str, Any]" required>
-      Request mapping. Missing values receive dataclass defaults. Numeric fields are converted with <code>int()</code>, non-<code>None</code> session IDs with <code>str()</code>, and metadata with <code>dict()</code>.
+      Request mapping. Missing values receive dataclass defaults. Numeric fields are converted with <code>int()</code>, non-<code>None</code> session IDs with <code>str()</code> and metadata with <code>dict()</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -4043,7 +4043,7 @@ print(report.to_dict())
 
 ## See also
 
-- [LLMs](llm.md) - inference, history ownership, and compaction behavior.
+- [LLMs](llm.md) - inference, history ownership and compaction behavior.
 - [Agents](agent.md) - task execution and lifecycle integration.
 - [Flows](flows.md) - structured route decisions and task propagation.
 - [State](state.md) - conversation and task persistence.

@@ -916,7 +916,7 @@ def _treatment_svg(indexed: Mapping[str, Mapping[str, Any]]) -> str:
         )
     return (
         '<svg class="treatment" viewBox="0 0 880 205" role="img" '
-        'aria-label="Solo, independent, star, and mesh communication conditions">'
+        'aria-label="Solo, independent, star and mesh communication conditions">'
         '<line x1="110" y1="100" x2="770" y2="100" class="axis"/>'
         + "".join(nodes)
         + '<text x="440" y="190" text-anchor="middle" class="sub">'

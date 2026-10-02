@@ -1,4 +1,4 @@
-"""Approval correlation, lifecycle, and reconnect behavior without UI dependencies."""
+"""Approval correlation, lifecycle and reconnect behavior without UI dependencies."""
 
 import asyncio
 

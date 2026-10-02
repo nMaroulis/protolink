@@ -203,9 +203,8 @@ class FastAPIBackend(BackendInterface):
     ):
         """Yield JSON-RPC envelopes as Server-Sent Events.
 
-        Streaming endpoint handlers return async iterators of Protolink events.
-        The backend serializes each event into a JSON-RPC-style SSE envelope so
-        HTTP clients can consume the same task stream shape as WebSocket clients.
+        Streaming endpoint handlers return async iterators of Protolink events. The backend serializes each event into a
+        JSON-RPC-style SSE envelope so HTTP clients can consume the same task stream shape as WebSocket clients.
         """
         try:
             if transport is not None:
@@ -293,10 +292,10 @@ class FastAPIBackend(BackendInterface):
     ) -> None:
         """Mount abstract Protolink endpoints as physical FastAPI routes.
 
-        This method acts as the architectural bridge between Protolink's internal `EndpointSpec`
-        definitions and the external ASGI routing engine. It dynamically constructs asynchronous
-        HTTP handlers capable of extracting JSON payloads, validating them (if enabled), and
-        marshaling the result back over the wire via FastAPI's `JSONResponse`.
+        This method acts as the architectural bridge between Protolink's internal `EndpointSpec` definitions and the
+        external ASGI routing engine. It dynamically constructs asynchronous HTTP handlers capable of extracting JSON
+        payloads, validating them (if enabled) and marshaling the result back over the wire via FastAPI's
+        `JSONResponse`.
         """
         for ep in endpoints:
             self._register_endpoint(ep, authenticator=authenticator, transport=transport)
@@ -308,10 +307,9 @@ class FastAPIBackend(BackendInterface):
     async def start(self, url: str, tls: TLSConfig | None = None) -> None:
         """Boot the Uvicorn ASGI server as an isolated background task.
 
-        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn
-        `Server` instance, and schedules it within the current asyncio event loop. To prevent
-        race conditions, it actively polls `server.started` to ensure the TCP socket is bound
-        before yielding control back to the caller.
+        Extracts the host and port from the provided URL, instantiates a programmatic Uvicorn `Server` instance and
+        schedules it within the current asyncio event loop. To prevent race conditions, it actively polls
+        `server.started` to ensure the TCP socket is bound before yielding control back to the caller.
         """
         import uvicorn
 
@@ -340,9 +338,9 @@ class FastAPIBackend(BackendInterface):
     async def stop(self) -> None:
         """Gracefully orchestrate Uvicorn server teardown.
 
-        Injects the `should_exit` signal directly into the Uvicorn state machine, triggering a
-        graceful draining of active connections. It then safely `await`s the server's background
-        task to prevent orphaned processes and suppresses any expected `CancelledError` exceptions.
+        Injects the `should_exit` signal directly into the Uvicorn state machine, triggering a graceful draining of
+        active connections. It then safely `await`s the server's background task to prevent orphaned processes and
+        suppresses any expected `CancelledError` exceptions.
         """
         if self._server_instance:
             self._server_instance.should_exit = True

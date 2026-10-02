@@ -122,5 +122,6 @@ class IDGenerator:
 
     @staticmethod
     def _generate_timestamp() -> str:
-        """Generate a timestamp string in a compact format."""
-        return datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+        """Return the UTC timestamp as ``YYYYMMDDHHMMSS`` for ID prefixes."""
+        now = datetime.now(UTC)
+        return f"{now.year:04d}{now.month:02d}{now.day:02d}{now.hour:02d}{now.minute:02d}{now.second:02d}"

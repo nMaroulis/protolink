@@ -92,7 +92,7 @@ class OutlookCalendar:
 
     Args:
         token: OAuth access token or sync/async callback returning one per request.
-            Consent, refresh, and storage are application-owned.
+            Consent, refresh and storage are application-owned.
         calendar_id: Calendar ID; ``None`` selects the user's default calendar.
         user_id: ``me`` for delegated tokens, or a user ID/UPN for application
             tokens and explicitly authorized shared access.
@@ -126,7 +126,7 @@ class OutlookCalendar:
         Query is a case-insensitive substring in subject, preview, or location,
         filtered locally within each page. Empty pages can have a continuation;
         follow every token to finish a search. Tokens require the same backend
-        instance, interval, query, and page size. Event fields retain Graph's shape.
+        instance, interval, query and page size. Event fields retain Graph's shape.
         """
         start, end = _interval(start, end)
         if not 1 <= max_results <= 100:
@@ -199,7 +199,7 @@ class OutlookEmail:
             or authorized shared mailboxes. All operations use this fixed mailbox.
 
     Requires ``protolink[integrations]``. Use ``Mail.Read`` for reading,
-    ``Mail.ReadWrite`` for drafts, and ``Mail.Send`` for sending (shared mailboxes
+    ``Mail.ReadWrite`` for drafts and ``Mail.Send`` for sending (shared mailboxes
     may require additional delegated permissions). Plain-text composition only.
     Sending returns ``status='accepted'`` without a fabricated server message ID:
     Graph's 202 response does not confirm delivery. Requests are never retried.
@@ -226,7 +226,7 @@ class OutlookEmail:
         """Search a page with Graph's message $search syntax (e.g. subject:review).
 
         Microsoft caps $search results at 1,000 messages. Empty queries list the
-        mailbox by received time. Keep the same backend instance, query, and page
+        mailbox by received time. Keep the same backend instance, query and page
         size when continuing. A token callback must keep the same account.
         """
         if not 1 <= max_results <= 100:

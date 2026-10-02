@@ -68,7 +68,7 @@ async def run_benchmark(
     output_root: Path,
     progress: Any = None,
 ) -> dict[str, Any]:
-    """Run fresh paired or single trials, aggregate them, and write artifacts."""
+    """Run fresh paired or single trials, aggregate them and write artifacts."""
     if settings.mode not in {"paired", "single"}:
         raise ValueError("Benchmark mode must be `paired` or `single`")
     if isinstance(settings.replicates, bool) or not isinstance(settings.replicates, int):
@@ -833,9 +833,9 @@ def _fairness_audit(
         "matched_non_advocate_controls": {
             "passed": control_matches,
             "detail": (
-                "Judge, jurors, procedure, temperature, and retry policy match within each pair."
+                "Judge, jurors, procedure, temperature and retry policy match within each pair."
                 if settings.mode == "paired"
-                else "Judge, jurors, procedure, temperature, and retry policy were recorded for this assignment."
+                else "Judge, jurors, procedure, temperature and retry policy were recorded for this assignment."
             ),
         },
         "seed_applied_by_all_models": {
@@ -874,7 +874,7 @@ def _fairness_audit(
             "passed": True,
             "values": {"blocked_disclosure_attempts": blocked_identity_disclosures},
             "detail": (
-                "Candidate IDs, labels, providers, and model IDs were omitted from evaluator payloads; "
+                "Candidate IDs, labels, providers and model IDs were omitted from evaluator payloads; "
                 "explicit disclosures in advocacy text are rejected before delivery."
             ),
         },
@@ -924,7 +924,7 @@ def _judge_prompt(case: CaseConfig) -> str:
         f"{case.judge.system_prompt}\n\n"
         "You are a fixed control agent in a controlled advocacy benchmark. Candidate identities and model "
         "families are hidden "
-        "from the evaluator panel. Apply only the configured case, procedure, and tally."
+        "from the evaluator panel. Apply only the configured case, procedure and tally."
     )
 
 

@@ -22,12 +22,10 @@ ActionBuilder = Callable[[dict[str, Any], RunContext], RunAction | Awaitable[Run
 class Tool(BaseTool):
     """Native Protolink tool wrapper.
 
-    This class adapts a Python callable into the :class:`~protolink.tools.base.BaseTool`
-    interface.
+    This class adapts a Python callable into the :class:`~protolink.tools.base.BaseTool` interface.
 
-    In addition to storing basic metadata (name/description/tags), it can
-    automatically infer JSON Schema ``input_schema`` and ``output_schema``
-    definitions from the wrapped function's signature and type annotations.
+    In addition to storing basic metadata (name/description/tags), it can automatically infer JSON Schema
+    ``input_schema`` and ``output_schema`` definitions from the wrapped function's signature and type annotations.
     """
 
     name: str
@@ -65,12 +63,10 @@ class Tool(BaseTool):
     ) -> "Tool":
         """Create a reusable tool from a typed Python callable.
 
-        The callable's name and cleaned docstring supply default metadata.
-        Callables without a docstring use ``"Call <name>."``. Explicit metadata
-        takes precedence, and missing schemas are inferred as in the regular
-        constructor. Use ``agent.add_tool(func)`` for inferred defaults, or
-        register this configured wrapper with ``agent.add_tool(tool)`` to keep
-        explicit metadata when invoking through Agent policy and task execution.
+        The callable's name and cleaned docstring supply default metadata. Callables without a docstring use
+        ``"Call <name>."``. Explicit metadata takes precedence and missing schemas are inferred as in the regular
+        constructor. Use ``agent.add_tool(func)`` for inferred defaults, or register this configured wrapper with
+        ``agent.add_tool(tool)`` to keep explicit metadata when invoking through Agent policy and task execution.
 
         Args:
             func: Synchronous or asynchronous callable to wrap.
@@ -84,14 +80,13 @@ class Tool(BaseTool):
             action_builder: Optional callback enriching the prepared runtime action.
 
         Returns:
-            A tool with the same schema, validation, and policy metadata as one
-            constructed explicitly.
+            A tool with the same schema, validation and policy metadata as one constructed explicitly.
 
         Raises:
-            TypeError: ``func`` is not callable or cannot be inspected, or the
-                explicit or inferred name is not a string.
-            ValueError: The tool name is empty or whitespace-only, or the
-                callable signature or explicit schema is invalid.
+            TypeError: ``func`` is not callable or cannot be inspected, or the explicit or inferred name is not a
+                string.
+            ValueError: The tool name is empty or whitespace-only, or the callable signature or explicit schema is
+                invalid.
         """
         if not callable(func):
             raise TypeError("Tool.from_callable requires a callable")
@@ -115,8 +110,8 @@ class Tool(BaseTool):
     def __post_init__(self) -> None:
         """Populate missing schemas.
 
-        If ``input_schema`` and/or ``output_schema`` are not provided explicitly,
-        they are inferred from the wrapped callable.
+        If ``input_schema`` and/or ``output_schema`` are not provided explicitly, they are inferred from the wrapped
+        callable.
         """
         self._signature = inspect.signature(self.func)
         self._type_hints = _safe_get_type_hints(self.func)
@@ -153,8 +148,8 @@ class Tool(BaseTool):
     async def __call__(self, **kwargs: Any) -> Any:
         """Invoke the underlying tool function.
 
-        The wrapped function may be either synchronous (``def``) or asynchronous
-        (``async def``). This method normalizes both forms to an async call.
+        The wrapped function may be either synchronous (``def``) or asynchronous (``async def``).
+        This method normalizes both forms to an async call.
         """
 
         kwargs = self.validate_args(kwargs)
@@ -166,10 +161,9 @@ class Tool(BaseTool):
     async def prepare_action(self, arguments: dict[str, Any], context: RunContext) -> RunAction:
         """Build the concrete runtime action evaluated before this tool runs.
 
-        ``action_builder`` lets an application attach structured preview
-        artifacts or metadata without moving its domain logic into Protolink.
-        The tool's declared capabilities are always merged into the returned
-        action so a custom builder cannot accidentally bypass policy checks.
+        ``action_builder`` lets an application attach structured preview artifacts or metadata without moving its domain
+        logic into Protolink. The tool's declared capabilities are always merged into the returned action so a custom
+        builder cannot accidentally bypass policy checks.
 
         Args:
             arguments: Validated keyword arguments proposed for the tool call.

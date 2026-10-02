@@ -1,4 +1,4 @@
-"""Parent evidence retains worker identities, live progress, and partial effects."""
+"""Parent evidence retains worker identities, live progress and partial effects."""
 
 import asyncio
 from unittest.mock import AsyncMock

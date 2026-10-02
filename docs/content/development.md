@@ -226,7 +226,7 @@ protolink/
 │   ├── client/         # Client code
 │   ├── core/           # Core models
 │   ├── discovery/      # Registry and discovery
-│   ├── llms/           # LLM integrations, infer loop, parsing, and metrics
+│   ├── llms/           # LLM integrations, infer loop, parsing and metrics
 │   ├── models/         # Exposes core models for importation
 │   ├── server/         # Server implementations
 │   ├── transport/      # Transport layers
@@ -244,10 +244,10 @@ protolink/
 
 ## Infer-loop Benchmark
 
-Prompt, parsing, action-selection, retry, and delegation changes should be
+Prompt, parsing, action-selection, retry and delegation changes should be
 checked with the repository-local infer-loop benchmark. It reports strict and
 functional correctness, failures and traces, task and model-call latency,
-Ollama prompt/load/generation timing, and cache-sensitive repeat comparisons.
+Ollama prompt/load/generation timing and cache-sensitive repeat comparisons.
 
 Run it from the repository root:
 
@@ -260,9 +260,9 @@ python -m benchmarks.infer_loop \
 ```
 
 Keep the provider, exact model and parameters, suite, seed, warm-up, attempts,
-repetitions, hardware, and host load controlled in before-and-after runs. See
+repetitions, hardware and host load controlled in before-and-after runs. See
 the [Infer-loop Benchmark](infer-loop-benchmark.md) guide for scoring, timing,
-baseline comparison, and artifacts.
+baseline comparison and artifacts.
 
 ---
 
@@ -351,8 +351,8 @@ Maintainers can follow this process for releases:
 1. **Update Python version sources** in `pyproject.toml` and `protolink/__version__.py`, then regenerate `uv.lock`.
 2. **Update documentation package metadata** in `docs/package.json` and regenerate `docs/package-lock.json`. Keep guides and API references focused on current behavior; record ProtoLink release numbers and feature history in the changelog. Retain version numbers where they identify actual dependency requirements or protocol contracts.
 3. **Finalize the changelog** in `docs/content/changelog.md`: replace `Unreleased` with the publication date and move the latest-release note to the new version.
-4. **Run release gates**: formatting, linting, type checking, the full test suite, the Docusaurus production build, `python -m build`, and `python -m twine check dist/*`.
-   Check that the wheel and source distribution include `protolink/py.typed`, that installed metadata and `protolink.__version__` agree, and that the first getting-started example runs using only the base dependencies.
+4. **Run release gates**: formatting, linting, type checking, the full test suite, the Docusaurus production build, `python -m build` and `python -m twine check dist/*`.
+   Check that the wheel and source distribution include `protolink/py.typed`, that installed metadata and `protolink.__version__` agree and that the first getting-started example runs using only the base dependencies.
 5. **Tag Release**: `git tag vX.Y.Z`
 6. **Push Tags**: `git push origin --tags`
 7. **Upload to PyPI**: `python -m twine upload dist/*`

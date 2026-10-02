@@ -1,8 +1,8 @@
-"""Protolink 0.6.3 run reports, replay, assertions, and redaction.
+"""Protolink 0.6.3 run reports, replay, assertions and redaction.
 
 ``Agent.start_run`` records a live application stream as a durable ``RunReport``.
 ``RunReplay`` and assertion helpers make the same report useful for CLI UIs,
-debug snapshots, and golden-run integration tests.
+debug snapshots and golden-run integration tests.
 
 Run it with:
 

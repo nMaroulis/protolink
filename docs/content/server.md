@@ -8,7 +8,7 @@ import ApiReference, {
 
 # Server
 
-Servers in Protolink act as the **coordination layer** between business logic (Agents or Registries) and the underlying Transport mechanism. They are responsible for wiring endpoints, managing lifecycle, and ensuring that the core logic remains transport-agnostic.
+Servers in Protolink act as the **coordination layer** between business logic (Agents or Registries) and the underlying Transport mechanism. They are responsible for wiring endpoints, managing lifecycle and ensuring that the core logic remains transport-agnostic.
 
 `AgentServer` always binds ProtoLink's native endpoints. When an HTTP agent is created with `a2a=True`, it additionally binds the A2A 1.0 adapter to the same execution logic. Agent authors still implement `handle_task(Task)` once.
 
@@ -28,12 +28,12 @@ Servers in Protolink act as the **coordination layer** between business logic (A
   cards={[
     {
       title: "AgentServer",
-      text: "Exposes native task, streaming, discovery, cancellation, status, chat, and LLM control endpoints, with an opt-in A2A 1.0 JSON-RPC boundary.",
+      text: "Exposes native task, streaming, discovery, cancellation, status, chat and LLM control endpoints, with an opt-in A2A 1.0 JSON-RPC boundary.",
       code: "/tasks/",
     },
     {
       title: "RegistryServer",
-      text: "Exposes registration, deregistration, discovery, liveness, and status endpoints.",
+      text: "Exposes registration, deregistration, discovery, liveness and status endpoints.",
       code: "/agents/",
     },
     {
@@ -76,16 +76,16 @@ The `AgentServer` exposes an `Agent` over a Transport.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/tasks/` | `POST` | **Task Submission**. Accepts a `Task` object, processes it via the Agent, and returns the result. |
+| `/tasks/` | `POST` | **Task Submission**. Accepts a `Task` object, processes it via the Agent and returns the result. |
 | `/tasks/cancel` | `POST` | **Task Cancellation**. Parses a `TaskCancellationRequest` and asks the Agent to cancel active work. |
-| `/tasks/stream` | `POST` | **Task Streaming**. Accepts a `Task` object and streams status, LLM, tool, artifact, and final events. Only registered when the transport has `supports_streaming=True`. |
+| `/tasks/stream` | `POST` | **Task Streaming**. Accepts a `Task` object and streams status, LLM, tool, artifact and final events. Only registered when the transport has `supports_streaming=True`. |
 | `/llm/history/compact` | `POST` | **History Compaction**. Runs the Agent's explicit conversation-compaction control plane. |
 | `/state/describe` | `POST` | **State Description**. Reports enabled persistent state stores. |
 | `/state/reset` | `POST` | **State Reset**. Clears selected persistent state stores after policy authorization. |
 | `/state/compact` | `POST` | **State Compaction**. Compacts selected persistent state stores after policy authorization. |
 | `/.well-known/agent.json` | `GET` | **Agent Discovery**. Returns the `AgentCard` describing this agent. |
 | `/.well-known/agent-card.json` | `GET` | **A2A 1.0 Agent Card**. Added only by `Agent(..., transport="http", a2a=True)`; returns the standard wire card. |
-| `/` | `POST` | **A2A 1.0 JSON-RPC**. Added only with `a2a=True`; handles `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask`. |
+| `/` | `POST` | **A2A 1.0 JSON-RPC**. Added only with `a2a=True`; handles `SendMessage`, `GetTask`, `ListTasks` and `CancelTask`. |
 | `/status` | `GET` | **Status Page**. Returns a human-readable HTML status dashboard. |
 | `/healthz` | `GET` | **Health**. Returns the underlying transport's health snapshot. |
 | `/readyz` | `GET` | **Readiness**. Currently calls the same transport health method as `/healthz`. |
@@ -257,7 +257,7 @@ attributes and methods.
   This internal server protocol is not re-exported from
   <code>protolink.server</code>. The public
   <code>protolink.AgentInterface</code> name refers instead to the Agent Card
-  interface dataclass containing a URL, transport, and protocol version.
+  interface dataclass containing a URL, transport and protocol version.
 </ApiCallout>
 
 </ApiReference>
@@ -288,7 +288,7 @@ network startup are deferred until `start()`.
     </ApiField>
     <ApiField name="agent" type="AgentInterface" required>
       Structurally compatible object implementing task execution, streaming,
-      cancellation, history/state controls, card/status/chat rendering, and chat
+      cancellation, history/state controls, card/status/chat rendering and chat
       message handling. Runtime inheritance from the protocol is not required.
     </ApiField>
     <ApiField name="a2a" type="bool" defaultValue="False">
@@ -327,7 +327,7 @@ network startup are deferred until `start()`.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/server/agent.py#L260"
 >
 
-Build the complete endpoint table, pass it to the transport, and await the
+Build the complete endpoint table, pass it to the transport and await the
 transport's server startup.
 
 <ApiSection title="Returns">
@@ -343,7 +343,7 @@ transport's server startup.
   <ApiFields ariaLabel="AgentServer.start side effects">
     <ApiField name="native routes" type="EndpointSpec[]">
       Registers task submission/cancellation, history and state controls, card,
-      status, health/readiness, and chat-page endpoints.
+      status, health/readiness and chat-page endpoints.
     </ApiField>
     <ApiField name="task stream" type="conditional route">
       Adds <code>POST /tasks/stream</code> only when the transport advertises
@@ -481,7 +481,7 @@ supplies route binding and networking.
   <ApiFields ariaLabel="RegistryServer constructor parameters">
     <ApiField name="registry" type="RegistryInterface" required>
       Structurally compatible object implementing register, unregister,
-      heartbeat, discovery, and HTML status handlers.
+      heartbeat, discovery and HTML status handlers.
     </ApiField>
     <ApiField name="transport" type="Transport" required>
       Concrete route-binding and server-lifecycle implementation.
@@ -534,7 +534,7 @@ Convert an inbound registration body into ProtoLink's runtime `AgentCard`.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="RegistryServer.register_parser errors">
     <ApiField name="deserialization error">
-      Mapping-shape, required-field, and nested model errors from
+      Mapping-shape, required-field and nested model errors from
       <code>AgentCard.from_dict()</code> propagate.
     </ApiField>
   </ApiFields>
@@ -674,7 +674,7 @@ handler.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/server/registry.py#L140"
 >
 
-Register all registry, status, health, and readiness routes, then await
+Register all registry, status, health and readiness routes, then await
 transport startup.
 
 <ApiSection title="Returns">
@@ -719,7 +719,7 @@ Await transport shutdown and mark the registry server idle.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="RegistryServer.stop errors">
     <ApiField name="transport error">
-      Shutdown exceptions propagate, and the running flag remains set when
+      Shutdown exceptions propagate and the running flag remains set when
       transport shutdown fails.
     </ApiField>
   </ApiFields>
@@ -750,7 +750,7 @@ Await transport shutdown and mark the registry server idle.
 
 Describe one transport-neutral route. Server classes create these immutable
 declarations; each transport interprets their path, extraction, parsing,
-invocation, serialization, and streaming fields for its own backend.
+invocation, serialization and streaming fields for its own backend.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="EndpointSpec constructor parameters">
@@ -770,7 +770,7 @@ invocation, serialization, and streaming fields for its own backend.
     </ApiField>
     <ApiField name="content_type" type={'"json" | "html"'} defaultValue={'"json"'}>
       Response rendering mode interpreted by the HTTP/ASGI backends.
-      WebSocket, gRPC, and Runtime transports serialize returned string values
+      WebSocket, gRPC and Runtime transports serialize returned string values
       through their normal protocol envelope instead.
     </ApiField>
     <ApiField name="streaming" type="bool" defaultValue="False">
@@ -806,7 +806,7 @@ invocation, serialization, and streaming fields for its own backend.
 <ApiCallout label="Request-source support">
   The shared type includes <code>form</code>, but current built-in transports do
   not extract form data. HTTP backends support body, query, headers, path
-  parameters, and the combined request view; WebSocket, gRPC, and Runtime
+  parameters and the combined request view; WebSocket, gRPC and Runtime
   currently bind body and query-parameter sources.
 </ApiCallout>
 

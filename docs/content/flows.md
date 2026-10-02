@@ -12,24 +12,24 @@ import ApiReference, {
 All flows expose `await flow.invoke(prompt, session_id=None, budget=None, context=None)` and
 `flow.sync.invoke(...)` for final content. `execute(task)` still exposes the complete task.
 `Step(handler)` adapts a Task-to-Task function, `ToolStep(agent, tool_name, args=None)` performs
-a validated tool task, and `RepeatUntil(step, checks, max_attempts=...)` adds bounded acceptance.
+a validated tool task and `RepeatUntil(step, checks, max_attempts=...)` adds bounded acceptance.
 See [deterministic steps](progressive-control.md#deterministic-steps-and-bounded-acceptance) for
-full signatures, execution evidence, budget sharing, and stop conditions.
+full signatures, execution evidence, budget sharing and stop conditions.
 
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Execution, approvals and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks and bounded workflows.
 
-Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact`, and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology, and returns the enriched task at the end.
+Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact` and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology and returns the enriched task at the end.
 
 Flows are a ProtoLink runtime extension, not an A2A protocol operation. The important boundary is that deterministic orchestration does not escape into graph-private models: it continues to use the shared A2A-based task language.
 
-Use flows when the shape of the process is known ahead of time. Instead of asking an LLM to decide the whole plan at runtime, you define the path in code: a sequential pipeline, a fan-out/fan-in review step, a controlled router, or a graph-shaped state machine with loops. The agents inside the flow can still use LLMs, tools, storage, and remote transports. The difference is that the orchestration itself is inspectable Python.
+Use flows when the shape of the process is known ahead of time. Instead of asking an LLM to decide the whole plan at runtime, you define the path in code: a sequential pipeline, a fan-out/fan-in review step, a controlled router, or a graph-shaped state machine with loops. The agents inside the flow can still use LLMs, tools, storage and remote transports. The difference is that the orchestration itself is inspectable Python.
 
 ---
 
 ## 🧠 The Logic Behind Flows
 
-In standard Protolink agent execution, an Agent receives a task, analyzes it using an LLM, and decides what to do next. It might call a tool, write a response, or delegate work to another Agent through an `agent_call`. That flexible mode is useful when the problem is open ended, but it can be too loose for workflows that must be repeatable, reviewable, or tied to a business process.
+In standard Protolink agent execution, an Agent receives a task, analyzes it using an LLM and decides what to do next. It might call a tool, write a response, or delegate work to another Agent through an `agent_call`. That flexible mode is useful when the problem is open ended, but it can be too loose for workflows that must be repeatable, reviewable, or tied to a business process.
 
 Flows move the topology out of the model and into code. A `Pipeline` always runs the same ordered steps. A `Parallel` flow always fans the same input out to the configured branches and merges the results. A `Graph` follows named edges and validates that destinations exist. A `Router` still lets a preceding agent choose a branch, but the available branch keys and destinations are fixed by the developer and recorded on the task for tracing.
 
@@ -62,7 +62,7 @@ Protolink Flows are fully recursive. This means a step in a `Pipeline` can be an
 </div>
 
 
-This lets you build hierarchical workflows out of small, reusable pieces. For example, a parent `Pipeline` can draft a response, run a `Parallel` review committee, route the reviewed output, and then finish with a final formatter.
+This lets you build hierarchical workflows out of small, reusable pieces. For example, a parent `Pipeline` can draft a response, run a `Parallel` review committee, route the reviewed output and then finish with a final formatter.
 
 :::info[Polymorphic Step Targets]
 
@@ -80,7 +80,7 @@ When a string target is not already a URL, the flow needs a `Registry` or `Regis
 
 ## ⚙️ Execution
 
-You can run every flow asynchronously with `.execute(task)`. This is the normal API for servers, async scripts, and agents that are already inside an event loop:
+You can run every flow asynchronously with `.execute(task)`. This is the normal API for servers, async scripts and agents that are already inside an event loop:
 
 ```python
 from protolink.flows import Pipeline
@@ -94,7 +94,7 @@ pipeline.add_step("researcher").add_step("summarizer")
 result = await pipeline.execute(task)
 ```
 
-For scripts, CLI commands, and notebooks without async support, use the synchronous wrapper:
+For scripts, CLI commands and notebooks without async support, use the synchronous wrapper:
 
 ```python
 result = pipeline.sync.execute(task)
@@ -106,7 +106,7 @@ The sync wrapper calls `asyncio.run()` internally, so do not use it from inside 
 
 ## 🧩 Core Flow Patterns
 
-All flow primitives share the same contract: they accept a `Task`, execute one or more `FlowTarget` objects, and return the updated `Task`. They differ only in how they choose the next target.
+All flow primitives share the same contract: they accept a `Task`, execute one or more `FlowTarget` objects and return the updated `Task`. They differ only in how they choose the next target.
 
 ### 1. Pipeline (Sequential)
 
@@ -119,7 +119,7 @@ pipeline.add_step("researcher").add_step("summarizer")
 await pipeline.execute(task)
 ```
 
-Use a `Pipeline` when each step depends on the previous step's result: research then summarize, draft then edit, extract then validate, plan then execute. The order is stable, and before each step Protolink looks at the next step to generate the right `flow_state["prompt"]`.
+Use a `Pipeline` when each step depends on the previous step's result: research then summarize, draft then edit, extract then validate, plan then execute. The order is stable and before each step Protolink looks at the next step to generate the right `flow_state["prompt"]`.
 
 If the next step is an agent, the prompt can include that agent's `AgentCard` so the current agent knows who will consume its output. If the next step is a `Router`, the prompt includes the available route keys and the routing instructions. If the next step is `Parallel`, the prompt describes all branch receivers so the current agent can produce an output useful to all of them.
 
@@ -187,9 +187,9 @@ task.add_message(
 )
 ```
 
-`Part.route(...)` round-trips through normal task serialization, appears in traces, and gives tests an exact branch key to assert. The Router also accepts JSON-shaped decisions such as `{"route_key": "editor"}` and the older `[ROUTE: editor]` text tag as compatibility fallbacks.
+`Part.route(...)` round-trips through normal task serialization, appears in traces and gives tests an exact branch key to assert. The Router also accepts JSON-shaped decisions such as `{"route_key": "editor"}` and the older `[ROUTE: editor]` text tag as compatibility fallbacks.
 
-The route key must match one of the keys in `routes`. If the preceding agent emits an unknown key, the router raises a `ValueError` instead of guessing. Every successful route decision is appended to `task.metadata["route_decisions"]`, which makes routing behavior easier to inspect in tests, traces, and replay tooling.
+The route key must match one of the keys in `routes`. If the preceding agent emits an unknown key, the router raises a `ValueError` instead of guessing. Every successful route decision is appended to `task.metadata["route_decisions"]`, which makes routing behavior easier to inspect in tests, traces and replay tooling.
 
 Use `Router` when the content of the task should choose the next branch but the allowed branches should remain controlled by the developer. If the branch decision should be pure Python logic instead of a model-generated route decision, use a `Graph` conditional edge.
 
@@ -215,7 +215,7 @@ In this example, the `writer` agent receives the routing instructions before it 
 
 ### 4. Graph Flows (State Machines)
 
-For creating highly complex deterministic workflows with loops, complex conditional branching, and a state-machine architecture, you can use the `Graph` flow.
+For creating highly complex deterministic workflows with loops, complex conditional branching and a state-machine architecture, you can use the `Graph` flow.
 
 ```python
 from protolink.flows import Graph
@@ -253,7 +253,7 @@ Graphs are useful when the workflow has named stages, loops, or code-defined bra
 - `add_edge("a", "b")` creates a fixed transition from one node to the next.
 - `add_conditional_edge("a", condition_fn, path_map)` evaluates `condition_fn(task)` after node `a` finishes and uses the returned key to choose a destination.
 
-Graph validates that referenced nodes exist, requires an entry point, and uses the reserved `"__END__"` destination to terminate. A node can have either a fixed edge or a conditional edge, but not both. To protect against accidental infinite loops, graph execution stops with an error after 50 iterations.
+Graph validates that referenced nodes exist, requires an entry point and uses the reserved `"__END__"` destination to terminate. A node can have either a fixed edge or a conditional edge, but not both. To protect against accidental infinite loops, graph execution stops with an error after 50 iterations.
 
 For deterministic edges, Graph can inject downstream context just like Pipeline. For conditional edges, the next node is not known until after the current node executes, so Protolink clears the transient flow prompt before running that node.
 
@@ -281,7 +281,7 @@ For deterministic edges, Graph can inject downstream context just like Pipeline.
     client: AgentClient | None = None,
     registry: Registry | RegistryClient | None = None,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/base.py">
-Base contract and shared dispatcher for deterministic workflows. It owns remote-client and registry wiring, the synchronous facade, semantic-context generation, target resolution, and nested-flow dependency propagation.
+Base contract and shared dispatcher for deterministic workflows. It owns remote-client and registry wiring, the synchronous facade, semantic-context generation, target resolution and nested-flow dependency propagation.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Flow constructor parameters">
   <ApiField name="client" type="AgentClient | None" defaultValue="None">Client used for string targets. When omitted, remote dispatch can infer one from a configured RegistryClient transport at execution time.</ApiField>
@@ -320,7 +320,7 @@ Execute an ordered sequence against one evolving Task. Before each step, Pipelin
     client: AgentClient | None = None,
     registry: Registry | RegistryClient | None = None,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/parallel.py">
-Fan one Task out to independently deep-copied branches, await every branch concurrently, then merge new messages, artifacts, and metadata back into the original Task in configured branch order.
+Fan one Task out to independently deep-copied branches, await every branch concurrently, then merge new messages, artifacts and metadata back into the original Task in configured branch order.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Parallel constructor parameters">
   <ApiField name="branches" type="list[FlowTarget]" required>Concurrent local Agents, strings, or nested Flows. An empty list is valid and returns the original task without additions.</ApiField>
@@ -340,7 +340,7 @@ Fan one Task out to independently deep-copied branches, await every branch concu
     client: AgentClient | None = None,
     registry: Registry | RegistryClient | None = None,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/router.py">
-Dispatch to one developer-approved target using a route decision already written by the preceding step. Router prefers structured route parts, accepts JSON-shaped decisions, and retains the historical text tag as a compatibility fallback.
+Dispatch to one developer-approved target using a route decision already written by the preceding step. Router prefers structured route parts, accepts JSON-shaped decisions and retains the historical text tag as a compatibility fallback.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Router constructor parameters">
   <ApiField name="routes" type="dict[str, FlowTarget]" required>Allowed decision keys mapped to targets. Router never guesses an unknown key.</ApiField>
@@ -359,7 +359,7 @@ Dispatch to one developer-approved target using a route decision already written
     *, max_iterations: int = 50,
     max_node_visits: int | dict[str, int] | None = None,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/graph.py">
-Create an initially empty named state machine. Nodes, edges, and entry point are added separately; <code>"__END__"</code> is reserved as the terminal destination.
+Create an initially empty named state machine. Nodes, edges and entry point are added separately; <code>"__END__"</code> is reserved as the terminal destination.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Graph constructor parameters">
   <ApiField name="client" type="AgentClient | None" defaultValue="None">Remote-node client.</ApiField>
@@ -502,9 +502,9 @@ Run the task through <code>steps</code> in declaration order. Before each step, 
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Pipeline execute parameters"><ApiField name="task" type="Task" required>Initial task that every sequential step reads and enriches.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="Pipeline execute return value"><ApiField name="task" type="Task">Fully processed task containing the accumulated messages, artifacts, metadata, and final flow context.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="Pipeline execute return value"><ApiField name="task" type="Task">Fully processed task containing the accumulated messages, artifacts, metadata and final flow context.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="Pipeline execute errors"><ApiField name="ValueError | RuntimeError">Target resolution fails, a target type is invalid, or a remote target has no usable client.</ApiField><ApiField name="target error">Agent, nested-flow, registry, and transport exceptions propagate immediately; remaining steps are not executed.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="Pipeline execute errors"><ApiField name="ValueError | RuntimeError">Target resolution fails, a target type is invalid, or a remote target has no usable client.</ApiField><ApiField name="target error">Agent, nested-flow, registry and transport exceptions propagate immediately; remaining steps are not executed.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -513,7 +513,7 @@ Run the task through <code>steps</code> in declaration order. Before each step, 
 <ApiReference kind="async method" path="protolink.flows.Parallel.execute" signature={`async execute(
     task: Task,
 ) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/parallel.py#L47">
-Deep-copy the input task for every branch, execute all branches concurrently, and merge only newly added messages and artifacts into the original task. Successful branch results are merged in configured order, regardless of completion order.
+Deep-copy the input task for every branch, execute all branches concurrently and merge only newly added messages and artifacts into the original task. Successful branch results are merged in configured order, regardless of completion order.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Parallel execute parameters"><ApiField name="task" type="Task" required>Source task copied independently for each configured branch.</ApiField></ApiFields></ApiSection>
 
@@ -528,13 +528,13 @@ Deep-copy the input task for every branch, execute all branches concurrently, an
 <ApiReference kind="async method" path="protolink.flows.Router.execute" signature={`async execute(
     task: Task,
 ) -> Task`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/flows/router.py#L128">
-Read the route decision already produced by the preceding step, validate it against the configured route map, record the decision, and dispatch the task to exactly one developer-approved target.
+Read the route decision already produced by the preceding step, validate it against the configured route map, record the decision and dispatch the task to exactly one developer-approved target.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Router execute parameters"><ApiField name="task" type="Task" required>Active task whose latest output contains a structured route part, JSON-shaped decision, or legacy route tag.</ApiField></ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Router execute return value"><ApiField name="task" type="Task">Task returned by the selected route after the decision has been recorded.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="Router execute errors"><ApiField name="ValueError">The decision is missing, malformed, or names a key absent from <code>routes</code>.</ApiField><ApiField name="target error">Resolution, nested-flow, Agent, registry, and transport failures from the selected route propagate.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="Router execute errors"><ApiField name="ValueError">The decision is missing, malformed, or names a key absent from <code>routes</code>.</ApiField><ApiField name="target error">Resolution, nested-flow, Agent, registry and transport failures from the selected route propagate.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -549,7 +549,7 @@ Traverse from the configured entry point until the reserved <code>"__END__"</cod
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Graph execute return value"><ApiField name="task" type="Task">Final enriched task after traversal reaches <code>"__END__"</code>.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="Graph execute errors"><ApiField name="ValueError">A conditional result has no destination in its path map, or shared target resolution rejects a target.</ApiField><ApiField name="RuntimeError">No entry point is configured, a remote target lacks a client, or traversal exceeds the 50-node safety limit.</ApiField><ApiField name="target error">Agent, nested-flow, registry, transport, and condition-function exceptions propagate.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="Graph execute errors"><ApiField name="ValueError">A conditional result has no destination in its path map, or shared target resolution rejects a target.</ApiField><ApiField name="RuntimeError">No entry point is configured, a remote target lacks a client, or traversal exceeds the 50-node safety limit.</ApiField><ApiField name="target error">Agent, nested-flow, registry, transport and condition-function exceptions propagate.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -559,4 +559,4 @@ Traverse from the configured entry point until the reserved <code>"__END__"</cod
 - Prefer structured `Part.route(...)` decisions for routers. Legacy `[ROUTE: key]` tags are supported, but structured parts are easier to test and replay.
 - Use registry names for portable flows and explicit URLs when you want the topology to point at a concrete service.
 - Keep branch metadata keys distinct in `Parallel` flows if multiple branches may write similar information.
-- Test flows by asserting the final `Task`: message count, artifact IDs, metadata, route decisions, and terminal state are usually better assertions than checking only the final text.
+- Test flows by asserting the final `Task`: message count, artifact IDs, metadata, route decisions and terminal state are usually better assertions than checking only the final text.

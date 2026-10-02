@@ -1,4 +1,4 @@
-"""Own agent lifecycle, consume events, cancel work, and obtain its report."""
+"""Own agent lifecycle, consume events, cancel work and obtain its report."""
 
 import asyncio
 import sys

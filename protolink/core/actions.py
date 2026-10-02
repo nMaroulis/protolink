@@ -2,7 +2,7 @@
 
 Language-model actions describe what a model requested. ``RunAction`` instead describes the concrete operation that the
 runtime is about to authorize and execute. Keeping those layers separate lets non-LLM callers, deterministic flows,
-remote agents, and local applications use the same policy boundary.
+remote agents and local applications use the same policy boundary.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class RunAction:
     """Concrete side-effect intent evaluated by the runtime policy layer.
 
     A run action is created after an application or model has selected an operation but before that operation executes.
-    Policies inspect its declared capabilities, payload, previews, and run context. Approval handlers receive the same
+    Policies inspect its declared capabilities, payload, previews and run context. Approval handlers receive the same
     object, giving user interfaces a stable structure to render without parsing tool-specific nested dictionaries.
 
     Attributes:

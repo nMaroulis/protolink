@@ -43,7 +43,7 @@ _IGNORED_DIRECTORY_NAMES = {".git", ".hg", ".svn", "__pycache__", "node_modules"
 
 
 class AutoLoader:
-    """Load common local, inline, and HTTP sources with safe defaults.
+    """Load common local, inline and HTTP sources with safe defaults.
 
     Local directories are traversed recursively. Text-like files are decoded as UTF-8 with replacement for malformed
     bytes; HTML is reduced to visible text; PDFs use the optional ``pypdf`` package. Unsupported binary files are

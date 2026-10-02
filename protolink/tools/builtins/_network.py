@@ -169,7 +169,7 @@ def _public_ip(address: str) -> str:
 
 
 def _ascii_hostname(hostname: str) -> str:
-    """Normalize an international hostname for DNS, TLS, and Host headers."""
+    """Normalize an international hostname for DNS, TLS and Host headers."""
     normalized = hostname.rstrip(".").lower()
     if not normalized:
         raise ValueError("URL must include a hostname")

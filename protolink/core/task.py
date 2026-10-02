@@ -27,7 +27,7 @@ class TaskState(Enum):
     UNKNOWN = "unknown"
 
 
-# Allowed transition graph (Not used yet)
+# Allowed task lifecycle transitions.
 _ALLOWED_TRANSITIONS: dict[TaskState, set[TaskState]] = {
     TaskState.SUBMITTED: {TaskState.WORKING, TaskState.CANCELED, TaskState.FAILED},
     TaskState.WORKING: {TaskState.COMPLETED, TaskState.INPUT_REQUIRED, TaskState.FAILED, TaskState.CANCELED},
@@ -45,7 +45,7 @@ class TaskExecutionError(RuntimeError):
     """A returned task failed or was canceled.
 
     Attributes:
-        task: The original task, including its state, error metadata, and any
+        task: The original task, including its state, error metadata and any
             partial outputs. Raised by :meth:`Task.raise_for_status`; exceptions
             raised directly by a handler retain their original types.
     """
@@ -149,7 +149,7 @@ class Task:
     def raise_for_status(self) -> "Task":
         """Raise for a failed or canceled task; otherwise return this task.
 
-        This check does not wait for completion. Submitted, working, and
+        This check does not wait for completion. Submitted, working and
         input-required tasks remain valid protocol responses; inspect ``state``
         when your application requires a completed result.
 
@@ -265,21 +265,22 @@ class Task:
     def from_dict(cls, data: dict[str, Any]) -> "Task":
         """Create a Task instance from a dictionary.
 
-        This method also reconstructs the `_last_item` cache by comparing the timestamps of the last message and
-        artifact.
+        Supplied IDs and timestamps are retained; defaults are generated only
+        for missing fields. The last-item cache is rebuilt by comparing the
+        timestamps of the last message and artifact.
 
         Time: O(M + A)
         """
         messages = [Message.from_dict(m) for m in data.get("messages", [])]
         artifacts = [Artifact.from_dict(a) for a in data.get("artifacts", [])]
         return cls(
-            id=data.get("id", IDGenerator.generate_task_id()),
+            id=data["id"] if "id" in data else IDGenerator.generate_task_id(),
             state=TaskState(data.get("state", TaskState.SUBMITTED.value)),
             messages=messages,
             artifacts=artifacts,
             metadata=data.get("metadata", {}),
             flow_state=data.get("flow_state", {}),
-            created_at=data.get("created_at", utc_now()),
+            created_at=data["created_at"] if "created_at" in data else utc_now(),
         )
 
     @classmethod
@@ -437,7 +438,7 @@ class Task:
     def get_last_part(self) -> Part | None:
         """Return the last part of the latest message or artifact, or ``None``.
 
-        Includes inputs, errors, and previews. This O(1) accessor preserves the
+        Includes inputs, errors and previews. This O(1) accessor preserves the
         part's type and typed content for applications handling the full protocol.
         It does not search older items when the latest item has no parts.
         """

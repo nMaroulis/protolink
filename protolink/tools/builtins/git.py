@@ -44,7 +44,7 @@ def git_tool(
 ) -> PreparedTool:
     """Create ``git(operation, ...)`` for one application-selected directory.
 
-    Read operations are ``status``, ``diff``, ``log``, and ``show``. Set
+    Read operations are ``status``, ``diff``, ``log`` and ``show``. Set
     ``allow_write=True`` to expose ``add`` and ``commit``. Every operation needs
     ``process.execute`` plus ``git.read`` or ``git.write``; write permission in
     the factory does not override Agent policy. Commands never use a shell.
@@ -55,7 +55,7 @@ def git_tool(
             Commits include ALL staged changes, including preexisting ones.
         env: Complete copied environment; ``None`` supplies only a system PATH.
             Supply author/committer variables explicitly when needed. Git's
-            system/global config, terminal prompts, and optional locks are
+            system/global config, terminal prompts and optional locks are
             disabled regardless of this mapping; local repo config still applies.
         executable: Git executable, absolute or resolved using the configured PATH.
         timeout_seconds: Positive finite command limit, bounded by run budgets.
@@ -71,7 +71,7 @@ def git_tool(
         ValueError: Invalid configuration, options, paths, or disabled writes.
         OSError: The configured directory or executable cannot be resolved.
 
-    Hooks, fsmonitor, signing, external diff, and textconv are disabled. Git
+    Hooks, fsmonitor, signing, external diff and textconv are disabled. Git
     attributes/clean filters may still execute code during staging; this is host
     execution, not isolation for untrusted repositories. Mutation is not
     automatically rolled back. Registration never runs Git.
@@ -113,11 +113,11 @@ def git_tool(
 
         status: short branch/status output, optionally filtered by paths.
         diff: working-tree changes, or staged=True for index changes; optional revision and paths.
-        log: recent commits, with optional revision, paths, and max_count.
+        log: recent commits, with optional revision, paths and max_count.
         show: one revision (default HEAD), with optional paths.
         add: stage the explicit nonempty paths list, including deletions.
         commit: commit ALL staged changes with the required message.
-        Check exit_code, timed_out, and truncated in the result before continuing.
+        Check exit_code, timed_out and truncated in the result before continuing.
         """
         raise AssertionError("Signature only")
 

@@ -12,7 +12,7 @@ Protolink implements a **pluggable transport layer** that decouples the agent's 
 
 At its core, the Transport abstraction behaves as a **protocol adapter pattern**, normalizing disparate wire formats into standard `Task` and `Message` domain objects.
 
-A2A supplies the shared agent model; a Transport moves it. ProtoLink's transports carry the same A2A-derived task and message objects, but they are not all canonical A2A bindings. `Agent(..., transport="http", a2a=True)` enables ProtoLink's A2A 1.0 JSON-RPC boundary; Runtime, WebSocket, SSE JSON-RPC, and gRPC remain ProtoLink-native transports.
+A2A supplies the shared agent model; a Transport moves it. ProtoLink's transports carry the same A2A-derived task and message objects, but they are not all canonical A2A bindings. `Agent(..., transport="http", a2a=True)` enables ProtoLink's A2A 1.0 JSON-RPC boundary; Runtime, WebSocket, SSE JSON-RPC and gRPC remain ProtoLink-native transports.
 
 All transports implement a consistent interface:
 
@@ -47,7 +47,7 @@ All transports inherit from the base `Transport` class.
     - Backed by ASGI frameworks:
         - `Starlette` + `httpx` + `uvicorn` (lightweight default backend).
         - `FastAPI` + `pydantic` + `uvicorn` (with optional request validation).
-    - Great default choice for web‑based agents, simple deployments, and interoperable APIs.
+    - Great default choice for web‑based agents, simple deployments and interoperable APIs.
 
 - **WebSocketTransport**
     - Uses WebSocket for streaming requests and responses.
@@ -60,7 +60,7 @@ All transports inherit from the base `Transport` class.
     - Uses HTTP request/response for normal calls and Server-Sent Events for task streams.
     - Streams JSON-RPC-style envelopes from `POST /tasks/stream`.
     - Inherits HTTP page exposure, so status and chat pages are available from the same base URL.
-    - Useful for CLIs, browser clients, dashboards, and other consumers that want streaming without a WebSocket connection.
+    - Useful for CLIs, browser clients, dashboards and other consumers that want streaming without a WebSocket connection.
 
 - **GRPCTransport**
     - Uses `grpc.aio` for unary request/response calls and unary-stream task events.
@@ -68,29 +68,29 @@ All transports inherit from the base `Transport` class.
     - Carries compact JSON envelopes over gRPC byte messages, so no generated protobuf files are required.
     - Supports gRPC metadata for the same bearer/API-key authentication headers used by HTTP and WebSocket transports.
     - Registers standard gRPC health checking and server reflection when installed through `protolink[grpc]`.
-    - Useful for service meshes, polyglot infrastructure, and teams that want gRPC deadlines and connection pooling while keeping Protolink's transport-neutral agent API.
+    - Useful for service meshes, polyglot infrastructure and teams that want gRPC deadlines and connection pooling while keeping Protolink's transport-neutral agent API.
 
 - **RuntimeTransport**
     - Simple **in‑process, in‑memory transport**.
     - Allows multiple agents to communicate within the same Python process.
     - Registers endpoint specs in memory only; there are no browser pages or bound network ports.
-    - Ideal for local development, test suites, and tightly‑coupled agent systems with zero network overhead.
+    - Ideal for local development, test suites and tightly‑coupled agent systems with zero network overhead.
 
 ## Choosing a Transport
 
-Choose the transport for the boundary around the agent; the `Agent`, `Task`, and client APIs stay the same.
+Choose the transport for the boundary around the agent; the `Agent`, `Task` and client APIs stay the same.
 
 | Transport | Use it when | Expected transport overhead | Streaming | Built-in surface and utilities | Main trade-off |
 | --- | --- | --- | --- | --- | --- |
-| [Runtime](#runtimetransport) (`"runtime"`) | All agents run in one Python process. It is the natural choice for tests, notebooks, local meshes, embedded agents, and deterministic flows. | **Lowest.** There is no socket or network round trip, although ProtoLink still enforces serialization and payload limits. | Yes | In-process routing plus Python-level `health()` and `metrics`. No listening port, browser pages, dashboard probe, TLS, or external A2A endpoint. | It cannot cross a process or host boundary and provides no network isolation. |
-| [HTTP](#httptransport) (`"http"`) | You want the default network service, broad client compatibility, browser-facing utilities, or the optional **A2A 1.0** wire boundary. | **Network baseline.** Pooled keep-alive connections make it a strong default for unary calls, but a caller receives the result only after the response is complete. | No live `subscribe()` stream | ProtoLink-native task and control APIs; `/status`, `/healthz`, `/readyz`, LLM-backed `/chat`, dashboard actions, ordinary HTTP tooling, proxies, and TLS. `a2a=True` adds the standard Agent Card, JSON-RPC routes, and outbound translation. | Use SSE, WebSocket, or gRPC when callers need incremental task events. A2A currently remains unary. |
-| [SSE JSON-RPC](#ssejsonrpctransport) (`"sse"`; aliases `"json-rpc"`, `"sse-json-rpc"`) | A browser, CLI, or dashboard needs one-way live progress while you keep an HTTP deployment model. | **HTTP-like for unary calls; progressive for streams.** One long-lived response delivers the first event before task completion and avoids polling, with text framing per event. | Yes, server to client | The native HTTP routes, status/health/chat pages, and dashboard actions, plus `POST /tasks/stream` as `text/event-stream`. The A2A 1.0 adapter is **not** mounted on this transport today. | The event channel is one-way, and proxies must permit long-lived SSE responses instead of buffering or timing them out. |
-| [WebSocket](#websockettransport) (`"websocket"`) | You need a long-lived interactive connection, frequent messages, or bidirectional task and token streaming. | **Low per frame after connection setup.** A connection can be reused for many JSON frames, while persistent connections and per-channel serialization still consume resources. | Yes, bidirectional | ProtoLink-native task and control operations over JSON frames, WSS/TLS, and a dedicated control connection so cancellation does not wait behind an active stream. | There are no plain HTTP status/chat pages, dashboard probes, or A2A endpoints; reconnect and load-balancer handling is more involved. |
-| [gRPC](#grpctransport) (`"grpc"`) | Internal services or service meshes already use gRPC deadlines, metadata, pooled channels, health checks, and reflection. | **Low for repeated RPCs and streams.** It uses persistent HTTP/2 channels and compact framing, but ProtoLink carries JSON byte envelopes rather than generated protobuf messages, so measure your workload. | Yes, server streaming | Generic `Invoke` and `Stream` methods, metadata authentication, TLS, deadlines, compression options, standard gRPC health, and reflection. | It requires the gRPC extra, has no browser/dashboard or A2A pages, and is less convenient for direct browser clients. |
+| [Runtime](#runtimetransport) (`"runtime"`) | All agents run in one Python process. It is the natural choice for tests, notebooks, local meshes, embedded agents and deterministic flows. | **Lowest.** There is no socket or network round trip, although ProtoLink still enforces serialization and payload limits. | Yes | In-process routing plus Python-level `health()` and `metrics`. No listening port, browser pages, dashboard probe, TLS, or external A2A endpoint. | It cannot cross a process or host boundary and provides no network isolation. |
+| [HTTP](#httptransport) (`"http"`) | You want the default network service, broad client compatibility, browser-facing utilities, or the optional **A2A 1.0** wire boundary. | **Network baseline.** Pooled keep-alive connections make it a strong default for unary calls, but a caller receives the result only after the response is complete. | No live `subscribe()` stream | ProtoLink-native task and control APIs; `/status`, `/healthz`, `/readyz`, LLM-backed `/chat`, dashboard actions, ordinary HTTP tooling, proxies and TLS. `a2a=True` adds the standard Agent Card, JSON-RPC routes and outbound translation. | Use SSE, WebSocket, or gRPC when callers need incremental task events. A2A currently remains unary. |
+| [SSE JSON-RPC](#ssejsonrpctransport) (`"sse"`; aliases `"json-rpc"`, `"sse-json-rpc"`) | A browser, CLI, or dashboard needs one-way live progress while you keep an HTTP deployment model. | **HTTP-like for unary calls; progressive for streams.** One long-lived response delivers the first event before task completion and avoids polling, with text framing per event. | Yes, server to client | The native HTTP routes, status/health/chat pages and dashboard actions, plus `POST /tasks/stream` as `text/event-stream`. The A2A 1.0 adapter is **not** mounted on this transport today. | The event channel is one-way and proxies must permit long-lived SSE responses instead of buffering or timing them out. |
+| [WebSocket](#websockettransport) (`"websocket"`) | You need a long-lived interactive connection, frequent messages, or bidirectional task and token streaming. | **Low per frame after connection setup.** A connection can be reused for many JSON frames, while persistent connections and per-channel serialization still consume resources. | Yes, bidirectional | ProtoLink-native task and control operations over JSON frames, WSS/TLS and a dedicated control connection so cancellation does not wait behind an active stream. | There are no plain HTTP status/chat pages, dashboard probes, or A2A endpoints; reconnect and load-balancer handling is more involved. |
+| [gRPC](#grpctransport) (`"grpc"`) | Internal services or service meshes already use gRPC deadlines, metadata, pooled channels, health checks and reflection. | **Low for repeated RPCs and streams.** It uses persistent HTTP/2 channels and compact framing, but ProtoLink carries JSON byte envelopes rather than generated protobuf messages, so measure your workload. | Yes, server streaming | Generic `Invoke` and `Stream` methods, metadata authentication, TLS, deadlines, compression options, standard gRPC health and reflection. | It requires the gRPC extra, has no browser/dashboard or A2A pages and is less convenient for direct browser clients. |
 
-The performance column compares **transport overhead**, not total agent response time, and is architectural guidance rather than benchmark data. Model inference, tool execution, payload size, network distance, TLS, and concurrency usually matter more than the protocol alone. Use the [built-in transport metrics](#transportmetricssnapshot) to compare representative workloads in your own deployment.
+The performance column compares **transport overhead**, not total agent response time and is architectural guidance rather than benchmark data. Model inference, tool execution, payload size, network distance, TLS and concurrency usually matter more than the protocol alone. Use the [built-in transport metrics](#transportmetricssnapshot) to compare representative workloads in your own deployment.
 
-`RuntimeTransport` is available with the base package. Install `protolink[http]` for HTTP, SSE JSON-RPC, and WebSocket, or `protolink[grpc]` for gRPC. String aliases are enough for the normal path, for example `Agent(card=card, transport="sse")`; construct the concrete class only when you need explicit TLS, limits, retries, or protocol-specific settings.
+`RuntimeTransport` is available with the base package. Install `protolink[http]` for HTTP, SSE JSON-RPC and WebSocket, or `protolink[grpc]` for gRPC. String aliases are enough for the normal path, for example `Agent(card=card, transport="sse")`; construct the concrete class only when you need explicit TLS, limits, retries, or protocol-specific settings.
 
 The rest of this page dives into the API of each transport in more detail.
 
@@ -105,8 +105,8 @@ One normal unary request follows this path:
 3. ProtoLink serializes the payload and checks its configured byte limit.
 4. The request waits for a concurrency slot. This applies backpressure when the process is already busy instead of starting unlimited work.
 5. The concrete transport sends the request using headers, metadata, or an envelope appropriate for its protocol.
-6. If the connection fails, ProtoLink retries only when the operation, method, and error all say that retrying is safe.
-7. The receiving transport deduplicates idempotent requests, executes the endpoint handler, checks the response size, and returns the result.
+6. If the connection fails, ProtoLink retries only when the operation, method and error all say that retrying is safe.
+7. The receiving transport deduplicates idempotent requests, executes the endpoint handler, checks the response size and returns the result.
 8. Metrics and health state are updated around the operation so applications can inspect what happened.
 
 Streaming requests use the same ideas, but hold a stream slot and check every event independently. ProtoLink does not automatically restart a failed stream because it cannot know which events the consumer already processed.
@@ -118,13 +118,13 @@ The shared APIs exist to solve four practical production problems:
 | A large payload or traffic spike exhausts memory | `TransportLimits` and request/stream slots | Work is bounded before one busy peer destabilizes the whole process. |
 | A temporary network failure interrupts a safe operation | `RetryPolicy` plus `ClientRequestSpec.idempotent` | Safe operations can recover without blindly repeating state changes. |
 | A retry arrives after the server already completed the first attempt | Correlation IDs and idempotency keys | The duplicate receives the original result instead of executing the handler twice. |
-| Operators cannot tell whether a service is ready or failing | Typed errors, metrics, and health endpoints | Failures become inspectable and automation can make informed decisions. |
+| Operators cannot tell whether a service is ready or failing | Typed errors, metrics and health endpoints | Failures become inspectable and automation can make informed decisions. |
 
 ## Production configuration
 
 Every transport accepts the same `TransportConfig`. Configure it on the concrete transport passed to `Agent`, `AgentClient`, or `Registry`. This keeps operational behavior consistent when an application changes protocols: an 8 MiB request limit means the same thing over HTTP, gRPC, WebSocket, or the in-process runtime.
 
-Most applications can start without creating this object. The defaults bound resources, collect local metrics, and keep retries disabled. Add an explicit configuration when deployment requirements differ from those defaults, such as a known maximum task size, a service concurrency budget, or a retry policy approved for your workload.
+Most applications can start without creating this object. The defaults bound resources, collect local metrics and keep retries disabled. Add an explicit configuration when deployment requirements differ from those defaults, such as a known maximum task size, a service concurrency budget, or a retry policy approved for your workload.
 
 ```python
 from protolink import Agent, AgentCard, RetryPolicy, TransportConfig, TransportLimits
@@ -153,9 +153,9 @@ transport = GRPCTransport(url=card.url, config=transport_config)
 agent = Agent(card=card, transport=transport)
 ```
 
-`max_attempts=1` is the default, so upgrading never enables retries implicitly. ProtoLink retries only request specifications explicitly marked idempotent, preserves one correlation ID across attempts, and sends an idempotency key so completed operations can be replayed without executing the handler again. Streams are not automatically retried because resuming a partial event sequence requires application-level checkpoints.
+`max_attempts=1` is the default, so upgrading never enables retries implicitly. ProtoLink retries only request specifications explicitly marked idempotent, preserves one correlation ID across attempts and sends an idempotency key so completed operations can be replayed without executing the handler again. Streams are not automatically retried because resuming a partial event sequence requires application-level checkpoints.
 
-The same limits apply to RuntimeTransport, making local tests representative of deployed serialization boundaries. HTTP uses bounded client/server concurrency, WebSocket uses bounded frame queues and ping/pong keepalive, and gRPC applies message-size, keepalive, and concurrent-RPC options.
+The same limits apply to RuntimeTransport, making local tests representative of deployed serialization boundaries. HTTP uses bounded client/server concurrency, WebSocket uses bounded frame queues and ping/pong keepalive and gRPC applies message-size, keepalive and concurrent-RPC options.
 
 :::tip[Start simple, configure explicitly]
 
@@ -263,21 +263,21 @@ Constructs a built-in transport by its case-insensitive alias and imports option
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/config.py#L109"
 >
 
-`TransportConfig` is the immutable operational policy accepted by every built-in transport. Share one instance when an Agent, client, and Registry should use the same limits and retry behavior; construct a new instance to change policy.
+`TransportConfig` is the immutable operational policy accepted by every built-in transport. Share one instance when an Agent, client and Registry should use the same limits and retry behavior; construct a new instance to change policy.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="TransportConfig parameters">
     <ApiField name="limits" type="TransportLimits" defaultValue="TransportLimits()">
-      Bounds serialized request, response, and event sizes and the number of active unary requests and streams. Concurrency semaphores are maintained per event loop.
+      Bounds serialized request, response and event sizes and the number of active unary requests and streams. Concurrency semaphores are maintained per event loop.
     </ApiField>
     <ApiField name="retry" type="RetryPolicy" defaultValue="RetryPolicy()">
       Controls bounded retries. The default policy performs exactly one attempt, so creating a transport never enables retries implicitly.
     </ApiField>
     <ApiField name="keepalive_interval" type="float | None" defaultValue="20.0">
-      Seconds between WebSocket pings, the HTTP keep-alive expiry, and the gRPC keepalive interval. `None` disables the periodic HTTP/WebSocket setting and maps to a zero gRPC interval.
+      Seconds between WebSocket pings, the HTTP keep-alive expiry and the gRPC keepalive interval. `None` disables the periodic HTTP/WebSocket setting and maps to a zero gRPC interval.
     </ApiField>
     <ApiField name="keepalive_timeout" type="float" defaultValue="20.0">
-      Seconds allowed for WebSocket pong handling, Uvicorn idle keep-alive, and gRPC keepalive acknowledgement.
+      Seconds allowed for WebSocket pong handling, Uvicorn idle keep-alive and gRPC keepalive acknowledgement.
     </ApiField>
     <ApiField name="shutdown_timeout" type="float" defaultValue="5.0">
       Maximum wait for each loop-owned connection or channel closer. WebSocket also uses it as the connection close timeout. This is not a request deadline.
@@ -314,7 +314,7 @@ Constructs a built-in transport by its case-insensitive alias and imports option
 </ApiSection>
 
 <ApiCallout label="Serialization">
-  `Agent.to_dict()`, YAML serialization, and `Agent.from_dict()` preserve this configuration inside the serialized transport block. Certificate and transport-specific constructor settings are handled separately.
+  `Agent.to_dict()`, YAML serialization and `Agent.from_dict()` preserve this configuration inside the serialized transport block. Certificate and transport-specific constructor settings are handled separately.
 </ApiCallout>
 
 </ApiReference>
@@ -377,7 +377,7 @@ Limits protect the process from accidental overload; they are not authorization 
 
 </ApiReference>
 
-Choose byte limits from the largest valid serialized task your application expects, with headroom for envelope metadata. Choose concurrency limits from measured CPU, memory, downstream-service, and model-provider capacity. Higher values increase parallelism and peak resource use; they do not make an individual request faster.
+Choose byte limits from the largest valid serialized task your application expects, with headroom for envelope metadata. Choose concurrency limits from measured CPU, memory, downstream-service and model-provider capacity. Higher values increase parallelism and peak resource use; they do not make an individual request faster.
 
 Protocol-specific mapping:
 
@@ -385,9 +385,9 @@ Protocol-specific mapping:
 |-----------|-------------------------|--------------------------|
 | HTTP | Checked before outbound send and before server response; `httpx` pools use the request limit. | Uvicorn `limit_concurrency` plus per-loop client request slots. |
 | SSE JSON-RPC | HTTP request limits plus `max_event_bytes` for every SSE result. | HTTP concurrency plus a bounded active-stream semaphore. |
-| WebSocket | `websockets` frame size plus explicit request, response, and event checks. | Bounded frame queues, unary handler slots, and active-stream slots. |
+| WebSocket | `websockets` frame size plus explicit request, response and event checks. | Bounded frame queues, unary handler slots and active-stream slots. |
 | gRPC | Mapped to `grpc.max_send_message_length` and `grpc.max_receive_message_length`, with explicit envelope checks. | `maximum_concurrent_rpcs` defaults to `max_concurrent_requests`; streams also use active-stream slots. |
-| Runtime | Applies the caller transport's serialized request, response, and event checks despite not opening a socket. | Unary calls use the caller's outbound slot and the target's inbound slot. Live streams use the caller's stream slot; the target handler is not wrapped in a second stream slot. |
+| Runtime | Applies the caller transport's serialized request, response and event checks despite not opening a socket. | Unary calls use the caller's outbound slot and the target's inbound slot. Live streams use the caller's stream slot; the target handler is not wrapped in a second stream slot. |
 
 ### RetryPolicy
 
@@ -456,7 +456,7 @@ A request is retried only when all three conditions are true:
 
 The same request ID and idempotency key are retained across every attempt; only `TransportRequestContext.attempt` increases. Streams are never automatically retried because replaying a partial event sequence requires an application checkpoint.
 
-Built-in task submission, agent-card retrieval, cancellation, state description, registry discovery, registry heartbeat, and registry unregister requests declare idempotency. Mutating state compaction/reset operations and streaming requests do not.
+Built-in task submission, agent-card retrieval, cancellation, state description, registry discovery, registry heartbeat and registry unregister requests declare idempotency. Mutating state compaction/reset operations and streaming requests do not.
 
 The transport retries only typed `TransportError` failures marked `retryable=True`. Application exceptions and protocol errors that indicate invalid data are returned immediately because waiting and trying the same invalid operation again cannot repair them.
 
@@ -517,7 +517,7 @@ Immutable metadata for one logical unary request. A retry creates a new context 
 | gRPC | Envelope `id` and `x-protolink-request-id` metadata | Envelope `idempotency_key` and `idempotency-key` metadata |
 | Runtime | In-process `TransportRequestContext` | In-process namespaced operation key |
 
-Server-side keys are namespaced by method and path. The first request owns the operation; concurrent duplicates await its result, and later duplicates replay the completed result until the TTL expires. Failed or cancelled operations are released rather than cached, so a later request can try the operation again. This cache is process-local. Use a durable application-level idempotency store as well when operations must remain deduplicated across restarts or multiple server replicas.
+Server-side keys are namespaced by method and path. The first request owns the operation; concurrent duplicates await its result and later duplicates replay the completed result until the TTL expires. Failed or cancelled operations are released rather than cached, so a later request can try the operation again. This cache is process-local. Use a durable application-level idempotency store as well when operations must remain deduplicated across restarts or multiple server replicas.
 
 The TTL and cache size are memory bounds, not correctness guarantees. Once an entry expires or is evicted, the transport no longer remembers the operation. Deployments requiring long-lived exactly-once business effects should enforce a durable unique operation key in their storage layer as well.
 
@@ -584,7 +584,7 @@ Immutable class-level feature flags used by generic code instead of concrete-cla
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L61"
 >
 
-The base class centralizes limits, retry decisions, metrics, correlation, duplicate suppression, and loop-aware cleanup while concrete subclasses own their wire protocol. Most applications use `AgentClient` instead of calling its low-level methods.
+The base class centralizes limits, retry decisions, metrics, correlation, duplicate suppression and loop-aware cleanup while concrete subclasses own their wire protocol. Most applications use `AgentClient` instead of calling its low-level methods.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Transport constructor parameters">
@@ -658,7 +658,7 @@ Low-level unary primitive implemented by each transport and used by `AgentClient
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Transport send parameters">
     <ApiField name="request_spec" type="ClientRequestSpec" required>
-      Declares the method, path, request and response parsers, channel, and idempotency eligibility.
+      Declares the method, path, request and response parsers, channel and idempotency eligibility.
     </ApiField>
     <ApiField name="base_url" type="str" required>
       Destination agent or Registry URL.
@@ -683,7 +683,7 @@ Low-level unary primitive implemented by each transport and used by `AgentClient
 <ApiSection title="Raises">
   <ApiFields ariaLabel="Transport send errors">
     <ApiField name="TransportError">
-      Concrete transports raise typed connection, timeout, protocol, remote, and limit subclasses. Only eligible retryable failures enter the retry loop.
+      Concrete transports raise typed connection, timeout, protocol, remote and limit subclasses. Only eligible retryable failures enter the retry loop.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -702,7 +702,7 @@ Low-level unary primitive implemented by each transport and used by `AgentClient
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L108"
 >
 
-Low-level task-event stream. HTTP's base implementation does not support it; Runtime, SSE JSON-RPC, WebSocket, and gRPC override it.
+Low-level task-event stream. HTTP's base implementation does not support it; Runtime, SSE JSON-RPC, WebSocket and gRPC override it.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="Transport subscribe parameters">
@@ -746,12 +746,12 @@ Low-level task-event stream. HTTP's base implementation does not support it; Run
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/base.py#L163"
 >
 
-Returns a JSON-compatible point-in-time view of lifecycle state, identity, declared capabilities, and local transport metrics.
+Returns a JSON-compatible point-in-time view of lifecycle state, identity, declared capabilities and local transport metrics.
 
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Transport health return value">
     <ApiField name="health" type="dict[str, Any]">
-      Contains `status`, `ready`, `transport`, `url`, `capabilities`, and `metrics`. `status` is `"ready"` while running and `"stopped"` otherwise.
+      Contains `status`, `ready`, `transport`, `url`, `capabilities` and `metrics`. `status` is `"ready"` while running and `"stopped"` otherwise.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -760,13 +760,13 @@ Returns a JSON-compatible point-in-time view of lifecycle state, identity, decla
 
 #### Custom transport contract
 
-A custom transport subclasses `Transport`, calls `super().__init__(config=config)`, declares its class capabilities, and implements `send`, `setup_routes`, `start`, `stop`, `validate_url`, and `url`. Streaming transports also override `subscribe`.
+A custom transport subclasses `Transport`, calls `super().__init__(config=config)`, declares its class capabilities and implements `send`, `setup_routes`, `start`, `stop`, `validate_url` and `url`. Streaming transports also override `subscribe`.
 
-The split is intentional: the custom class implements the wire protocol, while the inherited helpers preserve the same safety contract as built-in transports. A typical outbound implementation creates a request context, checks the request size, enters `request_slot()`, and calls `run_with_retries()` around the actual protocol operation. An inbound implementation enters `inbound_request_slot()`, claims any idempotency key, invokes the endpoint, checks the response, and then completes or aborts the idempotent result.
+The split is intentional: the custom class implements the wire protocol, while the inherited helpers preserve the same safety contract as built-in transports. A typical outbound implementation creates a request context, checks the request size, enters `request_slot()` and calls `run_with_retries()` around the actual protocol operation. An inbound implementation enters `inbound_request_slot()`, claims any idempotency key, invokes the endpoint, checks the response and then completes or aborts the idempotent result.
 
 The base class exposes reusable extension hooks so custom transports can preserve the built-in operational contract:
 
-<ApiSection title="Correlation, payloads, and retries">
+<ApiSection title="Correlation, payloads and retries">
   <ApiFields ariaLabel="Transport reliability extension methods">
     <ApiField name="new_request_context(request_spec, data=None)" type="TransportRequestContext">
       Generates a correlation ID and, for idempotent specifications, a stable operation key derived from `id`, `task_id`, `agent_url`, or the generated request ID.
@@ -778,7 +778,7 @@ The base class exposes reusable extension hooks so custom transports can preserv
       Measures and enforces the configured `"request"`, `"response"`, or `"event"` limit, returning the measured byte count or raising `TransportLimitError`.
     </ApiField>
     <ApiField name="run_with_retries(request_spec, context, operation)" type="Awaitable[Any]">
-      Executes an async operation with request outcome metrics and the configured eligibility, backoff, and jitter rules. Ordinary application exceptions are recorded and re-raised without retry.
+      Executes an async operation with request outcome metrics and the configured eligibility, backoff and jitter rules. Ordinary application exceptions are recorded and re-raised without retry.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -789,10 +789,10 @@ The base class exposes reusable extension hooks so custom transports can preserv
       Bounds outbound unary work and records admission. Pair it with `run_with_retries()` for complete outcome metrics.
     </ApiField>
     <ApiField name="inbound_request_slot()" type="AsyncContextManager[None]">
-      Bounds inbound unary handler work and records success, failure, latency, and active-request gauges.
+      Bounds inbound unary handler work and records success, failure, latency and active-request gauges.
     </ApiField>
     <ApiField name="stream_slot()" type="AsyncContextManager[None]">
-      Bounds a complete stream lifetime and records stream completion, failure, cancellation, and active-stream gauges.
+      Bounds a complete stream lifetime and records stream completion, failure, cancellation and active-stream gauges.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -958,7 +958,7 @@ Base exception for protocol-neutral transport failures. Typed subclasses let cal
       Correlation identifier for the logical request.
     </ApiField>
     <ApiField name="retryable" type="bool" defaultValue="False">
-      Whether the failure category permits a retry. The request specification, method, and retry policy must also allow one.
+      Whether the failure category permits a retry. The request specification, method and retry policy must also allow one.
     </ApiField>
     <ApiField name="status_code" type="int | str | None" defaultValue="None">
       Optional HTTP integer or protocol-native string such as a gRPC status name.
@@ -1009,7 +1009,7 @@ except TransportError as exc:
 
 ### Health and readiness
 
-Health endpoints exist for process managers, container orchestrators, load balancers, and human diagnostics. They provide a cheap answer without submitting a real task or requiring model-provider access.
+Health endpoints exist for process managers, container orchestrators, load balancers and human diagnostics. They provide a cheap answer without submitting a real task or requiring model-provider access.
 
 - `transport.health()` is useful from Python code and always returns JSON-safe data.
 - `GET /healthz` and `GET /readyz` expose the same conservative payload over HTTP-compatible Agent and Registry servers.
@@ -1057,7 +1057,7 @@ See [`examples/transport_production.py`](https://github.com/nMaroulis/protolink/
 
 ## TLS and mutual TLS
 
-TLS is transport security: it encrypts traffic and verifies certificates before ProtoLink sends any task data. It is separate from application authentication. Use `TLSConfig` for HTTPS, secure WebSockets, and secure gRPC; use an `Authenticator` for bearer tokens, API keys, Basic auth, or OAuth. Production services commonly use both.
+TLS is transport security: it encrypts traffic and verifies certificates before ProtoLink sends any task data. It is separate from application authentication. Use `TLSConfig` for HTTPS, secure WebSockets and secure gRPC; use an `Authenticator` for bearer tokens, API keys, Basic auth, or OAuth. Production services commonly use both.
 
 Configure TLS on the network transport that owns the socket and certificate identity:
 
@@ -1109,7 +1109,7 @@ The URL scheme activates encryption. The transport name does not change:
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/security/tls.py#L20"
 >
 
-Immutable certificate configuration shared by HTTP/SSE, WebSocket, and gRPC. Path-like values are normalized with `os.fspath()` during construction; certificate contents are loaded only when a context or credential bundle is created.
+Immutable certificate configuration shared by HTTP/SSE, WebSocket and gRPC. Path-like values are normalized with `os.fspath()` during construction; certificate contents are loaded only when a context or credential bundle is created.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="TLSConfig parameters">
@@ -1142,10 +1142,10 @@ Immutable certificate configuration shared by HTTP/SSE, WebSocket, and gRPC. Pat
 <ApiSection title="Methods">
   <ApiFields ariaLabel="TLSConfig methods">
     <ApiField name="create_server_context()" type="ssl.SSLContext">
-      Builds a TLS 1.2-or-newer server context, loads the certificate chain, and configures optional client-certificate verification.
+      Builds a TLS 1.2-or-newer server context, loads the certificate chain and configures optional client-certificate verification.
     </ApiField>
     <ApiField name="create_client_context()" type="ssl.SSLContext">
-      Builds a verified client context using `cafile` or system roots, applies hostname policy, and loads the optional mTLS identity.
+      Builds a verified client context using `cafile` or system roots, applies hostname policy and loads the optional mTLS identity.
     </ApiField>
     <ApiField name="require_server_identity(url=None)" type="None">
       Raises `ValueError` when a secure server is started without both identity files.
@@ -1216,7 +1216,7 @@ client_tls = TLSConfig(
 )
 ```
 
-Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport`, and `GRPCTransport` instances accept `tls=`. `Agent`, `AgentClient`, and `Registry` keep transport security out of their constructors: pass a configured transport object instead. `Agent.to_dict()` and `to_yaml()` serialize certificate paths inside the transport block; private-key contents are never embedded.
+Directly constructed `HTTPTransport`, `SSEJSONRPCTransport`, `WebSocketTransport` and `GRPCTransport` instances accept `tls=`. `Agent`, `AgentClient` and `Registry` keep transport security out of their constructors: pass a configured transport object instead. `Agent.to_dict()` and `to_yaml()` serialize certificate paths inside the transport block; private-key contents are never embedded.
 
 :::note[TLS termination]
 
@@ -1241,12 +1241,12 @@ Native TLS is useful for direct service exposure and end-to-end mTLS. It is also
   cards={[
     {
       title: "Request response",
-      text: "Submit tasks, discover agents, fetch cards, and call registry endpoints over simple JSON HTTP.",
+      text: "Submit tasks, discover agents, fetch cards and call registry endpoints over simple JSON HTTP.",
       code: "HTTPTransport",
     },
     {
       title: "Streaming",
-      text: "Emit task status, LLM chunks, tool events, artifacts, and final completion updates over SSE, WebSocket, gRPC, or runtime streams.",
+      text: "Emit task status, LLM chunks, tool events, artifacts and final completion updates over SSE, WebSocket, gRPC, or runtime streams.",
       code: "subscribe()",
     },
     {
@@ -1272,7 +1272,7 @@ Agent-facing transports should preserve the same logical contract even when thei
 - Control-plane routes such as `POST /tasks/cancel` and registry heartbeats must not depend on the active request/stream connection.
 - Request parsers may be synchronous or asynchronous; transports must normalize both.
 
-The repository includes `tests/test_transport_conformance.py` to keep Runtime, HTTP, WebSocket, and gRPC behavior aligned. Add new transports to that suite before treating them as production-ready.
+The repository includes `tests/test_transport_conformance.py` to keep Runtime, HTTP, WebSocket and gRPC behavior aligned. Add new transports to that suite before treating them as production-ready.
 
 ---
 
@@ -1317,8 +1317,8 @@ The repository includes `tests/test_transport_conformance.py` to keep Runtime, H
 | Transport | How endpoint specs are exposed |
 |-----------|--------------------------------|
 | `HTTPTransport` | Starlette/FastAPI mounts physical HTTP routes. Browser pages are available at `<base-url>/status` and `<base-url>/chat`. |
-| `SSEJSONRPCTransport` | Same HTTP routes as `HTTPTransport`, plus `POST /tasks/stream` as `text/event-stream`. The aliases `"sse"`, `"json-rpc"`, and `"sse-json-rpc"` all use this transport. |
-| `WebSocketTransport` | Endpoint specs are cached in memory and selected by JSON frames containing `id`, `method`, and `path`. A plain browser `GET /status` is not served. |
+| `SSEJSONRPCTransport` | Same HTTP routes as `HTTPTransport`, plus `POST /tasks/stream` as `text/event-stream`. The aliases `"sse"`, `"json-rpc"` and `"sse-json-rpc"` all use this transport. |
+| `WebSocketTransport` | Endpoint specs are cached in memory and selected by JSON frames containing `id`, `method` and `path`. A plain browser `GET /status` is not served. |
 | `GRPCTransport` | Endpoint specs are cached in memory and selected by JSON envelopes sent to the generic `Invoke` or `Stream` gRPC methods. A plain browser `GET /status` is not served. |
 | `RuntimeTransport` | Endpoint specs are cached in the process-local transport registry and called directly through `AgentClient`. No socket or browser surface is created. |
 
@@ -1328,7 +1328,7 @@ The browser pages themselves are not separate servers. Agent status and registry
 
 ## HTTPTransport
 
-`HTTPTransport` is the main network transport for communication in Protolink. It handles native Agent-to-Agent JSON HTTP APIs and Registry operations. On an `Agent`, `a2a=True` adds the canonical A2A 1.0 inbound routes and enables outbound translation through the same transport, preserving its TLS, authentication, pooling, limits, and metrics.
+`HTTPTransport` is the main network transport for communication in Protolink. It handles native Agent-to-Agent JSON HTTP APIs and Registry operations. On an `Agent`, `a2a=True` adds the canonical A2A 1.0 inbound routes and enables outbound translation through the same transport, preserving its TLS, authentication, pooling, limits and metrics.
 
 ### Overview
 
@@ -1396,7 +1396,7 @@ transport = HTTPTransport(url="http://localhost:8000", backend="fastapi", valida
 
 :::note[Recursive JSON normalization]
 
-Starlette and FastAPI normalize transport results recursively before JSON encoding. Nested Protolink dataclasses such as `ToolOutput`, objects exposing `to_dict()` or `model_dump()`, mappings, and collections are converted into JSON-compatible values even when they appear inside event content or metadata. WebSocket responses use the same normalization path.
+Starlette and FastAPI normalize transport results recursively before JSON encoding. Nested Protolink dataclasses such as `ToolOutput`, objects exposing `to_dict()` or `model_dump()`, mappings and collections are converted into JSON-compatible values even when they appear inside event content or metadata. WebSocket responses use the same normalization path.
 
 :::
 ```json
@@ -1432,7 +1432,7 @@ The tables below document each object type.
 | `metadata`   | `dict[str, Any]` | Arbitrary metadata attached to the task, including optional `state_history`. |
 | `created_at` | `str`            | ISO‑8601 timestamp (UTC).                     |
 
-`completed`, `failed`, and `canceled` are terminal states. Default agents move incoming tasks to `working` before execution and then finish them as `completed`, `input-required`, or `failed` depending on the produced outputs.
+`completed`, `failed` and `canceled` are terminal states. Default agents move incoming tasks to `working` before execution and then finish them as `completed`, `input-required`, or `failed` depending on the produced outputs.
 
 ProtoLink's native `POST /tasks/cancel` endpoint accepts a task-ID payload such as `{"id": "task-id", "metadata": {"reason": "Stopped by user"}}`. The response is the updated serialized `Task`. The endpoint controls active execution only; it is not a durable task lookup API. The A2A 1.0 HTTP adapter exposes the canonical `CancelTask` operation separately.
 
@@ -1601,7 +1601,7 @@ Dual-role HTTP client/server transport. It mounts an ASGI backend for inbound en
       Certificate identity and trust settings. An HTTPS server requires a local identity.
     </ApiField>
     <ApiField name="config" type="TransportConfig | None" defaultValue="None">
-      Shared limits, retries, keepalive, cleanup, idempotency, and metrics policy.
+      Shared limits, retries, keepalive, cleanup, idempotency and metrics policy.
     </ApiField>
     <ApiField name="log_level" type="str" defaultValue={'"info"'}>
       Uvicorn log level forwarded to the selected backend.
@@ -1641,10 +1641,10 @@ Dual-role HTTP client/server transport. It mounts an ASGI backend for inbound en
       Mounts `EndpointSpec` values on the selected backend. `AgentServer` and `RegistryServer` call this before startup.
     </ApiField>
     <ApiField name="start()" type="Awaitable[None]">
-      Starts the backend, marks the transport running, and primes a client for the current loop. Calling it while running is a no-op.
+      Starts the backend, marks the transport running and primes a client for the current loop. Calling it while running is a no-op.
     </ApiField>
     <ApiField name="stop()" type="Awaitable[None]">
-      Stops the backend, closes all loop-local clients on their owning loops, and clears lifecycle state. Repeated calls are safe.
+      Stops the backend, closes all loop-local clients on their owning loops and clears lifecycle state. Repeated calls are safe.
     </ApiField>
     <ApiField name="validate_url()" type="bool">
       Returns `True` for configured `http://` and `https://` URLs.
@@ -1668,12 +1668,12 @@ Dual-role HTTP client/server transport. It mounts an ASGI backend for inbound en
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py#L146"
 >
 
-Serializes and size-checks one unary operation, applies correlation, idempotency, and authentication headers, and parses the JSON response through the request specification.
+Serializes and size-checks one unary operation, applies correlation, idempotency and authentication headers and parses the JSON response through the request specification.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="HTTPTransport send parameters">
     <ApiField name="request_spec" type="ClientRequestSpec" required>
-      Supplies the HTTP method, path, parsers, and retry/idempotency metadata.
+      Supplies the HTTP method, path, parsers and retry/idempotency metadata.
     </ApiField>
     <ApiField name="base_url" type="str" required>
       Destination HTTP or HTTPS base URL.
@@ -1758,7 +1758,7 @@ Asks the configured authenticator to create an outbound security context. Future
 
 ## RuntimeTransport
 
-`RuntimeTransport` is an in-process, in-memory transport that enables agents to communicate directly without network overhead. Perfect for testing, local multi-agent setups, and rapid prototyping.
+`RuntimeTransport` is an in-process, in-memory transport that enables agents to communicate directly without network overhead. Perfect for testing, local multi-agent setups and rapid prototyping.
 
 ### Overview
 
@@ -1832,7 +1832,7 @@ async def main() -> None:
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/runtime_transport.py#L31"
 >
 
-Process-local transport that routes calls through registered Python objects while retaining the same serialization, byte-limit, concurrency, retry, idempotency, metrics, and endpoint-parser boundaries as network transports.
+Process-local transport that routes calls through registered Python objects while retaining the same serialization, byte-limit, concurrency, retry, idempotency, metrics and endpoint-parser boundaries as network transports.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="RuntimeTransport constructor parameters">
@@ -1860,7 +1860,7 @@ Process-local transport that routes calls through registered Python objects whil
       In-process, streaming, non-networked capability declaration.
     </ApiField>
     <ApiField name="metrics" type="TransportMetricsSnapshot">
-      Current immutable request, stream, retry, byte, and latency snapshot.
+      Current immutable request, stream, retry, byte and latency snapshot.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1877,7 +1877,7 @@ Process-local transport that routes calls through registered Python objects whil
       Registers `self` under its URL and marks it running. Calling it while already running is a no-op.
     </ApiField>
     <ApiField name="stop()" type="Awaitable[None]">
-      Unregisters the instance, clears every cached endpoint, and marks it stopped.
+      Unregisters the instance, clears every cached endpoint and marks it stopped.
     </ApiField>
     <ApiField name="validate_url()" type="bool">
       Returns `True` when the configured URL starts with `runtime://`.
@@ -1914,7 +1914,7 @@ Finds the target instance and endpoint in memory and crosses the request and res
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="RuntimeTransport send parameters">
     <ApiField name="request_spec" type="ClientRequestSpec" required>
-      Method/path contract, parsers, and retry/idempotency declaration.
+      Method/path contract, parsers and retry/idempotency declaration.
     </ApiField>
     <ApiField name="base_url" type="str" required>
       URL of a started Runtime transport in this process.
@@ -2048,7 +2048,7 @@ Use it when:
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/websocket_transport.py#L36"
 >
 
-Bidirectional JSON-envelope transport with loop-local persistent connections. Unary requests are serialized per connection, and request specifications marked for the control channel use a separate connection so cancellation does not wait behind active default-channel work.
+Bidirectional JSON-envelope transport with loop-local persistent connections. Unary requests are serialized per connection and request specifications marked for the control channel use a separate connection so cancellation does not wait behind active default-channel work.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="WebSocketTransport constructor parameters">
@@ -2068,7 +2068,7 @@ Bidirectional JSON-envelope transport with loop-local persistent connections. Un
       Certificate and trust settings. A WSS server requires a local identity; clients without an explicit configuration use the WebSocket library's default verified TLS behavior.
     </ApiField>
     <ApiField name="config" type="TransportConfig | None" defaultValue="None">
-      Frame limits, slots, ping/pong keepalive, retry, shutdown, idempotency, and metrics policy.
+      Frame limits, slots, ping/pong keepalive, retry, shutdown, idempotency and metrics policy.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2102,10 +2102,10 @@ Bidirectional JSON-envelope transport with loop-local persistent connections. Un
       Caches endpoint specifications for method/path frame dispatch.
     </ApiField>
     <ApiField name="start()" type="Awaitable[None]">
-      Starts the server with configured frame, queue, ping, TLS, and concurrency settings. Calling it while running is a no-op.
+      Starts the server with configured frame, queue, ping, TLS and concurrency settings. Calling it while running is a no-op.
     </ApiField>
     <ApiField name="stop()" type="Awaitable[None]">
-      Closes loop-local client connections, locks, and the server, then marks the transport stopped.
+      Closes loop-local client connections, locks and the server, then marks the transport stopped.
     </ApiField>
     <ApiField name="validate_url()" type="bool">
       Returns `True` for configured `ws://` and `wss://` URLs.
@@ -2145,7 +2145,7 @@ Sends one correlated JSON request envelope and waits under the connection's lock
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="WebSocketTransport send parameters">
     <ApiField name="request_spec" type="ClientRequestSpec" required>
-      Supplies method, path, channel, parsers, and idempotency metadata.
+      Supplies method, path, channel, parsers and idempotency metadata.
     </ApiField>
     <ApiField name="base_url" type="str" required>
       Destination WebSocket URL.
@@ -2288,7 +2288,7 @@ Creates an outbound authentication context whose headers are included in later W
 
 - `send_task()` and `get_agent_card()` use the unary `Invoke` method.
 - `send_task_streaming()` uses the unary-stream `Stream` method.
-- Control-plane calls such as cancellation, state operations, and history compaction use the same request-spec envelopes as other transports.
+- Control-plane calls such as cancellation, state operations and history compaction use the same request-spec envelopes as other transports.
 
 Install the optional dependency with:
 
@@ -2325,7 +2325,7 @@ The gRPC service name is `protolink.transport.v1.ProtolinkTransport`. It exposes
 
 | Method | Shape | Purpose |
 |--------|-------|---------|
-| `Invoke` | unary -> unary | Agent cards, task submission, registry calls, and control-plane operations. |
+| `Invoke` | unary -> unary | Agent cards, task submission, registry calls and control-plane operations. |
 | `Stream` | unary -> stream | Task event streams for `POST /tasks/stream`. |
 
 Each gRPC message is a JSON envelope carried as UTF-8 bytes:
@@ -2409,7 +2409,7 @@ Generic `grpc.aio` client/server transport. It multiplexes transport-neutral end
       Certificate identity and trust settings. A GRPCS server requires an identity; a GRPCS client without this object uses system roots.
     </ApiField>
     <ApiField name="config" type="TransportConfig | None" defaultValue="None">
-      Shared limits, retries, keepalive, cleanup, idempotency, and metrics policy.
+      Shared limits, retries, keepalive, cleanup, idempotency and metrics policy.
     </ApiField>
     <ApiField name="enable_health" type="bool" defaultValue="True">
       Registers the standard gRPC health service when its optional support package is importable.
@@ -2449,10 +2449,10 @@ Generic `grpc.aio` client/server transport. It multiplexes transport-neutral end
       Caches endpoint specifications by uppercase method and path.
     </ApiField>
     <ApiField name="start()" type="Awaitable[None]">
-      Starts the generic service, optional health and reflection services, and native TLS when selected. Calling it while running is a no-op.
+      Starts the generic service, optional health and reflection services and native TLS when selected. Calling it while running is a no-op.
     </ApiField>
     <ApiField name="stop()" type="Awaitable[None]">
-      Marks health not-serving, gives RPCs their graceful timeout, stops the server, and closes loop-local channels.
+      Marks health not-serving, gives RPCs their graceful timeout, stops the server and closes loop-local channels.
     </ApiField>
     <ApiField name="validate_url()" type="bool">
       Returns `True` for configured `grpc://` and `grpcs://` URLs.
@@ -2499,7 +2499,7 @@ Encodes one request as JSON bytes, invokes the peer's generic unary method with 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="GRPCTransport send parameters">
     <ApiField name="request_spec" type="ClientRequestSpec" required>
-      Supplies the routed method/path, parsers, and retry/idempotency declaration.
+      Supplies the routed method/path, parsers and retry/idempotency declaration.
     </ApiField>
     <ApiField name="base_url" type="str" required>
       Destination gRPC or GRPCS URL.
@@ -2640,7 +2640,7 @@ Use it when:
 
 - You want live task progress in a CLI or browser without managing WebSocket state.
 - You need streaming over infrastructure that already supports HTTP.
-- You want a structured envelope with request ids, `ok` status, `result` payloads, and final markers.
+- You want a structured envelope with request ids, `ok` status, `result` payloads and final markers.
 
 ### Client Usage
 
@@ -2655,7 +2655,7 @@ async for event in client.send_task_streaming("http://localhost:8010", task):
     print(event)
 ```
 
-The aliases `"sse"`, `"json-rpc"`, and `"sse-json-rpc"` all resolve to `SSEJSONRPCTransport`.
+The aliases `"sse"`, `"json-rpc"` and `"sse-json-rpc"` all resolve to `SSEJSONRPCTransport`.
 
 ### Wire Format
 
@@ -2667,7 +2667,7 @@ data: {"jsonrpc":"2.0","id":"...","ok":true,"result":{"type":"task_llm_stream"},
 
 The stream ends when `final` is `true`. If an error occurs, the envelope uses `ok: false` and includes an `error` object.
 
-Event results are normalized recursively before the SSE frame is encoded. For example, a `TaskLLMStreamEvent` carrying a delegated tool result inside `metadata` sends the structured `ToolOutput` fields (`call_id`, `result`, and `error`) as JSON rather than failing the stream when it encounters the Python dataclass. The same guarantee applies to WebSocket stream payloads.
+Event results are normalized recursively before the SSE frame is encoded. For example, a `TaskLLMStreamEvent` carrying a delegated tool result inside `metadata` sends the structured `ToolOutput` fields (`call_id`, `result` and `error`) as JSON rather than failing the stream when it encounters the Python dataclass. The same guarantee applies to WebSocket stream payloads.
 
 ### API
 
@@ -2718,7 +2718,7 @@ HTTPTransport subclass that keeps the inherited unary API and ASGI lifecycle whi
       HTTPS certificate and trust settings.
     </ApiField>
     <ApiField name="config" type="TransportConfig | None" defaultValue="None">
-      Shared unary and stream limits, slots, retries, cleanup, idempotency, and metrics.
+      Shared unary and stream limits, slots, retries, cleanup, idempotency and metrics.
     </ApiField>
     <ApiField name="log_level" type="str" defaultValue={'"info"'}>
       Uvicorn log level.
@@ -2732,7 +2732,7 @@ HTTPTransport subclass that keeps the inherited unary API and ASGI lifecycle whi
 <ApiSection title="Inherited surface">
   <ApiFields ariaLabel="SSEJSONRPCTransport inherited members">
     <ApiField name="send(...)" type="Awaitable[Any]">
-      Uses `HTTPTransport.send()` for ordinary request/response calls, including its pooling, retries, limits, authentication, and error mapping.
+      Uses `HTTPTransport.send()` for ordinary request/response calls, including its pooling, retries, limits, authentication and error mapping.
     </ApiField>
     <ApiField name="setup_routes(...) | start() | stop()" type="inherited">
       Uses the HTTP ASGI route and lifecycle implementation. The server adds `POST /tasks/stream` from the Agent endpoint specifications.
@@ -2757,7 +2757,7 @@ HTTPTransport subclass that keeps the inherited unary API and ASGI lifecycle whi
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/sse_jsonrpc_transport.py#L40"
 >
 
-Posts a task to `/tasks/stream`, parses `text/event-stream` data frames as ProtoLink JSON-RPC envelopes, and yields each successful result.
+Posts a task to `/tasks/stream`, parses `text/event-stream` data frames as ProtoLink JSON-RPC envelopes and yields each successful result.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SSEJSONRPCTransport subscribe parameters">

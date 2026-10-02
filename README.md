@@ -14,15 +14,15 @@
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/banner.png" alt="ProtoLink logo" width="60%">
 </div>
 
-ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python framework for building **pluggable agents** and multi-agent systems. It began as an A2A-based alternative to chain-centric frameworks such as LangChain: instead of organizing an application around chains of model calls, ProtoLink treats each `Agent` as a self-contained runtime entity with identity, capabilities, lifecycle, tools, optional reasoning, and direct task-based communication.
+ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specification/)-first Python framework for building **pluggable agents** and multi-agent systems. It began as an A2A-based alternative to chain-centric frameworks such as LangChain: instead of organizing an application around chains of model calls, ProtoLink treats each `Agent` as a self-contained runtime entity with identity, capabilities, lifecycle, tools, optional reasoning and direct task-based communication.
 
-A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, structured agent flows and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
+A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part` and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, structured agent flows and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
 
 The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, application knowledge for **RAG**, built-in, native, or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
 
 ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, vLLM, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
 
-The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hosted model SDKs, MCP, telemetry providers, and other integrations are installed only when you choose them.
+The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hosted model SDKs, MCP, telemetry providers and other integrations are installed only when you choose them.
 
 > **Simple by default. Explicit when it matters.**
 
@@ -33,13 +33,13 @@ The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hoste
 - **Pluggable by design** - compose an agent from independent modules instead of adopting a mandatory stack.
 - **Progressive control** - start with names and aliases, then configure or replace individual components through the same API.
 - **Local first, distributed when needed** - develop with no network or provider, then move the same task contract to HTTP, SSE JSON-RPC, WebSocket, or gRPC.
-- **Friendly to smaller models** - one-action-at-a-time inference, schema validation, JSON fallback, and deterministic flows reduce reliance on hidden prompt behavior.
-- **Explicit and inspectable** - tool calls, delegation, task state, policy decisions, approvals, runtime events, traces, and reports have typed representations.
-- **A2A at the core** - agents communicate through cards, tasks, messages, parts, and artifacts rather than framework-private graph state.
+- **Friendly to smaller models** - one-action-at-a-time inference, schema validation, JSON fallback and deterministic flows reduce reliance on hidden prompt behavior.
+- **Explicit and inspectable** - tool calls, delegation, task state, policy decisions, approvals, runtime events, traces and reports have typed representations.
+- **A2A at the core** - agents communicate through cards, tasks, messages, parts and artifacts rather than framework-private graph state.
 
-Focus on the agent's role and capabilities. ProtoLink handles the infer loop, validated tool execution, delegation, communication, lifecycle, and the operational modules around them.
+Focus on the agent's role and capabilities. ProtoLink handles the infer loop, validated tool execution, delegation, communication, lifecycle and the operational modules around them.
 
-ProtoLink also works as an engine for **coding agents and other agent applications**. Authorized command execution, recoverable file edits, cancellation, and execution limits help applications handle real work reliably. Typed outcomes and completion checks distinguish an approved plan from an executed, verified result, while bounded workflows keep repair attempts under control. The same lifecycle, policy, and reporting primitives support research assistants, data processing, and operational automation. See the [execution and recovery guide](docs/content/execution-tools.md) and [runnable examples](examples/runtime_capabilities/). Local command execution runs on the host and is not a sandbox.
+ProtoLink also works as an engine for **coding agents and other agent applications**. Authorized command execution, recoverable file edits, cancellation and execution limits help applications handle real work reliably. Typed outcomes and completion checks distinguish an approved plan from an executed, verified result, while bounded workflows keep repair attempts under control. The same lifecycle, policy and reporting primitives support research assistants, data processing and operational automation. See the [execution and recovery guide](docs/content/execution-tools.md) and [runnable examples](examples/runtime_capabilities/). Local command execution runs on the host and is not a sandbox.
 
 ## Start with one agent
 
@@ -64,7 +64,7 @@ agent = Agent(name="calculator", tools=[add])
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-This example needs no model, API key, server, or network connection. The function name, docstring, and type hints become the tool's public metadata and argument schema. `@agent.tool` and `@agent.tool()` also work; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
+This example needs no model, API key, server, or network connection. The function name, docstring and type hints become the tool's public metadata and argument schema. `@agent.tool` and `@agent.tool()` also work; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
 
 Choose the result you need:
 
@@ -72,7 +72,7 @@ Choose the result you need:
 | --- | --- | --- |
 | Call a known tool | `agent.sync.call_tool("add", a=2, b=3)` | The validated, authorized tool's raw result |
 | Let a model respond or choose tools | `agent.sync.invoke("What is 2 + 3?")` | Final part content; requires an LLM |
-| Keep task state, artifacts, and metadata | `agent.sync.run_task(task)` | The complete `Task` |
+| Keep task state, artifacts and metadata | `agent.sync.run_task(task)` | The complete `Task` |
 
 In async applications and notebooks with an active event loop, use `await agent.call_tool(...)`, `await agent.invoke(...)`, or `await agent.run_task(...)`.
 
@@ -85,7 +85,7 @@ agent.llm = create_llm("mock", default_response="Hello from ProtoLink")
 print(agent.sync.invoke("Say hello"))
 ```
 
-`invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect, and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
+`invoke()` and the retrieval helper `ask()` raise `TaskExecutionError` when execution returns a failed or canceled task; the exception's `.task` retains the details. `run_task()` returns task states for your application to inspect and `task.raise_for_status()` adds the same explicit check. Exceptions raised directly by handlers keep their original types. See the [Agent API](https://nmaroulis.github.io/protolink/docs/agent/).
 
 ## Progressive control
 
@@ -125,8 +125,8 @@ agent = Agent(card=card, llm=llm, transport=transport, tools=[add])
 
 `card=card.to_dict()` works too, since card also accepts dictionaries. Mix defaults and configured objects independently,
 for example `Agent(name="helper", llm=llm)`, or supply your own implementations of
-LLM, tool, and transport interfaces. The same pattern extends to storage, state,
-knowledge, and observability; execution stays on `invoke`, `.sync`, and task APIs.
+LLM, tool and transport interfaces. The same pattern extends to storage, state,
+knowledge and observability; execution stays on `invoke`, `.sync` and task APIs.
 
 These Gemini examples need `uv add "protolink[gemini]"` and `GEMINI_API_KEY` as an environment variable or pass api key directly into the constructor.
 Name-only agents need no transport; network aliases such as `transport="http"`
@@ -134,7 +134,7 @@ require an explicit `url=` with a port. A configured transport can supply its ow
 URL. Construction does not start a server.
 
 See the [progressive-control guide](docs/content/progressive-control.md) for
-component configuration, per-run budgets, and complete task control.
+component configuration, per-run budgets and complete task control.
 
 ## Your first agent mesh
 
@@ -170,11 +170,11 @@ finally:
     registry.stop()
 ```
 
-Agents register automatically, discover each other, and exchange tasks directly. Add models, tools, or more agents as you grow—the same API works across processes and machines.
+Agents register automatically, discover each other and exchange tasks directly. Add models, tools or more agents as you grow. The same API works across processes and machines.
 
 ## Plug in only what the agent needs
 
-**The constructor is the composition surface**. This expanded example uses a local Ollama model, registry discovery, SQLite state and run storage, local telemetry, authentication, file logging, dependency-free built-in web search, a native Python tool, and tools from an **MCP server**:
+**The constructor is the composition surface**. This expanded example uses a local Ollama model, registry discovery, SQLite state and run storage, local telemetry, authentication, file logging, dependency-free built-in web search, a native Python tool and tools from an **MCP server**:
 
 ```python
 from protolink import (
@@ -228,13 +228,13 @@ planner_agent.sync.add_mcp(
 planner_agent.start()
 ```
 
-Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. Registering the tool performs no network request. Remove any constructor argument or tool you do not need, or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies, and observability backends.
+Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. Registering the tool performs no network request. Remove any constructor argument or tool you do not need, or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies and observability backends.
 
-`MCPToolAdapter` supports local stdio, Streamable HTTP, and legacy SSE servers. Use
+`MCPToolAdapter` supports local stdio, Streamable HTTP and legacy SSE servers. Use
 `await agent.add_mcp(transport="streamable_http", url="https://example.com/mcp")`
 for Streamable HTTP. MCP tools retain their JSON schemas and follow the same policy,
-execution, and telemetry path as native tools. Plain text results remain strings;
-rich results preserve all content blocks, structured data, and metadata. Tool errors
+execution and telemetry path as native tools. Plain text results remain strings;
+rich results preserve all content blocks, structured data and metadata. Tool errors
 raise `MCPToolError`. Use `async with adapter.session()` to reuse a connection.
 See the [MCP guide](docs/content/tool.md#mcp-tools) for result and lifecycle details.
 
@@ -286,7 +286,7 @@ For LLM-backed agents, the **infer loop** is the heart of ProtoLink:
 4. The structured result is added to the task context.
 5. The loop repeats until completion or a configured bound is reached.
 
-Providers with reliable native tool calling use it. Local and smaller models can use the JSON fallback, which exposes the same `tool_call`, `agent_call`, and `final` action contract without depending on a provider-specific SDK feature.
+Providers with reliable native tool calling use it. Local and smaller models can use the JSON fallback, which exposes the same `tool_call`, `agent_call` and `final` action contract without depending on a provider-specific SDK feature.
 
 `agent_call` has two delegation modes: `tool_call` asks another agent to execute one of its tools, while `infer` asks that agent's LLM to handle a prompt and initiates the other agent's **infer loop**.
 
@@ -308,11 +308,11 @@ local_agent = Agent(
 )
 ```
 
-Swap `"ollama"` for another built-in or custom `LLM`; the agent, tools, tasks, and flows do not change.
+Swap `"ollama"` for another built-in or custom `LLM`; the agent, tools, tasks and flows do not change.
 
 ## Structured flows
 
-Agents can choose their own next action, but not every workflow should be probabilistic. `Pipeline`, `Parallel`, `Router`, and `Graph` provide explicit, deterministic topology while keeping every step on the same `Task -> Task` contract.
+Agents can choose their own next action, but not every workflow should be probabilistic. `Pipeline`, `Parallel`, `Router` and `Graph` provide explicit, deterministic topology while keeping every step on the same `Task -> Task` contract.
 
 ```python
 from protolink import Pipeline, Task
@@ -330,7 +330,7 @@ Flows can contain local agents, registry-resolved remote agents, or other nested
 
 ## A2A primitives, standard wire compatibility
 
-ProtoLink uses A2A's core `AgentCard`, `Task`, `Message`, `Part`, and `Artifact` concepts as first-class Python runtime primitives. Delegation, lifecycle transitions, structured flows, tool results, telemetry, and replay all operate on those explicit objects rather than escaping into a separate orchestration format.
+ProtoLink uses A2A's core `AgentCard`, `Task`, `Message`, `Part` and `Artifact` concepts as first-class Python runtime primitives. Delegation, lifecycle transitions, structured flows, tool results, telemetry and replay all operate on those explicit objects rather than escaping into a separate orchestration format.
 
 Standard wire compatibility is explicit and additive:
 
@@ -354,7 +354,7 @@ must match the Agent Card's origin. For a split-origin deployment you explicitly
 trust, use a dedicated `AgentClient(..., a2a_allow_cross_origin=True)`; see
 [A2A compatibility](https://nmaroulis.github.io/protolink/docs/a2a/) for the operational limits.
 
-With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat, and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask` JSON-RPC operations, and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
+With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks` and `CancelTask` JSON-RPC operations and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
 
 Compatibility is versioned and testable: the official [A2A Technology Compatibility Kit](https://github.com/a2aproject/a2a-tck) measures the adapter against a pinned protocol surface. The [A2A compatibility page](https://nmaroulis.github.io/protolink/docs/a2a/) records the exact binding, TCK commit, commands, current result, and the remaining upstream harness limitation.
 
@@ -372,14 +372,14 @@ print(result.status, result.output)
 
 `chunks()` delivers raw incremental model text; default JSON-action models stream JSON fragments.
 Use `handle.events()` for all typed events and `result.report` for the run report. Inspect the result
-status for failures, and use `await handle.cancel()` to stop a run. Remote subscriptions still require
+status for failures and use `await handle.cancel()` to stop a run. Remote subscriptions still require
 advertised streaming support. Ollama and other HTTP server streams require `httpx`
 (`uv add protolink httpx`), also included in the `llms` and `http` extras. See the
 [complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
 
 ## Local telemetry and replay
 
-ProtoLink includes dependency-free local tracing. Attach `LocalTraceTelemetry`, run a task, and replay the captured spans without sending data to an external service:
+ProtoLink includes dependency-free local tracing. Attach `LocalTraceTelemetry`, run a task and replay the captured spans without sending data to an external service:
 
 ```python
 from protolink import Agent, AgentCard, LocalTraceTelemetry, create_llm
@@ -397,7 +397,7 @@ result = agent.sync.invoke("Trace this task")
 trace = telemetry.recorder.replay()[-1]
 ```
 
-The same runtime contracts power cancellation, budgets, policy decisions, approval previews, run reports, redaction, read-only replay, and normalized report comparison for regression testing. Replay and comparison never re-execute model or tool calls: execute the candidate separately against controlled dependencies, record its report, and then diff it against the baseline. Normalization is limited to known ProtoLink report-envelope fields; application-owned payloads and report metadata remain exact unless you configure an ignore rule or numeric tolerance.
+The same runtime contracts power cancellation, budgets, policy decisions, approval previews, run reports, redaction, read-only replay and normalized report comparison for regression testing. Replay and comparison never re-execute model or tool calls: execute the candidate separately against controlled dependencies, record its report and then diff it against the baseline. Normalization is limited to known ProtoLink report-envelope fields; application-owned payloads and report metadata remain exact unless you configure an ignore rule or numeric tolerance.
 
 ## Dashboard developer tool
 
@@ -407,13 +407,13 @@ The `protolink dashboard` CLI command projects run-store and registry state into
 protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
 ```
 
-It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry, and provides local views for agent health, HTTP chat, task history, trace summaries, and run replay. It also includes **Protolink Studio**, an active visual builder for Agent, LLM, Tool, Registry, Flow, and operational Module nodes. Connect compatible nodes, configure transports and modules in the inspector, then generate ordinary Python that can be viewed, copied, or downloaded.
+It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry and provides local views for agent health, HTTP chat, task history, trace summaries and run replay. It also includes **Protolink Studio**, an active visual builder for Agent, LLM, Tool, Registry, Flow and operational Module nodes. Connect compatible nodes, configure transports and modules in the inspector, then generate ordinary Python that can be viewed, copied, or downloaded.
 
-Open Studio from the sidebar or directly at `http://127.0.0.1:8765/studio`. A served dashboard can start and stop one generated project as a local subprocess and show its recent output; closing the dashboard stops that process and removes its temporary script. A static `--output` dashboard remains useful for visual blueprint editing and export, but Python generation and live execution require the local dashboard server. Generated Python uses Protolink's public constructors directly and contains logical agent, tool, module, registry, LLM, and flow definitions—not canvas IDs, coordinates, edges, or embedded blueprint JSON. Studio blueprints are declarative: raw secrets are rejected, so configure environment-variable names such as `OPENAI_API_KEY` and review the generated code before running integrations with external side effects.
+Open Studio from the sidebar or directly at `http://127.0.0.1:8765/studio`. A served dashboard can start and stop one generated project as a local subprocess and show its recent output; closing the dashboard stops that process and removes its temporary script. A static `--output` dashboard remains useful for visual blueprint editing and export, but Python generation and live execution require the local dashboard server. Generated Python uses Protolink's public constructors directly and contains logical agent, tool, module, registry, LLM and flow definitions, not canvas IDs, coordinates, edges or embedded blueprint JSON. Studio blueprints are declarative: raw secrets are rejected, so configure environment-variable names such as `OPENAI_API_KEY` and review the generated code before running integrations with external side effects.
 
 ![ProtoLink dashboard overview](https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/devtools-dashboard.gif)
 
-The CLI also includes project scaffolding, environment diagnostics, registry inspection, run replay, and normalized report diffing:
+The CLI also includes project scaffolding, environment diagnostics, registry inspection, run replay and normalized report diffing:
 
 ```bash
 protolink init agent
@@ -428,8 +428,8 @@ See the [developer tools guide](https://nmaroulis.github.io/protolink/docs/devto
 ## Infer-loop benchmark
 
 The ProtoLink repository includes a closed-world regression benchmark for prompt and infer-loop changes. It exercises
-direct answers, local tools, directed and autonomous agent routing, dependent multi-step work, and grounding traps, then reports strict and
-recovered functional scores plus end-to-end, model-call, provider, and repeat/cache-sensitive timing.
+direct answers, local tools, directed and autonomous agent routing, dependent multi-step work and grounding traps, then reports strict and
+recovered functional scores plus end-to-end, model-call, provider and repeat/cache-sensitive timing.
 
 ```bash
 python -m benchmarks.infer_loop --provider ollama --model gemma4:e4b --suite smoke
@@ -437,13 +437,13 @@ python -m benchmarks.infer_loop --provider ollama --model gemma4:e4b --suite smo
 
 The benchmark is source-checkout tooling under `benchmarks/`, not part of the installable package. See the
 [infer-loop benchmark guide](benchmarks/infer_loop/README.md) for suite sizes, scoring, Ollama configuration, timing,
-baseline comparison, filtering, and CI thresholds.
+baseline comparison, filtering and CI thresholds.
 
 ## Built-in tools and agents
 
 General-purpose tools also work on any ordinary `Agent`: `filesystem_tools()` for scoped reads and
 recoverable edits, `storage_tools()` for JSON values, `http_tool()` for configured APIs,
-`document_tools()` for text/tables, and `database_tools(SQLiteDatabase(...))` for read-only SQL.
+`document_tools()` for text/tables and `database_tools(SQLiteDatabase(...))` for read-only SQL.
 See the [Built-in Tools](https://nmaroulis.github.io/protolink/docs/builtin-tools/) and run
 `python examples/generic_tools.py` for one complete offline example. PDF/Word/spreadsheet parsers are
 available through the optional `protolink[documents]` extra.
@@ -457,16 +457,16 @@ assistant = Assistant(llm=another_model, calendar=GoogleCalendar(token), email=G
 answer = await assistant.invoke("What is on my calendar today?")
 ```
 
-Supply your own models, OAuth token, and approval callback. These presets use the standard Agent API;
+Supply your own models, OAuth token and approval callback. These presets use the standard Agent API;
 calendar/email reads are enabled by default, while writes need explicit opt-ins and approval. Choose
 `GoogleCalendar`/`Gmail`, `OutlookCalendar`/`OutlookEmail`, or `IMAPEmail` for standard IMAP/SMTP.
 Google and Microsoft adapters need `pip install 'protolink[integrations]'`; IMAP/SMTP uses the standard
 library. Add `ask_user=handle_question` to await user feedback
-inside the inference loop. Shell, Git, calendar, email, and question tools can also be registered separately.
+inside the inference loop. Shell, Git, calendar, email and question tools can also be registered separately.
 See the [Built-in Agents](https://nmaroulis.github.io/protolink/docs/builtin-agents/).
 
 Run `python examples/builtin_assistants.py` for one complete offline test using a temporary repository,
-mock model, and in-memory calendar/mailbox. Run `python examples/service_backends.py` to exercise all
+mock model and in-memory calendar/mailbox. Run `python examples/service_backends.py` to exercise all
 five concrete service backends with offline HTTP and mail-server fixtures.
 
 ## More examples

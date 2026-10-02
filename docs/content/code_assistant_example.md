@@ -4,8 +4,8 @@ import ExampleArticle from '@site/src/components/ExampleArticle';
 
 <ExampleArticle
   source="Level Up Coding"
-  title="Build Easily Your Own Claude Code with Three Agents: Brain, Hands, and Coordinator"
-  description="Learn how to build a Claude Code-like system using a multi-agent architecture with specialized agents for planning, execution, and coordination."
+  title="Build Easily Your Own Claude Code with Three Agents: Brain, Hands and Coordinator"
+  description="Learn how to build a Claude Code-like system using a multi-agent architecture with specialized agents for planning, execution and coordination."
   href="https://levelup.gitconnected.com/build-easily-your-own-claude-code-with-three-agents-brain-hands-and-coordinator-5236b392ddf0"
   image="https://miro.medium.com/v2/resize:fit:1400/format:webp/1*MFPkOOnI5KY4V3_t7roF4A.jpeg"
   imageAlt="Build Easily Your Own Claude Code with Three Agents"
@@ -13,7 +13,7 @@ import ExampleArticle from '@site/src/components/ExampleArticle';
 
 The directory containing the example files can be found [here](https://github.com/nMaroulis/protolink/tree/main/examples/code_assistant).
 
-This example builds a simplified **"Claude Code"** - a terminal coding assistant powered by a mesh of three autonomous agents. It demonstrates how to compose specialized agents into a system where a **brain reasons**, **hands execute**, and a **coordinator orchestrates** - just like a real AI coding assistant.
+This example builds a simplified **"Claude Code"** - a terminal coding assistant powered by a mesh of three autonomous agents. It demonstrates how to compose specialized agents into a system where a **brain reasons**, **hands execute** and a **coordinator orchestrates** - just like a real AI coding assistant.
 
 It highlights:
 
@@ -50,13 +50,13 @@ From this single input, the system:
 
 **Role:** User-facing coordinator and workflow manager.  
 - Receives the user's coding request  
-- Decides **which agent to call, when, and with what context**  
+- Decides **which agent to call, when and with what context**  
 - Delegates reasoning to the Planner and file operations to the Coder  
 - Aggregates results and presents a summary to the user  
 > Uses an **LLM for decision-making**, but **never touches files or generates code** directly. It coordinates.
 
 ### 2. Planner Agent (Brain | LLM-Only)
-**Role:** Code analysis, planning, and code generation.
+**Role:** Code analysis, planning and code generation.
 - Analyzes coding tasks and creates step-by-step implementation plans  
 - Reviews existing source code for issues and improvements  
 - Generates precise, complete file contents ready to be written  
@@ -81,7 +81,7 @@ This architecture mirrors how production coding assistants (Claude Code, Cursor,
 | **Execution** | Coder | Deterministic; can run on a secure file server |
 | **Coordination** | Orchestrator | Can use a lighter (cheaper) model; just routes work |
 
-The key insight: **the brain that generates code should not be the same component that writes files.** Separation makes the system safer, more testable, and independently scalable.
+The key insight: **the brain that generates code should not be the same component that writes files.** Separation makes the system safer, more testable and independently scalable.
 
 ---
 
@@ -143,7 +143,7 @@ This is the **core of Protolink's agent mesh**: agents delegating to each other 
 
 - **Relatable use case**: Every developer understands what a coding assistant does
 - **Both delegation modes**: Demonstrates `infer` (LLM-to-LLM) and `tool_call` (LLM-to-Tool) in one system
-- **Separation of concerns**: Brain, Hands, and Coordinator are cleanly separated
+- **Separation of concerns**: Brain, Hands and Coordinator are cleanly separated
 - **LLM-agnostic**: Switch between OpenAI, Anthropic, Ollama with a single environment variable
 - **Safety by design**: Workspace sandboxing prevents agents from accessing arbitrary files
 - **Autonomous multi-step**: The entire workflow runs without human intervention after the initial request
@@ -156,7 +156,7 @@ When the Orchestrator receives a user request, Protolink runs an **inference loo
 
 1. The Orchestrator's **LLM reads the system prompt** + discovered agent cards (from the Registry)
 2. The LLM decides which agent to call and outputs a structured **`agent_call`**
-3. **Protolink intercepts** the agent_call, resolves the agent URL via the Registry, and sends an HTTP request
+3. **Protolink intercepts** the agent_call, resolves the agent URL via the Registry and sends an HTTP request
 4. The target agent processes the request and returns a result
 5. The result is injected back into the LLM's conversation as an **observation**
 6. The LLM decides the next step (another agent_call, or a final response)
@@ -349,7 +349,7 @@ All docstrings follow PEP 257 conventions.
 
 - [Getting Started](getting-started.md) – Core concepts and setup
 - [Agents](agent.md) – Agent lifecycle and tools
-- [Transports](transport.md) – Switching between HTTP, WebSocket, and runtime transports
+- [Transports](transport.md) – Switching between HTTP, WebSocket and runtime transports
 - [Tools](tool.md) – Native and MCP tool integration
 - [LLMs](llm.md) – LLM backends and usage
 - [Ticket Booking Example](ticket_booking_example.md) – Another multi-agent example

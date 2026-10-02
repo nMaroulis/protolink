@@ -68,7 +68,7 @@ class GoogleCalendar:
 
     Args:
         token: Access token or sync/async callback returning a fresh one. OAuth
-            consent, refresh, and secure storage belong to the application.
+            consent, refresh and secure storage belong to the application.
         calendar_id: Fixed calendar identifier; defaults to ``primary``.
 
     Install ``protolink[integrations]``. Reading needs ``calendar.events.readonly``
@@ -155,7 +155,7 @@ def calendar_tools(
     Register each returned tool on an Agent. Arguments and the fixed backend target
     are previewed before authorization. Tokens stay in the backend, outside tool
     arguments/events/serialization. Reattach backends after loading Agent dict/YAML.
-    Pagination is explicit: preserve backend, interval, query, and page size to continue.
+    Pagination is explicit: preserve backend, interval, query and page size to continue.
     Failed or canceled writes may already have occurred remotely; inspect the
     calendar before retrying. Applications own timezone choice and conflict checks.
     """
@@ -189,7 +189,7 @@ def calendar_tools(
     query_help = getattr(backend, "query_help", "Query uses the configured provider's search syntax.")
     list_calendar_events.__doc__ = (
         f"{list_calendar_events.__doc__} {query_help} "
-        "Keep the same interval, query, and max_results when continuing; an empty page can have a next token."
+        "Keep the same interval, query and max_results when continuing; an empty page can have a next token."
     )
 
     def validate(arguments: dict[str, Any]) -> None:

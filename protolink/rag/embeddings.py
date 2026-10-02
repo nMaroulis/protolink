@@ -17,7 +17,7 @@ _TOKEN_RE = re.compile(r"[\w'-]+", re.UNICODE)
 class HashEmbedder:
     """Create deterministic lexical vectors without a model dependency.
 
-    This embedder is intended for local development, examples, tests, and modest knowledge bases. It hashes normalized
+    This embedder is intended for local development, examples, tests and modest knowledge bases. It hashes normalized
     word and adjacent-word features into a fixed-size vector and L2-normalizes the result. It is not a neural semantic
     embedding model. Production applications can replace it with any object implementing
     :class:`~protolink.rag.Embedder`.

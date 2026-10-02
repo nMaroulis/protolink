@@ -94,7 +94,7 @@ def build_dashboard_snapshot(
     limit: int = 20,
     source_revision: int = 0,
 ) -> dict[str, Any]:
-    """Collect dashboard data from registry, run-store, and telemetry sources."""
+    """Collect dashboard data from registry, run-store and telemetry sources."""
     telemetry = empty_trace_page()
     telemetry["limit"] = limit
     if trace_path is not None:

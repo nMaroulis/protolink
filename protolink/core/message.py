@@ -13,9 +13,9 @@ class Message:
 
     Attributes:
         id: Unique message identifier
-        role: Sender role (user, agent, system)
-        parts: list[Part] = field(default_factory=list)
-        timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+        role: Sender role, such as user, agent, assistant, or system.
+        parts: Ordered content parts carried by the message.
+        timestamp: ISO timestamp recording message creation.
     """
 
     id: str = field(default_factory=lambda: IDGenerator.generate_message_id())
@@ -44,13 +44,16 @@ class Message:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Message":
-        """Create from dictionary."""
+        """Restore parts and retain supplied identity and timestamp fields.
+
+        Missing IDs and timestamps are generated for newly constructed messages.
+        """
         parts = [Part.from_dict(p) for p in data.get("parts", [])]
         return cls(
-            id=data.get("id", IDGenerator.generate_message_id()),
+            id=data["id"] if "id" in data else IDGenerator.generate_message_id(),
             role=data.get("role", "user"),
             parts=parts,
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
         )
 
     @classmethod

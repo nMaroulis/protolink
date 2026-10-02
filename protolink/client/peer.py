@@ -24,7 +24,7 @@ class AgentPeer:
     Obtain peers from ``agent.peer(target)`` or ``client.peer(target)``. Binding
     performs no I/O. Names resolve on every call so registry changes are visible;
     zero or multiple matches raise ValueError. URLs and cards need no registry.
-    Credentials, transport settings, and A2A opt-in come from the owning client.
+    Credentials, transport settings and A2A opt-in come from the owning client.
     """
 
     def __init__(

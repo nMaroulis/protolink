@@ -56,7 +56,7 @@ class Agent(
 
     Users should subclass this and implement the handle_task method only when they need custom orchestration. The
     default implementation executes explicit tool and inference parts, supports streaming, cancellation, persistent
-    state, delegation, policy checks, telemetry, and serialization.
+    state, delegation, policy checks, telemetry and serialization.
     """
 
     def __init__(
@@ -104,7 +104,7 @@ class Agent(
             tools: Typed functions or tool instances registered through add_tools.
             transport: Transport instance or transport type string. If a Transport object is provided, it's used
                 directly. If a string is provided (e.g., "http", "websocket"), a new Transport instance is created
-                with default settings using the agent's card URL. Configure TLS, limits, retries, keepalive, and
+                with default settings using the agent's card URL. Configure TLS, limits, retries, keepalive and
                 protocol-specific behavior on a concrete Transport before passing it to Agent.
             registry: Registry instance, RegistryClient, or transport type string. If a Registry object is provided,
                 its RegistryClient is extracted. If a RegistryClient is provided, it's used directly.
@@ -115,7 +115,7 @@ class Agent(
                 Strings use create_llm with provider defaults; pass an object for
                 custom credentials, model parameters, or server URLs.
             system_prompt: This is used as complementary text in the system prompt, which is responsible for explaining
-                the agent logic and role. Agent calling, tool calling, and other runtime actions are already predefined,
+                the agent logic and role. Agent calling, tool calling and other runtime actions are already predefined,
                 so the LLM already has the knowledge needed to interact with its environment.
                 If you wish to override the system prompt completely, set override_system_prompt to True.
             storage: Optional Storage instance for agent data persistence. It's also used for State persistence.
@@ -142,7 +142,7 @@ class Agent(
                 checkpoints. Protolink owns the safety contract; the application owns the user experience used to obtain
                 the decision.
             run_store: Optional persistent task/run store. When provided, the agent records task snapshots after direct,
-                server, and streaming execution paths.
+                server and streaming execution paths.
             registry_heartbeat_interval: Optional seconds between registry heartbeat requests after successful
                 registration. Leave ``None`` to disable automatic heartbeats.
             knowledge: One knowledge source, retriever, or sequence of sources.
@@ -150,7 +150,7 @@ class Agent(
                 the infer loop.
             retrieval: Default retrieval behavior for infer tasks:
                 ``"auto"`` lets the model choose the knowledge tool,
-                ``"always"`` retrieves before inference, and ``"required"``
+                ``"always"`` retrieves before inference and ``"required"``
                 additionally fails when retrieval finds no passages.
         """
 

@@ -2,7 +2,7 @@
 
 ``ContextManifest`` describes the prompt budget that is about to enter a model
 without depending on a provider SDK or tokenizer catalog. It is designed for
-CLIs, dashboards, tests, policy hooks, and local runtimes that need a stable
+CLIs, dashboards, tests, policy hooks and local runtimes that need a stable
 pre-call view before the model produces any usage metadata.
 """
 
@@ -150,25 +150,25 @@ def build_context_manifest(
         A provider-neutral, JSON-serializable manifest.
     """
     messages = history.messages_raw()
-    tool_prompt_tokens = estimate_token_count(
-        {
-            "tools": [_tool_descriptor(name, tool) for name, tool in sorted((tools or {}).items())],
-            "agents": [_agent_descriptor(card) for card in agent_cards or []],
-        },
-        model=model,
-    )
-    if not tools and not agent_cards:
-        tool_prompt_tokens = 0
+    tool_prompt_tokens = 0
+    if tools or agent_cards:
+        tool_prompt_tokens = estimate_token_count(
+            {
+                "tools": [_tool_descriptor(name, tool) for name, tool in sorted((tools or {}).items())],
+                "agents": [_agent_descriptor(card) for card in agent_cards or []],
+            },
+            model=model,
+        )
 
     system_raw_tokens = 0
     history_tokens = 0
     current_user_message = _find_current_user_message(messages, query)
     for message in messages:
+        if message is current_user_message:
+            continue
         message_tokens = estimate_token_count(message.content, model=model)
         if message.role == LLMMessageRole.SYSTEM:
             system_raw_tokens += message_tokens
-        elif message is current_user_message:
-            continue
         else:
             history_tokens += message_tokens
 
@@ -187,7 +187,7 @@ def build_context_manifest(
             kind="history",
             name="conversation_history",
             tokens=history_tokens,
-            metadata={"message_count": len([msg for msg in messages if msg is not current_user_message])},
+            metadata={"message_count": len(messages) - (current_user_message is not None)},
         ),
         ContextItem(kind="user", name="current_user_query", tokens=user_tokens),
     ]

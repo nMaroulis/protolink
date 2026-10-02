@@ -8,9 +8,9 @@ import ApiReference, {
 
 # Storage
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Execution, approvals and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks and bounded workflows.
 
-ProtoLink provides pluggable storage for Agent state, process-local caches, and
+ProtoLink provides pluggable storage for Agent state, process-local caches and
 durable execution records. Persistence depends on the selected backend:
 `SQLiteStorage` survives restarts, while `InMemoryStorage` intentionally does
 not.
@@ -24,7 +24,7 @@ Protolink currently supports the following storage implementations:
 - **`InMemoryStorage`** - process-local object storage with optional sliding
   time-to-live expiration.
 - **`SQLiteRunStore`** - indexed task snapshots and run reports for replay,
-  audit, and regression workflows.
+  audit and regression workflows.
 - **`StorageCheckpointStore`** - recovery records and filtered inventory over a dedicated `Storage` namespace,
   imported from `protolink` or `protolink.core.resources`.
 
@@ -73,7 +73,7 @@ This section provides a detailed API reference for the Storage module.
 
 :::tip[Unified Storage Interface]
 
-**Protolink provides a consistent CRUD interface for all storage backends.** Whether you are using SQLite, a cloud database, or a simple JSON file, you interact with them through the same standard methods: `save()`, `load()`, `update()`, and `delete()`.
+**Protolink provides a consistent CRUD interface for all storage backends.** Whether you are using SQLite, a cloud database, or a simple JSON file, you interact with them through the same standard methods: `save()`, `load()`, `update()` and `delete()`.
 
 :::
 
@@ -81,7 +81,7 @@ This section provides a detailed API reference for the Storage module.
   eyebrow="Persistence module"
   title="Storage"
   path="protolink.storage"
-  description="The storage surfaces used for namespaced Agent state, process-local TTL values, registry persistence, and indexed execution records."
+  description="The storage surfaces used for namespaced Agent state, process-local TTL values, registry persistence and indexed execution records."
   pills={[
     "CRUD interface",
     "SQLite implementation",
@@ -93,7 +93,7 @@ This section provides a detailed API reference for the Storage module.
   cards={[
     {
       title: "Base class",
-      text: "Defines the common save, load, update, and delete contract for storage backends.",
+      text: "Defines the common save, load, update and delete contract for storage backends.",
       code: "Storage",
     },
     {
@@ -176,7 +176,7 @@ Persist the supplied value as the current contents of this storage namespace.
   <ApiFields ariaLabel="Storage.save parameters">
     <ApiField name="data" type="Any" required>
       Backend-specific value. Implementations decide whether it must be
-      serializable, whether it is copied, and whether saving replaces existing
+      serializable, whether it is copied and whether saving replaces existing
       data.
     </ApiField>
   </ApiFields>
@@ -286,7 +286,7 @@ Remove the current namespace value.
 >
 
 Persist one JSON-serializable value per namespace in a small SQLite table.
-Construction validates the table identifier, opens or creates the database, and
+Construction validates the table identifier, opens or creates the database and
 creates the table when it is missing.
 
 <ApiSection title="Parameters">
@@ -327,7 +327,7 @@ creates the table when it is missing.
       Raised for a table name that is not a valid Python identifier.
     </ApiField>
     <ApiField name="sqlite3.Error">
-      Database creation, connection, schema, permission, and locking errors
+      Database creation, connection, schema, permission and locking errors
       propagate.
     </ApiField>
   </ApiFields>
@@ -377,7 +377,7 @@ JSON-encode a value and insert or replace the row for the active namespace.
       JSON serialization errors propagate before the database write.
     </ApiField>
     <ApiField name="sqlite3.Error">
-      Connection, locking, statement, and commit errors propagate.
+      Connection, locking, statement and commit errors propagate.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -472,7 +472,7 @@ Delete the row for the active namespace and commit the transaction.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="SQLiteStorage.delete errors">
     <ApiField name="sqlite3.Error">
-      Connection, locking, statement, and commit errors propagate.
+      Connection, locking, statement and commit errors propagate.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -862,7 +862,7 @@ Return all run-report record fields in a new outer mapping.
   <ApiFields ariaLabel="RunReportRecord.to_dict return value">
     <ApiField name="record" type="dict[str, Any]">
       Mapping containing run/session/trace/agent identity, report payload,
-      metadata, and creation time. Nested mappings are not deep-copied.
+      metadata and creation time. Nested mappings are not deep-copied.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -879,7 +879,7 @@ Return all run-report record fields in a new outer mapping.
 >
 
 Define the structural interface an Agent can use for durable task and report
-records. Implementations do not need to inherit from this protocol, and the
+records. Implementations do not need to inherit from this protocol and the
 protocol itself cannot be instantiated.
 
 <ApiSection title="Task methods">
@@ -950,7 +950,7 @@ relational columns index common lookup fields.
     </ApiField>
     <ApiField name="redaction_policy" type="RedactionPolicy | None" defaultValue="None">
       Apply this policy to every saved task/report payload and caller metadata before writing. Live objects,
-      index columns, and existing rows remain unchanged. Reads return the stored representation.
+      index columns and existing rows remain unchanged. Reads return the stored representation.
     </ApiField>
     <ApiField name="db_path" type="str | Path" defaultValue={'"runs.db"'}>
       SQLite database path, converted to <code>str</code>. The database file and
@@ -987,7 +987,7 @@ relational columns index common lookup fields.
       Raised for an invalid table-prefix identifier.
     </ApiField>
     <ApiField name="sqlite3.Error">
-      Connection, schema creation, index creation, permission, and locking
+      Connection, schema creation, index creation, permission and locking
       errors propagate.
     </ApiField>
   </ApiFields>
@@ -1021,7 +1021,7 @@ Serialize and upsert one task snapshot together with indexed run correlation.
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SQLiteRunStore.save_task parameters">
     <ApiField name="task" type="Task" required>
-      Task whose ID, state, creation time, and complete
+      Task whose ID, state, creation time and complete
       <code>to_dict()</code> payload are persisted.
     </ApiField>
     <ApiField name="context" type="RunContext | None" defaultValue="None">
@@ -1051,7 +1051,7 @@ Serialize and upsert one task snapshot together with indexed run correlation.
       Errors from task serialization or <code>json.dumps()</code> propagate.
     </ApiField>
     <ApiField name="sqlite3.Error">
-      Connection, statement, locking, and commit errors propagate.
+      Connection, statement, locking and commit errors propagate.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1231,7 +1231,7 @@ Serialize and upsert one complete run report.
       available.
     </ApiField>
     <ApiField name="serialization or sqlite error">
-      Report serialization, JSON encoding, database, and commit errors
+      Report serialization, JSON encoding, database and commit errors
       propagate.
     </ApiField>
   </ApiFields>
@@ -1472,7 +1472,7 @@ inventory never executes a continuation or changes the recovery state. Storage a
 >
 
 Load the namespace once and list records in reverse insertion order. All supplied filters match exactly and combine
-with AND. Pagination applies after filtering. Updating a record does not move it, and separate page requests are
+with AND. Pagination applies after filtering. Updating a record does not move it and separate page requests are
 independent reads of the namespace.
 
 <ApiSection title="Parameters">
@@ -1557,7 +1557,7 @@ cache.save({"messages": 4})
 # A successful load refreshes the five-minute idle timeout.
 value = cache.load()
 
-# Use the same backing store, heap, and TTL policy when pruning shared entries.
+# Use the same backing store, heap and TTL policy when pruning shared entries.
 removed = cache.cleanup_expired()
 ```
 
@@ -1594,8 +1594,8 @@ run_store = SQLiteRunStore("runs.db", redaction_policy=policy)
 ```
 
 The configured policy masks copies of all task/report payloads and caller metadata before SQLite writes, including
-intermediate Agent snapshots, nested events, tool output, errors, and final task data. Returned index records contain
-the same masked payloads. Live Tasks, Reports, and model/tool inputs are unchanged. With `redaction_policy=None`,
+intermediate Agent snapshots, nested events, tool output, errors and final task data. Returned index records contain
+the same masked payloads. Live Tasks, Reports and model/tool inputs are unchanged. With `redaction_policy=None`,
 the existing raw persistence contract remains available. Policies are supplied when opening the store and are not
 saved in the database.
 
@@ -1635,7 +1635,7 @@ class PersistentAgent(Agent):
 ProtoLink includes a unified **State** system.
 When you provide a `storage` instance and enable `conversation`, the
 conversation module automatically performs whole-payload `load()` and `save()`
-operations. The `tools`, `task`, and `flow` modules currently expose
+operations. The `tools`, `task` and `flow` modules currently expose
 storage-backed extension points; applications define their own persistence
 conventions on top.
 

@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import json
 import threading
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock
@@ -28,6 +29,7 @@ from protolink.client.request_spec import ClientRequestSpec
 from protolink.discovery import Registry
 from protolink.server.endpoint_handler import EndpointSpec
 from protolink.transport import RuntimeTransport, Transport, TransportRequestContext
+from protolink.utils.serialization import Serializer
 
 
 class HarnessTransport(Transport):
@@ -82,6 +84,18 @@ def test_transport_rejects_oversized_payloads() -> None:
 
     with pytest.raises(TransportLimitError, match="configured maximum"):
         transport.check_payload_limit("too large", kind="request")
+
+
+def test_transport_payload_size_preserves_extended_serialization() -> None:
+    transport = HarnessTransport()
+    payloads = [
+        {"items": [{"name": "café", "count": 2}]},
+        {"created": datetime(2026, 10, 2, tzinfo=UTC), "tags": {"one", "two"}},
+    ]
+    for payload in payloads:
+        normalized = Serializer.serialize_to_dict(payload)
+        expected = len(json.dumps(normalized, separators=(",", ":"), default=str).encode("utf-8"))
+        assert transport.payload_size(payload) == expected
 
 
 @pytest.mark.asyncio

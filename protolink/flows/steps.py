@@ -54,7 +54,7 @@ class ToolStep(Flow):
         registry: Registry for a remote name, as on Pipeline.
 
     Results remain typed tool-output parts. Validation, approvals, execution
-    receipts, and cancellation are supplied by the receiving Agent.
+    receipts and cancellation are supplied by the receiving Agent.
     """
 
     def __init__(

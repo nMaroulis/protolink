@@ -12,22 +12,22 @@ import ApiReference, {
 
 `agent.start_run(prompt_or_task, session_id=None, budget=None, context=None, store=None, redaction_policy=None)`
 returns the existing `RunHandle` in an active asyncio loop. `handle.chunks()` filters raw model
-text from the stream, while `events()`, `result()`, `report`, and `cancel()` retain full control.
+text from the stream, while `events()`, `result()`, `report` and `cancel()` retain full control.
 JSON-action chunks can contain raw JSON; inspect the final result status for failures.
-See [streaming, cancellation, and reports](progressive-control.md#streaming-cancellation-and-reports).
+See [streaming, cancellation and reports](progressive-control.md#streaming-cancellation-and-reports).
 
 
-See [Execution, approvals, and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks, and bounded workflows.
+See [Execution, approvals and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks and bounded workflows.
 
-Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part`, and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools, and any other agent application.
+Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part` and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools and any other agent application.
 
-The runtime layer does not replace transports, telemetry, storage, or structured flows. It gives them shared execution metadata, concrete action intents, policy and approval boundaries, and a normalized event stream.
+The runtime layer does not replace transports, telemetry, storage, or structured flows. It gives them shared execution metadata, concrete action intents, policy and approval boundaries and a normalized event stream.
 
 <ApiSurface
   eyebrow="Runtime control layer"
   title="Runtime Primitives"
   path="protolink.runtime"
-  description="The application-facing contracts for run context, cancellation, budgets, policies, approvals, actions, normalized events, reports, replay, regression comparison, and redaction."
+  description="The application-facing contracts for run context, cancellation, budgets, policies, approvals, actions, normalized events, reports, replay, regression comparison and redaction."
   pills={[
     "RunContext",
     "RunBudget",
@@ -40,12 +40,12 @@ The runtime layer does not replace transports, telemetry, storage, or structured
   cards={[
     {
       title: "Context",
-      text: "Attach run, session, trace, workspace, permission, and budget metadata to tasks without ad hoc keys.",
+      text: "Attach run, session, trace, workspace, permission and budget metadata to tasks without ad hoc keys.",
       code: "RunContext",
     },
     {
       title: "Control",
-      text: "Cancel active work and enforce model, tool, token, step, and runtime limits before side effects occur.",
+      text: "Cancel active work and enforce model, tool, token, step and runtime limits before side effects occur.",
       code: "CancellationToken",
     },
     {
@@ -63,9 +63,9 @@ The runtime layer does not replace transports, telemetry, storage, or structured
 
 ## Why A Runtime Layer Exists
 
-The protocol models describe **what travels through the system**: a `Task` contains messages, parts, state, and artifacts that agents and clients can exchange. An application runtime must additionally decide **how that work executes**: which run it belongs to, what operation is about to happen, whether that operation is permitted, how approval is obtained, and what progress the user sees.
+The protocol models describe **what travels through the system**: a `Task` contains messages, parts, state and artifacts that agents and clients can exchange. An application runtime must additionally decide **how that work executes**: which run it belongs to, what operation is about to happen, whether that operation is permitted, how approval is obtained and what progress the user sees.
 
-Without shared runtime primitives, each application tends to invent metadata keys, approval dictionaries, event names, and side-effect checks. Those private conventions work initially, but become difficult to propagate across agents, serialize through transports, test deterministically, or reuse in another interface. Protolink's runtime layer gives those concerns stable contracts while leaving application meaning and presentation outside the framework.
+Without shared runtime primitives, each application tends to invent metadata keys, approval dictionaries, event names and side-effect checks. Those private conventions work initially, but become difficult to propagate across agents, serialize through transports, test deterministically, or reuse in another interface. Protolink's runtime layer gives those concerns stable contracts while leaving application meaning and presentation outside the framework.
 
 The central lifecycle is:
 
@@ -94,28 +94,28 @@ This lifecycle is not limited to LLM-selected tool calls. The same `RunAction` a
 | Primitive | Question it answers |
 |------|-------------|
 | `Task` | What work and results are exchanged between participants? |
-| `RunContext` | Which run is this, and what constraints travel with it? |
+| `RunContext` | Which run is this and what constraints travel with it? |
 | `CancellationToken` | Has live cancellation been requested for active work? |
 | `ContextManifest` | What estimated prompt context is about to enter a model? |
 | `BudgetPolicy` / `BudgetEnforcer` | Is the run still under its configured execution limits? |
 | `RunAction` | What concrete operation is about to execute? |
 | `Artifact` | What output or pre-execution preview can be inspected? |
 | `PolicyDecision` | Is this action allowed, denied, or approval-gated? |
-| `ApprovalRequest` / `ApprovalDecision` | What must an application approve, and what did it decide? |
+| `ApprovalRequest` / `ApprovalDecision` | What must an application approve and what did it decide? |
 | `RunEvent` | What is happening now in a stable application-facing format? |
 | `EventSink` | Where should normalized runtime events be delivered? |
 
 ### What Protolink Does Not Decide
 
-Protolink does not define a universal permission taxonomy, approval screen, or domain-specific action type. Applications choose capability names, build meaningful preview artifacts, and decide whether approval appears in a terminal, desktop UI, web application, editor, or external service. The runtime only guarantees that the decision occurs before execution and that the result is represented consistently.
+Protolink does not define a universal permission taxonomy, approval screen, or domain-specific action type. Applications choose capability names, build meaningful preview artifacts and decide whether approval appears in a terminal, desktop UI, web application, editor, or external service. The runtime only guarantees that the decision occurs before execution and that the result is represented consistently.
 
-`RunBudget` is enforced by the default Agent and LLM inference paths through `BudgetEnforcer`. The built-in policy allows work under budget, emits warning events near limits, and raises before model or tool execution when a hard limit would be exceeded. The Agent shares one enforcer across the executable parts of a task, including physical provider retries, while nested tasks receive independent scopes. Applications can still provide their own policy when they want compaction, truncation, approval, or domain-specific accounting.
+`RunBudget` is enforced by the default Agent and LLM inference paths through `BudgetEnforcer`. The built-in policy allows work under budget, emits warning events near limits and raises before model or tool execution when a hard limit would be exceeded. The Agent shares one enforcer across the executable parts of a task, including physical provider retries, while nested tasks receive independent scopes. Applications can still provide their own policy when they want compaction, truncation, approval, or domain-specific accounting.
 
 ## Runtime Context
 
 `RunContext` is the typed execution envelope for a task run. It replaces ad hoc metadata keys such as `task.metadata["session_id"]`, `trace_id`, `workspace`, or `parent_agent` with one serializable object stored under `task.metadata["run_context"]`.
 
-Think of the context as information that belongs to the execution but is not the task's business payload. A prompt or record ID belongs in a `Message`, `Part`, or action payload; correlation IDs, permissions, cancellation state, and limits belong in `RunContext`.
+Think of the context as information that belongs to the execution but is not the task's business payload. A prompt or record ID belongs in a `Message`, `Part`, or action payload; correlation IDs, permissions, cancellation state and limits belong in `RunContext`.
 
 ```python
 from protolink import RunBudget, RunContext, Task
@@ -135,7 +135,7 @@ context = RunContext(
 context.attach_to_task(task)
 ```
 
-The default `Agent` runtime calls `RunContext.ensure_task_context()` before normal execution, streaming execution, and outbound agent calls. Existing callers can keep setting `task.metadata["session_id"]`; Protolink upgrades that legacy metadata into a typed context and mirrors common keys back for compatibility.
+The default `Agent` runtime calls `RunContext.ensure_task_context()` before normal execution, streaming execution and outbound agent calls. Existing callers can keep setting `task.metadata["session_id"]`; Protolink upgrades that legacy metadata into a typed context and mirrors common keys back for compatibility.
 
 Three IDs serve different purposes:
 
@@ -143,12 +143,12 @@ Three IDs serve different purposes:
 - `session_id` groups related runs, commonly for conversation or application continuity.
 - `trace_id` correlates observability data and may span several runs or agents.
 
-When work is delegated, `RunContext.child()` creates a new run identity while preserving the session, trace, workspace, permissions, budget, and application metadata. `parent_run_id` and `agent_chain` then describe how execution reached that child.
+When work is delegated, `RunContext.child()` creates a new run identity while preserving the session, trace, workspace, permissions, budget and application metadata. `parent_run_id` and `agent_chain` then describe how execution reached that child.
 
 Model-driven delegation includes worker events and receipts in the parent's stream and report, preserving worker
 identities and nested action links. The parent can validate actual worker outcomes without joining stored runs.
 See [delegated worker evidence](./execution-tools.md#delegated-worker-evidence) for sequence, terminal-state,
-transport, and interruption behavior.
+transport and interruption behavior.
 
 ### RunContext API
 
@@ -172,7 +172,7 @@ transport, and interruption behavior.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/run_context.py#L93"
 >
 
-Mutable, serializable execution metadata for one logical run. Dataclass factory defaults create independent lists, mappings, budgets, IDs, and timestamps for every instance.
+Mutable, serializable execution metadata for one logical run. Dataclass factory defaults create independent lists, mappings, budgets, IDs and timestamps for every instance.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="RunContext constructor parameters">
@@ -221,13 +221,13 @@ Mutable, serializable execution metadata for one logical run. Dataclass factory 
       Serializes all fields, including the nested budget.
     </ApiField>
     <ApiField name="from_dict(data)" type="RunContext">
-      Accepts a mapping or `None`, understands legacy `workspace`, `budgets`, `cancelled`, and `cancellation_reason` spellings, and generates missing identity/time values.
+      Accepts a mapping or `None`, understands legacy `workspace`, `budgets`, `cancelled` and `cancellation_reason` spellings and generates missing identity/time values.
     </ApiField>
     <ApiField name="from_task(task, *, default_session_id=None)" type="RunContext">
-      Reads `task.metadata["run_context"]`, merges compatible top-level legacy metadata, and returns a detached mutable context. It does not write back to the task.
+      Reads `task.metadata["run_context"]`, merges compatible top-level legacy metadata and returns a detached mutable context. It does not write back to the task.
     </ApiField>
     <ApiField name="ensure_task_context(task, *, default_session_id=None, agent_name=None)" type="RunContext">
-      Normalizes a task context, optionally appends an agent, persists it back to task metadata, and returns it.
+      Normalizes a task context, optionally appends an agent, persists it back to task metadata and returns it.
     </ApiField>
     <ApiField name="attach_to_task(task)" type="None">
       Mutates `task.metadata`: stores the complete context under `run_context` and mirrors populated correlation and cancellation keys at the top level. Existing mirrored keys are not deleted when a field later becomes `None`.
@@ -241,7 +241,7 @@ Mutable, serializable execution metadata for one logical run. Dataclass factory 
       Returns a copy with the agent appended unless it is already the final chain entry.
     </ApiField>
     <ApiField name="child(*, run_id=None, agent_name=None)" type="RunContext">
-      Returns a new run with `parent_run_id=self.run_id`, preserving session, trace, workspace, permission, budget, chain, and metadata values.
+      Returns a new run with `parent_run_id=self.run_id`, preserving session, trace, workspace, permission, budget, chain and metadata values.
     </ApiField>
     <ApiField name="cancel(reason=None)" type="RunContext">
       Returns a canceled copy; it does not mutate this context or signal live execution.
@@ -253,12 +253,12 @@ Mutable, serializable execution metadata for one logical run. Dataclass factory 
 </ApiSection>
 
 <ApiCallout label="Mutation boundary">
-  `RunContext` itself is mutable. The `with_agent()`, `child()`, `cancel()`, and `copy()` helpers return new contexts, while `attach_to_task()` and `ensure_task_context()` intentionally mutate task metadata.
+  `RunContext` itself is mutable. The `with_agent()`, `child()`, `cancel()` and `copy()` helpers return new contexts, while `attach_to_task()` and `ensure_task_context()` intentionally mutate task metadata.
 </ApiCallout>
 
 </ApiReference>
 
-`RunContext.permissions` accepts capability rules using `allow`, `deny`, or `require_approval`. Boolean values are also supported: `True` allows and `False` denies. Runtime-owned policy and context rules are combined using the most restrictive result, so task metadata can narrow but cannot weaken the agent's configured policy. `RunContext.budget` is enforced by the built-in LLM loop for steps, LLM calls, tool calls, runtime seconds, input tokens, and output tokens.
+`RunContext.permissions` accepts capability rules using `allow`, `deny`, or `require_approval`. Boolean values are also supported: `True` allows and `False` denies. Runtime-owned policy and context rules are combined using the most restrictive result, so task metadata can narrow but cannot weaken the agent's configured policy. `RunContext.budget` is enforced by the built-in LLM loop for steps, LLM calls, tool calls, runtime seconds, input tokens and output tokens.
 
 This most-restrictive rule is important at trust boundaries. An incoming task may request fewer privileges for a run, but it cannot grant itself more authority than the receiving agent's policy allows.
 
@@ -313,7 +313,7 @@ Mutable limit container carried by `RunContext`. It records policy input; `Budge
       Returns the complete JSON-compatible budget shape.
     </ApiField>
     <ApiField name="from_dict(data)" type="RunBudget">
-      Accepts a mapping or `None`, coerces known numeric fields with `int()`/`float()`, and preserves unknown keys inside `metadata`.
+      Accepts a mapping or `None`, coerces known numeric fields with `int()`/`float()` and preserves unknown keys inside `metadata`.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -334,7 +334,7 @@ Mutable limit container carried by `RunContext`. It records policy input; `Budge
 
 ## Context Manifests And Budgets
 
-Before every LLM call, Protolink prepares a `ContextManifest`. It is provider-neutral and estimates the context that is about to enter the model: compiled system instructions, runtime affordances such as tools and delegation targets, prior conversation history, and the current user query.
+Before every LLM call, Protolink prepares a `ContextManifest`. It is provider-neutral and estimates the context that is about to enter the model: compiled system instructions, runtime affordances such as tools and delegation targets, prior conversation history and the current user query.
 
 ```python
 from protolink import ContextManifest, LLMModelProfile, RunBudget, RunContext, create_llm
@@ -403,7 +403,7 @@ Immutable token estimate for one logical context section.
       Serializes all fields.
     </ApiField>
     <ApiField name="from_dict(data)" type="ContextItem">
-      Supplies fallback names, coerces `tokens` to an integer when possible, and clamps restored token counts to zero or greater.
+      Supplies fallback names, coerces `tokens` to an integer when possible and clamps restored token counts to zero or greater.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -498,7 +498,7 @@ Immutable provider-neutral preflight summary for one model input.
       Serializes the manifest and optionally applies recursive `RedactionPolicy` masking.
     </ApiField>
     <ApiField name="from_dict(data)" type="ContextManifest">
-      Restores items, coerces numeric fields when possible, clamps token counts to non-negative values, and regenerates a missing timestamp.
+      Restores items, coerces numeric fields when possible, clamps token counts to non-negative values and regenerates a missing timestamp.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -551,7 +551,7 @@ Builds the manifest used immediately before an LLM call without changing convers
       Supplies only `context_window` to the returned manifest.
     </ApiField>
     <ApiField name="tools" type="dict[str, Any] | None" defaultValue="None">
-      Exposed tools summarized by name, description, input schema, and capabilities.
+      Exposed tools summarized by name, description, input schema and capabilities.
     </ApiField>
     <ApiField name="agent_cards" type="list[Any] | None" defaultValue="None">
       Delegation targets included in runtime-affordance estimation.
@@ -562,7 +562,7 @@ Builds the manifest used immediately before an LLM call without changing convers
 <ApiSection title="Returns">
   <ApiFields ariaLabel="build_context_manifest return value">
     <ApiField name="manifest" type="ContextManifest">
-      A new immutable estimate with system, tool/delegation, history, user, total, and per-section counts.
+      A new immutable estimate with system, tool/delegation, history, user, total and per-section counts.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -773,7 +773,7 @@ Stateful counter and wall-clock tracker used by task execution and the inference
 <ApiSection title="Checks">
   <ApiFields ariaLabel="BudgetEnforcer methods">
     <ApiField name="check_step(step)" type="BudgetDecision">
-      Projects `steps=step`, measures elapsed runtime, and commits the snapshot only when the decision is allowed.
+      Projects `steps=step`, measures elapsed runtime and commits the snapshot only when the decision is allowed.
     </ApiField>
     <ApiField name="check_next_step()" type="BudgetDecision">
       Increments from the currently committed step count. Use this when several infer or tool operations share one enforcer and no caller-local step number is authoritative.
@@ -794,7 +794,7 @@ Stateful counter and wall-clock tracker used by task execution and the inference
 </ApiSection>
 
 <ApiCallout label="Denials and warnings">
-  These methods return decisions; they do not raise `BudgetExceededError` themselves. The default inference integration emits events and raises from a deny decision. Denied projections are not committed, and each warning limit is surfaced only once per enforcer.
+  These methods return decisions; they do not raise `BudgetExceededError` themselves. The default inference integration emits events and raises from a deny decision. Denied projections are not committed and each warning limit is surfaced only once per enforcer.
 </ApiCallout>
 
 </ApiReference>
@@ -885,7 +885,7 @@ assert canceled.state.value == "canceled"
 assert result.state.value == "canceled"
 ```
 
-The default `handle_task()` path also registers direct calls through `execute_task()`. `run_task()` guarantees active-task registration around custom handlers and offers results to configured run storage. The same wrapper is used by server routes, `invoke()`, and `ask()`. Blocking scripts can use `agent.sync.run_task(task)`; async applications use `await agent.run_task(task)`.
+The default `handle_task()` path also registers direct calls through `execute_task()`. `run_task()` guarantees active-task registration around custom handlers and offers results to configured run storage. The same wrapper is used by server routes, `invoke()` and `ask()`. Blocking scripts can use `agent.sync.run_task(task)`; async applications use `await agent.run_task(task)`.
 
 `run_task()` returns a protocol-canceled task so callers can inspect its partial results. Calling `result.raise_for_status()` raises `TaskExecutionError` for a failed or canceled result and preserves it as `exception.task`. `invoke()` and `ask()` perform that check automatically rather than returning canceled work as a successful answer. Other states, including `input-required`, pass through the check unchanged. External coroutine cancellation still propagates as `asyncio.CancelledError`.
 
@@ -907,7 +907,7 @@ canceled = await client.cancel_task(
 result = await running
 ```
 
-`AgentClient.cancel_task()` uses ProtoLink's native `POST /tasks/cancel` operation and returns the updated task. The HTTP adapter exposes the canonical A2A 1.0 `CancelTask` operation separately. The native client call works over HTTP, SSE JSON-RPC, WebSocket, gRPC, and RuntimeTransport; WebSocket uses a separate control connection so cancellation cannot wait behind the request or stream it needs to stop.
+`AgentClient.cancel_task()` uses ProtoLink's native `POST /tasks/cancel` operation and returns the updated task. The HTTP adapter exposes the canonical A2A 1.0 `CancelTask` operation separately. The native client call works over HTTP, SSE JSON-RPC, WebSocket, gRPC and RuntimeTransport; WebSocket uses a separate control connection so cancellation cannot wait behind the request or stream it needs to stop.
 
 The synchronous client exposes the same operation as `client.sync.cancel_task(...)`. A synchronous call can only cancel work running on another thread, process, or event loop; it cannot interrupt itself while blocked in the same call stack.
 
@@ -939,7 +939,7 @@ Successful cancellation synchronizes all application-visible surfaces:
 
 A protocol cancellation requested through `Agent.cancel_task()` is consumed by the execution wrapper and returned as the canceled task or final canceled stream event. If the owning coroutine is canceled externally, ProtoLink still marks and persists the task but re-raises `asyncio.CancelledError` so normal asyncio cancellation semantics are preserved. Closing a task stream before its terminal event also marks and persists unfinished work as canceled rather than leaving an orphaned `working` task.
 
-Cancellation does not erase an operation that already returned. Explicit tool results are preserved; late cancellation is described by `task.metadata["completed_after_cancellation"]`, and runtime overruns are appended to `task.metadata["completed_action_budget_overruns"]`. Successful model-selected tools and delegations receive immediately snapshotted `Artifact(kind="action_result")` JSON receipts carrying completion status, `action_id`, `source="inference"`, action kind, and inference step. The internal result is intentionally omitted from this client-visible receipt and remains in private LLM history. Each completed top-level task part is attached and snapshotted immediately, so a later part failure retains earlier progress.
+Cancellation does not erase an operation that already returned. Explicit tool results are preserved; late cancellation is described by `task.metadata["completed_after_cancellation"]` and runtime overruns are appended to `task.metadata["completed_action_budget_overruns"]`. Successful model-selected tools and delegations receive immediately snapshotted `Artifact(kind="action_result")` JSON receipts carrying completion status, `action_id`, `source="inference"`, action kind and inference step. The internal result is intentionally omitted from this client-visible receipt and remains in private LLM history. Each completed top-level task part is attached and snapshotted immediately, so a later part failure retains earlier progress.
 
 Requests for unknown active IDs raise `TaskNotFoundError`. This includes a cancellation request that arrives before task registration or after cleanup, so applications should wait for task acceptance or the first streamed status before enabling a cancel control. A task still registered but already terminal raises `TaskNotCancelableError`. The registry contains active execution only; durable lookup of completed tasks belongs in application storage.
 
@@ -1110,7 +1110,7 @@ action = RunAction(
 ).with_artifacts([preview])
 ```
 
-Every action has a stable `action_id`, an extensible `kind`, structured `payload`, required `capabilities`, and optional preview or result artifacts. `Artifact` descriptors now include `kind`, `name`, `uri`, `media_type`, and `action_id` while retaining their existing `parts` and `metadata` fields.
+Every action has a stable `action_id`, an extensible `kind`, structured `payload`, required `capabilities` and optional preview or result artifacts. `Artifact` descriptors now include `kind`, `name`, `uri`, `media_type` and `action_id` while retaining their existing `parts` and `metadata` fields.
 
 Applications can use preview artifacts for any operation that benefits from inspection before execution: a resource update, outbound message, database mutation, browser action, generated file, or domain-specific command.
 
@@ -1237,13 +1237,13 @@ Mutable structured output or pre-execution preview.
 <ApiSection title="Mutation and serialization">
   <ApiFields ariaLabel="Artifact methods">
     <ApiField name="add_part(part)" type="Artifact">
-      Appends the exact `Part` to `parts`, mutates this artifact, and returns `self`.
+      Appends the exact `Part` to `parts`, mutates this artifact and returns `self`.
     </ApiField>
     <ApiField name="add_text(text)" type="Artifact">
-      Creates and appends `Part.text(text)`, mutates this artifact, and returns `self`.
+      Creates and appends `Part.text(text)`, mutates this artifact and returns `self`.
     </ApiField>
     <ApiField name="for_action(action_id)" type="Artifact">
-      Replaces `action_id`, mutates this artifact, and returns `self`.
+      Replaces `action_id`, mutates this artifact and returns `self`.
     </ApiField>
     <ApiField name="to_dict()" type="dict[str, Any]">
       Serializes nested parts and descriptors.
@@ -1317,7 +1317,7 @@ class Policy(Protocol):
       Fully prepared operation; evaluation must not execute it.
     </ApiField>
     <ApiField name="context" type="RunContext" required>
-      Cancellation, permission, identity, and application metadata for the run.
+      Cancellation, permission, identity and application metadata for the run.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1352,7 +1352,7 @@ Immutable serializable result from a runtime policy.
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="PolicyDecision parameters">
     <ApiField name="effect" type="PolicyEffect" required>
-      Direct construction also accepts supported strings, booleans, and effect mappings through the same coercion used for capability rules.
+      Direct construction also accepts supported strings, booleans and effect mappings through the same coercion used for capability rules.
     </ApiField>
     <ApiField name="reason" type="str" required>
       Concise explanation.
@@ -1404,7 +1404,7 @@ First-party capability matcher. Runtime and context rules are combined per requi
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="CapabilityPolicy parameters">
     <ApiField name="rules" type="Mapping[str, PolicyEffect | str | bool | Mapping[str, Any]] | None" defaultValue="None">
-      Exact rules, `"*"` fallback, and namespace wildcards such as `"records.*"`. The longest matching wildcard wins after exact lookup.
+      Exact rules, `"*"` fallback and namespace wildcards such as `"records.*"`. The longest matching wildcard wins after exact lookup.
     </ApiField>
     <ApiField name="default_effect" type="PolicyEffect | str" defaultValue="PolicyEffect.ALLOW">
       Runtime result for a capability unmatched by `rules`.
@@ -1418,7 +1418,7 @@ First-party capability matcher. Runtime and context rules are combined per requi
 <ApiSection title="Rule values">
   <ApiFields ariaLabel="CapabilityPolicy rule forms">
     <ApiField name="effect string or PolicyEffect" type="rule">
-      Accepts allow/allowed, deny/denied, and approval aliases including `approval`, `approve`, `ask`, and `require_approval`.
+      Accepts allow/allowed, deny/denied and approval aliases including `approval`, `approve`, `ask` and `require_approval`.
     </ApiField>
     <ApiField name="bool" type="rule">
       `True` means allow and `False` means deny.
@@ -1455,7 +1455,7 @@ First-party capability matcher. Runtime and context rules are combined per requi
 </ApiSection>
 
 <ApiCallout label="Mutation">
-  Construction copies the top-level rules mapping, but `rules`, `default_effect`, and `name` remain public mutable attributes. Treat a configured policy as stable while actions are executing.
+  Construction copies the top-level rules mapping, but `rules`, `default_effect` and `name` remain public mutable attributes. Treat a configured policy as stable while actions are executing.
 </ApiCallout>
 
 </ApiReference>
@@ -1466,7 +1466,7 @@ When policy returns `require_approval`, `ActionAuthorizer` creates an `ApprovalR
 
 The handler returns an `ApprovalDecision` correlated by `request_id`. A denied decision raises `ActionDeniedError`. If no handler is configured, Protolink fails closed with `ApprovalRequiredError`, which carries the serializable request.
 
-The handler receives the complete `RunAction`, including validated arguments, required capabilities, description, metadata, and preview artifacts. It can therefore present useful context without rediscovering the intended operation from raw model output or tool arguments. Returning a decision is the only way an approval-gated action proceeds.
+The handler receives the complete `RunAction`, including validated arguments, required capabilities, description, metadata and preview artifacts. It can therefore present useful context without rediscovering the intended operation from raw model output or tool arguments. Returning a decision is the only way an approval-gated action proceeds.
 
 Native tools can attach action previews through `action_builder`:
 
@@ -1501,9 +1501,9 @@ async def publish_record(record_id: str) -> dict:
 
 Tool arguments are validated before the action is prepared and again before execution. Tool-declared capabilities are always merged into a custom action, so an `action_builder` cannot accidentally omit a required policy check.
 
-For deterministic code that invokes a tool without a `Task`, use `agent.call_tool_in_context(tool_name, context, **arguments)`. It applies the same argument preparation, capability policy, and approval handler as model-driven execution.
+For deterministic code that invokes a tool without a `Task`, use `agent.call_tool_in_context(tool_name, context, **arguments)`. It applies the same argument preparation, capability policy and approval handler as model-driven execution.
 
-When no application-owned context is needed, use `await agent.call_tool(name, **arguments)` or `agent.sync.call_tool(name, **arguments)`. Both return the raw tool value and propagate validation, policy, approval, and callable errors. These methods do not create a task or a persisted task lifecycle; use `run_task(Task.create_tool_call(...))` for those controls.
+When no application-owned context is needed, use `await agent.call_tool(name, **arguments)` or `agent.sync.call_tool(name, **arguments)`. Both return the raw tool value and propagate validation, policy, approval and callable errors. These methods do not create a task or a persisted task lifecycle; use `run_task(Task.create_tool_call(...))` for those controls.
 
 ### ApprovalRequest
 
@@ -1526,7 +1526,7 @@ Immutable checkpoint passed to an application approval handler.
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="ApprovalRequest parameters">
     <ApiField name="action" type="RunAction" required>
-      Fully prepared operation, including validated arguments, capabilities, and preview artifacts.
+      Fully prepared operation, including validated arguments, capabilities and preview artifacts.
     </ApiField>
     <ApiField name="policy_decision" type="PolicyDecision" required>
       Approval-requiring policy result.
@@ -1604,7 +1604,7 @@ Immutable application response to exactly one checkpoint.
   <ApiFields ariaLabel="ApprovalDecision methods">
     <ApiField name="to_dict()" type="dict[str, Any]">Serializes every field.</ApiField>
     <ApiField name="from_dict(data)" type="ApprovalDecision">
-      Restores the decision; missing `approved` fails closed to `False`, and a missing request ID becomes an empty string.
+      Restores the decision; missing `approved` fails closed to `False` and a missing request ID becomes an empty string.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1785,9 +1785,9 @@ Structured runtime-policy failures.
 
 ## Run Events
 
-Existing stream events such as `TaskStatusUpdateEvent`, `TaskArtifactUpdateEvent`, and `TaskLLMStreamEvent` remain the transport-compatible event objects. `RunEvent` is the normalized application-facing envelope for those events.
+Existing stream events such as `TaskStatusUpdateEvent`, `TaskArtifactUpdateEvent` and `TaskLLMStreamEvent` remain the transport-compatible event objects. `RunEvent` is the normalized application-facing envelope for those events.
 
-The distinction lets transports retain backward-compatible event objects while applications consume one versioned shape. A terminal renderer, web client, test recorder, and logging adapter can all switch on the same `RunEvent.type` values instead of interpreting provider-specific chunks or nested dictionaries.
+The distinction lets transports retain backward-compatible event objects while applications consume one versioned shape. A terminal renderer, web client, test recorder and logging adapter can all switch on the same `RunEvent.type` values instead of interpreting provider-specific chunks or nested dictionaries.
 
 ```python
 from protolink import InMemoryEventSink, RunContext
@@ -1879,10 +1879,10 @@ Mutable versioned application-facing envelope for task and inference runtime act
       Serializes the envelope and optionally masks secrets recursively.
     </ApiField>
     <ApiField name="from_dict(data)" type="RunEvent">
-      Restores optional numbers with `int()`, mappings with top-level copies, and generated identity/time/version defaults.
+      Restores optional numbers with `int()`, mappings with top-level copies and generated identity/time/version defaults.
     </ApiField>
     <ApiField name="from_task_event(event, *, context=None, sequence=None)" type="RunEvent">
-      Normalizes an event object/dictionary, maps known task and LLM event types, derives severity/summary/relationships, and optionally recovers context from an embedded serialized task payload.
+      Normalizes an event object/dictionary, maps known task and LLM event types, derives severity/summary/relationships and optionally recovers context from an embedded serialized task payload.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1895,7 +1895,7 @@ Mutable versioned application-facing envelope for task and inference runtime act
 
 `RunEvent.from_task_event(event)` can also recover context from an embedded task payload when the event includes a serialized task.
 
-LLM context, budget, and call lifecycle activity is promoted out of raw LLM metadata into stable event types:
+LLM context, budget and call lifecycle activity is promoted out of raw LLM metadata into stable event types:
 
 | Event type | Meaning |
 |------|-------------|
@@ -1917,11 +1917,11 @@ Action lifecycle activity is also promoted into stable event types:
 | `action.completed` | The operation completed successfully. |
 | `action.denied` / `action.failed` | Policy denied the operation or execution failed. |
 
-The promoted `manifest`, `action`, `request`, `decision`, `action_id`, `parent_action_id`, `span_id`, `parent_span_id`, and `delegation_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
+The promoted `manifest`, `action`, `request`, `decision`, `action_id`, `parent_action_id`, `span_id`, `parent_span_id` and `delegation_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
 
 ## Event Sinks
 
-`EventSink` is the protocol for consumers of normalized `RunEvent` objects. `InMemoryEventSink` is the built-in implementation for tests, local apps, and replay tooling. Use `RunRecorder` when you also want a durable `RunReport` after the stream completes.
+`EventSink` is the protocol for consumers of normalized `RunEvent` objects. `InMemoryEventSink` is the built-in implementation for tests, local apps and replay tooling. Use `RunRecorder` when you also want a durable `RunReport` after the stream completes.
 
 ```python
 from protolink import InMemoryEventSink, RunEvent
@@ -1968,7 +1968,7 @@ Structural async consumer contract. Implementations decide storage, fanout, rend
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L212"
 >
 
-Dependency-free process-local event buffer for tests, local interfaces, and recorder tooling.
+Dependency-free process-local event buffer for tests, local interfaces and recorder tooling.
 
 <ApiSection title="Attributes">
   <ApiFields ariaLabel="InMemoryEventSink attributes">
@@ -1984,7 +1984,7 @@ Dependency-free process-local event buffer for tests, local interfaces, and reco
       Appends the event. If `sequence is None`, mutates it to the next sequence; explicit sequence values are retained and advance the next counter when needed.
     </ApiField>
     <ApiField name="emit_task_event(event, *, context=None)" type="Awaitable[RunEvent]">
-      Calls `RunEvent.from_task_event()`, records the result, and returns the appended normalized event.
+      Calls `RunEvent.from_task_event()`, records the result and returns the appended normalized event.
     </ApiField>
     <ApiField name="to_list()" type="list[dict[str, Any]]">
       Serializes all events without automatic redaction.
@@ -2001,9 +2001,9 @@ Dependency-free process-local event buffer for tests, local interfaces, and reco
 
 </ApiReference>
 
-## Run Reports, Replay, And Regression Diffing
+## Run Reports, Replay and Regression Diffing
 
-`RunReport` is the durable app-facing summary built from normalized events. It collects context manifests, action records, approval checkpoints, artifacts, LLM metrics, and the final serialized task when the final stream event includes it.
+`RunReport` is the durable app-facing summary built from normalized events. It collects context manifests, action records, approval checkpoints, artifacts, LLM metrics and the final serialized task when the final stream event includes it.
 
 ```python
 from protolink import (
@@ -2031,7 +2031,7 @@ assert_no_denied_actions(replay)
 assert_budget_under(replay, max_total_tokens=8_000)
 ```
 
-`RunReplay` never re-executes tools or model calls. It is a read-only view over report events with helpers such as `event_types`, `iter_events()`, and `find_events("context.prepared")`.
+`RunReplay` never re-executes tools or model calls. It is a read-only view over report events with helpers such as `event_types`, `iter_events()` and `find_events("context.prepared")`.
 
 ### RunReport
 
@@ -2053,7 +2053,7 @@ assert_budget_under(replay, max_total_tokens=8_000)
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/report.py#L22"
 >
 
-Immutable report envelope extracted from normalized events. Tuple membership cannot be reassigned, but nested context, events, and dictionaries remain ordinary objects.
+Immutable report envelope extracted from normalized events. Tuple membership cannot be reassigned, but nested context, events and dictionaries remain ordinary objects.
 
 <ApiSection title="Sections">
   <ApiFields ariaLabel="RunReport fields">
@@ -2073,7 +2073,7 @@ Immutable report envelope extracted from normalized events. Tuple membership can
 <ApiSection title="Construction">
   <ApiFields ariaLabel="RunReport construction methods">
     <ApiField name="from_events(events, *, context=None, final_task=None, metadata=None)" type="RunReport">
-      Coerces event mappings, extracts stable sections, deduplicates actions with non-empty action IDs, and uses the newest final event carrying `metadata.task` when no truthy explicit final task is supplied.
+      Coerces event mappings, extracts stable sections, deduplicates actions with non-empty action IDs and uses the newest final event carrying `metadata.task` when no truthy explicit final task is supplied.
     </ApiField>
     <ApiField name="from_dict(data)" type="RunReport">
       Restores typed context/events and keeps only mapping entries in tuple sections.
@@ -2202,7 +2202,7 @@ Immutable recursive masking policy shared by runtime observability objects.
       Values are omitted from the policy's representation. This does not discover unknown secrets in free text.
     </ApiField>
     <ApiField name="sensitive_keys" type="frozenset[str]" defaultValue="DEFAULT_SENSITIVE_KEYS">
-      Case-insensitive names normalized by lowercasing and replacing hyphens with underscores. Defaults include API keys, authorization, credentials, passwords, secrets, tokens, and recovery `data_base64` fields.
+      Case-insensitive names normalized by lowercasing and replacing hyphens with underscores. Defaults include API keys, authorization, credentials, passwords, secrets, tokens and recovery `data_base64` fields.
     </ApiField>
     <ApiField name="replacement" type="str" defaultValue={'"[REDACTED]"'}>
       Value substituted for a sensitive field's complete value.
@@ -2216,7 +2216,7 @@ Immutable recursive masking policy shared by runtime observability objects.
 <ApiSection title="Methods">
   <ApiFields ariaLabel="RedactionPolicy methods">
     <ApiField name="is_sensitive_key(key)" type="bool">
-      Matches configured names plus `_api_key`, `_secret`, `_token`, `_password`, and `_credentials` suffixes.
+      Matches configured names plus `_api_key`, `_secret`, `_token`, `_password` and `_credentials` suffixes.
     </ApiField>
     <ApiField name="redact(value)" type="Any">
       Converts supported dataclasses/`to_dict()` objects to JSON-like values and recursively returns masked mappings and containers without mutating the input.
@@ -2271,7 +2271,7 @@ if not comparison.matches:
 assert_run_matches(baseline_report, candidate_report, config=config)
 ```
 
-The comparison canonicalizes known identifiers, timestamps, and sequence counters in ProtoLink-owned report envelopes. Recognized task-stream events also normalize runtime-derived summaries and timing values. Application-owned values inside tool payloads and report metadata remain exact unless they match an explicit ignore or tolerance rule. The result contains `matches`, `changed_sections`, and path-level `differences`.
+The comparison canonicalizes known identifiers, timestamps and sequence counters in ProtoLink-owned report envelopes. Recognized task-stream events also normalize runtime-derived summaries and timing values. Application-owned values inside tool payloads and report metadata remain exact unless they match an explicit ignore or tolerance rule. The result contains `matches`, `changed_sections` and path-level `differences`.
 
 `RunReportDiffConfig(sections=..., normalize_volatile=True, ignore_paths=(), tolerances=())` controls the comparison. Each `RunReportTolerance(path, absolute_tolerance=0.0, relative_tolerance=0.0)` allows bounded numeric variation at one selected path; rules are checked in declaration order and the first match wins. An explicit tolerance takes precedence over built-in volatile normalization for the selected numeric value, so a test can opt a timing field back into bounded comparison. Defaults remain strict for fields that are not part of the built-in volatile-field normalization.
 
@@ -2313,7 +2313,7 @@ Public typing vocabulary and the ordered default projection.
       Accepted report/replay/mapping/event-iterable input. Strings and bytes are explicitly rejected rather than treated as event iterables.
     </ApiField>
     <ApiField name="ALL_RUN_REPORT_SECTIONS" type="tuple[RunReportSection, ...]">
-      Ordered default: context, context manifests, events, actions, approvals, artifacts, metrics, final task, and metadata.
+      Ordered default: context, context manifests, events, actions, approvals, artifacts, metrics, final task and metadata.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2385,7 +2385,7 @@ Immutable normalization/comparison configuration; iterable constructor inputs ar
       Ordered unique projection. Unknown and duplicate names are rejected.
     </ApiField>
     <ApiField name="normalize_volatile" type="bool" defaultValue="True">
-      Canonicalizes known runtime IDs, timestamps, timing fields, and derived summaries while preserving application-owned values.
+      Canonicalizes known runtime IDs, timestamps, timing fields and derived summaries while preserving application-owned values.
     </ApiField>
     <ApiField name="ignore_paths" type="tuple[str, ...]" defaultValue="()">
       RFC 6901 pointer patterns whose exact node and complete subtree are omitted.
@@ -2560,7 +2560,7 @@ Normalizes baseline and candidate independently, then computes the complete stru
 <ApiSection title="Returns">
   <ApiFields ariaLabel="diff_run_reports return value">
     <ApiField name="difference" type="RunReportDiff">
-      All added, removed, and changed paths. Known sequence-like report sections use semantic alignment; ordinary lists compare positionally.
+      All added, removed and changed paths. Known sequence-like report sections use semantic alignment; ordinary lists compare positionally.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2609,7 +2609,7 @@ Normalizes baseline and candidate independently, then computes the complete stru
 
 </ApiReference>
 
-Core serialization is intentionally explicit about secrets. `RunReportDifference.to_dict()` always returns its raw fields, and `RunReportDiff.to_dict()` returns raw compared values unless a policy is supplied. Pass `redaction_policy=RedactionPolicy()` to `RunReportDiff.to_dict()` before exporting it. `RunReportDiff.format()` and the `assert_run_matches()` failure message apply the default redaction policy unless explicitly disabled. The `protolink run diff` text and JSON views also redact difference values by default.
+Core serialization is intentionally explicit about secrets. `RunReportDifference.to_dict()` always returns its raw fields and `RunReportDiff.to_dict()` returns raw compared values unless a policy is supplied. Pass `redaction_policy=RedactionPolicy()` to `RunReportDiff.to_dict()` before exporting it. `RunReportDiff.format()` and the `assert_run_matches()` failure message apply the default redaction policy unless explicitly disabled. The `protolink run diff` text and JSON views also redact difference values by default.
 
 The assertion helpers are intentionally small:
 
@@ -2726,7 +2726,7 @@ Aggregates recorded usage and checks caller-supplied regression limits.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="assert_budget_under return value">
     <ApiField name="usage" type="dict[str, int | float]">
-      `input_tokens`, `output_tokens`, `total_tokens`, and rounded `runtime_seconds`.
+      `input_tokens`, `output_tokens`, `total_tokens` and rounded `runtime_seconds`.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2745,7 +2745,7 @@ Aggregates recorded usage and checks caller-supplied regression limits.
 
 </ApiReference>
 
-Use `RedactionPolicy` whenever persisting reports, approval payloads, context manifests, or telemetry data. The default policy masks common fields such as API keys, tokens, passwords, secrets, authorization headers, and credentials.
+Use `RedactionPolicy` whenever persisting reports, approval payloads, context manifests, or telemetry data. The default policy masks common fields such as API keys, tokens, passwords, secrets, authorization headers and credentials.
 
 ## Persistent Run Store
 
@@ -2949,7 +2949,7 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
 
 <ApiCallout label="Security and redaction">
   Configure `redaction_policy=RedactionPolicy(...)` to protect every saved task/report payload and caller metadata.
-  Omission preserves raw persistence. Existing rows and relational identifiers are unchanged, and recovery/approval
+  Omission preserves raw persistence. Existing rows and relational identifiers are unchanged and recovery/approval
   storage is separate. See [redaction at persistence](./storage.md#redaction-at-persistence).
   The table prefix is validated, while record values are parameterized SQL inputs.
 </ApiCallout>
@@ -3018,7 +3018,7 @@ Dependency-free SQLite implementation using a fresh synchronous connection per o
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SQLiteRunStore list_task_records parameters">
     <ApiField name="limit" type="int" defaultValue="100">
-      SQL `LIMIT`; the implementation performs no positivity validation, and SQLite treats a negative value as no upper bound.
+      SQL `LIMIT`; the implementation performs no positivity validation and SQLite treats a negative value as no upper bound.
     </ApiField>
     <ApiField name="session_id" type="str | None" defaultValue="None">Exact session filter.</ApiField>
     <ApiField name="run_id" type="str | None" defaultValue="None">Exact run filter.</ApiField>
@@ -3105,10 +3105,10 @@ store.delete_report(run_id: str) -> None`}
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="SQLiteRunStore query and deletion parameters">
     <ApiField name="task_id" type="str" required>
-      Primary key accepted by `get_task()`, `get_task_record()`, and `delete_task()`.
+      Primary key accepted by `get_task()`, `get_task_record()` and `delete_task()`.
     </ApiField>
     <ApiField name="run_id" type="str" required>
-      Primary key accepted by `get_report()`, `get_report_record()`, and `delete_report()`.
+      Primary key accepted by `get_report()`, `get_report_record()` and `delete_report()`.
     </ApiField>
     <ApiField name="limit" type="int" defaultValue="100">
       SQL row limit for `list_report_records()`; the implementation does not validate positivity.
@@ -3154,11 +3154,11 @@ store.delete_report(run_id: str) -> None`}
 
 </ApiReference>
 
-The store is intentionally separate from the generic `Storage` key/value interface. `Storage` backs agent state such as conversations; `RunStore` records execution facts for lookup, replay, audit, and tests. Larger deployments can implement the same `RunStore` protocol against their own persistence layer.
+The store is intentionally separate from the generic `Storage` key/value interface. `Storage` backs agent state such as conversations; `RunStore` records execution facts for lookup, replay, audit and tests. Larger deployments can implement the same `RunStore` protocol against their own persistence layer.
 
 ## Complete Runnable Examples
 
-`examples/runtime_policy_and_approvals.py` combines the runtime primitives in one provider-free script. It uses `MockLLM` to request a tool, creates a preview artifact, obtains application approval, captures normalized events, and then proves that a stricter per-run permission prevents a second side effect.
+`examples/runtime_policy_and_approvals.py` combines the runtime primitives in one provider-free script. It uses `MockLLM` to request a tool, creates a preview artifact, obtains application approval, captures normalized events and then proves that a stricter per-run permission prevents a second side effect.
 
 Run it from the repository root:
 
@@ -3206,15 +3206,15 @@ snapshot = [
 ]
 ```
 
-Use this style for runtime compatibility tests: assert the stable event envelope, policy and approval sequence, task state, final artifacts, and context propagation. Keep volatile fields such as timestamps, UUIDs, and artifact IDs out of the golden snapshot unless the test explicitly controls them.
+Use this style for runtime compatibility tests: assert the stable event envelope, policy and approval sequence, task state, final artifacts and context propagation. Keep volatile fields such as timestamps, UUIDs and artifact IDs out of the golden snapshot unless the test explicitly controls them.
 
 ## Relationship To Telemetry
 
 Runtime events and telemetry serve different layers:
 
-- `RunEvent` is for live application progress, terminal rendering, stream snapshots, and runtime assertions.
-- `LocalTraceTelemetry` is for replayable traces, spans, metrics, redacted payloads, and observability backends.
+- `RunEvent` is for live application progress, terminal rendering, stream snapshots and runtime assertions.
+- `LocalTraceTelemetry` is for replayable traces, spans, metrics, redacted payloads and observability backends.
 
-Both share the same `run_id`, `trace_id`, `task_id`, and agent metadata through `RunContext`, so a local UI can show live progress while telemetry records the detailed trace behind it.
+Both share the same `run_id`, `trace_id`, `task_id` and agent metadata through `RunContext`, so a local UI can show live progress while telemetry records the detailed trace behind it.
 
 As a practical rule, use events to drive what the user sees now and telemetry to investigate what happened across the complete run later.

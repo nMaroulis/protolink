@@ -82,7 +82,7 @@ class Part:
                 return ToolCall(
                     tool_name=content["tool_name"],
                     args=content.get("args", {}),
-                    call_id=content.get("call_id", IDGenerator.generate_tool_call_id()),
+                    call_id=content["call_id"] if "call_id" in content else IDGenerator.generate_tool_call_id(),
                 )
 
         if part_type == "tool_output":
@@ -90,7 +90,7 @@ class Part:
                 return content
             if isinstance(content, dict):
                 return ToolOutput(
-                    call_id=content.get("call_id", IDGenerator.generate_tool_output_id()),
+                    call_id=content["call_id"] if "call_id" in content else IDGenerator.generate_tool_output_id(),
                     result=content.get("result"),
                     error=content.get("error"),
                 )

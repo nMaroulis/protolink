@@ -10,9 +10,9 @@ import ApiReference, {
 
 The Registry is ProtoLink's first-class discovery service for A2A-based agent meshes. It uses `AgentCard`, ProtoLink's runtime form of A2A's identity and capability primitive, as a shared address book where running agents publish who they are and other agents find peers by name, role, tags, capabilities, endpoint, or other card metadata.
 
-Its role is coordination, not orchestration. The registry does not decide which agent should handle a task, route messages between agents, or own workflow state. It answers a narrower question: which agents are currently available, where can they be reached, and what do they say they can do?
+Its role is coordination, not orchestration. The registry does not decide which agent should handle a task, route messages between agents, or own workflow state. It answers a narrower question: which agents are currently available, where can they be reached and what do they say they can do?
 
-That separation keeps agent-to-agent communication explicit. Agents still call each other through their own transports and clients, but they no longer need every peer URL hard-coded at startup. [A2A 1.0](https://a2a-protocol.org/latest/specification/) standardizes per-agent card discovery; ProtoLink adds central indexed lookup, roles and tags, liveness heartbeats, optional TTL pruning, persistence hooks, and a browser status view around that model. Those registry endpoints are ProtoLink-native runtime services, not additional A2A 1.0 operations.
+That separation keeps agent-to-agent communication explicit. Agents still call each other through their own transports and clients, but they no longer need every peer URL hard-coded at startup. [A2A 1.0](https://a2a-protocol.org/latest/specification/) standardizes per-agent card discovery; ProtoLink adds central indexed lookup, roles and tags, liveness heartbeats, optional TTL pruning, persistence hooks and a browser status view around that model. Those registry endpoints are ProtoLink-native runtime services, not additional A2A 1.0 operations.
 
 Use a registry when agents should discover each other dynamically instead of hard-coding every peer URL.
 
@@ -37,14 +37,14 @@ While the registry is running, open it with `protolink dashboard --registry-url 
 
 ## How It Works
 
-The Registry is both a local runtime object and a transport-backed service. Locally, it stores registered agents by their stable `AgentCard.url`, keeps liveness metadata in `RegistryEntry`, and maintains secondary indexes for common discovery filters. Over the transport, `RegistryClient` sends the same registration, heartbeat, unregistration, and discovery requests that agents use when they connect to a registry URL.
+The Registry is both a local runtime object and a transport-backed service. Locally, it stores registered agents by their stable `AgentCard.url`, keeps liveness metadata in `RegistryEntry` and maintains secondary indexes for common discovery filters. Over the transport, `RegistryClient` sends the same registration, heartbeat, unregistration and discovery requests that agents use when they connect to a registry URL.
 
 This means there are two useful ways to think about the API:
 
-- Use `register()`, `heartbeat()`, `unregister()`, and `discover()` when code should talk to a running registry through its configured transport.
-- Use `count()`, `list_urls()`, `get_entry()`, and `clear()` when code owns the in-process `Registry` object and needs diagnostics, tests, or local administration.
+- Use `register()`, `heartbeat()`, `unregister()` and `discover()` when code should talk to a running registry through its configured transport.
+- Use `count()`, `list_urls()`, `get_entry()` and `clear()` when code owns the in-process `Registry` object and needs diagnostics, tests, or local administration.
 
-Incoming transport requests are handled by `handle_register()`, `handle_heartbeat()`, `handle_unregister()`, and `handle_discover()`. Those handler methods update the local store, rebuild indexes as needed, prune expired entries when TTL is enabled, and persist entries when storage is configured. Most application code should use the higher-level client methods or `Agent` registry integration instead of calling handlers directly.
+Incoming transport requests are handled by `handle_register()`, `handle_heartbeat()`, `handle_unregister()` and `handle_discover()`. Those handler methods update the local store, rebuild indexes as needed, prune expired entries when TTL is enabled and persist entries when storage is configured. Most application code should use the higher-level client methods or `Agent` registry integration instead of calling handlers directly.
 
 ## Browser Status
 
@@ -54,13 +54,13 @@ When the registry runs on an HTTP-compatible transport, it exposes a small brows
 GET <registry-url>/status
 ```
 
-The page is served by `RegistryServer` from the same transport-neutral endpoint table as the JSON registry API. In the default HTTP path, `HTTPTransport` mounts that endpoint on the Starlette or FastAPI backend and returns HTML generated by `protolink.utils.renderers.status.to_registry_status_html()`. This keeps the page diagnostic-only: registration and discovery still go through the JSON endpoints such as `POST /agents/`, `GET /agents/`, `DELETE /agents/`, and `POST /agents/heartbeat`.
+The page is served by `RegistryServer` from the same transport-neutral endpoint table as the JSON registry API. In the default HTTP path, `HTTPTransport` mounts that endpoint on the Starlette or FastAPI backend and returns HTML generated by `protolink.utils.renderers.status.to_registry_status_html()`. This keeps the page diagnostic-only: registration and discovery still go through the JSON endpoints such as `POST /agents/`, `GET /agents/`, `DELETE /agents/` and `POST /agents/heartbeat`.
 
 <figure className="browser-surface-card browser-surface-card--single">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/registry_status_card.png" alt="Registry status page" loading="lazy" />
   <figcaption>
     <strong>Registry status</strong>
-    <span>Live identity, uptime, transport, and discovered-agent count from the running registry.</span>
+    <span>Live identity, uptime, transport and discovered-agent count from the running registry.</span>
   </figcaption>
 </figure>
 
@@ -111,8 +111,8 @@ The Registry is transport-agnostic. It relies on a Transport implementation to e
 
 Internally, `Registry` composes the transport in two directions:
 
-- `RegistryClient(transport)` is the outbound side. Public methods such as `register()`, `heartbeat()`, `unregister()`, and `discover()` delegate to this client, which turns each operation into a `ClientRequestSpec` and calls `transport.send(...)`.
-- `RegistryServer(self, transport)` is the inbound side. `start()` calls the server, the server builds an `EndpointSpec` table, and the transport mounts those endpoint specs as real routes.
+- `RegistryClient(transport)` is the outbound side. Public methods such as `register()`, `heartbeat()`, `unregister()` and `discover()` delegate to this client, which turns each operation into a `ClientRequestSpec` and calls `transport.send(...)`.
+- `RegistryServer(self, transport)` is the inbound side. `start()` calls the server, the server builds an `EndpointSpec` table and the transport mounts those endpoint specs as real routes.
 
 When you construct a registry with `Registry(transport="http", url="http://localhost:9000")`, the string transport is resolved through `get_transport(...)`. The resulting transport instance is passed to both the client and the server, so one configured URL defines both where the registry listens and where registry client requests are sent.
 
@@ -144,7 +144,7 @@ The transport is responsible for:
   eyebrow="Discovery module"
   title="Registry"
   path="protolink.discovery.Registry"
-  description="The discovery service for registering agent cards, finding peers by metadata, maintaining secondary indexes, and exposing registry operations through a transport."
+  description="The discovery service for registering agent cards, finding peers by metadata, maintaining secondary indexes and exposing registry operations through a transport."
   pills={[
     "Agent registration",
     "Filtered discovery",
@@ -188,11 +188,11 @@ These methods control the registry server component lifecycle.
 ) -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
 Start the RegistryServer and keep its transport lifecycle alive. This public entry point is synchronous even though server startup and shutdown are asynchronous.
 
-<ApiSection title="Parameters"><ApiFields ariaLabel="Registry start parameters"><ApiField name="background" type="bool" defaultValue="False">When false, run the lifecycle with <code>asyncio.run()</code> and block the caller. When true, start a non-daemon thread with its own event loop, wait for readiness, and return.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry start parameters"><ApiField name="background" type="bool" defaultValue="False">When false, run the lifecycle with <code>asyncio.run()</code> and block the caller. When true, start a non-daemon thread with its own event loop, wait for readiness and return.</ApiField></ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Registry start return"><ApiField name="None" type="None">Background mode returns after startup readiness or the ten-second readiness wait. Blocking mode returns after shutdown.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="Registry start errors"><ApiField name="startup error">Transport binding, route setup, and server failures propagate. Background failures are captured in the lifecycle thread and re-raised to the caller.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="Registry start errors"><ApiField name="startup error">Transport binding, route setup and server failures propagate. Background failures are captured in the lifecycle thread and re-raised to the caller.</ApiField></ApiFields></ApiSection>
 
 <ApiCallout label="Active event loops">Blocking mode logs an error but still calls <code>asyncio.run()</code>; from an active loop that raises <code>RuntimeError</code>. Use <code>background=True</code> in async applications and notebooks.</ApiCallout>
 
@@ -205,13 +205,13 @@ Cancel the private background lifecycle task and synchronously wait up to ten se
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Registry stop return"><ApiField name="None" type="None">Returns after the background thread exits or the join timeout elapses.</ApiField></ApiFields></ApiSection>
 
-<ApiCallout label="Repeated calls">The internal async stop primitive is guarded, and calling the public method again is safe.</ApiCallout>
+<ApiCallout label="Repeated calls">The internal async stop primitive is guarded and calling the public method again is safe.</ApiCallout>
 
 </ApiReference>
 
 ### Execution Models
 
-- **`background=True`** starts the registry in a dedicated background thread with its own isolated `asyncio` event loop and returns immediately. Use this for examples, notebooks, tests, and multi-agent scripts.
+- **`background=True`** starts the registry in a dedicated background thread with its own isolated `asyncio` event loop and returns immediately. Use this for examples, notebooks, tests and multi-agent scripts.
 - **`background=False`** blocks the main thread until the registry is stopped. Use this for a standalone registry process.
 
 ### Common Usage Patterns
@@ -301,7 +301,7 @@ Send an AgentCard to this Registry's transport-backed client. This does not upda
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Registry register parameters"><ApiField name="card" type="AgentCard" required>Complete identity and capability card keyed by its stable URL on the server.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="Registry register return"><ApiField name="status" type="dict[str, str]">Server status payload. Unlike RegistryClient, this facade catches any exception, logs it, and returns <code>{'{"status": str(error)}'}</code>.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="Registry register return"><ApiField name="status" type="dict[str, str]">Server status payload. Unlike RegistryClient, this facade catches any exception, logs it and returns <code>{'{"status": str(error)}'}</code>.</ApiField></ApiFields></ApiSection>
 
 <ApiCallout label="Retry contract">The built-in register request is not idempotent and is not automatically retried by transport policy.</ApiCallout>
 
@@ -340,7 +340,7 @@ Send an idempotent removal request through the configured RegistryClient.
 ) -> list[AgentCard]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
 Query the running service through RegistryClient and reconstruct matching AgentCard objects.
 
-<ApiSection title="Parameters"><ApiFields ariaLabel="Registry discover parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Exact field filters. Name, role, and a single string tag use secondary indexes; other fields and tag lists are refined by the full matcher.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Parameters"><ApiFields ariaLabel="Registry discover parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Exact field filters. Name, role and a single string tag use secondary indexes; other fields and tag lists are refined by the full matcher.</ApiField></ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Registry discover return"><ApiField name="cards" type="list[AgentCard]">All live cards when no filter is supplied, otherwise exact matches after TTL pruning.</ApiField></ApiFields></ApiSection>
 
@@ -372,9 +372,9 @@ Return local liveness metadata for one URL after TTL pruning.
 ### Registry.clear
 
 <ApiReference kind="method" path="protolink.discovery.Registry.clear" signature={`clear() -> None`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
-Remove every local card, RegistryEntry, and secondary-index value, then persist the empty entry list when storage is configured.
+Remove every local card, RegistryEntry and secondary-index value, then persist the empty entry list when storage is configured.
 
-<ApiCallout label="Administrative mutation">This bypasses transport, authentication, and server handlers. It is intended for code that owns the in-process Registry, tests, and explicit administration.</ApiCallout>
+<ApiCallout label="Administrative mutation">This bypasses transport, authentication and server handlers. It is intended for code that owns the in-process Registry, tests and explicit administration.</ApiCallout>
 
 </ApiReference>
 
@@ -385,7 +385,7 @@ The `handle_*` methods are the server-side endpoint hooks used by `RegistryServe
 <ApiReference kind="async handler" path="protolink.discovery.Registry.handle_register" signature={`async handle_register(
     card: AgentCard,
 ) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
-Insert or replace a local registration. Replacement first runs unregistration cleanup, then writes a fresh RegistryEntry with <code>last_seen=time.time()</code>, updates name/role/tag indexes, and persists the full entry set.
+Insert or replace a local registration. Replacement first runs unregistration cleanup, then writes a fresh RegistryEntry with <code>last_seen=time.time()</code>, updates name/role/tag indexes and persists the full entry set.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="handle register parameters"><ApiField name="card" type="AgentCard" required>Validated card supplied by RegistryServer's request parser or a direct caller.</ApiField></ApiFields></ApiSection>
 
@@ -411,7 +411,7 @@ Prune stale entries, then replace one RegistryEntry with a fresh timestamp while
 <ApiReference kind="async handler" path="protolink.discovery.Registry.handle_unregister" signature={`async handle_unregister(
     agent_url: str,
 ) -> dict[str, str]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
-Remove one local card and entry, clean empty secondary-index buckets, and persist the resulting store. The operation is idempotent.
+Remove one local card and entry, clean empty secondary-index buckets and persist the resulting store. The operation is idempotent.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="handle unregister parameters"><ApiField name="agent_url" type="str" required>Stable entry key to remove.</ApiField></ApiFields></ApiSection>
 
@@ -426,7 +426,7 @@ Remove one local card and entry, clean empty secondary-index buckets, and persis
     *,
     as_json: bool = False,
 ) -> list[dict[str, Any]] | list[AgentCard]`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
-Prune expired registrations, select indexed candidates, refine every candidate with exact field matching, and optionally serialize results.
+Prune expired registrations, select indexed candidates, refine every candidate with exact field matching and optionally serialize results.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="handle discover parameters"><ApiField name="filter_by" type="dict[str, Any] | None" defaultValue="None">Exact AgentCard attributes. For <code>tags</code>, every requested tag must be present.</ApiField><ApiField name="as_json" type="bool" defaultValue="False">Return dictionaries for transport handlers or AgentCard objects for local callers.</ApiField></ApiFields></ApiSection>
 
@@ -459,13 +459,13 @@ Prune expired entries and render the current registry card set and uptime as a s
     entry_ttl_seconds: float | None = None,
     storage: Storage | None = None,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/discovery/registry.py">
-Create an in-process indexed registry, a RegistryClient, and a RegistryServer around one resolved transport. Construction restores persisted entries and rebuilds secondary indexes, but it does not start listening.
+Create an in-process indexed registry, a RegistryClient and a RegistryServer around one resolved transport. Construction restores persisted entries and rebuilds secondary indexes, but it does not start listening.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Registry constructor parameters">
   <ApiField name="transport" type="TransportType | Transport" defaultValue={'"http"'}>Registered transport alias or configured instance. An alias is resolved with <code>url</code>; a concrete transport is shared unchanged by the client and server.</ApiField>
   <ApiField name="url" type="str | None" defaultValue="None">Address required when <code>transport</code> is a string. A concrete transport owns its own URL and ignores this argument.</ApiField>
   <ApiField name="verbosity" type="Literal[0, 1, 2]" defaultValue="1">Registry logger level: warning, info, or debug.</ApiField>
-  <ApiField name="entry_ttl_seconds" type="float | None" defaultValue="None">Maximum age since <code>last_seen</code>. Expiry is lazy: pruning runs during discovery, status rendering, inspection, heartbeat, and persisted-state load rather than on a timer.</ApiField>
+  <ApiField name="entry_ttl_seconds" type="float | None" defaultValue="None">Maximum age since <code>last_seen</code>. Expiry is lazy: pruning runs during discovery, status rendering, inspection, heartbeat and persisted-state load rather than on a timer.</ApiField>
   <ApiField name="storage" type="Storage | None" defaultValue="None">Optional persistence for a single dictionary containing serialized entries. Every registration, heartbeat, removal, clear, or TTL-prune rewrites that payload through <code>storage.save()</code>.</ApiField>
 </ApiFields></ApiSection>
 
@@ -474,13 +474,13 @@ Create an in-process indexed registry, a RegistryClient, and a RegistryServer ar
   <ApiField name="start_time" type="float | None">Unix timestamp set after successful server start.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="Registry constructor errors"><ApiField name="ValueError">A transport alias lacks <code>url</code>, or <code>transport</code> is neither a registered string nor a Transport instance.</ApiField><ApiField name="storage/model error">Malformed persisted entries, storage-load failures, and reconstruction errors propagate during construction.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="Registry constructor errors"><ApiField name="ValueError">A transport alias lacks <code>url</code>, or <code>transport</code> is neither a registered string nor a Transport instance.</ApiField><ApiField name="storage/model error">Malformed persisted entries, storage-load failures and reconstruction errors propagate during construction.</ApiField></ApiFields></ApiSection>
 
 <ApiCallout label="Persisted TTL">Restored entries retain their original <code>last_seen</code> timestamps and are pruned immediately after loading when a TTL is configured.</ApiCallout>
 
 </ApiReference>
 
-Registry follows the same construction rule as Agent and AgentClient. A string alias creates a default transport for fast setup; a concrete transport carries TLS, limits, retries, keepalive, and protocol-specific settings. The Registry passes that exact instance to both `RegistryClient` and `RegistryServer`, so inbound serving and outbound registry calls share one capability, health, and metrics surface.
+Registry follows the same construction rule as Agent and AgentClient. A string alias creates a default transport for fast setup; a concrete transport carries TLS, limits, retries, keepalive and protocol-specific settings. The Registry passes that exact instance to both `RegistryClient` and `RegistryServer`, so inbound serving and outbound registry calls share one capability, health and metrics surface.
 
 ```python
 # Simple: defaults are sufficient
@@ -508,9 +508,9 @@ transport = HTTPTransport(
 registry = Registry(transport=transport)
 ```
 
-The Registry needs the same protections as an Agent even though its requests are smaller. In a large deployment, many Agents may start or heartbeat at once. Concurrency limits keep that burst bounded, payload limits prevent malformed cards from consuming excessive memory, and health metrics reveal whether discovery traffic is failing or saturating the service. Keeping those settings on its transport also allows the Registry to use a different certificate identity and capacity policy from every Agent that calls it.
+The Registry needs the same protections as an Agent even though its requests are smaller. In a large deployment, many Agents may start or heartbeat at once. Concurrency limits keep that burst bounded, payload limits prevent malformed cards from consuming excessive memory and health metrics reveal whether discovery traffic is failing or saturating the service. Keeping those settings on its transport also allows the Registry to use a different certificate identity and capacity policy from every Agent that calls it.
 
-The built-in registry request specs mark `unregister`, `heartbeat`, and `discover` as idempotent. `register` is intentionally not retried automatically because registration may have application-specific replacement semantics. See [ClientRequestSpec](./client.md#clientrequestspec) and the [retry contract](./transport.md#retrypolicy).
+The built-in registry request specs mark `unregister`, `heartbeat` and `discover` as idempotent. `register` is intentionally not retried automatically because registration may have application-specific replacement semantics. See [ClientRequestSpec](./client.md#clientrequestspec) and the [retry contract](./transport.md#retrypolicy).
 
 In simple terms, reading discovery results, refreshing the same heartbeat, or removing an already removed URL has a repeatable outcome. Registration can mean “create,” “replace,” or trigger custom persistence behavior, so ProtoLink does not assume that repeating it is harmless. Applications that provide durable idempotent registration semantics can define an explicit custom request contract.
 
@@ -556,7 +556,7 @@ Compare an explicit clock value with <code>last_seen</code>.
 
 <ApiReference kind="methods" path="protolink.core.registry.RegistryEntry serialization" signature={`to_dict() -> dict[str, Any]
 RegistryEntry.from_dict(data: dict[str, Any]) -> RegistryEntry`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/registry.py">
-Serialize an entry into card, timestamp, and metadata fields or reconstruct it from that representation. <code>from_dict()</code> requires a <code>"card"</code> mapping, converts <code>last_seen</code> to float with a zero default, and copies metadata into a new dictionary.
+Serialize an entry into card, timestamp and metadata fields or reconstruct it from that representation. <code>from_dict()</code> requires a <code>"card"</code> mapping, converts <code>last_seen</code> to float with a zero default and copies metadata into a new dictionary.
 
 <ApiSection title="Raises"><ApiFields ariaLabel="RegistryEntry serialization errors"><ApiField name="KeyError | TypeError | ValueError">Missing or malformed card data, a non-numeric timestamp, or invalid AgentCard fields.</ApiField></ApiFields></ApiSection>
 
@@ -573,7 +573,7 @@ Serialize an entry into card, timestamp, and metadata fields or reconstruct it f
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/client/registry.py">
 Bind registry request specs to one configured transport.
 
-<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryClient constructor parameters"><ApiField name="transport" type="Transport" required>Concrete transport owning URL, TLS, authentication, limits, retry policy, health, and metrics. No runtime type validation or cloning occurs in the constructor.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Parameters"><ApiFields ariaLabel="RegistryClient constructor parameters"><ApiField name="transport" type="Transport" required>Concrete transport owning URL, TLS, authentication, limits, retry policy, health and metrics. No runtime type validation or cloning occurs in the constructor.</ApiField></ApiFields></ApiSection>
 
 <ApiSection title="Attributes"><ApiFields ariaLabel="RegistryClient attributes"><ApiField name="transport" type="Transport">The exact supplied object.</ApiField><ApiField name="url" type="str">Read-only proxy to <code>transport.url</code>.</ApiField></ApiFields></ApiSection>
 
@@ -590,7 +590,7 @@ Serialize the card and POST it to <code>/agents/</code> at the transport's own U
 
 <ApiSection title="Returns"><ApiFields ariaLabel="RegistryClient register return"><ApiField name="status" type="dict[str, str]">Decoded handler payload.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="RegistryClient register errors"><ApiField name="transport or remote error">Connection, timeout, authentication, serialization, response, and server failures propagate.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="RegistryClient register errors"><ApiField name="transport or remote error">Connection, timeout, authentication, serialization, response and server failures propagate.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -648,4 +648,4 @@ registry = Registry(transport=transport)
 assert registry.client.url == transport.url
 ```
 
-This keeps host, port, transport, and discovery metadata consistent across agent and registry instances.
+This keeps host, port, transport and discovery metadata consistent across agent and registry instances.

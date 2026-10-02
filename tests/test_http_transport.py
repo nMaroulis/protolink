@@ -5,6 +5,8 @@ import pytest
 
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.models import Message, Task
+from protolink.transport.config import TransportConfig, TransportLimits
+from protolink.transport.errors import TransportLimitError
 from protolink.transport.http_transport import HTTPTransport
 
 
@@ -140,3 +142,42 @@ async def test_http_serialization_task():
         # Should call to_dict() or similar
         assert "json" in kwargs
         assert kwargs["json"]["messages"][0]["parts"][0]["content"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_http_send_serializes_body_once() -> None:
+    class Payload:
+        calls = 0
+
+        def to_dict(self):
+            self.calls += 1
+            return {"value": "sent"}
+
+    transport = HTTPTransport(url="http://localhost:8000")
+    payload = Payload()
+    response = httpx.Response(200, json={"status": "ok"}, request=httpx.Request("POST", "http://agent/task"))
+    client = AsyncMock(spec=httpx.AsyncClient)
+    client.request.return_value = response
+
+    with patch.object(transport, "_ensure_client", return_value=client):
+        spec = ClientRequestSpec(name="task", method="POST", path="/task", request_source="body")
+        await transport.send(spec, "http://agent", data=payload)
+
+    assert payload.calls == 1
+    assert client.request.call_args.kwargs["json"] == {"value": "sent"}
+
+
+@pytest.mark.asyncio
+async def test_http_response_limit_uses_raw_byte_length() -> None:
+    transport = HTTPTransport(
+        url="http://localhost:8000",
+        config=TransportConfig(limits=TransportLimits(max_response_bytes=10)),
+    )
+    response = httpx.Response(200, content=b"x" * 11, request=httpx.Request("GET", "http://agent/task"))
+    client = AsyncMock(spec=httpx.AsyncClient)
+    client.request.return_value = response
+
+    with patch.object(transport, "_ensure_client", return_value=client):
+        spec = ClientRequestSpec(name="task", method="GET", path="/task")
+        with pytest.raises(TransportLimitError, match="11 bytes"):
+            await transport.send(spec, "http://agent")

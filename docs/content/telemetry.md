@@ -8,7 +8,7 @@ import ApiReference, {
 
 # Telemetry
 
-The Telemetry subsystem provides standard observable tracing to agent task execution, tool calling, and LLM inference. Protolink supports a non-invasive integration with external tracing services using Python's `contextvars`. This means it tracks nested traces, spans, and runs in the background without cluttering core execution method signatures.
+The Telemetry subsystem provides standard observable tracing to agent task execution, tool calling and LLM inference. Protolink supports a non-invasive integration with external tracing services using Python's `contextvars`. This means it tracks nested traces, spans and runs in the background without cluttering core execution method signatures.
 
 Protolink includes a built-in local trace recorder and native integrations for **[Langfuse](https://langfuse.com/)** and **[LangSmith](https://www.langchain.com/langsmith)**.
 
@@ -16,7 +16,7 @@ Protolink includes a built-in local trace recorder and native integrations for *
   eyebrow="Observability module"
   title="Telemetry"
   path="protolink.telemetry"
-  description="The tracing layer for task runs, tool calls, LLM spans, context usage, cost estimates, redacted local traces, and optional Langfuse or LangSmith export."
+  description="The tracing layer for task runs, tool calls, LLM spans, context usage, cost estimates, redacted local traces and optional Langfuse or LangSmith export."
   pills={[
     "LocalTraceTelemetry",
     "Langfuse",
@@ -37,7 +37,7 @@ Protolink includes a built-in local trace recorder and native integrations for *
     },
     {
       title: "Measure models",
-      text: "Capture context pressure, latency, token usage, and estimated cost around LLM calls.",
+      text: "Capture context pressure, latency, token usage and estimated cost around LLM calls.",
       code: "llm_call_metrics",
     },
     {
@@ -50,7 +50,7 @@ Protolink includes a built-in local trace recorder and native integrations for *
 
 ## How telemetry fits into execution
 
-Telemetry is an `Agent` lifecycle boundary, not a replacement for runtime events or reports. When `agent.telemetry` is set, the Agent awaits coarse hooks around the task, each direct task-level tool call, and the complete `LLM.infer()` cycle. While inference is running, it also forwards provider-neutral loop events to `on_llm_event()`.
+Telemetry is an `Agent` lifecycle boundary, not a replacement for runtime events or reports. When `agent.telemetry` is set, the Agent awaits coarse hooks around the task, each direct task-level tool call and the complete `LLM.infer()` cycle. While inference is running, it also forwards provider-neutral loop events to `on_llm_event()`.
 
 ```text
 on_task_start
@@ -64,13 +64,13 @@ on_task_start
 on_task_end
 ```
 
-The exact middle events depend on the action loop. A simple inference can emit context, call, response, action, and final events; multi-step inference can add streamed chunks, retries, tool operations, delegated-agent operations, budget decisions, and more. `LocalTraceTelemetry` retains those detailed events. The hosted backends currently inherit the base no-op implementation of `on_llm_event()`, so Langfuse and LangSmith receive the coarse task, LLM, and explicit tool lifecycle only.
+The exact middle events depend on the action loop. A simple inference can emit context, call, response, action and final events; multi-step inference can add streamed chunks, retries, tool operations, delegated-agent operations, budget decisions and more. `LocalTraceTelemetry` retains those detailed events. The hosted backends currently inherit the base no-op implementation of `on_llm_event()`, so Langfuse and LangSmith receive the coarse task, LLM and explicit tool lifecycle only.
 
-Telemetry is non-authoritative when attached to an Agent. The runtime catches hook exceptions, logs the first failure for each hook name, and continues with the task, LLM, or tool result unchanged. This isolation applies to unary and streaming task lifecycles. Calling a telemetry implementation's hook directly still follows that implementation's own exception contract.
+Telemetry is non-authoritative when attached to an Agent. The runtime catches hook exceptions, logs the first failure for each hook name and continues with the task, LLM, or tool result unchanged. This isolation applies to unary and streaming task lifecycles. Calling a telemetry implementation's hook directly still follows that implementation's own exception contract.
 
 :::info[Telemetry versus runtime reporting]
 
-Use telemetry for detailed traces, span hierarchy, observability export, and local debugging. Use `RunEvent`, `RunRecorder`, and `RunReport` from the [Runtime](runtime.md) layer for the stable application-facing event envelope, durable run summaries, replay, and regression assertions. An application can use both surfaces on the same Agent.
+Use telemetry for detailed traces, span hierarchy, observability export and local debugging. Use `RunEvent`, `RunRecorder` and `RunReport` from the [Runtime](runtime.md) layer for the stable application-facing event envelope, durable run summaries, replay and regression assertions. An application can use both surfaces on the same Agent.
 
 :::
 
@@ -103,7 +103,7 @@ To enable observability, instantiate your preferred telemetry tracker and inject
 
 ### Local Trace Example
 
-`LocalTraceTelemetry` records task traces in memory and can append replayable JSONL records to disk. It captures trace IDs, parent-child spans, model metadata, token estimates, raw inference-loop events, retry counts, and redacted payloads without requiring an external service.
+`LocalTraceTelemetry` records task traces in memory and can append replayable JSONL records to disk. It captures trace IDs, parent-child spans, model metadata, token estimates, raw inference-loop events, retry counts and redacted payloads without requiring an external service.
 
 ```python
 from protolink import Agent, AgentCard, LocalTraceTelemetry, Task
@@ -139,11 +139,11 @@ protolink dashboard --traces traces.jsonl --open
 
 :::
 
-`--telemetry` is an alias for `--traces`, and the dashboard Telemetry view also accepts a JSONL file selected locally in the browser. It pages recent task records, rolls a bounded summary window through older history, and loads detail payloads lazily rather than reading the entire file into the initial page. See [Developer Tools](devtools.md#telemetry-jsonl) for shared `trace_id` grouping, scan and detail safeguards, partial-line handling, and local-data security guidance.
+`--telemetry` is an alias for `--traces` and the dashboard Telemetry view also accepts a JSONL file selected locally in the browser. It pages recent task records, rolls a bounded summary window through older history and loads detail payloads lazily rather than reading the entire file into the initial page. See [Developer Tools](devtools.md#telemetry-jsonl) for shared `trace_id` grouping, scan and detail safeguards, partial-line handling and local-data security guidance.
 
 ### LLM Metrics and Context Usage
 
-When an agent has both an LLM and telemetry, Protolink records live context and budget metadata for every model call inside `LLM.infer()`. This includes the pre-call context manifest, latency, token usage, context-window pressure, and estimated cost. Provider-reported usage is used when available; otherwise Protolink estimates usage without requiring extra dependencies.
+When an agent has both an LLM and telemetry, Protolink records live context and budget metadata for every model call inside `LLM.infer()`. This includes the pre-call context manifest, latency, token usage, context-window pressure and estimated cost. Provider-reported usage is used when available; otherwise Protolink estimates usage without requiring extra dependencies.
 
 ```python
 from protolink import Agent, AgentCard, LLMModelProfile, LocalTraceTelemetry, Task, create_llm
@@ -171,9 +171,9 @@ llm_span = next(span for span in trace["spans"] if span["kind"] == "llm")
 print(llm_span["metadata"]["llm_metrics"])
 ```
 
-The same data is emitted live as `context_prepared`, `llm_context`, and `llm_call_metrics` events through `event_callback`, so terminal apps can render a status line such as context used, call latency, and session cost while the agent is still running.
+The same data is emitted live as `context_prepared`, `llm_context` and `llm_call_metrics` events through `event_callback`, so terminal apps can render a status line such as context used, call latency and session cost while the agent is still running.
 
-Local trace telemetry and runtime reports share the same default `RedactionPolicy`, so common secret-bearing fields such as API keys, tokens, passwords, authorization headers, and credentials are masked consistently before data is persisted.
+Local trace telemetry and runtime reports share the same default `RedactionPolicy`, so common secret-bearing fields such as API keys, tokens, passwords, authorization headers and credentials are masked consistently before data is persisted.
 
 :::note[Cost estimates]
 
@@ -182,7 +182,7 @@ Protolink does not ship a fixed provider pricing catalog. Prices and context win
 :::
 ### Langfuse Example
 
-The `LangfuseTelemetry` tracks tasks as traces, and LLM/Tool executions as spans/generations.
+The `LangfuseTelemetry` tracks tasks as traces and LLM/Tool executions as spans/generations.
 Install `protolink[telemetry]` for the supported Langfuse Python SDK 4.x and LangSmith integrations.
 
 ```python
@@ -301,7 +301,7 @@ class MyCustomTelemetry(Telemetry):
         pass
 ```
 
-Hooks are awaited inline by the Agent. A custom implementation should therefore avoid blocking I/O in the event loop, maintain per-task state with `contextvars` or another concurrency-safe mechanism, and decide explicitly whether export failures should propagate or be converted into warnings. Return values are permitted by the abstract contract but are ignored by the current Agent runtime.
+Hooks are awaited inline by the Agent. A custom implementation should therefore avoid blocking I/O in the event loop, maintain per-task state with `contextvars` or another concurrency-safe mechanism and decide explicitly whether export failures should propagate or be converted into warnings. Return values are permitted by the abstract contract but are ignored by the current Agent runtime.
 
 ## Example Code
 
@@ -356,7 +356,7 @@ from protolink.telemetry import (
 )
 ```
 
-`LocalTraceRecorder` and `LocalTraceTelemetry` are also available from the top-level `protolink` package. The hosted providers, multiplexer, abstract contract, and trace dataclasses are imported from `protolink.telemetry`.
+`LocalTraceRecorder` and `LocalTraceTelemetry` are also available from the top-level `protolink` package. The hosted providers, multiplexer, abstract contract and trace dataclasses are imported from `protolink.telemetry`.
 
 ### Telemetry
 
@@ -367,7 +367,7 @@ from protolink.telemetry import (
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/base.py#L7"
 >
 
-Define the asynchronous lifecycle contract shared by every telemetry backend. The class stores no state and supplies no constructor arguments. Concrete implementations decide how to preserve task-local hierarchy, serialize values, export data, and handle backend failures.
+Define the asynchronous lifecycle contract shared by every telemetry backend. The class stores no state and supplies no constructor arguments. Concrete implementations decide how to preserve task-local hierarchy, serialize values, export data and handle backend failures.
 
 <ApiSection title="Abstract methods">
   <ApiFields ariaLabel="Telemetry abstract methods">
@@ -416,7 +416,7 @@ Define the asynchronous lifecycle contract shared by every telemetry backend. Th
 
 ## Local tracing API
 
-The local backend is dependency-free. One `LocalTraceTelemetry` instance manages lifecycle state; its `LocalTraceRecorder` owns completed records in memory and, optionally, appends them to JSONL. `TraceRecord`, `TraceSpan`, and `TraceEvent` are the structured objects retained in memory.
+The local backend is dependency-free. One `LocalTraceTelemetry` instance manages lifecycle state; its `LocalTraceRecorder` owns completed records in memory and, optionally, appends them to JSONL. `TraceRecord`, `TraceSpan` and `TraceEvent` are the structured objects retained in memory.
 
 ### default_redactor
 
@@ -434,7 +434,7 @@ Best-effort normalize common runtime values and recursively mask fields recogniz
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="default_redactor parameters">
     <ApiField name="value" type="Any" required>
-      Nested runtime value. Objects with <code>to_dict()</code>, dataclass instances, mappings, lists, tuples, and sets receive special handling; ordinary non-JSON-native leaves fall back to <code>str(value)</code>.
+      Nested runtime value. Objects with <code>to_dict()</code>, dataclass instances, mappings, lists, tuples and sets receive special handling; ordinary non-JSON-native leaves fall back to <code>str(value)</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -442,7 +442,7 @@ Best-effort normalize common runtime values and recursively mask fields recogniz
 <ApiSection title="Returns">
   <ApiFields ariaLabel="default_redactor return">
     <ApiField name="redacted" type="Any">
-      Best-effort normalized value with case-insensitive secret fields masked. Default sensitive names include API key, authorization, client secret, credentials, password, secret, and token variants, including common suffixed forms.
+      Best-effort normalized value with case-insensitive secret fields masked. Default sensitive names include API key, authorization, client secret, credentials, password, secret and token variants, including common suffixed forms.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -481,7 +481,7 @@ Best-effort normalize common runtime values and recursively mask fields recogniz
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L266"
 >
 
-Record one replayable local trace per completed Agent task. Task, LLM, explicit tool, and inference-selected child operations are connected through IDs stored in `contextvars`, so concurrent async task contexts do not need trace objects passed through every runtime call.
+Record one replayable local trace per completed Agent task. Task, LLM, explicit tool and inference-selected child operations are connected through IDs stored in `contextvars`, so concurrent async task contexts do not need trace objects passed through every runtime call.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="LocalTraceTelemetry constructor parameters">
@@ -492,10 +492,10 @@ Record one replayable local trace per completed Agent task. Task, LLM, explicit 
       JSONL destination used only when the constructor creates its own recorder. It is ignored when a truthy <code>recorder</code> is supplied. Parent directories are created on the first completed trace.
     </ApiField>
     <ApiField name="redactor" type="Callable[[Any], Any] | None" defaultValue="None">
-      Application-specific transformation applied after default normalization and secret masking at explicit capture points: span inputs and outputs, event payloads, span metadata, and context or budget mappings. Generated trace status and metric-rollup fields are assigned directly.
+      Application-specific transformation applied after default normalization and secret masking at explicit capture points: span inputs and outputs, event payloads, span metadata and context or budget mappings. Generated trace status and metric-rollup fields are assigned directly.
     </ApiField>
     <ApiField name="capture_payloads" type="bool" defaultValue="True">
-      When true, retain span inputs and outputs plus event payloads. When false, those values become <code>None</code> or an empty mapping; span and trace metadata, event types, timing, IDs, statuses, and metrics are still recorded.
+      When true, retain span inputs and outputs plus event payloads. When false, those values become <code>None</code> or an empty mapping; span and trace metadata, event types, timing, IDs, statuses and metrics are still recorded.
     </ApiField>
     <ApiField name="max_traces" type="int" defaultValue="1000">
       In-memory retention limit passed to the automatically created recorder. Positive values keep only the newest records. Zero and negative values disable truncation, not recording.
@@ -520,7 +520,7 @@ Record one replayable local trace per completed Agent task. Task, LLM, explicit 
 <ApiSection title="Raises">
   <ApiFields ariaLabel="LocalTraceTelemetry constructor errors">
     <ApiField name="constructor error">
-      The constructor performs no explicit validation. Most path, redactor, serialization, and persistence errors occur later in lifecycle hooks and propagate to the Agent.
+      The constructor performs no explicit validation. Most path, redactor, serialization and persistence errors occur later in lifecycle hooks and propagate to the Agent.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -574,10 +574,10 @@ Implement the complete telemetry contract and translate it into a local trace hi
 <ApiSection title="Task lifecycle">
   <ApiFields ariaLabel="LocalTraceTelemetry task lifecycle">
     <ApiField name="on_task_start">
-      Reuse a truthy <code>task.metadata["trace_id"]</code> or generate a UUID, write it back to the Task, create a running <code>TraceRecord</code>, reset the context-local span stack, and open a root <code>kind="task"</code> span containing the serialized task.
+      Reuse a truthy <code>task.metadata["trace_id"]</code> or generate a UUID, write it back to the Task, create a running <code>TraceRecord</code>, reset the context-local span stack and open a root <code>kind="task"</code> span containing the serialized task.
     </ApiField>
     <ApiField name="on_task_end">
-      If no trace is active, return without action. Otherwise close the nearest active task span, derive error state only from <code>result.metadata["error"]</code>, set final-state and retry metadata, append the record through the recorder, and clear local context.
+      If no trace is active, return without action. Otherwise close the nearest active task span, derive error state only from <code>result.metadata["error"]</code>, set final-state and retry metadata, append the record through the recorder and clear local context.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -585,10 +585,10 @@ Implement the complete telemetry contract and translate it into a local trace hi
 <ApiSection title="LLM lifecycle">
   <ApiFields ariaLabel="LocalTraceTelemetry LLM lifecycle">
     <ApiField name="on_llm_start">
-      Open one <code>kind="llm"</code> span named <code>"LLM Call"</code>. Metadata includes the model, any supplied cost field, prompt character count, a four-character token estimate, and the caller metadata merged afterward.
+      Open one <code>kind="llm"</code> span named <code>"LLM Call"</code>. Metadata includes the model, any supplied cost field, prompt character count, a four-character token estimate and the caller metadata merged afterward.
     </ApiField>
     <ApiField name="on_llm_end">
-      Close the nearest active LLM span, capture response content, and add output character count plus the same local token estimate.
+      Close the nearest active LLM span, capture response content and add output character count plus the same local token estimate.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -616,16 +616,16 @@ Implement the complete telemetry contract and translate it into a local trace hi
       Append a mapping-valued <code>decision</code> to trace-level <code>budget_decisions</code>, then append the event.
     </ApiField>
     <ApiField name="llm_call_metrics">
-      Aggregate call count, latency, usage, estimated-call count, context pressure, window size, cost, and currency into both the current span and the trace before appending the event.
+      Aggregate call count, latency, usage, estimated-call count, context pressure, window size, cost and currency into both the current span and the trace before appending the event.
     </ApiField>
     <ApiField name="tool_start">
-      Open a nested <code>kind="tool"</code> span with <code>source="llm_loop"</code>, tool name, step, and arguments.
+      Open a nested <code>kind="tool"</code> span with <code>source="llm_loop"</code>, tool name, step and arguments.
     </ApiField>
     <ApiField name="tool_result | tool_error">
-      Append the event once, close the nearest tool span, attach result/name/step, and mark an error from <code>message</code> for <code>tool_error</code>.
+      Append the event once, close the nearest tool span, attach result/name/step and mark an error from <code>message</code> for <code>tool_error</code>.
     </ApiField>
     <ApiField name="agent_call_start">
-      Open a nested <code>kind="agent_call"</code> span containing agent, action, step, and payload.
+      Open a nested <code>kind="agent_call"</code> span containing agent, action, step and payload.
     </ApiField>
     <ApiField name="agent_call_result | agent_call_error">
       Append the event once and close the nearest delegated-agent span, using <code>message</code> as its error when appropriate.
@@ -645,7 +645,7 @@ Implement the complete telemetry contract and translate it into a local trace hi
 <ApiSection title="Fallback behavior">
   <ApiFields ariaLabel="LocalTraceTelemetry fallback behavior">
     <ApiField name="no active trace">
-      LLM, tool, and event hooks return without recording anything.
+      LLM, tool and event hooks return without recording anything.
     </ApiField>
     <ApiField name="no matching active span">
       Span-closing calls return without error. Events still attach to the trace and to the current span when one exists.
@@ -665,7 +665,7 @@ Implement the complete telemetry contract and translate it into a local trace hi
       Exceptions from the custom redactor propagate when the hook is called directly. Agent catches and logs them at its observability boundary.
     </ApiField>
     <ApiField name="serialization or filesystem error">
-      Task/result conversion, malformed metric values used by explicit integer conversion, directory creation, JSON encoding, and file writes may propagate from a direct hook call. Task-end cleanup runs in <code>finally</code>, so the active local trace frame is still cleared when recording fails; Agent execution also isolates that failure.
+      Task/result conversion, malformed metric values used by explicit integer conversion, directory creation, JSON encoding and file writes may propagate from a direct hook call. Task-end cleanup runs in <code>finally</code>, so the active local trace frame is still cleared when recording fails; Agent execution also isolates that failure.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -695,7 +695,7 @@ Receive control immediately before an Agent begins executing a task. Implementat
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="on_task_start parameters">
     <ApiField name="task" type="Task" required>
-      The live mutable Task about to execute. A backend may inspect its ID, state, parts, metadata, and attached run context. Mutating it affects the task seen by the runtime; <code>LocalTraceTelemetry</code> intentionally adds or reuses <code>task.metadata["trace_id"]</code>.
+      The live mutable Task about to execute. A backend may inspect its ID, state, parts, metadata and attached run context. Mutating it affects the task seen by the runtime; <code>LocalTraceTelemetry</code> intentionally adds or reuses <code>task.metadata["trace_id"]</code>.
     </ApiField>
     <ApiField name="agent_name" type="str" required>
       The current Agent card's name. It is not independently normalized or validated by the hook contract.
@@ -714,7 +714,7 @@ Receive control immediately before an Agent begins executing a task. Implementat
 <ApiSection title="Raises">
   <ApiFields ariaLabel="on_task_start errors">
     <ApiField name="implementation error">
-      A direct call can propagate an implementation error. Agent invokes the hook through its best-effort telemetry boundary, logs the first failure for this hook name, and continues task execution.
+      A direct call can propagate an implementation error. Agent invokes the hook through its best-effort telemetry boundary, logs the first failure for this hook name and continues task execution.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -781,7 +781,7 @@ Finalize the active task trace after execution. On the normal path, `result` is 
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/base.py#L43"
 >
 
-Begin observability around one complete `LLM.infer()` cycle. This is broader than one provider request: a single inference can call the model repeatedly while resolving tools, delegated agents, parse retries, and the final answer.
+Begin observability around one complete `LLM.infer()` cycle. This is broader than one provider request: a single inference can call the model repeatedly while resolving tools, delegated agents, parse retries and the final answer.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="on_llm_start parameters">
@@ -792,7 +792,7 @@ Begin observability around one complete `LLM.infer()` cycle. This is broader tha
       Best available model identifier, selected from the LLM's <code>model_name</code> or <code>model</code> attribute. It is <code>None</code> when neither exists.
     </ApiField>
     <ApiField name="metadata" type="dict[str, Any] | None" defaultValue="None">
-      Optional provider context. Agent currently passes <code>agent_name</code>, <code>task_id</code>, <code>trace_id</code>, <code>provider</code>, and <code>model_type</code>. Direct callers may pass a different mapping.
+      Optional provider context. Agent currently passes <code>agent_name</code>, <code>task_id</code>, <code>trace_id</code>, <code>provider</code> and <code>model_type</code>. Direct callers may pass a different mapping.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -902,7 +902,7 @@ Begin a span for a tool call executed from an explicit task `tool_call` Part. To
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/base.py#L88"
 >
 
-Finish an explicit task-level tool span. Agent sends the returned value on success; policy failures, cancellation, and tool exceptions are represented by `result=None` plus a string error.
+Finish an explicit task-level tool span. Agent sends the returned value on success; policy failures, cancellation and tool exceptions are represented by `result=None` plus a string error.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="on_tool_end parameters">
@@ -927,7 +927,7 @@ Finish an explicit task-level tool span. Agent sends the returned value on succe
 </ApiSection>
 
 <ApiCallout label="End-hook errors">
-  Agent logs and isolates this observer failure. A successful tool result remains successful, a tool error keeps its original error, and the hook is not called a second time merely because telemetry export failed.
+  Agent logs and isolates this observer failure. A successful tool result remains successful, a tool error keeps its original error and the hook is not called a second time merely because telemetry export failed.
 </ApiCallout>
 
 </ApiReference>
@@ -943,7 +943,7 @@ Finish an explicit task-level tool span. Agent sends the returned value on succe
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/base.py#L102"
 >
 
-Receive a provider-neutral event emitted while `LLM.infer()` is running. This optional high-detail hook carries context manifests, model-call metrics, chunks, actions, retries, tools, delegated agents, budget decisions, and final outputs without expanding the coarse lifecycle signature.
+Receive a provider-neutral event emitted while `LLM.infer()` is running. This optional high-detail hook carries context manifests, model-call metrics, chunks, actions, retries, tools, delegated agents, budget decisions and final outputs without expanding the coarse lifecycle signature.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="on_llm_event parameters">
@@ -1030,7 +1030,7 @@ Retain completed `TraceRecord` objects in process and optionally append one seri
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L214"
 >
 
-Append a completed trace to memory, enforce the positive retention limit, and then append its dictionary representation to the configured JSONL destination.
+Append a completed trace to memory, enforce the positive retention limit and then append its dictionary representation to the configured JSONL destination.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="LocalTraceRecorder record parameters">
@@ -1244,7 +1244,7 @@ Convert the event with `dataclasses.asdict()`.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="TraceEvent to_dict return">
     <ApiField name="event" type="dict[str, Any]">
-      Deep dataclass conversion containing <code>type</code>, <code>timestamp</code>, <code>span_id</code>, and <code>payload</code>.
+      Deep dataclass conversion containing <code>type</code>, <code>timestamp</code>, <code>span_id</code> and <code>payload</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1278,7 +1278,7 @@ Convert the event with `dataclasses.asdict()`.
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L123"
 >
 
-Represent one timed operation inside a local trace. The built-in tracer uses `kind` values `task`, `llm`, `tool`, and `agent_call`; parent IDs encode hierarchy while the record stores spans in a flat list.
+Represent one timed operation inside a local trace. The built-in tracer uses `kind` values `task`, `llm`, `tool` and `agent_call`; parent IDs encode hierarchy while the record stores spans in a flat list.
 
 <ApiSection title="Identity and hierarchy">
   <ApiFields ariaLabel="TraceSpan identity fields">
@@ -1326,7 +1326,7 @@ Represent one timed operation inside a local trace. The built-in tracer uses `ki
       Redacted operation output once closed and when payload capture is enabled.
     </ApiField>
     <ApiField name="metadata" type="dict[str, Any]" defaultValue="{}">
-      Redacted identifiers, source, steps, context manifests, and metric rollups. The default is per instance.
+      Redacted identifiers, source, steps, context manifests and metric rollups. The default is per instance.
     </ApiField>
     <ApiField name="events" type="list[TraceEvent]" defaultValue="[]">
       Detailed events observed while this span was active. The default is per instance.
@@ -1351,7 +1351,7 @@ Inspect elapsed time and serialize the complete span.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="TraceSpan inspection returns">
     <ApiField name="duration_ms" type="float | None">
-      <code>None</code> while <code>ended_at</code> is absent. Otherwise parse both ISO timestamps, subtract them, convert to milliseconds, and round to three decimal places.
+      <code>None</code> while <code>ended_at</code> is absent. Otherwise parse both ISO timestamps, subtract them, convert to milliseconds and round to three decimal places.
     </ApiField>
     <ApiField name="to_dict()" type="dict[str, Any]">
       All dataclass fields plus computed <code>duration_ms</code>, with each child event serialized through <code>TraceEvent.to_dict()</code>.
@@ -1428,7 +1428,7 @@ Represent the top-level replay artifact for one task. The local backend retains 
 <ApiSection title="Contents">
   <ApiFields ariaLabel="TraceRecord content fields">
     <ApiField name="metadata" type="dict[str, Any]" defaultValue="{}">
-      Agent/task state, final state, retry count, budget decisions, and trace-level metric rollups.
+      Agent/task state, final state, retry count, budget decisions and trace-level metric rollups.
     </ApiField>
     <ApiField name="spans" type="list[TraceSpan]" defaultValue="[]">
       Flat operation list in start order.
@@ -1459,7 +1459,7 @@ Inspect total elapsed task time and serialize a replayable trace dictionary.
       <code>None</code> until <code>ended_at</code> is set; otherwise elapsed milliseconds rounded to three decimals.
     </ApiField>
     <ApiField name="to_dict()" type="dict[str, Any]">
-      All trace fields plus computed duration, recursively serialized spans, and serialized trace-level events.
+      All trace fields plus computed duration, recursively serialized spans and serialized trace-level events.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1480,7 +1480,7 @@ Inspect total elapsed task time and serialize a replayable trace dictionary.
 
 ## Hosted telemetry providers
 
-The hosted adapters import their SDKs lazily when constructed. Importing `protolink.telemetry` therefore does not itself require Langfuse or LangSmith. Both adapters isolate async task state with `contextvars`, catch ordinary provider-operation exceptions inside lifecycle hooks, and log warnings so export outages normally do not stop Agent work.
+The hosted adapters import their SDKs lazily when constructed. Importing `protolink.telemetry` therefore does not itself require Langfuse or LangSmith. Both adapters isolate async task state with `contextvars`, catch ordinary provider-operation exceptions inside lifecycle hooks and log warnings so export outages normally do not stop Agent work.
 
 ### LangfuseTelemetry
 
@@ -1495,7 +1495,7 @@ The hosted adapters import their SDKs lazily when constructed. Importing `protol
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/langfuse_telemetry.py#L18"
 >
 
-Create a Langfuse client and map Agent tasks to traces, complete inference cycles to generations, and explicit task-level tool calls to spans.
+Create a Langfuse client and map Agent tasks to traces, complete inference cycles to generations and explicit task-level tool calls to spans.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="LangfuseTelemetry constructor parameters">
@@ -1564,10 +1564,10 @@ Translate the shared lifecycle into the Langfuse SDK 4 observation API. The six 
 <ApiSection title="Task mapping">
   <ApiFields ariaLabel="Langfuse task mapping">
     <ApiField name="on_task_start">
-      Create a root span with <code>start_observation()</code>, a <code>"Task: "</code>-prefixed agent name, and agent-name/task-ID metadata. Derive a valid trace ID with <code>create_trace_id(seed=task.id)</code>. The full task is not sent as input.
+      Create a root span with <code>start_observation()</code>, a <code>"Task: "</code>-prefixed agent name and agent-name/task-ID metadata. Derive a valid trace ID with <code>create_trace_id(seed=task.id)</code>. The full task is not sent as input.
     </ApiField>
     <ApiField name="on_task_end">
-      Update the root span output with <code>result.to_dict()</code>, explicitly end it, and flush the client. Restore the outer task's observations when a nested task completes, including after SDK failures.
+      Update the root span output with <code>result.to_dict()</code>, explicitly end it and flush the client. Restore the outer task's observations when a nested task completes, including after SDK failures.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1575,10 +1575,10 @@ Translate the shared lifecycle into the Langfuse SDK 4 observation API. The six 
 <ApiSection title="LLM mapping">
   <ApiFields ariaLabel="Langfuse LLM mapping">
     <ApiField name="on_llm_start">
-      If a trace exists, create a generation named <code>"LLM Call"</code> containing model, raw prompt input, and the supplied metadata. An empty or absent metadata mapping is sent as <code>None</code>.
+      If a trace exists, create a generation named <code>"LLM Call"</code> containing model, raw prompt input and the supplied metadata. An empty or absent metadata mapping is sent as <code>None</code>.
     </ApiField>
     <ApiField name="on_llm_end">
-      Update the generation output with <code>response.content</code> and call <code>end()</code>; objects without that attribute fall back to <code>str(response)</code>. End is attempted even if updating fails, and the current generation is cleared.
+      Update the generation output with <code>response.content</code> and call <code>end()</code>; objects without that attribute fall back to <code>str(response)</code>. End is attempted even if updating fails and the current generation is cleared.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1589,7 +1589,7 @@ Translate the shared lifecycle into the Langfuse SDK 4 observation API. The six 
       If a trace exists, create a span with a <code>"Tool: "</code>-prefixed tool name and the arguments as input.
     </ApiField>
     <ApiField name="on_tool_end">
-      Update the active span with <code>output=result</code> when <code>error</code> is falsey, or level <code>"ERROR"</code> and <code>status_message=error</code> otherwise. Explicitly end it, even if updating fails, and clear the current span.
+      Update the active span with <code>output=result</code> when <code>error</code> is falsey, or level <code>"ERROR"</code> and <code>status_message=error</code> otherwise. Explicitly end it, even if updating fails and clear the current span.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1695,10 +1695,10 @@ Translate the common hooks into root and child LangSmith runs. The six overrides
 <ApiSection title="Task mapping">
   <ApiFields ariaLabel="LangSmith task mapping">
     <ApiField name="on_task_start">
-      Construct a <code>RunTree</code> with a <code>"Task: "</code>-prefixed agent name, <code>run_type="chain"</code>, the configured project, a task-ID input mapping, agent-name metadata, and the shared client; post it and retain it as the current root.
+      Construct a <code>RunTree</code> with a <code>"Task: "</code>-prefixed agent name, <code>run_type="chain"</code>, the configured project, a task-ID input mapping, agent-name metadata and the shared client; post it and retain it as the current root.
     </ApiField>
     <ApiField name="on_task_end">
-      End the active root with <code>result.to_dict()</code> as outputs, patch it to LangSmith, and clear context in <code>finally</code>. The output is passed directly rather than wrapped under a named key.
+      End the active root with <code>result.to_dict()</code> as outputs, patch it to LangSmith and clear context in <code>finally</code>. The output is passed directly rather than wrapped under a named key.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1706,10 +1706,10 @@ Translate the common hooks into root and child LangSmith runs. The six overrides
 <ApiSection title="LLM mapping">
   <ApiFields ariaLabel="LangSmith LLM mapping">
     <ApiField name="on_llm_start">
-      Create and post an <code>llm</code> child named <code>"LLM Call"</code> with prompt, model, and metadata in its inputs.
+      Create and post an <code>llm</code> child named <code>"LLM Call"</code> with prompt, model and metadata in its inputs.
     </ApiField>
     <ApiField name="on_llm_end">
-      End the active child with response content under the <code>response</code> output key, patch it, and clear context. Objects without <code>content</code> are stringified.
+      End the active child with response content under the <code>response</code> output key, patch it and clear context. Objects without <code>content</code> are stringified.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1737,7 +1737,7 @@ Translate the common hooks into root and child LangSmith runs. The six overrides
       <code>on_task_start()</code> resolves <code>RunTree</code> through the lazy dependency helper before entering its SDK-operation <code>try</code> block. In the unusual case that the package becomes unavailable after construction, that <code>ImportError</code> propagates.
     </ApiField>
     <ApiField name="detailed inference events">
-      Context, metric, retry, budget, LLM-loop tool, and delegation events are not exported by the inherited no-op hook.
+      Context, metric, retry, budget, LLM-loop tool and delegation events are not exported by the inherited no-op hook.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1875,7 +1875,7 @@ Forward each hook, with the same arguments, to every tracker in list order.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="MultiTelemetry lifecycle errors">
     <ApiField name="tracker error">
-      Any exception propagates immediately. The failing tracker stops iteration, later trackers miss that hook, and no rollback is attempted for earlier trackers.
+      Any exception propagates immediately. The failing tracker stops iteration, later trackers miss that hook and no rollback is attempted for earlier trackers.
     </ApiField>
     <ApiField name="AttributeError">
       A list element does not implement the invoked hook.

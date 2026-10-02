@@ -23,7 +23,7 @@ from protolink.tools.prepared import PreparedTool
 
 @dataclass(frozen=True)
 class ProcessSpec:
-    """Exact command, explicit environment, and limits approved for a backend.
+    """Exact command, explicit environment and limits approved for a backend.
 
     Environment inheritance is never implicit. Pass a copied environment mapping
     explicitly when inheritance is desired. ``max_output_bytes`` caps combined
@@ -51,7 +51,7 @@ class ProcessResult:
     budget_exceeded: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize the result for task parts, events, and reports."""
+        """Serialize the result for task parts, events and reports."""
         return asdict(self)
 
 
@@ -86,7 +86,7 @@ class LocalExecutionBackend:
     boundary = "host process; no sandbox or filesystem/network isolation"
 
     async def execute(self, spec: ProcessSpec, execution: ToolExecution) -> ProcessResult:
-        """Launch a process, drain both pipes, and reap it before returning."""
+        """Launch a process, drain both pipes and reap it before returning."""
         execution.check()
         started = time.monotonic()
         remaining = execution.remaining_seconds

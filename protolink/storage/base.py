@@ -8,7 +8,7 @@ class Storage(ABC):
     """Abstract base class for storage implementations.
 
     This class defines the interface for persistent storage mechanisms used by agents.
-    It supports basic CRUD operations: save, load, update, and delete.
+    It supports basic CRUD operations: save, load, update and delete.
     Implementations should handle the underlying storage details (e.g., file system, database).
     """
 

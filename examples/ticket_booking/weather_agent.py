@@ -60,7 +60,7 @@ def create_weather_agent(registry: Registry | None = None, verbosity: int = 1) -
         Returns
         -------
         dict
-            Weather forecast with temperature, conditions, and recommendation
+            Weather forecast with temperature, conditions and recommendation
         """
         print(f"\n   🌤️  [weather_agent] get_weather called: location={location}, date={travel_date}")
 

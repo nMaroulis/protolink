@@ -11,7 +11,7 @@ from protolink.storage import SQLiteStorage
 
 
 def test_sqlite_run_store_persists_task_snapshots_and_reports(tmp_path) -> None:
-    """SQLiteRunStore should round-trip tasks, index records, and run reports."""
+    """SQLiteRunStore should round-trip tasks, index records and run reports."""
     store = SQLiteRunStore(tmp_path / "runs.db")
     task = Task.create_infer(prompt="persist this")
     context = RunContext(run_id="run-store-1", session_id="session-store", trace_id="trace-store")

@@ -21,7 +21,7 @@ class _TaskObservations:
 class LangfuseTelemetry(Telemetry):
     """Langfuse implementation for Protolink telemetry.
 
-    This class tracks agent tasks as traces, and LLM/Tool executions as spans or
+    This class tracks agent tasks as traces and LLM/Tool executions as spans or
     generations within those traces. It utilizes `contextvars` to manage the active
     trace and span states asynchronously, ensuring a non-invasive integration
     without the need to pass context objects through the execution chain.

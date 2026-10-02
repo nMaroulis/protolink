@@ -84,10 +84,10 @@ class Artifact:
         """
         parts = [Part.from_dict(p) for p in data.get("parts", [])]
         return cls(
-            id=data.get("id", IDGenerator.generate_artifact_id()),
+            id=data["id"] if "id" in data else IDGenerator.generate_artifact_id(),
             parts=parts,
             metadata=dict(data.get("metadata") or {}),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             kind=str(data.get("kind") or "result"),
             name=_optional_str(data.get("name")),
             uri=_optional_str(data.get("uri")),

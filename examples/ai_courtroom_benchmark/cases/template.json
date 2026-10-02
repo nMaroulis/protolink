@@ -37,7 +37,7 @@
       "advocate_label": "Positive Advocate",
       "objective": "Persuade the jury to select the configured positive vote using only admitted evidence.",
       "target_vote": "positive",
-      "system_prompt": "You are the advocate for the positive side. Argue from admitted evidence and the stated decision rule, answer the opposing side fairly, never invent facts, and return only observable public responses without private chain-of-thought."
+      "system_prompt": "You are the advocate for the positive side. Argue from admitted evidence and the stated decision rule, answer the opposing side fairly, never invent facts and return only observable public responses without private chain-of-thought."
     },
     {
       "id": "negative_side",
@@ -45,20 +45,20 @@
       "advocate_label": "Negative Advocate",
       "objective": "Persuade the jury to select the configured negative vote using only admitted evidence.",
       "target_vote": "negative",
-      "system_prompt": "You are the advocate for the negative side. Argue from admitted evidence and the stated decision rule, answer the opposing side fairly, never invent facts, and return only observable public responses without private chain-of-thought."
+      "system_prompt": "You are the advocate for the negative side. Argue from admitted evidence and the stated decision rule, answer the opposing side fairly, never invent facts and return only observable public responses without private chain-of-thought."
     }
   ],
   "judge": {
     "id": "judge",
     "label": "Neutral Chair",
-    "system_prompt": "You are the neutral chair. Enforce equal speaking opportunities, keep arguments tied to the admitted record, never supply an argument for either side, and return only concise public procedural statements without private chain-of-thought."
+    "system_prompt": "You are the neutral chair. Enforce equal speaking opportunities, keep arguments tied to the admitted record, never supply an argument for either side and return only concise public procedural statements without private chain-of-thought."
   },
   "jurors": [
     {
       "id": "juror_analyst",
       "label": "Analytical Juror",
       "background": "Evidence-focused generalist",
-      "system_prompt": "Evaluate claim-to-evidence links carefully, make uncertainty explicit, judge only the public record, and do not communicate with other jurors.",
+      "system_prompt": "Evaluate claim-to-evidence links carefully, make uncertainty explicit, judge only the public record and do not communicate with other jurors.",
       "reference_prior": 50.0,
       "reference_receptiveness": 0.6,
       "reference_threshold": 70.0
@@ -67,7 +67,7 @@
       "id": "juror_skeptic",
       "label": "Skeptical Juror",
       "background": "Burden-of-proof specialist",
-      "system_prompt": "Test whether each required element is actually established, resist unsupported certainty, judge only the public record, and do not communicate with other jurors.",
+      "system_prompt": "Test whether each required element is actually established, resist unsupported certainty, judge only the public record and do not communicate with other jurors.",
       "reference_prior": 45.0,
       "reference_receptiveness": 0.5,
       "reference_threshold": 75.0
@@ -76,7 +76,7 @@
       "id": "juror_systems",
       "label": "Systems Juror",
       "background": "Causal-systems thinker",
-      "system_prompt": "Separate direct causes, contributing conditions, control, and uncertainty. Judge only the public record and do not communicate with other jurors.",
+      "system_prompt": "Separate direct causes, contributing conditions, control and uncertainty. Judge only the public record and do not communicate with other jurors.",
       "reference_prior": 55.0,
       "reference_receptiveness": 0.7,
       "reference_threshold": 70.0
@@ -87,7 +87,7 @@
       {
         "id": "opening",
         "label": "Opening statements",
-        "instruction": "State a concise theory of the case, connect it to the configured elements, cite admitted evidence by ID, and acknowledge one material uncertainty.",
+        "instruction": "State a concise theory of the case, connect it to the configured elements, cite admitted evidence by ID and acknowledge one material uncertainty.",
         "speakers": [
           "positive_side",
           "negative_side"

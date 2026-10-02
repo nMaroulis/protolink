@@ -1,4 +1,4 @@
-"""Mailbox reading, draft creation, and separately enabled email sending."""
+"""Mailbox reading, draft creation and separately enabled email sending."""
 
 from __future__ import annotations
 
@@ -48,9 +48,9 @@ def _message_fields(to: list[str], subject: str, body: str) -> None:
     for address in to:
         _address(address)
     if not subject.strip() or len(subject) > 1000 or any(c in subject for c in "\r\n\x00"):
-        raise ValueError("subject must be nonblank, at most 1000 characters, and contain no line breaks or NUL bytes")
+        raise ValueError("subject must be nonblank, at most 1000 characters and contain no line breaks or NUL bytes")
     if not body.strip() or len(body) > 200000 or "\x00" in body:
-        raise ValueError("body must be nonblank, at most 200000 characters, and contain no NUL bytes")
+        raise ValueError("body must be nonblank, at most 200000 characters and contain no NUL bytes")
 
 
 class EmailBackend(Protocol):
@@ -58,7 +58,7 @@ class EmailBackend(Protocol):
 
     List results contain ``items`` and ``next_page_token``. Each item has an ``id``
     usable with ``get_message``. Draft/send return provider identifiers or explicit submission statuses.
-    Implementations own credentials, honor cancellation, and never retry writes
+    Implementations own credentials, honor cancellation and never retry writes
     automatically when delivery or creation may already have happened.
     """
 
@@ -84,14 +84,14 @@ class Gmail:
 
     Args:
         token: OAuth access token or sync/async callback supplying a fresh token.
-            The application owns consent, refresh, and secure credential storage.
+            The application owns consent, refresh and secure credential storage.
         sender: Bare authenticated address or configured Gmail send-as alias.
             Required for drafts and sending; reading needs only a token.
 
     Install ``protolink[integrations]``. Reading/search needs ``gmail.readonly``;
     drafts need ``gmail.compose``; sending needs ``gmail.send`` or ``gmail.compose``.
     Construction performs no requests. Only plain-text bodies are composed;
-    attachment content is not returned, and HTML bodies are not rendered.
+    attachment content is not returned and HTML bodies are not rendered.
     """
 
     query_help = "Use Gmail search syntax, e.g. is:unread newer_than:7d. Empty query lists all messages."
@@ -204,7 +204,7 @@ def email_tools(
     ``allow_write`` adds ``create_email_draft`` (``email.write``); ``allow_send``
     adds ``send_email`` (``email.send``) independently. The default is read-only.
     Sending needs explicit Agent policy, ideally ``email.send=require_approval``.
-    The exact recipients, subject, body, and configured sender are previewed.
+    The exact recipients, subject, body and configured sender are previewed.
 
     Args:
         backend: ``Gmail``, ``OutlookEmail``, ``IMAPEmail``, or an application
@@ -217,7 +217,7 @@ def email_tools(
     Register each returned tool on an Agent; direct calls are rejected. Credentials
     stay in the backend and must be reattached after restoring Agent dict/YAML.
     Query syntax belongs to the provider; Gmail supports e.g. ``is:unread``.
-    Lists are paginated; preserve the backend, query, and page size when continuing.
+    Lists are paginated; preserve the backend, query and page size when continuing.
     Reads do not mark messages as read. No automatic retry follows a canceled or
     failed write: inspect the mailbox before deciding whether to retry.
     """

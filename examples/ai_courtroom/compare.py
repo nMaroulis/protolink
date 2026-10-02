@@ -110,7 +110,7 @@ def build_comparison_markdown(records: list[tuple[Path, dict[str, Any]]]) -> str
             "- Immediate register shifts are temporal association proxies. Causal claims require paired message "
             "ablations and repeated runs.",
             "- Consensus is not accuracy. Polarization and consensus gain are N/A for a single solo decision-maker.",
-            "- Provider comparisons should freeze prompts and transcript, rotate persona assignments, and include "
+            "- Provider comparisons should freeze prompts and transcript, rotate persona assignments and include "
             "failures.",
             "",
             "## Source files",

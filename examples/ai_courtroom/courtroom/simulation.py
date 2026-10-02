@@ -169,7 +169,7 @@ class CourtroomSimulation:
         self.control_fingerprint = ""
 
     async def run(self) -> dict[str, Any]:
-        """Execute orientation, public record, deliberation, ballots, and judgment."""
+        """Execute orientation, public record, deliberation, ballots and judgment."""
         self._progress(
             1,
             f"Orientation · judge briefs {len(self.active_juror_ids)} "

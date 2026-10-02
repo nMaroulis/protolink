@@ -2,7 +2,7 @@
 ProtoLink Type Aliases
 
 This module contains shared type aliases used throughout the Protolink framework.
-Centralizing types improves reusability, discoverability, and maintainability.
+Centralizing types improves reusability, discoverability and maintainability.
 """
 
 from typing import TYPE_CHECKING, Literal, TypeAlias

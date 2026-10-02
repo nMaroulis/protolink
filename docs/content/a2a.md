@@ -3,35 +3,35 @@
 ### A2A Core and 1.0 Compatibility
 
 ProtoLink is an **A2A-first runtime**. `AgentCard`, `Task`, `Message`, `Part`,
-`Artifact`, task states, and discovery are first-class concepts throughout its
-Python API, structured flows, agent delegation, storage, and observability.
+`Artifact`, task states and discovery are first-class concepts throughout its
+Python API, structured flows, agent delegation, storage and observability.
 ProtoLink then adds the execution substrate A2A leaves open: pluggable LLMs,
 native and MCP tools, transports, registry services, state, policy,
-authentication, logging, and telemetry.
+authentication, logging and telemetry.
 
 ## From native A2A 0.3 primitives to A2A 1.0
 
 ProtoLink was originally built natively on the [A2A 0.3
 specification](https://a2a-protocol.org/v0.3.0/specification/): `AgentCard`,
-`Task`, `Message`, `Part`, `Artifact`, task states, and discovery became its
+`Task`, `Message`, `Part`, `Artifact`, task states and discovery became its
 public Python objects and its internal runtime language. Here, **0.3 is the A2A
-protocol version**, not the ProtoLink package version, and **native** means that
+protocol version**, not the ProtoLink package version and **native** means that
 these primitives underpin the runtime itself rather than existing only in an
 integration adapter.
 
 That foundation gives local and remote agents one small, typed language for
-identity, work, results, and lifecycle. Because it is independent of any model
+identity, work, results and lifecycle. Because it is independent of any model
 provider or transport, the same simple `Agent` and `Task` API can support local
-inference, native and MCP tools, deterministic flows, persistence, and remote
+inference, native and MCP tools, deterministic flows, persistence and remote
 delegation. ProtoLink extended the A2A 0.3 model with execution semantics such
-as inference instructions, tool actions, flow state, runtime context, and
+as inference instructions, tool actions, flow state, runtime context and
 events; those are ProtoLink runtime features, not additional A2A operations.
 
-As A2A evolved to 1.0, its canonical cards, operations, and wire shapes evolved
+As A2A evolved to 1.0, its canonical cards, operations and wire shapes evolved
 too. ProtoLink keeps its established native runtime model and places A2A 1.0
 interoperability at an explicit, versioned boundary. With `a2a=True`, a standard
 peer discovers a canonical Agent Card and exchanges canonical messages, tasks,
-parts, artifacts, and states through the implemented JSON-RPC operations.
+parts, artifacts and states through the implemented JSON-RPC operations.
 ProtoLink translates that surface to the same executor used by its native API.
 Compatibility therefore comes from explicit two-way translation and TCK
 verification, not from claiming that the A2A 0.3-based runtime objects are
@@ -68,7 +68,7 @@ agent = Agent(
 ```
 
 With the default `a2a=False`, HTTP serves ProtoLink's
-native task, card, status, health, chat, and control endpoints, and outbound
+native task, card, status, health, chat and control endpoints and outbound
 calls use the native contract. `a2a=True` requires the exact HTTP transport and
 adds both:
 
@@ -97,7 +97,7 @@ result = await agent.call_agent(peer_url, task, protocol="a2a")
 ```
 
 `"auto"` probes the native ProtoLink card first. Only a definitive `404` or
-`405` moves discovery to the standard A2A Agent Card, and the result is cached
+`405` moves discovery to the standard A2A Agent Card and the result is cached
 for five minutes. This process-local protocol cache is bounded to 1,024 peers;
 expired and oldest entries are removed. Authentication, connection, timeout,
 and server errors are not treated as evidence that the peer uses another
@@ -127,7 +127,7 @@ result = await client.send_task(peer_url, task, protocol="a2a")
 
 The secure default is `a2a_allow_cross_origin=False`. Before sending a task or
 credentials, ProtoLink requires the JSON-RPC interface advertised by the
-standard Agent Card to use the same origin: scheme, hostname, and effective
+standard Agent Card to use the same origin: scheme, hostname and effective
 port. A cross-origin card is rejected before its interface receives a request.
 
 Some deployments intentionally publish discovery and execution on different
@@ -173,8 +173,8 @@ http://127.0.0.1:9999/.well-known/agent-card.json
 The A2A 1.0 card must declare at least one entry in `supportedInterfaces`.
 This harness starts with only `JSONRPC`, keeping the first compatibility target
 narrow and auditable. The TCK then sends JSON-RPC 2.0 requests with A2A method
-names such as `SendMessage`, `GetTask`, `ListTasks`, and `CancelTask`. It also
-checks canonical A2A data shapes, error mappings, version handling, and any
+names such as `SendMessage`, `GetTask`, `ListTasks` and `CancelTask`. It also
+checks canonical A2A data shapes, error mappings, version handling and any
 capabilities declared by the card. See the [A2A 1.0
 specification](https://a2a-protocol.org/latest/specification/) for the normative
 contract.
@@ -196,16 +196,16 @@ must not be worked around by weakening the preflight check.
 The 1.0 adapter currently implements:
 
 - `SendMessage`, including blocking and `returnImmediately` execution modes.
-- `GetTask`, `ListTasks`, and `CancelTask` over a process-local task index.
+- `GetTask`, `ListTasks` and `CancelTask` over a process-local task index.
 - Task visibility scoped to the request tenant and, when the HTTP agent uses a
   ProtoLink `Authenticator`, the authenticated principal.
 - History limits, task filtering, descending status-time ordering, pagination,
   and the `includeArtifacts` list policy.
-- Canonical card, task, message, part, artifact, enum, timestamp, and
+- Canonical card, task, message, part, artifact, enum, timestamp and
   `google.rpc.ErrorInfo` JSON shapes.
 - A2A version and HTTP content-type validation.
 
-The card declares streaming, push notifications, and the extended card as
+The card declares streaming, push notifications and the extended card as
 disabled. Calls to those operations return their standard A2A errors instead
 of silently advertising or emulating unsupported capabilities.
 
@@ -221,9 +221,9 @@ runtime execution rules:
   inference request.
 - An outbound ProtoLink `infer` prompt becomes a standard A2A text part.
 - Text, JSON data, raw/file content, URI content, messages, artifacts, task
-  status, and supported security declarations have canonical translations.
+  status and supported security declarations have canonical translations.
 - A2A servers assign their own task IDs. ProtoLink preserves the caller's local
-  task ID and stores the remote ID, context, state, and status timestamp in
+  task ID and stores the remote ID, context, state and status timestamp in
   namespaced task metadata for continuation and cancellation.
 - `send_message()` returns a response `Message`. If an A2A peer completes with
   artifacts but no response message, use `send_task()` to receive and inspect
@@ -241,7 +241,7 @@ full native contract; `"auto"` already makes that the preferred path.
 ### Outbound task IDs and cancellation
 
 The local-to-remote task-ID mappings used for A2A continuation and cancellation
-are process-local, bounded to **1,024 entries**, and expire after **one hour**.
+are process-local, bounded to **1,024 entries** and expire after **one hour**.
 Oldest entries are removed when the bound is exceeded. Restarting the process
 or losing a mapping means the client can no longer safely cancel that remote
 task by its local ProtoLink ID.
@@ -341,7 +341,7 @@ On 14 July 2026, the command above at the pinned commit completed with:
 
 The sole failure is the generic `CORE-SEND-003` requirement test. ProtoLink
 returns the required JSON-RPC `ContentTypeNotSupportedError` (`-32005`) for the
-unsupported media type, and the TCK's dedicated error-code test passes. At this
+unsupported media type and the TCK's dedicated error-code test passes. At this
 pin, however, the upstream [`CORE-SEND-003` requirement
 entry](https://github.com/a2aproject/a2a-tck/blob/5996b79f9cefa6fc390980e383e358a66fb9e49e/tck/requirements/core_operations.py#L96-L122)
 omits its `expected_error`. The [generic requirement
@@ -351,7 +351,7 @@ therefore treats the required error response as a failed operation.
 This is an upstream defect in the pinned TCK, but the checked-in workflow is
 deliberately left red: ProtoLink does not patch the conformance kit or convert
 the failure into a pass. Re-run against a newer, explicitly pinned TCK commit
-after upstream corrects the requirement entry, and record that new pin and
+after upstream corrects the requirement entry and record that new pin and
 report before making a passing claim.
 
 ## Interpreting a result
@@ -362,7 +362,7 @@ explicitly recorded TCK commit supports a precise statement such as:
 > ProtoLink passed the A2A 1.0 JSON-RPC MUST suite at TCK commit
 > `<commit>`.
 
-It does not demonstrate gRPC or HTTP+JSON compatibility, and it does not mean
+It does not demonstrate gRPC or HTTP+JSON compatibility and it does not mean
 that every SHOULD or MAY requirement was exercised. Run the unfiltered suite
 and publish its exact report before making a broader claim.
 
@@ -370,7 +370,7 @@ and publish its exact report before making a broader claim.
 
 The `A2A TCK` GitHub Actions workflow is intentionally available only through
 `workflow_dispatch`. It starts the same provider-free fixture, enforces the
-1.0 Agent Card preflight, runs the pinned JSON-RPC MUST suite, and uploads the
+1.0 Agent Card preflight, runs the pinned JSON-RPC MUST suite and uploads the
 logs and reports even after a failure. It is not a required pull-request check
 and currently surfaces the known `CORE-SEND-003` failure described above. It
 should not be represented as a compatibility badge until an unmodified,

@@ -35,7 +35,7 @@ class ConsoleProgress:
 
 
 async def async_main(args: argparse.Namespace) -> int:
-    """Validate controls, run the benchmark, and print the report location."""
+    """Validate controls, run the benchmark and print the report location."""
     try:
         case = load_case_config(args.case)
     except ValueError as exc:

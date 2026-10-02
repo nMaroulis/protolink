@@ -1,7 +1,6 @@
 """Optional dependency loaders for agent transports.
 
-This module centralizes lazy imports for optional HTTP backends
-used by the agent transport layer.
+This module centralizes lazy imports for optional HTTP backends used by the agent transport layer.
 """
 
 

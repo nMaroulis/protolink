@@ -61,7 +61,7 @@ class WebSocketTransport(Transport):
         credentials: Optional credentials for outbound authentication.
         tls: Optional certificate and trust configuration used by ``wss://``
             servers and clients.
-        config: Shared limits, retry, keepalive, shutdown, idempotency, and metrics settings.
+        config: Shared limits, retry, keepalive, shutdown, idempotency and metrics settings.
     """
 
     transport_type: ClassVar[TransportType] = "websocket"
@@ -237,7 +237,7 @@ class WebSocketTransport(Transport):
 
         This client orchestrator translates a RESTful ``ClientRequestSpec`` into a JSON-RPC
         flavored payload by injecting a unique ``message_id``. It secures an exclusive lease
-        on the loop-isolated connection via ``asyncio.Lock()``, pushes the payload, and blocks
+        on the loop-isolated connection via ``asyncio.Lock()``, pushes the payload and blocks
         until a frame with the exact matching ``id`` is yielded by the remote server.
 
         This design facilitates transparent, bi-directional communication while appearing identical
@@ -557,7 +557,7 @@ class WebSocketTransport(Transport):
         """The central multiplexer for all inbound WebSocket traffic.
 
         This loop continuously consumes raw JSON frames from the underlying socket. It deserializes
-        the request to identify its correlation ``id``, intended ``method``, and ``path``. It then:
+        the request to identify its correlation ``id``, intended ``method`` and ``path``. It then:
         1. Resolves the appropriate ``EndpointSpec`` registered via ``setup_routes``.
         2. Normalizes input data into the expected format (body vs. query parameters).
         3. Executes the underlying domain handler. If the handler is a streaming generator, it loops

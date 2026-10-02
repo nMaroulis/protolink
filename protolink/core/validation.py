@@ -27,7 +27,7 @@ class ToolOutcome:
 
 @dataclass(frozen=True)
 class CompletionEvidence:
-    """Typed task, executed outcomes, artifacts, and report exposed to a predicate."""
+    """Typed task, executed outcomes, artifacts and report exposed to a predicate."""
 
     task: Task
     outcomes: tuple[ToolOutcome, ...]

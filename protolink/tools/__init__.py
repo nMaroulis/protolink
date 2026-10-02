@@ -1,4 +1,4 @@
-"""Public tool contracts, schema helpers, and opt-in built-in factories."""
+"""Public tool contracts, schema helpers and opt-in built-in factories."""
 
 from .base import BaseTool
 from .builtins import (

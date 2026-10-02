@@ -2,7 +2,7 @@
 Protolink logging package.
 
 Provides a unified interface for logging across the Protolink library.
-Includes standard loggers like ConsoleLogger, FileLogger, and QuietLogger.
+Includes standard loggers like ConsoleLogger, FileLogger and QuietLogger.
 """
 
 from .base import BaseLogger

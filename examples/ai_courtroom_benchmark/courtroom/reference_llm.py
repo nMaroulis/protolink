@@ -21,7 +21,7 @@ class ReferenceBenchmarkLLM(MockLLM):
     """Case-aware deterministic model used for offline demos and tests.
 
     The two reference model styles are deliberately simple fixtures. They
-    exercise role swaps, evidence validation, opinion trajectories, and report
+    exercise role swaps, evidence validation, opinion trajectories and report
     generation; they are not claims about real model persuasion quality.
     """
 

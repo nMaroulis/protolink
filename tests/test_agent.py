@@ -406,7 +406,7 @@ class TestAgent:
         async for event in test_agent.handle_task_streaming(task):
             events.append(event)
 
-        # Should have status update, artifact update (if any), and completion
+        # Should have status update, artifact update (if any) and completion
         assert len(events) >= 2
 
         # First event should be working status

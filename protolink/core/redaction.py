@@ -1,6 +1,6 @@
 """Shared redaction policy for runtime observability objects.
 
-The runtime layer emits data that applications often persist: events, reports, approval requests, context manifests, and
+The runtime layer emits data that applications often persist: events, reports, approval requests, context manifests and
 telemetry payloads. This module keeps secret masking in one small, dependency-free policy object so those surfaces can
 share the same behavior without coupling to a particular telemetry backend.
 """
@@ -43,7 +43,7 @@ class RedactionPolicy:
             and case-sensitive, before optional string truncation.
 
     The policy also redacts keys ending in common secret suffixes such as ``"_api_key"``, ``"_secret"``, ``"_token"``,
-    ``"_password"``, and ``"_credentials"``.
+    ``"_password"`` and ``"_credentials"``.
     """
 
     sensitive_keys: frozenset[str] = field(default_factory=lambda: DEFAULT_SENSITIVE_KEYS)

@@ -4,7 +4,7 @@ Run:
     python examples/grpc_agent.py
 
 This script starts one mock-LLM agent on a free local ``grpc://`` port, fetches
-its public agent card, sends a unary task, and then consumes the same task over
+its public agent card, sends a unary task and then consumes the same task over
 the streaming API. It is provider-free and only requires the ``grpc`` extra.
 """
 

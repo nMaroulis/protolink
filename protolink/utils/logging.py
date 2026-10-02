@@ -130,8 +130,7 @@ class ProtoLinkWarning(UserWarning):
 class ProtoLinkLogger:
     """Custom logger for Protolink with consistent formatting.
 
-    This logger provides methods for different log levels and supports both
-    console and file logging.
+    This logger provides methods for different log levels and supports both console and file logging.
     """
 
     _instances: ClassVar[dict[str, "ProtoLinkLogger"]] = {}

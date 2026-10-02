@@ -38,7 +38,7 @@ class RunResult:
 
 
 class RunHandle:
-    """Consume typed events, request cancellation, and await one final result.
+    """Consume typed events, request cancellation and await one final result.
 
     Start with ``RunHandle.start(agent, task)`` or an AgentClient plus URL. The
     handle consumes the original task stream exactly once, even if only
@@ -175,7 +175,7 @@ class RunHandle:
         Model text arrives in ``event.payload["content"]`` when
         ``event.payload.get("llm_event_type") == "llm_chunk"``. JSON-action
         models emit raw JSON fragments; native tools are assembled separately.
-        ``llm_final`` carries the complete answer, and the terminal task status
+        ``llm_final`` carries the complete answer and the terminal task status
         ends the run. Leaving this iterator does not cancel the shared run;
         call ``await handle.cancel()`` to stop it explicitly.
         """
@@ -239,9 +239,9 @@ class AgentGroup:
     """Own an embedded group without imposing agent roles or network conventions.
 
     ``agents`` are owned: their existing lifecycle starts/stops with the group.
-    ``external_agents``, a supplied client, and the registry (unless explicitly
+    ``external_agents``, a supplied client and the registry (unless explicitly
     owned) remain application-owned. Configure transports, credentials, policies,
-    storage, and LLMs on each Agent normally. Agents without transports run by
+    storage and LLMs on each Agent normally. Agents without transports run by
     direct local invocation; runtime:// transports require no network server.
     """
 
@@ -272,7 +272,7 @@ class AgentGroup:
         self._started = self._closed = False
 
     async def start(self) -> AgentGroup:
-        """Start owned resources, await readiness, and roll back partial startup."""
+        """Start owned resources, await readiness and roll back partial startup."""
         if self._closed:
             raise RuntimeError("A closed AgentGroup cannot be restarted")
         if self._started:

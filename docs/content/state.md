@@ -50,7 +50,7 @@ Protolink exposes four state module names through `StateMode`. You can enable th
 
 :::note[Current maturity]
 
-`conversation` is the fully integrated automatic runtime path today: agents load LLM history before inference and save it after normal completion. A failed turn is normally isolated, but history is retained when a new `Artifact(kind="action_result")` proves that a tool or delegation side effect completed and its observation must survive a retry. `tools`, `task`, and `flow` are available as typed module slots for persistent extension work; they share the same storage backend, but only `flow` currently exposes a small `to_dict()` helper and tool/task modules intentionally stay minimal.
+`conversation` is the fully integrated automatic runtime path today: agents load LLM history before inference and save it after normal completion. A failed turn is normally isolated, but history is retained when a new `Artifact(kind="action_result")` proves that a tool or delegation side effect completed and its observation must survive a retry. `tools`, `task` and `flow` are available as typed module slots for persistent extension work; they share the same storage backend, but only `flow` currently exposes a small `to_dict()` helper and tool/task modules intentionally stay minimal.
 
 :::
 ### 1. Conversation State (`conversation`)
@@ -131,13 +131,13 @@ If no `session_id` is provided:
 
 ## The `State` Object API
 
-Construct `State` directly when application code needs manual module access, then retain that object while also passing it to `Agent(state=state)`. The current Agent implementation stores it internally and exposes state operations through `describe_state()`, `reset_state()`, and `compact_state()`; it does not define a public `agent.state` property.
+Construct `State` directly when application code needs manual module access, then retain that object while also passing it to `Agent(state=state)`. The current Agent implementation stores it internally and exposes state operations through `describe_state()`, `reset_state()` and `compact_state()`; it does not define a public `agent.state` property.
 
 <ApiSurface
   eyebrow="State module"
   title="State"
   path="protolink.state"
-  description="The optional state container that gives agents durable conversation, tool, task, and flow memory while keeping persistence explicit and inspectable."
+  description="The optional state container that gives agents durable conversation, tool, task and flow memory while keeping persistence explicit and inspectable."
   pills={[
     "Conversation state",
     "Tool state",
@@ -153,7 +153,7 @@ Construct `State` directly when application code needs manual module access, the
     },
     {
       title: "Conversation",
-      text: "Load, save, inspect, clear, and compact per-session conversation history.",
+      text: "Load, save, inspect, clear and compact per-session conversation history.",
       code: "conversation",
     },
     {
@@ -163,7 +163,7 @@ Construct `State` directly when application code needs manual module access, the
     },
     {
       title: "Remote control",
-      text: "Describe, reset, and compact state through typed Agent and AgentClient calls.",
+      text: "Describe, reset and compact state through typed Agent and AgentClient calls.",
       code: "describe_state()",
     },
   ]}
@@ -179,7 +179,7 @@ Create the state orchestrator and instantiate the requested built-in modules in 
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="State constructor parameters">
   <ApiField name="storage" type="Storage" required>Shared backend passed unchanged to every enabled module. State performs no runtime type validation.</ApiField>
-  <ApiField name="enabled" type="list[StateMode]" required>Any combination of <code>"conversation"</code>, <code>"tools"</code>, <code>"task"</code>, and <code>"flow"</code>. An empty list creates a valid stateless orchestrator.</ApiField>
+  <ApiField name="enabled" type="list[StateMode]" required>Any combination of <code>"conversation"</code>, <code>"tools"</code>, <code>"task"</code> and <code>"flow"</code>. An empty list creates a valid stateless orchestrator.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Raises"><ApiFields ariaLabel="State constructor errors"><ApiField name="ValueError">An enabled name is not registered in <code>STATE_REGISTRY</code>.</ApiField><ApiField name="module constructor error">Errors raised while binding a module to storage propagate.</ApiField></ApiFields></ApiSection>
@@ -207,7 +207,7 @@ Access or replace enabled module objects and inspect their shared backend.
   <ApiField name="enabled_modes" type="tuple[StateMode, ...]">Enabled names in fixed registry order: conversation, tools, task, then flow, not necessarily constructor-list order.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiCallout label="Replacing storage">Assigning <code>state.storage</code> changes only the orchestrator's <code>_storage</code> reference. Existing ConversationState, ToolState, TaskState, and FlowState instances retain the Storage object they received at construction.</ApiCallout>
+<ApiCallout label="Replacing storage">Assigning <code>state.storage</code> changes only the orchestrator's <code>_storage</code> reference. Existing ConversationState, ToolState, TaskState and FlowState instances retain the Storage object they received at construction.</ApiCallout>
 
 </ApiReference>
 
@@ -218,7 +218,7 @@ Access or replace enabled module objects and inspect their shared backend.
 ) -> StateOperationResult`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/state/state.py">
 Inspect requested stores without mutation. Omission creates a default request and reports every enabled module in deterministic registry order.
 
-<ApiSection title="Parameters"><ApiFields ariaLabel="State describe parameters"><ApiField name="request" type="StateOperationRequest | None" defaultValue="None">Optional store selection, session scope, data-inclusion flag, and application metadata. Request metadata is not copied into the result by the current orchestrator.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Parameters"><ApiFields ariaLabel="State describe parameters"><ApiField name="request" type="StateOperationRequest | None" defaultValue="None">Optional store selection, session scope, data-inclusion flag and application metadata. Request metadata is not copied into the result by the current orchestrator.</ApiField></ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="State describe return"><ApiField name="result" type="StateOperationResult">One report per requested store plus disabled names in <code>missing</code>. Conversation reports become session-scoped when a session ID is supplied.</ApiField></ApiFields></ApiSection>
 
@@ -235,7 +235,7 @@ Clear one conversation session or delete the entire shared storage namespace, de
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="State reset parameters"><ApiField name="request" type="StateOperationRequest | None" defaultValue="None">A session ID defaults selection to conversation. Without a session, an empty store selection means every enabled mode.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Returns"><ApiFields ariaLabel="State reset return"><ApiField name="result" type="StateOperationResult">Structured cleared, missing, and error reports. Unsupported partial resets are reported rather than raised.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Returns"><ApiFields ariaLabel="State reset return"><ApiField name="result" type="StateOperationResult">Structured cleared, missing and error reports. Unsupported partial resets are reported rather than raised.</ApiField></ApiFields></ApiSection>
 
 <ApiCallout label="Namespace deletion">A full reset calls <code>storage.delete()</code> once. A non-session subset that differs from all enabled modes is rejected because deleting the shared namespace would clear more than requested.</ApiCallout>
 
@@ -294,7 +294,7 @@ Load and deserialize one session, or create a fresh history when the key is miss
 
 <ApiSection title="Returns"><ApiFields ariaLabel="get history return"><ApiField name="history" type="ConversationHistory">A reconstructed or new mutable history. Reading does not write it back.</ApiField></ApiFields></ApiSection>
 
-<ApiSection title="Raises"><ApiFields ariaLabel="get history errors"><ApiField name="storage or history error">Backend failures, incompatible payload shapes, and malformed serialized messages propagate.</ApiField></ApiFields></ApiSection>
+<ApiSection title="Raises"><ApiFields ariaLabel="get history errors"><ApiField name="storage or history error">Backend failures, incompatible payload shapes and malformed serialized messages propagate.</ApiField></ApiFields></ApiSection>
 
 </ApiReference>
 
@@ -304,7 +304,7 @@ Load and deserialize one session, or create a fresh history when the key is miss
     session_id: str,
     history: ConversationHistory,
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/state/conversation.py">
-Load the complete session mapping, replace one key with <code>history.to_list()</code>, and save the complete mapping.
+Load the complete session mapping, replace one key with <code>history.to_list()</code> and save the complete mapping.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="save history parameters"><ApiField name="session_id" type="str" required>Session key to create or replace.</ApiField><ApiField name="history" type="ConversationHistory" required>History serialized into its provider-neutral message-list representation.</ApiField></ApiFields></ApiSection>
 
@@ -383,7 +383,7 @@ compacted = await agent.compact_state(
 )
 ```
 
-The request and result models are immutable dataclasses designed to cross local, HTTP, WebSocket, runtime, and other transport boundaries.
+The request and result models are immutable dataclasses designed to cross local, HTTP, WebSocket, runtime and other transport boundaries.
 
 ### StateOperationRequest
 
@@ -398,7 +398,7 @@ The request and result models are immutable dataclasses designed to cross local,
     summary_max_tokens: int = 512,
     metadata: dict[str, Any] = field(default_factory=dict),
 )`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/state/operations.py">
-Describe the scope and compaction settings for one state control-plane operation. The same type is reused for describe, reset, and compact; the receiving operation decides which fields apply.
+Describe the scope and compaction settings for one state control-plane operation. The same type is reused for describe, reset and compact; the receiving operation decides which fields apply.
 
 <ApiSection title="Fields"><ApiFields ariaLabel="StateOperationRequest fields">
   <ApiField name="session_id" type="str | None" defaultValue="None">Optional session scope. Conversation is the only built-in session-keyed store.</ApiField>
@@ -424,7 +424,7 @@ Describe the scope and compaction settings for one state control-plane operation
 StateOperationRequest.from_dict(
     data: dict[str, Any] | None,
 ) -> StateOperationRequest`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/state/operations.py">
-Serialize tuples as lists or coerce a decoded mapping back into a validated request. <code>from_dict(None)</code> creates defaults; a string <code>stores</code> value becomes a one-element tuple, numeric limits pass through <code>int()</code>, and metadata is copied.
+Serialize tuples as lists or coerce a decoded mapping back into a validated request. <code>from_dict(None)</code> creates defaults; a string <code>stores</code> value becomes a one-element tuple, numeric limits pass through <code>int()</code> and metadata is copied.
 
 <ApiSection title="Parameters"><ApiFields ariaLabel="StateOperationRequest serialization parameters"><ApiField name="data" type="dict[str, Any] | None" required>Decoded request mapping passed to `from_dict()`; explicit `None` selects all request defaults.</ApiField></ApiFields></ApiSection>
 
@@ -459,7 +459,7 @@ Report the observation or mutation outcome for one store.
   <ApiField name="error" type="str | None" defaultValue="None">Store-scoped non-exception failure.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiCallout label="Validation boundary">Direct construction performs no semantic validation between flags. <code>from_dict()</code> applies basic string, bool, integer, and dictionary coercion but likewise permits combinations such as <code>enabled=False</code> with <code>cleared=True</code>.</ApiCallout>
+<ApiCallout label="Validation boundary">Direct construction performs no semantic validation between flags. <code>from_dict()</code> applies basic string, bool, integer and dictionary coercion but likewise permits combinations such as <code>enabled=False</code> with <code>cleared=True</code>.</ApiCallout>
 
 </ApiReference>
 
@@ -500,7 +500,7 @@ Aggregate all per-store reports and operation-level outcome lists.
   <ApiField name="metadata" type="dict[str, Any]" defaultValue="{}">Application or operation metadata.</ApiField>
 </ApiFields></ApiSection>
 
-<ApiCallout label="Construction versus parsing">Direct dataclass construction trusts the annotated operation value at runtime. <code>from_dict()</code> explicitly rejects operations outside describe, reset, and compact.</ApiCallout>
+<ApiCallout label="Construction versus parsing">Direct dataclass construction trusts the annotated operation value at runtime. <code>from_dict()</code> explicitly rejects operations outside describe, reset and compact.</ApiCallout>
 
 </ApiReference>
 
@@ -517,7 +517,7 @@ Convert tuple fields into transport-friendly lists and nested report dictionarie
 </ApiReference>
 
 Each `StateStoreReport` includes the store name, whether it is enabled, whether
-state exists, item/message counts when known, and operation metadata. Passing
+state exists, item/message counts when known and operation metadata. Passing
 `include_data=True` to `describe_state()` includes the inspected payload in the
 report for debugging or export workflows.
 
@@ -555,7 +555,7 @@ is namespace-based; ProtoLink reports that limitation instead of clearing more
 state than requested.
 
 `compact_state()` currently targets conversation state. It loads the persisted
-session, runs the LLM-owned `HistoryCompactor`, saves the compacted history, and
+session, runs the LLM-owned `HistoryCompactor`, saves the compacted history and
 returns before/after counts in the report metadata. The operation is still a
 control-plane request and is never shown to the model as a tool.
 

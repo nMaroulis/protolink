@@ -14,7 +14,7 @@ import ExampleArticle from '@site/src/components/ExampleArticle';
 
 The source files live in [`examples/ticket_booking`](https://github.com/nMaroulis/protolink/tree/main/examples/ticket_booking).
 
-This example demonstrates a practical multi-agent vacation planning workflow. A user asks for a relaxing Greek island trip, and a coordinator agent delegates to specialist agents for advice, weather validation, and hotel booking.
+This example demonstrates a practical multi-agent vacation planning workflow. A user asks for a relaxing Greek island trip and a coordinator agent delegates to specialist agents for advice, weather validation and hotel booking.
 
 It highlights:
 
@@ -39,7 +39,7 @@ From this single task, the system:
 
 ### Coordinator Agent
 
-The coordinator is the primary entry point. It receives the user request, discovers available agents, and decides when to delegate.
+The coordinator is the primary entry point. It receives the user request, discovers available agents and decides when to delegate.
 
 - Has an LLM
 - Uses `agent_call` with `infer` for advisory reasoning
@@ -50,7 +50,7 @@ The coordinator is the primary entry point. It receives the user request, discov
 The advisor is an LLM-only specialist for travel recommendations.
 
 - Interprets vacation preferences
-- Evaluates destinations, dates, budget, and suitability
+- Evaluates destinations, dates, budget and suitability
 - Returns concise structured advice to the coordinator
 
 ### Weather Agent
@@ -100,7 +100,7 @@ sequenceDiagram
 
 | Agent | Uses LLM | Has Tools | Purpose |
 | --- | --- | --- | --- |
-| Coordinator | Yes | No | Plans, routes, and summarizes |
+| Coordinator | Yes | No | Plans, routes and summarizes |
 | Holiday Advisor | Yes | No | Travel reasoning and recommendations |
 | Weather Agent | No | Yes | Weather lookup |
 | Hotel Agent | No | Yes | Hotel booking |
@@ -208,5 +208,5 @@ The current checked-in demo focuses on the happy path. Protolink's architecture 
 - [Getting Started](getting-started.md) - Core setup
 - [Agents](agent.md) - Agent lifecycle and tools
 - [Registry](registry.md) - Dynamic discovery
-- [Transports](transport.md) - HTTP, SSE, WebSocket, and runtime transports
+- [Transports](transport.md) - HTTP, SSE, WebSocket and runtime transports
 - [LLMs](llm.md) - LLM backends and inference behavior

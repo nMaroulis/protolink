@@ -115,7 +115,7 @@ class LlamaCPPServerLLM(ServerLLM):
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
         """Yield text as it arrives without blocking the event loop.
 
-        Uses request-scoped async HTTP; completion, cancellation, and explicit
+        Uses request-scoped async HTTP; completion, cancellation and explicit
         iterator closure release the connection. JSON-action mode yields raw
         JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
         """
@@ -149,7 +149,7 @@ class LlamaCPPServerLLM(ServerLLM):
         """Return one typed action from llama.cpp server.
 
         Native tool calling is opt-in because llama.cpp behavior depends on the
-        selected model, chat template, and server build. When disabled, Protolink
+        selected model, chat template and server build. When disabled, Protolink
         uses the prompt JSON fallback. When enabled, this method sends
         Chat-Completions-style tools and normalizes returned tool calls.
         """

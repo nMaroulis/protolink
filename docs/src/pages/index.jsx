@@ -9,13 +9,13 @@ const pathways = [
   {
     eyebrow: "Start",
     title: "Create an agent",
-    body: "Define an AgentCard, plug in an LLM or tools, and start a local or networked agent with minimal boilerplate.",
+    body: "Define an AgentCard, plug in an LLM or tools and start a local or networked agent with minimal boilerplate.",
     to: "/docs/getting-started",
   },
   {
     eyebrow: "Protocol",
     title: "Understand the A2A core",
-    body: "Work with AgentCard, Task, Message, Part, Artifact, and TaskState as the shared language between agents.",
+    body: "Work with AgentCard, Task, Message, Part, Artifact and TaskState as the shared language between agents.",
     to: "/docs/concept",
   },
   {
@@ -27,30 +27,30 @@ const pathways = [
   {
     eyebrow: "Systems",
     title: "Compose flows and meshes",
-    body: "Build coordinators, workers, deterministic flows, registry-backed discovery, and multi-agent examples.",
+    body: "Build coordinators, workers, deterministic flows, registry-backed discovery and multi-agent examples.",
     to: "/docs/examples",
   },
 ];
 
 const agentShapes = [
   ["Tool-only", "Deterministic capabilities without an LLM."],
-  ["LLM-only", "Reasoning, transformation, and conversation."],
+  ["LLM-only", "Reasoning, transformation and conversation."],
   ["Hybrid", "LLM decisions with typed tool execution."],
-  ["Coordinator", "Discovery, delegation, and multi-agent routing."],
+  ["Coordinator", "Discovery, delegation and multi-agent routing."],
 ];
 
 const foundations = [
   [
     "Identity",
-    "AgentCard declares name, URL, transport, skills, tags, formats, and security schemes.",
+    "AgentCard declares name, URL, transport, skills, tags, formats and security schemes.",
   ],
   [
     "Work exchange",
-    "Tasks carry Messages, Parts, Artifacts, state, and metadata across local or remote boundaries.",
+    "Tasks carry Messages, Parts, Artifacts, state and metadata across local or remote boundaries.",
   ],
   [
     "Capability surface",
-    "Native tools, MCP adapters, schemas, examples, LLMs, and peer agents become discoverable contracts.",
+    "Native tools, MCP adapters, schemas, examples, LLMs and peer agents become discoverable contracts.",
   ],
   [
     "Deployment path",
@@ -1251,7 +1251,7 @@ export default function Home() {
   return (
     <Layout
       title="A2A-first autonomous agent systems"
-      description="ProtoLink documentation for autonomous agents, A2A protocol objects, LLMs, tools, transports, discovery, flows, and production-ready multi-agent systems."
+      description="ProtoLink documentation for autonomous agents, A2A protocol objects, LLMs, tools, transports, discovery, flows and production-ready multi-agent systems."
     >
       <main className={styles.page}>
         <section className={styles.hero}>
@@ -1265,7 +1265,7 @@ export default function Home() {
               <p className={styles.lede}>
                 ProtoLink helps you build distributed, LLM-powered agent systems
                 where every agent is an entity with identity, tools, optional
-                grounded knowledge, transport, discovery, and a clean task
+                grounded knowledge, transport, discovery and a clean task
                 contract.
               </p>
               <p className={styles.positioning}>
@@ -1305,7 +1305,7 @@ export default function Home() {
                 </span>
                 <span className={styles.cueLabel}>Try it here</span>
                 <strong>
-                  Choose a module, pick an implementation, and watch the agent
+                  Choose a module, pick an implementation and watch the agent
                   code assemble.
                 </strong>
                 <span className={styles.cueArrows} aria-hidden="true">
@@ -1340,10 +1340,10 @@ export default function Home() {
             </div>
             <p>
               An agent can receive work, initiate work, discover peers, expose
-              capabilities, call its model, stream progress, and shut down
+              capabilities, call its model, stream progress and shut down
               cleanly. The model is one pluggable module inside that entity,
               alongside tools, transports, state, telemetry, authentication,
-              logging, and policy.
+              logging and policy.
             </p>
           </div>
           <div className={styles.shapeGrid}>
@@ -1380,7 +1380,7 @@ export default function Home() {
             <p>
               The docs cover the full surface: agents, clients, LLMs, tools,
               RAG, transports, registry discovery, state, storage, telemetry,
-              structured flows, examples, and the runtime controls that make
+              structured flows, examples and the runtime controls that make
               production behavior inspectable.
             </p>
           </div>

@@ -45,7 +45,7 @@ async def main():
     print("🚀 Protolink Flow: Graph State Machine (Cyclic Looping)")
     print("=" * 70)
     print("This example demonstrates how a Graph flow defines complex state machine topologies,")
-    print("enabling cyclic loops, dynamic branching, and multi-step reviews.\n")
+    print("enabling cyclic loops, dynamic branching and multi-step reviews.\n")
 
     # 1. Start Registry
     registry = Registry(url=REGISTRY_URL, transport="http")

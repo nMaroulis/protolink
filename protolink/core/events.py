@@ -50,7 +50,7 @@ class RunEvent:
 
     ``RunEvent`` is the stable application-facing envelope for task execution streams. Existing task stream events
     remain available for wire/backward compatibility; this type gives applications one normalized event shape with
-    sequence numbers, severity, summaries, run IDs, task IDs, agent names, step numbers, payloads, and final-result
+    sequence numbers, severity, summaries, run IDs, task IDs, agent names, step numbers, payloads and final-result
     markers.
 
     Attributes:
@@ -213,7 +213,7 @@ class EventSink(Protocol):
 class InMemoryEventSink:
     """Simple event sink that records run events in memory.
 
-    The sink is intentionally small and dependency-free so tests, CLIs, and local applications can capture a canonical
+    The sink is intentionally small and dependency-free so tests, CLIs and local applications can capture a canonical
     event stream without a telemetry backend. It assigns monotonic sequence numbers when incoming events do not already
     have one.
     """
@@ -554,11 +554,11 @@ class TaskStatusUpdateEvent:
     def from_dict(cls, data: dict) -> "TaskStatusUpdateEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             previous_state=data.get("previous_state"),
             new_state=data.get("new_state", ""),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             final=data.get("final", False),
             metadata=data.get("metadata", {}),
         )
@@ -604,10 +604,10 @@ class TaskArtifactUpdateEvent:
     def from_dict(cls, data: dict) -> "TaskArtifactUpdateEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             artifact=data.get("artifact"),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )
 
@@ -651,11 +651,11 @@ class TaskProgressEvent:
     def from_dict(cls, data: dict) -> "TaskProgressEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             progress=data.get("progress", 0),
             message=data.get("message"),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )
 
@@ -665,7 +665,7 @@ class TaskLLMStreamEvent:
     """LLM inference event emitted while an agent is processing a task.
 
     This event carries provider-agnostic inference activity such as streamed chunks, parsed actions, tool
-    starts/results, delegated agent calls, and final inference content.
+    starts/results, delegated agent calls and final inference content.
     """
 
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -697,14 +697,14 @@ class TaskLLMStreamEvent:
     def from_dict(cls, data: dict) -> "TaskLLMStreamEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             agent_name=data.get("agent_name", ""),
             llm_event_type=data.get("llm_event_type", ""),
             step=data.get("step"),
             content=data.get("content"),
             final=data.get("final", False),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )
 
@@ -750,11 +750,11 @@ class TaskErrorEvent:
     def from_dict(cls, data: dict) -> "TaskErrorEvent":
         """Create event from dictionary."""
         return cls(
-            event_id=data.get("event_id", str(uuid.uuid4())),
+            event_id=data["event_id"] if "event_id" in data else str(uuid.uuid4()),
             task_id=data.get("task_id", ""),
             error_code=data.get("error_code", ""),
             error_message=data.get("error_message", ""),
             recoverable=data.get("recoverable", False),
-            timestamp=data.get("timestamp", utc_now()),
+            timestamp=data["timestamp"] if "timestamp" in data else utc_now(),
             metadata=data.get("metadata", {}),
         )

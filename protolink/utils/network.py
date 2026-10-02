@@ -1,7 +1,7 @@
 """Network-related utility functions.
 
 This module provides utilities for network operations such as finding available ports,
-handling sockets, and other network-related helper functions.
+handling sockets and other network-related helper functions.
 """
 
 import socket
@@ -12,9 +12,8 @@ from contextlib import contextmanager
 def get_free_port(host: str = "127.0.0.1") -> int:
     """Find a free TCP port on the specified host.
 
-    This function creates a temporary socket, binds it to the specified host with port 0,
-    which lets the OS assign an available port, then returns that port number. The socket
-    is immediately closed after retrieving the port.
+    This function creates a temporary socket, binds it to the specified host with port 0, which lets the OS assign an
+    available port, then returns that port number. The socket is immediately closed after retrieving the port.
 
     Args:
         host: The host address to bind to. Defaults to "127.0.0.1" (localhost).
@@ -37,9 +36,9 @@ def get_free_port(host: str = "127.0.0.1") -> int:
         True
 
     Note:
-        The port returned is only guaranteed to be free at the moment of the call.
-        In a multi-threaded or multi-process environment, another process could bind
-        to this port before the caller does. Always handle potential port conflicts.
+        The port returned is only guaranteed to be free at the moment of the call. In a multi-threaded or multi-process
+        environment, another process could bind to this port before the caller does. Always handle potential port
+        conflicts.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, 0))
@@ -51,8 +50,8 @@ def get_free_port(host: str = "127.0.0.1") -> int:
 def reserve_port(host: str = "127.0.0.1") -> Generator[int, None, None]:
     """Context manager that reserves a port for the duration of a context.
 
-    This function provides a context manager that keeps a socket bound to a free port,
-    preventing other processes from using it. The port is released when the context exits.
+    This function provides a context manager that keeps a socket bound to a free port, preventing other processes from
+    using it. The port is released when the context exits.
 
     Args:
         host: The host address to bind to. Defaults to "127.0.0.1" (localhost).
@@ -70,8 +69,8 @@ def reserve_port(host: str = "127.0.0.1") -> Generator[int, None, None]:
         ... # Port is released here
 
     Note:
-        This is useful when you need to ensure a port remains available while
-        setting up a service, but want automatic cleanup if setup fails.
+        This is useful when you need to ensure a port remains available while setting up a service, but want automatic
+        cleanup if setup fails.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, 0))
@@ -105,8 +104,8 @@ def is_port_available(port: int, host: str = "127.0.0.1") -> bool:
         False
 
     Note:
-        This check is not atomic - the port could be taken by another process
-        between the check and actual use. Always handle potential conflicts.
+        This check is not atomic - the port could be taken by another process between the check and actual use.
+        Always handle potential conflicts.
     """
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

@@ -4,7 +4,7 @@ Run: python examples/service_backends.py
 Requires: pip install 'protolink[integrations]'
 
 The main function shows the public API. The fixtures below replace only network
-transports; real backends, MIME handling, tools, and Agent approval still execute.
+transports; real backends, MIME handling, tools and Agent approval still execute.
 Replace these fixtures with your credentials to use live services. Never use this
 demo's automatic approval callback for a real mailbox.
 """
@@ -30,7 +30,7 @@ MESSAGE = {"to": ["reviewer@example.com"], "subject": "Review", "body": "Please 
 
 
 async def main() -> None:
-    """Run the same tools against Google, Microsoft, and standard mail protocols."""
+    """Run the same tools against Google, Microsoft and standard mail protocols."""
 
     async def approve(request, context):
         # Safe only because every service transport is replaced below.

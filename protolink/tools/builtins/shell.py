@@ -37,7 +37,7 @@ def shell_tool(
 ) -> PreparedTool:
     """Create ``run_shell(command)`` with application-owned execution settings.
 
-    Each call starts a fresh noninteractive shell: ``cd``, variables, and other
+    Each call starts a fresh noninteractive shell: ``cd``, variables and other
     shell state do not persist. Scripts may use pipelines and redirections.
     Output and termination facts are returned as ``ProcessResult``; nonzero
     exits and timeouts are results, not exceptions. Requires ``process.execute``

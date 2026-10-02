@@ -4,7 +4,7 @@ The inference loop treats language models as planners, not executors. A model
 may produce user-facing text, request a local tool, or delegate work to another
 agent, but every side effect still flows through the runtime. The models below
 are the hard boundary for that contract: prompt-fallback adapters parse into
-them, provider-native tool calls normalize into them, and the runtime dispatches
+them, provider-native tool calls normalize into them and the runtime dispatches
 only after Pydantic validation succeeds.
 """
 

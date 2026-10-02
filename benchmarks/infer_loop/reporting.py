@@ -1,4 +1,4 @@
-"""Scoring, timing, metadata, and artifact helpers for the infer-loop benchmark."""
+"""Scoring, timing, metadata and artifact helpers for the infer-loop benchmark."""
 
 # ruff: noqa: E501
 
@@ -627,7 +627,7 @@ def compare_with_baseline(
     baseline_hash = baseline.get("suite", {}).get("hash")
     if baseline_hash != current_suite_hash:
         raise ValueError(
-            "Baseline suite hash does not match this run. Use the same suite, seed, filters, and generated case count."
+            "Baseline suite hash does not match this run. Use the same suite, seed, filters and generated case count."
         )
     old_case_items = {
         str(item["key"]): item for item in baseline.get("case_results", []) if isinstance(item, dict) and "key" in item
@@ -803,7 +803,7 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
             "Strict",
             scores.get("strict"),
             scores.get("strict_percent"),
-            "Exact result, actions, and clean protocol",
+            "Exact result, actions and clean protocol",
             "strict",
         ),
         (
@@ -1054,7 +1054,7 @@ def _write_html_report(path: Path, summary: dict[str, Any]) -> None:
         if eligible_pairs
         else (
             "No eligible pairs. Use at least two repetitions; both adjacent first attempts must be strict, "
-            "retry-free, timing-complete, and use the same LLM call count."
+            "retry-free, timing-complete and use the same LLM call count."
         )
     )
 

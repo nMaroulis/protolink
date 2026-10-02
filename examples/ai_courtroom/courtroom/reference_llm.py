@@ -51,7 +51,7 @@ _INITIAL_FOCUS = {
         "offset": 9.0,
         "evidence_ids": ["E2", "E3", "E6"],
         "reason": (
-            "The warning, calibration mismatch, and known connectivity problem raise institutional-control questions, "
+            "The warning, calibration mismatch and known connectivity problem raise institutional-control questions, "
             "but the record still leaves room for individual scapegoating."
         ),
         "uncertainty": "A process failure does not by itself identify who knowingly accepted the risk.",
@@ -69,7 +69,7 @@ _INITIAL_FOCUS = {
         "offset": 8.0,
         "evidence_ids": ["E2", "E3", "E5"],
         "reason": (
-            "A validated calibration was not the calibration deployed, and the signing path lacked isolation. That is "
+            "A validated calibration was not the calibration deployed and the signing path lacked isolation. That is "
             "a release-governance failure, not merely a perception bug."
         ),
         "uncertainty": "The admitted record does not show who approved or noticed the production mismatch.",
@@ -78,7 +78,7 @@ _INITIAL_FOCUS = {
         "offset": 9.0,
         "evidence_ids": ["E2", "E3", "E7"],
         "reason": (
-            "The warning, artifact mismatch, and reconstruction form a concerning timeline, although each document "
+            "The warning, artifact mismatch and reconstruction form a concerning timeline, although each document "
             "also supports a narrower innocent explanation."
         ),
         "uncertainty": "A coherent timeline can still overstate what the company actually knew.",
@@ -176,7 +176,7 @@ _DELIBERATION_MOVES: dict[str, tuple[dict[str, Any], ...]] = {
         {
             "action": "attempt_persuasion",
             "message": (
-                "E5 shows Aster Vale deliberately let vision veto radar, and E1 shows that exact arbitration delayed "
+                "E5 shows Aster Vale deliberately let vision veto radar and E1 shows that exact arbitration delayed "
                 "braking. Approval may explain the choice, but it does not erase ownership of the safety control."
             ),
             "evidence_ids": ["E1", "E5"],
@@ -247,7 +247,7 @@ class ReferenceCourtroomLLM(MockLLM):
             return {
                 "statement": (
                     "This was not an unknowable bolt from the blue. Aster Vale had a blocked safety ticket, deployed a "
-                    "different calibration from the one it validated, and kept relying on remote intervention after "
+                    "different calibration from the one it validated and kept relying on remote intervention after "
                     "earlier outages. The question is not whether roadworks contributed; it is whether the company "
                     "knowingly sent an inadequately controlled release onto public streets."
                 ),
@@ -259,7 +259,7 @@ class ReferenceCourtroomLLM(MockLLM):
         return {
             "statement": (
                 "Lina Ortega's death was tragic, but tragedy is not guilt. The reported defect was cleared when C-90 "
-                "passed every rerun, the braking design was disclosed and approved, and an unreported road change plus "
+                "passed every rerun, the braking design was disclosed and approved and an unreported road change plus "
                 "a network outage defeated separate safeguards. The evidence supports an interacting accident, not a "
                 "criminally negligent deployment."
             ),
@@ -282,7 +282,7 @@ class ReferenceCourtroomLLM(MockLLM):
             "statement": (
                 "The record never identifies who selected C-91 or proves that a decision-maker knew it differed from "
                 "the validated bundle. The regulator approved the disclosed braking architecture, the contractor "
-                "altered the scene, and the network removed remote support. Those are not excuses; they are reasonable "
+                "altered the scene and the network removed remote support. Those are not excuses; they are reasonable "
                 "doubts about the charged company's state of knowledge."
             ),
             "evidence_ids": ["E3", "E4", "E5", "E6"],
@@ -330,7 +330,7 @@ class ReferenceCourtroomLLM(MockLLM):
                 }
             return {
                 "statement": (
-                    "Aster Vale disclosed the braking architecture, and our review found a legitimate benefit from "
+                    "Aster Vale disclosed the braking architecture and our review found a legitimate benefit from "
                     "fewer phantom emergency stops. The permit did not require a perfect network. At the time, the "
                     "aggregate outage report did not establish that this particular collision scenario was imminent."
                 ),
@@ -344,7 +344,7 @@ class ReferenceCourtroomLLM(MockLLM):
             if direct:
                 return {
                     "statement": (
-                        "Our company funded E7, and that financial interest should be visible. The protocol was fixed "
+                        "Our company funded E7 and that financial interest should be visible. The protocol was fixed "
                         "before testing and the raw runs are available. The crash combination stopped safely in only 6 "
                         "of 20 trials, while C-90 on the corrected map stopped in 19. Both calibration and scene data "
                         "materially changed the result."
@@ -357,7 +357,7 @@ class ReferenceCourtroomLLM(MockLLM):
             return {
                 "statement": (
                     "The same reconstruction also shows why a software-only account is incomplete. C-90 fell from 19 "
-                    "safe stops to 14 under the crash-scene map, and C-91 improved from 6 to 16 when the map was "
+                    "safe stops to 14 under the crash-scene map and C-91 improved from 6 to 16 when the map was "
                     "corrected. Our testing allocates contributing risk; it does not identify anyone's state of mind."
                 ),
                 "evidence_ids": ["E4", "E7"],
@@ -381,8 +381,8 @@ class ReferenceCourtroomLLM(MockLLM):
             return {
                 "statement": (
                     "E4 is a material contributor. Moving the arrow board and omitting the map update reduced usable "
-                    "observation, and even C-90 performed worse with the crash-scene map. I cannot infer corporate "
-                    "knowledge from physical reconstruction, and I cannot reduce this collision to a single root cause."
+                    "observation and even C-90 performed worse with the crash-scene map. I cannot infer corporate "
+                    "knowledge from physical reconstruction and I cannot reduce this collision to a single root cause."
                 ),
                 "evidence_ids": ["E4", "E7"],
                 "credibility_note": "The investigator distinguishes causal contribution from legal culpability.",
@@ -668,8 +668,8 @@ def _public_record_delta(
 
 
 def _peer_content_delta(incoming: dict[str, Any], profile: dict[str, Any]) -> float:
-    # Intentionally use only the authored message, action, and cited evidence.
-    # Speaker probability, confidence, and vote are neither read nor accepted as inputs.
+    # Intentionally use only the authored message, action and cited evidence.
+    # Speaker probability, confidence and vote are neither read nor accepted as inputs.
     text = f"{incoming['statement']} {incoming['public_intent']}".lower()
     evidence_signal = _average_evidence_signal(incoming["evidence_ids"]) * 0.72
     guilt_terms = (

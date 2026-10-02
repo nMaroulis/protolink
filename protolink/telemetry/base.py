@@ -103,7 +103,7 @@ class Telemetry(ABC):
         """Called for detailed provider-agnostic inference-loop events.
 
         Implementations may use this hook to record raw action payloads,
-        parse retries, streamed chunks, delegated agent calls, and other
+        parse retries, streamed chunks, delegated agent calls and other
         execution details emitted by ``LLM.infer()``. The default is a no-op
         so existing telemetry providers only need the coarse hooks above.
         """

@@ -10,12 +10,12 @@ const surfaces = [
     title: 'Agent as the autonomous runtime unit',
     accent: '#0a84ff',
     summary:
-      'The Agent facade owns identity, lifecycle, execution, policy, tools, optional LLMs, state access, and peer communication through client/server boundaries.',
+      'The Agent facade owns identity, lifecycle, execution, policy, tools, optional LLMs, state access and peer communication through client/server boundaries.',
     modules: ['protolink.agents', 'protolink.core', 'protolink.models'],
     responsibilities: [
       'Owns AgentCard identity and advertised capabilities',
       'Starts and stops the embedded server runtime',
-      'Executes tasks, tool calls, inference, cancellation, and reports',
+      'Executes tasks, tool calls, inference, cancellation and reports',
       'Coordinates registry registration and discovery through RegistryClient',
     ],
     boundaries: [
@@ -36,12 +36,12 @@ const surfaces = [
     title: 'A2A primitives with ProtoLink extensions',
     accent: '#16a34a',
     summary:
-      'AgentCard, Task, Message, Part, Artifact, and registry discovery give ProtoLink a protocol-native base while runtime controls extend the useful operating surface.',
+      'AgentCard, Task, Message, Part, Artifact and registry discovery give ProtoLink a protocol-native base while runtime controls extend the useful operating surface.',
     modules: ['protolink.core', 'protolink.discovery', 'protolink.types'],
     responsibilities: [
-      'Defines portable task, message, artifact, and identity shapes',
+      'Defines portable task, message, artifact and identity shapes',
       'Publishes and discovers AgentCards through the registry',
-      'Adds run context, budgets, cancellation, policy, reports, and replay',
+      'Adds run context, budgets, cancellation, policy, reports and replay',
       'Keeps integration points inspectable instead of hidden behind orchestration magic',
     ],
     boundaries: [
@@ -63,12 +63,12 @@ const surfaces = [
     title: 'Intent-level APIs over swappable transports',
     accent: '#14b8a6',
     summary:
-      'Clients express outgoing intent, servers expose incoming handlers, and transports provide the physical protocol and event-loop runtime.',
+      'Clients express outgoing intent, servers expose incoming handlers and transports provide the physical protocol and event-loop runtime.',
     modules: ['protolink.client', 'protolink.server', 'protolink.transport'],
     responsibilities: [
       'Turns operations into ClientRequestSpec definitions',
       'Mounts handlers as EndpointSpec routes',
-      'Supports HTTP, WebSocket, SSE JSON-RPC, gRPC, and in-process runtime paths',
+      'Supports HTTP, WebSocket, SSE JSON-RPC, gRPC and in-process runtime paths',
       'Separates protocol concerns from agent logic',
     ],
     boundaries: [
@@ -84,20 +84,20 @@ const surfaces = [
   },
   {
     id: 'intelligence',
-    label: 'LLMs, knowledge, and tools',
+    label: 'LLMs, knowledge and tools',
     eyebrow: 'Capability layer',
-    title: 'Provider-optional reasoning, retrieval, and tool execution',
+    title: 'Provider-optional reasoning, retrieval and tool execution',
     accent: '#7c3aed',
     summary:
-      'LLM adapters, managed or existing knowledge, and native or MCP-backed tools can be attached to agents without changing the communication substrate.',
+      'LLM adapters, managed or existing knowledge and native or MCP-backed tools can be attached to agents without changing the communication substrate.',
     modules: ['protolink.llms', 'protolink.rag', 'protolink.tools'],
     responsibilities: [
       'Normalizes inference and tool-call behavior across providers',
-      'Loads, indexes, retrieves, filters, and cites application-owned knowledge',
+      'Loads, indexes, retrieves, filters and cites application-owned knowledge',
       'Adapts existing vector databases and custom retrievers through small protocols',
       'Keeps provider SDK dependencies optional',
       'Builds tool schemas and execution boundaries',
-      'Tracks history, context manifests, compaction, and usage metrics when enabled',
+      'Tracks history, context manifests, compaction and usage metrics when enabled',
     ],
     boundaries: [
       'Agents can run without an LLM',
@@ -116,13 +116,13 @@ const surfaces = [
     id: 'state-storage',
     label: 'State and storage',
     eyebrow: 'Persistence layer',
-    title: 'State modules, storage backends, and run records',
+    title: 'State modules, storage backends and run records',
     accent: '#ca8a04',
     summary:
-      'State modules make persistence explicit, storage backends keep runtime data replaceable, and run stores provide durable execution records for inspection.',
+      'State modules make persistence explicit, storage backends keep runtime data replaceable and run stores provide durable execution records for inspection.',
     modules: ['protolink.state', 'protolink.storage', 'protolink.core.report'],
     responsibilities: [
-      'Persists conversation, task, flow, and tool state by selected mode',
+      'Persists conversation, task, flow and tool state by selected mode',
       'Provides memory and SQLite storage implementations',
       'Records task snapshots and RunReport payloads with replayable event timelines',
       'Supports durable registry entries when storage is configured',
@@ -142,10 +142,10 @@ const surfaces = [
     id: 'operations',
     label: 'Operations',
     eyebrow: 'Inspection layer',
-    title: 'CLI, dashboard, telemetry, logging, and security',
+    title: 'CLI, dashboard, telemetry, logging and security',
     accent: '#db2777',
     summary:
-      'ProtoLink includes practical runtime visibility: a CLI, local dashboard, registry and run inspection, telemetry adapters, logs, and authentication primitives.',
+      'ProtoLink includes practical runtime visibility: a CLI, local dashboard, registry and run inspection, telemetry adapters, logs and authentication primitives.',
     modules: [
       'protolink.cli',
       'protolink.devtools',
@@ -179,12 +179,12 @@ const surfaces = [
     title: 'Runnable systems and structured flow patterns',
     accent: '#2563eb',
     summary:
-      'Examples show the same primitives in motion, from basic agents and registries to ticket booking, code assistants, replayable communication experiments, runtime policies, and structured flows.',
+      'Examples show the same primitives in motion, from basic agents and registries to ticket booking, code assistants, replayable communication experiments, runtime policies and structured flows.',
     modules: ['examples', 'examples/ticket_booking', 'examples/code_assistant', 'examples/ai_courtroom', 'examples/structured_flows'],
     responsibilities: [
       'Demonstrates registry-backed multi-agent systems',
-      'Shows graph, pipeline, router, parallel, and tool-call flows',
-      'Provides focused examples for runtime agents, WebSocket, MCP, and cancellation',
+      'Shows graph, pipeline, router, parallel and tool-call flows',
+      'Provides focused examples for runtime agents, WebSocket, MCP and cancellation',
       'Studies how direct communication and topology affect observable group decisions',
       'Gives practical project shapes to adapt',
     ],
@@ -209,7 +209,7 @@ const flowSteps = [
     label: 'Identity',
     title: 'AgentCard declares who an agent is',
     summary:
-      'Every agent starts with an AgentCard. It carries the name, URL, capabilities, skills, tags, and metadata that other agents can discover.',
+      'Every agent starts with an AgentCard. It carries the name, URL, capabilities, skills, tags and metadata that other agents can discover.',
     path: 'AgentCard -> Registry -> discoverable peers',
     docs: [
       ['Models', '/docs/models'],
@@ -233,7 +233,7 @@ const flowSteps = [
     label: 'Discovery',
     title: 'Registry lookup stays transport-backed',
     summary:
-      'Discovery calls go through RegistryClient, become transport requests, and return AgentCards from the registry store after filtering and TTL pruning.',
+      'Discovery calls go through RegistryClient, become transport requests and return AgentCards from the registry store after filtering and TTL pruning.',
     path: 'Agent.discover_agents() -> RegistryClient.discover() -> Registry.handle_discover()',
     docs: [
       ['Registry', '/docs/registry'],
@@ -243,7 +243,7 @@ const flowSteps = [
   {
     id: 'task',
     label: 'Task flow',
-    title: 'Tasks move through client, transport, and server',
+    title: 'Tasks move through client, transport and server',
     summary:
       'A caller sends a Task through AgentClient. The transport delivers it to AgentServer, which delegates execution back to the receiving Agent.',
     path: 'AgentClient.send_task() -> Transport.send() -> AgentServer -> handle_task()',
@@ -257,7 +257,7 @@ const flowSteps = [
     label: 'Control',
     title: 'Runtime control is explicit and inspectable',
     summary:
-      'RunContext, budgets, policy decisions, cancellation requests, semantic events, reports, and replay all live in visible runtime contracts.',
+      'RunContext, budgets, policy decisions, cancellation requests, semantic events, reports and replay all live in visible runtime contracts.',
     path: 'RunContext + Policy + Cancellation -> RunEvent -> RunReport',
     docs: [
       ['Runtime', '/docs/runtime'],
@@ -269,7 +269,7 @@ const flowSteps = [
     label: 'Observe',
     title: 'Operations read from registry and run stores',
     summary:
-      'The CLI and dashboard project live registry state, run-store task snapshots, stored run reports, and agent status probes into tools for local development and debugging.',
+      'The CLI and dashboard project live registry state, run-store task snapshots, stored run reports and agent status probes into tools for local development and debugging.',
     path: 'Registry state + SQLiteRunStore -> CLI and dashboard',
     docs: [
       ['CLI', '/docs/cli'],
@@ -321,7 +321,7 @@ export default function ProjectMap() {
           <h1 id="project-map-title">ProtoLink Project Map</h1>
           <p>
             An interactive index of the framework: A2A primitives, agent runtime,
-            transports, registry discovery, state, tools, LLMs, and operational surfaces.
+            transports, registry discovery, state, tools, LLMs and operational surfaces.
           </p>
           <LinkList items={quickLinks} />
         </div>

@@ -1,4 +1,4 @@
-"""Outbound A2A 1.0 discovery, translation, and protocol selection tests."""
+"""Outbound A2A 1.0 discovery, translation and protocol selection tests."""
 
 from __future__ import annotations
 

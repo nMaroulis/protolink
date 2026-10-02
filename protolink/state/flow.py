@@ -8,7 +8,7 @@ from protolink.storage import Storage
 class FlowState:
     """Manages persistent state for ProtoLink flows.
 
-    This class handles the persistence of flow-specific data, such as progress, checkpoint information, and execution
+    This class handles the persistence of flow-specific data, such as progress, checkpoint information and execution
     context across multiple runs.
     """
 

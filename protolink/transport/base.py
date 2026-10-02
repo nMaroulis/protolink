@@ -63,7 +63,7 @@ class Transport(ABC):
 
     Concrete transports retain ownership of protocol I/O while this base class
     provides one contract for capabilities, configuration, limits, retries,
-    metrics, correlation identifiers, and health reporting.
+    metrics, correlation identifiers and health reporting.
     """
 
     transport_type: ClassVar[str] = "custom"
@@ -74,7 +74,7 @@ class Transport(ABC):
         """Initialize shared production behavior for a concrete transport.
 
         Args:
-            config: Limits, retries, keepalive, shutdown, idempotency, and
+            config: Limits, retries, keepalive, shutdown, idempotency and
                 metrics settings. Defaults to a new ``TransportConfig``.
         """
         self.config = config or TransportConfig()
@@ -161,7 +161,7 @@ class Transport(ABC):
         return bool(getattr(self, "_transport_running", False))
 
     def health(self) -> dict[str, Any]:
-        """Return transport state, capabilities, and metrics as JSON-safe data."""
+        """Return transport state, capabilities and metrics as JSON-safe data."""
         return {
             "status": "ready" if self.is_running else "stopped",
             "ready": self.is_running,
@@ -309,9 +309,19 @@ class Transport(ABC):
             future.exception()
 
     def payload_size(self, payload: Any) -> int:
-        """Estimate serialized payload size using ProtoLink's normal serializer."""
+        """Measure the compact JSON byte length of a transport payload.
+
+        Ordinary JSON data is encoded directly. Domain objects and extended
+        values such as datetimes fall back to ProtoLink's recursive serializer.
+        This avoids copying an already normalized request or event tree.
+        """
         if payload is None:
             return 0
+        if isinstance(payload, (dict, list, tuple, str, int, float, bool)):
+            try:
+                return len(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+            except TypeError:
+                pass
         normalized = Serializer.serialize_to_dict(payload)
         return len(json.dumps(normalized, separators=(",", ":"), default=str).encode("utf-8"))
 

@@ -180,7 +180,7 @@ class HistoryCompactor:
         Notes:
             Summary generation uses a temporary ``ConversationHistory``. The
             live history is replaced only after a non-empty summary returns.
-            The normal agent inference loop, tool registry, and system prompt
+            The normal agent inference loop, tool registry and system prompt
             are not involved.
         """
         summarizer = self._summarize_messages if strategy == "summary" else None
@@ -213,7 +213,7 @@ def _build_summary_history(
     summary_history = ConversationHistory(
         system_prompt=(
             "Compact the supplied conversation into durable context. Preserve decisions, requirements, "
-            "constraints, unresolved work, important facts, and named entities. Remove repetition and filler. "
+            "constraints, unresolved work, important facts and named entities. Remove repetition and filler. "
             f"Keep the summary under approximately {summary_max_tokens} tokens. Return exactly one JSON object "
             'with a non-empty string field named "summary".'
         )
@@ -266,8 +266,8 @@ def _compact_conversation_history(
     """Compact a conversation in place using one of three strategies.
 
     ``recent`` keeps the leading system prompt and the newest messages.
-    ``tokens`` walks backward from the newest protected messages until adding
-    another message would exceed ``max_tokens``. ``summary`` replaces older
+    ``tokens`` finds the longest recent suffix that fits beside protected
+    messages under ``max_tokens``. ``summary`` replaces older
     messages with one system summary and keeps ``preserve_recent`` messages
     verbatim.
 
@@ -365,19 +365,26 @@ def _compact_to_token_budget(
     preserve_recent: int,
     model: str | None,
 ) -> list[dict[str, Any]]:
-    """Keep the newest chronological suffix that fits the token budget."""
+    """Find the longest older suffix that fits beside protected messages.
+
+    Candidate size grows with each older message. Binary search keeps the
+    number of full token estimates logarithmic in the older history length.
+    The system prompt and protected recent messages remain even when their
+    combined estimate exceeds the budget.
+    """
     protected_count = min(preserve_recent, len(body))
     protected = body[-protected_count:] if protected_count else []
     remaining = body[:-protected_count] if protected_count else body
-    kept = list(protected)
+    lower, upper = 0, len(remaining)
+    while lower < upper:
+        count = (lower + upper + 1) // 2
+        candidate = [*leading_system, *remaining[-count:], *protected]
+        if estimate_token_count(_provider_messages(candidate), model=model) <= max_tokens:
+            lower = count
+        else:
+            upper = count - 1
 
-    for message in reversed(remaining):
-        candidate = [*leading_system, message, *kept]
-        if estimate_token_count(_provider_messages(candidate), model=model) > max_tokens:
-            break
-        kept.insert(0, message)
-
-    return leading_system + kept
+    return leading_system + (remaining[-lower:] if lower else []) + protected
 
 
 def _split_leading_system(

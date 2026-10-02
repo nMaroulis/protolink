@@ -67,7 +67,7 @@ async def approve_demo(request, context) -> ApprovalDecision:
 
 
 async def main() -> None:
-    """Verify shell/Git, user feedback, calendar/email, and normal Agent inference."""
+    """Verify shell/Git, user feedback, calendar/email and normal Agent inference."""
     env = {
         "PATH": os.defpath,
         "GIT_AUTHOR_NAME": "Demo",

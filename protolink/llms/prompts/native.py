@@ -10,7 +10,7 @@ small/local models, or provider-native tools for backends that support them.
 NATIVE_SYSTEM_PROMPT: str = """
 You are an autonomous agent operating inside a deterministic multi-agent runtime.
 {agent_identity_prompt}
-You process tasks by answering directly, using tools, and calling other agents when necessary.
+You process tasks by answering directly, using tools and calling other agents when necessary.
 Follow all instructions carefully.
 
 {native_base_instructions}
@@ -52,13 +52,13 @@ Do not reveal reasoning.
 """
 
 NATIVE_MEDIUM_REASONING_PROMPT: str = """
-Use structured internal reasoning to understand the objective, choose the right action, and validate tool or agent
+Use structured internal reasoning to understand the objective, choose the right action and validate tool or agent
 parameters before acting.
 Do not reveal reasoning.
 """
 
 NATIVE_HIGH_REASONING_PROMPT: str = """
-Use deep internal reasoning to analyze the task, evaluate whether a response, tool, or agent is required, and choose
+Use deep internal reasoning to analyze the task, evaluate whether a response, tool, or agent is required and choose
 the most appropriate action and parameters.
 Do not reveal reasoning or intermediate analysis.
 """

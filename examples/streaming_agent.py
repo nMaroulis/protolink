@@ -5,7 +5,7 @@ This example demonstrates the full streaming path added to Protolink:
 1. An Agent with a streaming-capable transport exposes ``/tasks/stream``.
 2. ``AgentClient.send_task_streaming()`` subscribes to that task stream.
 3. ``Agent.handle_task_streaming()`` calls ``LLM.infer(streaming=True)``.
-4. The client receives task status, LLM stream, artifact, and final events.
+4. The client receives task status, LLM stream, artifact and final events.
 
 The default mode uses ``RuntimeTransport`` and ``MockLLM`` so the example can
 run without API keys or a local model server.
@@ -52,7 +52,7 @@ class ChunkedMockLLM(MockLLM):
         super().__init__(
             default_response=(
                 "Hello from a streaming MockLLM. You are seeing task status, "
-                "LLM chunks, the final artifact, and the closing event flow "
+                "LLM chunks, the final artifact and the closing event flow "
                 "through AgentClient."
             )
         )

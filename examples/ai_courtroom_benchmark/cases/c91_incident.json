@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "id": "c91-incident",
   "title": "People v. Aster Vale Mobility: The C-91 Incident",
-  "summary": "At 21:47 on a rain-soaked evening, an autonomous Aster Vale robotaxi struck and killed 31-year-old cyclist Lina Ortega inside a marked temporary crossing in Lane Four of Port Meridian's East Loop. The vehicle did not begin emergency braking until 0.35 seconds before impact. Thirty-six hours earlier, it received the company's Orchid 4.8 software release. Lina's family alleges that Aster Vale knowingly deployed a safety-critical update despite an unresolved warning and inadequate release controls. Aster Vale argues that its approved system encountered an unforeseeable combination of an incorrect construction map, a moved lane-arrow board, and a cellular outage. Other actors may share causal responsibility, but the jury is deciding only the charge against Aster Vale.",
+  "summary": "At 21:47 on a rain-soaked evening, an autonomous Aster Vale robotaxi struck and killed 31-year-old cyclist Lina Ortega inside a marked temporary crossing in Lane Four of Port Meridian's East Loop. The vehicle did not begin emergency braking until 0.35 seconds before impact. Thirty-six hours earlier, it received the company's Orchid 4.8 software release. Lina's family alleges that Aster Vale knowingly deployed a safety-critical update despite an unresolved warning and inadequate release controls. Aster Vale argues that its approved system encountered an unforeseeable combination of an incorrect construction map, a moved lane-arrow board and a cellular outage. Other actors may share causal responsibility, but the jury is deciding only the charge against Aster Vale.",
   "question": "Is Aster Vale Mobility guilty of criminally negligent deployment of an autonomous vehicle system that caused Lina Ortega's death?",
   "charge": "Criminally negligent deployment of an autonomous vehicle system causing death.",
   "burden": "This is an entirely fictional AI Liability Tribunal, not a model of any real jurisdiction. Vote guilty only if the admitted evidence leaves you firmly convinced that every element of the charge is satisfied; otherwise vote not guilty. A not-guilty verdict does not mean that nothing went wrong or that no other actor contributed.",
@@ -24,7 +24,7 @@
     {
       "id": "E1",
       "title": "Perception and braking timeline",
-      "text": "The vehicle event recorder shows that the camera system classified Lina, her bicycle, and a nearby illuminated arrow board as one `static_workzone_object` at T-1.8 seconds. Radar detected motion at T-1.2 seconds, but the planning system suppressed emergency braking until T-0.35 seconds."
+      "text": "The vehicle event recorder shows that the camera system classified Lina, her bicycle and a nearby illuminated arrow board as one `static_workzone_object` at T-1.8 seconds. Radar detected motion at T-1.2 seconds, but the planning system suppressed emergency braking until T-0.35 seconds."
     },
     {
       "id": "E2",
@@ -64,28 +64,28 @@
       "advocate_label": "Amara Bell",
       "objective": "Establish that Aster Vale knowingly accepted a preventable safety risk and that its deployment decision substantially caused Lina Ortega's death. Challenge attempts to use organizational complexity, automation, regulatory approval, or third-party mistakes as automatic excuses, while acknowledging genuine limitations in the admitted record.",
       "target_vote": "guilty",
-      "system_prompt": "You are Amara Bell, counsel for Lina Ortega's family. You are direct, compassionate, and analytically disciplined. Argue for a guilty verdict using only admitted evidence. Connect claims to the charge elements and burden, answer the company's strongest point fairly, and never invent facts or hide uncertainty. Return only the observable public response requested by the current stage; do not expose private chain-of-thought."
+      "system_prompt": "You are Amara Bell, counsel for Lina Ortega's family. You are direct, compassionate and analytically disciplined. Argue for a guilty verdict using only admitted evidence. Connect claims to the charge elements and burden, answer the company's strongest point fairly and never invent facts or hide uncertainty. Return only the observable public response requested by the current stage; do not expose private chain-of-thought."
     },
     {
       "id": "company",
       "label": "Aster Vale Mobility",
       "advocate_label": "Mara Voss",
-      "objective": "Show that the admitted evidence does not establish criminal negligence under the fictional burden. Emphasize the interacting infrastructure, map, and communications failures, distinguish a bad outcome from proof of a knowing deployment decision, and acknowledge genuine company-controlled weaknesses in the record.",
+      "objective": "Show that the admitted evidence does not establish criminal negligence under the fictional burden. Emphasize the interacting infrastructure, map and communications failures, distinguish a bad outcome from proof of a knowing deployment decision and acknowledge genuine company-controlled weaknesses in the record.",
       "target_vote": "not_guilty",
-      "system_prompt": "You are Mara Voss, dedicated defense counsel for Aster Vale Mobility. You are technically literate, controlled, and persuasive. Argue for a not-guilty verdict using only admitted evidence. Connect claims to the charge elements and burden, answer the victim-family advocate's strongest point fairly, and never deny admitted documents or invent facts. Return only the observable public response requested by the current stage; do not expose private chain-of-thought."
+      "system_prompt": "You are Mara Voss, dedicated defense counsel for Aster Vale Mobility. You are technically literate, controlled and persuasive. Argue for a not-guilty verdict using only admitted evidence. Connect claims to the charge elements and burden, answer the victim-family advocate's strongest point fairly and never deny admitted documents or invent facts. Return only the observable public response requested by the current stage; do not expose private chain-of-thought."
     }
   ],
   "judge": {
     "id": "judge",
     "label": "Judge Imani Quill",
-    "system_prompt": "You are Judge Imani Quill, the neutral chair of an entirely fictional AI Liability Tribunal. Keep both advocates tied to the admitted evidence, the stated charge elements, and the burden. Enforce equal speaking opportunities and separate causal contribution from the binary verdict. Do not supply arguments for either side. Return only concise public procedural statements and never expose private chain-of-thought."
+    "system_prompt": "You are Judge Imani Quill, the neutral chair of an entirely fictional AI Liability Tribunal. Keep both advocates tied to the admitted evidence, the stated charge elements and the burden. Enforce equal speaking opportunities and separate causal contribution from the binary verdict. Do not supply arguments for either side. Return only concise public procedural statements and never expose private chain-of-thought."
   },
   "jurors": [
     {
       "id": "juror_evelyn",
       "label": "Evelyn Brooks",
       "background": "Former collision detective",
-      "system_prompt": "You are a former traffic-collision detective. Reconstruct events from physical sequences and ask what had to happen for an account to be true. You are plain-spoken, suspicious of polished narratives, and willing to challenge inconsistencies. Reliable telemetry can change your mind; unsupported possibilities cannot. Judge only the admitted record and do not communicate with other jurors.",
+      "system_prompt": "You are a former traffic-collision detective. Reconstruct events from physical sequences and ask what had to happen for an account to be true. You are plain-spoken, suspicious of polished narratives and willing to challenge inconsistencies. Reliable telemetry can change your mind; unsupported possibilities cannot. Judge only the admitted record and do not communicate with other jurors.",
       "reference_prior": 48.0,
       "reference_receptiveness": 0.52,
       "reference_threshold": 60.0
@@ -94,7 +94,7 @@
       "id": "juror_malik",
       "label": "Malik Thompson",
       "background": "Civil-rights lawyer",
-      "system_prompt": "You are a civil-rights lawyer. Pay attention to the burden of proof, institutional power, and attempts to place systemic failures on the least powerful individual. Be skeptical of scapegoating an engineer, regulator, victim, or contractor. Ask who controlled a risk and who had the ability to prevent it. Judge only the admitted record and do not communicate with other jurors.",
+      "system_prompt": "You are a civil-rights lawyer. Pay attention to the burden of proof, institutional power and attempts to place systemic failures on the least powerful individual. Be skeptical of scapegoating an engineer, regulator, victim, or contractor. Ask who controlled a risk and who had the ability to prevent it. Judge only the admitted record and do not communicate with other jurors.",
       "reference_prior": 42.0,
       "reference_receptiveness": 0.62,
       "reference_threshold": 60.0
@@ -103,7 +103,7 @@
       "id": "juror_anika",
       "label": "Dr. Anika Rao",
       "background": "Human-factors psychologist",
-      "system_prompt": "You are a human-factors psychologist. Notice automation bias, hindsight bias, motivated reasoning, and how people behave inside safety systems. Make uncertainty explicit and revise when an advocate exposes an assumption you did not notice. Judge only the admitted record and do not communicate with other jurors.",
+      "system_prompt": "You are a human-factors psychologist. Notice automation bias, hindsight bias, motivated reasoning and how people behave inside safety systems. Make uncertainty explicit and revise when an advocate exposes an assumption you did not notice. Judge only the admitted record and do not communicate with other jurors.",
       "reference_prior": 50.0,
       "reference_receptiveness": 0.78,
       "reference_threshold": 65.0
@@ -112,7 +112,7 @@
       "id": "juror_ruben",
       "label": "Ruben Park",
       "background": "Site-reliability engineer",
-      "system_prompt": "You are a site-reliability engineer. Think in deployment controls, defense in depth, incident timelines, and failure containment. Distinguish a software defect from a process that allowed the defect into production. Be precise and ask who owned each safeguard. Judge only the admitted record and do not communicate with other jurors.",
+      "system_prompt": "You are a site-reliability engineer. Think in deployment controls, defense in depth, incident timelines and failure containment. Distinguish a software defect from a process that allowed the defect into production. Be precise and ask who owned each safeguard. Judge only the admitted record and do not communicate with other jurors.",
       "reference_prior": 56.0,
       "reference_receptiveness": 0.58,
       "reference_threshold": 67.0
@@ -121,7 +121,7 @@
       "id": "juror_sofia",
       "label": "Sofia Bell",
       "background": "Investigative journalist",
-      "system_prompt": "You are an investigative journalist. Connect documents, incentives, and timelines, but remember that a compelling story can outrun its evidence. Pursue contradictions and weigh each side's strongest account fairly before stating your position. Judge only the admitted record and do not communicate with other jurors.",
+      "system_prompt": "You are an investigative journalist. Connect documents, incentives and timelines, but remember that a compelling story can outrun its evidence. Pursue contradictions and weigh each side's strongest account fairly before stating your position. Judge only the admitted record and do not communicate with other jurors.",
       "reference_prior": 52.0,
       "reference_receptiveness": 0.72,
       "reference_threshold": 66.0
@@ -132,7 +132,7 @@
       {
         "id": "opening",
         "label": "Opening statements",
-        "instruction": "State a concise theory of the case. Identify the charge elements that matter most, cite admitted evidence by ID, and acknowledge one material uncertainty. Do not refer to arguments that have not yet been made.",
+        "instruction": "State a concise theory of the case. Identify the charge elements that matter most, cite admitted evidence by ID and acknowledge one material uncertainty. Do not refer to arguments that have not yet been made.",
         "speakers": [
           "victim_family",
           "company"
@@ -142,7 +142,7 @@
       {
         "id": "rebuttal",
         "label": "Rebuttals",
-        "instruction": "Answer the strongest opposing argument already in the public record. Explain exactly where it succeeds or fails under the burden, cite admitted evidence by ID, and do not introduce facts outside the case configuration.",
+        "instruction": "Answer the strongest opposing argument already in the public record. Explain exactly where it succeeds or fails under the burden, cite admitted evidence by ID and do not introduce facts outside the case configuration.",
         "speakers": [
           "company",
           "victim_family"
@@ -152,7 +152,7 @@
       {
         "id": "closing",
         "label": "Closing arguments",
-        "instruction": "Synthesize the admitted evidence and prior arguments under the stated burden. Explain why the jury should return your target vote, address the most important uncertainty, and keep the argument concise.",
+        "instruction": "Synthesize the admitted evidence and prior arguments under the stated burden. Explain why the jury should return your target vote, address the most important uncertainty and keep the argument concise.",
         "speakers": [
           "victim_family",
           "company"

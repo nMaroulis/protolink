@@ -30,7 +30,7 @@ class UserInputRequest:
     """One immutable question for an application callback.
 
     ``request_id`` uniquely correlates this question, including concurrent calls.
-    ``run_id``, ``task_id``, and ``action_id`` associate it with runtime events;
+    ``run_id``, ``task_id`` and ``action_id`` associate it with runtime events;
     ``task_id`` is absent for standalone ``Agent.call_tool`` calls. Options are
     suggestions, never a restriction on free-text answers. IDs are correlation
     values, not credentials: UI adapters must authenticate and scope responders.

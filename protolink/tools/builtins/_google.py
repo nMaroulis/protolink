@@ -18,7 +18,7 @@ class GoogleAPIError(RuntimeError):
 
 
 class GoogleAPI(OAuthJSONAPI):
-    """Use fixed HTTPS endpoints, bounded responses, and no automatic retries."""
+    """Use fixed HTTPS endpoints, bounded responses and no automatic retries."""
 
     def __init__(self, token: GoogleToken, base_url: str) -> None:
         super().__init__(token, base_url, provider="Google", error_type=GoogleAPIError)

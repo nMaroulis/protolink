@@ -11,7 +11,7 @@ class InMemoryStorage(Storage):
     """In-memory storage implementation.
 
     A lightweight, dictionary-backed storage that lives entirely in RAM.
-    Ideal for development, testing, and short-lived agents that don't need disk persistence.
+    Ideal for development, testing and short-lived agents that don't need disk persistence.
     Supports optional TTL-based expiration per entry.
 
     This implementation uses a min-heap to optimize proactive cleanup of expired entries.

@@ -10,7 +10,7 @@ A simplified **"Claude Code"** built as a mesh of three autonomous agents using 
 
 ## 🌟 Why This Example?
 
-Coding assistants like Claude Code, Cursor, and GitHub Copilot are the most relatable AI applications for developers. Under the hood, they all share a similar architecture:
+Coding assistants like Claude Code, Cursor and GitHub Copilot are the most relatable AI applications for developers. Under the hood, they all share a similar architecture:
 
 - A **brain** that reasons about code
 - **hands** that read/write the filesystem
@@ -20,7 +20,7 @@ This example rebuilds that architecture using **Protolink's agent mesh**, demons
 
 ---
 
-## 🏗️ Architecture: Brain, Hands, and Coordinator
+## 🏗️ Architecture: Brain, Hands and Coordinator
 
 ```
 User Request: "Add docstrings to all functions in utils.py"
@@ -67,7 +67,7 @@ User Request: "Add docstrings to all functions in utils.py"
 |-------|------|-------------------|---------|
 | **Orchestrator** | LLM + Agent Calls | `agent_call` (both `infer` & `tool_call`) | User-facing coordinator. Receives coding requests and delegates to specialists. |
 | **Planner** | LLM-only | `infer` (LLM-to-LLM delegation) | Pure reasoning. Analyzes code, creates plans, generates precise edits. No filesystem access. |
-| **Coder** | Tools-only | `tool_call` (deterministic tools) | File operations. Reads, writes, lists, and searches files. No reasoning needed. |
+| **Coder** | Tools-only | `tool_call` (deterministic tools) | File operations. Reads, writes, lists and searches files. No reasoning needed. |
 | **Registry** | Discovery | Agent registration & lookup | Where agents register so they can discover each other dynamically. |
 
 ### Why Three Agents?
@@ -76,7 +76,7 @@ This mirrors how real coding assistants work:
 
 - **Separation of Concerns**: The "brain" (Planner) doesn't touch files. The "hands" (Coder) don't reason. The Orchestrator coordinates.
 - **Both Delegation Modes**: Planner gets `infer` calls (LLM-to-LLM), Coder gets `tool_call` calls, showcasing both A2A delegation modes.
-- **Scalability**: In production, you could run the Planner on a powerful GPU, the Coder on a secure file server, and the Orchestrator as a lightweight API gateway.
+- **Scalability**: In production, you could run the Planner on a powerful GPU, the Coder on a secure file server and the Orchestrator as a lightweight API gateway.
 
 ---
 
@@ -296,7 +296,7 @@ The Orchestrator's LLM enters an **inference loop**:
 9. **LLM outputs**: `agent_call → coder.write_file(path="utils.py", content="...")`
 10. **LLM outputs**: Final summary → loop ends
 
-All of this happens **autonomously** - Protolink handles the routing, serialization, and response parsing.
+All of this happens **autonomously** - Protolink handles the routing, serialization and response parsing.
 
 ---
 

@@ -178,7 +178,7 @@ def document_tools(
         }
 
     async def read_document(path: str) -> dict[str, Any]:
-        """Extract text, table rows, and source locations. truncated=true means incomplete extraction."""
+        """Extract text, table rows and source locations. truncated=true means incomplete extraction."""
         return await asyncio.to_thread(extract, path)
 
     async def search_document(

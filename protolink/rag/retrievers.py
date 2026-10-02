@@ -1,4 +1,4 @@
-"""Retriever implementations for local stores, callables, and existing indexes."""
+"""Retriever implementations for local stores, callables and existing indexes."""
 
 from __future__ import annotations
 
@@ -137,7 +137,7 @@ class ChromaRetriever:
         k: int = 5,
         where: Mapping[str, Any] | None = None,
     ) -> list[SearchHit]:
-        """Query Chroma and normalize documents, distances, and metadata."""
+        """Query Chroma and normalize documents, distances and metadata."""
         kwargs: dict[str, Any] = {
             "n_results": k,
             "include": ["documents", "metadatas", "distances"],

@@ -64,7 +64,7 @@ async def _assert_streaming_contract(agent: Agent, client: AgentClient) -> None:
 
 @pytest.mark.asyncio
 async def test_runtime_transport_conforms_to_agent_contract() -> None:
-    """Runtime transport should support request/response, metadata, and streaming."""
+    """Runtime transport should support request/response, metadata and streaming."""
     url = "runtime://transport-conformance-runtime"
     server_transport = RuntimeTransport(url=url)
     agent = Agent(

@@ -18,14 +18,14 @@ PathLike = str | os.PathLike[str]
 
 @dataclass(frozen=True, slots=True)
 class TLSConfig:
-    """Configure TLS for HTTP, SSE, WebSocket, and gRPC transports.
+    """Configure TLS for HTTP, SSE, WebSocket and gRPC transports.
 
     The same configuration is used for both sides of ProtoLink's dual-role
     transports. ``certfile`` and ``keyfile`` identify the local server and, when
     mutual TLS is used, the local client. ``cafile`` defines the certificate
     authorities trusted for outbound servers and inbound client certificates.
 
-    Secure URL schemes activate TLS: ``https://``, ``wss://``, and
+    Secure URL schemes activate TLS: ``https://``, ``wss://`` and
     ``grpcs://``. Insecure schemes continue to work without this configuration.
     TLS 1.2 is the minimum protocol version for Python SSL contexts created by
     this class.

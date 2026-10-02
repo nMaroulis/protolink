@@ -71,7 +71,7 @@ sequenceDiagram
 The authentication module revolves around three primary data models and abstractions.
 
 ### `SecurityContext`
-The `SecurityContext` represents an active, authenticated session. It encapsulates details about the authenticated principal, tokens, and expiration times.
+The `SecurityContext` represents an active, authenticated session. It encapsulates details about the authenticated principal, tokens and expiration times.
 
 ```python
 from dataclasses import dataclass, field
@@ -139,7 +139,7 @@ class Authenticator(ABC):
 ## Built-in Providers
 
 Protolink includes several security providers out of the box. The local API-key,
-Basic, and HMAC JWT providers validate credentials in-process. The OAuth
+Basic and HMAC JWT providers validate credentials in-process. The OAuth
 delegation provider calls an external token-exchange endpoint and is intentionally
 a small integration primitive rather than a complete OAuth client.
 
@@ -160,7 +160,7 @@ auth = APIKeyAuth(valid_keys={"sk-12345": ["read", "write"], "sk-abcde": ["read"
 </TabItem>
 <TabItem value="bearer-token-authentication" label="Bearer Token Authentication">
 
-`BearerTokenAuth` validates compact JSON Web Tokens (JWTs) signed with a shared HMAC secret. It checks the declared algorithm, signature, `exp`, `nbf`, `iat`, and optional issuer/audience claims before returning a `SecurityContext`.
+`BearerTokenAuth` validates compact JSON Web Tokens (JWTs) signed with a shared HMAC secret. It checks the declared algorithm, signature, `exp`, `nbf`, `iat` and optional issuer/audience claims before returning a `SecurityContext`.
 
 ```python
 from protolink.security.auth import BearerTokenAuth
@@ -173,7 +173,7 @@ auth = BearerTokenAuth(
 )
 ```
 
-Supported algorithms are `HS256`, `HS384`, and `HS512`. Use `APIKeyAuth` for static opaque service tokens.
+Supported algorithms are `HS256`, `HS384` and `HS512`. Use `APIKeyAuth` for static opaque service tokens.
 
 </TabItem>
 <TabItem value="basic-authentication" label="Basic Authentication">
@@ -210,7 +210,7 @@ auth = OAuth2DelegationAuth(
 
 ## Server-Side Authentication
 
-When hosting an agent server, endpoints can be protected by configuring an `authenticator` on the transport. The transport backend (FastAPI or Starlette) will intercept incoming HTTP requests, extract headers, and invoke the validator.
+When hosting an agent server, endpoints can be protected by configuring an `authenticator` on the transport. The transport backend (FastAPI or Starlette) will intercept incoming HTTP requests, extract headers and invoke the validator.
 
 :::note[Authentication and TLS are different layers]
 
@@ -428,7 +428,7 @@ class LDAPAuthenticator(Authenticator):
   eyebrow="Security module"
   title="Authentication"
   path="protolink.security"
-  description="The credential verification layer for incoming agent requests, advertised security schemes, outgoing credentials, bearer tokens, and custom authenticators."
+  description="The credential verification layer for incoming agent requests, advertised security schemes, outgoing credentials, bearer tokens and custom authenticators."
   pills={[
     "SecurityContext",
     "SecurityScheme",
@@ -439,7 +439,7 @@ class LDAPAuthenticator(Authenticator):
   cards={[
     {
       title: "Context",
-      text: "Carries the verified principal, token, timestamps, and provider metadata after authentication succeeds.",
+      text: "Carries the verified principal, token, timestamps and provider metadata after authentication succeeds.",
       code: "SecurityContext",
     },
     {
@@ -454,7 +454,7 @@ class LDAPAuthenticator(Authenticator):
     },
     {
       title: "Bearer JWT",
-      text: "Verifies signed bearer tokens with issuer, audience, algorithm, and leeway controls.",
+      text: "Verifies signed bearer tokens with issuer, audience, algorithm and leeway controls.",
       code: "BearerTokenAuth",
     },
   ]}
@@ -482,7 +482,7 @@ bringing a provider SDK into the rest of the application.
 >
 
 Represent the authenticated identity produced by an `Authenticator`. The
-context carries the credential that was accepted, provider timestamps, and
+context carries the credential that was accepted, provider timestamps and
 application-specific metadata so later policy and transport layers do not need
 to authenticate the request again.
 
@@ -576,7 +576,7 @@ All five context fields are included, including the raw token.
   <ApiFields ariaLabel="SecurityContext.to_dict return value">
     <ApiField name="context" type="dict[str, Any]">
       Mapping with <code>principal_id</code>, <code>token</code>,
-      <code>expires_at</code>, <code>issued_at</code>, and
+      <code>expires_at</code>, <code>issued_at</code> and
       <code>metadata</code> keys. The outer mapping is new, but the metadata
       dictionary is not deep-copied.
     </ApiField>
@@ -613,7 +613,7 @@ credential should be represented on the wire.
       <code>"basic"</code>. Pass <code>None</code> for non-HTTP scheme types.
       The annotation also accepts <code>digest</code>, <code>hmac</code>,
       <code>negotiate</code>, <code>ntlm</code>, <code>aws4auth</code>,
-      <code>hawk</code>, and <code>edgegrid</code>.
+      <code>hawk</code> and <code>edgegrid</code>.
     </ApiField>
     <ApiField name="description" type="str" required>
       Human-readable explanation suitable for discovery metadata.
@@ -651,7 +651,7 @@ metadata.
   <ApiFields ariaLabel="SecurityScheme.to_dict return value">
     <ApiField name="scheme" type="dict[str, Any]">
       Mapping with <code>type</code>, <code>scheme</code>,
-      <code>description</code>, and <code>metadata</code> keys. The
+      <code>description</code> and <code>metadata</code> keys. The
       <code>metadata</code> value is shared with the dataclass rather than
       deep-copied.
     </ApiField>
@@ -676,7 +676,7 @@ called; the authenticator owns how a raw credential becomes a trusted context.
 >
 
 Abstract base class for credential providers. Implementations must advertise a
-`SecurityScheme`, validate raw credentials asynchronously, and provide an
+`SecurityScheme`, validate raw credentials asynchronously and provide an
 explicit refresh behavior even when refresh is a no-op.
 
 <ApiSection title="Abstract members">
@@ -698,7 +698,7 @@ explicit refresh behavior even when refresh is a no-op.
 <ApiCallout label="Subclass requirement">
   All three members are abstract. A custom subclass remains non-instantiable
   until it implements <code>security_scheme</code>,
-  <code>authenticate()</code>, and <code>refresh_token()</code>.
+  <code>authenticate()</code> and <code>refresh_token()</code>.
 </ApiCallout>
 
 </ApiReference>
@@ -719,7 +719,7 @@ metadata.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Authenticator.security_scheme return value">
     <ApiField name="scheme" type="SecurityScheme">
-      Provider category, optional HTTP scheme, human-readable description, and
+      Provider category, optional HTTP scheme, human-readable description and
       any provider metadata.
     </ApiField>
   </ApiFields>
@@ -754,7 +754,7 @@ dictionary checks, or await an external identity provider.
 <ApiSection title="Returns">
   <ApiFields ariaLabel="Authenticator.authenticate return value">
     <ApiField name="context" type="SecurityContext">
-      Verified principal, accepted token, timestamps, and optional metadata.
+      Verified principal, accepted token, timestamps and optional metadata.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -824,7 +824,7 @@ schedule refresh automatically.
 >
 
 Validate compact JWTs signed with a shared HMAC secret. The implementation is
-dependency-free and deliberately restricted to symmetric `HS256`, `HS384`, and
+dependency-free and deliberately restricted to symmetric `HS256`, `HS384` and
 `HS512` signatures; it does not fetch JWK sets or accept asymmetric algorithms.
 
 <ApiSection title="Parameters">
@@ -846,7 +846,7 @@ dependency-free and deliberately restricted to symmetric `HS256`, `HS384`, and
     </ApiField>
     <ApiField name="leeway_seconds" type="int" defaultValue="0">
       Non-negative clock-skew allowance applied to <code>exp</code>,
-      <code>nbf</code>, and <code>iat</code> validation.
+      <code>nbf</code> and <code>iat</code> validation.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -882,7 +882,7 @@ dependency-free and deliberately restricted to symmetric `HS256`, `HS384`, and
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/security/auth.py#L251"
 >
 
-Decode and verify one compact JWT, validate its registered claims, and build the
+Decode and verify one compact JWT, validate its registered claims and build the
 corresponding principal context.
 
 <ApiSection title="Parameters">
@@ -920,7 +920,7 @@ corresponding principal context.
 
 <ApiCallout label="Claim validation">
   The provider validates <code>exp</code>, <code>nbf</code>,
-  <code>iat</code>, and optionally <code>iss</code> and <code>aud</code>. It
+  <code>iat</code> and optionally <code>iss</code> and <code>aud</code>. It
   does not require a subject, consult a revocation list, or enforce
   application-specific authorization claims.
 </ApiCallout>
@@ -1031,7 +1031,7 @@ into a `SecurityContext`.
     <ApiField name="context" type="SecurityContext">
       Context populated from response fields: <code>sub</code> defaults to
       <code>"unknown"</code>, <code>access_token</code> defaults to an empty
-      string, and <code>metadata</code> defaults to an empty dictionary.
+      string and <code>metadata</code> defaults to an empty dictionary.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1039,7 +1039,7 @@ into a `SecurityContext`.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="OAuth2DelegationAuth.authenticate errors">
     <ApiField name="Exception">
-      Non-200 responses, network failures, JSON decoding errors, and response
+      Non-200 responses, network failures, JSON decoding errors and response
       conversion failures are wrapped as
       <code>Exception("OAuth delegation failed: …")</code>.
     </ApiField>
@@ -1261,7 +1261,7 @@ or the Base64 payload normally carried after an `Authorization: Basic` prefix.
 >
 
 Decode the credential when it is valid Base64, split the resulting text at the
-first colon, and compare the username/password pair with the configured
+first colon and compare the username/password pair with the configured
 mapping.
 
 <ApiSection title="Parameters">
@@ -1397,7 +1397,7 @@ does not authenticate or decode the returned value.
   <ApiFields ariaLabel="extract_credentials errors">
     <ApiField name="collection error">
       The helper does not normalize arbitrary header objects. Invalid iterable
-      shapes, non-string names or values, and custom <code>.get()</code>
+      shapes, non-string names or values and custom <code>.get()</code>
       failures may propagate their native exceptions.
     </ApiField>
   </ApiFields>

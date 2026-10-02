@@ -185,7 +185,7 @@ class BearerTokenAuth(Authenticator):
     Validates compact JSON Web Tokens signed with an HMAC SHA algorithm. This
     keeps the default implementation dependency-free while still checking the
     important security properties: algorithm, signature, expiration, not-before
-    time, issuer, and audience.
+    time, issuer and audience.
 
     Example:
         auth = BearerTokenAuth(
@@ -224,11 +224,11 @@ class BearerTokenAuth(Authenticator):
         Args:
             secret: Shared HMAC signing secret used to verify JWT signatures.
             algorithm: HMAC JWT algorithm. Supported values are ``HS256``,
-                ``HS384``, and ``HS512``.
+                ``HS384`` and ``HS512``.
             issuer: Optional required ``iss`` claim.
             audience: Optional required ``aud`` claim. The token may provide
                 either a string or a list of strings.
-            leeway_seconds: Clock-skew allowance for ``exp``, ``nbf``, and
+            leeway_seconds: Clock-skew allowance for ``exp``, ``nbf`` and
                 ``iat`` checks.
 
         Raises:
@@ -265,7 +265,7 @@ class BearerTokenAuth(Authenticator):
         try:
             parts = credentials.split(".")
             if len(parts) != 3:
-                raise ValueError("JWT must contain header, payload, and signature segments")
+                raise ValueError("JWT must contain header, payload and signature segments")
 
             header_segment, payload_segment, signature_segment = parts
             header = _json_segment(header_segment, label="header")

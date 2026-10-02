@@ -258,8 +258,8 @@ class AgentCard:
     def get_prompt_format(self) -> str:
         """Generate deterministic JSON metadata for delegation prompts.
 
-        The result is a complete JSON object rather than a Python-style repr, so quotes, newlines, booleans, and nested
-        schemas cannot corrupt the surrounding prompt. Capabilities are emitted as an explicit data object, and skills
+        The result is a complete JSON object rather than a Python-style repr, so quotes, newlines, booleans and nested
+        schemas cannot corrupt the surrounding prompt. Capabilities are emitted as an explicit data object and skills
         are sorted by identifier for stable prompt caching.
 
         The format includes:

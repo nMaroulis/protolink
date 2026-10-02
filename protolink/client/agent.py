@@ -1,7 +1,7 @@
 """Agent Client - High-level interface for agent-to-agent and User-to-agent communication.
 
 This module provides the `AgentClient` class, which abstracts transport details and offers convenient methods for
-sending tasks, messages, and retrieving agent cards.
+sending tasks, messages and retrieving agent cards.
 
 The client uses `ClientRequestSpec` objects to define API contracts in a transport-agnostic way. This allows the same
 client code to work over HTTP, WebSocket, or any other transport.
@@ -93,7 +93,7 @@ class AgentClient:
     ) -> AgentPeer:
         """Bind a remote URL/card or unique registry name without performing I/O.
 
-        The peer supplies invoke, invoke_typed, call_tool, run_task, and sync
+        The peer supplies invoke, invoke_typed, call_tool, run_task and sync
         equivalents using this client's configured transport and credentials.
         Pass registry only when resolving names instead of URLs or cards.
         """
@@ -385,7 +385,7 @@ class AgentClient:
 
         This method is the high-level streaming entry point for agent-to-agent communication. It delegates to the
         configured transport's ``subscribe()`` implementation, so the same client call works with streaming-capable
-        transports such as ``"sse"``, ``"json-rpc"``, ``"websocket"``, and ``"runtime"``.
+        transports such as ``"sse"``, ``"json-rpc"``, ``"websocket"`` and ``"runtime"``.
 
         Args:
             agent_url: Target agent endpoint URL.
@@ -488,7 +488,7 @@ class AgentClient:
         """Request LLM-history compaction from an agent control endpoint.
 
         This uses the transport-neutral ``COMPACT_HISTORY_REQUEST`` spec and calls ``POST /llm/history/compact`` on the
-        target agent. It does not send a task, does not create a model-visible tool, and does not modify the LLM prompt.
+        target agent. It does not send a task, does not create a model-visible tool and does not modify the LLM prompt.
         """
         request = HistoryCompactionRequest(
             strategy=strategy,
@@ -747,7 +747,7 @@ class SyncAgentClient:
         """Synchronously stream events from a remote agent.
 
         This wrapper runs the async streaming API in a background thread and yields events to the caller as they arrive.
-        It is useful for scripts, notebooks without an active event loop, and terminal UIs that want a blocking iterator
+        It is useful for scripts, notebooks without an active event loop and terminal UIs that want a blocking iterator
         while still using Protolink's async transports.
 
         Example:

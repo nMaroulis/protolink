@@ -1,4 +1,4 @@
-"""Service wire contracts, policy previews, and compact built-in Agent presets."""
+"""Service wire contracts, policy previews and compact built-in Agent presets."""
 
 import asyncio
 import base64

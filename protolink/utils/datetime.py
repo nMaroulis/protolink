@@ -13,9 +13,8 @@ def utc_now(*, iso: Literal[False]) -> datetime: ...
 def utc_now(*, iso: bool = True) -> datetime | str:
     """Get the current UTC datetime with timezone awareness.
 
-    This function provides a standardized way to get the current time
-    across the entire Protolink codebase. It always returns a timezone-aware
-    datetime object in UTC, avoiding common datetime pitfalls.
+    This function provides a standardized way to get the current time across the entire Protolink codebase. It always
+    returns a timezone-aware datetime object in UTC, avoiding common datetime pitfalls.
 
     Returns:
         datetime: Current UTC datetime with tzinfo=timezone.utc
@@ -28,8 +27,8 @@ def utc_now(*, iso: bool = True) -> datetime | str:
         '2024-01-01T12:00:00+00:00'
 
     Note:
-        This function should be used instead of datetime.now() to ensure
-        consistent timezone handling throughout the application.
+        This function should be used instead of datetime.now() to ensure consistent timezone handling throughout the
+        application.
     """
     dt = datetime.now(UTC)
 

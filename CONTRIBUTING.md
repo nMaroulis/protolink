@@ -2,7 +2,7 @@
 
 First off, thank you for your interest in contributing to Protolink!
 
-This document describes how to set up a development environment, coding standards, and the preferred contribution workflow.
+This document describes how to set up a development environment, coding standards and the preferred contribution workflow.
 
 ---
 
@@ -30,8 +30,8 @@ uv sync --locked
 source .venv/bin/activate
 ```
 
-This installs editable ProtoLink, test integrations, Ruff, ty, and pre-commit. Model-provider SDKs,
-local llama.cpp bindings, and notebooks are opt-in: for example, `uv sync --locked --extra openai`.
+This installs editable ProtoLink, test integrations, Ruff, ty and pre-commit. Model-provider SDKs,
+local llama.cpp bindings and notebooks are opt-in: for example, `uv sync --locked --extra openai`.
 Focused groups are available with `uv sync --locked --no-default-groups --group test`
 (or `lint`, `typing`, `build`).
 
@@ -41,12 +41,12 @@ For an existing pip workflow:
 python -m pip install -e ".[test,mcp,telemetry]"
 ```
 
-The published `test`, `build`, and full `dev` extras remain supported for compatibility.
+The published `test`, `build` and full `dev` extras remain supported for compatibility.
 Use the dependency groups for new contributor workflows.
 
 Commit `uv.lock` changes alongside dependency changes. Run `uv lock` after editing requirements;
 use `uv lock --upgrade` for an intentional refresh. Runtime requirements remain flexible for library users.
-CI tests the lock on Python 3.11, 3.13, and 3.14, and separately resolves the minimum direct and latest
+CI tests the lock on Python 3.11, 3.13 and 3.14 and separately resolves the minimum direct and latest
 dependencies to detect compatibility problems. Dependency minimums should reflect tested API requirements.
 
 ---
@@ -161,7 +161,7 @@ uv run --no-sync pytest tests
 
 The test group includes `pytest-asyncio`; installing `pytest` alone is not enough
 to run the async tests. Pytest checks for that plugin before collecting tests.
-It also includes MCP, YAML, and telemetry integrations. Langfuse compatibility tests use the real SDK
+It also includes MCP, YAML and telemetry integrations. Langfuse compatibility tests use the real SDK
 with an in-memory exporter; no account or network export is required.
 
 If your change requires additional test fixtures or helper utilities, place them in the appropriate `tests/` module.
@@ -205,13 +205,13 @@ python -m benchmarks.infer_loop \
 ```
 
 Keep the provider, exact model build, model parameters, action mode, suite selection, seed, attempts, repetitions,
-warm-up, hardware, and host load as consistent as practical. In the pull request, report the strict score before and
-after, fixed or regressed cases, strict-first-attempt median and p95 latency, paired timing delta, and the
+warm-up, hardware and host load as consistent as practical. In the pull request, report the strict score before and
+after, fixed or regressed cases, strict-first-attempt median and p95 latency, paired timing delta and the
 cache-sensitive repeat signal. Timing is diagnostic and does not replace correctness.
 
 See the [infer-loop benchmark documentation](https://nmaroulis.github.io/protolink/docs/infer-loop-benchmark/) and
 the repository's [`benchmarks/infer_loop/README.md`](benchmarks/infer_loop/README.md) for scoring, artifacts, timing
-semantics, filters, and limitations. Generated `benchmark_results/` artifacts are ignored by Git; attach or summarize
+semantics, filters and limitations. Generated `benchmark_results/` artifacts are ignored by Git; attach or summarize
 the relevant results in the pull request instead of committing them.
 
 ---

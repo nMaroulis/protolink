@@ -57,10 +57,10 @@ class LLMFactory:
             provider (str | LLMProvider): The name of the LLM provider
                 (e.g., "openai", "ollama", "lmstudio", "vllm"), or a
                 "provider:model" string. Only the first colon separates the
-                provider; the model's case, tags, paths, and further colons are retained.
+                provider; the model's case, tags, paths and further colons are retained.
             **kwargs: Additional provider constructor arguments. ProtoLink
                 runtime options such as ``metrics_profile``,
-                ``metrics_enabled``, and ``max_parse_failures`` are consumed by
+                ``metrics_enabled`` and ``max_parse_failures`` are consumed by
                 the factory and are not forwarded to provider request options.
 
         Returns:

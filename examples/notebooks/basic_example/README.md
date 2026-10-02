@@ -1,8 +1,8 @@
 # Basic Example: One Complete Multi-Agent Notebook
 
-Open [`basic_example.ipynb`](basic_example.ipynb) for a detailed introduction built around short, direct ProtoLink calls. Start a `Registry`, then WeatherAgent, then AlertAgent; discover peers, call tools, invoke agents, and explore the HTTP pages and APIs.
+Open [`basic_example.ipynb`](basic_example.ipynb) for a detailed introduction built around short, direct ProtoLink calls. Start a `Registry`, then WeatherAgent, then AlertAgent; discover peers, call tools, invoke agents and explore the HTTP pages and APIs.
 
-Both agents are ordinary `Agent` instances with tools, instructions, and an LLM; AlertAgent also enables conversation state. There is no `handle_task` override. The default HTTP transport, `MockLLM`, and small weather tool need no API key, model server, or external weather service. The alert tool returns demonstration output without sending an external notification.
+Both agents are ordinary `Agent` instances with tools, instructions and an LLM; AlertAgent also enables conversation state. There is no `handle_task` override. The default HTTP transport, `MockLLM` and small weather tool need no API key, model server, or external weather service. The alert tool returns demonstration output without sending an external notification.
 
 ## Quick Start
 
@@ -15,14 +15,14 @@ python -m jupyter lab examples/notebooks/basic_example/basic_example.ipynb
 
 Choose the Python environment where you installed ProtoLink as the notebook kernel, then run the cells from top to bottom. Jupyter supports the notebook's top-level `await`.
 
-**Run All includes cleanup.** Pause before the final cleanup cell to use the browser status and chat pages. Run cleanup when finished, and before rebuilding the example with different settings.
+**Run All includes cleanup.** Pause before the final cleanup cell to use the browser status and chat pages. Run cleanup when finished and before rebuilding the example with different settings.
 
 ## What the Notebook Covers
 
-- **Core API:** `Registry(...)`, `Agent(...)`, `start()`, `call_tool()`, `invoke()`, `call_agent()`, and `stop()`.
+- **Core API:** `Registry(...)`, `Agent(...)`, `start()`, `call_tool()`, `invoke()`, `call_agent()` and `stop()`.
 - **Discovery and state:** use the agent's existing `client` to inspect peers and manage conversation state.
-- **HTTP:** open status and chat pages, send small JSON requests, and inspect the endpoint tables.
-- **Plug-in components:** add a calculator, attach a reusable `Tool`, replace a weather tool implementation, and attach knowledge.
+- **HTTP:** open status and chat pages, send small JSON requests and inspect the endpoint tables.
+- **Plug-in components:** add a calculator, attach a reusable `Tool`, replace a weather tool implementation and attach knowledge.
 - **Configuration recipes:** change the transport, LLM, conversation storage, or run store with short examples.
 - **Optional extensions:** see a declarative mock delegation example and reference snippets for streaming and cancellation.
 
@@ -51,9 +51,9 @@ Change the URL values near the top of the notebook if these ports are occupied.
 
 ## Transport Choices
 
-The notebook lists HTTP, SSE JSON-RPC, WebSocket, in-process runtime, and gRPC configurations. Change the agents' `TRANSPORT` and URLs together; the registry can stay on HTTP or use its own transport setting. Install the optional gRPC dependency with `python -m pip install -e '.[grpc]'` before selecting it.
+The notebook lists HTTP, SSE JSON-RPC, WebSocket, in-process runtime and gRPC configurations. Change the agents' `TRANSPORT` and URLs together; the registry can stay on HTTP or use its own transport setting. Install the optional gRPC dependency with `python -m pip install -e '.[grpc]'` before selecting it.
 
-Before a transport change, run cleanup, then update the settings and rerun from the top. Skip the two HTTP-only request cells for runtime, WebSocket, and gRPC agents. Browser pages work with HTTP and SSE; runtime opens no network ports. Streaming requires a transport that advertises streaming support, such as SSE JSON-RPC.
+Before a transport change, run cleanup, then update the settings and rerun from the top. Skip the two HTTP-only request cells for runtime, WebSocket and gRPC agents. Browser pages work with HTTP and SSE; runtime opens no network ports. Streaming requires a transport that advertises streaming support, such as SSE JSON-RPC.
 
 ## HTTP Agent API Reference
 
@@ -74,11 +74,11 @@ The notebook includes a few direct JSON requests and an endpoint reference. The 
 | `POST` | `/state/reset` | Reset conversation state |
 | `POST` | `/llm/history/compact` | Compact LLM history |
 
-The registry has its own discovery API and status page. Task, chat, and state requests go to the agents. Streaming and cancellation are covered as optional reference examples; a `/tasks/stream` endpoint is registered only for a transport with streaming support.
+The registry has its own discovery API and status page. Task, chat and state requests go to the agents. Streaming and cancellation are covered as optional reference examples; a `/tasks/stream` endpoint is registered only for a transport with streaming support.
 
 ## Rerunning and Troubleshooting
 
 - **Connection refused:** run the startup cells in order and leave the services running until after the HTTP exploration cells.
 - **Address already in use:** run cleanup for this notebook's previous run or change the configured ports.
 - **Import error:** install the extras in the selected notebook kernel's Python environment.
-- **Changed transport or component:** run cleanup, update the configuration, and rerun from the top. Restart the kernel for a completely fresh session.
+- **Changed transport or component:** run cleanup, update the configuration and rerun from the top. Restart the kernel for a completely fresh session.

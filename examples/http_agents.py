@@ -24,13 +24,13 @@ class EchoAgent(Agent):
 
     This agent extends the core `Agent` class and binds itself to an `HTTPTransport`.
     It is designed to receive network requests, parse the incoming JSON payload back
-    into a Protolink `Task` object, and echo the payload back to the caller. This proves
+    into a Protolink `Task` object and echo the payload back to the caller. This proves
     full end-to-end traversal of the ASGI backend, the Pydantic serialization layer,
     and the asynchronous HTTP client pooling.
     """
 
     def __init__(self, name: str, description: str, port: int) -> None:
-        """Initialize the agent, its identity card, and its network binding.
+        """Initialize the agent, its identity card and its network binding.
 
         Args:
             name: The internal identifier for the agent.

@@ -118,7 +118,7 @@ def test_run_report_assertions_catch_denials_and_budget_overages():
 
 
 def test_redaction_policy_applies_to_runtime_surfaces():
-    """Shared redaction should work across events, manifests, and approvals."""
+    """Shared redaction should work across events, manifests and approvals."""
     policy = RedactionPolicy()
 
     event = RunEvent(type="task.status", payload={"api_key": "secret"})

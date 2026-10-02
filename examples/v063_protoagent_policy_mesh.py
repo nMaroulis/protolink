@@ -7,7 +7,7 @@ This is not the full ProtoAgent app. It mirrors that architecture abstractly:
 * Architect is the user-facing coordinator and may delegate to other agents.
 
 The prompts are intentionally tiny; the point is to showcase tool capabilities,
-``CapabilityPolicy``, ``action_builder`` previews, and approval handling.
+``CapabilityPolicy``, ``action_builder`` previews and approval handling.
 
 Run it with:
 

@@ -58,7 +58,7 @@ class Planner(Agent):
 
 
 async def main() -> None:
-    """Start the mesh, send one task through it, and stop cleanly."""
+    """Start the mesh, send one task through it and stop cleanly."""
     agents: list[Agent] = [
         Specialist("researcher", "collect the evidence"),
         Specialist("reviewer", "check the risky assumptions"),

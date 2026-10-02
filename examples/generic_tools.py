@@ -1,4 +1,4 @@
-"""Exercise filesystem, storage, HTTP, documents, and database tools on one Agent.
+"""Exercise filesystem, storage, HTTP, documents and database tools on one Agent.
 
 Run: python examples/generic_tools.py
 Install: pip install 'protolink[integrations]'

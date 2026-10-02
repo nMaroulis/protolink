@@ -1,4 +1,4 @@
-"""Keep the published package, lockfiles, and documentation on one release."""
+"""Keep the published package, lockfiles and documentation on one release."""
 
 import json
 import re

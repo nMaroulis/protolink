@@ -1,14 +1,14 @@
 # Progressive control
 
 Progressive control is a core design principle of ProtoLink: start with a small
-call, configure the parts that need attention, and plug in your own components
-through the same API. It applies to agent setup, execution, and deployment.
+call, configure the parts that need attention and plug in your own components
+through the same API. It applies to agent setup, execution and deployment.
 
-Identity, models, tools, transport, storage, and observability are independent
+Identity, models, tools, transport, storage and observability are independent
 choices. A model string resolves to an LLM object; a transport alias resolves to a
 transport instance. You can configure or replace either while keeping the rest
 of the agent. Short and explicit forms share the same execution paths for
-validation, policy, approvals, cancellation, and reporting.
+validation, policy, approvals, cancellation and reporting.
 
 Run the complete, provider-free walkthrough:
 
@@ -36,7 +36,7 @@ print(agent.sync.invoke("Hello"))
 ```
 
 This example needs no provider credentials or server. The name creates an agent
-card, `"mock"` selects the built-in offline model, and the typed function becomes
+card, `"mock"` selects the built-in offline model and the typed function becomes
 a tool. In async programs and notebooks use `await agent.invoke(...)` and
 `await agent.call_tool(...)`. Blocking facades reject calls inside an active event
 loop before creating a coroutine.
@@ -52,16 +52,16 @@ require changing tools; changing a model does not require changing task handling
 | Boundary | Start small | Add control |
 | --- | --- | --- |
 | Agent identity | `Agent(name="helper")` | Pass a card dictionary or an `AgentCard` with skills and capabilities |
-| Transport | `Agent(name="helper", transport="http", url="http://127.0.0.1:8001")` | Pass `HTTPTransport(...)` with timeouts, TLS, and limits |
+| Transport | `Agent(name="helper", transport="http", url="http://127.0.0.1:8001")` | Pass `HTTPTransport(...)` with timeouts, TLS and limits |
 | Standalone client | `AgentClient("http")` | Pass a configured transport |
 | Registry | `registry="http", registry_url=url` | Pass a `RegistryClient` or `Registry` |
 | Model | `llm="gemini"` or `llm="ollama:qwen3:4b"` | Pass `GeminiLLM(...)`, `create_llm(...)`, or your own `LLM` |
-| Tools | `tools=[function]` or `@agent.tool` | Supply a `Tool` with schemas, names, and capabilities |
+| Tools | `tools=[function]` or `@agent.tool` | Supply a `Tool` with schemas, names and capabilities |
 | State | `state=["conversation"]` | Supply storage and a configured `State` |
 | Knowledge | `create_knowledge("memory", sources=[...])` | Choose components or supply a retriever |
 | Logs | `verbosity=0`, `1`, or `2` | Supply a logger; attach telemetry and a run store separately |
 | Task creation | `Task.create_infer("Hello")` | Add run controls or compose messages and parts |
-| Task reading | `task.get_output()` | Inspect `get_last_part()`, messages, artifacts, and state |
+| Task reading | `task.get_output()` | Inspect `get_last_part()`, messages, artifacts and state |
 | Execution | `await agent.invoke("Hello")` | Use `start_run(...)` or `run_task(task)` |
 | Flows | `await Pipeline([a, b]).invoke("Hello")` | Use `execute(task)` or a custom `Graph` |
 
@@ -179,8 +179,8 @@ work; do not supply a model both inline and through `model=`.
 
 Pass typed functions or configured tools through `Agent(name="helper", tools=[...])`
 or register them later with `add_tools`. Both paths use the existing validation,
-policy, and skill-registration behavior. Continue to execute through `invoke`,
-`.sync`, and the task APIs.
+policy and skill-registration behavior. Continue to execute through `invoke`,
+`.sync` and the task APIs.
 See [LLMs](llm.md) for provider extras and implementing the `LLM` contract.
 Provider construction or connection validation may contact the model service;
 use `"mock"` or a configured `MockLLM` for an offline setup.
@@ -264,9 +264,9 @@ print(result.get_last_part().as_tool_output().call_id)
 ```
 
 `Task.create(text)` wraps `Message.user(text)`; it does not implicitly request an
-LLM call. `create_infer` creates that instruction, and `create_tool_call` requests
+LLM call. `create_infer` creates that instruction and `create_tool_call` requests
 a tool directly. Creation performs no execution. Existing keyword calls still work.
-All three factories accept `session_id`, `budget`, and `context`, with copied controls
+All three factories accept `session_id`, `budget` and `context`, with copied controls
 and explicit options overriding the supplied context. Omitted controls leave task
 metadata empty. The inference factory's `metadata` still belongs to the infer part.
 
@@ -279,7 +279,7 @@ metadata empty. The inference factory's `metadata` still belongs to the infer pa
 | `messages`, `artifacts`, `state` | The complete task history and lifecycle status |
 
 `get_output` examines only the final part of the latest item. It accepts inference
-outputs, successful tool outputs, and text/JSON in agent or assistant messages and
+outputs, successful tool outputs and text/JSON in agent or assistant messages and
 `kind="result"` artifacts. An input, error, preview, diagnostic, unsupported part,
 or empty item returns `default`; it never falls back to a stale answer. Falsey
 answers, including `None`, are preserved. A sentinel default can distinguish an
@@ -303,7 +303,7 @@ factory parameters and reader contracts.
 
 ## Add run controls
 
-`invoke`, `ask`, `start_run`, `Flow.invoke`, and peer inference accept `budget` and
+`invoke`, `ask`, `start_run`, `Flow.invoke` and peer inference accept `budget` and
 `context`. The blocking equivalents accept the same controls where available.
 
 ```python
@@ -342,13 +342,13 @@ result.raise_for_status()
 ```
 
 `invoke` returns final part content; `call_tool` returns the raw tool value. Falsey
-values such as `0`, `False`, and empty collections remain intact. `invoke`, `ask`,
-`Flow.invoke`, and peer convenience calls raise `TaskExecutionError` for returned
+values such as `0`, `False` and empty collections remain intact. `invoke`, `ask`,
+`Flow.invoke` and peer convenience calls raise `TaskExecutionError` for returned
 failed/canceled tasks. `run_task` and `Flow.execute` retain returned states for
-inspection; provider, policy, and handler exceptions still propagate. Inspect the
+inspection; provider, policy and handler exceptions still propagate. Inspect the
 full task when your application handles `input-required` or other incomplete states.
 
-## Streaming, cancellation, and reports
+## Streaming, cancellation and reports
 
 ```python
 handle = agent.start_run("Explain the plan", budget=RunBudget(max_llm_calls=2))
@@ -373,14 +373,14 @@ stream without starting a server. It returns the existing `RunHandle`.
 
 Passing a configured `Task` preserves its context unless you explicitly override
 controls. Report persistence defaults to the agent's `run_store`; `store` selects
-another store, and `redaction_policy` controls captured data. Direct local streams
+another store and `redaction_policy` controls captured data. Direct local streams
 need no card capability flag; remote subscriptions still follow the advertised
 streaming capability and transport support. Use `RunHandle.start(...)` for remote
 handles or `RunRecorder` when adapting your own event source.
 
 ## Register collections and MCP tools
 
-An ordinary typed function provides an inferred name, description, and schemas.
+An ordinary typed function provides an inferred name, description and schemas.
 Pass a configured `Tool` when you need explicit metadata or capability requirements:
 
 ```python
@@ -444,7 +444,7 @@ async with adapter.session():
 ```
 
 Single plain text results return strings. Rich results are dictionaries with MCP
-fields such as `content`, `structuredContent`, and `_meta`; for structured output,
+fields such as `content`, `structuredContent` and `_meta`; for structured output,
 read `result["structuredContent"]`. MCP tool failures raise `MCPToolError` on direct
 calls and become failed tool outputs through task execution. See [MCP tools](tool.md#mcp-tools).
 
@@ -457,7 +457,7 @@ answer = await peer.invoke("Explain the calculation", session_id="planning")
 ```
 
 `agent.peer(target, *, protocol="auto")` binds an `AgentCard`, URL, or registry name.
-It uses the agent's existing transport, credentials, registry, and outbound protocol
+It uses the agent's existing transport, credentials, registry and outbound protocol
 selection. Binding performs no I/O. A registry name resolves afresh on each call and
 must match exactly one agent; zero or multiple matches raise `ValueError`.
 
@@ -471,14 +471,14 @@ answer = peer.sync.invoke("Hello")
 ```
 
 `client.peer(target, *, registry=None, protocol="auto")` accepts a `RegistryClient`
-when resolving names. Peers expose `invoke`, `invoke_typed`, `call_tool`, and `run_task`,
+when resolving names. Peers expose `invoke`, `invoke_typed`, `call_tool` and `run_task`,
 plus matching `.sync` methods. Tool keyword arguments belong exclusively to the tool;
 use `run_task` with an explicit context for controlled tool tasks.
 
 Peers submit once and preserve normal transport errors. `call_tool` requires a native
 ProtoLink peer and a tool-output response. A2A-only peers support inference translation,
 not ProtoLink tool tasks or native budget/permission controls. Existing `call_agent`,
-`send_task`, and `send_infer_task` remain available for full task handling.
+`send_task` and `send_infer_task` remain available for full task handling.
 
 ## Compose local flows before adding services
 
@@ -494,7 +494,7 @@ is the blocking equivalent; `flow.execute(task)` retains the complete task contr
 The convenience result is final part content, including `ToolOutput` for a tool step.
 
 For agents that communicate through transports, the existing `AgentGroup` owns startup,
-readiness, and cleanup:
+readiness and cleanup:
 
 ```python
 from protolink import AgentGroup
@@ -546,7 +546,7 @@ for pure answer checks.
 
 Failed acceptance permits another attempt; execution exceptions and failed, canceled,
 or input-required tasks stop immediately. Exhaustion raises `WorkflowLimitError`
-and records a blocker. Local attempts share the workflow budget, and repetition can
+and records a blocker. Local attempts share the workflow budget and repetition can
 repeat side effects. Use `Graph` when you need custom routing or repair topology.
 
 ## Typed responses and explicit repair
@@ -567,19 +567,19 @@ print(plan.version)
 `invoke_typed(message, response_model, *, max_attempts=1, session_id=None, budget=None,
 context=None)` adds the type's JSON schema to the prompt, executes through the normal
 task lifecycle, then validates the answer with Pydantic `TypeAdapter`. Pydantic models,
-dataclasses, and other supported Python types work. Pydantic's normal coercion rules
+dataclasses and other supported Python types work. Pydantic's normal coercion rules
 apply; choose strict fields/types when your contract requires them. JSON strings,
-JSON values, and a single enclosing `json` code fence are accepted. No prose extraction
+JSON values and a single enclosing `json` code fence are accepted. No prose extraction
 or provider-specific schema guarantee is implied.
 
 Set `max_attempts=2` to explicitly permit one corrective inference following a
 validation failure. Feedback includes the original request/schema, previous answer,
 and validation errors. This can execute tools again. Execution failures, transport
-errors, and incomplete tasks never trigger repair. One local workflow budget covers
+errors and incomplete tasks never trigger repair. One local workflow budget covers
 all attempts; remote peers receive serialized limits but do not share atomic counters
 across submissions. The local wall-clock budget still bounds the overall remote call.
 
-`StructuredResponseError` exposes `.task`, `.attempts`, and `.validation_error` when
+`StructuredResponseError` exposes `.task`, `.attempts` and `.validation_error` when
 validation cannot succeed; the validation error is `None` for missing/incomplete
 responses. These errors preserve task evidence. The same interface is available through
-`agent.sync.invoke_typed`, `peer.invoke_typed`, and `peer.sync.invoke_typed`.
+`agent.sync.invoke_typed`, `peer.invoke_typed` and `peer.sync.invoke_typed`.

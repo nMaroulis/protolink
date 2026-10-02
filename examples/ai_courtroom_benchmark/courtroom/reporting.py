@@ -28,7 +28,7 @@ COLORS = (
 
 
 def write_benchmark_artifacts(benchmark: dict[str, Any], output_root: Path) -> None:
-    """Write the paired benchmark summary, transcript, and standalone report."""
+    """Write the paired benchmark summary, transcript and standalone report."""
     destination = Path(output_root)
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "summary.json").write_text(
@@ -97,7 +97,7 @@ def _render_transcript(benchmark: Mapping[str, Any]) -> str:
         f"- Started: `{_md_code(meta.get('started_at', 'unavailable'))}`",
         f"- Finished: `{_md_code(meta.get('finished_at', 'unavailable'))}`",
         "",
-        "> Public arguments, juror registers, votes, and protocol events only. "
+        "> Public arguments, juror registers, votes and protocol events only. "
         "Observed after-message movement is a temporal association, not a causal estimate.",
         "",
         "## Candidates",
@@ -278,10 +278,10 @@ def _render_report(benchmark: Mapping[str, Any]) -> str:
     )
     hero_lede = (
         "Two reciprocal trial assignments expose how model-authored advocacy was followed by "
-        "juror register movement, citations, and final votes."
+        "juror register movement, citations and final votes."
         if paired
         else "One controlled assignment exposes how model-authored advocacy was followed by juror register "
-        "movement, citations, and final votes. Side advantage is not controlled in single mode."
+        "movement, citations and final votes. Side advantage is not controlled in single mode."
     )
     audit_eyebrow = "ROLE-SWAP AUDIT" if paired else "SINGLE-RUN CONTROL AUDIT"
     assignment_eyebrow = "RECIPROCAL ASSIGNMENT" if paired else "SINGLE ASSIGNMENT"

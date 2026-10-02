@@ -314,7 +314,7 @@ def _multi_step_case(index: int, ordinal: int, seed: int, rng: random.Random) ->
             f"For {request_id}, perform these actions in order. First delegate travel_agent.get_weather with "
             f"location={location}, travel_date={travel_date}, request_id={request_id}. Second delegate "
             f"travel_agent.quote_hotel with location={location}, nights={hotel_args['nights']}, "
-            f"guests={hotel_args['guests']}, tier={hotel_args['tier']}, request_id={request_id}, and pass the exact "
+            f"guests={hotel_args['guests']}, tier={hotel_args['tier']}, request_id={request_id} and pass the exact "
             "weather receipt from step one as weather_receipt. Return exactly "
             "temperature_c=<weather value>;weather_receipt=<weather receipt>;"
             "total_eur=<hotel value>;hotel_receipt=<hotel receipt>."
@@ -342,7 +342,7 @@ def _multi_step_case(index: int, ordinal: int, seed: int, rng: random.Random) ->
         prompt = (
             f"For {request_id}, perform these actions in order. First delegate workspace_agent.read_file with "
             f"path={path}, request_id={request_id}. Then delegate workspace_agent.search_symbol with query={query}, "
-            f"request_id={request_id}, and pass the exact read receipt as source_receipt. Return exactly "
+            f"request_id={request_id} and pass the exact read receipt as source_receipt. Return exactly "
             "digest=<read digest>;read_receipt=<read receipt>;"
             "matches=<number of matches>;search_receipt=<search receipt>."
         )
@@ -368,7 +368,7 @@ def _multi_step_case(index: int, ordinal: int, seed: int, rng: random.Random) ->
         prompt = (
             f"For {request_id}, perform these actions in order. First call local multiply_numbers with a={a}, b={b}, "
             f"request_id={request_id}. Then delegate infer to oracle_agent with a prompt containing "
-            f"REFERENCE={reference}, REQUEST_ID={request_id}, and EVIDENCE=<the exact multiply receipt>. "
+            f"REFERENCE={reference}, REQUEST_ID={request_id} and EVIDENCE=<the exact multiply receipt>. "
             "Return exactly "
             "product=<product>;local_receipt=<multiply receipt>;"
             "verdict=<oracle verdict>;oracle_receipt=<oracle receipt>."
@@ -487,7 +487,7 @@ def _routing_choice_case(index: int, ordinal: int, seed: int, rng: random.Random
             category="routing_choice",
             prompt=(
                 f"For {request_id}, ask the available deterministic reference analyst to resolve this assessment. "
-                f"The request must contain REFERENCE={reference}, REQUEST_ID={request_id}, and EVIDENCE=NONE. "
+                f"The request must contain REFERENCE={reference}, REQUEST_ID={request_id} and EVIDENCE=NONE. "
                 "Return exactly verdict=<reported verdict>;receipt=<reported receipt>."
             ),
             expected_final=f"verdict={output['verdict']};receipt={output['receipt']}",

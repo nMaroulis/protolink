@@ -104,7 +104,7 @@ class SyncAgent:
         budget: RunBudget | None = None,
         context: RunContext | None = None,
     ) -> ResultT:
-        """Blocking Agent.invoke_typed; validation, repair limits, and errors are identical."""
+        """Blocking Agent.invoke_typed; validation, repair limits and errors are identical."""
         return _run_sync(
             self._agent.invoke_typed,
             message,
@@ -147,7 +147,7 @@ class SyncAgent:
         )
 
     def call_tool(self, tool_name: str, **kwargs: Any) -> Any:
-        """Validate, authorize, and call a tool, returning its raw result.
+        """Validate, authorize and call a tool, returning its raw result.
 
         Args:
             tool_name: Registered tool name.
@@ -161,7 +161,7 @@ class SyncAgent:
             ValueError: The tool is not registered or arguments are invalid.
             RuntimeError: Called inside an active event loop.
 
-        Tool, policy, and approval exceptions propagate unchanged. This direct
+        Tool, policy and approval exceptions propagate unchanged. This direct
         call does not create a Task; use ``run_task`` for task state and durable
         task snapshots.
         """
@@ -174,7 +174,7 @@ class SyncAgent:
             task: Task passed to the Agent's configured handler.
 
         Returns:
-            The full task, including state, artifacts, and error metadata.
+            The full task, including state, artifacts and error metadata.
             Returned failed or canceled tasks remain inspectable; call
             ``result.raise_for_status()`` to turn them into exceptions.
 
