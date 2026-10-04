@@ -13,10 +13,12 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
 from typing import Any
 
+from protolink.agents.subagents import current_subagent_supervisor, subagent_scope
 from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError
 from protolink.core.cancellation import ActiveTaskExecution, CancellationToken, mark_task_canceled
 from protolink.core.delegation import DelegationRecorder
+from protolink.core.durable import current_durable_run, durable_run_scope, is_durable_streaming
 from protolink.core.execution import (
     ToolExecution,
     closing_stream,
@@ -142,8 +144,12 @@ class AgentExecutionMixin(_AgentMixinBase):
         budget_token = _activate_task_budget(task, context)
         try:
             self._raise_if_execution_canceled(task, execution.token)
-            with execution_scope(task):
-                result = await self.handle_task(task)
+            result = task
+            budget = _current_task_budget(task)
+            assert budget is not None
+            with execution_scope(task), durable_run_scope(self, task, budget):
+                async with subagent_scope(self, task, budget):
+                    result = await self.handle_task(task)
             self._persist_task_snapshot(result)
             return result
         except asyncio.CancelledError as exc:
@@ -171,6 +177,25 @@ class AgentExecutionMixin(_AgentMixinBase):
         keeps SSE, WebSocket, runtime and direct consumers aligned on the same lifecycle.
         """
         from protolink.core.events import TaskStatusUpdateEvent
+
+        if self.durability is not None or self.subagents or current_durable_run() is not None:
+            from protolink.core.durable import durable_streaming_scope
+
+            async def managed_stream():
+                if not task.is_terminal:
+                    yield TaskStatusUpdateEvent(
+                        task_id=task.id, previous_state=task.state.value, new_state=TaskState.WORKING.value
+                    )
+                with durable_streaming_scope():
+                    result = await self.run_task(task)
+                yield TaskStatusUpdateEvent(
+                    task_id=task.id, new_state=result.state.value, final=True, metadata={"task": result.to_dict()}
+                )
+
+            async with closing_stream(stream_runtime_events(managed_stream(), task)) as stream:
+                async for event in stream:
+                    yield event
+            return
 
         if task.is_terminal:
             yield TaskStatusUpdateEvent(
@@ -784,6 +809,12 @@ class AgentExecutionMixin(_AgentMixinBase):
             The same Task instance, augmented with new Messages or Artifacts.
         """
 
+        supervisor = current_subagent_supervisor()
+        if (self.durability is not None and current_durable_run() is None) or (
+            self.subagents and (supervisor is None or supervisor.task.id != task.id)
+        ):
+            return await self.run_task(task)
+
         if task.is_terminal:
             return task
 
@@ -835,7 +866,25 @@ class AgentExecutionMixin(_AgentMixinBase):
 
             async with self._llm_history_scope(task, context, outputs=outputs):
                 # ---- Inspect Parts in the last item only ----
-                for part in last_item.parts:
+                durable = current_durable_run()
+                parts = (
+                    [Part.from_dict(item) for item in durable.data["input_parts"]]
+                    if durable is not None
+                    else last_item.parts
+                )
+                for index, part in enumerate(parts):
+                    if durable is not None:
+                        durable.part_key = f"part:{index}"
+                        durable.slot = f"part:{index}:0"
+                        completed = durable.data["outputs"].get(str(index))
+                        if completed is not None:
+                            output = (
+                                Message.from_dict(completed["data"])
+                                if completed["kind"] == "message"
+                                else Part.from_dict(completed["data"])
+                            )
+                            outputs.append(output)
+                            continue
                     cancellation_token.raise_if_cancelled()
                     output: Part | Message | None = None
                     if part.type == "tool_call":
@@ -869,6 +918,12 @@ class AgentExecutionMixin(_AgentMixinBase):
                         # Persist each completed boundary. If a later part
                         # fails, callers still see which operations succeeded.
                         self._persist_task_snapshot(task)
+                        if durable is not None:
+                            durable.data["outputs"][str(index)] = {
+                                "kind": "message" if isinstance(output, Message) else "part",
+                                "data": output.to_dict(),
+                            }
+                            durable.save()
 
             self._finalize_task_state(task, outputs)
         except Exception as exc:
@@ -1034,7 +1089,9 @@ class AgentExecutionMixin(_AgentMixinBase):
             active_token.raise_if_cancelled()
 
         active_budget_enforcer = budget_enforcer or _current_task_budget(task) or BudgetEnforcer(context)
-        self._enforce_budget_decision(active_budget_enforcer.check_next_step())
+        durable = current_durable_run()
+        if durable is None or durable.entry is None:
+            self._enforce_budget_decision(active_budget_enforcer.check_next_step())
 
         tc = part.as_tool_call()
         tool_name, args, call_id = tc.tool_name, tc.args, tc.call_id
@@ -1054,7 +1111,10 @@ class AgentExecutionMixin(_AgentMixinBase):
             if active_token is not None:
                 active_token.raise_if_cancelled()
             self._enforce_budget_decision(active_budget_enforcer.evaluate())
-            self._enforce_budget_decision(active_budget_enforcer.check_tool_call())
+            if durable is None or not durable.tool_charged:
+                self._enforce_budget_decision(active_budget_enforcer.check_tool_call())
+                if durable is not None:
+                    durable.mark_tool_charged()
             with execution_scope(task):
                 result = await execute_authorized_tool(
                     tool, ToolExecution(authorization, context, active_budget_enforcer, active_token)
@@ -1132,6 +1192,10 @@ class AgentExecutionMixin(_AgentMixinBase):
                 await self._emit_telemetry("on_tool_end", tool_name, None, error=str(e))
             raise
         except Exception as e:
+            from protolink.storage.durable import DurableExecutionError
+
+            if isinstance(e, DurableExecutionError):
+                raise
             if self.telemetry:
                 await self._emit_telemetry("on_tool_end", tool_name, None, error=str(e))
             return Part.tool_output(
@@ -1183,6 +1247,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             executed automatically and their results are injected back into the conversation for the LLM to process.
         """
 
+        streaming = streaming or is_durable_streaming()
         active_token = cancellation_token
         if active_token is None and task is not None:
             active_token = self.get_cancellation_token(task.id)
@@ -1211,6 +1276,26 @@ class AgentExecutionMixin(_AgentMixinBase):
                 delegation_action_id = event.get("action_id")
             public_event = self._sanitize_knowledge_tool_event(event)
             self._record_inference_action_result(task, public_event)
+            if is_durable_streaming() and task is not None:
+                from protolink.core.events import RunEvent, TaskLLMStreamEvent
+                from protolink.core.execution import publish_runtime_event
+
+                metadata = {
+                    key: value for key, value in public_event.items() if key not in {"type", "step", "content", "final"}
+                }
+                if public_event.get("type") in {"tool_result", "agent_call_result"}:
+                    metadata.pop("result", None)
+                    metadata["result_omitted"] = True
+                stream_event = TaskLLMStreamEvent(
+                    task_id=task.id,
+                    agent_name=self.card.name,
+                    llm_event_type=str(public_event.get("type", "")),
+                    step=public_event.get("step"),
+                    content=public_event.get("content"),
+                    final=bool(public_event.get("final", False)),
+                    metadata=metadata,
+                )
+                await publish_runtime_event(RunEvent.from_task_event(stream_event, context=active_context))
             if self.telemetry:
                 await self._emit_telemetry("on_llm_event", public_event)
             if event_callback and not external_observer_disabled:
@@ -1255,11 +1340,15 @@ class AgentExecutionMixin(_AgentMixinBase):
                 self._logger.warning(f"Agent discovery failed; continuing inference without delegation targets: {exc}")
                 discovered = []
 
+            local_cards = [child.card for child in self.subagents.values()]
+            local_names = {card.name.casefold() for card in local_cards}
+            discovered = [card for card in discovered if card.name.casefold() not in local_names] + local_cards
             ancestor_names = {name.strip().casefold() for name in active_context.agent_chain}
             discovered = [
                 agent
                 for agent in discovered
-                if agent.url != self.card.url and agent.name.strip().casefold() not in ancestor_names
+                if (agent.name in self.subagents or agent.url != self.card.url)
+                and agent.name.strip().casefold() not in ancestor_names
             ]
             agent_cards_list = [
                 f"Agent {i}:\n{agent.get_prompt_format()}" for i, agent in enumerate(discovered, start=1)
@@ -1848,6 +1937,19 @@ class AgentExecutionMixin(_AgentMixinBase):
                 raise ValueError(
                     f"Delegation cycle detected: agent '{agent_name}' already appears in the ancestor chain ({chain})."
                 )
+
+        if agent_name in self.subagents:
+            supervisor = current_subagent_supervisor()
+            if supervisor is None:
+                raise RuntimeError("Local subagent delegation requires run_task or start_run")
+            return await supervisor.call(agent_name, action, payload, parent_action_id)
+
+        if current_durable_run() is not None:
+            from protolink.storage.durable import DurableExecutionError
+
+            raise DurableExecutionError(
+                "Durable delegation supports configured local subagents; remote continuation is not available"
+            )
 
         # Resolve the registry-advertised agent name to its transport URL.
         agent_url = await self._resolve_agent_url(agent_name)

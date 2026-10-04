@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Callable, Coroutine, Sequence
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
+from protolink.agents.durable import _UNSET
 from protolink.core.run_context import RunBudget, RunContext
 from protolink.models import AgentCard, Task
 from protolink.rag import RAGAnswer
@@ -113,6 +114,39 @@ class SyncAgent:
             session_id=session_id,
             budget=budget,
             context=context,
+        )
+
+    def resume(
+        self,
+        run_id: str,
+        *,
+        request_id: str | None = None,
+        approved: bool | None = None,
+        answer: Any = _UNSET,
+        fingerprint: str | None = None,
+    ) -> Any:
+        """Blocking resume with the same durable response and output contract."""
+        return _run_sync(
+            self._agent.resume, run_id, request_id=request_id, approved=approved, answer=answer, fingerprint=fingerprint
+        )
+
+    def resume_task(
+        self,
+        run_id: str,
+        *,
+        request_id: str | None = None,
+        approved: bool | None = None,
+        answer: Any = _UNSET,
+        fingerprint: str | None = None,
+    ) -> Task:
+        """Blocking resume returning the complete Task, including a pending wait."""
+        return _run_sync(
+            self._agent.resume_task,
+            run_id,
+            request_id=request_id,
+            approved=approved,
+            answer=answer,
+            fingerprint=fingerprint,
         )
 
     def add_mcp(

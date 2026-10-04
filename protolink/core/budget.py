@@ -198,6 +198,11 @@ class BudgetEnforcer:
         """Return whether output-token usage must be checked after LLM calls."""
         return self.budget.max_output_tokens is not None
 
+    def restore_usage(self, usage: BudgetUsage) -> None:
+        """Restore committed counters; suspension time does not consume active runtime."""
+        self.usage = usage
+        self._started_at = time.monotonic() - usage.runtime_seconds
+
     def check_step(self, step: int) -> BudgetDecision:
         """Record and evaluate the current runtime step."""
         return self._evaluate_candidate(replace(self.usage, steps=step), commit=True)

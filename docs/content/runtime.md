@@ -3218,3 +3218,9 @@ Runtime events and telemetry serve different layers:
 Both share the same `run_id`, `trace_id`, `task_id` and agent metadata through `RunContext`, so a local UI can show live progress while telemetry records the detailed trace behind it.
 
 As a practical rule, use events to drive what the user sees now and telemetry to investigate what happened across the complete run later.
+
+## Owned children and restart recovery
+
+`await handle.spawn("specialist", "task")` starts an owned local child while a parent with a configured roster is running. Its `SubagentHandle` exposes `result()` and `cancel()`; unfinished children are drained when their parent ends. See [local subagents](subagents.md).
+
+With `Agent(..., durability="runs.sqlite")`, run attempts can finish in `input-required` state with a saved approval or question. Inspect `result.task.metadata["interruption"]`, authenticate the response in your application, and call `agent.resume()` or `resume_task()` after reopening the same store. A run handle represents one attempt. See [durable execution](durable-execution.md) for the supported checkpoint boundaries.

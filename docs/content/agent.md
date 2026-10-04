@@ -57,6 +57,12 @@ High‑level ideas:
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%" />
 </div>
 
+## Local specialists and durable execution
+
+Configure `subagents=[specialist]` for owned local children and `durability="runs.sqlite"` for restartable default-loop execution. Both are optional. See [local subagents](subagents.md) for limits and background work, and [durable execution](durable-execution.md) for approvals, input, `resume()` and uncertain outcomes.
+
+`subagent_limits=SubagentLimits(...)` supplies deeper control. `execution_version="1"` identifies your application tool contract; increment it when executable behavior changes. `durability` also accepts a `SQLiteDurableStore` or a custom `DurableStore`.
+
 ## Creating an Agent
 
 A name is enough for an embedded agent. Add a model and typed functions when you

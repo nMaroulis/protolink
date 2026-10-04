@@ -12,6 +12,8 @@ const sidebars = {
         'whitepaper',
         'getting-started',
         'progressive-control',
+        'subagents',
+        'durable-execution',
         'cli',
         'devtools',
         {

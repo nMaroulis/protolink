@@ -34,6 +34,34 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.8.0] - Unreleased
+
+Version 0.8.0 adds owned local subagents and durable execution to the existing Agent API. Configure specialists with `subagents=[...]` and restartable execution with `durability="runs.sqlite"`. The standard inference actions and provider prompt formats remain unchanged.
+
+### Added
+
+- Local child tasks with independent conversations, parent/child evidence, inherited policies, shared root budgets, and total-child, concurrency and depth limits.
+- `SubagentLimits` and owned `SubagentHandle` results/cancellation. Live `RunHandle.spawn()` and optional model tools `spawn_subagent`, `wait_subagent` and `cancel_subagent` support background work.
+- `SQLiteDurableStore` and a replaceable `DurableStore` contract for versioned checkpoints, fenced ownership, conversation/cursor recovery and committed action receipts.
+- `RunInterrupted` / `RunInterruption`, `Agent.resume()` and `resume_task()`, and matching synchronous facades for approvals and questions that survive application restarts.
+- Verified-outcome `Agent.reconcile()` and typed busy, contract-mismatch and uncertain-execution errors. Unknown external outcomes are never automatically replayed.
+- Durable blocking local delegation, direct tool invocation and streamed run attempts; root usage survives pauses and child continuation.
+- Configuration serialization for SQLite stores, execution versions and subagent limits, with explicit reattachment of executable child rosters and custom stores.
+- Guides for [local subagents](subagents.md) and [durable execution](durable-execution.md), plus offline examples that demonstrate local delegation and three separate restart phases.
+
+### Changed
+
+- `ask_user_tool()` may omit its live callback when attached to a durable agent. Its durable mode returns a checkpointed `input-required` task and continues from a supplied answer.
+- Approval-required actions on durable agents pause through execution checkpoints. Agents without durability retain the existing live approval and question callbacks.
+
+### Validation
+
+Recovery tests exercise separate application processes, crashes before and after result receipts, stale approvals, nested child limits, and root/child continuation. A controlled offline comparison against v0.7.5 retained **80/80 strict passes** on the 40-case core suite with two repetitions. Scripted actions verify the runtime contract; they do not measure real-model quality.
+
+### Recovery scope
+
+Durable recovery covers the default task handler/inference loop, registered tools and blocking local children. Background children, remote delegation, custom orchestration handlers and eager retrieval modes are explicitly outside that recovery contract. Committed results are reused; an operation started without a receipt requires externally verified reconciliation. SQLite checkpoints are private execution data, separate from diagnostic run reports.
+
 ## [0.7.5] - 2026-10-02
 
 :::note Latest Update

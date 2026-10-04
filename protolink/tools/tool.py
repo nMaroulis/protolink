@@ -45,6 +45,7 @@ class Tool(BaseTool):
     _protolink_knowledge_tool: bool = field(init=False, repr=False, default=False)
     _protolink_knowledge_name: str | None = field(init=False, repr=False, default=None)
     _protolink_ephemeral_result: bool = field(init=False, repr=False, default=False)
+    _protolink_supervision_tool: bool = field(init=False, repr=False, default=False)
     _protolink_validates_args: ClassVar[bool] = True
 
     @classmethod

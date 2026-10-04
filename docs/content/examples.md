@@ -252,3 +252,10 @@ Run `python examples/service_backends.py` to exercise every concrete backend: `G
 `Gmail`, `OutlookCalendar`, `OutlookEmail` and `IMAPEmail`. Install `protolink[integrations]` first.
 The example replaces HTTP/IMAP/SMTP transports with offline fixtures while using real `Assistant`
 tools, approvals, serialization and MIME handling. See the [service backend reference](builtin-tools.md#calendar-and-email-backends).
+
+## Harness examples (v0.8.0)
+
+- [Local specialists](https://github.com/nMaroulis/protolink/blob/main/examples/subagents.py): an owned child using the existing `agent_call` action, with shared limits and streamed evidence.
+- [Durable execution](https://github.com/nMaroulis/protolink/blob/main/examples/durable_execution.py): approval and user input across three separate application invocations, with an offline model and a persisted tool result.
+
+Both examples run without API keys or external services. Read the [subagent](subagents.md) and [durable execution](durable-execution.md) guides for application controls and recovery scope.

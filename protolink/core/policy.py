@@ -13,6 +13,8 @@ import copy
 import inspect
 import math
 from collections.abc import Awaitable, Callable, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
@@ -30,6 +32,19 @@ class PolicyEffect(StrEnum):
     ALLOW = "allow"
     DENY = "deny"
     REQUIRE_APPROVAL = "require_approval"
+
+
+_inherited_policies: ContextVar[tuple[Policy, ...]] = ContextVar("protolink_inherited_policies", default=())
+
+
+@contextmanager
+def inherited_policy_scope(policy: Policy):
+    """Require local children to satisfy every ancestor's configured policy."""
+    token = _inherited_policies.set((*_inherited_policies.get(), policy))
+    try:
+        yield
+    finally:
+        _inherited_policies.reset(token)
 
 
 @dataclass(frozen=True)
@@ -497,22 +512,72 @@ class ActionAuthorizer:
             ActionDeniedError: The policy or approver denied the action.
             ApprovalRequiredError: Approval is required but no handler exists.
         """
+        from protolink.core.durable import current_durable_run
         from protolink.core.execution import emit_runtime_event
 
         if context.canceled:
             raise asyncio.CancelledError(context.cancel_reason)
+        durable = current_durable_run()
+        if durable is not None:
+            action = durable.prepare(action)
+            if durable.entry is not None and durable.entry["state"] == "succeeded":
+                # No new effect is dispatched when replaying a committed receipt.
+                # Preserve its original authorization rather than requesting new
+                # permission for an operation that already finished.
+                return ActionAuthorization.from_dict(durable.entry["authorization"])
+
+        def committed(authorization: ActionAuthorization) -> ActionAuthorization:
+            if durable is not None:
+                assert durable.entry is not None
+                durable.entry["authorization"] = authorization.to_dict()
+                durable.save()
+            return authorization
+
         fingerprint = action.fingerprint
         await emit_runtime_event("action.requested", context, action_id=action.action_id, action=action.to_dict())
-        decision = await self.policy.evaluate(copy.deepcopy(action), context.copy())
+        decisions = [
+            await policy.evaluate(copy.deepcopy(action), context.copy())
+            for policy in (
+                *_inherited_policies.get(),
+                self.policy,
+            )
+        ]
+        decision = next((item for item in decisions if item.effect is PolicyEffect.DENY), None)
+        if decision is None:
+            decision = next((item for item in decisions if item.effect is PolicyEffect.REQUIRE_APPROVAL), decisions[-1])
         await emit_runtime_event("action.policy", context, action_id=action.action_id, decision=decision.to_dict())
         if decision.effect is PolicyEffect.DENY:
             await emit_runtime_event("action.denied", context, action_id=action.action_id, decision=decision.to_dict())
             raise ActionDeniedError(action=action, decision=decision)
         if decision.effect is PolicyEffect.ALLOW:
-            return ActionAuthorization(action=action, policy_decision=decision)
+            if durable is not None and durable.entry is not None:
+                pending = durable.entry.get("interruptions", {}).get("approval")
+                response = durable.root.data["responses"].get(pending["request_id"]) if pending else None
+                if response is not None and response.get("approved") is False:
+                    raise ActionDeniedError(
+                        action=action, decision=PolicyDecision(PolicyEffect.DENY, "Approval denied", "durable_approval")
+                    )
+            return committed(ActionAuthorization(action=action, policy_decision=decision))
 
         request = ApprovalRequest(action=action, policy_decision=decision, run_id=context.run_id)
+        if durable is not None and durable.entry is not None:
+            pending = durable.entry.get("interruptions", {}).get("approval")
+            if pending is not None:
+                request = ApprovalRequest.from_dict(pending["request"])
         await emit_runtime_event("approval.required", context, action_id=action.action_id, request=request.to_dict())
+        if durable is not None:
+            response = durable.request("approval", request.to_dict(), fingerprint)
+            assert response is not None and durable.entry is not None
+            stored_request = ApprovalRequest.from_dict(durable.entry["interruptions"]["approval"]["request"])
+            approval = ApprovalDecision(approved=response["approved"], request_id=stored_request.request_id)
+            if not approval.approved:
+                raise ActionDeniedError(
+                    action=action, decision=decision, approval_request=stored_request, approval_decision=approval
+                )
+            await emit_runtime_event(
+                "approval.decided", context, action_id=action.action_id, decision=approval.to_dict()
+            )
+            return committed(ActionAuthorization(action, decision, stored_request, approval))
         if self.approval_handler is None:
             raise ApprovalRequiredError(request)
 

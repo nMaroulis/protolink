@@ -4,6 +4,12 @@ These optional primitives let applications supply their own roles, workflows, po
 and UI while ProtoLink handles execution and lifecycle. They cover command execution, recoverable file changes,
 approvals, delegated evidence, completion checks and checkpoint inventory without adding base-package dependencies.
 
+## Restartable execution and owned children
+
+Version 0.8.0 adds execution checkpoints through `Agent(..., durability="runs.sqlite")`. A durable approval or question pauses the task, and `resume()` continues after an application restart. See the [durable execution guide](durable-execution.md) for committed results, unknown outcomes and supported boundaries. Configure `subagents=[...]` for [owned local specialists](subagents.md), using existing delegation actions.
+
+The approval broker and checkpoint inventory below retain their existing live-adapter and inspection roles. Execution continuation uses the separate `DurableStore` API.
+
 ## Built-in execution tools
 
 The [Built-in Tools](builtin-tools.md) catalog documents [command execution](builtin-tools.md#command-execution),
@@ -122,7 +128,7 @@ Task cancellation unblocks the wait and marks the request canceled. `records(sco
 resolution records. Close unused subscriptions. Reconnecting to the same broker preserves pending waits. One live
 broker owns its Storage namespace on one event loop; it is not a distributed multi-writer approval service.
 
-Reopening durable storage is inspection only. Orphan pending requests become `uncertain` and cannot release an
+Reopening the broker's approval storage is inspection only. Orphan pending requests become `uncertain` and cannot release an
 action. Approval records carry `effect_state="unknown"`: approval itself cannot prove that an effect happened.
 Consult execution receipts and the actual resource. Duplicate requests or reconnects never resume execution.
 

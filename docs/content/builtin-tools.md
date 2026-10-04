@@ -471,7 +471,9 @@ print(answer.status, answer.answer)
 `application_ui` is your UI adapter. The model-facing API is `ask_user(question, options=None)`.
 When invoked by the inference loop, the tool awaits your async callback, then puts its result in normal
 tool history before the next model step. The task stays working during the wait. This does not suspend
-or resume a task across process restarts and does not use `input-required` as a durable checkpoint.
+or resume a task across process restarts by itself.
+
+For [durable execution](durable-execution.md), register `ask_user_tool()` without a callback on `Agent(..., durability="runs.sqlite")`. The same model tool call persists the question and returns an `input-required` task. After restarting, `agent.resume(run_id, request_id=..., answer="CSV")` restores the normal tool observation and continues. Durable mode uses checkpointed responses even if a live callback was supplied; its wait has no live timeout. `answer=None` explicitly declines.
 
 `UserInputRequest` has `request_id`, `question`, immutable suggested `options`, `run_id`, `task_id` and
 `action_id`; standalone tool calls have no task ID. IDs correlate simultaneous calls but do not authenticate

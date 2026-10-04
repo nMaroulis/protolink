@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator, Callable
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
+    from protolink.agents.subagents import SubagentLimits
     from protolink.client import AgentClient, RegistryClient
     from protolink.core.actions import RunAction
     from protolink.core.budget import BudgetEnforcer
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from protolink.state import State
     from protolink.state.operations import StateOperationRequest, StateOperationResult
     from protolink.storage import Storage
+    from protolink.storage.durable import DurableStore
     from protolink.telemetry.base import Telemetry
     from protolink.tools import BaseTool
     from protolink.transport import Transport
@@ -56,6 +58,11 @@ class _AgentMixinBase(Protocol):
     _task_executions: TaskExecutionRegistry
     _control_tasks: set[asyncio.Task[Any]]
     run_store: Any | None
+    durability: DurableStore | None
+    execution_version: str
+    subagents: dict[str, Any]
+    subagent_limits: SubagentLimits
+    _subagent_runs: dict[str, Any]
     _session_locks: dict[str, asyncio.Lock]
     _registry_heartbeat_interval: float | None
     _registry_heartbeat_task: asyncio.Task[Any] | None
