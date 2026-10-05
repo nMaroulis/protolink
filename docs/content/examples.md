@@ -258,6 +258,10 @@ through `Assistant` and `CodeAssistant`. The example uses a temporary repository
 in-memory service adapters, so it needs no accounts or API keys and sends no real messages.
 See [Built-in Agents](builtin-agents.md) for the preset APIs.
 
+Run `python examples/builtin_agents.py` for ResearchAgent, KnowledgeAgent, DatabaseAgent,
+ExplorerAgent and EchoAgent. It uses fixture web providers, local knowledge, scoped files and a
+temporary SQLite database; its scripted models build answers from the actual tool results.
+
 Run `python examples/service_backends.py` to exercise every concrete backend: `GoogleCalendar`,
 `Gmail`, `OutlookCalendar`, `OutlookEmail` and `IMAPEmail`. Install `protolink[integrations]` first.
 The example replaces HTTP/IMAP/SMTP transports with offline fixtures while using real `Assistant`

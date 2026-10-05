@@ -2,7 +2,15 @@
 
 from protolink.__version__ import __version__
 from protolink.agents import Agent
-from protolink.agents.builtins import Assistant, CodeAssistant
+from protolink.agents.builtins import (
+    Assistant,
+    CodeAssistant,
+    DatabaseAgent,
+    EchoAgent,
+    ExplorerAgent,
+    KnowledgeAgent,
+    ResearchAgent,
+)
 from protolink.agents.subagents import SubagentHandle, SubagentLimitError, SubagentLimits
 from protolink.client import AgentPeer
 from protolink.core import (
@@ -166,10 +174,13 @@ __all__ = [
     "CompletionValidator",
     "ContextItem",
     "ContextManifest",
+    "DatabaseAgent",
     "Document",
     "DurableExecutionError",
     "DurableStore",
+    "EchoAgent",
     "EventSink",
+    "ExplorerAgent",
     "Flow",
     "Graph",
     "HistoryCompactionRequest",
@@ -179,6 +190,7 @@ __all__ = [
     "InMemoryEventSink",
     "InferParseError",
     "Knowledge",
+    "KnowledgeAgent",
     "LLMModelProfile",
     "LocalTraceRecorder",
     "LocalTraceTelemetry",
@@ -192,6 +204,7 @@ __all__ = [
     "RAGAnswer",
     "RedactionPolicy",
     "RepeatUntil",
+    "ResearchAgent",
     "ResourceConflictError",
     "ResourceRevision",
     "RetryPolicy",

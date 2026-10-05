@@ -1033,6 +1033,7 @@ configured factories; the simple parameterless built-ins keep their existing rou
 | --- | --- |
 | [`generic_tools.py`](https://github.com/nMaroulis/protolink/blob/main/examples/generic_tools.py) | Filesystem reads/search/edits/recovery, storage CRUD, HTTP, CSV extraction/search and real SQLite on one ordinary Agent |
 | [`builtin_assistants.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_assistants.py) | Shell, all six Git operations, model question/answer continuation, in-memory calendar/email, clock and calculator |
+| [`builtin_agents.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_agents.py) | Specialist agent presets with fixture web providers, retrieved citations, bounded SQLite reads, scoped files and deterministic echo |
 | [`service_backends.py`](https://github.com/nMaroulis/protolink/blob/main/examples/service_backends.py) | Google Calendar, Gmail, Outlook Calendar, Outlook Email and IMAP/SMTP using offline transport fixtures |
 | [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) | Public web search with explicit engine selection and policy; a query performs network requests |
 

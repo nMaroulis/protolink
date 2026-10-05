@@ -36,10 +36,12 @@ uv add --upgrade protolink
 
 ## [0.8.0] - Unreleased
 
-Version 0.8.0 adds owned local subagents and durable execution to the existing Agent API. Configure specialists with `subagents=[...]` and restartable execution with `durability="runs.sqlite"`. The standard inference actions and provider prompt formats remain unchanged.
+Version 0.8.0 adds owned local subagents, durable execution and configurable specialist agent presets to the existing Agent API. Configure local children with `subagents=[...]` and restartable execution with `durability="runs.sqlite"`. The standard inference actions and provider prompt formats remain unchanged.
 
 ### Added
 
+- `ResearchAgent`, `KnowledgeAgent`, `DatabaseAgent` and `ExplorerAgent`: configurable presets for source-grounded web research, knowledge retrieval, read-only database analysis and scoped workspace exploration, using the existing Agent runtime.
+- Built-in agent reference and an offline preset example covering custom providers, citations, bounded SQL, scoped files and deterministic echo.
 - Local child tasks with independent conversations, parent/child evidence, inherited policies, shared root budgets, and total-child, concurrency and depth limits.
 - `SubagentLimits` and owned `SubagentHandle` results/cancellation. Live `RunHandle.spawn()` and optional model tools `spawn_subagent`, `wait_subagent` and `cancel_subagent` support background work.
 - `SQLiteDurableStore` and a replaceable `DurableStore` contract for versioned checkpoints, fenced ownership, conversation/cursor recovery and committed action receipts.
@@ -51,6 +53,9 @@ Version 0.8.0 adds owned local subagents and durable execution to the existing A
 
 ### Changed
 
+- `EchoAgent` now echoes inference prompts and received task parts deterministically without invoking a model or executing tools; unary and streamed tasks use the normal lifecycle.
+- Presets accept standard `name`, `description`, `url`, LLM aliases and caller-supplied tool overrides. Durable presets install user-question tools without requiring live callbacks.
+- `CodeAssistant` includes scoped file reads, listing and search; an optional checkpoint store enables prepared file edits and recovery with approval defaults.
 - Shortened the README overview, added module introductions and quick examples, and consolidated durable execution into [Execution, approvals and recovery](execution-tools.md). The former durable execution page redirects to the consolidated guide.
 - `ask_user_tool()` may omit its live callback when attached to a durable agent. Its durable mode returns a checkpointed `input-required` task and continues from a supplied answer.
 - Approval-required actions on durable agents pause through execution checkpoints. Agents without durability retain the existing live approval and question callbacks.
