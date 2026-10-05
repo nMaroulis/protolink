@@ -41,28 +41,6 @@ Focus on the agent's role and capabilities. ProtoLink handles the infer loop, va
 
 ProtoLink also works as an engine for **coding agents and other agent applications**. Authorized command execution, recoverable file edits, cancellation and execution limits help applications handle real work reliably. Typed outcomes and completion checks distinguish an approved plan from an executed, verified result, while bounded workflows keep repair attempts under control. The same lifecycle, policy and reporting primitives support research assistants, data processing and operational automation. See the [execution and recovery guide](docs/content/execution-tools.md) and [runnable examples](examples/runtime_capabilities/). Local command execution runs on the host and is not a sandbox.
 
-## Owned specialists and restartable work
-
-Version 0.8.0 adds two optional capabilities to the same Agent API:
-
-```python
-from protolink import Agent
-from protolink.tools import ask_user_tool
-
-researcher = Agent(name="researcher", llm="mock")
-assistant = Agent(
-    name="assistant",
-    llm="mock",
-    subagents=[researcher],
-    tools=[ask_user_tool()],
-    durability="runs.sqlite",
-)
-```
-
-A configured specialist runs as an owned child with its own conversation, shared root budgets and inherited policies. The model delegates through the existing `agent_call` action. Durable agents can pause for approval or input, exit the application, and continue with `agent.resume(run_id, request_id=..., answer="CSV")`. Completed tool results are reused; unknown outcomes require explicit reconciliation.
-
-Start with the [subagent guide](docs/content/subagents.md), [durable execution guide](docs/content/durable-execution.md) and provider-free examples: [local specialists](examples/subagents.py) and [restartable approval/input](examples/durable_execution.py).
-
 ## Start with one agent
 
 Install the base package:
@@ -349,6 +327,8 @@ result = review_flow.sync.execute(
 ```
 
 Flows can contain local agents, registry-resolved remote agents, or other nested flows. Semantic context injection tells each agent what the next step expects without coupling that agent to the overall topology. See [structured flows](https://nmaroulis.github.io/protolink/docs/flows/) and the [runnable examples](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows).
+
+Add [local subagents](docs/content/subagents.md) with `subagents=[specialist]` for owned workers sharing budgets and policies. Add `durability="runs.sqlite"` to [pause for approval or input and resume after a restart](docs/content/execution-tools.md#durable-execution). Try the offline [subagent](examples/subagents.py) and [durable execution](examples/durable_execution.py) examples.
 
 ## A2A primitives, standard wire compatibility
 
