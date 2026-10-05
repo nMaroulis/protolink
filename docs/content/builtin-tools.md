@@ -8,6 +8,16 @@ Import factories from `protolink.tools` or `protolink.tools.builtins`. For the t
 custom Python tools and MCP adapters, see the [Tool API](tool.md). For ready-made compositions,
 see [Built-in Agents](builtin-agents.md).
 
+```python
+from protolink import Agent
+from protolink.tools import calculator
+
+agent = Agent(name="helper", tools=[calculator()])
+print(agent.sync.call_tool("calculator", expression="(18 + 6) / 3"))
+```
+
+This runs offline without a model. Register a factory's result through `tools=` or `add_tool()`; attach an LLM when the model should select tools. Integrations requiring accounts or services take their configuration explicitly.
+
 ## Catalog
 
 | Factory | Generated tools | Capabilities | Requirements |
@@ -374,7 +384,7 @@ execution must pass through an Agent's authorization pipeline.
 | `ProcessCancelledError` | Native `asyncio.CancelledError` subclass with a partial typed `.result`. |
 
 Backend/result types are in `protolink.tools.builtins.process`. A future remote or container backend can implement this
-protocol; ProtoLink does not implement those backends in this release. Backend implementations are trusted application
+protocol; ProtoLink does not include those backends. Backend implementations are trusted application
 code and must honor the approved specification and live execution limits.
 
 The local backend uses an argument array without an implicit shell. Environment inheritance is explicit: `env={}`
@@ -473,7 +483,7 @@ When invoked by the inference loop, the tool awaits your async callback, then pu
 tool history before the next model step. The task stays working during the wait. This does not suspend
 or resume a task across process restarts by itself.
 
-For [durable execution](durable-execution.md), register `ask_user_tool()` without a callback on `Agent(..., durability="runs.sqlite")`. The same model tool call persists the question and returns an `input-required` task. After restarting, `agent.resume(run_id, request_id=..., answer="CSV")` restores the normal tool observation and continues. Durable mode uses checkpointed responses even if a live callback was supplied; its wait has no live timeout. `answer=None` explicitly declines.
+For [durable execution](execution-tools.md#durable-execution), register `ask_user_tool()` without a callback on `Agent(..., durability="runs.sqlite")`. The same model tool call persists the question and returns an `input-required` task. After restarting, `agent.resume(run_id, request_id=..., answer="CSV")` restores the normal tool observation and continues. Durable mode uses checkpointed responses even if a live callback was supplied; its wait has no live timeout. `answer=None` explicitly declines.
 
 `UserInputRequest` has `request_id`, `question`, immutable suggested `options`, `run_id`, `task_id` and
 `action_id`; standalone tool calls have no task ID. IDs correlate simultaneous calls but do not authenticate
@@ -603,7 +613,7 @@ states include `prepared`, `applied`, `restoring`, `restored`, `failed` and `unc
 leaves a `prepared` or `restoring` record, inspection reports uncertainty. Failure to save the initial record prevents
 mutation. Failure after a possible write leaves an uncertainty marker; no automatic replay or restoration occurs.
 Restoration conflicts raise `ResourceConflictError`. Recovery of an uncertain operation requires application-led
-inspection; this release deliberately does not guess whether its effect occurred.
+inspection; recovery does not guess whether its effect occurred.
 
 Recovery storage is a dedicated namespace with one live writer. Keep it outside mutable allowed roots where practical.
 It contains lossless original bytes, so protect it as application data. Resource recovery, conversation history and
@@ -793,7 +803,7 @@ Results use `items` and `next_page_token`; keep the same backend, interval, quer
 another page. An empty page can still have a next token. Google and Microsoft event objects retain
 their original service fields, including their different representations of all-day boundaries.
 
-Creation returns the service event object with its `id`. This version creates personal timed events:
+Creation returns the service event object with its `id`. The calendar adapter creates personal timed events:
 it does not invite attendees, create recurring/all-day events, modify existing events, or delete events.
 Applications choose the user's timezone and check scheduling conflicts. Invalid intervals are rejected
 before an approval is requested or a backend is called.
@@ -834,7 +844,7 @@ backends do not request attachments separately. HTML-only MIME bodies are omitte
 Compose operations accept 1–50 bare ASCII recipient addresses, a nonblank subject up to 1,000
 characters and a nonblank plain-text body up to 200,000 characters. Header injection is rejected
 before approval. Gmail's fixed `sender` is required for composing and must be the authenticated
-address or a configured send-as alias. This version does not compose attachments, CC/BCC, HTML,
+address or a configured send-as alias. The email adapter does not compose attachments, CC/BCC, HTML,
 or threaded replies. Gmail sending returns service message/thread IDs; draft creation returns draft
 and message identifiers. Other backends return the statuses described below. None claims delivery
 to the recipient's inbox.

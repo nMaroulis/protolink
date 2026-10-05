@@ -47,10 +47,11 @@ Version 0.8.0 adds owned local subagents and durable execution to the existing A
 - Verified-outcome `Agent.reconcile()` and typed busy, contract-mismatch and uncertain-execution errors. Unknown external outcomes are never automatically replayed.
 - Durable blocking local delegation, direct tool invocation and streamed run attempts; root usage survives pauses and child continuation.
 - Configuration serialization for SQLite stores, execution versions and subagent limits, with explicit reattachment of executable child rosters and custom stores.
-- Guides for [local subagents](subagents.md) and [durable execution](durable-execution.md), plus offline examples that demonstrate local delegation and three separate restart phases.
+- Guides for [local subagents](subagents.md) and [durable execution](execution-tools.md#durable-execution), plus offline examples that demonstrate local delegation and three separate restart phases.
 
 ### Changed
 
+- Shortened the README overview, added module introductions and quick examples, and consolidated durable execution into [Execution, approvals and recovery](execution-tools.md). The former durable execution page redirects to the consolidated guide.
 - `ask_user_tool()` may omit its live callback when attached to a durable agent. Its durable mode returns a checkpointed `input-required` task and continues from a supplied answer.
 - Approval-required actions on durable agents pause through execution checkpoints. Agents without durability retain the existing live approval and question callbacks.
 

@@ -7,6 +7,23 @@ import ApiReference, {
 
 # Flows
 
+Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact` and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology and returns the enriched task at the end.
+
+Flows are a ProtoLink runtime extension, not an A2A protocol operation. The important boundary is that deterministic orchestration does not escape into graph-private models: it continues to use the shared A2A-based task language.
+
+Use flows when the shape of the process is known ahead of time. Instead of asking an LLM to decide the whole plan at runtime, you define the path in code: a sequential pipeline, a fan-out/fan-in review step, a controlled router, or a graph-shaped state machine with loops. The agents inside the flow can still use LLMs, tools, storage and remote transports. The difference is that the orchestration itself is inspectable Python.
+
+```python
+from protolink import Agent, Pipeline
+
+researcher = Agent(name="researcher", llm="mock")
+writer = Agent(name="writer", llm="mock")
+flow = Pipeline([researcher, writer])
+print(flow.sync.invoke("Research this topic and write a summary."))
+```
+
+The mock adapters provide deterministic fixture responses. Configured provider adapters use the same topology. `invoke()` returns final content; `execute(task)` exposes the complete task, including messages, artifacts and flow metadata.
+
 ## Simple flow calls and steps
 
 All flows expose `await flow.invoke(prompt, session_id=None, budget=None, context=None)` and
@@ -18,12 +35,6 @@ full signatures, execution evidence, budget sharing and stop conditions.
 
 
 See [Execution, approvals and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks and bounded workflows.
-
-Structured Flows orchestrate the same A2A-derived `Task`, `Message`, `Part`, `Artifact` and `AgentCard` primitives used by autonomous delegation. A flow is a deterministic `Flow.execute(Task) -> Task` state machine: it receives the current task, moves it through a known topology and returns the enriched task at the end.
-
-Flows are a ProtoLink runtime extension, not an A2A protocol operation. The important boundary is that deterministic orchestration does not escape into graph-private models: it continues to use the shared A2A-based task language.
-
-Use flows when the shape of the process is known ahead of time. Instead of asking an LLM to decide the whole plan at runtime, you define the path in code: a sequential pipeline, a fan-out/fan-in review step, a controlled router, or a graph-shaped state machine with loops. The agents inside the flow can still use LLMs, tools, storage and remote transports. The difference is that the orchestration itself is inspectable Python.
 
 ---
 

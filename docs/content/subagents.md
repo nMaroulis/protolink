@@ -96,7 +96,7 @@ assistant = Agent(
 
 This registers three ordinary tools: `spawn_subagent(agent, prompt)`, `wait_subagent(child_id)` and `cancel_subagent(child_id)`. The spawn receipt contains the child ID; waiting returns its state, output and metadata. The parent must check that state before using the result. These tools use `tool_call` and add their usual tool descriptions to the prompt. The core action vocabulary stays the same.
 
-Background children are live execution. A child with its own durable configuration must run under a durable parent; child checkpoints use the parent's execution store. Version 0.8.0 supports [durable execution](durable-execution.md) for blocking local delegation. Combining durable configuration with background model tools is rejected; `RunHandle.spawn()` is also unavailable on durable parents.
+Background children are live execution. A child with its own durable configuration must run under a durable parent; child checkpoints use the parent's execution store. Blocking local delegation supports [durable execution](execution-tools.md#durable-execution). Combining durable configuration with background model tools is rejected; `RunHandle.spawn()` is also unavailable on durable parents.
 
 ## Configuration and evidence
 

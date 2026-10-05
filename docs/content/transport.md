@@ -12,6 +12,20 @@ Protolink implements a **pluggable transport layer** that decouples the agent's 
 
 At its core, the Transport abstraction behaves as a **protocol adapter pattern**, normalizing disparate wire formats into standard `Task` and `Message` domain objects.
 
+```python
+from protolink import Agent
+
+agent = Agent(
+    name="helper",
+    llm="mock",
+    transport="http",
+    url="http://127.0.0.1:8001",
+)
+agent.start()
+```
+
+Install `protolink[http]` to run this HTTP server. A transport alias creates default configuration; pass a configured transport object for timeouts, credentials, TLS or limits. Name-only embedded agents need no transport.
+
 A2A supplies the shared agent model; a Transport moves it. ProtoLink's transports carry the same A2A-derived task and message objects, but they are not all canonical A2A bindings. `Agent(..., transport="http", a2a=True)` enables ProtoLink's A2A 1.0 JSON-RPC boundary; Runtime, WebSocket, SSE JSON-RPC and gRPC remain ProtoLink-native transports.
 
 All transports implement a consistent interface:

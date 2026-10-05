@@ -20,6 +20,14 @@ This benchmark is a repeatable health check for ProtoLink's infer loop. Run the
 same task suite before and after a prompt or code change to see whether Agents
 complete more tasks correctly and whether they do it faster.
 
+With ProtoLink installed and your local Ollama model available, run from the repository root:
+
+```bash
+python -m benchmarks.infer_loop --provider ollama --model gemma4:e4b --suite smoke
+```
+
+Replace `--model` with a model installed on your server. This small suite records results and execution evidence for comparison; the setup and output sections below explain provider options and how to interpret failures.
+
 The infer loop turns each model response into one validated next action: **finish
 with an answer**, **call a local tool**, or **delegate work to another Agent**.
 It must also decide which of those action modes fits the request, which

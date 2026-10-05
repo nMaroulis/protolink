@@ -2,6 +2,17 @@
 
 This guide provides detailed examples of how to integrate and use LLMs within the Protolink framework. It distinguishes between **Direct Usage** (for simple chat interactions) and the **Automated Pipeline** (for complex Agent interactions with tool calling).
 
+```python
+from protolink import Agent, create_llm
+
+model = create_llm("mock", default_response="Hello")
+print(model.chat("Say hello"))  # One direct model response.
+agent = Agent(name="helper", llm=model)
+print(agent.sync.invoke("Say hello"))  # A managed agent task.
+```
+
+This example runs offline. The provider examples below require their optional dependencies and model configuration. See [LLMs](llm.md) for adapter interfaces, inference behavior and streaming controls.
+
 ## Supported Providers
 
 Protolink supports several major LLM providers. You can initialize them by setting environment variables or passing API keys and configuration parameters directly.

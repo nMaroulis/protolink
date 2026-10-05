@@ -15,6 +15,14 @@ The directory containing the example files can be found [here](https://github.co
 
 This example builds a simplified **"Claude Code"** - a terminal coding assistant powered by a mesh of three autonomous agents. It demonstrates how to compose specialized agents into a system where a **brain reasons**, **hands execute** and a **coordinator orchestrates** - just like a real AI coding assistant.
 
+After installing `protolink[http,llms]` and configuring your model as described below, run from the repository root:
+
+```bash
+python examples/code_assistant/run.py "Add docstrings to all functions in utils.py"
+```
+
+The coder acts on its configured workspace. Follow the setup section before running a request that changes files; the agent definitions show where to replace tools, prompts and model adapters.
+
 It highlights:
 
 - How an **orchestrator agent** coordinates both LLM and tool agents

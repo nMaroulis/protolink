@@ -13,7 +13,6 @@ const sidebars = {
         'getting-started',
         'progressive-control',
         'subagents',
-        'durable-execution',
         'cli',
         'devtools',
         {

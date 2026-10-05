@@ -8,6 +8,23 @@ import ApiReference, {
 
 # Tools
 
+Tools extend agent capabilities with additional functions. They enable LLMs and agents to interact with external systems, execute code, access data and perform specialized tasks that go beyond pure text generation.
+
+ProtoLink derives argument schemas from type hints, validates each call and applies the agent's policies before execution. The model can select a registered tool, or your application can call a known tool directly without a model.
+
+```python
+from protolink import Agent
+
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+agent = Agent(name="calculator", tools=[add])
+print(agent.sync.call_tool("add", a=2, b=3))  # 5
+```
+
+This example runs offline. Use `await agent.call_tool(...)` in async code, or attach an LLM and use `invoke()` when the model should decide which tool to call.
+
 ## Register a collection or MCP server
 
 `agent.add_tools(iterable)` applies ordinary `add_tool` registration to tools and typed functions.
@@ -20,8 +37,6 @@ for collision handling, discovery side effects and connection ownership.
 
 See [Built-in Tools](builtin-tools.md) for the complete built-in catalog.
 [Execution, approvals and recovery](execution-tools.md) covers run handles, approval brokers and completion checks.
-
-Tools extend agent capabilities with additional functions. They enable LLMs and agents to interact with external systems, execute code, access data and perform specialized tasks that go beyond pure text generation.
 
 ## Overview
 

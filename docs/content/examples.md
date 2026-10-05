@@ -2,6 +2,16 @@
 
 This section links to example projects and code snippets in the repository.
 
+From a checkout with ProtoLink installed:
+
+```bash
+python examples/progressive_control.py
+python examples/subagents.py
+python examples/durable_execution.py
+```
+
+These scripts need no API keys or external services. The notebook and larger projects below include their own setup instructions for optional transports and model providers.
+
 :::tip[New here?]
 
 Start with the **Basic Example notebook** in `examples/notebooks/basic_example`. It starts a registry and two agents in one interactive walkthrough.
@@ -253,9 +263,9 @@ Run `python examples/service_backends.py` to exercise every concrete backend: `G
 The example replaces HTTP/IMAP/SMTP transports with offline fixtures while using real `Assistant`
 tools, approvals, serialization and MIME handling. See the [service backend reference](builtin-tools.md#calendar-and-email-backends).
 
-## Harness examples (v0.8.0)
+## Subagents and durable execution examples
 
 - [Local specialists](https://github.com/nMaroulis/protolink/blob/main/examples/subagents.py): an owned child using the existing `agent_call` action, with shared limits and streamed evidence.
 - [Durable execution](https://github.com/nMaroulis/protolink/blob/main/examples/durable_execution.py): approval and user input across three separate application invocations, with an offline model and a persisted tool result.
 
-Both examples run without API keys or external services. Read the [subagent](subagents.md) and [durable execution](durable-execution.md) guides for application controls and recovery scope.
+Both examples run without API keys or external services. Read the [subagent](subagents.md) and [durable execution](execution-tools.md#durable-execution) guides for application controls and recovery scope.

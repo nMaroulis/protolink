@@ -17,6 +17,21 @@ WebSocket connections, ProtoLink can authenticate peers before endpoint
 handlers run. Built-in authenticators verify credentials; application policy
 remains responsible for interpreting scopes and deciding authorization.
 
+```python
+import os
+from protolink import Agent
+from protolink.security import APIKeyAuth
+
+agent = Agent(
+    name="helper",
+    url="http://127.0.0.1:8001",
+    transport="http",
+    authenticator=APIKeyAuth({os.environ["AGENT_API_KEY"]: []}),
+)
+```
+
+Set `AGENT_API_KEY` in the server environment and install `protolink[http]`. This configures authentication; `agent.start()` starts serving. Tool capabilities and approval requirements belong to the separate [execution policy](execution-tools.md) layer.
+
 ---
 
 ## Overview

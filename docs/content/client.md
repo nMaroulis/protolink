@@ -8,6 +8,18 @@ import ApiReference, {
 
 # Client
 
+The **Client** layer in Protolink provides a high-level interface for agent-to-agent communication. It abstracts transport details and offers convenient methods for sending tasks, messages and retrieving agent metadata.
+
+```python
+from protolink.client import AgentClient
+
+client = AgentClient("http")
+helper = client.peer("http://127.0.0.1:8001")
+print(helper.sync.invoke("Summarize your capabilities."))
+```
+
+Install `protolink[http]` and start the target agent before making this call. In async applications use `await helper.invoke(...)`. Agents also expose `agent.peer(...)` with their configured registry and communication path.
+
 ## Bound peers
 
 `client.peer(target, registry=None, protocol="auto")` binds a URL, card, or unique registry name without I/O.
@@ -15,8 +27,6 @@ It provides `invoke`, `invoke_typed`, `call_tool` and `run_task`, with matching 
 `agent.peer(target)` also reuses the agent's configured registry and communication path.
 See [peer calls](progressive-control.md#call-a-peer) for resolution, native/A2A behavior and errors.
 
-
-The **Client** layer in Protolink provides a high-level interface for agent-to-agent communication. It abstracts transport details and offers convenient methods for sending tasks, messages and retrieving agent metadata.
 
 ## AgentClient
 

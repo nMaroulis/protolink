@@ -2,6 +2,13 @@
 
 Protolink ships with a command-line interface for project scaffolding, local health checks, registry inspection, run replay and regression diffing and local dashboard access to runtime and telemetry data.
 
+```bash
+uv add protolink
+uv run protolink doctor
+```
+
+`doctor` checks the local installation. Add a run store or registry URL to the commands below when you want to inspect your own application's data.
+
 The CLI is meant to be the shortest path from "I have a Protolink project" to "I can see what is installed, what agents are registered, what happened during a run and how my agent topology is shaped." It does not replace the Python API. Instead, it sits on top of the same public runtime contracts that applications use directly: `AgentCard`, `RunContext`, `RunEvent`, `RunReport`, `SQLiteRunStore` and registry discovery.
 
 Use the CLI in three common moments:

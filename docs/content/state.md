@@ -10,14 +10,32 @@ import ApiReference, {
 
 Protolink's State system is a sophisticated, modular orchestration layer that manages the persistence of an agent's internal data. It bridges the gap between the high-level **Agent** logic and the low-level **Storage** backends, providing a unified API for session-based memory.
 
+```python
+from protolink import Agent
+from protolink.storage import SQLiteStorage
+
+agent = Agent(
+    name="helper",
+    llm="mock",
+    state=["conversation"],
+    storage=SQLiteStorage("memory.sqlite", namespace="helper"),
+)
+agent.sync.invoke("Hello", session_id="customer-42")
+agent.sync.invoke("Continue our conversation.", session_id="customer-42")
+```
+
+Recreate the agent with the same database, namespace and session ID to continue its saved conversation. This preserves history between turns; [durable execution](execution-tools.md#durable-execution) separately checkpoints an unfinished operation so it can resume after a restart.
+
 ## Why use the State system?
 
 In a distributed agentic system, maintaining context is critical. Without state management, every interaction is a "cold start." The State system allows agents to:
 
-- **Resume conversations**: Remember what was said minutes or days ago.
-- **Persist tool data**: Allow tools to keep track of their own history or configuration.
-- **Track task progress**: Monitor long-running tasks across multiple execution cycles.
-- **Coordinate flows**: Manage checkpoints and state transitions in complex workflows.
+- **Resume conversations**: Remember what was said minutes or days ago through automatically persisted session history.
+- **Persist tool data**: Give custom tools a storage-backed module for their history or configuration.
+- **Track task progress**: Let application code retain task metadata across execution cycles.
+- **Coordinate flows**: Store application-defined workflow context through the flow module.
+
+Conversation persistence is integrated into the default runtime. Tool, task and flow modules are extension points: application code defines their persistence conventions. Execution suspension and resumption use [durable checkpoints](execution-tools.md#durable-execution).
 
 ---
 

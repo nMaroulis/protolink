@@ -10,6 +10,16 @@ import ApiReference, {
 
 ProtoLink centralizes the small vocabularies shared by agents, transports, request specifications, LLM adapters, state modules, models, security declarations and structured flows. These aliases make accepted values visible to type checkers and IDEs while keeping public signatures consistent across packages.
 
+```python
+from protolink import Agent
+from protolink.types import TransportType
+
+transport: TransportType = "http"
+agent = Agent(name="helper", transport=transport, url="http://127.0.0.1:8001")
+```
+
+Aliases annotate the values you pass to ordinary constructors and functions. They do not add a runtime component: `Literal` values guide IDEs and static checking, while the receiving API performs any runtime validation. This HTTP configuration requires `protolink[http]` and does not start a server.
+
 <ApiSurface
   eyebrow="Typing layer"
   title="Type Aliases"

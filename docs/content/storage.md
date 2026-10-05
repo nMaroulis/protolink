@@ -8,12 +8,34 @@ import ApiReference, {
 
 # Storage
 
-See [Execution, approvals and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks and bounded workflows.
-
 ProtoLink provides pluggable storage for Agent state, process-local caches and
 durable execution records. Persistence depends on the selected backend:
 `SQLiteStorage` survives restarts, while `InMemoryStorage` intentionally does
 not.
+
+```python
+from protolink import Agent
+from protolink.storage import SQLiteStorage
+
+agent = Agent(
+    name="helper",
+    llm="mock",
+    storage=SQLiteStorage("memory.sqlite", namespace="helper"),
+    state=["conversation"],
+)
+print(agent.sync.invoke("Hello", session_id="customer-42"))
+```
+
+SQLite persists this session's model history in a local file. `InMemoryStorage` keeps data in the current process. Pass your configured backend through `storage=`; state modules decide what to load and save.
+
+| Need | Attach or use | What it preserves |
+| --- | --- | --- |
+| Conversation memory or application key/value data | `storage=SQLiteStorage(...)` | Data used by enabled state modules and application code |
+| Inspect and compare past runs | `run_store=SQLiteRunStore(...)` | Task snapshots and diagnostic run reports |
+| Restore a filesystem change | `StorageCheckpointStore` with filesystem tools | Original resource bytes and recovery records |
+| Resume unfinished execution | `durability="runs.sqlite"` or `SQLiteDurableStore` | Pending actions, responses, committed results and execution progress |
+
+See [Execution, approvals and recovery](execution-tools.md) for the workflows using these stores. A saved conversation or report alone does not make an interrupted operation resumable.
 
 ## Storage Types
 
@@ -27,10 +49,14 @@ Protolink currently supports the following storage implementations:
   audit and regression workflows.
 - **`StorageCheckpointStore`** - recovery records and filtered inventory over a dedicated `Storage` namespace,
   imported from `protolink` or `protolink.core.resources`.
+- **`SQLiteDurableStore`** - fenced execution checkpoints for restarting paused or interrupted runs,
+  imported from `protolink` or `protolink.storage`.
 
 You can implement a custom state backend by subclassing `Storage`, or implement
-the structural `RunStore` protocol when execution records belong in an
-application database.
+the structural `RunStore` protocol when diagnostic execution records belong in an
+application database. Implement `DurableStore` when your application supplies its own
+execution checkpoint backend; its ownership and commit requirements are explained in
+[durable execution](execution-tools.md#storage-and-application-changes).
 
 ## Configuration
 

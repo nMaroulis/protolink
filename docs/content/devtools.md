@@ -6,6 +6,13 @@ Protolink includes local devtools for the same runtime contracts that power agen
 
 The important idea is that devtools are not a separate observability product bolted onto the framework. They are a small projection layer over Protolink's core design: an agent is an autonomous runtime entity and its execution can be described through typed context, events, reports, registry cards and stored task state.
 
+```bash
+protolink doctor
+protolink dashboard --store runs.db --open
+```
+
+The CLI is included in the base package. Point `--store` at your application's `SQLiteRunStore` file; add `--registry-url` for live agent discovery or a trace path for local telemetry. [Execution checkpoints](execution-tools.md#durable-execution) use a separate store for resumption.
+
 The current surface has four command groups, including the dashboard and its Studio builder:
 
 - `protolink doctor` checks local installation, optional extras, run-store readability and optional agent/registry endpoints.

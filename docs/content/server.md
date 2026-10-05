@@ -12,6 +12,15 @@ Servers in Protolink act as the **coordination layer** between business logic (A
 
 `AgentServer` always binds ProtoLink's native endpoints. When an HTTP agent is created with `a2a=True`, it additionally binds the A2A 1.0 adapter to the same execution logic. Agent authors still implement `handle_task(Task)` once.
 
+```python
+from protolink import Agent
+
+agent = Agent(name="helper", llm="mock", transport="http", url="http://127.0.0.1:8001")
+agent.start()
+```
+
+Install `protolink[http]`, then run this as a script. `start()` serves until shutdown and configures the server for you. Use the server classes below when extending endpoints or managing their lifecycle directly.
+
 <ApiSurface
   eyebrow="Server coordination layer"
   title="AgentServer and RegistryServer"

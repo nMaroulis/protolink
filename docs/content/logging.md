@@ -10,6 +10,16 @@ import ApiReference, {
 
 Protolink provides a unified logging package to manage console, file-based and intentionally silent logs consistently.
 
+```python
+from protolink import Agent
+from protolink.logging import FileLogger
+
+agent = Agent(name="helper", llm="mock", logger=FileLogger("agent.log"))
+print(agent.sync.invoke("Hello"))
+```
+
+The offline run writes ordinary log messages to `agent.log`. Use [telemetry](telemetry.md) for nested execution traces and [runtime reports](runtime.md) for structured run evidence.
+
 ## Overview
 
 Protolink's logging is built around a common `BaseLogger` abstract class, which ensures that custom and built-in loggers expose the standard logging methods. 

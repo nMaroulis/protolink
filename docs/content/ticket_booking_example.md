@@ -2,6 +2,16 @@ import ExampleArticle from '@site/src/components/ExampleArticle';
 
 # Ticket Booking Example
 
+This example demonstrates a practical multi-agent vacation planning workflow. A user asks for a relaxing Greek island trip and a coordinator agent delegates to specialist agents for advice, weather validation and hotel booking.
+
+After installing `protolink[http,llms]` and configuring a provider as described below:
+
+```bash
+python examples/ticket_booking/run.py "Plan a relaxing five-night trip to Santorini"
+```
+
+Run this from the repository root. The weather and hotel tools return deterministic example data; they illustrate tool contracts rather than connecting to a live booking service.
+
 <ExampleArticle
   source="Level Up Coding"
   title="Your First Autonomous Agent Mesh - Easier Than You Think"
@@ -13,8 +23,6 @@ import ExampleArticle from '@site/src/components/ExampleArticle';
 
 
 The source files live in [`examples/ticket_booking`](https://github.com/nMaroulis/protolink/tree/main/examples/ticket_booking).
-
-This example demonstrates a practical multi-agent vacation planning workflow. A user asks for a relaxing Greek island trip and a coordinator agent delegates to specialist agents for advice, weather validation and hotel booking.
 
 It highlights:
 

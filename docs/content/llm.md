@@ -10,6 +10,16 @@ import ApiReference, {
 
 ProtoLink's LLM package starts with a simple promise: choose where a model runs, then use the same application-facing contract to talk to it. That contract can stop after one text response, stream text as it arrives, or continue into a controlled Agent loop where the model requests tools and delegates work while ProtoLink remains responsible for execution.
 
+```python
+from protolink import Agent, create_llm
+
+model = create_llm("mock", default_response="Hello")
+agent = Agent(name="helper", llm=model)
+print(agent.sync.invoke("Say hello"))  # Hello
+```
+
+The mock backend needs no credentials or server. Replace it with a provider alias or configured adapter through `llm=`. The adapter handles model communication; the Agent owns tool execution, policy and task lifecycle.
+
 The useful mental model is a progression:
 
 1. **Choose a backend**: hosted API, model server, in-process local model, or deterministic mock.
