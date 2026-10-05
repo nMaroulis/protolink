@@ -15,9 +15,11 @@ ProtoLink derives argument schemas from type hints, validates each call and appl
 ```python
 from protolink import Agent
 
+
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
+
 
 agent = Agent(name="calculator", tools=[add])
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
