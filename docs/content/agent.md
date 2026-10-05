@@ -11,6 +11,20 @@ import registryStatusCard from '@site/assets/registry_status_card.png';
 
 # Agents
 
+Agents are the core building blocks in Protolink.
+
+An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part` and `Artifact` primitives and can act as both **client and server**.
+It is the **core building block** of Protolink, responsible for managing identity, capabilities and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **knowledge and RAG**, **transport**, **state**, **storage**, **telemetry** and **logging**.
+
+```python
+from protolink import Agent
+
+agent = Agent(name="helper", llm="mock")
+print(agent.sync.invoke("Hello"))
+```
+
+`llm="mock"` selects the deterministic offline adapter. Use `await agent.invoke(...)` inside an async application; compose tools through `tools=` and network communication through `transport=`.
+
 ## Convenience methods
 
 Start with `invoke` or `ask`, then add `budget=RunBudget(...)` or `context=RunContext(...)`.
@@ -20,15 +34,10 @@ Start with `invoke` or `ask`, then add `budget=RunBudget(...)` or `context=RunCo
 See [Progressive control](progressive-control.md) for signatures, examples, precedence and failure behavior.
 
 
-Agents are the core building blocks in Protolink.
-
 For optional `Assistant`, `CodeAssistant` and `EchoAgent` classes, see [Built-in Agents](builtin-agents.md).
 For reusable capabilities to register on any Agent, see [Built-in Tools](builtin-tools.md).
 
 ## Concepts
-
-An **Agent** is ProtoLink's A2A-first runtime entity. It owns an `AgentCard`, receives and returns `Task` objects composed of `Message`, `Part` and `Artifact` primitives and can act as both **client and server**.
-It is the **core building block** of Protolink, responsible for managing identity, capabilities and interactions between agents. The Agent integrates key components such as **tools**, **LLMs**, **knowledge and RAG**, **transport**, **state**, **storage**, **telemetry** and **logging**.
 
 `Agent(..., transport="http", a2a=True)` adds [A2A 1.0](https://a2a-protocol.org/latest/specification/) inbound and outbound translation without changing `handle_task(Task)` or removing the native ProtoLink endpoints. The default `a2a=False` preserves the previous native-only behavior.
 
@@ -59,7 +68,7 @@ High‑level ideas:
 
 ## Local specialists and durable execution
 
-Configure `subagents=[specialist]` for owned local children and `durability="runs.sqlite"` for restartable default-loop execution. Both are optional. See [local subagents](subagents.md) for limits and background work, and [durable execution](durable-execution.md) for approvals, input, `resume()` and uncertain outcomes.
+Configure `subagents=[specialist]` for owned local children and `durability="runs.sqlite"` for restartable default-loop execution. Both are optional. See [local subagents](subagents.md) for limits and background work, and [durable execution](execution-tools.md#durable-execution) for approvals, input, `resume()` and uncertain outcomes.
 
 `subagent_limits=SubagentLimits(...)` supplies deeper control. `execution_version="1"` identifies your application tool contract; increment it when executable behavior changes. `durability` also accepts a `SQLiteDurableStore` or a custom `DurableStore`.
 

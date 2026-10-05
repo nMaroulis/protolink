@@ -9,6 +9,22 @@ ProtoLink then adds the execution substrate A2A leaves open: pluggable LLMs,
 native and MCP tools, transports, registry services, state, policy,
 authentication, logging and telemetry.
 
+Enable standard A2A HTTP communication when your agent must exchange work with other A2A implementations:
+
+```python
+from protolink import Agent
+
+agent = Agent(
+    name="helper",
+    llm="mock",
+    url="http://127.0.0.1:8001",
+    transport="http",
+    a2a=True,
+)
+```
+
+Install `protolink[http]` and call `agent.start()` to serve it. The HTTP adapter translates supported A2A wire operations to the same native task executor. The protocol versions below identify interoperability contracts; they do not change how you construct or invoke an agent.
+
 ## From native A2A 0.3 primitives to A2A 1.0
 
 ProtoLink was originally built natively on the [A2A 0.3
