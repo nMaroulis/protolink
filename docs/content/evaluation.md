@@ -6,6 +6,7 @@ Evaluations run an Agent against named reference cases and score its actual outp
 import asyncio
 from protolink import EchoAgent, EvaluationCase, evaluate
 
+
 async def main():
     report = await evaluate(
         lambda: EchoAgent(verbosity=0),
@@ -13,6 +14,7 @@ async def main():
         repetitions=2,
     )
     print(report.passed)  # True
+
 
 asyncio.run(main())
 ```
@@ -45,6 +47,7 @@ The default check, `exact_match`, compares the final output to `expected` using 
 ```python
 from protolink import EvaluationScore, tool_used
 
+
 def has_citations(sample):
     output = sample.output
     return EvaluationScore(
@@ -52,6 +55,7 @@ def has_citations(sample):
         float(isinstance(output, str) and "https://" in output),
         "Require a source URL in the completed answer.",
     )
+
 
 report = await evaluate(
     make_research_agent,

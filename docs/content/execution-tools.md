@@ -228,6 +228,7 @@ Arbitrary internal steps inside a Python tool are one operation from the checkpo
 from protolink import Agent, RunManager
 from protolink.tools import ask_user_tool
 
+
 def application():
     return Agent(
         name="helper",
@@ -235,6 +236,7 @@ def application():
         tools=[ask_user_tool()],
         durability="runs.sqlite",
     )
+
 
 manager = RunManager(application())
 print(manager.list(status="input-required"))

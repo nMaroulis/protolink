@@ -5,9 +5,11 @@ Lifecycle hooks let an application prepare model inputs, transform successful to
 ```python
 from protolink import Agent, AgentHooks, FinalResponse
 
+
 def check_answer(response: FinalResponse) -> None:
     if not isinstance(response.content, str) or not response.content.strip():
         raise ValueError("Expected a nonempty answer")
+
 
 agent = Agent(
     name="helper",
@@ -32,21 +34,26 @@ Callbacks run in registration order and may be synchronous or asynchronous. They
 ```python
 from protolink import Agent, AgentHooks, ModelRequest, ToolObservation
 
+
 def select_context(request: ModelRequest) -> None:
     # Remove this registered capability from this model step.
     request.tools.pop("delete_document", None)
+
 
 async def normalize_observation(observation: ToolObservation) -> None:
     if observation.name == "search" and isinstance(observation.result, dict):
         observation.result = {"hits": observation.result.get("hits", [])}
 
+
 agent = Agent(
     name="helper",
     llm="mock",
-    hooks=[AgentHooks(
-        before_model=select_context,
-        after_tool=normalize_observation,
-    )],
+    hooks=[
+        AgentHooks(
+            before_model=select_context,
+            after_tool=normalize_observation,
+        )
+    ],
 )
 ```
 

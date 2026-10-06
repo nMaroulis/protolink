@@ -391,10 +391,12 @@ Direct `llm.infer(...)` calls are unchanged: they use the LLM's default history 
 from protolink import Agent, RoutedLLM
 from protolink.llms import MockLLM
 
-models = RoutedLLM({
-    "fast": MockLLM(default_response="A quick response"),
-    "reasoning": MockLLM(default_response="A detailed response"),
-})
+models = RoutedLLM(
+    {
+        "fast": MockLLM(default_response="A quick response"),
+        "reasoning": MockLLM(default_response="A detailed response"),
+    }
+)
 agent = Agent(name="helper", llm=models)
 print(agent.sync.invoke("Hello"))
 ```
@@ -404,13 +406,14 @@ The first configured key is the default. Values can be configured `LLM` objects 
 ```python
 from protolink import RoutedLLM
 
+
 def choose_model(history):
     latest_user = next(
-        (message["content"] for message in reversed(history.messages)
-         if message["role"] == "user"),
+        (message["content"] for message in reversed(history.messages) if message["role"] == "user"),
         "",
     )
     return "reasoning" if "analyze" in latest_user.lower() else "fast"
+
 
 models = RoutedLLM(
     {"fast": fast_adapter, "reasoning": reasoning_adapter},
