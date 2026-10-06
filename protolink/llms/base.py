@@ -69,6 +69,7 @@ See Also:
 """
 
 import asyncio
+import copy
 import inspect
 import json
 import re
@@ -85,6 +86,7 @@ from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError, BudgetPolicy
 from protolink.core.cancellation import CancellationToken
 from protolink.core.execution import closing_stream
+from protolink.core.hooks import AgentHooks, FinalResponse, ModelRequest, ToolObservation, apply_hooks
 from protolink.core.part import Part
 from protolink.core.policy import (
     ActionAuthorization,
@@ -107,6 +109,7 @@ from protolink.llms.compaction import (
     HistoryCompactor,
 )
 from protolink.llms.context import ContextManifest, build_context_manifest
+from protolink.llms.context_policy import ContextPolicy
 from protolink.llms.errors import InferParseError
 from protolink.llms.history import EPHEMERAL_TOOL_OBSERVATION_KEY, ConversationHistory
 from protolink.llms.metrics import (
@@ -708,6 +711,9 @@ class LLM(ABC):
         run_context: RunContext | dict[str, Any] | None = None,
         budget_policy: BudgetPolicy | None = None,
         budget_enforcer: BudgetEnforcer | None = None,
+        context_policy: ContextPolicy | None = None,
+        hooks: tuple[AgentHooks, ...] = (),
+        tool_prompt_builder: Callable[[dict[str, BaseTool]], None] | None = None,
     ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -803,6 +809,16 @@ class LLM(ABC):
         budget_enforcer : BudgetEnforcer, optional
             Existing task-scoped enforcer. The Agent runtime supplies one when several infer/tool parts share a task so
             usage, warnings and runtime accounting remain cumulative. Direct LLM callers may omit it.
+        context_policy : ContextPolicy, optional
+            Deterministic preparation before requests and bounded observation offloading.
+            Agent supplies the scoped artifact inventory/retrieval tool; direct callers
+            must supply that scope if their observations require offloading.
+        hooks : tuple[AgentHooks, ...], optional
+            Ordered authoritative callbacks for model inputs, successful observations
+            and final content. Callbacks mutate their input and return None.
+        tool_prompt_builder : Callable, optional
+            Agent-owned callback that regenerates the system prompt for a filtered
+            roster. A hook's explicit compiled-system-message edit takes precedence.
 
         Returns
         -------
@@ -880,18 +896,27 @@ class LLM(ABC):
         """
 
         active_context = _coerce_run_context(run_context)
+        registered_tools = dict(tools)
         if active_context.canceled:
             raise asyncio.CancelledError(active_context.cancel_reason or "Run context was canceled before inference")
         if cancellation_token is not None:
             cancellation_token.raise_if_cancelled()
 
-        active_budget_enforcer = budget_enforcer or BudgetEnforcer(active_context, policy=budget_policy)
-        self.history.add_user(query)
+        from protolink.core.durable import current_durable_run
+        from protolink.storage.durable import DurableExecutionError
 
-        steps: int = 0
-        parse_failures: int = 0
+        durable = current_durable_run()
+        saved_loop = durable.loop_state() if durable is not None else None
+        active_budget_enforcer = budget_enforcer or BudgetEnforcer(active_context, policy=budget_policy)
+        if saved_loop is not None:
+            self.history.replace(saved_loop["history"])
+        else:
+            self.history.add_user(query)
+
+        steps: int = saved_loop["steps"] if saved_loop is not None else 0
+        parse_failures: int = saved_loop["parse_failures"] if saved_loop is not None else 0
         max_parse_failures = self.max_parse_failures
-        recent_actions: list[str] = []  # Track recent actions for dedup detection
+        recent_actions: list[str] = list(saved_loop["recent_actions"]) if saved_loop is not None else []
         max_recent_actions: int = 5  # Window for detecting repeated actions
         observer_disabled = False
 
@@ -956,197 +981,262 @@ class LLM(ABC):
 
         metrics_active = self.metrics_enabled and event_callback is not None and event_metrics is not False
 
-        while steps < MAX_INFER_STEPS:
-            if cancellation_token is not None:
-                cancellation_token.raise_if_cancelled()
-            steps += 1
-            await enforce_budget(active_budget_enforcer.check_next_step())
-            await emit({"type": "llm_step", "step": steps})
-            action_error: ValueError | None = None
-            action_result: LLMActionResult | None = None
-            call_metrics: LLMCallMetrics | None = None
-            manifest: ContextManifest = build_context_manifest(
-                history=self.history,
-                query=query,
-                run_context=active_context,
-                provider=str(getattr(self, "provider", "")) or None,
-                model=self.model,
-                profile=self.metrics_profile,
-                tools=tools,
-                agent_cards=agent_cards,
-            )
-            manifest_payload = manifest.to_dict()
-            await emit({"type": "context_prepared", "step": steps, "manifest": manifest_payload})
-            await enforce_budget(active_budget_enforcer.check_llm_call(input_tokens=manifest.total_estimated_tokens))
-
-            if metrics_active:
-                context_usage: LLMContextUsage = context_usage_from_tokens(
-                    manifest.total_estimated_tokens,
-                    self.metrics_profile,
-                    estimated=True,
-                )
-                await emit(
-                    {
-                        "type": "llm_context",
-                        "step": steps,
-                        "provider": self.provider,
-                        "model": self.model,
-                        "manifest": manifest_payload,
-                        "context": context_usage.to_dict(),
-                    }
+        def checkpoint_ready() -> None:
+            if durable is not None:
+                durable.save_loop(
+                    self.history,
+                    steps=steps,
+                    parse_failures=parse_failures,
+                    recent_actions=recent_actions,
+                    pending=None,
                 )
 
-            # ─────────────────────────────────────────────────────────────────
-            # Step 1: Ask the LLM adapter for one typed action
-            # ─────────────────────────────────────────────────────────────────
-            attempt_count = 0
-            stream_state = {"output_exposed": False}
+        while steps < MAX_INFER_STEPS or (
+            durable is not None and (durable.loop_state() or {}).get("pending") is not None
+        ):
+            pending_state = durable.loop_state() if durable is not None else None
+            pending = pending_state.get("pending") if pending_state is not None else None
+            if pending is not None:
+                from protolink.llms.actions import validate_action_payload
 
-            async def before_llm_attempt(
-                attempt: int,
-                current_step: int = steps,
-                input_tokens: int = manifest.total_estimated_tokens,
-                current_manifest: dict[str, Any] = manifest_payload,
-            ) -> None:
-                nonlocal attempt_count
                 if cancellation_token is not None:
                     cancellation_token.raise_if_cancelled()
-                if attempt > 1:
-                    await enforce_budget(active_budget_enforcer.evaluate())
-                    await enforce_budget(active_budget_enforcer.check_llm_call(input_tokens=input_tokens))
-                attempt_count = attempt
-                await emit(
-                    {
-                        "type": "llm_call_started",
-                        "step": current_step,
-                        "attempt": attempt,
-                        "provider": self.provider,
-                        "model": self.model,
-                        "streaming": streaming,
-                        "manifest": current_manifest,
-                    }
+                action_result = LLMActionResult(
+                    action=validate_action_payload(pending["action"]),
+                    raw_response=pending["raw_response"],
+                    native=pending["native"],
+                    metadata=pending["metadata"],
+                )
+                tools = {name: registered_tools[name] for name in pending.get("tool_names", registered_tools)}
+                action_error = None
+            else:
+                if cancellation_token is not None:
+                    cancellation_token.raise_if_cancelled()
+                steps += 1
+                await enforce_budget(active_budget_enforcer.check_next_step())
+                await emit({"type": "llm_step", "step": steps})
+                if tool_prompt_builder is not None:
+                    tool_prompt_builder(registered_tools)
+                original_system = (
+                    self.history.messages_raw()[0].content
+                    if hooks and tool_prompt_builder is not None and len(self.history)
+                    else None
+                )
+                if hooks:
+                    request = ModelRequest(self.history, dict(registered_tools), active_context.copy(), steps)
+                    await apply_hooks(hooks, "before_model", request)
+                    if request.history is not self.history:
+                        raise ValueError("before_model hooks must mutate the active history, not replace it")
+                    if any(
+                        name not in registered_tools or tool is not registered_tools[name]
+                        for name, tool in request.tools.items()
+                    ):
+                        raise ValueError("before_model hooks may remove tools, not introduce or replace them")
+                    tools = request.tools
+                if tool_prompt_builder is not None and set(tools) != set(registered_tools):
+                    edited_system = self.history.messages_raw()[0].content if len(self.history) else None
+                    tool_prompt_builder(tools)
+                    if edited_system is not None and edited_system != original_system:
+                        self.history.set_system(edited_system)
+                if context_policy is not None:
+                    prepared = context_policy.prepare(
+                        self.history, context_window=getattr(self.metrics_profile, "context_window", None)
+                    )
+                    await emit({"type": "context_compacted", "step": steps, **prepared})
+                action_error: ValueError | None = None
+                action_result: LLMActionResult | None = None
+                call_metrics: LLMCallMetrics | None = None
+                manifest: ContextManifest = build_context_manifest(
+                    history=self.history,
+                    query=query,
+                    run_context=active_context,
+                    provider=str(getattr(self, "provider", "")) or None,
+                    model=self.model,
+                    profile=self.metrics_profile,
+                    tools=tools,
+                    agent_cards=agent_cards,
+                )
+                manifest_payload = manifest.to_dict()
+                await emit({"type": "context_prepared", "step": steps, "manifest": manifest_payload})
+                await enforce_budget(
+                    active_budget_enforcer.check_llm_call(input_tokens=manifest.total_estimated_tokens)
                 )
 
-            async def on_llm_retry(
-                failed_attempt: int,
-                exc: Exception,
-                delay: float,
-                current_step: int = steps,
-            ) -> None:
-                await emit(
-                    {
-                        "type": "llm_retry",
-                        "step": current_step,
-                        "reason": "transient_error",
-                        "attempt": failed_attempt,
-                        "next_attempt": failed_attempt + 1,
-                        "retry_in_seconds": round(delay, 3),
-                        "error_type": type(exc).__name__,
-                        "message": str(exc),
-                    }
-                )
+                checkpoint_ready()
 
-            try:
-                import time
+                if metrics_active:
+                    context_usage: LLMContextUsage = context_usage_from_tokens(
+                        manifest.total_estimated_tokens,
+                        self.metrics_profile,
+                        estimated=True,
+                    )
+                    await emit(
+                        {
+                            "type": "llm_context",
+                            "step": steps,
+                            "provider": self.provider,
+                            "model": self.model,
+                            "manifest": manifest_payload,
+                            "context": context_usage.to_dict(),
+                        }
+                    )
 
-                call_started_at = time.perf_counter()
-                if streaming:
+                # ─────────────────────────────────────────────────────────────────
+                # Step 1: Ask the LLM adapter for one typed action
+                # ─────────────────────────────────────────────────────────────────
+                attempt_count = 0
+                stream_state = {"output_exposed": False}
 
-                    async def stream_action(current_step=steps, current_stream_state=stream_state):
-                        async def emit_chunk(chunk: str) -> None:
-                            current_stream_state["output_exposed"] = True
-                            await emit({"type": "llm_chunk", "step": current_step, "content": chunk})
+                async def before_llm_attempt(
+                    attempt: int,
+                    current_step: int = steps,
+                    input_tokens: int = manifest.total_estimated_tokens,
+                    current_manifest: dict[str, Any] = manifest_payload,
+                ) -> None:
+                    nonlocal attempt_count
+                    if cancellation_token is not None:
+                        cancellation_token.raise_if_cancelled()
+                    if attempt > 1:
+                        await enforce_budget(active_budget_enforcer.evaluate())
+                        await enforce_budget(active_budget_enforcer.check_llm_call(input_tokens=input_tokens))
+                    attempt_count = attempt
+                    checkpoint_ready()
+                    await emit(
+                        {
+                            "type": "llm_call_started",
+                            "step": current_step,
+                            "attempt": attempt,
+                            "provider": self.provider,
+                            "model": self.model,
+                            "streaming": streaming,
+                            "manifest": current_manifest,
+                        }
+                    )
 
-                        return await self.call_action_stream(
+                async def on_llm_retry(
+                    failed_attempt: int,
+                    exc: Exception,
+                    delay: float,
+                    current_step: int = steps,
+                ) -> None:
+                    await emit(
+                        {
+                            "type": "llm_retry",
+                            "step": current_step,
+                            "reason": "transient_error",
+                            "attempt": failed_attempt,
+                            "next_attempt": failed_attempt + 1,
+                            "retry_in_seconds": round(delay, 3),
+                            "error_type": type(exc).__name__,
+                            "message": str(exc),
+                        }
+                    )
+
+                try:
+                    import time
+
+                    call_started_at = time.perf_counter()
+                    if streaming:
+
+                        async def stream_action(
+                            current_step=steps, current_stream_state=stream_state, current_tools=tools
+                        ):
+                            async def emit_chunk(chunk: str) -> None:
+                                current_stream_state["output_exposed"] = True
+                                await emit({"type": "llm_chunk", "step": current_step, "content": chunk})
+
+                            return await self.call_action_stream(
+                                self.history,
+                                tools=current_tools,
+                                agent_callback_available=agent_callback is not None,
+                                agent_cards=agent_cards,
+                                chunk_callback=emit_chunk,
+                            )
+
+                        def allow_stream_retry(_exc: Exception, current_stream_state=stream_state) -> bool:
+                            return not current_stream_state["output_exposed"]
+
+                        action_result = await self._call_with_retry(
+                            stream_action,
+                            _before_attempt=before_llm_attempt,
+                            _on_retry=on_llm_retry,
+                            _retry_predicate=allow_stream_retry,
+                        )
+                        raw_response = action_result.raw_response
+                    else:
+                        action_result = await self._call_with_retry(
+                            self.call_action,
                             self.history,
                             tools=tools,
                             agent_callback_available=agent_callback is not None,
                             agent_cards=agent_cards,
-                            chunk_callback=emit_chunk,
+                            _before_attempt=before_llm_attempt,
+                            _on_retry=on_llm_retry,
                         )
-
-                    def allow_stream_retry(_exc: Exception, current_stream_state=stream_state) -> bool:
-                        return not current_stream_state["output_exposed"]
-
-                    action_result = await self._call_with_retry(
-                        stream_action,
-                        _before_attempt=before_llm_attempt,
-                        _on_retry=on_llm_retry,
-                        _retry_predicate=allow_stream_retry,
+                        raw_response = action_result.raw_response
+                    latency_ms = round((time.perf_counter() - call_started_at) * 1000, 3)
+                    response_metadata = dict(action_result.metadata if action_result is not None else {})
+                    response_metadata["attempts"] = attempt_count
+                    response_metadata["retry_attempts"] = max(attempt_count - 1, 0)
+                    needs_call_metrics = (
+                        metrics_active or active_budget_enforcer.has_output_token_limit
+                    ) and action_result is not None
+                    if needs_call_metrics and action_result is not None:
+                        call_metrics = build_call_metrics(
+                            step=steps,
+                            provider=str(getattr(self, "provider", "")) or None,
+                            model=self.model,
+                            latency_ms=latency_ms,
+                            input_value=self.history,
+                            output_value=action_result.raw_response,
+                            profile=self.metrics_profile,
+                            provider_usage=response_metadata.get("usage"),
+                            streaming=streaming,
+                            native=action_result.native,
+                        )
+                        metrics_payload = call_metrics.to_dict()
+                        response_metadata["metrics"] = metrics_payload
+                        if metrics_active:
+                            await emit({"type": "llm_call_metrics", **metrics_payload})
+                        await enforce_budget(
+                            active_budget_enforcer.record_output_tokens(call_metrics.usage.output_tokens)
+                        )
+                    await emit(
+                        {
+                            "type": "llm_call_completed",
+                            "step": steps,
+                            "provider": self.provider,
+                            "model": self.model,
+                            "latency_ms": latency_ms,
+                            "attempts": attempt_count,
+                            "streaming": streaming,
+                            "native": action_result.native if action_result is not None else False,
+                            "metrics": call_metrics.to_dict() if call_metrics else None,
+                            "budget": active_budget_enforcer.usage.to_dict(),
+                        }
                     )
-                    raw_response = action_result.raw_response
-                else:
-                    action_result = await self._call_with_retry(
-                        self.call_action,
-                        self.history,
-                        tools=tools,
-                        agent_callback_available=agent_callback is not None,
-                        agent_cards=agent_cards,
-                        _before_attempt=before_llm_attempt,
-                        _on_retry=on_llm_retry,
+                    await emit(
+                        {
+                            "type": "llm_response",
+                            "step": steps,
+                            "streaming": streaming,
+                            "native": action_result.native if action_result is not None else False,
+                            "metadata": response_metadata,
+                            "metrics": call_metrics.to_dict() if call_metrics else None,
+                        }
                     )
-                    raw_response = action_result.raw_response
-                latency_ms = round((time.perf_counter() - call_started_at) * 1000, 3)
-                response_metadata = dict(action_result.metadata if action_result is not None else {})
-                response_metadata["attempts"] = attempt_count
-                response_metadata["retry_attempts"] = max(attempt_count - 1, 0)
-                needs_call_metrics = (
-                    metrics_active or active_budget_enforcer.has_output_token_limit
-                ) and action_result is not None
-                if needs_call_metrics and action_result is not None:
-                    call_metrics = build_call_metrics(
-                        step=steps,
-                        provider=str(getattr(self, "provider", "")) or None,
-                        model=self.model,
-                        latency_ms=latency_ms,
-                        input_value=self.history,
-                        output_value=action_result.raw_response,
-                        profile=self.metrics_profile,
-                        provider_usage=response_metadata.get("usage"),
-                        streaming=streaming,
-                        native=action_result.native,
-                    )
-                    metrics_payload = call_metrics.to_dict()
-                    response_metadata["metrics"] = metrics_payload
-                    if metrics_active:
-                        await emit({"type": "llm_call_metrics", **metrics_payload})
-                    await enforce_budget(active_budget_enforcer.record_output_tokens(call_metrics.usage.output_tokens))
-                await emit(
-                    {
-                        "type": "llm_call_completed",
-                        "step": steps,
-                        "provider": self.provider,
-                        "model": self.model,
-                        "latency_ms": latency_ms,
-                        "attempts": attempt_count,
-                        "streaming": streaming,
-                        "native": action_result.native if action_result is not None else False,
-                        "metrics": call_metrics.to_dict() if call_metrics else None,
-                        "budget": active_budget_enforcer.usage.to_dict(),
-                    }
-                )
-                await emit(
-                    {
-                        "type": "llm_response",
-                        "step": steps,
-                        "streaming": streaming,
-                        "native": action_result.native if action_result is not None else False,
-                        "metadata": response_metadata,
-                        "metrics": call_metrics.to_dict() if call_metrics else None,
-                    }
-                )
-                # Runtime budgets are checked after every physical operation as
-                # well as before the next step. This catches a call that itself
-                # crossed the configured wall-clock limit, including final calls
-                # that would otherwise return immediately.
-                await enforce_budget(active_budget_enforcer.evaluate())
-            except ValueError as e:
-                action_error = e
-            except BudgetExceededError:
-                raise
-            except Exception as e:
-                await emit({"type": "llm_error", "step": steps, "message": str(e), "recoverable": False})
-                raise RuntimeError(f"LLM call failed at step {steps}: {e}") from e
+                    # Runtime budgets are checked after every physical operation as
+                    # well as before the next step. This catches a call that itself
+                    # crossed the configured wall-clock limit, including final calls
+                    # that would otherwise return immediately.
+                    await enforce_budget(active_budget_enforcer.evaluate())
+                except ValueError as e:
+                    action_error = e
+                except BudgetExceededError:
+                    raise
+                except Exception as e:
+                    await emit({"type": "llm_error", "step": steps, "message": str(e), "recoverable": False})
+                    raise RuntimeError(f"LLM call failed at step {steps}: {e}") from e
 
             # ─────────────────────────────────────────────────────────────────
             # Step 2: Normalize parsed action fields
@@ -1189,19 +1279,44 @@ class LLM(ABC):
                         agent_callback_available=agent_callback is not None,
                     )
                 )
+                checkpoint_ready()
                 continue
 
             # ─────────────────────────────────────────────────────────────────
             # Step 3: Deduplication detection for repeated actions
             # ─────────────────────────────────────────────────────────────────
+            if durable is not None:
+                durable.slot = f"{durable.part_key}:{steps}"
+                durable.save_loop(
+                    self.history,
+                    steps=steps,
+                    parse_failures=parse_failures,
+                    recent_actions=recent_actions,
+                    pending={
+                        "action": action_obj.model_dump(exclude_none=True),
+                        "raw_response": raw_response,
+                        "native": action_result.native,
+                        "metadata": action_result.metadata,
+                        "tool_names": list(tools),
+                    },
+                )
             await emit({"type": "llm_action", "step": steps, "action": action, "payload": payload})
 
             # Final actions have no side effect to deduplicate and should be
             # returned immediately even if their content repeats earlier text.
             if isinstance(action_obj, FinalAction):
                 content = action_obj.content
-                self.history.add_assistant(raw_response)
+                if hooks:
+                    final = FinalResponse(copy.deepcopy(content), active_context.copy(), steps)
+                    await apply_hooks(hooks, "before_complete", final)
+                    content = final.content
+                self.history.add_assistant(
+                    json.dumps({"type": "final", "content": content}, default=json_history_default)
+                    if hooks
+                    else raw_response
+                )
                 await emit({"type": "llm_final", "step": steps, "content": content, "final": True})
+                checkpoint_ready()
                 return Part("infer_output", content)
 
             action_signature = self._compute_action_signature(action_obj)
@@ -1221,6 +1336,7 @@ class LLM(ABC):
                     f"The result is in your context. Please proceed with your task - "
                     f"either produce a 'final' response or take a different action."
                 )
+                checkpoint_ready()
                 continue
 
             # ─────────────────────────────────────────────────────────────────
@@ -1255,6 +1371,7 @@ class LLM(ABC):
                             "The `tool_call` was structurally valid, but no local tools are available "
                             "for this inference. Choose another action, such as `final`."
                         )
+                    checkpoint_ready()
                     continue
 
                 tool = tools[tool_name]
@@ -1275,6 +1392,7 @@ class LLM(ABC):
                     self.history.add_system(
                         f"Tool '{tool_name}' arguments were invalid: {e}. Check the tool's input schema and try again."
                     )
+                    checkpoint_ready()
                     continue
 
                 try:
@@ -1297,7 +1415,10 @@ class LLM(ABC):
                     else:
                         action_id = runtime_action.action_id
                     await enforce_budget(active_budget_enforcer.evaluate())
-                    await enforce_budget(active_budget_enforcer.check_tool_call())
+                    if durable is None or not durable.tool_charged:
+                        await enforce_budget(active_budget_enforcer.check_tool_call())
+                        if durable is not None:
+                            durable.mark_tool_charged()
                     await emit(
                         {
                             "type": "tool_start",
@@ -1307,20 +1428,21 @@ class LLM(ABC):
                             "action_id": action_id,
                         }
                     )
-                    if callable(getattr(tool, "execute_authorized", None)):
+                    if authorization is not None:
                         from protolink.core.execution import ToolExecution, execute_authorized_tool
 
-                        if authorization is None:
-                            raise RuntimeError("Prepared tools require an action authorizer")
                         tool_result = await execute_authorized_tool(
                             tool,
                             ToolExecution(authorization, active_context, active_budget_enforcer, cancellation_token),
+                            emit_events=callable(getattr(tool, "execute_authorized", None)),
                         )
                     else:
                         if cancellation_token is not None:
                             cancellation_token.raise_if_cancelled()
                         tool_result = await tool(**tool_args)
                 except ActionPolicyError:
+                    raise
+                except DurableExecutionError:
                     raise
                 except BudgetExceededError:
                     raise
@@ -1337,6 +1459,18 @@ class LLM(ABC):
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
                 history_tool_result = _history_safe_result(tool_result)
+                if hooks:
+                    observation = ToolObservation(
+                        tool_name, copy.deepcopy(history_tool_result), active_context.copy(), steps
+                    )
+                    await apply_hooks(hooks, "after_tool", observation)
+                    history_tool_result = observation.result
+                if (
+                    context_policy is not None
+                    and tool_name != "read_context_artifact"
+                    and not getattr(tool, "_protolink_ephemeral_result", False)
+                ):
+                    history_tool_result = context_policy.observation(history_tool_result)
                 observation_fallback = False
                 observation_start = len(self.history)
                 try:
@@ -1363,6 +1497,14 @@ class LLM(ABC):
                             default=json_history_default,
                         )
                     )
+                if context_policy is not None:
+                    from protolink.llms.context_policy import CONTEXT_OBSERVATION_KEY
+
+                    marker = {"tool": tool_name}
+                    if isinstance(history_tool_result, dict) and "context_artifact" in history_tool_result:
+                        marker["context_artifact"] = history_tool_result["context_artifact"]
+                    for message in self.history.messages_raw()[observation_start:]:
+                        message.metadata[CONTEXT_OBSERVATION_KEY] = marker
                 if getattr(tool, "_protolink_ephemeral_result", False):
                     marker = {
                         "tool": tool_name,
@@ -1384,6 +1526,7 @@ class LLM(ABC):
                 # A completed tool may already have committed a side effect.
                 # Record it before honoring a cancellation or runtime overrun;
                 # the next loop preflight prevents any further dispatch.
+                checkpoint_ready()
                 continue
 
             elif isinstance(action_obj, AgentCallAction):
@@ -1406,6 +1549,7 @@ class LLM(ABC):
                         "The `agent_call` was structurally valid, but no agent delegation route is available "
                         f"for this inference. Choose {alternatives} instead."
                     )
+                    checkpoint_ready()
                     continue
 
                 # Add assistant call to history before result
@@ -1443,6 +1587,8 @@ class LLM(ABC):
                     agent_result = await agent_callback(agent_name, agent_action, payload)
                 except ActionPolicyError:
                     raise
+                except DurableExecutionError:
+                    raise
                 except BudgetExceededError:
                     raise
                 except ValueError as e:
@@ -1459,6 +1605,7 @@ class LLM(ABC):
                         }
                     )
                     self.history.add_system(f"Agent call failed: {e}")
+                    checkpoint_ready()
                     continue
                 except Exception as e:
                     await emit(
@@ -1510,6 +1657,7 @@ class LLM(ABC):
                 remember_action(action_signature)
                 # Delegation can also commit remote side effects. Preserve its
                 # receipt and enforce stop conditions at the next boundary.
+                checkpoint_ready()
                 continue
 
             else:
@@ -1520,6 +1668,7 @@ class LLM(ABC):
                     f"- 'tool_call': Execute a tool\n"
                     f"- 'agent_call': Delegate to another agent"
                 )
+                checkpoint_ready()
                 continue
 
         raise RuntimeError(

@@ -7,6 +7,7 @@ and renderers in their own CLIs or notebooks.
 
 from .agents import chat_with_agent, ping_agent
 from .doctor import build_doctor_report
+from .durable_runs import RunManager, load_run_manager
 from .models import CheckResult, DoctorReport, RunDiffView, RunReplayItem, RunReplayView
 from .registry import fetch_registry_agents, inspect_registry_agent
 from .runs import build_run_diff_view, build_run_replay_view, list_run_store_records
@@ -26,6 +27,7 @@ __all__ = [
     "CheckResult",
     "DoctorReport",
     "RunDiffView",
+    "RunManager",
     "RunReplayItem",
     "RunReplayView",
     "StudioCode",
@@ -42,6 +44,7 @@ __all__ = [
     "inspect_registry_agent",
     "list_run_store_records",
     "list_trace_records",
+    "load_run_manager",
     "load_studio_blueprint",
     "load_trace_record",
     "ping_agent",

@@ -1,7 +1,7 @@
 # Infer-loop benchmark
 
 The infer loop is the part of ProtoLink that turns a model response into one
-validated next action: a final answer, a local tool call, or a delegation to
+validated next action: a final answer, a local tool call or a delegation to
 another agent. This benchmark is intended for comparing infer-loop and prompt
 changes with the same provider, model and generation settings.
 
@@ -95,7 +95,7 @@ categories:
 - `grounding_trap`: ignore untrusted or stale values and use the authoritative
   observation.
 - `routing_choice`: decide whether to finish directly, use a local capability,
-  delegate a tool, or delegate inference without being given implementation
+  delegate a tool or delegate inference without being given implementation
   names. Tool-routing cases include specialists with overlapping schemas and
   identical outputs, so only the correct target passes the ledger and trace
   checks.
@@ -105,7 +105,7 @@ schedule replaces a small number of repetitive directed cases with routing
 choices: 4 in `core` and 20 in `full`. The 12-case smoke suite includes two
 routing choices.
 
-`--count` overrides a suite's generated size. Changing the seed, count, or
+`--count` overrides a suite's generated size. Changing the seed, count or
 selected cases changes the suite hash and therefore creates a different
 baseline.
 
@@ -129,7 +129,7 @@ A functional pass requires all of the following:
   and order.
 
 A strict pass is a functional pass whose protocol path was also clean. It has
-no parse recovery, duplicate-action retry, invalid local tool attempt, or
+no parse recovery, duplicate-action retry, invalid local tool attempt or
 invalid agent-call attempt.
 
 This distinction makes self-correction visible. A model that first invents an
@@ -184,7 +184,7 @@ python -m benchmarks.infer_loop \
 
 `--limit N` keeps the first `N` cases after filtering. `--shuffle` shuffles the
 selection deterministically with `--seed`. Record the complete command because
-filters, ordering, generated count and seed are part of suite identity.
+filters ordering, generated count and seed are part of suite identity.
 
 To test alternative complementary coordinator instructions without editing the
 benchmark source:
@@ -317,7 +317,7 @@ python -m benchmarks.infer_loop \
 
 The comparison reports the strict-score delta, paired end-to-end/model/prompt
 evaluation timing deltas and the logical cases that were fixed, regressed,
-stable passes, or stable failures. Timing comparisons use retry-free strict
+stable passes or stable failures. Timing comparisons use retry-free strict
 first attempts that exist in both runs; model and prompt-evaluation pairs also
 require the same infer-loop call count. Baseline comparison
 requires the same suite hash and logical case keys, so use the same suite,
@@ -325,7 +325,7 @@ seed, count, filters, shuffle setting and repetitions. The benchmark only
 enforces case identity; keep provider, model, action mode, model parameters,
 attempts, warm-up and system instructions controlled when attributing a delta
 to one change. A performance-fingerprint warning is included when recorded
-provider, warm-up outcome, verbosity, or runner settings differ; prompt hashes
+provider, warm-up outcome, verbosity or runner settings differ; prompt hashes
 may intentionally differ.
 
 ## CI threshold
@@ -362,7 +362,7 @@ that scores transfer between machines or model builds.
 - The mesh uses `RuntimeTransport`. It exercises ProtoLink task
   serialization, registry discovery, agent delegation, tools, telemetry and
   the infer loop without binding ports, but it does not benchmark HTTP,
-  WebSocket, gRPC, or real network behavior.
+  WebSocket, gRPC or real network behavior.
 - The per-task timeout is best-effort. Cancellation is cooperative and a
   blocking provider request or an action already in progress may not stop at
   the timeout boundary. Benchmark tools are synthetic, but callers should not

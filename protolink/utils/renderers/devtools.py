@@ -642,6 +642,7 @@ __PROTOLINK_STUDIO_CSS__
         </form>
       </div>
       <div class="runs-overview" id="runs-overview"></div>
+      <div class="panel" id="durable-controls" hidden><h2>Durable executions</h2><p class="panel-note">Inspect stopped runs, answer requests and continue execution through the configured application.</p><div id="durable-list"></div><div id="durable-detail"></div><p id="durable-feedback" role="status" aria-live="polite"></p></div>
       <div class="runs-layout">
         <aside class="panel run-browser">
           <div class="run-browser-head">
@@ -919,11 +920,61 @@ function render() {
   document.getElementById('registry-table').innerHTML = table(['Agent', 'Transport', 'URL', 'Capabilities', 'Health', 'Actions'], agents.map((a, index) => registryRow(a, index)));
   renderSourceControls();
   renderRuns();
+  renderDurableRuns();
   renderAgentDetail();
   renderTelemetry();
   renderChat();
   renderStudio();
   hydrateIcons();
+}
+
+let durableSelection = null;
+let durableBusy = false;
+function renderDurableRuns() {
+  const data = snapshot.durable;
+  document.getElementById('durable-controls').hidden = !data?.configured;
+  if (!data?.configured) return;
+  const records = data.runs || [];
+  document.getElementById('durable-list').innerHTML = data.error ? `<p>${esc(data.error)}</p>` : records.map((run, i) => `<button class="btn" onclick="inspectDurableRun(${i})" ${durableBusy ? 'disabled' : ''}>${esc(run.agent_name)} · ${esc(run.status)} · ${esc(run.run_id)}</button>`).join(' ') || '<p>No checkpoints.</p>';
+}
+async function inspectDurableRun(index) {
+  const record = snapshot.durable.runs[index];
+  try {
+    const response = await fetch('/api/durable/' + encodeURIComponent(record.run_id));
+    const run = await response.json();
+    if (!response.ok) throw new Error(run.error || 'Inspection failed');
+    durableSelection = run;
+    const wait = run.interruption;
+    const unresolved = run.uncertain_actions || [];
+    const terminal = ['completed', 'failed', 'canceled'].includes(run.status);
+    document.getElementById('durable-detail').innerHTML = `<pre>${esc(JSON.stringify(run, null, 2))}</pre>` + (!terminal ? (wait?.kind === 'approval' ? '<button class="btn" onclick="durableAction(&quot;resume&quot;, true)">Approve</button> <button class="btn" onclick="durableAction(&quot;resume&quot;, false)">Deny</button>' : wait ? '<textarea id="durable-answer" aria-label="Answer the pending request"></textarea><button class="btn" onclick="durableAction(&quot;resume&quot;)">Submit answer</button><button class="btn" onclick="durableAction(&quot;decline&quot;)">Decline</button>' : unresolved.length ? '<p>Verify the external action before providing its outcome.</p><select id="durable-action-id" aria-label="Uncertain action">' + unresolved.map(item => `<option value="${esc(item.action_id)}">${esc(item.name)} · ${esc(item.action_id)}</option>`).join('') + '</select><textarea id="durable-result" aria-label="Verified result as JSON"></textarea><button class="btn" onclick="durableAction(&quot;reconcile&quot;)">Commit verified result</button>' : '<button class="btn" onclick="durableAction(&quot;resume&quot;)">Resume</button>') + '<button class="btn" onclick="durableAction(&quot;cancel&quot;)">Cancel stopped run</button>' : '');
+  } catch (error) { document.getElementById('durable-feedback').textContent = error.message; }
+}
+async function durableAction(operation, approved) {
+  if (durableBusy || !durableSelection) return;
+  const run = durableSelection;
+  let payload = {};
+  try {
+    if (operation === 'reconcile') payload = {action_id: document.getElementById('durable-action-id').value, result: JSON.parse(document.getElementById('durable-result').value)};
+    else if (operation !== 'cancel' && run.interruption) {
+      payload = {request_id: run.interruption.request_id, fingerprint: run.interruption.fingerprint};
+      if (run.interruption.kind === 'approval') payload.approved = approved;
+      else payload.answer = operation === 'decline' ? null : document.getElementById('durable-answer').value;
+    }
+    durableBusy = true;
+    document.getElementById('durable-detail').querySelectorAll('button, textarea, select').forEach(el => el.disabled = true);
+    document.getElementById('durable-feedback').textContent = 'Processing continuation…';
+    const response = await fetch('/api/durable/' + encodeURIComponent(run.run_id) + '/' + (operation === 'decline' ? 'resume' : operation), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Operation failed');
+    document.getElementById('durable-feedback').textContent = 'Run state: ' + (result.run || result).status;
+    durableSelection = null;
+    document.getElementById('durable-detail').innerHTML = '';
+    await refresh();
+  } catch (error) {
+    document.getElementById('durable-feedback').textContent = error.message;
+    document.getElementById('durable-detail').querySelectorAll('button, textarea, select').forEach(el => el.disabled = false);
+  } finally { durableBusy = false; renderDurableRuns(); }
 }
 
 function renderSourceControls() {

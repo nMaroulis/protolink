@@ -18,9 +18,9 @@ ProtoLink is a lightweight, [**A2A**](https://a2a-protocol.org/latest/specificat
 
 A2A is the architectural core, not a bolt-on integration. ProtoLink's native `AgentCard`, `Task`, `Message`, `Part` and `Artifact` runtime model was originally built on [A2A 0.3](https://a2a-protocol.org/v0.3.0/specification/), then extended for inference, tools, structured agent flows and operational modules without abandoning those protocol primitives. That choice keeps the `Agent`/`Task` API simple and the runtime pluggable; `a2a=True` translates the implemented HTTP surface between ProtoLink's native model and canonical [A2A 1.0](https://a2a-protocol.org/latest/specification/) JSON-RPC shapes for standard peers.
 
-The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, application knowledge for **RAG**, built-in, native, or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy, or durable run records. Every module is optional and replaceable through a small public interface.
+The agent is the stable composition surface. Plug in only what that agent needs: an API or local **LLM**, application knowledge for **RAG**, built-in, native or **MCP** tools, a transport, registry, storage and state, telemetry, authentication, logging, policy or durable run records. Every module is optional and replaceable through a small public interface.
 
-ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, vLLM, or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools, or its communication layer.
+ProtoLink is deliberately **LLM-agnostic and local-first**. Provider-native tool calling is used when available; a strict JSON action fallback keeps self-hosted and smaller models on Ollama, llama.cpp, LM Studio, vLLM or custom backends inside the same infer loop. Changing the model does not require rewriting the agent, its tools or its communication layer.
 
 The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hosted model SDKs, MCP, telemetry providers and other integrations are installed only when you choose them.
 
@@ -32,7 +32,7 @@ The base package has one runtime dependency: Pydantic. HTTP servers, gRPC, hoste
 
 - **Pluggable by design** - compose an agent from independent modules instead of adopting a mandatory stack.
 - **Progressive control** - start with names and aliases, then configure or replace individual components through the same API.
-- **Local first, distributed when needed** - develop with no network or provider, then move the same task contract to HTTP, SSE JSON-RPC, WebSocket, or gRPC.
+- **Local first, distributed when needed** - develop with no network or provider, then move the same task contract to HTTP, SSE JSON-RPC, WebSocket or gRPC.
 - **Friendly to smaller models** - one-action-at-a-time inference, schema validation, JSON fallback and deterministic flows reduce reliance on hidden prompt behavior.
 - **Explicit and inspectable** - tool calls, delegation, task state, policy decisions, approvals, runtime events, traces and reports have typed representations.
 - **A2A at the core** - agents communicate through cards, tasks, messages, parts and artifacts rather than framework-private graph state.
@@ -64,7 +64,7 @@ agent = Agent(name="calculator", tools=[add])
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-This example needs no model, API key, server, or network connection. The function name, docstring and type hints become the tool's public metadata and argument schema. `@agent.tool` and `@agent.tool()` also work; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
+This example needs no model, API key, server or network connection. The function name, docstring and type hints become the tool's public metadata and argument schema. `@agent.tool` and `@agent.tool()` also work; explicit names and descriptions remain available when needed. Register an existing function on any agent with `agent.add_tool(add)`.
 
 Choose the result you need:
 
@@ -74,7 +74,7 @@ Choose the result you need:
 | Let a model respond or choose tools | `agent.sync.invoke("What is 2 + 3?")` | Final part content; requires an LLM |
 | Keep task state, artifacts and metadata | `agent.sync.run_task(task)` | The complete `Task` |
 
-In async applications and notebooks with an active event loop, use `await agent.call_tool(...)`, `await agent.invoke(...)`, or `await agent.run_task(...)`.
+In async applications and notebooks with an active event loop, use `await agent.call_tool(...)`, `await agent.invoke(...)` or `await agent.run_task(...)`.
 
 Add an LLM when you need inference. The mock backend lets you try the same API without a provider:
 
@@ -124,7 +124,7 @@ agent = Agent(card=card, llm=llm, transport=transport, tools=[add])
 ```
 
 `card=card.to_dict()` works too, since card also accepts dictionaries. Mix defaults and configured objects independently,
-for example `Agent(name="helper", llm=llm)`, or supply your own implementations of
+for example `Agent(name="helper", llm=llm)` or supply your own implementations of
 LLM, tool and transport interfaces. The same pattern extends to storage, state,
 knowledge and observability; execution stays on `invoke`, `.sync` and task APIs.
 
@@ -228,7 +228,7 @@ planner_agent.sync.add_mcp(
 planner_agent.start()
 ```
 
-Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. Registering the tool performs no network request. Remove any constructor argument or tool you do not need, or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies and observability backends.
+Install the integrations used here with `uv add "protolink[http,mcp]"`; the Ollama server and example MCP process run separately. `web_search()` defaults to Brave and reads `BRAVE_SEARCH_API_KEY` only when invoked. Pass `engine="wikipedia"` for documented, keyless English Wikipedia search or `engine="duckduckgo"` for keyless, best-effort DuckDuckGo HTML search. Registering the tool performs no network request. Remove any constructor argument or tool you do not need or replace it with your own implementation. Different agents in the same mesh can use different models, transports, credentials, storage, policies and observability backends.
 
 `MCPToolAdapter` supports local stdio, Streamable HTTP and legacy SSE servers. Use
 `await agent.add_mcp(transport="streamable_http", url="https://example.com/mcp")`
@@ -273,7 +273,7 @@ print(answer.text, answer.citations)
 `Agent.invoke()` lets the model choose the automatically registered
 `search_product_docs` tool. `Agent.ask()` always retrieves first and returns
 the answer together with normalized hits and citations. Existing Chroma,
-Pinecone, Qdrant, or custom search systems can be attached without moving
+Pinecone, Qdrant or custom search systems can be attached without moving
 their data. See [Retrieval-Augmented Generation](https://nmaroulis.github.io/protolink/docs/rag/).
 
 ## LLM-agnostic, with a strong local focus
@@ -282,7 +282,7 @@ For LLM-backed agents, the **infer loop** is the heart of ProtoLink:
 
 1. The model proposes one next action, including a knowledge search when one is available.
 2. ProtoLink parses and validates it.
-3. The runtime executes a tool call, agent delegation, or final response.
+3. The runtime executes a tool call, agent delegation or final response.
 4. The structured result is added to the task context.
 5. The loop repeats until completion or a configured bound is reached.
 
@@ -326,7 +326,9 @@ result = review_flow.sync.execute(
 )
 ```
 
-Flows can contain local agents, registry-resolved remote agents, or other nested flows. Semantic context injection tells each agent what the next step expects without coupling that agent to the overall topology. See [structured flows](https://nmaroulis.github.io/protolink/docs/flows/) and the [runnable examples](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows).
+Flows can contain local agents, registry-resolved remote agents or other nested flows. Semantic context injection tells each agent what the next step expects without coupling that agent to the overall topology. See [structured flows](https://nmaroulis.github.io/protolink/docs/flows/) and the [runnable examples](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows).
+
+Add [local subagents](docs/content/subagents.md) with `subagents=[specialist]` for owned workers sharing budgets and policies. Add `durability="runs.sqlite"` to [pause for approval or input and resume after a restart](docs/content/execution-tools.md#durable-execution). Try the offline [subagent](examples/subagents.py) and [durable execution](examples/durable_execution.py) examples.
 
 ## A2A primitives, standard wire compatibility
 
@@ -356,7 +358,7 @@ trust, use a dedicated `AgentClient(..., a2a_allow_cross_origin=True)`; see
 
 With the default `a2a=False`, HTTP behaves exactly as before: native tasks, status, health, chat and control endpoints only. With `a2a=True`, the agent additionally serves the standard Agent Card and `SendMessage`, `GetTask`, `ListTasks` and `CancelTask` JSON-RPC operations and its client can translate outbound calls to A2A-only peers. Outbound ProtoLink `infer` instructions become A2A user text. Inbound A2A user text remains a normal ProtoLink text part for custom handlers; the default LLM engine recognizes the A2A metadata and treats that text as an inference request. Framework-specific tool-call and flow state should stay on the native protocol.
 
-Compatibility is versioned and testable: the official [A2A Technology Compatibility Kit](https://github.com/a2aproject/a2a-tck) measures the adapter against a pinned protocol surface. The [A2A compatibility page](https://nmaroulis.github.io/protolink/docs/a2a/) records the exact binding, TCK commit, commands, current result, and the remaining upstream harness limitation.
+Compatibility is versioned and testable: the official [A2A Technology Compatibility Kit](https://github.com/a2aproject/a2a-tck) measures the adapter against a pinned protocol surface. The [A2A compatibility page](https://nmaroulis.github.io/protolink/docs/a2a/) records the exact binding, TCK commit, commands, current result and the remaining upstream harness limitation.
 
 ## Stream model output into your app
 
@@ -407,7 +409,7 @@ The `protolink dashboard` CLI command projects run-store and registry state into
 protolink dashboard --store runs.db --registry-url http://127.0.0.1:9010 --open
 ```
 
-It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry and provides local views for agent health, HTTP chat, task history, trace summaries and run replay. It also includes **Protolink Studio**, an active visual builder for Agent, LLM, Tool, Registry, Flow and operational Module nodes. Connect compatible nodes, configure transports and modules in the inspector, then generate ordinary Python that can be viewed, copied, or downloaded.
+It reads task snapshots and `RunReport` records from `SQLiteRunStore`, loads `AgentCard` entries from the registry and provides local views for agent health, HTTP chat, task history, trace summaries and run replay. It also includes **Protolink Studio**, an active visual builder for Agent, LLM, Tool, Registry, Flow and operational Module nodes. Connect compatible nodes, configure transports and modules in the inspector, then generate ordinary Python that can be viewed, copied or downloaded.
 
 Open Studio from the sidebar or directly at `http://127.0.0.1:8765/studio`. A served dashboard can start and stop one generated project as a local subprocess and show its recent output; closing the dashboard stops that process and removes its temporary script. A static `--output` dashboard remains useful for visual blueprint editing and export, but Python generation and live execution require the local dashboard server. Generated Python uses Protolink's public constructors directly and contains logical agent, tool, module, registry, LLM and flow definitions, not canvas IDs, coordinates, edges or embedded blueprint JSON. Studio blueprints are declarative: raw secrets are rejected, so configure environment-variable names such as `OPENAI_API_KEY` and review the generated code before running integrations with external side effects.
 
@@ -459,7 +461,7 @@ answer = await assistant.invoke("What is on my calendar today?")
 
 Supply your own models, OAuth token and approval callback. These presets use the standard Agent API;
 calendar/email reads are enabled by default, while writes need explicit opt-ins and approval. Choose
-`GoogleCalendar`/`Gmail`, `OutlookCalendar`/`OutlookEmail`, or `IMAPEmail` for standard IMAP/SMTP.
+`GoogleCalendar`/`Gmail`, `OutlookCalendar`/`OutlookEmail` or `IMAPEmail` for standard IMAP/SMTP.
 Google and Microsoft adapters need `pip install 'protolink[integrations]'`; IMAP/SMTP uses the standard
 library. Add `ask_user=handle_question` to await user feedback
 inside the inference loop. Shell, Git, calendar, email and question tools can also be registered separately.
@@ -469,7 +471,34 @@ Run `python examples/builtin_assistants.py` for one complete offline test using 
 mock model and in-memory calendar/mailbox. Run `python examples/service_backends.py` to exercise all
 five concrete service backends with offline HTTP and mail-server fixtures.
 
+## Building philosophy
+
+ProtoLink was built to make agent development simple while giving developers precise control over execution and deployment. These principles guide the API and how its modules fit together.
+
+- **[Progressive control](docs/content/progressive-control.md)** — start with names, aliases and typed functions; configure or replace components through the same API.
+- **[Pluggable composition](docs/content/concept.md)** — models, tools, knowledge, storage, transport and operational modules are independent choices.
+- **[Local first, LLM-agnostic](docs/content/llm.md)** — use mock, local or hosted models, then move to network deployment as needed.
+- **[A shared task contract](docs/content/types.md)** — agents and flows work with explicit cards, tasks, messages, parts and artifacts.
+
+## More features
+
+ProtoLink provides optional capabilities for coordinating work, managing context and operating agents reliably. They plug into the existing Agent API, with detailed configuration in the linked guides.
+
+- **[Local subagents](docs/content/subagents.md)** — isolated conversations, shared budgets, inherited policies and background work.
+- **[Durable execution](docs/content/execution-tools.md#durable-execution)** — pause for approval or input, restart and resume with committed results preserved.
+- **[Context management](docs/content/context-management.md) and [lifecycle hooks](docs/content/hooks.md)** — bounded prompts, large-result retrieval, history compaction and callbacks around model calls, observations and completion.
+- **[Model routing](docs/content/llm.md#model-routing-and-fallback)** — per-step model selection and bounded fallback within the same Agent loop.
+- **[Local evaluations](docs/content/evaluation.md)** — JSONL datasets, custom checks, repetitions and experiment comparisons.
+- **[Specialist agents](docs/content/builtin-agents.md)** — `ResearchAgent`, `KnowledgeAgent`, `DatabaseAgent` and `ExplorerAgent` for web research, RAG, read-only SQL and workspace exploration.
+- **[Execution tools](docs/content/builtin-tools.md#command-execution)** — host or Docker command execution, scoped files and recoverable edits.
+- **[Knowledge](docs/content/rag.md) and [built-in tools](docs/content/builtin-tools.md)** — retrieval with citations, documents, databases, HTTP APIs and multi-engine web search.
+- **[Runtime control](docs/content/runtime.md)** — budgets, policy, approvals, cancellation, redaction, replay and normalized run regression diffing.
+- **[Agent meshes](docs/content/registry.md) and [structured flows](docs/content/flows.md)** — discovery and delegation across transports, with explicit pipeline, parallel, router or graph topology.
+- **[Developer tooling](docs/content/devtools.md)** — scaffolding, diagnostics, durable run controls, dashboards and [Studio](docs/content/studio.md); [YAML configuration](docs/content/agent.md#yaml-import-and-export) for reusable agent definitions.
+
 ## More examples
+
+These runnable examples show how the components fit together, from local tools to complete multi-agent applications. Use them as starting points for your own models, integrations and workflows.
 
 - [Progressive control, from simple calls to bounded workflows](examples/progressive_control.py)
 - [Paired AI courtroom advocacy benchmark](examples/ai_courtroom_benchmark/)
@@ -481,6 +510,13 @@ five concrete service backends with offline HTTP and mail-server fixtures.
 - [Runtime policy and approvals](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_policy_and_approvals.py)
 - [Task cancellation](https://github.com/nMaroulis/protolink/blob/main/examples/task_cancellation.py)
 - [Structured flows](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows)
+- [Local subagents and background work](examples/subagents.py)
+- [Durable execution across application restarts](examples/durable_execution.py)
+- [Durable run inspection and continuation](examples/durable_management.py)
+- [Context management, hooks, model routing and evaluations](examples/harness_controls.py)
+- [Built-in specialist agents](examples/builtin_agents.py)
+- [Offline filesystem, storage, HTTP, document and database tools](examples/generic_tools.py)
+- [Command execution, recoverable edits and verified workflows](examples/runtime_capabilities/)
 - [All examples](https://nmaroulis.github.io/protolink/docs/examples/)
 
 ## Contributing

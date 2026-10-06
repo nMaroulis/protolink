@@ -9,24 +9,29 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections.abc import Callable, Iterable, Sequence
+from pathlib import Path
 from typing import Any, Literal, cast
 
 from protolink.client import RegistryClient
 from protolink.core.cancellation import TaskExecutionRegistry
+from protolink.core.hooks import AgentHooks, ModelRequest
 from protolink.core.policy import ActionAuthorizer, ApprovalHandlerLike, CapabilityPolicy, Policy
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
+from protolink.llms.context_policy import ContextPolicy
 from protolink.logging import BaseLogger, ConsoleLogger
 from protolink.models import AgentCard
 from protolink.rag import Knowledge, RetrievalMode, Retriever
 from protolink.security.auth import Authenticator
 from protolink.state import State
 from protolink.storage import InMemoryStorage, Storage
+from protolink.storage.durable import DurableStore, SQLiteDurableStore
 from protolink.telemetry.base import Telemetry
 from protolink.tools import BaseTool
 from protolink.transport import Transport
 from protolink.types import StateMode, TransportType
 
+from .durable import AgentDurableMixin
 from .engine import AgentExecutionMixin
 from .helpers import _coerce_state_operation_request
 from .identity import resolve_identity
@@ -38,6 +43,7 @@ from .mixins import (
     AgentSerializationMixin,
     AgentToolMixin,
 )
+from .subagents import SubagentLimits, supervision_tools
 from .sync import SyncAgent
 
 __all__ = ["Agent", "SyncAgent", "_coerce_state_operation_request"]
@@ -48,6 +54,7 @@ class Agent(
     AgentControlPlaneMixin,
     AgentCommunicationMixin,
     AgentToolMixin,
+    AgentDurableMixin,
     AgentExecutionMixin,
     AgentConfigurationMixin,
     AgentSerializationMixin,
@@ -90,6 +97,12 @@ class Agent(
         registry_heartbeat_interval: float | None = None,
         knowledge: Knowledge | Retriever | Sequence[Knowledge | Retriever] | None = None,
         retrieval: RetrievalMode = "auto",
+        subagents: Iterable[Agent] | None = None,
+        subagent_limits: SubagentLimits | None = None,
+        durability: DurableStore | str | Path | None = None,
+        execution_version: str = "1",
+        context_policy: ContextPolicy | Literal["auto"] | None = None,
+        hooks: Iterable[AgentHooks | Callable[[ModelRequest], Any]] | None = None,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -152,6 +165,18 @@ class Agent(
                 ``"auto"`` lets the model choose the knowledge tool,
                 ``"always"`` retrieves before inference and ``"required"``
                 additionally fails when retrieval finds no passages.
+            subagents: Ordinary local Agents exposed through the existing agent_call
+                contract, without a registry/server. Children share root budgets and
+                satisfy ancestor policies; their conversations are independent.
+            subagent_limits: Optional child count, concurrency, depth and background
+                tool controls. Defaults allow eight children, four concurrent, depth one.
+            durability: Execution checkpoint store or SQLite file path. Durable runs
+                pause for approvals/questions and resume through resume/resume_task.
+                They use the default engine and blocking local delegation.
+            execution_version: Application-owned version of tool code/dependencies.
+                Change it when stored execution must not continue under new code.
+            context_policy: Opt-in "auto" or ContextPolicy for bounded model inputs.
+            hooks: AgentHooks objects or before_model functions, in execution order.
         """
 
         # Validate shorthand endpoints before provider initialization can perform I/O.
@@ -185,6 +210,36 @@ class Agent(
         self._task_executions = TaskExecutionRegistry()
         self._control_tasks: set[asyncio.Task[Any]] = set()
         self.run_store = run_store
+        from protolink.core.hooks import normalize_hooks
+        from protolink.llms.context_policy import ContextArtifacts, resolve_context_policy
+
+        self.context_policy = resolve_context_policy(context_policy)
+        self.context_artifacts = ContextArtifacts()
+        self.hooks = normalize_hooks(hooks)
+        if not isinstance(execution_version, str) or not execution_version.strip():
+            raise ValueError("execution_version must be nonblank text")
+        self.execution_version = execution_version
+        if subagent_limits is not None and not isinstance(subagent_limits, SubagentLimits):
+            raise TypeError("subagent_limits must be a SubagentLimits instance")
+        self.subagent_limits = subagent_limits or SubagentLimits()
+        self.subagents: dict[str, Agent] = {}
+        self._subagent_runs: dict[str, Any] = {}
+        for child in subagents or ():
+            if not isinstance(child, Agent):
+                raise TypeError("subagents must contain Agent instances")
+            child_name = child.card.name
+            if child_name.casefold() in {self.card.name.casefold(), *(name.casefold() for name in self.subagents)}:
+                raise ValueError("Local subagent names must be unique and different from the parent")
+            self.subagents[child_name] = child
+        if self.subagents and not self.card.capabilities.delegation:
+            raise ValueError("subagents require the delegation capability")
+        if durability is not None and self.subagent_limits.background:
+            raise ValueError("Durable runs use blocking local delegation; background tools are live-only")
+        self.durability = SQLiteDurableStore(durability) if isinstance(durability, (str, Path)) else durability
+        if self.durability is not None and not all(
+            callable(getattr(self.durability, method, None)) for method in ("get", "acquire", "save", "release")
+        ):
+            raise TypeError("durability must be a file path or implement DurableStore")
         self._session_locks: dict[str, asyncio.Lock] = {}
         self._registry_heartbeat_interval = registry_heartbeat_interval
         self._registry_heartbeat_task: asyncio.Task[Any] | None = None
@@ -259,3 +314,11 @@ class Agent(
         self.sync = SyncAgent(self)
         if tools is not None:
             self.add_tools(tools)
+        if self.context_policy is not None:
+            from protolink.llms.context_policy import context_artifact_tool
+
+            if "read_context_artifact" in self.tools:
+                raise ValueError("read_context_artifact is reserved when context_policy is configured")
+            self.add_tool(context_artifact_tool())
+        if self.subagent_limits.background:
+            self.add_tools(supervision_tools())

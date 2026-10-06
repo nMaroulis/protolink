@@ -170,7 +170,7 @@ If your change requires additional test fixtures or helper utilities, place them
 
 ## Infer-loop Benchmark
 
-Changes to `protolink/llms/prompts/`, infer-loop parsing, action selection, retry behavior, tools, or agent delegation
+Changes to `protolink/llms/prompts/`, infer-loop parsing, action selection, retry behavior, tools or agent delegation
 should include a controlled before-and-after benchmark run. The benchmark is repository tooling under `benchmarks/`,
 outside the installable `protolink` package.
 

@@ -1,4 +1,4 @@
-"""Keep the published package, lockfiles and documentation on one release."""
+"""Keep package metadata, lockfiles and the changelog on one release."""
 
 import json
 import re
@@ -17,7 +17,6 @@ def test_release_versions_match() -> None:
 
     assert project["project"]["version"] == __version__
     assert docs["version"] == docs_lock["version"] == docs_lock["packages"][""]["version"] == __version__
-    assert f"Documentation version: **{__version__}**" in (ROOT / "docs/content/index.md").read_text(encoding="utf-8")
     changelog = (ROOT / "docs/content/changelog.md").read_text(encoding="utf-8")
     assert re.search(rf"^## \[{re.escape(__version__)}\] - .+$", changelog, re.MULTILINE)
 

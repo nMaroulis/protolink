@@ -34,9 +34,68 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.7.5] - 2026-10-02
+## [0.8.0] - 2026-10-07
 
 :::note Latest Update
+
+Version 0.8.0 is a **major feature update** that expands ProtoLink's Agent harness for coordinated, restartable and inspectable workloads. It brings owned local subagents, durable execution, context preparation, lifecycle hooks, model routing, local evaluations and optional container execution into the same pluggable runtime.
+
+Local subagents provide independent conversations with shared budgets and inherited policies. Durable execution lets applications pause for approval or user input, restart and continue from saved checkpoints and committed results. Context policies bound model input and make large tool results available through progressive retrieval, while hooks give applications control over model preparation, observations and final-answer validation. Model routing and local evaluations support deliberate model selection, bounded fallback and repeatable comparisons of agent behavior.
+
+New specialist presets cover web research, knowledge retrieval, read-only database analysis and workspace exploration. `RunManager`, CLI commands and dashboard controls make pending executions inspectable and resumable through the application's configured agents. The documentation now includes expanded module guides, focused offline examples, a reorganized Agent reference and local search.
+
+These capabilities follow ProtoLink's **progressive control** philosophy: start with a small, comprehensible API, then configure individual components or supply your own implementations as requirements grow. The additions use the existing Agent API and standard inference action protocol, with explicit policies, budgets and execution evidence throughout.
+
+:::
+
+### Added
+
+- Opt-in `ContextPolicy` and `context_policy="auto"` for output reservation, complete-turn pruning, old-observation clearing and scoped retrieval of oversized tool results. Durable context artifacts survive restart; ephemeral retrieval observations are not offloaded.
+- `AgentHooks`, `ModelRequest`, `ToolObservation` and `FinalResponse` for synchronous/asynchronous before-model, after-tool and before-completion callbacks. Filtered rosters remain enforced across pending-action recovery, successful receipts remain authoritative.
+- `RunManager`, bounded SQLite checkpoint inventory and read-only inspection, plus `run pending/inspect/resume/cancel/reconcile` CLI commands. Dashboard and Studio Runs controls reconnect an explicit trusted application factory and enforce local/same-origin mutations.
+- Public `evaluate()` API with JSONL/reference cases, repetitions, isolated concurrent factories, synchronous/asynchronous checks, execution evidence, usage/latency summaries and experiment comparisons. Evaluation cancellation drains active runs.
+- `RoutedLLM` for per-step model selection and bounded transient-request fallback under shared budgets. Exposed stream content prevents fallback; tools are never repeated by model routing.
+- Optional `DockerExecutionBackend` for process/shell/Git tools and CodeAssistant, with explicit image/workspace, read-only and network defaults, non-root users, resource limits, bounded output and daemon cleanup on timeout/cancellation.
+- Detailed [context management](context-management.md), [lifecycle hook](hooks.md), [evaluation](evaluation.md), routing and execution guides with primary methodology/reference links, plus offline runnable harness examples.
+
+- `ResearchAgent`, `KnowledgeAgent`, `DatabaseAgent` and `ExplorerAgent`: configurable presets for source-grounded web research, knowledge retrieval, read-only database analysis and scoped workspace exploration, using the existing Agent runtime.
+- Built-in agent reference and an offline preset example covering custom providers, citations, bounded SQL, scoped files and deterministic echo.
+- Local child tasks with independent conversations, parent/child evidence, inherited policies, shared root budgets and total-child, concurrency and depth limits.
+- `SubagentLimits` and owned `SubagentHandle` results/cancellation. Live `RunHandle.spawn()` and optional model tools `spawn_subagent`, `wait_subagent` and `cancel_subagent` support background work.
+- `SQLiteDurableStore` and a replaceable `DurableStore` contract for versioned checkpoints, fenced ownership, conversation/cursor recovery and committed action receipts.
+- `RunInterrupted` / `RunInterruption`, `Agent.resume()` and `resume_task()` and matching synchronous facades for approvals and questions that survive application restarts.
+- Verified-outcome `Agent.reconcile()` and typed busy, contract-mismatch and uncertain-execution errors. Unknown external outcomes are never automatically replayed.
+- Durable blocking local delegation, direct tool invocation and streamed run attempts; root usage survives pauses and child continuation.
+- Configuration serialization for SQLite stores, execution versions and subagent limits, with explicit reattachment of executable child rosters and custom stores.
+- Guides for [local subagents](subagents.md) and [durable execution](execution-tools.md#durable-execution), plus offline examples that demonstrate local delegation and three separate restart phases.
+
+### Changed
+
+- Documentation search now runs locally through EasyOps, with a build-generated, cache-versioned index, section links and keyboard shortcuts. Documentation builds require no external search-service credentials.
+- `EchoAgent` now echoes inference prompts and received task parts deterministically without invoking a model or executing tools; unary and streamed tasks use the normal lifecycle.
+- Presets accept standard `name`, `description`, `url`, LLM aliases and caller-supplied tool overrides. Durable presets install user-question tools without requiring live callbacks.
+- `CodeAssistant` includes scoped file reads, listing and search; an optional checkpoint store enables prepared file edits and recovery with approval defaults.
+- Shortened the README overview, added module introductions and quick examples and consolidated durable execution into [Execution, approvals and recovery](execution-tools.md). The former durable execution page redirects to the consolidated guide.
+- `ask_user_tool()` may omit its live callback when attached to a durable agent. Its durable mode returns a checkpointed `input-required` task and continues from a supplied answer.
+- Approval-required actions on durable agents pause through execution checkpoints. Agents without durability retain the existing live approval and question callbacks.
+
+### Fixed
+
+- Ollama calls now handle runners that reject the default JSON format with HTTP 501 (`structured output is unavailable`), including Gemma MLX configurations. Ordinary and streaming calls retry once using the existing JSON action prompt, retain action validation and remember the server/model limitation. Explicit formats and JSON schemas remain required; unrelated errors and accepted-stream failures propagate. `format`, `think` and `keep_alive` are forwarded as Ollama request controls rather than generation options.
+
+### Validation
+
+Recovery tests exercise separate application processes, crashes before and after result receipts, stale approvals, nested child limits and root/child continuation. A controlled offline comparison against v0.7.5 retained **80/80 strict passes** on the 40-case core suite with two repetitions. Scripted actions verify the runtime contract; they do not measure real-model quality.
+
+Harness integration tests cover durable context retrieval, hook ordering and receipt preservation, routing budgets across restarts, partial-stream fallback restrictions, evaluation cancellation, read-only inventory and dashboard request validation. A live Docker check verifies read-only mounts, disabled network/capabilities, timeout and container removal; the dashboard answer/continuation flow is also verified in the browser.
+
+### Recovery scope
+
+Durable recovery covers the default task handler/inference loop, registered tools and blocking local children. Background children, remote delegation, custom orchestration handlers and eager retrieval modes are explicitly outside that recovery contract. Committed results are reused; an operation started without a receipt requires externally verified reconciliation. SQLite checkpoints are private execution data, separate from diagnostic run reports.
+
+## [0.7.5] - 2026-10-02
+
+:::note Release Summary
 
 Version 0.7.5 reduces repeated work across inference, conversation history,
 transports and core model serialization. Inference metrics now use provider

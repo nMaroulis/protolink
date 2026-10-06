@@ -13,6 +13,16 @@ import ExampleArticle from '@site/src/components/ExampleArticle';
 
 # ProtoAgent Case Study
 
+ProtoAgent is a coding application built on ProtoLink's runtime. Its terminal interface supplies the workflow and presentation, while ProtoLink supplies agent communication, capability policies, execution events, history and reports.
+
+To try the execution and validation contracts discussed here without installing the downstream application, run from a ProtoLink checkout:
+
+```bash
+python examples/runtime_capabilities/verified_workflow.py
+```
+
+This offline example checks a tool result and bounds repair attempts. The case study below shows how those same runtime contracts fit into a larger coding assistant.
+
 
 <ExampleArticle
   source="Level Up Coding"

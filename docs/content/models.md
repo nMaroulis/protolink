@@ -12,6 +12,17 @@ ProtoLink's models are the transport-neutral vocabulary shared by agents, client
 
 These are ProtoLink's ergonomic runtime forms of A2A's core agent primitives. The [A2A 1.0 adapter](a2a.md) maps the advertised subset to canonical wire models when interoperability is required; the classes on this page remain the native Python contract used inside ProtoLink.
 
+```python
+from protolink import Agent, Task
+
+agent = Agent(name="helper", llm="mock")
+task = Task.create_infer(prompt="Hello")
+completed = agent.sync.run_task(task)
+print(completed.state, completed.get_output())
+```
+
+`run_task()` exposes the complete protocol model, including lifecycle state, chronological messages, artifacts and metadata. `invoke()` unwraps final content for applications that do not need the task envelope.
+
 <ApiSurface
   eyebrow="Protocol model layer"
   title="Core Data Models"

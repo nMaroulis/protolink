@@ -4,6 +4,7 @@ from .base import BaseTool
 from .builtins import (
     CalendarBackend,
     DatabaseBackend,
+    DockerExecutionBackend,
     EmailBackend,
     Gmail,
     GoogleAPIError,
@@ -45,6 +46,7 @@ __all__ = [
     "BaseTool",
     "CalendarBackend",
     "DatabaseBackend",
+    "DockerExecutionBackend",
     "EmailBackend",
     "Gmail",
     "GoogleAPIError",

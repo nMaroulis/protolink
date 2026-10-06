@@ -1002,21 +1002,6 @@ html {
   .navbar__title {
     max-width: 122px;
   }
-
-  .DocSearch-Button {
-    width: 42px;
-    padding: 0;
-    justify-content: center;
-  }
-
-  .DocSearch-Button-Container {
-    width: auto;
-  }
-
-  .DocSearch-Button-Placeholder,
-  .DocSearch-Button-Keys {
-    display: none;
-  }
 }
 
 @media (max-width: 996px) {
@@ -1030,10 +1015,6 @@ html {
 
   .navbar__title {
     max-width: 168px;
-  }
-
-  .DocSearch-Button {
-    margin-left: 0;
   }
 
   .theme-doc-markdown h1 {

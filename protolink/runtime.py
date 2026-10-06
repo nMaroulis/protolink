@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from protolink.agents import Agent
+from protolink.agents.subagents import SubagentHandle
 from protolink.client import AgentClient
 from protolink.core.cancellation import TaskNotCancelableError, TaskNotFoundError, mark_task_canceled
 from protolink.core.events import RunEvent, TaskStatusUpdateEvent
@@ -195,6 +196,28 @@ class RunHandle:
     async def result(self) -> RunResult:
         """Await the normalized result without propagating waiter cancellation to the run."""
         return await asyncio.shield(self._worker)
+
+    async def spawn(self, agent: str, prompt: str) -> SubagentHandle:
+        """Start an owned local specialist while this live parent is running.
+
+        The child shares root limits/policies and is drained when the parent
+        ends. Durable runs use blocking agent_call delegation instead.
+        """
+        if not isinstance(self.target, Agent):
+            raise RuntimeError("Local child supervision requires a local Agent")
+        if not self.target.subagents:
+            raise RuntimeError("Parent requires a local subagent roster")
+        if self.target.durability is not None:
+            raise RuntimeError("Durable runs use blocking agent_call delegation")
+        while self.task.id not in self.target._subagent_runs and not self._worker.done():
+            await asyncio.sleep(0)
+        supervisor = self.target._subagent_runs.get(self.task.id)
+        if supervisor is None:
+            raise RuntimeError("Parent is not running with a local subagent roster")
+        from protolink.core.execution import execution_scope
+
+        with execution_scope(self.task):
+            return await supervisor.spawn(agent, prompt)
 
     async def chunks(self) -> AsyncIterator[str]:
         """Yield raw model text fragments from this run's recorded/live events.

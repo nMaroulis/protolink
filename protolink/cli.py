@@ -9,6 +9,7 @@ experience fast while preserving Protolink's standard runtime APIs.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -114,6 +115,30 @@ def _build_parser() -> argparse.ArgumentParser:
     run_diff_parser.add_argument("--store", default="runs.db", help="SQLite run-store path.")
     run_diff_parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
 
+    pending_parser = run_subparsers.add_parser("pending", help="Inspect private execution checkpoints read-only.")
+    pending_parser.add_argument("--durability", required=True, help="Existing SQLite execution checkpoint file.")
+    pending_parser.add_argument("--status", default="input-required", help="Checkpoint status filter.")
+    pending_parser.add_argument("--limit", type=int, default=20)
+    pending_parser.add_argument("--json", action="store_true")
+    for command in ("inspect", "resume", "cancel", "reconcile"):
+        control = run_subparsers.add_parser(command, help=f"{command.capitalize()} a configured durable run.")
+        control.add_argument("run_id")
+        control.add_argument(
+            "--factory", required=True, help="Trusted module:function returning configured durable Agents."
+        )
+        control.add_argument("--json", action="store_true")
+        if command == "resume":
+            control.add_argument("--request-id")
+            control.add_argument("--fingerprint")
+            responses = control.add_mutually_exclusive_group()
+            responses.add_argument("--answer")
+            responses.add_argument("--decline", action="store_true")
+            responses.add_argument("--approve", action="store_true")
+            responses.add_argument("--deny", action="store_true")
+        if command == "reconcile":
+            control.add_argument("action_id")
+            control.add_argument("--result", required=True, help="JSON outcome verified in the external system.")
+
     dashboard_parser = subparsers.add_parser("dashboard", help="Open the local Protolink dashboard.")
     dashboard_parser.add_argument("--registry-url", help="Optional HTTP registry URL.")
     dashboard_parser.add_argument(
@@ -130,6 +155,7 @@ def _build_parser() -> argparse.ArgumentParser:
     dashboard_parser.add_argument("--port", type=int, default=8765, help="Dashboard bind port.")
     dashboard_parser.add_argument("--open", action="store_true", help="Open the dashboard in a browser.")
     dashboard_parser.add_argument("--output", help="Write a static dashboard HTML snapshot and exit.")
+    dashboard_parser.add_argument("--factory", help="Trusted module:function enabling durable controls.")
 
     studio_parser = subparsers.add_parser("studio", help="Open the local Protolink Studio visual builder.")
     studio_parser.add_argument("blueprint", nargs="?", help="Optional Studio blueprint JSON file (e.g. name.json).")
@@ -141,6 +167,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Studio bind IP address or hostname.",
     )
     studio_parser.add_argument("--port", type=int, default=8765, help="Studio bind port.")
+    studio_parser.add_argument("--factory", help="Trusted module:function enabling durable controls.")
 
     return parser
 
@@ -239,6 +266,37 @@ def main(argv: list[str] | None = None) -> int:
             print(text_renderer.render_registry_agents([card]))
         return 0
 
+    if args.command == "run" and args.run_command in {"pending", "inspect", "resume", "cancel", "reconcile"}:
+        from protolink.devtools.durable_runs import checkpoint_view, load_run_manager
+        from protolink.storage.durable import SQLiteDurableStore
+
+        try:
+            if args.run_command == "pending":
+                store = SQLiteDurableStore(args.durability, read_only=True)
+                result = [checkpoint_view(record) for record in store.list(status=args.status, limit=args.limit)]
+            else:
+                manager = load_run_manager(args.factory)
+                if args.run_command == "resume":
+                    response = {}
+                    if args.request_id:
+                        response["request_id"] = args.request_id
+                    if args.fingerprint:
+                        response["fingerprint"] = args.fingerprint
+                    if args.answer is not None or args.decline:
+                        response["answer"] = None if args.decline else args.answer
+                    elif args.approve or args.deny:
+                        response["approved"] = args.approve
+                    result = asyncio.run(manager.resume(args.run_id, **response))
+                elif args.run_command == "reconcile":
+                    result = manager.reconcile(args.run_id, args.action_id, result=json.loads(args.result))
+                else:
+                    result = getattr(manager, args.run_command)(args.run_id)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        except Exception as exc:
+            print(f"Durable run operation failed: {exc}", file=sys.stderr)
+            return 1
+
     if args.command == "run" and args.run_command == "list":
         records = list_run_store_records(args.store, limit=args.limit)
         if args.json:
@@ -289,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
             store_path=dashboard_store,
             trace_path=args.traces,
             open_browser=args.open,
+            factory=args.factory,
         )
         return 0
 
@@ -310,6 +369,7 @@ def main(argv: list[str] | None = None) -> int:
             blueprint=blueprint,
             project_loaded=bool(args.blueprint),
             start_tab="studio",
+            factory=args.factory,
         )
         return 0
 

@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import json
+import os
 from email import message_from_bytes, policy
 
 import httpx
@@ -306,7 +307,10 @@ async def test_presets_use_standard_agent_tools_and_gate_mutations(http_mock, tm
     readonly = Assistant(calendar=GoogleCalendar("token"), email=Gmail("token"), verbosity=0)
     assert "create_calendar_event" not in readonly.tools and "send_email" not in readonly.tools
     coder = CodeAssistant(cwd=tmp_path, verbosity=0)
-    assert {"run_shell", "git", "calculator"} == coder.tools.keys()
+    expected_tools = {"run_shell", "git", "calculator"}
+    if os.name == "posix":
+        expected_tools.update({"read_file", "list_files", "search_files"})
+    assert expected_tools == coder.tools.keys()
     with pytest.raises(ApprovalRequiredError):
         await coder.call_tool("run_shell", command="touch forbidden")
     assert not (tmp_path / "forbidden").exists()

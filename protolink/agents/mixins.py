@@ -788,6 +788,11 @@ class AgentCommunicationMixin(_AgentMixinBase):
 
         # Process the task
         result_task = await self.run_task(task)
+        from protolink.core.durable import RunInterrupted
+        from protolink.core.task import TaskState
+
+        if result_task.state is TaskState.INPUT_REQUIRED and "interruption" in result_task.metadata:
+            raise RunInterrupted(result_task)
         result_task.raise_for_status()
         last_part = response_content(result_task, request_item_ids)
         return last_part if last_part is not None else "No response generated"
@@ -1284,6 +1289,16 @@ class AgentToolMixin(_AgentMixinBase):
             raise ValueError(f"Tool {tool_name} not found")
         from protolink.core.execution import current_task
 
+        if self.durability is not None and current_task() is None:
+            from protolink.core.durable import RunInterrupted
+            from protolink.core.task import TaskState
+
+            task = await self.run_task(Task.create_tool_call(tool_name, kwargs))
+            if task.state is TaskState.INPUT_REQUIRED:
+                raise RunInterrupted(task)
+            task.raise_for_status()
+            return task.get_output()
+
         task = current_task()
         context = RunContext.from_task(task) if task is not None else RunContext(agent_chain=[self.card.name])
         return await self.call_tool_in_context(tool_name, context, **kwargs)
@@ -1403,7 +1418,30 @@ class AgentToolMixin(_AgentMixinBase):
         context: RunContext,
     ) -> tuple[ActionAuthorization, dict[str, Any]]:
         """Prepare and authorize a tool operation immediately before execution."""
+        from protolink.core.durable import _json, current_durable_run
+        from protolink.storage.durable import CheckpointMismatchError, UncertainExecutionError
+
+        durable = current_durable_run()
+        if durable is not None and durable.entry is not None:
+            entry = durable.entry
+            if entry["state"] in {"executing", "uncertain"}:
+                raise UncertainExecutionError(
+                    f"Action '{entry['action']['action_id']}' has no committed outcome; reconcile it first"
+                )
+            if entry["state"] == "succeeded":
+                action = RunAction.from_dict(entry["action"])
+                if action.name != tool.name or entry.get("source_arguments") != _json(arguments):
+                    raise CheckpointMismatchError("Saved tool receipt does not match the pending call")
+                # The original effect can itself change resource preconditions.
+                # Reuse its authorized operation and receipt instead of preparing
+                # a new preview against the now-changed external state.
+                return await self.authorize_action(action, context), action.payload["arguments"]
         action, call_args = await self._prepare_tool_action(tool, arguments, context)
+        if durable is not None:
+            action = durable.prepare(action)
+            assert durable.entry is not None
+            durable.entry["source_arguments"] = _json(arguments)
+            durable.save()
         authorization = await self.authorize_action(action, context)
         return authorization, call_args
 
@@ -1967,6 +2005,10 @@ class AgentSerializationMixin(_AgentMixinBase):
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the agent configuration to a dictionary representation."""
+        from dataclasses import asdict
+
+        from protolink.storage.durable import SQLiteDurableStore
+
         level = getattr(self._logger, "level", 20)
         verbosity = 1
         if level == 30:
@@ -1985,6 +2027,25 @@ class AgentSerializationMixin(_AgentMixinBase):
             "credentials": self.credentials,
             "a2a": self._a2a_enabled,
         }
+        if self.subagents:
+            data["subagents"] = [{"name": name, "reconnect_required": True} for name in self.subagents]
+        if self.subagents or self.subagent_limits.background:
+            data["subagent_limits"] = asdict(self.subagent_limits)
+        if self.durability is not None:
+            if isinstance(self.durability, SQLiteDurableStore):
+                data["durability"] = {
+                    "type": "sqlite",
+                    "path": self.durability.path,
+                    "lease_seconds": self.durability.lease_seconds,
+                }
+            else:
+                data["durability"] = {"reconnect_required": True}
+        if self.durability is not None or self.execution_version != "1":
+            data["execution_version"] = self.execution_version
+        if self.context_policy is not None:
+            data["context_policy"] = self.context_policy.to_dict()
+        if self.hooks:
+            data["hooks"] = {"reconnect_required": True}
 
         policy = self.action_authorizer.policy
         if type(policy) is CapabilityPolicy:
@@ -2049,7 +2110,10 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         # Tools
         serializable_tools = [
-            tool for tool in self.tools.values() if not getattr(tool, "_protolink_knowledge_tool", False)
+            tool
+            for tool in self.tools.values()
+            if not getattr(tool, "_protolink_knowledge_tool", False)
+            and not getattr(tool, "_protolink_supervision_tool", False)
         ]
         if serializable_tools:
             data["tools"] = [self._serialize_tool(tool) for tool in serializable_tools]
@@ -2163,6 +2227,8 @@ class AgentSerializationMixin(_AgentMixinBase):
                 from protolink.llms import create_llm
 
                 provider = llm_config.get("provider")
+                if provider == "router":
+                    raise ValueError("Reconnect routing models and selector with from_dict(..., llm=RoutedLLM(...))")
                 l_kwargs = {
                     "model": llm_config.get("model"),
                     "model_params": llm_config.get("model_params", {}),
@@ -2227,6 +2293,34 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         system_prompt = overrides.get("system_prompt", data.get("system_prompt"))
 
+        from protolink.agents.subagents import SubagentLimits
+        from protolink.storage.durable import SQLiteDurableStore
+
+        subagents = overrides.get("subagents")
+        descriptors = data.get("subagents") or []
+        if descriptors:
+            if subagents is None:
+                raise ValueError("Reconnect local subagents with from_dict(..., subagents=[...])")
+            subagents = list(subagents)
+            if [child.card.name for child in subagents] != [item["name"] for item in descriptors]:
+                raise ValueError("Reconnected subagent names must match the serialized roster")
+        subagent_limits = overrides.get("subagent_limits")
+        if subagent_limits is None and data.get("subagent_limits"):
+            subagent_limits = SubagentLimits(**data["subagent_limits"])
+        durability = overrides.get("durability")
+        if "durability" not in overrides and data.get("durability"):
+            config = data["durability"]
+            if config.get("type") != "sqlite":
+                raise ValueError("Reconnect the custom durability store with from_dict(..., durability=store)")
+            durability = SQLiteDurableStore(config["path"], lease_seconds=config.get("lease_seconds", 300.0))
+        from protolink.llms.context_policy import ContextPolicy
+
+        context_policy = overrides.get("context_policy")
+        if "context_policy" not in overrides and data.get("context_policy"):
+            context_policy = ContextPolicy(**data["context_policy"])
+        if data.get("hooks") and "hooks" not in overrides:
+            raise ValueError("Reconnect lifecycle callbacks with from_dict(..., hooks=[...])")
+
         agent = cls(
             card=card_data,
             transport=transport,
@@ -2250,6 +2344,12 @@ class AgentSerializationMixin(_AgentMixinBase):
             approval_handler=approval_handler,
             knowledge=knowledge,
             retrieval=retrieval,
+            subagents=subagents,
+            subagent_limits=subagent_limits,
+            durability=durability,
+            context_policy=context_policy,
+            hooks=overrides.get("hooks"),
+            execution_version=overrides.get("execution_version", data.get("execution_version", "1")),
         )
         descriptors = data.get("knowledge") or []
         if descriptors:
@@ -2267,6 +2367,8 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         tools_data = data.get("tools", [])
         for tool_dict in tools_data:
+            if agent.context_policy is not None and tool_dict.get("name") == "read_context_artifact":
+                continue
             tool = cls._deserialize_tool(tool_dict)
             agent.add_tool(tool)
 

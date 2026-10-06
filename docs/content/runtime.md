@@ -8,7 +8,24 @@ import ApiReference, {
 
 # Runtime
 
+Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part` and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools and any other agent application.
+
+The runtime layer does not replace transports, telemetry, storage, or structured flows. It gives them shared execution metadata, concrete action intents, policy and approval boundaries and a normalized event stream.
+
 ## Start a controlled run
+
+```python
+from protolink import Agent, RunBudget
+
+agent = Agent(name="helper", llm="mock")
+handle = agent.start_run("Hello", budget=RunBudget(max_llm_calls=3))
+async for event in handle.events():
+    print(event.type)
+result = await handle.result()
+print(result.status, result.output)
+```
+
+Run this inside an async function or notebook with an active event loop. The mock model needs no provider; use `handle.cancel()` to stop work and `result.report` to inspect its execution record.
 
 `agent.start_run(prompt_or_task, session_id=None, budget=None, context=None, store=None, redaction_policy=None)`
 returns the existing `RunHandle` in an active asyncio loop. `handle.chunks()` filters raw model
@@ -18,10 +35,6 @@ See [streaming, cancellation and reports](progressive-control.md#streaming-cance
 
 
 See [Execution, approvals and recovery](./execution-tools.md) for the optional process/filesystem tools, embedded groups, approval broker, completion checks and bounded workflows.
-
-Protolink's runtime primitives provide a stable execution layer above the core A2A-derived `Task`, `Message`, `Part` and `Artifact` models. They are intentionally generic: the same contracts work for local CLIs, workflow engines, support assistants, research systems, browser agents, data tools and any other agent application.
-
-The runtime layer does not replace transports, telemetry, storage, or structured flows. It gives them shared execution metadata, concrete action intents, policy and approval boundaries and a normalized event stream.
 
 <ApiSurface
   eyebrow="Runtime control layer"
@@ -3218,3 +3231,9 @@ Runtime events and telemetry serve different layers:
 Both share the same `run_id`, `trace_id`, `task_id` and agent metadata through `RunContext`, so a local UI can show live progress while telemetry records the detailed trace behind it.
 
 As a practical rule, use events to drive what the user sees now and telemetry to investigate what happened across the complete run later.
+
+## Owned children and restart recovery
+
+`await handle.spawn("specialist", "task")` starts an owned local child while a parent with a configured roster is running. Its `SubagentHandle` exposes `result()` and `cancel()`; unfinished children are drained when their parent ends. See [local subagents](subagents.md).
+
+With `Agent(..., durability="runs.sqlite")`, run attempts can finish in `input-required` state with a saved approval or question. Inspect `result.task.metadata["interruption"]`, authenticate the response in your application and call `agent.resume()` or `resume_task()` after reopening the same store. A run handle represents one attempt. See [durable execution](execution-tools.md#durable-execution) for the supported checkpoint boundaries.

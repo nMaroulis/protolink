@@ -12,6 +12,17 @@ The Telemetry subsystem provides standard observable tracing to agent task execu
 
 Protolink includes a built-in local trace recorder and native integrations for **[Langfuse](https://langfuse.com/)** and **[LangSmith](https://www.langchain.com/langsmith)**.
 
+```python
+from protolink import Agent, LocalTraceTelemetry
+
+telemetry = LocalTraceTelemetry(path="traces.jsonl")
+agent = Agent(name="helper", llm="mock", telemetry=telemetry)
+agent.sync.invoke("Hello")
+trace = telemetry.recorder.replay()[-1]
+```
+
+This writes an offline run to a local JSONL file. Pass a different backend through `telemetry=` to change where traces go. Reading a trace does not rerun its model or tools; execution resumption uses [durable checkpoints](execution-tools.md#durable-execution).
+
 <ApiSurface
   eyebrow="Observability module"
   title="Telemetry"

@@ -231,14 +231,17 @@ def _prepare_process_action(
         raise ValueError("Invalid environment entry")
     args["env"] = env
     executable = argv[0]
-    if not os.path.isabs(executable):
+    resolver = getattr(executor, "resolve_executable", None)
+    if callable(resolver):
+        executable = resolver(executable, cwd=str(directory), env=env)
+    elif not os.path.isabs(executable):
         if os.path.dirname(executable):
             executable = str(directory / executable)
         else:
             executable = shutil.which(executable, path=env.get("PATH", "")) or ""
     if not executable:
         raise ValueError("Executable requires an absolute path or an explicit env PATH")
-    args["argv"] = [str(Path(executable).resolve(strict=True)), *argv[1:]]
+    args["argv"] = [executable if callable(resolver) else str(Path(executable).resolve(strict=True)), *argv[1:]]
     args["cwd"] = str(directory)
     duration = args.get("timeout_seconds", 60.0)
     output_limit = args.get("max_output_bytes", 65536)

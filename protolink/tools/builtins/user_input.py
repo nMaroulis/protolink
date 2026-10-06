@@ -66,7 +66,7 @@ UserInputHandler = Callable[[UserInputRequest], Awaitable[str | None]]
 
 
 def ask_user_tool(
-    handler: UserInputHandler,
+    handler: UserInputHandler | None = None,
     *,
     timeout_seconds: float = 300.0,
     max_answer_chars: int = 16384,
@@ -80,10 +80,11 @@ def ask_user_tool(
     ``user.interact``. Feedback does not grant permission for other tool calls.
 
     Args:
-        handler: Async callable accepting a ``UserInputRequest`` and returning
+        handler: Optional async callable accepting a ``UserInputRequest`` and returning
             nonblank text or ``None`` to decline. Options are suggestions and
             free text is always accepted. Exceptions propagate to tool execution.
             Release pending UI state in ``finally`` on cancellation or timeout.
+            Durable agents use checkpointed input responses instead of this callback.
         timeout_seconds: Positive finite wait limit in seconds. The run's
             remaining runtime budget may end the wait earlier.
         max_answer_chars: Positive maximum answer length; oversized answers are
@@ -100,12 +101,14 @@ def ask_user_tool(
     A question timeout returns ``status='timed_out'``; declining returns
     ``status='declined'``. Native cancellation propagates and run-budget expiry
     raises the existing budget exception. The task remains working while it
-    waits: this is a live coroutine, not a durable suspended/restartable task.
+    waits when using a live callback. With Agent durability enabled, execution
+    pauses in input-required state and resumes from an explicit answer after a
+    restart; no live timeout runs while suspended. The callback can be omitted.
     Questions and answers enter model history and runtime events; do not use
     this tool for password collection. Concurrent calls invoke independent
     callbacks, so terminal adapters should serialize their own prompts.
     """
-    if not callable(handler):
+    if handler is not None and not callable(handler):
         raise TypeError("handler must be an async callable")
     if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be finite and positive")
@@ -139,8 +142,14 @@ def ask_user_tool(
         execution.check()
         action = execution.authorization.action
         arguments = action.payload["arguments"]
+        from protolink.core.durable import current_durable_run
+
+        durable = current_durable_run()
+        pending = durable.entry.get("interruptions", {}).get("input") if durable is not None and durable.entry else None
         request = UserInputRequest(
-            request_id=IDGenerator.generate_context_id(prefix="input_"),
+            request_id=pending["request_id"]
+            if pending is not None
+            else IDGenerator.generate_context_id(prefix="input_"),
             question=arguments["question"],
             options=tuple(arguments["options"]),
             run_id=execution.context.run_id,
@@ -148,6 +157,22 @@ def ask_user_tool(
             action_id=action.action_id,
         )
         await execution.emit("user_input.requested", request=request.to_dict())
+        if durable is not None:
+            response = durable.request(
+                "input", {**request.to_dict(), "max_answer_chars": max_answer_chars}, action.fingerprint
+            )
+            assert response is not None and durable.entry is not None
+            request_id = durable.entry["interruption"]["request_id"]
+            answer = response["answer"]
+            if answer is not None and (
+                not isinstance(answer, str) or not answer.strip() or len(answer) > max_answer_chars
+            ):
+                raise ValueError("user answer must be nonblank text within max_answer_chars, or None")
+            result = UserInputResult(request_id, "declined" if answer is None else "answered", answer)
+            await execution.emit(f"user_input.{result.status}", result=result.to_dict())
+            return result
+        if handler is None:
+            raise RuntimeError("ask_user_tool() requires a live handler or an Agent with durability configured")
         remaining = execution.remaining_seconds
         timeout = min(timeout_seconds, remaining) if remaining is not None else timeout_seconds
         timer = asyncio.timeout(timeout)

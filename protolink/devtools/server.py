@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
 import sqlite3
@@ -17,6 +18,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 from protolink.__version__ import __version__
 from protolink.devtools.agents import chat_with_agent, ping_agent
+from protolink.devtools.durable_runs import RunManager, load_run_manager
 from protolink.devtools.registry import fetch_registry_agents
 from protolink.devtools.runs import build_run_replay_view, list_run_store_records
 from protolink.devtools.studio import (
@@ -166,8 +168,20 @@ def serve_dashboard(
     project_loaded: bool = False,
     open_browser: bool = False,
     start_tab: str = "dashboard",
+    factory: str | None = None,
+    run_manager: RunManager | None = None,
 ) -> None:
-    """Serve the local dashboard until interrupted."""
+    """Serve local diagnostics and optional application-owned durable controls.
+
+    ``factory`` imports trusted application code once at startup. Browser clients
+    cannot supply factories, credentials, tools or execution configuration. Durable
+    mutations require a local client and use the application's normal fenced
+    resume path. Provide ``run_manager`` directly for embedded applications.
+    """
+    if factory is not None and run_manager is not None:
+        raise ValueError("Supply either factory or run_manager")
+    manager = load_run_manager(factory) if factory is not None else run_manager
+    manager_lock = RLock()
     renderer = DevtoolsHtmlRenderer()
     studio_runtime = StudioRuntimeManager()
     source_state = _DashboardSourceState(
@@ -177,7 +191,7 @@ def serve_dashboard(
 
     def current_snapshot() -> dict[str, Any]:
         active_registry, active_store, revision = source_state.current()
-        return build_dashboard_snapshot(
+        snapshot = build_dashboard_snapshot(
             registry_url=active_registry,
             store_path=active_store,
             trace_path=trace_path,
@@ -185,6 +199,15 @@ def serve_dashboard(
             project_loaded=project_loaded,
             source_revision=revision,
         )
+        durable_view: dict[str, Any] = {"configured": manager is not None, "runs": [], "error": None}
+        snapshot["durable"] = durable_view
+        if manager is not None:
+            try:
+                with manager_lock:
+                    snapshot["durable"]["runs"] = manager.list()
+            except Exception as exc:
+                snapshot["durable"]["error"] = _dashboard_error_message(exc)
+        return snapshot
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -205,6 +228,21 @@ def serve_dashboard(
                 return
             if path == "/api/snapshot":
                 self._send_json(current_snapshot())
+                return
+            if path == "/api/durable" or path.startswith("/api/durable/"):
+                if manager is None:
+                    self._send_json({"error": "No durable application factory configured"}, status=404)
+                    return
+                try:
+                    with manager_lock:
+                        result = (
+                            manager.list()
+                            if path == "/api/durable"
+                            else manager.inspect(unquote(path.removeprefix("/api/durable/")))
+                        )
+                    self._send_json({"runs": result} if isinstance(result, list) else result)
+                except Exception as exc:
+                    self._send_json({"error": _dashboard_error_message(exc)}, status=422)
                 return
             if path == "/api/studio/catalog":
                 self._send_json(studio_catalog())
@@ -303,6 +341,34 @@ def serve_dashboard(
                 self._send_json({"error": "Dashboard request body is too large"}, status=413)
                 return
             path = urlsplit(self.path).path
+            if path.startswith("/api/durable/"):
+                if not _dashboard_source_mutation_allowed(self.client_address[0]):
+                    self._send_json({"error": "Durable controls require a client on this machine"}, status=403)
+                    return
+                if manager is None:
+                    self._send_json({"error": "No durable application factory configured"}, status=404)
+                    return
+                run_id, separator, operation = path.removeprefix("/api/durable/").rpartition("/")
+                if not separator or operation not in {"resume", "cancel", "reconcile"}:
+                    self._send_json({"error": "Unknown durable operation"}, status=404)
+                    return
+                try:
+                    payload = self._read_json(strict=True)
+                    with manager_lock:
+                        if operation == "resume":
+                            result = asyncio.run(manager.resume(unquote(run_id), **payload))
+                        elif operation == "cancel":
+                            if payload:
+                                raise ValueError("Cancellation accepts an empty object")
+                            result = manager.cancel(unquote(run_id))
+                        else:
+                            if set(payload) != {"action_id", "result"}:
+                                raise ValueError("Reconciliation requires action_id and a verified result")
+                            result = manager.reconcile(unquote(run_id), payload["action_id"], result=payload["result"])
+                    self._send_json(result)
+                except Exception as exc:
+                    self._send_json({"error": _dashboard_error_message(exc)}, status=422)
+                return
             if path == "/api/studio/generate":
                 payload = self._read_json()
                 if "blueprint" not in payload:
@@ -530,15 +596,21 @@ def serve_dashboard(
             self.send_header("Pragma", "no-cache")
             super().end_headers()
 
-        def _read_json(self) -> dict[str, Any]:
-            """Read a small JSON request body."""
+        def _read_json(self, *, strict: bool = False) -> dict[str, Any]:
+            """Read a bounded object; durable mutations require explicit valid JSON."""
             length = int(self.headers.get("Content-Length") or 0)
             if length <= 0:
+                if strict:
+                    raise ValueError("Supply a JSON object, including {} for cancellation")
                 return {}
             try:
                 payload = json.loads(self.rfile.read(length).decode("utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+                if strict:
+                    raise ValueError("Invalid JSON request body") from None
                 return {}
+            if strict and not isinstance(payload, dict):
+                raise ValueError("Request body must be a JSON object")
             return payload if isinstance(payload, dict) else {}
 
         def _send_html(self, html: str) -> None:

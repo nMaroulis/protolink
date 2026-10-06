@@ -257,6 +257,8 @@ Review it first when the topology contains providers, tools, transports, or modu
 
 ## Run, stop and logs
 
+Start Studio with `protolink studio --factory myapp:application` to expose the configured application's [durable execution controls](devtools.md#durable-run-controls) in the shared **Runs** tab. Those controls inspect/resume checkpoints through the supplied factory. Studio's generated-project Run/Stop controls below retain their subprocess lifecycle; the durable factory is a separate application configuration and is not reconstructed from the visual blueprint.
+
 In served mode, **Run** validates and regenerates the current blueprint, writes the generated source to a temporary directory and starts it with the same Python interpreter and environment as the dashboard. Studio permits one active generated subprocess per dashboard.
 
 The output dialog switches to **Runtime logs** when a process starts or stops. Status is polled while the dashboard is open, recent combined output is bounded and the top status pill shows starting, running, stopping, idle, or error state. **Stop** terminates the active run by its run ID. Closing the dashboard server also stops the child process and removes its temporary script.

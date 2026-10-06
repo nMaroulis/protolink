@@ -47,6 +47,8 @@ HTML reports.
 :::
 
 
+The AI Courtroom studies how communication changes the decisions of agents with different roles. Lawyers, witnesses, a judge and jurors exchange ProtoLink tasks; the experiment records messages, evidence and observable verdicts for comparison.
+
 The AI Courtroom is a flagship ProtoLink showcase built as an experiment rather
 than a scripted roleplay. Lawyers, witnesses, a judge and jurors are separate,
 addressable agents with their own model, role prompt, context, incentives and

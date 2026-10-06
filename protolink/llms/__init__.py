@@ -6,7 +6,9 @@ from typing import Any
 __all__ = [
     "VLLMLLM",
     "ContextItem",
+    "ContextLimitError",
     "ContextManifest",
+    "ContextPolicy",
     "HistoryCompactionRequest",
     "HistoryCompactionResult",
     "HistoryCompactionStrategy",
@@ -16,11 +18,15 @@ __all__ = [
     "LMStudioLLM",
     "MockLLM",
     "OpenAICompatibleLLM",
+    "RoutedLLM",
     "build_context_manifest",
     "create_llm",
 ]
 
 _EXPORTS = {
+    "ContextPolicy": "protolink.llms.context_policy.ContextPolicy",
+    "ContextLimitError": "protolink.llms.context_policy.ContextLimitError",
+    "RoutedLLM": "protolink.llms.routed.RoutedLLM",
     "ContextItem": "protolink.llms.context.ContextItem",
     "ContextManifest": "protolink.llms.context.ContextManifest",
     "HistoryCompactionRequest": "protolink.llms.compaction.HistoryCompactionRequest",

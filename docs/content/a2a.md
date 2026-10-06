@@ -9,6 +9,22 @@ ProtoLink then adds the execution substrate A2A leaves open: pluggable LLMs,
 native and MCP tools, transports, registry services, state, policy,
 authentication, logging and telemetry.
 
+Enable standard A2A HTTP communication when your agent must exchange work with other A2A implementations:
+
+```python
+from protolink import Agent
+
+agent = Agent(
+    name="helper",
+    llm="mock",
+    url="http://127.0.0.1:8001",
+    transport="http",
+    a2a=True,
+)
+```
+
+Install `protolink[http]` and call `agent.start()` to serve it. The HTTP adapter translates supported A2A wire operations to the same native task executor. The protocol versions below identify interoperability contracts; they do not change how you construct or invoke an agent.
+
 ## From native A2A 0.3 primitives to A2A 1.0
 
 ProtoLink was originally built natively on the [A2A 0.3
@@ -38,7 +54,7 @@ verification, not from claiming that the A2A 0.3-based runtime objects are
 identical to the A2A 1.0 wire schema.
 
 This design lets an A2A 1.0 peer communicate with a ProtoLink agent without
-forcing application code, tools, LLMs, or flows to adopt a second API.
+forcing application code, tools, LLMs or flows to adopt a second API.
 
 This page addresses the narrower question of canonical **A2A 1.0 wire
 compatibility** for the implemented JSON-RPC surface. That is a property of the
@@ -78,7 +94,7 @@ adds both:
   call a standard A2A 1.0 JSON-RPC peer.
 
 The native endpoints stay mounted, so enabling A2A does not change
-`handle_task(Task)`, registry/state APIs, status/chat utilities, or normal
+`handle_task(Task)`, registry/state APIs, status/chat utilities or normal
 ProtoLink-to-ProtoLink calls.
 
 ### Choose the outbound protocol
@@ -153,7 +169,7 @@ when that split-origin deployment is under your control.
 This page describes an engineering harness, not a compatibility claim.
 ProtoLink should only claim a passing A2A 1.0 binding after the official TCK
 finishes successfully and its report is published. A passing internal transport
-test, a working `Agent`, or a valid-looking Agent Card is not a substitute.
+test, a working `Agent` or a valid-looking Agent Card is not a substitute.
 
 :::
 
@@ -267,7 +283,7 @@ disabled today:
 - Extended authenticated Agent Cards.
 
 Until those capabilities land with focused tests and TCK evidence, use
-ProtoLink's native SSE, WebSocket, gRPC, or runtime streaming APIs where live
+ProtoLink's native SSE, WebSocket, gRPC or runtime streaming APIs where live
 events are required.
 
 ## Run locally

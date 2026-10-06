@@ -35,6 +35,16 @@ def current_workflow_budget() -> BudgetEnforcer | None:
 
 
 @contextmanager
+def shared_budget_scope(budget: BudgetEnforcer) -> Iterator[None]:
+    """Bind root accounting for supervised local children."""
+    token = _workflow_budget.set(budget)
+    try:
+        yield
+    finally:
+        _workflow_budget.reset(token)
+
+
+@contextmanager
 def workflow_budget_scope(context: RunContext) -> Iterator[BudgetEnforcer]:
     """Share native counters across nested workflows without global run state."""
     budget = _workflow_budget.get() or BudgetEnforcer(context)
@@ -178,28 +188,41 @@ class ToolExecution:
         )
 
 
-async def execute_authorized_tool(tool: BaseTool, execution: ToolExecution) -> Any:
+async def execute_authorized_tool(tool: BaseTool, execution: ToolExecution, *, emit_events: bool = True) -> Any:
     """Dispatch an authorized prepared tool or the existing callable contract.
 
     Budget counters are charged by the caller once, before this hook. Results
     are recorded before returning to optional telemetry or model-history code.
     """
     execution.check()
+    from protolink.core.durable import current_durable_run
+
+    durable = current_durable_run()
+    if durable is not None:
+        replay, result = durable.start_action()
+        if replay:
+            return result
     action = execution.authorization.action
-    await execution.emit("action.started", action=action.to_dict())
+    if emit_events:
+        await execution.emit("action.started", action=action.to_dict())
     execution.check()
     try:
         hook = getattr(tool, "execute_authorized", None)
         result = await hook(execution) if callable(hook) else await tool(**action.payload["arguments"])
     except asyncio.CancelledError:
-        await execution.emit("action.canceled", action=action.to_dict())
+        if emit_events:
+            await execution.emit("action.canceled", action=action.to_dict())
         raise
     except Exception as exc:
-        await execution.emit(
-            "action.failed", action=action.to_dict(), error={"code": type(exc).__name__, "message": str(exc)}
-        )
+        if emit_events:
+            await execution.emit(
+                "action.failed", action=action.to_dict(), error={"code": type(exc).__name__, "message": str(exc)}
+            )
         raise
-    await execution.emit("action.completed", action=action.to_dict(), result=result)
+    if durable is not None:
+        result = durable.complete_action(result)
+    if emit_events:
+        await execution.emit("action.completed", action=action.to_dict(), result=result)
     return result
 
 

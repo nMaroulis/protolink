@@ -20,14 +20,25 @@ Use a registry when agents should discover each other dynamically instead of har
 
 ```python
 from protolink.discovery import Registry
+from protolink import Agent
 
 registry = Registry(url="http://localhost:9000", transport="http")
+agent = Agent(
+    name="helper",
+    llm="mock",
+    url="http://localhost:8001",
+    transport="http",
+    registry=registry,
+)
+
 registry.start(background=True)
-
-# ...start agents that use this registry...
-
-registry.stop()
+try:
+    agent.start()
+finally:
+    registry.stop()
 ```
+
+Install `protolink[http]` and run this as a script. Start the registry first; the agent registers automatically and serves until shutdown. Other agents can use the same registry object or its URL.
 
 :::tip[View the registry in Devtools]
 

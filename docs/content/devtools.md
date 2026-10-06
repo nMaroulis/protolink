@@ -6,6 +6,13 @@ Protolink includes local devtools for the same runtime contracts that power agen
 
 The important idea is that devtools are not a separate observability product bolted onto the framework. They are a small projection layer over Protolink's core design: an agent is an autonomous runtime entity and its execution can be described through typed context, events, reports, registry cards and stored task state.
 
+```bash
+protolink doctor
+protolink dashboard --store runs.db --open
+```
+
+The CLI is included in the base package. Point `--store` at your application's `SQLiteRunStore` file; add `--registry-url` for live agent discovery or a trace path for local telemetry. [Execution checkpoints](execution-tools.md#durable-execution) use a separate store for resumption.
+
 The current surface has four command groups, including the dashboard and its Studio builder:
 
 - `protolink doctor` checks local installation, optional extras, run-store readability and optional agent/registry endpoints.
@@ -207,6 +214,16 @@ The comparison canonicalizes known ProtoLink runtime-envelope identifiers, times
 The command exits `0` when the normalized reports match, `1` when they changed and `2` when either report is missing. Add `--json` in CI or custom tooling to receive `status`, `missing_run_ids`, `changed_sections` and structured differences in addition to the baseline and candidate selectors. Both terminal and JSON output mask sensitive baseline/candidate values with the default redaction policy while retaining their JSON Pointer paths.
 
 ## Dashboard
+
+### Durable run controls
+
+Configure `protolink dashboard --factory myapp:application` to add a durable execution panel to **Runs**. The synchronous factory returns configured durable Agents or a `RunManager`; it reconnects the application's own models, tools, policies and private checkpoint store. The configured roster is fixed at startup.
+
+The panel lists bounded status records, displays pending questions/approval previews and sends answers or approval decisions with the current request ID and fingerprint. A continuation can complete or produce another pending request; refresh and inspect the updated state. Stopped runs can be canceled when no effects remain unresolved. Uncertain actions expose their identifiers and accept a JSON result only after the operator verifies the outcome externally. The UI does not automatically repeat an uncertain operation.
+
+Controls require a client on the dashboard machine. The server validates Host, same-origin requests and JSON payloads and uses ordinary lease/configuration checks. The local dashboard is intended for trusted local development; external applications must authenticate and authorize their own users before invoking `RunManager`. Private checkpoints are distinct from the diagnostic `--store` source and management views omit full model histories and raw tool receipts.
+
+These HTTP endpoints support embedded tooling: `GET /api/durable`, `GET /api/durable/RUN_ID` and `POST /api/durable/RUN_ID/resume`, `/cancel` or `/reconcile`. Resume accepts only `request_id`, `fingerprint` and either `answer` or `approved`; cancel requires `{}`; reconcile requires `action_id` and `result`. No request can supply an application factory. See [durable management](execution-tools.md#manage-stopped-runs) for recovery semantics.
 
 Serve the local dashboard:
 

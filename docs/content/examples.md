@@ -2,6 +2,19 @@
 
 This section links to example projects and code snippets in the repository.
 
+From a checkout with ProtoLink installed:
+
+```bash
+python examples/progressive_control.py
+python examples/subagents.py
+python examples/durable_execution.py
+python examples/harness_controls.py
+```
+
+These scripts need no API keys or external services. The notebook and larger projects below include their own setup instructions for optional transports and model providers.
+
+[`harness_controls.py`](https://github.com/nMaroulis/protolink/blob/main/examples/harness_controls.py) demonstrates scoped context-artifact retrieval, a completion hook, transient model fallback and repeated local evaluations. [`durable_management.py`](https://github.com/nMaroulis/protolink/blob/main/examples/durable_management.py) creates a pending question and exports a reusable application factory for the CLI/dashboard; it writes a private `managed-runs.sqlite` file in the current working directory. Container execution is optional and uses separately installed Docker and a pre-pulled image, as described in the [tool guide](builtin-tools.md#isolated-container-execution).
+
 :::tip[New here?]
 
 Start with the **Basic Example notebook** in `examples/notebooks/basic_example`. It starts a registry and two agents in one interactive walkthrough.
@@ -248,7 +261,18 @@ through `Assistant` and `CodeAssistant`. The example uses a temporary repository
 in-memory service adapters, so it needs no accounts or API keys and sends no real messages.
 See [Built-in Agents](builtin-agents.md) for the preset APIs.
 
+Run `python examples/builtin_agents.py` for ResearchAgent, KnowledgeAgent, DatabaseAgent,
+ExplorerAgent and EchoAgent. It uses fixture web providers, local knowledge, scoped files and a
+temporary SQLite database; its scripted models build answers from the actual tool results.
+
 Run `python examples/service_backends.py` to exercise every concrete backend: `GoogleCalendar`,
 `Gmail`, `OutlookCalendar`, `OutlookEmail` and `IMAPEmail`. Install `protolink[integrations]` first.
 The example replaces HTTP/IMAP/SMTP transports with offline fixtures while using real `Assistant`
 tools, approvals, serialization and MIME handling. See the [service backend reference](builtin-tools.md#calendar-and-email-backends).
+
+## Subagents and durable execution examples
+
+- [Local specialists](https://github.com/nMaroulis/protolink/blob/main/examples/subagents.py): an owned child using the existing `agent_call` action, with shared limits and streamed evidence.
+- [Durable execution](https://github.com/nMaroulis/protolink/blob/main/examples/durable_execution.py): approval and user input across three separate application invocations, with an offline model and a persisted tool result.
+
+Both examples run without API keys or external services. Read the [subagent](subagents.md) and [durable execution](execution-tools.md#durable-execution) guides for application controls and recovery scope.

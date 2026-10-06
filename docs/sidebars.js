@@ -12,6 +12,7 @@ const sidebars = {
         'whitepaper',
         'getting-started',
         'progressive-control',
+        'subagents',
         'cli',
         'devtools',
         {
@@ -33,6 +34,9 @@ const sidebars = {
         'client',
         'flows',
         'llm',
+        'context-management',
+        'hooks',
+        'evaluation',
         'rag',
         'logging',
         'models',

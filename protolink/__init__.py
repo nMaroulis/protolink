@@ -2,7 +2,16 @@
 
 from protolink.__version__ import __version__
 from protolink.agents import Agent
-from protolink.agents.builtins import Assistant, CodeAssistant
+from protolink.agents.builtins import (
+    Assistant,
+    CodeAssistant,
+    DatabaseAgent,
+    EchoAgent,
+    ExplorerAgent,
+    KnowledgeAgent,
+    ResearchAgent,
+)
+from protolink.agents.subagents import SubagentHandle, SubagentLimitError, SubagentLimits
 from protolink.client import AgentPeer
 from protolink.core import (
     ALL_RUN_REPORT_SECTIONS,
@@ -57,6 +66,8 @@ from protolink.core import (
     normalize_run_report,
 )
 from protolink.core.approvals import ApprovalBroker, ApprovalScope
+from protolink.core.durable import RunInterrupted, RunInterruption
+from protolink.core.hooks import AgentHooks, FinalResponse, ModelRequest, ToolObservation
 from protolink.core.resources import ResourceConflictError, ResourceRevision, StorageCheckpointStore
 from protolink.core.validation import (
     CompletionCheck,
@@ -64,6 +75,18 @@ from protolink.core.validation import (
     CompletionValidator,
     ToolOutcome,
     ValidationResult,
+)
+from protolink.devtools.durable_runs import RunManager
+from protolink.evaluation import (
+    EvaluationCase,
+    EvaluationReport,
+    EvaluationSample,
+    EvaluationScore,
+    compare_evaluations,
+    evaluate,
+    exact_match,
+    load_evaluation_cases,
+    tool_used,
 )
 from protolink.flows import (
     Flow,
@@ -79,13 +102,16 @@ from protolink.flows import (
 )
 from protolink.llms import (
     ContextItem,
+    ContextLimitError,
     ContextManifest,
+    ContextPolicy,
     HistoryCompactionRequest,
     HistoryCompactionResult,
     HistoryCompactionStrategy,
     HistoryCompactor,
     InferParseError,
     LLMModelProfile,
+    RoutedLLM,
     build_context_manifest,
     create_llm,
 )
@@ -102,6 +128,15 @@ from protolink.runtime import AgentGroup, RunHandle, RunResult
 from protolink.security import TLSConfig
 from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import RunReportRecord, RunStore, SQLiteRunStore, TaskRecord
+from protolink.storage.durable import (
+    CheckpointMismatchError,
+    DurableExecutionError,
+    DurableStore,
+    RunBusyError,
+    RunCheckpoint,
+    SQLiteDurableStore,
+    UncertainExecutionError,
+)
 from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
 from protolink.tools import BaseTool, Tool
 from protolink.transport import (
@@ -127,6 +162,7 @@ __all__ = [
     "Agent",
     "AgentCard",
     "AgentGroup",
+    "AgentHooks",
     "AgentInterface",
     "AgentPeer",
     "AgentSkill",
@@ -147,15 +183,28 @@ __all__ = [
     "BudgetUsage",
     "CancellationToken",
     "CapabilityPolicy",
+    "CheckpointMismatchError",
     "Citation",
     "CodeAssistant",
     "CompletionCheck",
     "CompletionEvidence",
     "CompletionValidator",
     "ContextItem",
+    "ContextLimitError",
     "ContextManifest",
+    "ContextPolicy",
+    "DatabaseAgent",
     "Document",
+    "DurableExecutionError",
+    "DurableStore",
+    "EchoAgent",
+    "EvaluationCase",
+    "EvaluationReport",
+    "EvaluationSample",
+    "EvaluationScore",
     "EventSink",
+    "ExplorerAgent",
+    "FinalResponse",
     "Flow",
     "Graph",
     "HistoryCompactionRequest",
@@ -165,10 +214,12 @@ __all__ = [
     "InMemoryEventSink",
     "InferParseError",
     "Knowledge",
+    "KnowledgeAgent",
     "LLMModelProfile",
     "LocalTraceRecorder",
     "LocalTraceTelemetry",
     "Message",
+    "ModelRequest",
     "Parallel",
     "Part",
     "Pipeline",
@@ -178,15 +229,22 @@ __all__ = [
     "RAGAnswer",
     "RedactionPolicy",
     "RepeatUntil",
+    "ResearchAgent",
     "ResourceConflictError",
     "ResourceRevision",
     "RetryPolicy",
+    "RoutedLLM",
     "Router",
     "RunAction",
     "RunBudget",
+    "RunBusyError",
+    "RunCheckpoint",
     "RunContext",
     "RunEvent",
     "RunHandle",
+    "RunInterrupted",
+    "RunInterruption",
+    "RunManager",
     "RunRecorder",
     "RunReplay",
     "RunReport",
@@ -200,6 +258,7 @@ __all__ = [
     "RunReportTolerance",
     "RunResult",
     "RunStore",
+    "SQLiteDurableStore",
     "SQLiteRunStore",
     "SearchHit",
     "StateOperationRequest",
@@ -208,6 +267,9 @@ __all__ = [
     "Step",
     "StorageCheckpointStore",
     "StructuredResponseError",
+    "SubagentHandle",
+    "SubagentLimitError",
+    "SubagentLimits",
     "TLSConfig",
     "Task",
     "TaskAlreadyRunningError",
@@ -219,6 +281,7 @@ __all__ = [
     "TaskRecord",
     "TaskState",
     "Tool",
+    "ToolObservation",
     "ToolOutcome",
     "ToolStep",
     "TransportConfig",
@@ -230,6 +293,7 @@ __all__ = [
     "TransportProtocolError",
     "TransportRemoteError",
     "TransportTimeoutError",
+    "UncertainExecutionError",
     "ValidationResult",
     "WorkflowLimitError",
     "__version__",
@@ -238,8 +302,13 @@ __all__ = [
     "assert_run_events",
     "assert_run_matches",
     "build_context_manifest",
+    "compare_evaluations",
     "create_knowledge",
     "create_llm",
     "diff_run_reports",
+    "evaluate",
+    "exact_match",
+    "load_evaluation_cases",
     "normalize_run_report",
+    "tool_used",
 ]

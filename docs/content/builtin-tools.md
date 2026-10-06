@@ -8,6 +8,16 @@ Import factories from `protolink.tools` or `protolink.tools.builtins`. For the t
 custom Python tools and MCP adapters, see the [Tool API](tool.md). For ready-made compositions,
 see [Built-in Agents](builtin-agents.md).
 
+```python
+from protolink import Agent
+from protolink.tools import calculator
+
+agent = Agent(name="helper", tools=[calculator()])
+print(agent.sync.call_tool("calculator", expression="(18 + 6) / 3"))
+```
+
+This runs offline without a model. Register a factory's result through `tools=` or `add_tool()`; attach an LLM when the model should select tools. Integrations requiring accounts or services take their configuration explicitly.
+
 ## Catalog
 
 | Factory | Generated tools | Capabilities | Requirements |
@@ -327,6 +337,52 @@ Create a fresh timezone-aware clock tool. UTC requires no external service or ti
 
 ## Command execution
 
+### Isolated container execution
+
+`DockerExecutionBackend` implements the same process backend contract as host execution. It runs approved argument arrays in a disposable container with an explicit image, mounted workspace and resource boundary. Register it on `process_tool()`, `shell_tool()`, `git_tool()` or `CodeAssistant(backend=...)`; registration makes no daemon calls.
+
+```python
+from protolink import Agent
+from protolink.tools import DockerExecutionBackend, process_tool
+
+backend = DockerExecutionBackend(
+    image="python:3.12-slim",  # Pull and verify the image separately; prefer a digest.
+    workspace="/absolute/workspace",
+)
+agent = Agent(name="commands", tools=[process_tool(backend=backend)])
+result = await agent.call_tool(
+    "execute_command",
+    argv=["python", "-c", "print('hello')"],
+    cwd="/absolute/workspace",
+    env={},
+    timeout_seconds=10,
+    max_output_bytes=4096,
+)
+print(result.exit_code, result.stdout)
+```
+
+The operator installs/configures Docker and prepares a trusted image containing the desired executables. `--pull=never` prevents implicit downloads. An executable name resolves inside the image; an absolute executable path refers to the container filesystem. Commands unavailable on the host can therefore run through `process_tool()` when installed in the image. The approved command, cwd, arguments, environment and configured backend boundary appear in the execution preview.
+
+| Setting | Default / behavior |
+| --- | --- |
+| `workspace` | Required existing directory; only this directory is mounted |
+| `writable` | `False`; mount is read-only unless explicitly enabled |
+| `network` | `False`; uses Docker's `none` network, or `bridge` when enabled |
+| `memory_mb`, `cpus`, `pids_limit` | 512 MiB, one CPU, 128 PIDs; memory/swap allowance is bounded |
+| `user` | Non-root numeric host UID:GID where available, otherwise `65534:65534`; may be supplied explicitly |
+| `docker_env` | CLI environment, defaulting to a minimal system PATH; pass Docker context/host settings explicitly |
+| `executable` | Docker CLI resolved once at construction |
+
+The root filesystem is read-only, Linux capabilities are dropped, privilege escalation and image healthchecks are disabled and `/tmp` is a bounded writable tmpfs. Command environment variables are explicit; host secrets are not inherited into the CLI or container. The image's own configured environment remains in effect. `cwd` must resolve within the mounted workspace. Factory/command timeout, output limits, cancellation and run budgets continue to apply.
+
+Normal completion, timeout and cancellation force-remove the named container before returning. A cleanup error is visible and includes the container name for inspection; process events record that name. Abrupt application death or daemon failure can leave external work without a receipt. Inspect Docker and reconcile the verified result before continuing an uncertain durable action; do not assume that terminating a client rolled back container effects.
+
+Docker is a trusted execution service with its own host/daemon boundary. Resource limits and mount restrictions reduce ordinary command access but do not provide a guarantee against a hostile image exploiting the daemon or kernel. With `writable=True`, host workspace edits remain external effects. CodeAssistant's scoped file tools still access the configured host directory; selecting a process backend changes shell/Git execution, not every application tool. Reconnect backend instances explicitly when restoring tools and update the application's execution version when their contract changes.
+
+The runtime flags and their platform behavior are documented in [Docker's container run reference](https://docs.docker.com/reference/cli/docker/container/run/). ProtoLink uses that CLI directly and adds no mandatory container dependency.
+
+### Host execution
+
 ```python
 import sys
 from protolink import Agent, AgentCard, ApprovalDecision, CapabilityPolicy
@@ -374,7 +430,7 @@ execution must pass through an Agent's authorization pipeline.
 | `ProcessCancelledError` | Native `asyncio.CancelledError` subclass with a partial typed `.result`. |
 
 Backend/result types are in `protolink.tools.builtins.process`. A future remote or container backend can implement this
-protocol; ProtoLink does not implement those backends in this release. Backend implementations are trusted application
+protocol; ProtoLink does not include those backends. Backend implementations are trusted application
 code and must honor the approved specification and live execution limits.
 
 The local backend uses an argument array without an implicit shell. Environment inheritance is explicit: `env={}`
@@ -471,7 +527,9 @@ print(answer.status, answer.answer)
 `application_ui` is your UI adapter. The model-facing API is `ask_user(question, options=None)`.
 When invoked by the inference loop, the tool awaits your async callback, then puts its result in normal
 tool history before the next model step. The task stays working during the wait. This does not suspend
-or resume a task across process restarts and does not use `input-required` as a durable checkpoint.
+or resume a task across process restarts by itself.
+
+For [durable execution](execution-tools.md#durable-execution), register `ask_user_tool()` without a callback on `Agent(..., durability="runs.sqlite")`. The same model tool call persists the question and returns an `input-required` task. After restarting, `agent.resume(run_id, request_id=..., answer="CSV")` restores the normal tool observation and continues. Durable mode uses checkpointed responses even if a live callback was supplied; its wait has no live timeout. `answer=None` explicitly declines.
 
 `UserInputRequest` has `request_id`, `question`, immutable suggested `options`, `run_id`, `task_id` and
 `action_id`; standalone tool calls have no task ID. IDs correlate simultaneous calls but do not authenticate
@@ -601,7 +659,7 @@ states include `prepared`, `applied`, `restoring`, `restored`, `failed` and `unc
 leaves a `prepared` or `restoring` record, inspection reports uncertainty. Failure to save the initial record prevents
 mutation. Failure after a possible write leaves an uncertainty marker; no automatic replay or restoration occurs.
 Restoration conflicts raise `ResourceConflictError`. Recovery of an uncertain operation requires application-led
-inspection; this release deliberately does not guess whether its effect occurred.
+inspection; recovery does not guess whether its effect occurred.
 
 Recovery storage is a dedicated namespace with one live writer. Keep it outside mutable allowed roots where practical.
 It contains lossless original bytes, so protect it as application data. Resource recovery, conversation history and
@@ -791,7 +849,7 @@ Results use `items` and `next_page_token`; keep the same backend, interval, quer
 another page. An empty page can still have a next token. Google and Microsoft event objects retain
 their original service fields, including their different representations of all-day boundaries.
 
-Creation returns the service event object with its `id`. This version creates personal timed events:
+Creation returns the service event object with its `id`. The calendar adapter creates personal timed events:
 it does not invite attendees, create recurring/all-day events, modify existing events, or delete events.
 Applications choose the user's timezone and check scheduling conflicts. Invalid intervals are rejected
 before an approval is requested or a backend is called.
@@ -832,7 +890,7 @@ backends do not request attachments separately. HTML-only MIME bodies are omitte
 Compose operations accept 1–50 bare ASCII recipient addresses, a nonblank subject up to 1,000
 characters and a nonblank plain-text body up to 200,000 characters. Header injection is rejected
 before approval. Gmail's fixed `sender` is required for composing and must be the authenticated
-address or a configured send-as alias. This version does not compose attachments, CC/BCC, HTML,
+address or a configured send-as alias. The email adapter does not compose attachments, CC/BCC, HTML,
 or threaded replies. Gmail sending returns service message/thread IDs; draft creation returns draft
 and message identifiers. Other backends return the statuses described below. None claims delivery
 to the recipient's inbox.
@@ -1021,6 +1079,7 @@ configured factories; the simple parameterless built-ins keep their existing rou
 | --- | --- |
 | [`generic_tools.py`](https://github.com/nMaroulis/protolink/blob/main/examples/generic_tools.py) | Filesystem reads/search/edits/recovery, storage CRUD, HTTP, CSV extraction/search and real SQLite on one ordinary Agent |
 | [`builtin_assistants.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_assistants.py) | Shell, all six Git operations, model question/answer continuation, in-memory calendar/email, clock and calculator |
+| [`builtin_agents.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_agents.py) | Specialist agent presets with fixture web providers, retrieved citations, bounded SQLite reads, scoped files and deterministic echo |
 | [`service_backends.py`](https://github.com/nMaroulis/protolink/blob/main/examples/service_backends.py) | Google Calendar, Gmail, Outlook Calendar, Outlook Email and IMAP/SMTP using offline transport fixtures |
 | [`builtin_web_search.py`](https://github.com/nMaroulis/protolink/blob/main/examples/builtin_web_search.py) | Public web search with explicit engine selection and policy; a query performs network requests |
 
