@@ -47,7 +47,7 @@ High‑level ideas:
   - **Storage** (e.g. `InMemoryStorage`, `SQLiteStorage`).
   - **Telemetry** (e.g. `LocalTraceTelemetry`, `LangfuseTelemetry`, `LangSmithTelemetry`).
   - **Logger** (e.g. `ConsoleLogger`, `FileLogger`, `QuietLogger`).
-- **Transport abstraction**: agents communicate over transports such as HTTP, SSE JSON-RPC, WebSocket, gRPC, or the in-process runtime transport.
+- **Transport abstraction**: agents communicate over transports such as HTTP, SSE JSON-RPC, WebSocket, gRPC or the in-process runtime transport.
 
 <div className="centered-media">
   <img src="https://raw.githubusercontent.com/nMaroulis/protolink/main/docs/assets/agent_architecture.png" alt="Agent Architecture" width="100%" />
@@ -136,13 +136,13 @@ For reusable capabilities to register on any Agent, see [Built-in Tools](builtin
 
 ## Local specialists and durable execution
 
-Configure `subagents=[specialist]` for owned local children and `durability="runs.sqlite"` for restartable default-loop execution. Both are optional. See [local subagents](subagents.md) for limits and background work, and [durable execution](execution-tools.md#durable-execution) for approvals, input, `resume()` and uncertain outcomes.
+Configure `subagents=[specialist]` for owned local children and `durability="runs.sqlite"` for restartable default-loop execution. Both are optional. See [local subagents](subagents.md) for limits and background work and [durable execution](execution-tools.md#durable-execution) for approvals, input, `resume()` and uncertain outcomes.
 
 `subagent_limits=SubagentLimits(...)` supplies deeper control. `execution_version="1"` identifies your application tool contract; increment it when executable behavior changes. `durability` also accepts a `SQLiteDurableStore` or a custom `DurableStore`.
 
 ### Model context and run controls
 
-For model-input preparation, enable [`context_policy="auto"`](context-management.md) or configure a `ContextPolicy`. [`hooks=[AgentHooks(...)]`](hooks.md) adds before-model, after-tool and before-completion callbacks to the default loop. [`RoutedLLM`](llm.md#model-routing-and-fallback) selects and falls back between model adapters without replaying tools. Use [`evaluate()`](evaluation.md) to compare the resulting behavior on reference cases, and [`RunManager`](execution-tools.md#manage-stopped-runs) to operate durable executions through your application configuration.
+For model-input preparation, enable [`context_policy="auto"`](context-management.md) or configure a `ContextPolicy`. [`hooks=[AgentHooks(...)]`](hooks.md) adds before-model, after-tool and before-completion callbacks to the default loop. [`RoutedLLM`](llm.md#model-routing-and-fallback) selects and falls back between model adapters without replaying tools. Use [`evaluate()`](evaluation.md) to compare the resulting behavior on reference cases and [`RunManager`](execution-tools.md#manage-stopped-runs) to operate durable executions through your application configuration.
 
 ## Agent-to-Agent Communication
 
@@ -153,7 +153,7 @@ Agents communicate over a chosen transport.
 Common patterns:
 
 - **RuntimeTransport**: agents operate dedicated native local transports connected via a globally shared memory registry. This mirrors distributed HTTP environments perfectly, enabling zero network overhead testing workflows while retaining accurate boundaries.
-- **HTTPTransport / SSEJSONRPCTransport**: agents expose normal HTTP endpoints so other agents, CLIs, dashboards, browser pages, or external clients can send requests. SSE adds streamed task events over `text/event-stream`.
+- **HTTPTransport / SSEJSONRPCTransport**: agents expose normal HTTP endpoints so other agents, CLIs, dashboards, browser pages or external clients can send requests. SSE adds streamed task events over `text/event-stream`.
 - **WebSocketTransport**: agents expose the same endpoint specs over JSON frames on a WebSocket connection. Use this for streamed task events and long-lived clients rather than direct browser page URLs.
 
 ### Agent Transport Layers
@@ -280,13 +280,13 @@ Create the stable Agent facade and wire its identity, execution engine, communic
       Description for a generated card, defaulting to <code>"Agent &lt;name&gt;"</code>. Cannot be combined with an explicit card.
     </ApiField>
     <ApiField name="url" type="str | None" defaultValue="None">
-      Advertised URL for a generated card. Without a transport, or with the runtime alias, defaults to <code>runtime://&lt;URL-encoded name&gt;</code>. Network aliases require a URL with a matching scheme, explicit port and no path prefix. A configured transport supplies its own URL when omitted and permits a separate public address when supplied. Cannot be combined with an explicit card.
+      Advertised URL for a generated card. Without a transport or with the runtime alias, defaults to <code>runtime://&lt;URL-encoded name&gt;</code>. Network aliases require a URL with a matching scheme, explicit port and no path prefix. A configured transport supplies its own URL when omitted and permits a separate public address when supplied. Cannot be combined with an explicit card.
     </ApiField>
     <ApiField name="tools" type="Iterable[BaseTool | Callable[..., Any]] | None" defaultValue="None">
       Initial functions or tool instances registered through <code>add_tools()</code>, preserving schemas, policy metadata and skill registration. Registration does not execute the tools.
     </ApiField>
     <ApiField name="transport" type="TransportType | Transport | None" defaultValue="None">
-      Inbound and outbound communication layer. A registered alias such as <code>"http"</code>, <code>"runtime"</code>, <code>"websocket"</code>, or <code>"grpc"</code> creates a transport with defaults derived from <code>card.url</code>. A concrete instance preserves its TLS, retry, limits, keepalive, metrics and ownership configuration. <code>None</code> creates a local facade with no client or server.
+      Inbound and outbound communication layer. A registered alias such as <code>"http"</code>, <code>"runtime"</code>, <code>"websocket"</code> or <code>"grpc"</code> creates a transport with defaults derived from <code>card.url</code>. A concrete instance preserves its TLS, retry, limits, keepalive, metrics and ownership configuration. <code>None</code> creates a local facade with no client or server.
     </ApiField>
     <ApiField name="registry" type="TransportType | Registry | RegistryClient | None" defaultValue="None">
       Optional discovery connection. A <code>Registry</code> contributes its client, a <code>RegistryClient</code> is used directly and a transport alias creates a default client at <code>registry_url</code>. Without one, discovery returns an empty list and registration methods are no-ops.
@@ -295,7 +295,7 @@ Create the stable Agent facade and wire its identity, execution engine, communic
       Registry address used only when <code>registry</code> is a transport alias. Put advanced TLS and capacity settings on a configured registry transport and pass its <code>RegistryClient</code> instead.
     </ApiField>
     <ApiField name="llm" type="LLM | str | None" defaultValue="None">
-      Optional language model used for explicit <code>infer</code> parts. Strings use <code>create_llm()</code> and accept provider aliases or <code>provider:model</code>. Pass an object for custom parameters, credentials, or server URLs. Assignment calls <code>llm.validate_connection()</code> and uses its result to update <code>card.capabilities.has_llm</code>. Depending on the adapter, validation may contact a provider or local server during Agent construction.
+      Optional language model used for explicit <code>infer</code> parts. Strings use <code>create_llm()</code> and accept provider aliases or <code>provider:model</code>. Pass an object for custom parameters, credentials or server URLs. Assignment calls <code>llm.validate_connection()</code> and uses its result to update <code>card.capabilities.has_llm</code>. Depending on the adapter, validation may contact a provider or local server during Agent construction.
     </ApiField>
     <ApiField name="system_prompt" type="str | None" defaultValue="None">
       Agent-specific role and behavior instructions appended to ProtoLink's runtime prompt. Tool, delegation, flow and action instructions are compiled separately. Set <code>override_system_prompt=True</code> only when the supplied text should replace that built-in blueprint.
@@ -367,11 +367,11 @@ Create the stable Agent facade and wire its identity, execution engine, communic
       Seconds between heartbeats after successful registration. <code>None</code> disables the loop. Values below <code>0.1</code> are clamped to 0.1 seconds.
     </ApiField>
     <ApiField name="knowledge" type="Knowledge | Retriever | Sequence[Knowledge | Retriever] | None" defaultValue="None">
-      One knowledge source, a structural retriever, or a sequence of sources.
+      One knowledge source, a structural retriever or a sequence of sources.
       Each source becomes a typed <code>search_&lt;name&gt;</code> tool available
       to the inference loop. Plain retrievers are wrapped as knowledge named
       <code>"knowledge"</code>; wrap them in <code>Knowledge</code> to provide a
-      specific name, description, result limit, or reranker.
+      specific name, description, result limit or reranker.
     </ApiField>
     <ApiField name="retrieval" type={'Literal["auto", "always", "required"]'} defaultValue={'"auto"'}>
       Default retrieval behavior for infer tasks. <code>"auto"</code> lets the
@@ -385,7 +385,7 @@ Create the stable Agent facade and wire its identity, execution engine, communic
 </ApiSection>
 
 <ApiCallout label="Construction side effects">
-  The constructor creates default storage, logger, policy, state and sync facades and may construct transport clients and routes. LLM connection validation can perform I/O. Attaching knowledge creates retrieval tools and capability metadata, but staged knowledge sources remain lazy until <code>ready()</code> or the first search. Construction does not bind Agent server ports, register the card, or begin heartbeats until lifecycle methods run.
+  The constructor creates default storage, logger, policy, state and sync facades and may construct transport clients and routes. LLM connection validation can perform I/O. Attaching knowledge creates retrieval tools and capability metadata, but staged knowledge sources remain lazy until <code>ready()</code> or the first search. Construction does not bind Agent server ports, register the card or begin heartbeats until lifecycle methods run.
 </ApiCallout>
 
 </ApiReference>
@@ -431,7 +431,7 @@ agent.add_tool(add)
 print(agent.sync.call_tool("add", a=2, b=3))  # 5
 ```
 
-Register the same function on another agent with `other_agent.add_tool(add)`. For explicit metadata such as a public name, tags, or capabilities, pass `Tool.from_callable(add, ...)` to `add_tool()`.
+Register the same function on another agent with `other_agent.add_tool(add)`. For explicit metadata such as a public name, tags or capabilities, pass `Tool.from_callable(add, ...)` to `add_tool()`.
 
 ### Agent.tool
 

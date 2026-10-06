@@ -40,7 +40,7 @@ report = await evaluate(
 report.save("experiment.json")
 ```
 
-Case names must be unique; JSONL files are limited to 10,000 records and one million characters per record. Experiments allow up to 100,000 total samples and cap active concurrency at 128. Parallel evaluations require a factory to avoid sharing conversation/model state. A factory should return a fresh Agent on every call, and every repetition still executes real work.
+Case names must be unique; JSONL files are limited to 10,000 records and one million characters per record. Experiments allow up to 100,000 total samples and cap active concurrency at 128. Parallel evaluations require a factory to avoid sharing conversation/model state. A factory should return a fresh Agent on every call and every repetition still executes real work.
 
 The default check, `exact_match`, compares the final output to `expected` using Python equality. Every sample also receives `execution_completed`. Use checks suited to the task rather than treating one metric as a universal measure of quality:
 
@@ -98,7 +98,6 @@ candidate.save("candidate.json", include_reports=True)
 
 Comparisons average repetitions for each case and named metric. Missing baseline metrics and decreases beyond the tolerance are reported as regressions. Candidate execution/evaluator errors also fail the comparison. Timing is recorded but is not implicitly treated as quality. Run-report regression diffing remains available when you need to compare normalized event/action structure rather than experiment scores.
 
-JSON exports contain reference cases, outputs, errors, scores, observed budget counters and elapsed time. Aggregate totals include steps, model calls, tool calls and input/output tokens observed by the runtime. Token counts may be estimates; provider failures can consume usage not reported by a provider, and judge usage is separate. Diagnostic run reports are included only with `include_reports=True`. Experiment files contain application input/output data, so apply your own redaction and retention policy before sharing them.
+JSON exports contain reference cases, outputs, errors, scores, observed budget counters and elapsed time. Aggregate totals include steps, model calls, tool calls and input/output tokens observed by the runtime. Token counts may be estimates; provider failures can consume usage not reported by a provider and judge usage is separate. Diagnostic run reports are included only with `include_reports=True`. Experiment files contain application input/output data, so apply your own redaction and retention policy before sharing them.
 
 For the conceptual distinction between datasets, experiments and evaluators, see [LangSmith's evaluation concepts](https://docs.langchain.com/langsmith/evaluation-concepts). ProtoLink runs evaluations locally through its own Agent and RunReport contracts. Offline scripted experiments test those runtime contracts; real-model evaluations measure model behavior on the chosen dataset.
-

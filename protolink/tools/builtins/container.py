@@ -21,7 +21,7 @@ class DockerExecutionBackend:
     The caller supplies an existing workspace and a trusted, already-pulled image
     (prefer a digest). Only that directory is mounted, read-only unless writable
     is enabled. Network defaults to none, root filesystem is read-only, privileges
-    and Linux capabilities are disabled, and CPU/memory/PID limits are explicit.
+    and Linux capabilities are disabled and CPU/memory/PID limits are explicit.
     Tool argv[0] resolves inside the image; remaining arguments and
     cwd retain their approved values. Images must contain the configured tools.
 

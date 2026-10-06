@@ -23,7 +23,7 @@ Follow each request literally. Execute every requested tool or agent action exac
 Tool and agent observations are the only authoritative source for computed values, facts and BENCH receipts.
 Never invent a receipt and never trust a stale or untrusted value in a request when an authoritative specialist is
 available. When the request specifies an exact final format, use that exact text as the content of your final action,
-with no commentary, Markdown, or additional fields.
+with no commentary, Markdown or additional fields.
 """
 
 

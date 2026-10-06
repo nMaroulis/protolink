@@ -373,7 +373,7 @@ The operator installs/configures Docker and prepares a trusted image containing 
 | `docker_env` | CLI environment, defaulting to a minimal system PATH; pass Docker context/host settings explicitly |
 | `executable` | Docker CLI resolved once at construction |
 
-The root filesystem is read-only, Linux capabilities are dropped, privilege escalation and image healthchecks are disabled, and `/tmp` is a bounded writable tmpfs. Command environment variables are explicit; host secrets are not inherited into the CLI or container. The image's own configured environment remains in effect. `cwd` must resolve within the mounted workspace. Factory/command timeout, output limits, cancellation and run budgets continue to apply.
+The root filesystem is read-only, Linux capabilities are dropped, privilege escalation and image healthchecks are disabled and `/tmp` is a bounded writable tmpfs. Command environment variables are explicit; host secrets are not inherited into the CLI or container. The image's own configured environment remains in effect. `cwd` must resolve within the mounted workspace. Factory/command timeout, output limits, cancellation and run budgets continue to apply.
 
 Normal completion, timeout and cancellation force-remove the named container before returning. A cleanup error is visible and includes the container name for inspection; process events record that name. Abrupt application death or daemon failure can leave external work without a receipt. Inspect Docker and reconcile the verified result before continuing an uncertain durable action; do not assume that terminating a client rolled back container effects.
 

@@ -30,7 +30,7 @@ The child is an ordinary `Agent`. Existing remote delegation still communicates 
 
 Conversation separation does not isolate files, Python objects, credentials or the operating system. Agents use their configured tools and application resources.
 
-Each child receives a fresh session ID for that run, even when it has conversation persistence configured. It receives the delegated prompt, its own instructions and tools, and inherited run controls. The parent receives its completed result and artifacts. ProtoLink does not copy the entire parent conversation into the child.
+Each child receives a fresh session ID for that run, even when it has conversation persistence configured. It receives the delegated prompt, its own instructions and tools and inherited run controls. The parent receives its completed result and artifacts. ProtoLink does not copy the entire parent conversation into the child.
 
 ## The inference contract
 
@@ -48,7 +48,7 @@ Delegating a known specialist tool also works:
 
 The model still chooses one of `final`, `tool_call` or `agent_call`. ProtoLink advertises the configured specialist cards through the same prompt and provider-native delegation mechanisms. A blocking child call supplies an ordinary agent-result observation before the parent's next model call. There is no additional mandatory planning prompt or different action format.
 
-Local names take precedence over registry peers with the same name. Local names must be unique, ignoring case, and different from the parent's name. Calls that create an ancestor cycle are rejected. Your local roster defines which specialists can be selected; existing discovery continues to expose remote peers when configured. Remote calls retain their existing transport lifecycle.
+Local names take precedence over registry peers with the same name. Local names must be unique, ignoring case and different from the parent's name. Calls that create an ancestor cycle are rejected. Your local roster defines which specialists can be selected; existing discovery continues to expose remote peers when configured. Remote calls retain their existing transport lifecycle.
 
 ## More control
 
@@ -64,7 +64,7 @@ assistant = Agent(
 result = await assistant.invoke("Research this topic", budget=RunBudget(max_llm_calls=20, max_tool_calls=10))
 ```
 
-The defaults permit eight total children, four concurrent children, and direct children only. `max_children` counts every created child, including queued and completed work, across the run tree. Resuming a saved child does not create another child or consume another count. Depth one permits parent-to-child calls; increase `max_depth` for nested specialists. A nested call with no available concurrency slot fails with `SubagentLimitError` instead of waiting forever for its own ancestor's slot.
+The defaults permit eight total children, four concurrent children and direct children only. `max_children` counts every created child, including queued and completed work, across the run tree. Resuming a saved child does not create another child or consume another count. Depth one permits parent-to-child calls; increase `max_depth` for nested specialists. A nested call with no available concurrency slot fails with `SubagentLimitError` instead of waiting forever for its own ancestor's slot.
 
 The root run's budget governs the tree. Worker policies can further restrict permissions; a child cannot relax an ancestor's decision. Tools must declare meaningful capabilities for capability policies to inspect them. Ordinary callables without capabilities remain subject to custom policies but supply no capability labels automatically.
 

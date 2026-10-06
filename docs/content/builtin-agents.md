@@ -118,7 +118,7 @@ separate from `durability`, which checkpoints the execution itself. See
 ## ResearchAgent
 
 `ResearchAgent` composes web search, URL fetching, clock and calculator. Its supplemental instructions
-request primary sources, citations beside claims, verification beyond search snippets, and explicit
+request primary sources, citations beside claims, verification beyond search snippets and explicit
 distinctions between evidence and inference. Searches and reads use the existing bounded tools;
 the preset adds no new inference action format or research workflow engine.
 
@@ -130,7 +130,7 @@ answer = await researcher.invoke("Explain structured concurrency and cite the so
 ```
 
 `search_engine` selects the provider for `web_search`; the model supplies `query`, `max_results` and
-`freshness`, and cannot switch providers through that tool. The default is `"brave"`, which reads
+`freshness` and cannot switch providers through that tool. The default is `"brave"`, which reads
 `BRAVE_SEARCH_API_KEY` at invocation. `"wikipedia"` is keyless, searches English Wikipedia and
 supports only `freshness="any"`. `"duckduckgo"` is a keyless, best-effort HTML interface.
 `fetch_url` reads bounded text from public HTTP(S) URLs with the existing DNS/redirect checks.
@@ -145,7 +145,7 @@ Custom providers own their credentials, network restrictions and output limits. 
 ## KnowledgeAgent
 
 `KnowledgeAgent` connects the existing [Knowledge/RAG subsystem](rag.md) to a focused answer preset.
-Its instructions request retrieval before domain answers, source citations, and an explicit limitation
+Its instructions request retrieval before domain answers, source citations and an explicit limitation
 when evidence is absent or insufficient. It reuses the existing knowledge tools and citation metadata.
 
 ```python
@@ -179,7 +179,7 @@ applications can use `invoke_typed()` and their own validation when they need a 
 ## DatabaseAgent
 
 `DatabaseAgent` exposes schema inspection, bounded read-only queries and calculator. Its instructions
-request schema verification, bound parameters, explicit aggregates for totals, and disclosure of
+request schema verification, bound parameters, explicit aggregates for totals and disclosure of
 filters and truncation. The configured backend owns connections and read-only enforcement.
 
 ```python
@@ -195,7 +195,7 @@ rows = await analyst.call_tool(
 ```
 
 The database must already exist. `SQLiteDatabase` opens it read-only, rejects writes and unsafe
-operations, and bounds returned data. For PostgreSQL or another service, implement `DatabaseBackend`
+operations and bounds returned data. For PostgreSQL or another service, implement `DatabaseBackend`
 and pass it as `database`; a policy grant alone does not enforce read-only SQL on a custom connection.
 The default policy allows `database.read` and user questions. See
 [database tools](builtin-tools.md#database-queries) for backend contracts, query limits and timeouts.
@@ -295,7 +295,7 @@ The presets are optional starting points. Register additional tools with
 an ordinary `Agent`. Their default policies deny capabilities beyond the preset, so explicitly update
 the policy when adding capabilities. A supplied policy replaces the preset policy.
 
-All accept `name`, `description` and `url`, or `card`, to change identity, and standard Agent options such as
+All accept `name`, `description` and `url`, or `card`, to change identity and standard Agent options such as
 `system_prompt`, `approval_handler`, `transport`, `state`, `storage` and `run_store`. Model-driven presets
 accept model objects or ordinary LLM aliases. A supplied `tools=[...]` entry takes precedence over a
 preset tool with the same name. Configure callbacks in your own

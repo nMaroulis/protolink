@@ -21,7 +21,7 @@ class RoutedLLM(LLM):
     synchronous selector receives a copied canonical history and returns a model
     key. The default uses the first configured key. Fallbacks are tried in the
     supplied order after bounded retries. Every attempt is charged through the
-    inference loop's shared budget callback, and exposed stream output prevents
+    inference loop's shared budget callback and exposed stream output prevents
     fallback. Authentication, validation, policy and cancellation failures never
     trigger fallback. This wrapper never executes or replays tools.
 

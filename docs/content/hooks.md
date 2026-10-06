@@ -1,6 +1,6 @@
 # Lifecycle hooks
 
-Lifecycle hooks let an application prepare model inputs, transform successful tool observations and validate a final answer while retaining ProtoLink's standard inference loop. They are executable application callbacks: use them for deterministic context selection, result normalization or completion checks. Capability policy continues to authorize actions, and telemetry continues to observe them.
+Lifecycle hooks let an application prepare model inputs, transform successful tool observations and validate a final answer while retaining ProtoLink's standard inference loop. They are executable application callbacks: use them for deterministic context selection, result normalization or completion checks. Capability policy continues to authorize actions and telemetry continues to observe them.
 
 ```python
 from protolink import Agent, AgentHooks, FinalResponse
@@ -69,7 +69,7 @@ After a successful authorized tool call, its durable receipt is committed before
 
 For a final action, `before_complete` runs before the final event, output part and completion. The transformed answer is retained in conversation history. Validation applies to the complete response; already exposed raw streaming chunks cannot be recalled. If consumers require validated content, display the completed result after the hook succeeds.
 
-Keep callbacks deterministic, idempotent and free of external side effects. Resume can repeat preparation at a checkpoint boundary, and replay of a committed result can repeat observation preparation. Application side effects belong in registered tools with normal authorization and receipts. Hooks apply to the default inference loop; direct `call_tool()` invocations and custom orchestration handlers retain their own execution paths.
+Keep callbacks deterministic, idempotent and free of external side effects. Resume can repeat preparation at a checkpoint boundary and replay of a committed result can repeat observation preparation. Application side effects belong in registered tools with normal authorization and receipts. Hooks apply to the default inference loop; direct `call_tool()` invocations and custom orchestration handlers retain their own execution paths.
 
 ## Configuration and recovery
 

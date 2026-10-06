@@ -40,7 +40,7 @@ Agent; this page explains the runtime facilities shared by built-in and applicat
 
 ## Durable execution
 
-Configure a checkpoint file to let an agent pause for approval or an answer, exit the application, and continue after a restart.
+Configure a checkpoint file to let an agent pause for approval or an answer, exit the application and continue after a restart.
 
 ```python
 from protolink import Agent
@@ -49,7 +49,7 @@ from protolink.tools import ask_user_tool
 agent = Agent(name="assistant", tools=[ask_user_tool()], durability="runs.sqlite")
 ```
 
-For a known operation, use `call_tool()` without a model, as below. Add your model through `llm=` and use `invoke()` to let it select tools; `run_task()` and `start_run()` expose the full task and run controls. The runnable [durable execution example](https://github.com/nMaroulis/protolink/blob/main/examples/durable_execution.py) demonstrates approval, a question, and continuation across three separate application processes, using an offline scripted model.
+For a known operation, use `call_tool()` without a model, as below. Add your model through `llm=` and use `invoke()` to let it select tools; `run_task()` and `start_run()` expose the full task and run controls. The runnable [durable execution example](https://github.com/nMaroulis/protolink/blob/main/examples/durable_execution.py) demonstrates approval, a question and continuation across three separate application processes, using an offline scripted model.
 
 ### Start, inspect, restart, resume
 
@@ -67,7 +67,7 @@ except RunInterrupted as pause:
     # Persist the root run ID in your application's job record and show the request.
 ```
 
-Recreate the same agent and tools after restarting, open the same checkpoint file, and supply the pending request ID:
+Recreate the same agent and tools after restarting, open the same checkpoint file and supply the pending request ID:
 
 ```python
 agent = Agent(name="assistant", tools=[ask_user_tool()], durability="runs.sqlite")
@@ -133,9 +133,9 @@ except RunInterrupted as pause:
     )
 ```
 
-`application_service` represents your application's integration. Direct `call_tool()` creates a checkpointed task when durability is enabled. Reject with `approved=False`; the action does not execute, and the run fails with its policy denial.
+`application_service` represents your application's integration. Direct `call_tool()` creates a checkpointed task when durability is enabled. Reject with `approved=False`; the action does not execute and the run fails with its policy denial.
 
-The stored request includes the exact prepared action, preview artifacts and policy decision. A committed result retains its original authorization and is reused without requesting approval for an effect that already finished. Resume checks the request ID and optional displayed fingerprint, prepares the action again, compares its payload and resource preconditions with the saved action, and evaluates current policies before dispatch. A changed resource or execution contract fails closed. Approval of an old preview cannot authorize a newly prepared operation. Prepared tools must still verify external resource preconditions immediately before effects.
+The stored request includes the exact prepared action, preview artifacts and policy decision. A committed result retains its original authorization and is reused without requesting approval for an effect that already finished. Resume checks the request ID and optional displayed fingerprint, prepares the action again, compares its payload and resource preconditions with the saved action and evaluates current policies before dispatch. A changed resource or execution contract fails closed. Approval of an old preview cannot authorize a newly prepared operation. Prepared tools must still verify external resource preconditions immediately before effects.
 
 With durability enabled, approval requirements and `ask_user_tool()` use checkpointed interruptions. Live `approval_handler` and user-input callbacks are used for agents without durability. Durable waits do not keep a coroutine or terminal input open. The existing `ApprovalBroker` continues to support live approval adapters and persisted inspection; it is a separate facility from execution checkpoints.
 
@@ -214,7 +214,7 @@ Agent dict/YAML serialization retains SQLite path, lease interval, execution ver
 
 ### Supported execution boundaries
 
-Durable execution checkpoints the default Agent task handler and `LLM.infer` loop, registered tool dispatch, and blocking configured local children. Both JSON action providers and provider-native action adapters use these boundaries. Tool outputs must be representable by ProtoLink's JSON serializer; a result that cannot be committed leaves the effect uncertain. Durable dispatch returns that JSON representation on both initial execution and receipt replay. Objects with `to_dict()` or Pydantic serialization become mappings, tuples become lists, and datetimes become strings. Ordinary live tools retain their original return types.
+Durable execution checkpoints the default Agent task handler and `LLM.infer` loop, registered tool dispatch and blocking configured local children. Both JSON action providers and provider-native action adapters use these boundaries. Tool outputs must be representable by ProtoLink's JSON serializer; a result that cannot be committed leaves the effect uncertain. Durable dispatch returns that JSON representation on both initial execution and receipt replay. Objects with `to_dict()` or Pydantic serialization become mappings, tuples become lists and datetimes become strings. Ordinary live tools retain their original return types.
 
 Custom `handle_task` or `LLM.infer` overrides and automatic eager RAG modes (`retrieval="always"` or `"required"`) are rejected for durable runs. On-demand knowledge tools remain available with `retrieval="auto"`. Background children and remote peer delegation are live features; durable runs reject remote delegation rather than silently resubmitting a transported side effect.
 
@@ -247,7 +247,7 @@ print(manager.list(status="input-required"))
 
 `manager.inspect(run_id)` returns redacted status, interruption, usage and uncertain-action metadata. Inventory contains configured root-agent records; blocking child continuation remains part of the parent's resume path. `SQLiteDurableStore.list(status=None, agent_name=None, limit=20)` reads up to 1,000 private checkpoints without acquiring a lease. Other stores may implement that optional inventory API without changing the four-method `DurableStore` contract.
 
-`manager.resume()` returns a redacted task and refreshed run metadata, including any subsequent interruption. `manager.reconcile(run_id, action_id, result=verified_result)` commits an outcome already verified in the external system. `manager.cancel(run_id)` fences a stopped checkpoint and marks it canceled; it refuses active leases and unresolved executing/uncertain actions. It does not cancel a currently running process, reverse effects or invent a result. Use the live run handle to cancel active work, and inspect/reconcile uncertain effects before offline cancellation.
+`manager.resume()` returns a redacted task and refreshed run metadata, including any subsequent interruption. `manager.reconcile(run_id, action_id, result=verified_result)` commits an outcome already verified in the external system. `manager.cancel(run_id)` fences a stopped checkpoint and marks it canceled; it refuses active leases and unresolved executing/uncertain actions. It does not cancel a currently running process, reverse effects or invent a result. Use the live run handle to cancel active work and inspect/reconcile uncertain effects before offline cancellation.
 
 The [CLI](cli.md#durable-run-controls) and [dashboard](devtools.md#durable-run-controls) accept a trusted `module:function` factory returning an Agent, an iterable of Agents or a RunManager. The factory has no arguments and is selected by the operator at startup; importing it executes application code. Browsers cannot replace the factory or reconnect executable callbacks through JSON. Management projections apply `RedactionPolicy`; private execution checkpoints remain in their separate store. Network applications should authenticate users and scope the configured roster before exposing these methods.
 

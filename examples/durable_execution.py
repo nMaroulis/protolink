@@ -1,4 +1,4 @@
-"""Pause, exit, and resume through three separate application invocations.
+"""Pause, exit and resume through three separate application invocations.
 
 uv run python examples/durable_execution.py start --directory /tmp/protolink-demo
 uv run python examples/durable_execution.py approve --directory /tmp/protolink-demo

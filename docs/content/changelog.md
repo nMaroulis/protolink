@@ -60,10 +60,10 @@ These capabilities follow ProtoLink's **progressive control** philosophy: start 
 
 - `ResearchAgent`, `KnowledgeAgent`, `DatabaseAgent` and `ExplorerAgent`: configurable presets for source-grounded web research, knowledge retrieval, read-only database analysis and scoped workspace exploration, using the existing Agent runtime.
 - Built-in agent reference and an offline preset example covering custom providers, citations, bounded SQL, scoped files and deterministic echo.
-- Local child tasks with independent conversations, parent/child evidence, inherited policies, shared root budgets, and total-child, concurrency and depth limits.
+- Local child tasks with independent conversations, parent/child evidence, inherited policies, shared root budgets and total-child, concurrency and depth limits.
 - `SubagentLimits` and owned `SubagentHandle` results/cancellation. Live `RunHandle.spawn()` and optional model tools `spawn_subagent`, `wait_subagent` and `cancel_subagent` support background work.
 - `SQLiteDurableStore` and a replaceable `DurableStore` contract for versioned checkpoints, fenced ownership, conversation/cursor recovery and committed action receipts.
-- `RunInterrupted` / `RunInterruption`, `Agent.resume()` and `resume_task()`, and matching synchronous facades for approvals and questions that survive application restarts.
+- `RunInterrupted` / `RunInterruption`, `Agent.resume()` and `resume_task()` and matching synchronous facades for approvals and questions that survive application restarts.
 - Verified-outcome `Agent.reconcile()` and typed busy, contract-mismatch and uncertain-execution errors. Unknown external outcomes are never automatically replayed.
 - Durable blocking local delegation, direct tool invocation and streamed run attempts; root usage survives pauses and child continuation.
 - Configuration serialization for SQLite stores, execution versions and subagent limits, with explicit reattachment of executable child rosters and custom stores.
@@ -75,13 +75,13 @@ These capabilities follow ProtoLink's **progressive control** philosophy: start 
 - `EchoAgent` now echoes inference prompts and received task parts deterministically without invoking a model or executing tools; unary and streamed tasks use the normal lifecycle.
 - Presets accept standard `name`, `description`, `url`, LLM aliases and caller-supplied tool overrides. Durable presets install user-question tools without requiring live callbacks.
 - `CodeAssistant` includes scoped file reads, listing and search; an optional checkpoint store enables prepared file edits and recovery with approval defaults.
-- Shortened the README overview, added module introductions and quick examples, and consolidated durable execution into [Execution, approvals and recovery](execution-tools.md). The former durable execution page redirects to the consolidated guide.
+- Shortened the README overview, added module introductions and quick examples and consolidated durable execution into [Execution, approvals and recovery](execution-tools.md). The former durable execution page redirects to the consolidated guide.
 - `ask_user_tool()` may omit its live callback when attached to a durable agent. Its durable mode returns a checkpointed `input-required` task and continues from a supplied answer.
 - Approval-required actions on durable agents pause through execution checkpoints. Agents without durability retain the existing live approval and question callbacks.
 
 ### Validation
 
-Recovery tests exercise separate application processes, crashes before and after result receipts, stale approvals, nested child limits, and root/child continuation. A controlled offline comparison against v0.7.5 retained **80/80 strict passes** on the 40-case core suite with two repetitions. Scripted actions verify the runtime contract; they do not measure real-model quality.
+Recovery tests exercise separate application processes, crashes before and after result receipts, stale approvals, nested child limits and root/child continuation. A controlled offline comparison against v0.7.5 retained **80/80 strict passes** on the 40-case core suite with two repetitions. Scripted actions verify the runtime contract; they do not measure real-model quality.
 
 Harness integration tests cover durable context retrieval, hook ordering and receipt preservation, routing budgets across restarts, partial-stream fallback restrictions, evaluation cancellation, read-only inventory and dashboard request validation. A live Docker check verifies read-only mounts, disabled network/capabilities, timeout and container removal; the dashboard answer/continuation flow is also verified in the browser.
 
