@@ -11,6 +11,15 @@ from contextvars import copy_context
 from typing import Any
 
 
+class _HTTPResponseError(RuntimeError):
+    """Retain a rejected HTTP response for narrowly scoped capability handling."""
+
+    def __init__(self, message: str, *, status_code: int, body: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.body = body
+
+
 @asynccontextmanager
 async def http_stream(
     url: str,
@@ -61,8 +70,10 @@ async def http_stream(
         async with client.stream("POST", url, json=payload, headers=headers) as response:
             if not response.is_success:
                 await response.aread()
-                raise RuntimeError(
-                    f"{provider} API streaming request failed with status {response.status_code}: {response.text}"
+                raise _HTTPResponseError(
+                    f"{provider} API streaming request failed with status {response.status_code}: {response.text}",
+                    status_code=response.status_code,
+                    body=response.text,
                 )
             yield chunks(response)
 

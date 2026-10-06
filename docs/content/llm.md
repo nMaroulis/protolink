@@ -2409,6 +2409,10 @@ Client for Ollama's `/api/chat` endpoint. It serializes `ConversationHistory` in
 
 JSON action mode is the default because local-model tool reliability depends on both the model and its template. Set `supports_tool_calling=True` only after verifying that the selected Ollama model produces correct native tool calls; direct `chat()` and `call()` usage does not require that flag.
 
+The adapter uses Ollama's documented [`/api/chat` endpoint](https://docs.ollama.com/api/chat). JSON action mode normally requests `format="json"` to constrain the server's output. Some runners, including MLX configurations, reject structured output with HTTP 501 and `structured output is unavailable`. For that specific rejection of the default format, ProtoLink retries once without the format field and remembers the limitation for the same server/model on that adapter. The inference prompt and action validation remain in place, so tools and delegation still use the standard action contract. This applies to ordinary and streaming calls; errors inside an accepted stream propagate without a format fallback.
+
+Use `model_params={"format": None}` to omit server formatting from the outset. An explicit `"json"` or JSON schema is a required formatting contract and is never silently dropped. `format`, `think` and `keep_alive` are sent as top-level Ollama request controls; generation settings such as `temperature`, `num_ctx` and `num_predict` remain in `options`. The existing `max_tokens` alias maps to `num_predict`.
+
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="OllamaLLM parameters">
     <ApiField name="base_url" type="str | None" defaultValue="None">
@@ -2421,7 +2425,7 @@ JSON action mode is the default because local-model tool reliability depends on 
       Ollama model name. <code>None</code> resolves to <code>gemma4:e4b</code>.
     </ApiField>
     <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
-      Values merged over <code>temperature=1.0</code>, <code>num_predict=8192</code> and <code>num_ctx=8192</code>.
+      Values merged over <code>temperature=1.0</code>, <code>num_predict=8192</code> and <code>num_ctx=8192</code>. The <code>format</code>, <code>think</code> and <code>keep_alive</code> keys configure top-level request controls; other values configure generation options.
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
       Opt into native Ollama tools. The default uses JSON action mode.
@@ -2450,6 +2454,24 @@ llm = OllamaLLM(
     model="qwen3",
 )
 ```
+
+For an installed Gemma MLX model, keep the default action mode and optionally disable thinking output:
+
+```python
+from protolink import Agent
+
+agent = Agent(
+    name="helper",
+    llm=OllamaLLM(
+        base_url="http://127.0.0.1:11434",
+        model="gemma4:12b-mlx",
+        model_params={"think": False},
+    ),
+)
+print(agent.sync.invoke("Say hello in one sentence."))
+```
+
+Use the exact tag installed on your server. The default-format fallback is triggered by the server response, rather than inferred from a model's name or family. Native tool support and structured-output support are independent capabilities.
 
 </ApiSection>
 

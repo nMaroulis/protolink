@@ -79,6 +79,10 @@ These capabilities follow ProtoLink's **progressive control** philosophy: start 
 - `ask_user_tool()` may omit its live callback when attached to a durable agent. Its durable mode returns a checkpointed `input-required` task and continues from a supplied answer.
 - Approval-required actions on durable agents pause through execution checkpoints. Agents without durability retain the existing live approval and question callbacks.
 
+### Fixed
+
+- Ollama calls now handle runners that reject the default JSON format with HTTP 501 (`structured output is unavailable`), including Gemma MLX configurations. Ordinary and streaming calls retry once using the existing JSON action prompt, retain action validation and remember the server/model limitation. Explicit formats and JSON schemas remain required; unrelated errors and accepted-stream failures propagate. `format`, `think` and `keep_alive` are forwarded as Ollama request controls rather than generation options.
+
 ### Validation
 
 Recovery tests exercise separate application processes, crashes before and after result receipts, stale approvals, nested child limits and root/child continuation. A controlled offline comparison against v0.7.5 retained **80/80 strict passes** on the 40-case core suite with two repetitions. Scripted actions verify the runtime contract; they do not measure real-model quality.

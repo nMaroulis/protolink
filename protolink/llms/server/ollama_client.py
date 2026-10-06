@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 from urllib.parse import urlparse
 
-from protolink.llms._streaming import http_stream
+from protolink.llms._streaming import _HTTPResponseError, http_stream
 from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
@@ -26,7 +26,14 @@ logger = get_logger(__name__)
 
 
 class OllamaLLM(ServerLLM):
-    """Ollama Server implementation of the LLM interface. Uses the http client to make requests to the Ollama server."""
+    """Ollama chat adapter with JSON actions and optional native tool calling.
+
+    Default JSON formatting falls back to prompt-defined output when a runner
+    explicitly rejects structured output before generation. Explicit ``format``
+    settings in ``model_params`` are preserved, including JSON schemas and
+    ``None`` to omit server formatting. ``think`` and ``keep_alive`` are also
+    forwarded as request fields rather than generation options.
+    """
 
     provider: ClassVar[LLMProvider] = "ollama"
     DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"  # lightweight model
@@ -71,6 +78,7 @@ class OllamaLLM(ServerLLM):
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
         self.headers = {"Content-Type": "application/json", **headers}
+        self._json_format_unavailable_for: tuple[str, str] | None = None
 
         # Initialize the client
         parsed = urlparse(self.base_url)
@@ -97,32 +105,62 @@ class OllamaLLM(ServerLLM):
     # LLM calling (invocation)
     # ----------------------------------------------------------------------
 
-    def _call_response(self, history: ConversationHistory) -> dict[str, Any]:
-        """Return the complete non-streaming Ollama response payload."""
-        if self._client is None:
-            raise ValueError("Ollama client not connected")
-
-        # Translate max_tokens to num_predict for Ollama options compatibility
+    def _chat_payload(self, history: ConversationHistory, *, streaming: bool, json_actions: bool) -> dict[str, Any]:
+        """Keep Ollama request controls separate from model generation options."""
         options = dict(self._model_params)
         if "max_tokens" in options:
             options["num_predict"] = options.pop("max_tokens")
-
+        explicit_format = "format" in options
+        response_format = options.pop("format", "json" if json_actions else None)
         payload = {
             "model": self.model,
             "messages": history.messages,
-            "stream": False,
-            "format": "json",
+            "stream": streaming,
             "options": options,
         }
+        for name in ("think", "keep_alive"):
+            if name in options:
+                payload[name] = options.pop(name)
+        if response_format not in (None, "") and (
+            explicit_format or self._json_format_unavailable_for != (self.base_url, self.model)
+        ):
+            payload["format"] = response_format
+        return payload
 
-        headers = self.headers
+    def _fallback_from_unavailable_format(self, payload: dict[str, Any], error: _HTTPResponseError) -> bool:
+        """Drop only implicit JSON formatting after Ollama's pre-generation rejection.
 
+        HTTP 501 with this specific error means the runner cannot provide
+        structured output. Other errors, explicit formatting contracts and
+        failures inside an accepted stream must propagate without another call.
+        The learned capability is scoped to this adapter's server/model pair.
+        """
+        if error.status_code != 501 or payload.get("format") != "json" or "format" in self._model_params:
+            return False
+        try:
+            response = json.loads(error.body)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(response, dict) or response.get("error") != "structured output is unavailable":
+            return False
+        self._json_format_unavailable_for = (self.base_url, self.model)
+        payload.pop("format")
+        logger.warning(
+            f"Ollama model {self.model} cannot enforce JSON output; "
+            "continuing with prompt-defined output and action validation."
+        )
+        return True
+
+    def _post_chat(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Send one chat request, close its connection and validate the envelope."""
+        if self._client is None:
+            raise ValueError("Ollama client not connected")
         try:
             self._client.request(
                 method="POST",
                 url="/api/chat",
                 body=json.dumps(payload),
-                headers=headers,
+                headers=self.headers,
             )
 
             response = self._client.getresponse()
@@ -131,16 +169,36 @@ class OllamaLLM(ServerLLM):
             self._client.close()
 
         if response.status != 200:
-            raise RuntimeError(f"Ollama API request failed with status {response.status}: {data}")
+            raise _HTTPResponseError(
+                f"Ollama API request failed with status {response.status}: {data}",
+                status_code=response.status,
+                body=data,
+            )
 
         try:
             result = json.loads(data)
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Failed to decode Ollama response as JSON: {data}") from e
 
+        if not isinstance(result, dict):
+            raise RuntimeError(f"Unexpected Ollama response format: {result}")
         if "error" in result:
             raise RuntimeError(f"Ollama API returned an error: {result['error']}")
 
+        return result
+
+    def _call_response(self, history: ConversationHistory) -> dict[str, Any]:
+        """Return JSON-action content, adapting only to unsupported default formatting."""
+        payload = self._chat_payload(history, streaming=False, json_actions=True)
+        retried = False
+        while True:
+            try:
+                result = self._post_chat(payload)
+                break
+            except _HTTPResponseError as exc:
+                if retried or not self._fallback_from_unavailable_format(payload, exc):
+                    raise
+                retried = True
         if "message" not in result or "content" not in result["message"]:
             raise RuntimeError(f"Unexpected Ollama response format. Missing 'message' or 'content': {result}")
 
@@ -158,30 +216,26 @@ class OllamaLLM(ServerLLM):
         iterator closure release the connection. JSON-action mode yields raw
         JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
         """
-        # Translate max_tokens to num_predict for Ollama options compatibility
-        options = dict(self._model_params)
-        if "max_tokens" in options:
-            options["num_predict"] = options.pop("max_tokens")
-
-        payload = {
-            "model": self.model,
-            "messages": history.messages,
-            "stream": True,
-            "format": "json",
-            "options": options,
-        }
-
-        async with http_stream(
-            f"{self.base_url.rstrip('/')}/api/chat",
-            payload,
-            headers=self.headers,
-            timeout=self._CHAT_TIMEOUT,
-            provider="Ollama",
-        ) as stream:
-            async for chunk in stream:
-                content = (chunk.get("message") or {}).get("content")
-                if content:
-                    yield content
+        payload = self._chat_payload(history, streaming=True, json_actions=True)
+        retried = False
+        while True:
+            try:
+                async with http_stream(
+                    f"{self.base_url.rstrip('/')}/api/chat",
+                    payload,
+                    headers=self.headers,
+                    timeout=self._CHAT_TIMEOUT,
+                    provider="Ollama",
+                ) as stream:
+                    async for chunk in stream:
+                        content = (chunk.get("message") or {}).get("content")
+                        if content:
+                            yield content
+                return
+            except _HTTPResponseError as exc:
+                if retried or not self._fallback_from_unavailable_format(payload, exc):
+                    raise
+                retried = True
 
     def call_action(
         self,
@@ -214,13 +268,6 @@ class OllamaLLM(ServerLLM):
                 native=False,
                 metadata=usage_metadata({"provider": "ollama"}, result),
             )
-        if self._client is None:
-            raise ValueError("Ollama client not connected")
-
-        options = dict(self._model_params)
-        if "max_tokens" in options:
-            options["num_predict"] = options.pop("max_tokens")
-
         tool_specs = chat_completion_tools(
             tools,
             include_agent_tools=should_include_agent_tools(
@@ -228,30 +275,10 @@ class OllamaLLM(ServerLLM):
                 agent_cards=agent_cards,
             ),
         )
-        payload = {
-            "model": self.model,
-            "messages": history.messages,
-            "stream": False,
-            "options": options,
-        }
+        payload = self._chat_payload(history, streaming=False, json_actions=False)
         if tool_specs:
             payload["tools"] = tool_specs
-        headers = self.headers
-        try:
-            self._client.request(
-                method="POST",
-                url="/api/chat",
-                body=json.dumps(payload),
-                headers=headers,
-            )
-            response = self._client.getresponse()
-            data = response.read().decode("utf-8")
-        finally:
-            self._client.close()
-
-        if response.status != 200:
-            raise RuntimeError(f"Ollama API request failed with status {response.status}: {data}")
-        result = json.loads(data)
+        result = self._post_chat(payload)
         return self._action_from_chat_result(result)
 
     async def call_action_stream(
@@ -282,10 +309,6 @@ class OllamaLLM(ServerLLM):
                 agent_cards=agent_cards,
                 chunk_callback=chunk_callback,
             )
-        options = dict(self._model_params)
-        if "max_tokens" in options:
-            options["num_predict"] = options.pop("max_tokens")
-
         tool_specs = chat_completion_tools(
             tools,
             include_agent_tools=should_include_agent_tools(
@@ -293,12 +316,7 @@ class OllamaLLM(ServerLLM):
                 agent_cards=agent_cards,
             ),
         )
-        payload = {
-            "model": self.model,
-            "messages": history.messages,
-            "stream": True,
-            "options": options,
-        }
+        payload = self._chat_payload(history, streaming=True, json_actions=False)
         if tool_specs:
             payload["tools"] = tool_specs
 
