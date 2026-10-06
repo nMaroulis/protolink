@@ -34,9 +34,19 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.8.0] - Unreleased
+## [0.8.0] - 2026-10-07
 
-Version 0.8.0 expands the Agent harness with owned local subagents, durable execution, context preparation, lifecycle hooks, model routing, local evaluations and optional container execution. These capabilities use the existing Agent API and standard inference action protocol, with configurable specialist presets and progressive control.
+:::note Latest Update
+
+Version 0.8.0 is a **major feature update** that expands ProtoLink's Agent harness for coordinated, restartable and inspectable workloads. It brings owned local subagents, durable execution, context preparation, lifecycle hooks, model routing, local evaluations and optional container execution into the same pluggable runtime.
+
+Local subagents provide independent conversations with shared budgets and inherited policies. Durable execution lets applications pause for approval or user input, restart and continue from saved checkpoints and committed results. Context policies bound model input and make large tool results available through progressive retrieval, while hooks give applications control over model preparation, observations and final-answer validation. Model routing and local evaluations support deliberate model selection, bounded fallback and repeatable comparisons of agent behavior.
+
+New specialist presets cover web research, knowledge retrieval, read-only database analysis and workspace exploration. `RunManager`, CLI commands and dashboard controls make pending executions inspectable and resumable through the application's configured agents. The documentation now includes expanded module guides, focused offline examples, a reorganized Agent reference and local search.
+
+These capabilities follow ProtoLink's **progressive control** philosophy: start with a small, comprehensible API, then configure individual components or supply your own implementations as requirements grow. The additions use the existing Agent API and standard inference action protocol, with explicit policies, budgets and execution evidence throughout.
+
+:::
 
 ### Added
 
@@ -81,7 +91,7 @@ Durable recovery covers the default task handler/inference loop, registered tool
 
 ## [0.7.5] - 2026-10-02
 
-:::note Latest Update
+:::note Release Summary
 
 Version 0.7.5 reduces repeated work across inference, conversation history,
 transports and core model serialization. Inference metrics now use provider

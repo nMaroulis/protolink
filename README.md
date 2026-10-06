@@ -471,7 +471,34 @@ Run `python examples/builtin_assistants.py` for one complete offline test using 
 mock model and in-memory calendar/mailbox. Run `python examples/service_backends.py` to exercise all
 five concrete service backends with offline HTTP and mail-server fixtures.
 
+## Building philosophy
+
+ProtoLink was built to make agent development simple while giving developers precise control over execution and deployment. These principles guide the API and how its modules fit together.
+
+- **[Progressive control](docs/content/progressive-control.md)** — start with names, aliases and typed functions; configure or replace components through the same API.
+- **[Pluggable composition](docs/content/concept.md)** — models, tools, knowledge, storage, transport and operational modules are independent choices.
+- **[Local first, LLM-agnostic](docs/content/llm.md)** — use mock, local or hosted models, then move to network deployment as needed.
+- **[A shared task contract](docs/content/types.md)** — agents and flows work with explicit cards, tasks, messages, parts and artifacts.
+
+## More features
+
+ProtoLink provides optional capabilities for coordinating work, managing context and operating agents reliably. They plug into the existing Agent API, with detailed configuration in the linked guides.
+
+- **[Local subagents](docs/content/subagents.md)** — isolated conversations, shared budgets, inherited policies and background work.
+- **[Durable execution](docs/content/execution-tools.md#durable-execution)** — pause for approval or input, restart and resume with committed results preserved.
+- **[Context management](docs/content/context-management.md) and [lifecycle hooks](docs/content/hooks.md)** — bounded prompts, large-result retrieval, history compaction and callbacks around model calls, observations and completion.
+- **[Model routing](docs/content/llm.md#model-routing-and-fallback)** — per-step model selection and bounded fallback within the same Agent loop.
+- **[Local evaluations](docs/content/evaluation.md)** — JSONL datasets, custom checks, repetitions and experiment comparisons.
+- **[Specialist agents](docs/content/builtin-agents.md)** — `ResearchAgent`, `KnowledgeAgent`, `DatabaseAgent` and `ExplorerAgent` for web research, RAG, read-only SQL and workspace exploration.
+- **[Execution tools](docs/content/builtin-tools.md#command-execution)** — host or Docker command execution, scoped files and recoverable edits.
+- **[Knowledge](docs/content/rag.md) and [built-in tools](docs/content/builtin-tools.md)** — retrieval with citations, documents, databases, HTTP APIs and multi-engine web search.
+- **[Runtime control](docs/content/runtime.md)** — budgets, policy, approvals, cancellation, redaction, replay and normalized run regression diffing.
+- **[Agent meshes](docs/content/registry.md) and [structured flows](docs/content/flows.md)** — discovery and delegation across transports, with explicit pipeline, parallel, router or graph topology.
+- **[Developer tooling](docs/content/devtools.md)** — scaffolding, diagnostics, durable run controls, dashboards and [Studio](docs/content/studio.md); [YAML configuration](docs/content/agent.md#yaml-import-and-export) for reusable agent definitions.
+
 ## More examples
+
+These runnable examples show how the components fit together, from local tools to complete multi-agent applications. Use them as starting points for your own models, integrations and workflows.
 
 - [Progressive control, from simple calls to bounded workflows](examples/progressive_control.py)
 - [Paired AI courtroom advocacy benchmark](examples/ai_courtroom_benchmark/)
@@ -483,6 +510,13 @@ five concrete service backends with offline HTTP and mail-server fixtures.
 - [Runtime policy and approvals](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_policy_and_approvals.py)
 - [Task cancellation](https://github.com/nMaroulis/protolink/blob/main/examples/task_cancellation.py)
 - [Structured flows](https://github.com/nMaroulis/protolink/tree/main/examples/structured_flows)
+- [Local subagents and background work](examples/subagents.py)
+- [Durable execution across application restarts](examples/durable_execution.py)
+- [Durable run inspection and continuation](examples/durable_management.py)
+- [Context management, hooks, model routing and evaluations](examples/harness_controls.py)
+- [Built-in specialist agents](examples/builtin_agents.py)
+- [Offline filesystem, storage, HTTP, document and database tools](examples/generic_tools.py)
+- [Command execution, recoverable edits and verified workflows](examples/runtime_capabilities/)
 - [All examples](https://nmaroulis.github.io/protolink/docs/examples/)
 
 ## Contributing
