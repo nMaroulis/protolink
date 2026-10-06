@@ -18,15 +18,18 @@ example_scripts = [str(p) for p in EXAMPLES_DIR.glob("*.py") if p.name not in EX
 
 
 @pytest.mark.parametrize("script", example_scripts, ids=lambda x: Path(x).name)
-def test_example_scripts(script):
+def test_example_scripts(script, tmp_path):
     """Test that example scripts run without errors."""
     with open(script) as f:
         content = f.read()
         # TODO(): maybe skip this line
         if 'if __name__ == "__main__":' not in content:
             pytest.skip(f"Skipping {script}: no main guard found")
+    command = [sys.executable, script]
+    if Path(script).name == "durable_management.py":
+        command.extend(["--durability", str(tmp_path / "managed-runs.sqlite")])
     result = subprocess.run(
-        [sys.executable, script],
+        command,
         cwd=EXAMPLES_DIR,
         capture_output=True,
         text=True,

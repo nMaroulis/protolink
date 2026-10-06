@@ -383,7 +383,57 @@ await agent.execute_task(task)
 
 Direct `llm.infer(...)` calls are unchanged: they use the LLM's default history unless you explicitly call `llm.use_history(history)`.
 
+## Model routing and fallback
+
+`RoutedLLM` chooses a configured adapter for each logical inference step and provides bounded fallback for transient request failures. Use it through the ordinary Agent `llm=` parameter; tools, policy, budgets and durable execution remain owned by the Agent.
+
+```python
+from protolink import Agent, RoutedLLM
+from protolink.llms import MockLLM
+
+models = RoutedLLM({
+    "fast": MockLLM(default_response="A quick response"),
+    "reasoning": MockLLM(default_response="A detailed response"),
+})
+agent = Agent(name="helper", llm=models)
+print(agent.sync.invoke("Hello"))
+```
+
+The first configured key is the default. Values can be configured `LLM` objects or normal `provider:model` aliases. To route explicitly, supply a synchronous selector returning a configured key:
+
+```python
+from protolink import RoutedLLM
+
+def choose_model(history):
+    latest_user = next(
+        (message["content"] for message in reversed(history.messages)
+         if message["role"] == "user"),
+        "",
+    )
+    return "reasoning" if "analyze" in latest_user.lower() else "fast"
+
+models = RoutedLLM(
+    {"fast": fast_adapter, "reasoning": reasoning_adapter},
+    selector=choose_model,
+    fallbacks=["reasoning"],
+    retries_per_model=0,
+)
+```
+
+`fast_adapter` and `reasoning_adapter` are configured application models. The selector receives a copied canonical history after hooks and context preparation. It runs once per step, before physical request attempts. It can use the latest question or accumulated evidence; it should be pure and deterministic for recoverable execution. Unknown keys fail visibly. Nested routers are rejected.
+
+Fallback keys are tried in declared order, excluding the already selected key. `retries_per_model` defaults to zero; increasing it permits the normal transient retry/backoff behavior before moving to the next candidate. Every attempted request consumes the same root model-call/input budget. Fallback does not add another logical step or reset token, runtime or tool limits.
+
+Only transient provider/connection failures qualify. Invalid credentials, validation failures, policy denials and cancellation do not switch providers. If streamed content has already been exposed, the request fails visibly without retry or fallback; consumers must handle the partial stream as incomplete. Parsing invalid action text uses normal inference correction rather than silently retrying the same request through another provider. Tool operations execute after a successful parsed action and are never replayed by routing.
+
+The router inherits the default inference loop and uses ProtoLink's portable JSON action prompt and observations. It delegates plain text/stream requests to adapters instead of mixing provider-native tool IDs across models. Applications requiring native provider features can use a concrete adapter directly. Response metadata includes the selected key, provider, model and total request attempts for the step. Metrics and token budgets remain observable; the portable path may rely on estimated usage rather than provider-native response metadata. Configure conservative context/cost profiles on the router for the set of possible models, or set an explicit `ContextPolicy.max_tokens`.
+
+Model identities, declared fallback order and non-secret configuration hashes serialize as routing descriptors. Reconnect executable adapters and the selector with `Agent.from_dict(saved, llm=RoutedLLM(...))`; credentials and callbacks are not restored from descriptors. Changes to declared adapter parameters affect the durable contract. Increment `execution_version` when selector or other executable behavior changes. Construction makes no provider calls; `validate_connection()` explicitly checks configured adapters.
+
 ## History compaction
+
+For automatic preparation on every inference step, see [Context management](context-management.md). It reserves output space, prunes complete old turns, clears older acknowledged observations and offloads large results to scoped retrieval artifacts. The explicit compaction API below remains useful when the application chooses a summary strategy or a specific compaction boundary.
+
 
 Every LLM wrapper owns a modular `HistoryCompactor` at `llm.compactor`. Its `compact()` method mutates the current `ConversationHistory` in place and returns a `HistoryCompactionResult` with before/after message and estimated-token counts. `LLM.compact_history()` remains as a convenient facade, so direct usage stays concise.
 
@@ -1473,11 +1523,16 @@ After observing the tool result, the model completes with:
     run_context: RunContext | dict[str, Any] | None = None,
     budget_policy: BudgetPolicy | None = None,
     budget_enforcer: BudgetEnforcer | None = None,
+    context_policy: ContextPolicy | None = None,
+    hooks: tuple[AgentHooks, ...] = (),
+    tool_prompt_builder: Callable[[dict[str, BaseTool]], None] | None = None,
 ) -> Part`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L560"
 >
 
 Run the controlled multi-step inference loop used by `Agent`. The model declares typed intent; ProtoLink validates and executes tools or agent calls, feeds observations back to the model and stops on a final action or safety limit.
+
+Configure [context policy](context-management.md) and [lifecycle hooks](hooks.md) on the Agent for integrated scoped retrieval, roster prompt regeneration and durable recovery. Direct `LLM.infer()` callers can pass the corresponding extension objects, but must supply an artifact scope/retrieval tool when observation offloading is needed. The Agent supplies `tool_prompt_builder` to regenerate its compiled tool prompt after roster filtering; it is a runtime integration callback rather than an application configuration field.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="LLM infer parameters">

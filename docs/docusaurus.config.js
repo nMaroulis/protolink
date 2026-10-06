@@ -1,26 +1,6 @@
 const lightCodeTheme = require("prism-react-renderer").themes.github;
 const darkCodeTheme = require("prism-react-renderer").themes.dracula;
 
-const algoliaConfig = (() => {
-  const appId = process.env.DOCSEARCH_APP_ID || process.env.ALGOLIA_APP_ID;
-  const apiKey =
-    process.env.DOCSEARCH_API_KEY || process.env.ALGOLIA_SEARCH_API_KEY;
-  const indexName =
-    process.env.DOCSEARCH_INDEX_NAME || process.env.ALGOLIA_INDEX_NAME;
-
-  if (!appId || !apiKey || !indexName) {
-    return undefined;
-  }
-
-  return {
-    appId,
-    apiKey,
-    indexName,
-    contextualSearch: true,
-    searchPagePath: "search",
-  };
-})();
-
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: "protolink",
@@ -31,16 +11,6 @@ const config = {
   baseUrl: "/protolink/",
   organizationName: "nMaroulis",
   projectName: "protolink",
-
-  headTags: [
-    {
-      tagName: "meta",
-      attributes: {
-        name: "algolia-site-verification",
-        content: "45AFD9E85485A956",
-      },
-    },
-  ],
 
   onBrokenLinks: "throw",
   trailingSlash: true,
@@ -57,7 +27,31 @@ const config = {
     },
   },
 
-  themes: ["@docusaurus/theme-mermaid"],
+  themes: [
+    [
+      "@docusaurus/theme-classic",
+      {
+        customCss: require.resolve("./src/css/custom.css"),
+      },
+    ],
+    "@docusaurus/theme-mermaid",
+    [
+      require.resolve("@easyops-cn/docusaurus-search-local"),
+      /** @type {import('@easyops-cn/docusaurus-search-local').PluginOptions} */
+      ({
+        hashed: "filename",
+        docsDir: "content",
+        docsRouteBasePath: "docs",
+        indexDocs: true,
+        indexBlog: false,
+        indexPages: false,
+        language: "en",
+        explicitSearchResultPath: true,
+        highlightSearchTermsOnTargetPage: true,
+        searchBarPosition: "right",
+      }),
+    ],
+  ],
   stylesheets: [
     {
       href: "https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&display=swap",
@@ -65,30 +59,30 @@ const config = {
     },
   ],
 
-  presets: [
+  plugins: [
     [
-      "classic",
-      /** @type {import('@docusaurus/preset-classic').Options} */
+      "@docusaurus/plugin-content-docs",
+      /** @type {import('@docusaurus/plugin-content-docs').Options} */
       ({
-        docs: {
-          path: "content",
-          sidebarPath: require.resolve("./sidebars.js"),
-          routeBasePath: "docs",
-          editUrl:
-            "https://github.com/nMaroulis/protolink/blob/main/docs/",
-          showLastUpdateAuthor: false,
-          showLastUpdateTime: false,
-        },
-        blog: false,
-        theme: {
-          customCss: require.resolve("./src/css/custom.css"),
-        },
+        path: "content",
+        sidebarPath: require.resolve("./sidebars.js"),
+        routeBasePath: "docs",
+        editUrl:
+          "https://github.com/nMaroulis/protolink/blob/main/docs/",
+        showLastUpdateAuthor: false,
+        showLastUpdateTime: false,
       }),
     ],
+    "@docusaurus/plugin-content-pages",
+    "@docusaurus/plugin-sitemap",
+    "@docusaurus/plugin-svgr",
+    ...(process.env.NODE_ENV !== "production"
+      ? ["@docusaurus/plugin-debug"]
+      : []),
   ],
 
   themeConfig:
-    /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
+    /** @type {import('@docusaurus/theme-classic').ThemeConfig} */
     ({
       image: "img/banner.png",
       metadata: [
@@ -103,7 +97,6 @@ const config = {
         disableSwitch: false,
         respectPrefersColorScheme: true,
       },
-      ...(algoliaConfig ? { algolia: algoliaConfig } : {}),
       navbar: {
         title: "protolink",
         logo: {

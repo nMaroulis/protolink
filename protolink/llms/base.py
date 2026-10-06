@@ -69,6 +69,7 @@ See Also:
 """
 
 import asyncio
+import copy
 import inspect
 import json
 import re
@@ -85,6 +86,7 @@ from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError, BudgetPolicy
 from protolink.core.cancellation import CancellationToken
 from protolink.core.execution import closing_stream
+from protolink.core.hooks import AgentHooks, FinalResponse, ModelRequest, ToolObservation, apply_hooks
 from protolink.core.part import Part
 from protolink.core.policy import (
     ActionAuthorization,
@@ -107,6 +109,7 @@ from protolink.llms.compaction import (
     HistoryCompactor,
 )
 from protolink.llms.context import ContextManifest, build_context_manifest
+from protolink.llms.context_policy import ContextPolicy
 from protolink.llms.errors import InferParseError
 from protolink.llms.history import EPHEMERAL_TOOL_OBSERVATION_KEY, ConversationHistory
 from protolink.llms.metrics import (
@@ -708,6 +711,9 @@ class LLM(ABC):
         run_context: RunContext | dict[str, Any] | None = None,
         budget_policy: BudgetPolicy | None = None,
         budget_enforcer: BudgetEnforcer | None = None,
+        context_policy: ContextPolicy | None = None,
+        hooks: tuple[AgentHooks, ...] = (),
+        tool_prompt_builder: Callable[[dict[str, BaseTool]], None] | None = None,
     ) -> "Part":
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -803,6 +809,16 @@ class LLM(ABC):
         budget_enforcer : BudgetEnforcer, optional
             Existing task-scoped enforcer. The Agent runtime supplies one when several infer/tool parts share a task so
             usage, warnings and runtime accounting remain cumulative. Direct LLM callers may omit it.
+        context_policy : ContextPolicy, optional
+            Deterministic preparation before requests and bounded observation offloading.
+            Agent supplies the scoped artifact inventory/retrieval tool; direct callers
+            must supply that scope if their observations require offloading.
+        hooks : tuple[AgentHooks, ...], optional
+            Ordered authoritative callbacks for model inputs, successful observations
+            and final content. Callbacks mutate their input and return None.
+        tool_prompt_builder : Callable, optional
+            Agent-owned callback that regenerates the system prompt for a filtered
+            roster. A hook's explicit compiled-system-message edit takes precedence.
 
         Returns
         -------
@@ -880,6 +896,7 @@ class LLM(ABC):
         """
 
         active_context = _coerce_run_context(run_context)
+        registered_tools = dict(tools)
         if active_context.canceled:
             raise asyncio.CancelledError(active_context.cancel_reason or "Run context was canceled before inference")
         if cancellation_token is not None:
@@ -990,6 +1007,7 @@ class LLM(ABC):
                     native=pending["native"],
                     metadata=pending["metadata"],
                 )
+                tools = {name: registered_tools[name] for name in pending.get("tool_names", registered_tools)}
                 action_error = None
             else:
                 if cancellation_token is not None:
@@ -997,6 +1015,34 @@ class LLM(ABC):
                 steps += 1
                 await enforce_budget(active_budget_enforcer.check_next_step())
                 await emit({"type": "llm_step", "step": steps})
+                if tool_prompt_builder is not None:
+                    tool_prompt_builder(registered_tools)
+                original_system = (
+                    self.history.messages_raw()[0].content
+                    if hooks and tool_prompt_builder is not None and len(self.history)
+                    else None
+                )
+                if hooks:
+                    request = ModelRequest(self.history, dict(registered_tools), active_context.copy(), steps)
+                    await apply_hooks(hooks, "before_model", request)
+                    if request.history is not self.history:
+                        raise ValueError("before_model hooks must mutate the active history, not replace it")
+                    if any(
+                        name not in registered_tools or tool is not registered_tools[name]
+                        for name, tool in request.tools.items()
+                    ):
+                        raise ValueError("before_model hooks may remove tools, not introduce or replace them")
+                    tools = request.tools
+                if tool_prompt_builder is not None and set(tools) != set(registered_tools):
+                    edited_system = self.history.messages_raw()[0].content if len(self.history) else None
+                    tool_prompt_builder(tools)
+                    if edited_system is not None and edited_system != original_system:
+                        self.history.set_system(edited_system)
+                if context_policy is not None:
+                    prepared = context_policy.prepare(
+                        self.history, context_window=getattr(self.metrics_profile, "context_window", None)
+                    )
+                    await emit({"type": "context_compacted", "step": steps, **prepared})
                 action_error: ValueError | None = None
                 action_result: LLMActionResult | None = None
                 call_metrics: LLMCallMetrics | None = None
@@ -1092,14 +1138,16 @@ class LLM(ABC):
                     call_started_at = time.perf_counter()
                     if streaming:
 
-                        async def stream_action(current_step=steps, current_stream_state=stream_state):
+                        async def stream_action(
+                            current_step=steps, current_stream_state=stream_state, current_tools=tools
+                        ):
                             async def emit_chunk(chunk: str) -> None:
                                 current_stream_state["output_exposed"] = True
                                 await emit({"type": "llm_chunk", "step": current_step, "content": chunk})
 
                             return await self.call_action_stream(
                                 self.history,
-                                tools=tools,
+                                tools=current_tools,
                                 agent_callback_available=agent_callback is not None,
                                 agent_cards=agent_cards,
                                 chunk_callback=emit_chunk,
@@ -1249,6 +1297,7 @@ class LLM(ABC):
                         "raw_response": raw_response,
                         "native": action_result.native,
                         "metadata": action_result.metadata,
+                        "tool_names": list(tools),
                     },
                 )
             await emit({"type": "llm_action", "step": steps, "action": action, "payload": payload})
@@ -1257,7 +1306,15 @@ class LLM(ABC):
             # returned immediately even if their content repeats earlier text.
             if isinstance(action_obj, FinalAction):
                 content = action_obj.content
-                self.history.add_assistant(raw_response)
+                if hooks:
+                    final = FinalResponse(copy.deepcopy(content), active_context.copy(), steps)
+                    await apply_hooks(hooks, "before_complete", final)
+                    content = final.content
+                self.history.add_assistant(
+                    json.dumps({"type": "final", "content": content}, default=json_history_default)
+                    if hooks
+                    else raw_response
+                )
                 await emit({"type": "llm_final", "step": steps, "content": content, "final": True})
                 checkpoint_ready()
                 return Part("infer_output", content)
@@ -1402,6 +1459,18 @@ class LLM(ABC):
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
                 history_tool_result = _history_safe_result(tool_result)
+                if hooks:
+                    observation = ToolObservation(
+                        tool_name, copy.deepcopy(history_tool_result), active_context.copy(), steps
+                    )
+                    await apply_hooks(hooks, "after_tool", observation)
+                    history_tool_result = observation.result
+                if (
+                    context_policy is not None
+                    and tool_name != "read_context_artifact"
+                    and not getattr(tool, "_protolink_ephemeral_result", False)
+                ):
+                    history_tool_result = context_policy.observation(history_tool_result)
                 observation_fallback = False
                 observation_start = len(self.history)
                 try:
@@ -1428,6 +1497,14 @@ class LLM(ABC):
                             default=json_history_default,
                         )
                     )
+                if context_policy is not None:
+                    from protolink.llms.context_policy import CONTEXT_OBSERVATION_KEY
+
+                    marker = {"tool": tool_name}
+                    if isinstance(history_tool_result, dict) and "context_artifact" in history_tool_result:
+                        marker["context_artifact"] = history_tool_result["context_artifact"]
+                    for message in self.history.messages_raw()[observation_start:]:
+                        message.metadata[CONTEXT_OBSERVATION_KEY] = marker
                 if getattr(tool, "_protolink_ephemeral_result", False):
                     marker = {
                         "tool": tool_name,

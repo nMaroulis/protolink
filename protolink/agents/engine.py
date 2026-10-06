@@ -1432,6 +1432,24 @@ class AgentExecutionMixin(_AgentMixinBase):
             "cancellation_token": active_token,
             "run_context": active_context,
         }
+        if self.context_policy is not None or self.hooks:
+
+            def rebuild_tool_prompt(selected_tools):
+                assert self.llm is not None
+                self.llm.build_system_prompt(
+                    user_instructions=self._system_prompt,
+                    agent_cards=agent_cards,
+                    tools=self._build_tools_prompt(selected_tools),
+                    action_mode=action_mode,
+                    flow_instructions=flow_instructions,
+                    override_system_prompt=self.override_system_prompt,
+                    persist=True,
+                    agent_name=self.card.name,
+                )
+
+            infer_kwargs.update(
+                context_policy=self.context_policy, hooks=self.hooks, tool_prompt_builder=rebuild_tool_prompt
+            )
         if _accepts_keyword_argument(self.llm.infer, "event_metrics"):
             infer_kwargs["event_metrics"] = bool(self.telemetry or event_callback)
         # ``LLM.infer`` is a documented extension point. Existing adapters may
@@ -1444,9 +1462,15 @@ class AgentExecutionMixin(_AgentMixinBase):
             infer_kwargs["budget_enforcer"] = active_budget_enforcer
 
         history_start = len(self.llm.history)
+        from protolink.llms.context_policy import _artifacts
+
+        artifact_token = _artifacts.set(
+            self.context_artifacts.for_run(active_context) if self.context_policy is not None else None
+        )
         try:
             response: Part = await self.llm.infer(**infer_kwargs)
         finally:
+            _artifacts.reset(artifact_token)
             new_messages = self.llm.history.messages_raw()[history_start:]
             self._scrub_ephemeral_tool_observations(new_messages)
             if pre_retrieved:

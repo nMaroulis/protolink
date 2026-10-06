@@ -14,9 +14,11 @@ from typing import Any, Literal, cast
 
 from protolink.client import RegistryClient
 from protolink.core.cancellation import TaskExecutionRegistry
+from protolink.core.hooks import AgentHooks, ModelRequest
 from protolink.core.policy import ActionAuthorizer, ApprovalHandlerLike, CapabilityPolicy, Policy
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
+from protolink.llms.context_policy import ContextPolicy
 from protolink.logging import BaseLogger, ConsoleLogger
 from protolink.models import AgentCard
 from protolink.rag import Knowledge, RetrievalMode, Retriever
@@ -99,6 +101,8 @@ class Agent(
         subagent_limits: SubagentLimits | None = None,
         durability: DurableStore | str | Path | None = None,
         execution_version: str = "1",
+        context_policy: ContextPolicy | Literal["auto"] | None = None,
+        hooks: Iterable[AgentHooks | Callable[[ModelRequest], Any]] | None = None,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -171,6 +175,8 @@ class Agent(
                 They use the default engine and blocking local delegation.
             execution_version: Application-owned version of tool code/dependencies.
                 Change it when stored execution must not continue under new code.
+            context_policy: Opt-in "auto" or ContextPolicy for bounded model inputs.
+            hooks: AgentHooks objects or before_model functions, in execution order.
         """
 
         # Validate shorthand endpoints before provider initialization can perform I/O.
@@ -204,6 +210,12 @@ class Agent(
         self._task_executions = TaskExecutionRegistry()
         self._control_tasks: set[asyncio.Task[Any]] = set()
         self.run_store = run_store
+        from protolink.core.hooks import normalize_hooks
+        from protolink.llms.context_policy import ContextArtifacts, resolve_context_policy
+
+        self.context_policy = resolve_context_policy(context_policy)
+        self.context_artifacts = ContextArtifacts()
+        self.hooks = normalize_hooks(hooks)
         if not isinstance(execution_version, str) or not execution_version.strip():
             raise ValueError("execution_version must be nonblank text")
         self.execution_version = execution_version
@@ -302,5 +314,11 @@ class Agent(
         self.sync = SyncAgent(self)
         if tools is not None:
             self.add_tools(tools)
+        if self.context_policy is not None:
+            from protolink.llms.context_policy import context_artifact_tool
+
+            if "read_context_artifact" in self.tools:
+                raise ValueError("read_context_artifact is reserved when context_policy is configured")
+            self.add_tool(context_artifact_tool())
         if self.subagent_limits.background:
             self.add_tools(supervision_tools())

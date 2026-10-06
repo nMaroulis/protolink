@@ -6,6 +6,7 @@ Stores are trusted application resources and may contain private tool results.
 
 from __future__ import annotations
 
+import builtins
 import json
 import math
 import os
@@ -66,15 +67,22 @@ class SQLiteDurableStore:
     reclaimed immediately; otherwise ownership expires after ``lease_seconds``.
     A stalled owner must renew before dispatch and cannot commit after takeover.
     This store does not implement distributed scheduling or external rollback.
+    ``read_only=True`` opens an existing file for get/list inspection without
+    creating tables or acquiring/writing leases. Inventory returns private
+    checkpoints; management interfaces must project/redact before exporting them.
     """
 
-    def __init__(self, path: str | Path, *, lease_seconds: float = 300.0) -> None:
+    def __init__(self, path: str | Path, *, lease_seconds: float = 300.0, read_only: bool = False) -> None:
         if not math.isfinite(lease_seconds) or lease_seconds <= 0:
             raise ValueError("lease_seconds must be finite and positive")
         if str(path) == ":memory:":
             raise ValueError("Durable SQLite storage requires a file path")
         self.path = str(Path(path).expanduser())
         self.lease_seconds = lease_seconds
+        self.read_only = read_only
+        if read_only:
+            Path(self.path).resolve(strict=True)
+            return
         try:
             descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
         except FileExistsError:
@@ -89,9 +97,37 @@ class SQLiteDurableStore:
             )
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path, timeout=10)
+        connection = sqlite3.connect(
+            Path(self.path).resolve().as_uri() + "?mode=ro" if self.read_only else self.path,
+            timeout=10,
+            uri=self.read_only,
+        )
         connection.row_factory = sqlite3.Row
         return connection
+
+    def list(
+        self, *, status: str | None = None, agent_name: str | None = None, limit: int = 20
+    ) -> builtins.list[RunCheckpoint]:
+        """Inspect the newest bounded checkpoint inventory without acquiring leases."""
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        clauses, values = [], []
+        if status is not None:
+            clauses.append("status=?")
+            values.append(status)
+        if agent_name is not None:
+            clauses.append("agent_name=?")
+            values.append(agent_name)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT * FROM protolink_checkpoints" + where + " ORDER BY rowid DESC LIMIT ?", [*values, limit]
+            ).fetchall()
+            return [self._record(row) for row in rows]
+
+    def _writable(self) -> None:
+        if self.read_only:
+            raise DurableExecutionError("Checkpoint store is read-only")
 
     @staticmethod
     def _record(row: sqlite3.Row) -> RunCheckpoint:
@@ -117,6 +153,7 @@ class SQLiteDurableStore:
         return self._record(row) if row is not None else None
 
     def acquire(self, run_id: str, agent_name: str, initial: dict[str, Any]) -> tuple[str, RunCheckpoint]:
+        self._writable()
         payload = json.dumps(initial, allow_nan=False)
         token = uuid.uuid4().hex
         with closing(self._connect()) as connection, connection:
@@ -139,6 +176,7 @@ class SQLiteDurableStore:
         return token, record
 
     def save(self, run_id: str, token: str, status: str, data: dict[str, Any]) -> None:
+        self._writable()
         payload = json.dumps(data, allow_nan=False)
         with closing(self._connect()) as connection, connection:
             updated = connection.execute(
@@ -149,6 +187,7 @@ class SQLiteDurableStore:
                 raise RunBusyError(f"Execution lease for '{run_id}' was lost")
 
     def release(self, run_id: str, token: str) -> None:
+        self._writable()
         with closing(self._connect()) as connection, connection:
             connection.execute(
                 "UPDATE protolink_checkpoints SET owner=NULL,host=NULL,pid=NULL,expires=NULL "

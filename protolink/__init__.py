@@ -67,6 +67,7 @@ from protolink.core import (
 )
 from protolink.core.approvals import ApprovalBroker, ApprovalScope
 from protolink.core.durable import RunInterrupted, RunInterruption
+from protolink.core.hooks import AgentHooks, FinalResponse, ModelRequest, ToolObservation
 from protolink.core.resources import ResourceConflictError, ResourceRevision, StorageCheckpointStore
 from protolink.core.validation import (
     CompletionCheck,
@@ -74,6 +75,18 @@ from protolink.core.validation import (
     CompletionValidator,
     ToolOutcome,
     ValidationResult,
+)
+from protolink.devtools.durable_runs import RunManager
+from protolink.evaluation import (
+    EvaluationCase,
+    EvaluationReport,
+    EvaluationSample,
+    EvaluationScore,
+    compare_evaluations,
+    evaluate,
+    exact_match,
+    load_evaluation_cases,
+    tool_used,
 )
 from protolink.flows import (
     Flow,
@@ -89,13 +102,16 @@ from protolink.flows import (
 )
 from protolink.llms import (
     ContextItem,
+    ContextLimitError,
     ContextManifest,
+    ContextPolicy,
     HistoryCompactionRequest,
     HistoryCompactionResult,
     HistoryCompactionStrategy,
     HistoryCompactor,
     InferParseError,
     LLMModelProfile,
+    RoutedLLM,
     build_context_manifest,
     create_llm,
 )
@@ -146,6 +162,7 @@ __all__ = [
     "Agent",
     "AgentCard",
     "AgentGroup",
+    "AgentHooks",
     "AgentInterface",
     "AgentPeer",
     "AgentSkill",
@@ -173,14 +190,21 @@ __all__ = [
     "CompletionEvidence",
     "CompletionValidator",
     "ContextItem",
+    "ContextLimitError",
     "ContextManifest",
+    "ContextPolicy",
     "DatabaseAgent",
     "Document",
     "DurableExecutionError",
     "DurableStore",
     "EchoAgent",
+    "EvaluationCase",
+    "EvaluationReport",
+    "EvaluationSample",
+    "EvaluationScore",
     "EventSink",
     "ExplorerAgent",
+    "FinalResponse",
     "Flow",
     "Graph",
     "HistoryCompactionRequest",
@@ -195,6 +219,7 @@ __all__ = [
     "LocalTraceRecorder",
     "LocalTraceTelemetry",
     "Message",
+    "ModelRequest",
     "Parallel",
     "Part",
     "Pipeline",
@@ -208,6 +233,7 @@ __all__ = [
     "ResourceConflictError",
     "ResourceRevision",
     "RetryPolicy",
+    "RoutedLLM",
     "Router",
     "RunAction",
     "RunBudget",
@@ -218,6 +244,7 @@ __all__ = [
     "RunHandle",
     "RunInterrupted",
     "RunInterruption",
+    "RunManager",
     "RunRecorder",
     "RunReplay",
     "RunReport",
@@ -254,6 +281,7 @@ __all__ = [
     "TaskRecord",
     "TaskState",
     "Tool",
+    "ToolObservation",
     "ToolOutcome",
     "ToolStep",
     "TransportConfig",
@@ -274,8 +302,13 @@ __all__ = [
     "assert_run_events",
     "assert_run_matches",
     "build_context_manifest",
+    "compare_evaluations",
     "create_knowledge",
     "create_llm",
     "diff_run_reports",
+    "evaluate",
+    "exact_match",
+    "load_evaluation_cases",
     "normalize_run_report",
+    "tool_used",
 ]

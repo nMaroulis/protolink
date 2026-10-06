@@ -12,6 +12,7 @@ from protolink.core.agent_card import AgentCard
 from protolink.core.resources import CheckpointStore
 from protolink.llms.base import LLM
 from protolink.tools.builtins import calculator, filesystem_tools, git_tool, shell_tool
+from protolink.tools.builtins.process import ExecutionBackend
 from protolink.tools.builtins.user_input import UserInputHandler
 
 from ._common import add_preset_tools, configure_preset
@@ -46,6 +47,7 @@ class CodeAssistant(Agent):
         ask_user: UserInputHandler | None = None,
         allow_git_write: bool = False,
         checkpoints: CheckpointStore | None = None,
+        backend: ExecutionBackend | None = None,
         card: AgentCard | dict[str, Any] | None = None,
         **agent_options: Any,
     ) -> None:
@@ -58,6 +60,8 @@ class CodeAssistant(Agent):
             ask_user: Optional async user-feedback callback.
             allow_git_write: Expose staging and committing behind Agent policy.
             checkpoints: Opt into prepared file edits and recovery, scoped to cwd.
+            backend: Optional process backend, e.g. DockerExecutionBackend, for shell/Git.
+                Scoped file tools still operate on the configured host directory.
             card: Optional custom identity and transport URL.
             **agent_options: Normal Agent settings, including policy, approval_handler,
                 system_prompt, state, storage, transport and run_store.
@@ -101,8 +105,8 @@ class CodeAssistant(Agent):
             self,
             [
                 *files,
-                shell_tool(cwd=cwd, env=env),
-                git_tool(cwd=cwd, env=env, allow_write=allow_git_write),
+                shell_tool(cwd=cwd, env=env, backend=backend),
+                git_tool(cwd=cwd, env=env, allow_write=allow_git_write, backend=backend),
                 calculator(),
             ],
             ask_user,

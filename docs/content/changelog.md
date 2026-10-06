@@ -36,9 +36,17 @@ uv add --upgrade protolink
 
 ## [0.8.0] - Unreleased
 
-Version 0.8.0 adds owned local subagents, durable execution and configurable specialist agent presets to the existing Agent API. Configure local children with `subagents=[...]` and restartable execution with `durability="runs.sqlite"`. The standard inference actions and provider prompt formats remain unchanged.
+Version 0.8.0 expands the Agent harness with owned local subagents, durable execution, context preparation, lifecycle hooks, model routing, local evaluations and optional container execution. These capabilities use the existing Agent API and standard inference action protocol, with configurable specialist presets and progressive control.
 
 ### Added
+
+- Opt-in `ContextPolicy` and `context_policy="auto"` for output reservation, complete-turn pruning, old-observation clearing and scoped retrieval of oversized tool results. Durable context artifacts survive restart; ephemeral retrieval observations are not offloaded.
+- `AgentHooks`, `ModelRequest`, `ToolObservation` and `FinalResponse` for synchronous/asynchronous before-model, after-tool and before-completion callbacks. Filtered rosters remain enforced across pending-action recovery, successful receipts remain authoritative.
+- `RunManager`, bounded SQLite checkpoint inventory and read-only inspection, plus `run pending/inspect/resume/cancel/reconcile` CLI commands. Dashboard and Studio Runs controls reconnect an explicit trusted application factory and enforce local/same-origin mutations.
+- Public `evaluate()` API with JSONL/reference cases, repetitions, isolated concurrent factories, synchronous/asynchronous checks, execution evidence, usage/latency summaries and experiment comparisons. Evaluation cancellation drains active runs.
+- `RoutedLLM` for per-step model selection and bounded transient-request fallback under shared budgets. Exposed stream content prevents fallback; tools are never repeated by model routing.
+- Optional `DockerExecutionBackend` for process/shell/Git tools and CodeAssistant, with explicit image/workspace, read-only and network defaults, non-root users, resource limits, bounded output and daemon cleanup on timeout/cancellation.
+- Detailed [context management](context-management.md), [lifecycle hook](hooks.md), [evaluation](evaluation.md), routing and execution guides with primary methodology/reference links, plus offline runnable harness examples.
 
 - `ResearchAgent`, `KnowledgeAgent`, `DatabaseAgent` and `ExplorerAgent`: configurable presets for source-grounded web research, knowledge retrieval, read-only database analysis and scoped workspace exploration, using the existing Agent runtime.
 - Built-in agent reference and an offline preset example covering custom providers, citations, bounded SQL, scoped files and deterministic echo.
@@ -53,6 +61,7 @@ Version 0.8.0 adds owned local subagents, durable execution and configurable spe
 
 ### Changed
 
+- Documentation search now runs locally through EasyOps, with a build-generated, cache-versioned index, section links and keyboard shortcuts. Documentation builds require no external search-service credentials.
 - `EchoAgent` now echoes inference prompts and received task parts deterministically without invoking a model or executing tools; unary and streamed tasks use the normal lifecycle.
 - Presets accept standard `name`, `description`, `url`, LLM aliases and caller-supplied tool overrides. Durable presets install user-question tools without requiring live callbacks.
 - `CodeAssistant` includes scoped file reads, listing and search; an optional checkpoint store enables prepared file edits and recovery with approval defaults.
@@ -63,6 +72,8 @@ Version 0.8.0 adds owned local subagents, durable execution and configurable spe
 ### Validation
 
 Recovery tests exercise separate application processes, crashes before and after result receipts, stale approvals, nested child limits, and root/child continuation. A controlled offline comparison against v0.7.5 retained **80/80 strict passes** on the 40-case core suite with two repetitions. Scripted actions verify the runtime contract; they do not measure real-model quality.
+
+Harness integration tests cover durable context retrieval, hook ordering and receipt preservation, routing budgets across restarts, partial-stream fallback restrictions, evaluation cancellation, read-only inventory and dashboard request validation. A live Docker check verifies read-only mounts, disabled network/capabilities, timeout and container removal; the dashboard answer/continuation flow is also verified in the browser.
 
 ### Recovery scope
 

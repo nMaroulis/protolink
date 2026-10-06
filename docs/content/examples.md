@@ -8,9 +8,12 @@ From a checkout with ProtoLink installed:
 python examples/progressive_control.py
 python examples/subagents.py
 python examples/durable_execution.py
+python examples/harness_controls.py
 ```
 
 These scripts need no API keys or external services. The notebook and larger projects below include their own setup instructions for optional transports and model providers.
+
+[`harness_controls.py`](https://github.com/nMaroulis/protolink/blob/main/examples/harness_controls.py) demonstrates scoped context-artifact retrieval, a completion hook, transient model fallback and repeated local evaluations. [`durable_management.py`](https://github.com/nMaroulis/protolink/blob/main/examples/durable_management.py) creates a pending question and exports a reusable application factory for the CLI/dashboard; it writes a private `managed-runs.sqlite` file in the current working directory. Container execution is optional and uses separately installed Docker and a pre-pulled image, as described in the [tool guide](builtin-tools.md#isolated-container-execution).
 
 :::tip[New here?]
 

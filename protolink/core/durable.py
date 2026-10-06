@@ -125,6 +125,8 @@ def configuration_fingerprint(agent: Any) -> str:
             for name, tool in agent.tools.items()
         },
         "subagents": sorted(agent.subagents),
+        "context_policy": agent.context_policy.to_dict() if agent.context_policy is not None else None,
+        "hooks": [{stage: callback is not None for stage, callback in vars(hook).items()} for hook in agent.hooks],
     }
     return hashlib.sha256(json.dumps(_json(payload), sort_keys=True).encode()).hexdigest()
 

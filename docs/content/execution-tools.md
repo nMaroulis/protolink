@@ -220,6 +220,35 @@ Custom `handle_task` or `LLM.infer` overrides and automatic eager RAG modes (`re
 
 Arbitrary internal steps inside a Python tool are one operation from the checkpoint's perspective. Tools that need several independently recoverable effects should expose those operations separately to the default loop, or implement their own idempotent external workflow. Direct application flows and private event-loop/SDK state are not captured automatically. Cancellation remains cooperative and cannot undo an effect that already committed.
 
+### Manage stopped runs
+
+`RunManager` reconnects an application's durable agents and provides bounded inventory, inspection, continuation, cancellation and verified-outcome reconciliation. Its controls use the same leases, configuration checks and prepared-action checks as `Agent.resume_task()`. A run ID selects a record; it does not authorize access to that record.
+
+```python
+from protolink import Agent, RunManager
+from protolink.tools import ask_user_tool
+
+def application():
+    return Agent(
+        name="helper",
+        llm="mock",
+        tools=[ask_user_tool()],
+        durability="runs.sqlite",
+    )
+
+manager = RunManager(application())
+print(manager.list(status="input-required"))
+# In async application code, answer an inspected request:
+# await manager.resume(run_id, request_id=request_id,
+#                      fingerprint=fingerprint, answer="CSV")
+```
+
+`manager.inspect(run_id)` returns redacted status, interruption, usage and uncertain-action metadata. Inventory contains configured root-agent records; blocking child continuation remains part of the parent's resume path. `SQLiteDurableStore.list(status=None, agent_name=None, limit=20)` reads up to 1,000 private checkpoints without acquiring a lease. Other stores may implement that optional inventory API without changing the four-method `DurableStore` contract.
+
+`manager.resume()` returns a redacted task and refreshed run metadata, including any subsequent interruption. `manager.reconcile(run_id, action_id, result=verified_result)` commits an outcome already verified in the external system. `manager.cancel(run_id)` fences a stopped checkpoint and marks it canceled; it refuses active leases and unresolved executing/uncertain actions. It does not cancel a currently running process, reverse effects or invent a result. Use the live run handle to cancel active work, and inspect/reconcile uncertain effects before offline cancellation.
+
+The [CLI](cli.md#durable-run-controls) and [dashboard](devtools.md#durable-run-controls) accept a trusted `module:function` factory returning an Agent, an iterable of Agents or a RunManager. The factory has no arguments and is selected by the operator at startup; importing it executes application code. Browsers cannot replace the factory or reconnect executable callbacks through JSON. Management projections apply `RedactionPolicy`; private execution checkpoints remain in their separate store. Network applications should authenticate users and scope the configured roster before exposing these methods.
+
 ## Embedded groups and run handles
 
 ```python

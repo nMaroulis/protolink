@@ -13,10 +13,12 @@ if TYPE_CHECKING:
     from protolink.core.budget import BudgetEnforcer
     from protolink.core.cancellation import CancellationToken, TaskCancellationRequest, TaskExecutionRegistry
     from protolink.core.events import EventSink
+    from protolink.core.hooks import AgentHooks
     from protolink.core.policy import ActionAuthorization, ActionAuthorizer
     from protolink.core.run_context import RunBudget, RunContext
     from protolink.llms.base import LLM
     from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
+    from protolink.llms.context_policy import ContextArtifacts, ContextPolicy
     from protolink.logging import BaseLogger
     from protolink.models import AgentCard, AgentSkill, Part, Task
     from protolink.rag import Knowledge, RAGAnswer, RetrievalMode, Retriever
@@ -58,6 +60,9 @@ class _AgentMixinBase(Protocol):
     _task_executions: TaskExecutionRegistry
     _control_tasks: set[asyncio.Task[Any]]
     run_store: Any | None
+    context_policy: ContextPolicy | None
+    context_artifacts: ContextArtifacts
+    hooks: tuple[AgentHooks, ...]
     durability: DurableStore | None
     execution_version: str
     subagents: dict[str, Any]

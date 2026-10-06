@@ -337,6 +337,52 @@ Create a fresh timezone-aware clock tool. UTC requires no external service or ti
 
 ## Command execution
 
+### Isolated container execution
+
+`DockerExecutionBackend` implements the same process backend contract as host execution. It runs approved argument arrays in a disposable container with an explicit image, mounted workspace and resource boundary. Register it on `process_tool()`, `shell_tool()`, `git_tool()` or `CodeAssistant(backend=...)`; registration makes no daemon calls.
+
+```python
+from protolink import Agent
+from protolink.tools import DockerExecutionBackend, process_tool
+
+backend = DockerExecutionBackend(
+    image="python:3.12-slim",  # Pull and verify the image separately; prefer a digest.
+    workspace="/absolute/workspace",
+)
+agent = Agent(name="commands", tools=[process_tool(backend=backend)])
+result = await agent.call_tool(
+    "execute_command",
+    argv=["python", "-c", "print('hello')"],
+    cwd="/absolute/workspace",
+    env={},
+    timeout_seconds=10,
+    max_output_bytes=4096,
+)
+print(result.exit_code, result.stdout)
+```
+
+The operator installs/configures Docker and prepares a trusted image containing the desired executables. `--pull=never` prevents implicit downloads. An executable name resolves inside the image; an absolute executable path refers to the container filesystem. Commands unavailable on the host can therefore run through `process_tool()` when installed in the image. The approved command, cwd, arguments, environment and configured backend boundary appear in the execution preview.
+
+| Setting | Default / behavior |
+| --- | --- |
+| `workspace` | Required existing directory; only this directory is mounted |
+| `writable` | `False`; mount is read-only unless explicitly enabled |
+| `network` | `False`; uses Docker's `none` network, or `bridge` when enabled |
+| `memory_mb`, `cpus`, `pids_limit` | 512 MiB, one CPU, 128 PIDs; memory/swap allowance is bounded |
+| `user` | Non-root numeric host UID:GID where available, otherwise `65534:65534`; may be supplied explicitly |
+| `docker_env` | CLI environment, defaulting to a minimal system PATH; pass Docker context/host settings explicitly |
+| `executable` | Docker CLI resolved once at construction |
+
+The root filesystem is read-only, Linux capabilities are dropped, privilege escalation and image healthchecks are disabled, and `/tmp` is a bounded writable tmpfs. Command environment variables are explicit; host secrets are not inherited into the CLI or container. The image's own configured environment remains in effect. `cwd` must resolve within the mounted workspace. Factory/command timeout, output limits, cancellation and run budgets continue to apply.
+
+Normal completion, timeout and cancellation force-remove the named container before returning. A cleanup error is visible and includes the container name for inspection; process events record that name. Abrupt application death or daemon failure can leave external work without a receipt. Inspect Docker and reconcile the verified result before continuing an uncertain durable action; do not assume that terminating a client rolled back container effects.
+
+Docker is a trusted execution service with its own host/daemon boundary. Resource limits and mount restrictions reduce ordinary command access but do not provide a guarantee against a hostile image exploiting the daemon or kernel. With `writable=True`, host workspace edits remain external effects. CodeAssistant's scoped file tools still access the configured host directory; selecting a process backend changes shell/Git execution, not every application tool. Reconnect backend instances explicitly when restoring tools and update the application's execution version when their contract changes.
+
+The runtime flags and their platform behavior are documented in [Docker's container run reference](https://docs.docker.com/reference/cli/docker/container/run/). ProtoLink uses that CLI directly and adds no mandatory container dependency.
+
+### Host execution
+
 ```python
 import sys
 from protolink import Agent, AgentCard, ApprovalDecision, CapabilityPolicy

@@ -2042,6 +2042,10 @@ class AgentSerializationMixin(_AgentMixinBase):
                 data["durability"] = {"reconnect_required": True}
         if self.durability is not None or self.execution_version != "1":
             data["execution_version"] = self.execution_version
+        if self.context_policy is not None:
+            data["context_policy"] = self.context_policy.to_dict()
+        if self.hooks:
+            data["hooks"] = {"reconnect_required": True}
 
         policy = self.action_authorizer.policy
         if type(policy) is CapabilityPolicy:
@@ -2223,6 +2227,8 @@ class AgentSerializationMixin(_AgentMixinBase):
                 from protolink.llms import create_llm
 
                 provider = llm_config.get("provider")
+                if provider == "router":
+                    raise ValueError("Reconnect routing models and selector with from_dict(..., llm=RoutedLLM(...))")
                 l_kwargs = {
                     "model": llm_config.get("model"),
                     "model_params": llm_config.get("model_params", {}),
@@ -2307,6 +2313,13 @@ class AgentSerializationMixin(_AgentMixinBase):
             if config.get("type") != "sqlite":
                 raise ValueError("Reconnect the custom durability store with from_dict(..., durability=store)")
             durability = SQLiteDurableStore(config["path"], lease_seconds=config.get("lease_seconds", 300.0))
+        from protolink.llms.context_policy import ContextPolicy
+
+        context_policy = overrides.get("context_policy")
+        if "context_policy" not in overrides and data.get("context_policy"):
+            context_policy = ContextPolicy(**data["context_policy"])
+        if data.get("hooks") and "hooks" not in overrides:
+            raise ValueError("Reconnect lifecycle callbacks with from_dict(..., hooks=[...])")
 
         agent = cls(
             card=card_data,
@@ -2334,6 +2347,8 @@ class AgentSerializationMixin(_AgentMixinBase):
             subagents=subagents,
             subagent_limits=subagent_limits,
             durability=durability,
+            context_policy=context_policy,
+            hooks=overrides.get("hooks"),
             execution_version=overrides.get("execution_version", data.get("execution_version", "1")),
         )
         descriptors = data.get("knowledge") or []
@@ -2352,6 +2367,8 @@ class AgentSerializationMixin(_AgentMixinBase):
 
         tools_data = data.get("tools", [])
         for tool_dict in tools_data:
+            if agent.context_policy is not None and tool_dict.get("name") == "read_context_artifact":
+                continue
             tool = cls._deserialize_tool(tool_dict)
             agent.add_tool(tool)
 

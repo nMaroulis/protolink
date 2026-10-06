@@ -276,6 +276,41 @@ See [Protolink Studio](studio.md) for the complete visual-builder guide and [Dev
 
 ## Command Reference
 
+### Durable run controls
+
+Durable checkpoints preserve unfinished execution separately from diagnostic reports. Inventory can be read without loading the application:
+
+```bash
+protolink run pending --durability runs.sqlite --json
+protolink run pending --durability runs.sqlite --status uncertain --limit 10
+```
+
+The SQLite file must already exist; inspection opens it read-only and never creates a replacement database. Pending inventory defaults to `input-required`. Status filtering is exact; unresolved actions may also occur in failed or interrupted records, so inspect the relevant run when recovering a crash.
+
+For controls, expose a synchronous zero-argument application factory, such as `application()` in `myapp.py`, returning configured durable agents or a `RunManager`:
+
+```bash
+protolink run inspect RUN_ID --factory myapp:application
+protolink run resume RUN_ID --factory myapp:application \
+  --request-id REQUEST_ID --fingerprint DISPLAYED_FINGERPRINT --answer CSV
+protolink run resume RUN_ID --factory myapp:application \
+  --request-id REQUEST_ID --fingerprint DISPLAYED_FINGERPRINT --approve
+protolink run cancel RUN_ID --factory myapp:application
+protolink run reconcile RUN_ID ACTION_ID --factory myapp:application \
+  --result '{"external_id":"verified-existing-operation"}'
+```
+
+Use `--deny` for an approval rejection and `--decline` for an unanswered user question; these do not select defaults. Responses require the current request ID. Supplying the inspected fingerprint binds the response to the displayed preview. `resume` with no response continues a safe boundary or returns a completed result. These controls emit JSON and return a nonzero exit status when the operation fails.
+
+The factory imports trusted application code and reconnects clients, tools, policies, hooks and models. It cannot be inferred from a diagnostic report. A stale request, changed configuration, active lease or uncertain external result is rejected through normal recovery checks. Reconcile only after checking the external system; cancellation does not undo effects. See [Execution, approvals and recovery](execution-tools.md#manage-stopped-runs) for the management contract.
+
+```bash
+protolink dashboard --factory myapp:application
+protolink studio --factory myapp:application
+```
+
+Both expose the same durable controls in the dashboard's Runs tab. The factory is loaded once at server startup. Static HTML snapshots support inspection only and cannot continue execution.
+
 ```bash
 protolink --version
 protolink init agent [path] [--template basic|tool] [--force]

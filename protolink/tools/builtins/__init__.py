@@ -16,6 +16,7 @@ from ._oauth import OAuthToken
 from .calculator import calculator
 from .calendar import CalendarBackend, GoogleCalendar, calendar_tools
 from .clock import current_datetime
+from .container import DockerExecutionBackend
 from .database import DatabaseBackend, SQLiteDatabase, database_tools
 from .documents import document_tools
 from .email import EmailBackend, Gmail, email_tools
@@ -49,6 +50,7 @@ def _create_builtin(builtin_id: str) -> Tool:
 __all__ = [
     "CalendarBackend",
     "DatabaseBackend",
+    "DockerExecutionBackend",
     "EmailBackend",
     "Gmail",
     "GoogleAPIError",
