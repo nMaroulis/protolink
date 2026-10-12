@@ -12,7 +12,7 @@ import json
 import threading
 import time
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypeVar, cast, overload
 
 from protolink.client import AgentClient, RegistryClient
 from protolink.core.actions import RunAction
@@ -1511,6 +1511,8 @@ class AgentToolMixin(_AgentMixinBase):
 class AgentConfigurationMixin(_AgentMixinBase):
     """Owns transport, model, storage, registry, status and chat configuration."""
 
+    _default_inference_support: ClassVar[bool | None] = None
+
     @property
     def a2a(self) -> bool:
         """Return whether the optional A2A 1.0 HTTP boundary is enabled."""
@@ -1628,7 +1630,12 @@ class AgentConfigurationMixin(_AgentMixinBase):
 
     @llm.setter
     def llm(self, llm: LLM | str | None) -> None:
-        """Resolve an optional model string, validate it and update capabilities."""
+        """Resolve a model and refresh health metadata and inference support.
+
+        A configured model supports inference even if its connection check fails
+        temporarily. Explicit card declarations take precedence; undeclared custom
+        task handlers remain unknown rather than being assumed tools-only.
+        """
         if isinstance(llm, str):
             from protolink.llms import create_llm
 
@@ -1640,6 +1647,31 @@ class AgentConfigurationMixin(_AgentMixinBase):
             self.card.capabilities.has_llm = has_llm
         elif isinstance(self.card.capabilities, dict):
             self.card.capabilities["has_llm"] = has_llm
+        self._refresh_inference_capability()
+
+    def _refresh_inference_capability(self) -> None:
+        """Advertise the request contract independently of model availability."""
+        from .engine import AgentExecutionMixin
+
+        declared = self._inference_support_override
+        if declared is not None:
+            support = declared
+        elif self._llm is not None:
+            support = True
+        elif self._default_inference_support is not None:
+            support = self._default_inference_support
+        else:
+            custom_handler = any(
+                getattr(type(self), name) is not getattr(AgentExecutionMixin, name)
+                for name in (
+                    "handle_task",
+                    "handle_task_streaming",
+                    "_execute_task_impl",
+                    "_handle_task_streaming_impl",
+                )
+            )
+            support = None if custom_handler else False
+        self.card.capabilities.supports_inference = support
 
     @property
     def telemetry(self) -> Telemetry | None:
@@ -2027,6 +2059,10 @@ class AgentSerializationMixin(_AgentMixinBase):
             "credentials": self.credentials,
             "a2a": self._a2a_enabled,
         }
+        # This is application configuration, unlike card.to_dict() discovery
+        # metadata. Preserve None so restoring an automatically derived card does
+        # not turn its current inference support into a permanent override.
+        data["card"]["capabilities"]["supports_inference"] = self._inference_support_override
         if self.subagents:
             data["subagents"] = [{"name": name, "reconnect_required": True} for name in self.subagents]
         if self.subagents or self.subagent_limits.background:

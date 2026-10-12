@@ -85,8 +85,8 @@ machinery and the adapter's existing tool-observation hook. Try the runnable
 
 ### Bound corrections within the current inference
 
-`max_tool_corrections` defaults to **two corrective turns** per `infer()` invocation. Unknown tools, schema mismatches
-and explicit tool rejections share this allowance. Two rejected requests can receive corrective turns; a third
+`max_tool_corrections` defaults to **two corrective turns** per `infer()` invocation. Local and delegated tool validation,
+unavailable delegation routes and explicit no-change rejections share this allowance. Two rejected requests can receive corrective turns; a third
 rejection raises `ToolCorrectionLimitError`. Set the limit to `0` to stop at the first rejection, or assign
 `llm.max_tool_corrections` after construction. The accepted range is `0` through `10`; the inference loop's existing
 ten-step ceiling can stop work sooner.
@@ -107,6 +107,7 @@ rejected request; earlier successful actions may already have changed resources.
 | --- | --- | --- |
 | Successful execution | The tool returned its result | `tool_result` / `action.completed` |
 | Request rejected | `ToolRejectedError`, or pre-execution tool/schema validation; nothing changed in this request | `tool_rejected` / `action.rejected` |
+| Delegation rejected | Unsupported advertised target/tool/schema, or a correlated single-tool no-change response | `agent_call_rejected` / `action.rejected` |
 | Permission denied | Policy or approval denied the action | `action.denied` |
 | Execution failed | Ordinary exception inside the tool; effects may be partial or unknown | `tool_error` / `action.failed` |
 
@@ -126,6 +127,11 @@ preserves the correction counter. Approval pauses and application restarts do no
 stops after the receipt is committed but before feedback enters history, resumption reuses the recorded rejection
 without calling or charging the tool again. An `action_rejection` artifact never proves successful execution for
 `CompletionValidator`.
+
+Delegated tool calls use the same validation principles. The sender checks advertised tool names and schemas before
+dispatch; native receivers return structured rejection errors for unknown tools or invalid arguments before entering
+user code. A single-tool no-change response can be corrected by the parent's model. Ordinary remote failures and
+completed effects remain terminal. See [delegation capability checks](llm.md#delegation-capability-checks).
 
 ### ToolRejectedError
 

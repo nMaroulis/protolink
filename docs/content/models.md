@@ -1462,7 +1462,7 @@ Discovery starts with an `AgentCard`. The card identifies one logical agent, des
     tags: list[str] = [],
     interfaces: list[AgentInterface] = [],
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L132"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L141"
 >
 
 Agent identity and capability declaration used by ProtoLink discovery, registration, delegation prompts and server metadata. The primary `url` and `transport` describe the normal route; `interfaces` advertises additional routes to the same logical agent.
@@ -1572,7 +1572,7 @@ card = AgentCard(
   kind="method"
   path="protolink.AgentCard.to_dict"
   signature={`to_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L185"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L193"
 >
 
 Serialize the card into ProtoLink's native discovery-card dictionary. Nested capabilities and skills become dictionaries, field names that belong to the wire contract use camel case and additional interfaces are omitted when the list is empty.
@@ -1611,7 +1611,7 @@ print(payload["additionalInterfaces"])  # serialized alternate route
   signature={`from_dict(
     data: dict[str, Any],
 ) -> AgentCard`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L209"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L217"
 >
 
 Construct an `AgentCard` from the native discovery dictionary. This is the validated and normalizing path for data received from JSON, a registry, or another transport boundary.
@@ -1679,7 +1679,7 @@ card = AgentCard.from_dict(data)
   kind="method"
   path="protolink.AgentCard.get_prompt_format"
   signature={`get_prompt_format() -> str`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L260"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L267"
 >
 
 Generate deterministic JSON metadata for an LLM delegation prompt. The object contains the agent's name, description, capabilities and a skill-sorted `tools` array with each skill's description, schemas and examples. It deliberately omits the transport URL so model output cannot select an arbitrary destination directly.
@@ -1716,8 +1716,9 @@ Generate deterministic JSON metadata for an LLM delegation prompt. The object co
     timeout_support: bool = False,
     rag: bool = False,
     code_execution: bool = False,
+    supports_inference: bool | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L15"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L16"
 >
 
 Coarse capability and capacity declaration carried by an `AgentCard`. These values help peers choose an interaction mode; they do not themselves enable streaming, tools, delegation, or execution infrastructure.
@@ -1740,7 +1741,8 @@ Coarse capability and capacity declaration carried by an `AgentCard`. These valu
       Indicates that the agent may delegate work to other agents. It defaults to enabled in ProtoLink's native runtime profile.
     </ApiField>
     <ApiField name="has_llm" type="bool" defaultValue="False">
-      Declares that an LLM is part of the agent's processing path. This does not expose the provider or model identifier.
+      LLM connection metadata updated by the Agent's model setter. A failed connection check makes this false;
+      delegated inference support uses <code>supports_inference</code> separately. This does not expose the provider or model identifier.
     </ApiField>
     <ApiField name="max_concurrency" type="int" defaultValue="1">
       Advertised maximum simultaneous task capacity. No positivity validator runs in this dataclass; runtime schedulers decide how to enforce the declared value.
@@ -1768,6 +1770,13 @@ Coarse capability and capacity declaration carried by an `AgentCard`. These valu
     <ApiField name="code_execution" type="bool" defaultValue="False">
       Advertises access to a code-execution facility. This flag is not a security boundary; the actual sandbox and policy must be configured separately.
     </ApiField>
+    <ApiField name="supports_inference" type="bool | None" defaultValue="None">
+      Native request contract for <code>infer</code> delegation. <code>False</code> rejects the request before dispatch;
+      <code>True</code> also permits custom prompt handlers without an LLM. <code>None</code> means undeclared, preserving
+      legacy and external-handler compatibility. Ordinary Agents derive support from model configuration unless the
+      card explicitly declares it. Only booleans or <code>None</code> are accepted. The flag does not install an LLM,
+      implement a handler or grant permission to execute. See <a href="./agent#custom-prompt-handlers">custom prompt handlers</a>.
+    </ApiField>
   </ApiFields>
 </ApiSection>
 
@@ -1783,7 +1792,7 @@ Coarse capability and capacity declaration carried by an `AgentCard`. These valu
   kind="method"
   path="protolink.core.agent_card.AgentCapabilities.as_dict"
   signature={`as_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L47"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L57"
 >
 
 Convert every capability field into a plain dictionary using `dataclasses.asdict()`.
@@ -1804,7 +1813,7 @@ Convert every capability field into a plain dictionary using `dataclasses.asdict
   kind="method"
   path="protolink.core.agent_card.AgentCapabilities.enabled"
   signature={`enabled() -> list[str]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L51"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L61"
 >
 
 Produce a compact display list of truthy boolean capabilities and positive integer capacities.
@@ -1845,7 +1854,7 @@ print(capabilities.enabled())
     tags: list[str] = [],
     examples: list[Any] = [],
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L63"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L73"
 >
 
 Task-level capability advertised by an agent. A skill combines a stable identifier with enough schema and example information for humans, registries and delegating models to understand how to call it.
@@ -1917,7 +1926,7 @@ skill = AgentSkill(
     transport: TransportType,
     protocol_version: str = protolink_version,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L95"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L105"
 >
 
 Additional endpoint exposed by the same logical agent. The primary route remains `AgentCard.url` plus `AgentCard.transport`; use an interface only when one agent is genuinely reachable over another URL, transport, or protocol version.
@@ -1950,7 +1959,7 @@ Additional endpoint exposed by the same logical agent. The primary route remains
   signature={`from_dict(
     data: Mapping[str, Any],
 ) -> AgentInterface`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L112"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L122"
 >
 
 Normalize an alternate-interface mapping from the native card wire format.
@@ -1987,7 +1996,7 @@ Normalize an alternate-interface mapping from the native card wire format.
   kind="method"
   path="protolink.AgentInterface.to_dict"
   signature={`to_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L121"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/agent_card.py#L130"
 >
 
 Serialize the interface using the field names expected inside `AgentCard.additionalInterfaces`.

@@ -9,6 +9,7 @@ from protolink import (
     Agent,
     AgentCard,
     AgentGroup,
+    AgentSkill,
     Artifact,
     CompletionCheck,
     CompletionValidator,
@@ -132,6 +133,7 @@ async def test_nested_delegation_keeps_worker_identity_in_nonstreamed_parent():
 @pytest.mark.parametrize("failure", ["disconnect", "missing_final", "cancel"])
 async def test_interrupted_delegation_keeps_executed_receipts_without_resubmitting(failure):
     child = agent("interrupted-child")
+    child.card.skills.append(AgentSkill(id="work"))
     parent = agent("interrupted-parent", [delegate(child), "must not execute"])
     discover(parent, child)
     emitted = asyncio.Event()
@@ -224,7 +226,12 @@ async def test_custom_unary_worker_keeps_its_handler_and_returns_receipts_once()
             return task.complete(await self.call_tool("work"))
 
     child = UnaryWorker(
-        AgentCard(name="unary-worker", description="custom", url="runtime://unary-worker"),
+        AgentCard(
+            name="unary-worker",
+            description="custom",
+            url="runtime://unary-worker",
+            capabilities={"supports_inference": True},
+        ),
         transport="runtime",
         verbosity=0,
     )
@@ -254,6 +261,8 @@ async def test_custom_unary_worker_keeps_its_handler_and_returns_receipts_once()
 @pytest.mark.asyncio
 async def test_a2a_delegation_uses_mapped_task_without_native_subscription():
     child = agent("a2a-worker")
+    # This fixture's external handler accepts prompts without a local LLM.
+    child.card.capabilities.supports_inference = True
     parent = agent("a2a-parent", [delegate(child, action="infer"), "parent done"])
     discover(parent, child)
     parent.client._select_protocol = AsyncMock(return_value=("a2a", None))

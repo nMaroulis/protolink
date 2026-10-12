@@ -70,7 +70,7 @@ on_task_start
     ├── on_llm_event: context_prepared
     ├── on_llm_event: llm_call_metrics
     ├── on_llm_event: tool_start → tool_result | tool_rejected | tool_error
-    ├── on_llm_event: agent_call_start → agent_call_result | agent_call_error
+    ├── on_llm_event: agent_call_start → agent_call_result | agent_call_rejected | agent_call_error
     └── on_llm_end
 on_task_end
 ```
@@ -645,6 +645,10 @@ Implement the complete telemetry contract and translate it into a local trace hi
     </ApiField>
     <ApiField name="agent_call_result | agent_call_error">
       Append the event once and close the nearest delegated-agent span, using <code>message</code> as its error when appropriate.
+    </ApiField>
+    <ApiField name="agent_call_rejected">
+      Record bounded, structured delegation rejection feedback. Pre-dispatch validation opens no execution span;
+      rejection returned during dispatch closes the active delegated-agent span with status <code>rejected</code>.
     </ApiField>
     <ApiField name="llm_parse_error">
       Set trace retry count to the maximum of its existing value and the event's <code>retry_count</code>, falling back to <code>parse_failures</code>.

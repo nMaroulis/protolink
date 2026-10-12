@@ -126,7 +126,9 @@ class Agent(
             registry_url: URL of registry when using string transport type for registry creation.
             llm: Optional LLM instance, provider alias, or "provider:model" string.
                 Strings use create_llm with provider defaults; pass an object for
-                custom credentials, model parameters, or server URLs.
+                custom credentials, model parameters, or server URLs. Inference
+                support is derived automatically; custom prompt handlers can declare
+                ``card.capabilities.supports_inference=True`` without a model.
             system_prompt: This is used as complementary text in the system prompt, which is responsible for explaining
                 the agent logic and role. Agent calling, tool calling and other runtime actions are already predefined,
                 so the LLM already has the knowledge needed to interact with its environment.
@@ -184,6 +186,9 @@ class Agent(
         self.card, self._automatic_identity_url = resolve_identity(
             card, name=name, description=description, url=url, transport=transport
         )
+        # Keep the declaration separate from the derived discovery value so model
+        # replacement and configuration round trips retain automatic detection.
+        self._inference_support_override = self.card.capabilities.supports_inference
         # LLM validation is handled by the @llm.setter property.
         self._llm: LLM | None = None
         self.llm = llm

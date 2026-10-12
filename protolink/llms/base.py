@@ -116,6 +116,7 @@ from protolink.llms.compaction import (
 )
 from protolink.llms.context import ContextManifest, build_context_manifest
 from protolink.llms.context_policy import ContextPolicy
+from protolink.llms.delegation import validate_delegation_request
 from protolink.llms.errors import InferParseError
 from protolink.llms.history import EPHEMERAL_TOOL_OBSERVATION_KEY, ConversationHistory
 from protolink.llms.metrics import (
@@ -473,8 +474,8 @@ class LLM(ABC):
     def max_tool_corrections(self) -> int:
         """Maximum corrective turns for rejected tool requests in one inference.
 
-        Defaults to two. Unknown tools, invalid input schemas and explicit
-        ``ToolRejectedError`` share this allowance. Zero stops at the first
+        Defaults to two. Local and delegated tool validation, unavailable
+        delegation targets and explicit ``ToolRejectedError`` share this allowance. Zero stops at the first
         rejection. Successful actions do not reset the counter; all further
         model calls and actual tool invocations also consume existing budgets.
         Durable checkpoints preserve the counter across pauses and restarts.
@@ -951,11 +952,13 @@ class LLM(ABC):
 
             The callback receives the target agent's name, the action type (``tool_call`` or ``infer``) and the full
             payload. It should return the result from the delegated agent. If None, agent_call actions trigger
-            self-correction guidance.
+            bounded self-correction guidance. ``ToolRejectedError`` may report a guaranteed no-change rejection.
+            Ordinary callback exceptions, including ``ValueError``, are execution failures and are not retried.
         agent_cards : list[Any], optional
             Discovered agent cards available for delegation. Provider-native adapters can use these to expose agent
             delegation tools; prompt-fallback parsing uses them to repair unambiguous legacy shorthand emitted by
-            smaller local models.
+            smaller local models. Before dispatch the runtime checks exact target/skill identifiers and advertised
+            tool argument schemas. Omission preserves custom callback integrations without an authoritative catalog.
         streaming : bool, default False
             Whether to invoke the underlying LLM in streaming mode. When True, the response is collected from an async
             generator before parsing.
@@ -1010,8 +1013,8 @@ class LLM(ABC):
             Raised in the following scenarios:
 
             - **LLM call failure**: Network error, API error, or provider-specific issue that persists after retries.
-            - **Unrecoverable tool error**: Tool execution raises an exception other than ``TypeError`` (which triggers
-              self-correction).
+            - **Unrecoverable execution error**: A tool or delegation callback raises an ordinary exception,
+              including ``TypeError`` or ``ValueError``. Only explicit no-change rejections are recoverable.
             - **Step limit exceeded**: ``MAX_INFER_STEPS`` reached without ``final``.
 
         Notes
@@ -1196,6 +1199,8 @@ class LLM(ABC):
             tool_args: dict[str, Any],
             phase: str,
             action_id: str | None = None,
+            agent_name: str | None = None,
+            agent_action: str | None = None,
         ) -> None:
             """Deliver a no-change observation and charge one bounded correction."""
             nonlocal tool_corrections
@@ -1203,7 +1208,7 @@ class LLM(ABC):
             recoverable = tool_corrections <= max_tool_corrections
             rejection = error.to_dict()
             feedback = {
-                "type": "tool_rejection",
+                "type": "agent_rejection" if agent_name is not None else "tool_rejection",
                 **rejection,
                 "correction": {
                     "attempt": tool_corrections,
@@ -1214,10 +1219,32 @@ class LLM(ABC):
                     ),
                 },
             }
-            fallback = inject_tool_observation(tool_name, tool_args, feedback)
+            if agent_name is None:
+                fallback = inject_tool_observation(tool_name, tool_args, feedback)
+            else:
+                fallback = False
+                try:
+                    self._inject_agent_call(
+                        agent_name=agent_name, agent_action=agent_action or "tool_call", agent_result=feedback
+                    )
+                except Exception as exc:
+                    fallback = True
+                    logger.warning(f"Provider agent-result history injection failed; using portable observation: {exc}")
+                    self.history.add_system(
+                        json.dumps(
+                            {
+                                "type": "agent_result",
+                                "agent": agent_name,
+                                "action": agent_action,
+                                "result": feedback,
+                                "observation_format": "portable_fallback",
+                            }
+                        )
+                    )
             await emit(
                 {
-                    "type": "tool_rejected",
+                    "type": "agent_call_rejected" if agent_name is not None else "tool_rejected",
+                    **({"agent": agent_name, "action": agent_action} if agent_name is not None else {}),
                     "step": steps,
                     "tool": tool_name,
                     "action_id": action_id,
@@ -1775,35 +1802,45 @@ class LLM(ABC):
                 continue
 
             elif isinstance(action_obj, AgentCallAction):
+                self.history.add_assistant(raw_response)
                 if not agent_callback:
-                    await emit(
-                        {
-                            "type": "agent_call_error",
-                            "step": steps,
-                            "agent": action_obj.agent,
-                            "action": action_obj.action,
-                            "message": "Agent delegation is unavailable in this context",
-                            "recoverable": True,
-                            "phase": "validation",
-                        }
-                    )
                     alternatives = "`final`"
                     if tools:
                         alternatives += " or `tool_call` with an available local tool"
-                    self.history.add_system(
-                        "The `agent_call` was structurally valid, but no agent delegation route is available "
-                        f"for this inference. Choose {alternatives} instead."
+                    await reject_tool_request(
+                        ToolRejectedError(
+                            "The `agent_call` was structurally valid, but no agent delegation route is available "
+                            f"for this inference. Choose {alternatives} instead.",
+                            code="delegation_unavailable",
+                        ),
+                        tool_name=f"{action_obj.agent}.{action_obj.tool or action_obj.action}",
+                        tool_args=action_obj.args or {},
+                        phase="validation",
+                        agent_name=action_obj.agent,
+                        agent_action=action_obj.action,
                     )
-                    checkpoint_ready()
                     continue
-
-                # Add assistant call to history before result
-                self.history.add_assistant(raw_response)
 
                 # Validate agent_call payload
                 agent_name = action_obj.agent
                 agent_action = action_obj.action
+                if durable is None or durable.entry is None:
+                    try:
+                        payload = validate_delegation_request(
+                            agent_name, agent_action, payload, agent_cards, agent_chain=active_context.agent_chain
+                        )
+                    except ToolRejectedError as error:
+                        await reject_tool_request(
+                            error,
+                            tool_name=f"{agent_name}.{action_obj.tool or agent_action}",
+                            tool_args=action_obj.args or {},
+                            phase="validation",
+                            agent_name=agent_name,
+                            agent_action=agent_action,
+                        )
+                        continue
 
+                delegation_rejection: ToolRejectedError | None = None
                 try:
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
@@ -1829,29 +1866,17 @@ class LLM(ABC):
                             "action_id": action_id,
                         }
                     )
-                    agent_result = await agent_callback(agent_name, agent_action, payload)
+                    try:
+                        agent_result = await agent_callback(agent_name, agent_action, payload)
+                    except ToolRejectedError as error:
+                        delegation_rejection = error
+                        agent_result = None
                 except ActionPolicyError:
                     raise
                 except DurableExecutionError:
                     raise
                 except BudgetExceededError:
                     raise
-                except ValueError as e:
-                    # Agent not found or validation error - help LLM correct
-                    await emit(
-                        {
-                            "type": "agent_call_error",
-                            "step": steps,
-                            "agent": agent_name,
-                            "action": agent_action,
-                            "message": str(e),
-                            "recoverable": True,
-                            "phase": "validation",
-                        }
-                    )
-                    self.history.add_system(f"Agent call failed: {e}")
-                    checkpoint_ready()
-                    continue
                 except Exception as e:
                     await emit(
                         {
@@ -1864,6 +1889,18 @@ class LLM(ABC):
                         }
                     )
                     raise RuntimeError(f"Agent call to '{agent_name}' failed: {e}") from e
+
+                if delegation_rejection is not None:
+                    await reject_tool_request(
+                        delegation_rejection,
+                        tool_name=f"{agent_name}.{action_obj.tool or agent_action}",
+                        tool_args=action_obj.args or {},
+                        phase="dispatch",
+                        agent_name=agent_name,
+                        agent_action=agent_action,
+                        action_id=action_id,
+                    )
+                    continue
 
                 history_agent_result = _history_safe_result(agent_result)
                 observation_fallback = False

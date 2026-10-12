@@ -95,7 +95,11 @@ Rules:
 - Choose only agents listed below
 - For delegated tool execution, choose a tool owned by the target agent
 - For delegated inference, give the target agent a clear prompt
-- After an agent result is returned, continue from that result instead of repeating the same delegation
+- Never request inference from an agent whose supports_inference capability is false
+- After a successful agent result is returned, continue from that result instead of repeating the same delegation
+- A result with status="rejected" and changes_made=false is correction feedback, not completed work
+- Use its code, details and suggestion to correct the request, choose another action, or explain the rejection
+- Submit corrected requests only using advertised agent/tool names; never claim that a rejected request succeeded
 
 Available agents:
 {{agent_cards_from_registry}}

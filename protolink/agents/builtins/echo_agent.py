@@ -26,6 +26,8 @@ class EchoAgent(Agent):
     This utility has no conversation reasoning and requires no LLM.
     """
 
+    _default_inference_support = True
+
     def __init__(self, card: AgentCard | dict[str, Any] | None = None, **agent_options: Any) -> None:
         if card is None:
             agent_options.setdefault("name", "echo")

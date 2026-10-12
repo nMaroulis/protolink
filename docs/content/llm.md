@@ -818,7 +818,7 @@ Do not instantiate `LLM` directly. Use a concrete implementation such as `OpenAI
     reasoning: Literal["none", "low", "medium", "high"] = "none",
     tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L307"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L308"
 >
 
 Abstract provider-neutral model contract. Subclasses implement text generation and connection validation; the base class owns history binding, typed action parsing, inference orchestration, compaction and metrics.
@@ -903,7 +903,7 @@ Abstract provider-neutral model contract. Subclasses implement text generation a
     *,
     streaming: bool = False,
 ) -> str | AsyncIterator[str]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L755"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L756"
 >
 
 Add one user message to the active history, then make a direct provider call.
@@ -955,7 +955,7 @@ async for chunk in llm.chat("Draft the introduction.", streaming=True):
   signature={`call(
     history: ConversationHistory,
 ) -> str`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L716"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L717"
 >
 
 Generate one complete text response from a conversation history. Concrete adapters translate the history into their provider’s request format.
@@ -997,7 +997,7 @@ Generate one complete text response from a conversation history. Concrete adapte
   signature={`call_stream(
     history: ConversationHistory,
 ) -> AsyncIterator[str]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L730"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L731"
 >
 
 Start a streaming provider call and yield incremental text chunks.
@@ -1036,7 +1036,7 @@ Start a streaming provider call and yield incremental text chunks.
     agent_callback_available: bool = False,
     agent_cards: list[Any] | None = None,
 ) -> LLMActionResult`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L792"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L793"
 >
 
 Acquire one validated runtime action. The base implementation parses a JSON action from text; native-capable adapters override it and normalize provider tool calls into the same result type.
@@ -1089,7 +1089,7 @@ Acquire one validated runtime action. The base implementation parses a JSON acti
     agent_cards: list[Any] | None = None,
     chunk_callback: Callable[[str], Awaitable[None]] | None = None,
 ) -> LLMActionResult`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L825"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L826"
 >
 
 Streaming counterpart to `call_action()`. The fallback implementation forwards text chunks to the observer, buffers the complete response and validates exactly one action after the stream ends.
@@ -1482,11 +1482,66 @@ Many model mistakes are observations, not immediate application failures:
 | Unknown or unavailable tool | Lists tools that are actually available, or states that this inference has none. |
 | Missing required fields | Returns field-level validation details. |
 | Wrong tool arguments | Explains the callable mismatch and asks the model to check the input schema. |
-| Agent not found | Reports the unavailable target through the delegation callback. |
+| Agent not found | Rejects a target absent from the current advertised catalog and lists available agents. |
+| Unknown delegated tool | Lists the target's advertised tools; a reasoning agent receives guidance to use `infer` with a prompt. |
+| Wrong delegated tool arguments | Validates the advertised input schema before contacting the target. |
 | Agent delegation unavailable | States that no delegation route exists and suggests only dispatchable alternatives. |
 | Invalid action type | Reports the detected type and lists only action kinds available in the current inference. |
 
-Tool arguments are validated and conservatively coerced before authorization, deduplication, or tool-budget consumption. These model mistakes normally remain inside `infer()` so the model can correct them. An exception raised by the tool body, including `TypeError`, remains an execution failure and is not relabeled as an argument mismatch.
+Tool arguments are validated and conservatively coerced before authorization, dispatch or tool-budget consumption. These model mistakes normally remain inside `infer()` so the model can correct them. An ordinary exception raised by the tool body, including `TypeError`, remains an execution failure and is not relabeled as an argument mismatch.
+
+##### Delegation capability checks
+
+Delegation has two explicit modes: `infer` asks an agent to handle a prompt, while `tool_call` selects a tool advertised
+by that agent. `tool_call` is an action kind, not a built-in tool named `tool_call`. A Planner with an LLM and no tools
+should receive:
+
+```json
+{"type":"agent_call","agent":"planner","action":"infer","prompt":"Add docstrings to the following code: ..."}
+```
+
+If the model instead selects `planner.tool_call`, ProtoLink rejects that unsupported tool before dispatch and returns
+an `agent_result` containing structured `agent_rejection` feedback. The next model turn receives the target name,
+available tools, error code and suggestion to use `infer`. The runtime does not reinterpret the action, move arguments
+into a guessed prompt or contact the Planner with an invalid tool task.
+
+This is automatic for ordinary Agents. Registry targets and configured local subagents use the same check. A supplied
+`agent_cards` catalog also enables it for direct `LLM.infer()` integrations; cards may be `AgentCard` objects or native
+serialized card dictionaries. Exact names, skill IDs and advertised argument schemas define the available requests.
+Empty input schemas add no constraints. Known registry cards are checked again at dispatch using the normal discovery
+cache, so a changed catalog can reject a request before sending it. Discovery data never grants permission:
+existing policy and approvals still authorize every valid operation.
+
+No new API or setting is needed. `max_tool_corrections` covers local tool validation, delegation capability checks,
+unavailable routes and explicit no-change rejections together. It defaults to two corrective turns; successful work
+does not replenish it. Rejected requests consume their existing model/step/token budgets, preserve observations of
+completed work and are not remembered as successfully executed actions. Pre-dispatch rejection does not reserve a
+tool call or create a child task. Once a request reaches a receiver, its reserved budgets remain counted even if it
+returns a no-change rejection. See the runnable
+[offline delegation-correction example](https://github.com/nMaroulis/protolink/blob/main/examples/delegation_correction.py).
+
+Inference requests use `capabilities.supports_inference`: `False` rejects `infer` before dispatch with the code
+`unsupported_inference`, while `True` supports both LLM agents and custom prompt handlers. Ordinary Agents advertise
+this automatically from their configured LLM; a temporary connection failure does not change that request contract.
+Custom handlers can declare support in their card without installing a model. See
+[custom prompt handlers and the delegation pipeline](agent.md#custom-prompt-handlers).
+
+Missing or `None` support remains unknown for legacy/external cards and undeclared custom handlers; those requests
+are left to the target for compatibility. `has_llm` supplies only a positive correction hint when support is unknown.
+An explicit `False` takes precedence over that hint. Custom callbacks without a catalog can still use
+`agent_cards=None`; their own dispatch layer remains responsible for capability validation.
+
+After dispatch, automatic recovery is deliberately narrow: a failed native Task must contain exactly one requested
+tool call and one matching `tool_output.error` with `status="rejected"` and `changes_made=false`, and no completed
+execution evidence. The parent receives that rejection as correction feedback. Failed inference, mixed requests,
+partial execution, untyped legacy errors, input-required responses and lost connections remain failures. The runtime
+never classifies them by matching error text. Ordinary callback exceptions, including `ValueError`, are terminal;
+custom callbacks use `ToolRejectedError` only when they guarantee no changes.
+
+`agent_call_rejected` normalizes to `action.rejected`, with warning severity, correction counters and a no-change
+summary. It records an `action_rejection` artifact rather than successful execution evidence. Durable local child
+calls retain explicit rejection receipts and the same correction counter, avoiding unresolved execution state when
+the child has guaranteed that its rejected tool request made no changes.
 
 When an Agent-owned inference tool or delegation succeeds, the Agent also attaches and immediately snapshots an `Artifact(kind="action_result")` receipt keyed by the runtime `action_id`. The receipt records completion and correlation metadata but deliberately omits the internal result, which remains in private LLM history. If a later step fails, exceeds budget, or is canceled, the Task and optional `RunStore` snapshot still show what already happened without exposing model-only observations or inviting an unsafe blind retry. Non-JSON or circular results receive a bounded serialization fallback in that private history so the completion observation cannot be lost.
 
@@ -1660,7 +1715,7 @@ After observing the tool result, the model completes with:
     hooks: tuple[AgentHooks, ...] = (),
     tool_prompt_builder: Callable[[dict[str, BaseTool]], None] | None = None,
 ) -> Part`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L872"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L873"
 >
 
 Run the controlled multi-step inference loop used by `Agent`. The model declares typed intent; ProtoLink validates and executes tools or agent calls, feeds observations back to the model and stops on a final action or safety limit.
@@ -1676,10 +1731,12 @@ Configure [context policy](context-management.md) and [lifecycle hooks](hooks.md
       Executable tools available during this run.
     </ApiField>
     <ApiField name="agent_callback" type="Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None" defaultValue="None">
-      Async dispatcher for delegated <code>tool_call</code> and <code>infer</code> actions. Without it, attempted delegation is returned to the model as corrective feedback.
+      Async dispatcher for delegated <code>tool_call</code> and <code>infer</code> actions. Without it, attempted delegation receives bounded correction feedback. Explicit <code>ToolRejectedError</code> reports a guaranteed no-change rejection; ordinary callback exceptions remain terminal.
     </ApiField>
     <ApiField name="agent_cards" type="list[Any] | None" defaultValue="None">
-      Discovered agents exposed to the model for delegation.
+      Advertised targets exposed to the model and checked before dispatch, including tool IDs and input schemas.
+      Accepts AgentCard objects or native serialized mappings. <code>None</code> preserves callback integrations
+      without an authoritative catalog. See <a href="#delegation-capability-checks">delegation capability checks</a>.
     </ApiField>
     <ApiField name="streaming" type="bool" defaultValue="False">
       Acquire each model action from the streaming adapter path.
@@ -1784,7 +1841,7 @@ print(result.content)
     streaming: bool = False,
     event_callback: Callable | None = None,
 ) -> Part`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2502"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2539"
 >
 
 Blocking wrapper around `LLM.infer()` for scripts and synchronous command-line programs.
@@ -1834,7 +1891,7 @@ Blocking wrapper around `LLM.infer()` for scripts and synchronous command-line p
   signature={`use_history(
     history: ConversationHistory,
 ) -> ContextManager[ConversationHistory]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L494"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L495"
 >
 
 Temporarily bind a conversation history to the current execution context. The binding uses `contextvars`, so concurrent asyncio tasks can share one LLM instance without sharing mutable messages.
@@ -1891,7 +1948,7 @@ with llm.use_history(customer_history):
     preserve_recent: int = 6,
     summary_max_tokens: int = 512,
 ) -> HistoryCompactionResult`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L679"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L680"
 >
 
 Compact the active history in place. `recent` and `tokens` are local operations; `summary` makes one isolated synchronous model call before replacing older messages.
@@ -1967,7 +2024,7 @@ print(report.to_dict())
     currency: str = "USD",
     enabled: bool = True,
 ) -> LLM`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L628"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L629"
 >
 
 Attach application-owned model limits and prices used for observational inference metrics.
@@ -2081,7 +2138,7 @@ This separation of reasoning from execution is what allows one inference loop to
     persist: bool = False,
     agent_name: str | None = None,
 ) -> str`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2332"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2369"
 >
 
 Build and store the complete runtime system prompt from base instructions, action mode, tools, discovered agents, flow context and application instructions.
@@ -2137,7 +2194,7 @@ Build and store the complete runtime system prompt from base instructions, actio
   signature={`set_system_prompt(
     system_prompt: str,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2449"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2486"
 >
 
 Assign a new value to `llm.system_prompt`.
@@ -2170,7 +2227,7 @@ Assign a new value to `llm.system_prompt`.
   kind="abstract method"
   path="protolink.llms.base.LLM.validate_connection"
   signature={`validate_connection() -> bool`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2423"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2460"
 >
 
 Check whether the provider client, server, or local model can respond.

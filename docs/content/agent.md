@@ -317,6 +317,8 @@ Create the stable Agent facade and wire its identity, execution engine, communic
     </ApiField>
     <ApiField name="llm" type="LLM | str | None" defaultValue="None">
       Optional language model used for explicit <code>infer</code> parts. Strings use <code>create_llm()</code> and accept provider aliases or <code>provider:model</code>. Pass an object for custom parameters, credentials or server URLs. Assignment calls <code>llm.validate_connection()</code> and uses its result to update <code>card.capabilities.has_llm</code>. Depending on the adapter, validation may contact a provider or local server during Agent construction.
+      The request contract is separate: <code>supports_inference</code> is derived from the configured model, so a
+      temporary connection failure does not advertise an otherwise valid inference request as unsupported.
     </ApiField>
     <ApiField name="system_prompt" type="str | None" defaultValue="None">
       Agent-specific role and behavior instructions appended to ProtoLink's runtime prompt. Tool, delegation, flow and action instructions are compiled separately. Set <code>override_system_prompt=True</code> only when the supplied text should replace that built-in blueprint.
@@ -876,6 +878,7 @@ result = await self.llm.infer(
     query=query,
     tools=self.tools,
     agent_callback=dispatch_discovered_agent,
+    agent_cards=discovered_cards,
     cancellation_token=token,
     run_context=context,
     budget_enforcer=task_budget,
@@ -884,38 +887,48 @@ result = await self.llm.infer(
 
 Registry discovery is a best-effort prompt affordance. If discovery fails, local LLM and tool work continues without delegation targets. Existing custom `LLM.infer()` overrides keep working: Agent supplies `budget_enforcer` only when the override explicitly accepts it or `**kwargs`.
 
-The **agent callback** (`_handle_agent_call`) is invoked when the LLM produces an `agent_call` action. It:
+The inference loop validates a model-produced `agent_call` against the advertised cards before invoking the
+**agent callback** (`_handle_agent_call`). The callback checks the target again at dispatch. Together they:
 
-1. **Requires a Registry-advertised name** and rejects a model-produced URL
-2. **Rejects self-delegation and ancestor-cycle targets** before dispatch
-3. **Resolves the agent name to URL** by querying the registry
-4. **Creates a child Task and RunContext** with the appropriate infer or tool-call part
-5. **Sends the task** to the target agent via `call_agent()`
-6. **Validates the remote Task state** and returns output only from a genuinely <code>completed</code> task. Item IDs
+1. **Require an advertised name** from the local roster or Registry, and reject a model-produced URL
+2. **Reject self-delegation and ancestor-cycle targets** before dispatch
+3. **Validate the request contract**: `infer` requires that the target has not declared inference unsupported;
+   `tool_call` requires an advertised tool ID and valid arguments. Registry targets are rechecked using the normal
+   discovery cache before task creation or tool-budget reservation.
+4. **Authorize the operation and enforce budgets**, then create a child Task and RunContext with the infer or tool-call part
+5. **Run the child** locally or send the task to a discovered target via `call_agent()`
+6. **Validate the returned Task state** and return output only from a genuinely <code>completed</code> task. Item IDs
    distinguish new output from the outbound request, supporting both full-task and response-only transport shapes.
-   Remote <code>failed</code>, <code>canceled</code>, non-terminal, empty-completion and <code>input-required</code>
+   A correlated single-tool rejection with an explicit no-change guarantee becomes bounded correction feedback.
+   Other remote <code>failed</code>, <code>canceled</code>, non-terminal, empty-completion and <code>input-required</code>
    responses are propagated explicitly instead of echoing the child request as a successful result.
+
+For example, a model-selected `tool_call` for `planner` is rejected if the Planner advertises no tools. Feedback tells
+the same coordinator to use `action="infer"` with a prompt, preserving completed reads and other observations.
+Conversely, a tools-only `coder` rejects `infer` before dispatch and suggests one of its advertised tools or another
+agent. ProtoLink returns guidance; the model chooses the corrected action.
+The existing `max_tool_corrections` allowance applies; no extra configuration is required. See
+[delegation capability checks](llm.md#delegation-capability-checks) for custom callbacks, schema validation and recovery limits.
 
 This enables a coordinator agent to delegate work to specialized agents without manual orchestration.
 
 :::info[Agent Delegation Flow]
 
 ```
-User Query → Coordinator Agent → LLM.infer()
-                                    ↓
-                               agent_call action
-                                    ↓
-                           _handle_agent_call()
-                                    ↓
-                           resolve agent URL
-                                    ↓
-                           call_agent(weather_agent)
-                                    ↓
-                           Weather Agent processes task
-                                    ↓
-                           Result returned to LLM
-                                    ↓
-                            LLM produces final response
+User query → Coordinator LLM proposes agent_call
+                         ↓
+              Validate target and request
+                         ↓
+           ┌─────────────┴─────────────┐
+        Rejected                     Valid
+           ↓                           ↓
+     No child starts           Policy and budgets
+           ↓                           ↓
+     Correction feedback         Child executes
+           ↓                           ↓
+        Same LLM ←──────────── Result observation
+           ↓
+    Next action or final answer
 ```
 
 :::
@@ -926,6 +939,41 @@ By default, any agent with an LLM can dynamically delegate work to other agents 
 
 * **`delegation`**: A boolean flag (defaulting to `True`) indicating whether the agent is allowed to delegate tasks to other agents.
 * **`has_llm`**: A boolean flag (defaulting to `False`) showing whether the agent has an LLM as a core component.
+* **`supports_inference`**: Whether the target accepts an `infer` request. A standard Agent derives this automatically:
+  a configured LLM means `True`, a tools-only Agent means `False`. An explicit declaration takes precedence.
+
+#### Custom prompt handlers
+
+Inference support describes the accepted request, rather than requiring a particular implementation. A deterministic
+handler can accept prompts without a model:
+
+```python
+from protolink import Agent, AgentCard, Task
+
+
+class PromptHandler(Agent):
+    async def handle_task(self, task: Task) -> Task:
+        """Answer a prompt using application logic."""
+        return task.complete("Handled by the application.")
+
+
+handler = PromptHandler(
+    card=AgentCard(
+        name="handler",
+        description="Handles prompts with application logic",
+        url="runtime://handler",
+        capabilities={"supports_inference": True},
+    ),
+)
+```
+
+This declaration does not install a model or implement the handler. `EchoAgent` already advertises support for its
+deterministic prompt echo. An undeclared custom handler, legacy card or external card keeps `None` (unknown) support;
+ProtoLink leaves such requests to that handler for compatibility. Declare `True` or `False` to make the contract
+explicit. The flag is ProtoLink-native metadata; it does not extend the standard A2A capability schema.
+
+Replacing `agent.llm` refreshes automatic support. `agent.to_dict()` preserves the original declaration (`None` for
+automatic detection), while `agent.get_agent_card()` publishes the current derived capability for discovery.
 
 #### Disabling Delegation
 
@@ -1896,6 +1944,8 @@ Return the live identity card or its serializable dictionary representation. <co
 <ApiReference kind="properties" path="protolink.agents.Agent.llm / storage" signature={`llm: LLM | None
 storage: Storage`} source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/mixins.py">
 The <code>llm</code> setter calls <code>validate_connection()</code> and updates <code>card.capabilities.has_llm</code> from that result. The <code>storage</code> setter updates the existing State object's storage reference so future persistence follows the replacement backend; the annotation expects <code>Storage</code>, but the setter performs no runtime type check.
+The setter also refreshes automatic <code>supports_inference</code> from model configuration, independently of
+connection health. Explicit inference-support declarations remain in effect when the model is replaced.
 
 <ApiCallout label="Existing data">Changing <code>storage</code> does not migrate data from the old backend. Changing <code>llm</code> does not rewrite existing conversation histories or rebuild a running server's route set.</ApiCallout>
 

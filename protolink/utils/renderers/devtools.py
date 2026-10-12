@@ -1823,6 +1823,7 @@ function boundedPreviewValue(value, state, depth) {
 }
 
 function eventSummary(event) {
+  if (event?.type === 'agent_call_rejected') return `Delegation to '${boundedDisplayText(event.payload?.agent, 'unnamed', 120)}' rejected; nothing changed in that request.`;
   if (event?.type === 'tool_rejected') return `Tool '${boundedDisplayText(event.payload?.tool, 'unnamed', 120)}' rejected the request; nothing changed.`;
   const payload = event?.payload && typeof event.payload === 'object' ? event.payload : {};
   const parts = [

@@ -41,6 +41,7 @@ _RUNTIME_LLM_EVENT_TYPE_MAP = {
     "agent_call_start": "action.started",
     "agent_call_result": "action.completed",
     "agent_call_error": "action.failed",
+    "agent_call_rejected": "action.rejected",
 }
 """Stable run-event types promoted from inference runtime activity."""
 
@@ -331,6 +332,7 @@ def _severity_for_payload(source_type: str, payload: dict[str, Any]) -> str:
         "llm_parse_error",
         "llm_retry",
         "tool_rejected",
+        "agent_call_rejected",
     }:
         return "warning"
     return "info"
@@ -398,6 +400,9 @@ def _summary_for_payload(source_type: str, payload: dict[str, Any]) -> str | Non
         if llm_type == "tool_rejected":
             target = metadata.get("tool") or "unnamed"
             return f"Tool '{target}' rejected the request; nothing changed."
+        if llm_type == "agent_call_rejected":
+            target = metadata.get("agent") or "unnamed"
+            return f"Delegation to '{target}' rejected; nothing changed in that request."
         if llm_type in {"tool_error", "agent_call_error"}:
             return _optional_str(metadata.get("message")) or "Action failed"
         content = payload.get("content")
@@ -469,7 +474,12 @@ def _relationships_from_payload(payload: dict[str, Any]) -> dict[str, str | None
     parent_action_id = first_string("parent_action_id")
     delegation_id = first_string("delegation_id")
     llm_type = payload.get("llm_event_type")
-    if delegation_id is None and llm_type in {"agent_call_start", "agent_call_result", "agent_call_error"}:
+    if delegation_id is None and llm_type in {
+        "agent_call_start",
+        "agent_call_result",
+        "agent_call_error",
+        "agent_call_rejected",
+    }:
         delegation_id = action_id
 
     span_id = first_string("span_id")

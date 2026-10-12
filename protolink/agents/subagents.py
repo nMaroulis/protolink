@@ -18,6 +18,7 @@ from protolink.core.execution import execution_scope, shared_budget_scope
 from protolink.core.policy import inherited_policy_scope
 from protolink.core.run_context import RunContext
 from protolink.core.task import Task, TaskState
+from protolink.core.tool_errors import ToolRejectedError
 from protolink.tools import Tool
 
 
@@ -219,7 +220,12 @@ class SubagentSupervisor:
         task = await handle.result()
         if task.state is TaskState.INPUT_REQUIRED and "interruption" in task.metadata:
             raise _SuspendRun(RunInterruption.from_dict(task.metadata["interruption"]))
-        result = self.agent._require_completed_delegation(task, name, request_item_ids=request_ids)
+        try:
+            result = self.agent._require_completed_delegation(task, name, request_item_ids=request_ids)
+        except ToolRejectedError as error:
+            if durable is not None:
+                durable.reject_action(error)
+            raise
         if durable is not None:
             result = durable.complete_action(result)
         return result

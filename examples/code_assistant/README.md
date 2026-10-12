@@ -298,6 +298,20 @@ The Orchestrator's LLM enters an **inference loop**:
 
 All of this happens **autonomously** - Protolink handles the routing, serialization and response parsing.
 
+The Planner has no tools, so requests to it use `action="infer"` and a top-level `prompt`:
+
+```json
+{"type":"agent_call","agent":"planner","action":"infer","prompt":"Add docstrings to this code: ..."}
+```
+
+If the model mistakenly asks the Planner to execute a tool named `tool_call`, ProtoLink checks the advertised card,
+rejects that request before sending it and provides correction guidance to the same Orchestrator. Completed reads
+remain in context. The existing `max_tool_corrections` option defaults to two corrective turns, shared with other tool
+validation mistakes. The Coder has tools but no LLM: it advertises `supports_inference=False`, so asking it to `infer`
+also returns correction guidance before dispatch. The Orchestrator can select a Coder tool or ask the Planner to
+reason. Ordinary remote execution failures still stop the run. See
+[delegation validation](https://nmaroulis.github.io/protolink/docs/llm#delegation-capability-checks).
+
 ---
 
 ## 🎯 Protolink Features Showcased

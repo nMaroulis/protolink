@@ -23,6 +23,7 @@ from protolink.core.execution import (
     ToolExecution,
     closing_stream,
     current_task,
+    emit_runtime_event,
     execute_authorized_tool,
     execution_scope,
     record_task_blocker,
@@ -38,6 +39,7 @@ from protolink.core.policy import (
 from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
 from protolink.core.tool_errors import ToolRejectedError
+from protolink.llms.delegation import validate_delegation_request
 from protolink.llms.history import EPHEMERAL_TOOL_OBSERVATION_KEY, ConversationHistory
 from protolink.models import Artifact, Message, Part, Task
 from protolink.rag import Citation, KnowledgeNotFoundError, RetrievalMode, SearchHit
@@ -534,10 +536,15 @@ class AgentExecutionMixin(_AgentMixinBase):
         Rejection artifacts are separate from completed-action artifacts and
         never count as evidence of an effect or successful execution.
         """
-        if task is None or event.get("type") not in {"tool_result", "agent_call_result", "tool_rejected"}:
+        if task is None or event.get("type") not in {
+            "tool_result",
+            "agent_call_result",
+            "tool_rejected",
+            "agent_call_rejected",
+        }:
             return
 
-        rejected = event["type"] == "tool_rejected"
+        rejected = event["type"] in {"tool_rejected", "agent_call_rejected"}
         artifact_kind = "action_rejection" if rejected else "action_result"
 
         action_id_value = event.get("action_id")
@@ -1114,11 +1121,44 @@ class AgentExecutionMixin(_AgentMixinBase):
         tool_name, args, call_id = tc.tool_name, tc.args, tc.call_id
         self._logger.debug(f"Executing tool: {tool_name}")
         tool = self.tools.get(tool_name)
+
+        async def reject_request(rejection: ToolRejectedError) -> Part:
+            """Return typed no-change feedback without entering tool execution."""
+            with execution_scope(task):
+                await emit_runtime_event(
+                    "action.rejected",
+                    context,
+                    rejection=rejection.to_dict(),
+                    tool=tool_name,
+                    severity="warning",
+                    summary=f"Tool '{tool_name}' rejected the request; nothing changed.",
+                )
+            return Part.tool_output(call_id=call_id, error=rejection.to_dict())
+
         if not tool:
-            return Part.tool_output(
-                call_id=call_id,
-                error={"message": f"Tool '{tool_name}' not found"},
+            rejection = ToolRejectedError(
+                f"Tool '{tool_name}' not found",
+                code="unknown_tool",
+                details={"available_tools": list(self.tools)},
+                suggestion="Choose a registered tool or delegate an inference request.",
             )
+            return await reject_request(rejection)
+
+        if durable is None or durable.entry is None:
+            from protolink.llms.base import LLM
+
+            try:
+                # Check before preparation/authorization so only argument
+                # validation failures are classified as no-change rejections.
+                LLM._validate_tool_arguments(tool, args)
+            except (TypeError, ValueError) as error:
+                return await reject_request(
+                    ToolRejectedError(
+                        f"Tool '{tool_name}' arguments were invalid: {error}",
+                        code="invalid_arguments",
+                        suggestion="Correct args using the tool input schema.",
+                    )
+                )
 
         if self.telemetry:
             await self._emit_telemetry("on_tool_start", tool_name, args)
@@ -1309,7 +1349,8 @@ class AgentExecutionMixin(_AgentMixinBase):
             public_event = self._sanitize_knowledge_tool_event(event)
             self._record_inference_action_result(task, public_event)
             if task is not None and (
-                is_durable_streaming() or (public_event.get("type") == "tool_rejected" and not streaming)
+                is_durable_streaming()
+                or (public_event.get("type") in {"tool_rejected", "agent_call_rejected"} and not streaming)
             ):
                 from protolink.core.events import RunEvent, TaskLLMStreamEvent
                 from protolink.core.execution import publish_runtime_event
@@ -1965,7 +2006,9 @@ class AgentExecutionMixin(_AgentMixinBase):
         Handle agent delegation from the LLM inference loop.
 
         This callback is invoked when the LLM produces an agent_call action. It translates the LLM's delegation request
-        into a Task and sends it to the target agent using the transport layer.
+        into a Task and sends it to the target agent using the transport layer. Known target cards are checked before
+        task creation and tool-budget reservation. Advertised skills are a capability catalog, not permission grants.
+        Invalid delegated tool requests return explicit no-change rejection feedback to the inference loop.
 
         Args:
             agent_name: Registry-advertised name of the agent to delegate to.
@@ -1980,6 +2023,8 @@ class AgentExecutionMixin(_AgentMixinBase):
             The result from the delegated agent (typically the last part content from the response task).
 
         Raises:
+            ToolRejectedError: A known target does not advertise the requested tool, arguments do not match its schema,
+                or a single remote tool task explicitly rejected the request without completing any operation.
             ValueError: If the target is a direct URL, would create a delegation cycle, or the action type is unknown.
             RuntimeError: If the delegation fails (propagated from call_agent).
         """
@@ -1999,6 +2044,9 @@ class AgentExecutionMixin(_AgentMixinBase):
                 )
 
         if agent_name in self.subagents:
+            durable = current_durable_run()
+            if durable is None or durable.entry is None:
+                payload = validate_delegation_request(agent_name, action, payload, [self.subagents[agent_name].card])
             supervisor = current_subagent_supervisor()
             if supervisor is None:
                 raise RuntimeError("Local subagent delegation requires run_task or start_run")
@@ -2011,8 +2059,22 @@ class AgentExecutionMixin(_AgentMixinBase):
                 "Durable delegation supports configured local subagents; remote continuation is not available"
             )
 
-        # Resolve the registry-advertised agent name to its transport URL.
-        agent_url = await self._resolve_agent_url(agent_name)
+        # Resolve and validate from one filtered lookup. A registry catalog is
+        # checked again at dispatch because it can differ from the prompt snapshot.
+        cards = await self.discover_agents(filter_by={"name": agent_name})
+        target = next((card for card in cards if card.name == agent_name), None)
+        if target is not None:
+            payload = validate_delegation_request(agent_name, action, payload, [target])
+            agent_url = target.url
+        elif self.registry_client is not None:
+            raise ToolRejectedError(
+                f"Agent '{agent_name}' is no longer advertised by the registry.",
+                code="unknown_agent",
+                suggestion="Choose an available agent or another action.",
+            )
+        else:
+            # Preserve custom URL resolvers used without an authoritative catalog.
+            agent_url = await self._resolve_agent_url(agent_name)
 
         # Guardrail Check for self-delegation
         if agent_url == self.card.url:
@@ -2082,7 +2144,13 @@ class AgentExecutionMixin(_AgentMixinBase):
         *,
         request_item_ids: frozenset[str],
     ) -> Any:
-        """Return a delegated result only when the remote task truly completed."""
+        """Return completed work or propagate an explicit single-tool rejection.
+
+        Recovery requires a correlated native tool-output error guaranteeing
+        no changes, exactly one requested tool call and no completed outcomes.
+        Failed inference, mixed tasks, partial execution, cancellation and
+        untyped legacy errors remain terminal; error text is never classified.
+        """
         state = result_task.state
         if not isinstance(state, TaskState):
             try:
@@ -2095,6 +2163,32 @@ class AgentExecutionMixin(_AgentMixinBase):
                 f"Delegated agent '{agent_name}' requires additional input before it can complete the task"
             )
         if state is TaskState.FAILED:
+            request_parts = [
+                part for message in result_task.messages if message.id in request_item_ids for part in message.parts
+            ]
+            output = result_task.get_last_item()
+            if len(request_parts) == 1 and request_parts[0].type == "tool_call" and output is not None:
+                requested = request_parts[0].as_tool_call()
+                outputs = [
+                    part
+                    for item in (*result_task.messages, *result_task.artifacts)
+                    if item.id not in request_item_ids
+                    for part in item.parts
+                    if part.type == "tool_output"
+                ]
+                completed = any(
+                    event.get("type") == "action.completed" for event in result_task.metadata.get("run_events", [])
+                ) or any(artifact.kind == "action_result" for artifact in result_task.artifacts)
+                if len(outputs) == 1 and not completed:
+                    tool_output = outputs[0].as_tool_output()
+                    error = tool_output.error
+                    if (
+                        tool_output.call_id == requested.call_id
+                        and isinstance(error, dict)
+                        and error.get("status") == "rejected"
+                        and error.get("changes_made") is False
+                    ):
+                        raise ToolRejectedError.from_dict(error)
             reason = result_task.metadata.get("error") or "remote task failed without an error message"
             raise RuntimeError(f"Delegated agent '{agent_name}' failed: {reason}")
         if state is TaskState.CANCELED:

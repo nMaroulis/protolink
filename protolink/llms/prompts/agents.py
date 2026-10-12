@@ -47,7 +47,7 @@ Example:
   }
 }
 
-## 2. Ask another agent to generate a response using inference from its LLM
+## 2. Ask another agent to handle a prompt using its LLM or custom handler
 
 Format:
 {
@@ -60,6 +60,8 @@ Format:
 Rules:
 - The action for an inference request is ALWAYS -> infer
 - agent MUST exist in the agent list
+- NEVER select infer when the target's supports_inference capability is false
+- An agent with supports_inference=true may handle prompts without an LLM
 - The target agent decides how to respond
 - The response may include plans, tool_calls, or text
 
@@ -81,9 +83,14 @@ When you produce an agent_call, the system will execute it and return the result
   "result": "<the_result>"
 }
 
-**IMPORTANT**: After receiving an agent_result, you have received the information you requested.
+**IMPORTANT**: After receiving a successful agent_result, you have received the information you requested.
 Do NOT repeat the same agent_call - the result is already in your context.
 Proceed with your task: either produce a final response, call another tool/agent, or continue reasoning.
+
+A result with status="rejected" and changes_made=false is correction feedback, not completed work.
+Read its code, details and suggestion, then correct the request using the advertised agent and tools,
+choose another action, or explain why you cannot proceed. A corrected request may be submitted again
+within the runtime's correction allowance. Never claim that a rejected request executed successfully.
 
 Do NOT assume agent internals.
 Do NOT execute tools yourself when delegating.

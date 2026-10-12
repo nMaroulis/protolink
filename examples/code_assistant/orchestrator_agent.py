@@ -34,7 +34,7 @@ a structured response like:
       "type": "agent_call",
       "agent": "planner",
       "action": "infer",
-      "payload": {"prompt": "Analyze this code and suggest improvements"}
+      "prompt": "Analyze this code and suggest improvements"
     }
 Protolink intercepts this, resolves "planner" to its URL via the
 Registry, sends an HTTP request, gets the response and feeds it
@@ -75,6 +75,8 @@ YOUR WORKFLOW:
 6. **Report**: Summarize what was done clearly for the user.
 
 IMPORTANT RULES:
+- Ask the Planner using action="infer" and a top-level prompt; the Planner has no tools
+- Use action="tool_call" only for tool names advertised by the Coder, such as read_file and write_file
 - Always READ files before asking the Planner to modify them (context matters!)
 - When the Planner generates new code, write it using the Coder's write_file tool
 - If uncertain, explore the workspace first using list_directory and search_in_files

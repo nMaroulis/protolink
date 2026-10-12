@@ -116,6 +116,11 @@ def configuration_fingerprint(agent: Any) -> str:
         "override_system_prompt": agent.override_system_prompt,
         "model_params": getattr(agent.llm, "_model_params", {}),
         "reasoning": getattr(agent.llm, "_reasoning", None),
+        **(
+            {"supports_inference": agent._inference_support_override}
+            if agent._inference_support_override is not None
+            else {}
+        ),
         **({"tool_calling": agent.llm.tool_calling} if agent.llm and agent.llm.tool_calling is not None else {}),
         **(
             {"max_tool_corrections": agent.llm.max_tool_corrections}

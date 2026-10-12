@@ -284,6 +284,7 @@ async def test_code_edits_require_approval_and_recovery_survives_reconstruction(
 async def test_echo_invoke_and_stream_return_exact_input(text):
     agent = EchoAgent(verbosity=0)
     assert agent.llm is None
+    assert agent.card.capabilities.supports_inference is True
     assert await agent.invoke(text) == text
     task = Task.create(text)
     events = [event async for event in agent.run_task_streaming(task)]

@@ -679,6 +679,16 @@ class LocalTraceTelemetry(Telemetry):
                 metadata={"agent": event.get("agent"), "action": event.get("action"), "step": event.get("step")},
             )
             return
+        elif event_type == "agent_call_rejected":
+            self._record_event(event_type, payload)
+            if event.get("phase") != "validation":
+                self._end_span(
+                    kind="agent_call",
+                    status="rejected",
+                    output={"rejection": event.get("rejection")},
+                    metadata={"agent": event.get("agent"), "action": event.get("action"), "changes_made": False},
+                )
+            return
         elif event_type == "llm_parse_error":
             trace = self._trace()
             if trace:

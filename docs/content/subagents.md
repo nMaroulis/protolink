@@ -48,6 +48,15 @@ Delegating a known specialist tool also works:
 
 The model still chooses one of `final`, `tool_call` or `agent_call`. ProtoLink advertises the configured specialist cards through the same prompt and provider-native delegation mechanisms. A blocking child call supplies an ordinary agent-result observation before the parent's next model call. There is no additional mandatory planning prompt or different action format.
 
+Before creating a child task, ProtoLink checks inference support, delegated tool names and advertised argument schemas. A reasoning
+specialist with no tools receives `infer`; an invented tool request returns correction guidance to the same parent.
+An ordinary tools-only child advertises `supports_inference=False`, so an `infer` request also returns guidance
+before the child starts. Custom prompt handlers can explicitly advertise support without an LLM. See the
+[Agent delegation pipeline](agent.md#controlling-agent-delegation) and its declaration example.
+Local and delegated validation share `max_tool_corrections`. Explicit single-tool no-change rejections also retain
+durable receipts; failed child inference or partial execution remains terminal. See
+[delegation capability checks](llm.md#delegation-capability-checks).
+
 Local names take precedence over registry peers with the same name. Local names must be unique, ignoring case and different from the parent's name. Calls that create an ancestor cycle are rejected. Your local roster defines which specialists can be selected; existing discovery continues to expose remote peers when configured. Remote calls retain their existing transport lifecycle.
 
 ## More control

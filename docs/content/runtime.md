@@ -1839,7 +1839,7 @@ events = sink.to_list()
     version: str = "1.0",
     timestamp: str = <UTC timestamp>,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L49"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L50"
 >
 
 Mutable versioned application-facing envelope for task and inference runtime activity.
@@ -1934,7 +1934,7 @@ Action lifecycle activity is also promoted into stable event types:
 
 The promoted `manifest`, `action`, `request`, `decision`, `rejection`, `action_id`, `parent_action_id`, `span_id`, `parent_span_id` and `delegation_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
 
-Model-loop `tool_rejected` events normalize to `action.rejected` with warning severity and a “nothing changed” summary.
+Model-loop `tool_rejected` and `agent_call_rejected` events normalize to `action.rejected` with warning severity and a “nothing changed” summary.
 The payload retains the code, message, JSON details, optional suggestion and correction counters. Rejection feedback
 is meant for the model and observers; keep sensitive data out of it. Completed-action evidence excludes rejected
 requests. See [recoverable tool validation](tool.md#reject-a-request-the-model-can-correct).
@@ -1964,7 +1964,7 @@ An event sink observes execution; it does not authorize it. Approval decisions s
   signature={`await sink.emit(
     event: RunEvent,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L206"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L207"
 >
 
 Structural async consumer contract. Implementations decide storage, fanout, rendering, or observability behavior; emitting has no authorization meaning.
@@ -1985,7 +1985,7 @@ Structural async consumer contract. Implementations decide storage, fanout, rend
   kind="class"
   path="protolink.InMemoryEventSink"
   signature={`InMemoryEventSink()`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L214"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L215"
 >
 
 Dependency-free process-local event buffer for tests, local interfaces and recorder tooling.

@@ -54,10 +54,19 @@ Bounded correction stays with the same model and run, while distinct rejection e
 what happened without presenting a rejected request as successful execution. Ordinary tool exceptions retain their
 failure behavior.
 
+Delegated tool requests now receive the same capability-aware validation before dispatch. A coordinator asking a
+reasoning-only Planner to execute an invented tool receives bounded correction guidance instead of sending the
+invalid task and aborting on its remote failure. Completed observations stay available to the same coordinator.
+The inverse mistake is checked too: an ordinary tools-only agent rejects an `infer` request before any child task
+starts. Explicit inference-support metadata lets custom prompt handlers participate without requiring an LLM.
+
 :::
 
 ### Added
 
+- `AgentCapabilities.supports_inference`, automatically derived for standard Agents and explicitly declarable for
+  custom handlers. Inference support stays separate from connection-health metadata, follows model replacement and
+  retains automatic detection through configuration round trips. `EchoAgent` advertises its deterministic handler.
 - `tool_calling="auto" | "native" | "json"` on the LLM factory and concrete adapters, with a mutable runtime policy
   and `resolve_tool_calling()` for inspection. Omission preserves adapter defaults and legacy capability flags.
 - Cached Ollama model capability discovery through authenticated `POST /api/show`, using the exact model tag and
@@ -82,6 +91,21 @@ failure behavior.
 
 ### Fixed
 
+- Validate model-selected delegation targets, advertised tool names and argument schemas before dispatch, with
+  a second registry-card check at the normal discovery-cache boundary. A Planner with no tools receives guidance
+  to use `infer` and a top-level prompt. Custom task handlers without an LLM remain compatible; no new API is required.
+- Reject `infer` requests to targets declaring `supports_inference=False` before dispatch, with structured
+  `unsupported_inference` guidance in the same bounded correction loop. Unknown legacy/external support stays
+  compatible. Update the Agent guide with the validation, authorization, execution and correction pipeline.
+- Delegation capability mistakes and explicit no-change rejections share `max_tool_corrections`, emit
+  `agent_call_rejected` / `action.rejected`, retain distinct rejection artifacts and preserve completed observations.
+- Native tool-task receivers report unknown tools and invalid arguments as structured no-change rejections.
+  The parent recovers only correlated single-tool rejection responses without completed execution evidence;
+  untyped failures, failed inference, mixed requests, partial effects and disconnections remain terminal.
+  Ordinary callback `ValueError` is no longer treated as proof that retrying delegation is safe.
+- Durable local-child rejection receipts prevent known no-change outcomes from remaining unresolved, retaining
+  the parent correction counter and existing shared budgets.
+- Clarify delegation examples and prompts, and add an offline delegation-correction example.
 - Unknown-tool and argument-schema correction events now report request rejection separately from execution failure.
   The inference benchmark counts these as invalid proposals alongside legacy validation events.
 - Outer `tool_call`, `tool_calls`, `function_call`, `function_calls` and `agent_call` wrappers no longer become bare
@@ -101,6 +125,11 @@ normalization, legitimate JSON answers, code examples, correction exhaustion, sh
 tool preservation, capability caching and configuration round trips. Tool-validation coverage includes correction
 limits, schema and application feedback, JSON/native streaming, shared budgets, ordinary exception propagation,
 distinct reporting, approval resumption and a process crash after the rejection receipt is committed.
+Delegation regressions cover the reported code-assistant sequence in JSON/native and unary/streaming modes,
+completed-read deduplication, advertised schema coercion, catalog changes, bounded feedback, ordinary callback
+failures, correlation/partial-effect safeguards and durable local-child rejection. Inference-support regressions cover
+tools-only targets across local/registry delegation, JSON/native and unary/streaming paths, changed registry cards,
+custom non-LLM handlers, transient model-health failures and automatic/explicit configuration round trips.
 
 ## [0.8.0] - 2026-10-07
 

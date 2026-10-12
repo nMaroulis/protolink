@@ -184,7 +184,9 @@ def _trace_metrics(trace: TraceRecord | None) -> tuple[dict[str, Any], list[LLMC
                 metrics["duplicate_retries"] += 1
         elif event.type in {"tool_error", "tool_rejected"} and payload.get("phase") == "validation":
             metrics["invalid_tool_attempts"] += 1
-        elif event.type == "agent_call_error" and payload.get("recoverable", False):
+        elif event.type == "agent_call_rejected" or (
+            event.type == "agent_call_error" and payload.get("recoverable", False)
+        ):
             metrics["invalid_agent_attempts"] += 1
 
     calls = [_llm_call_result(payload, index) for index, payload in enumerate(completed_calls, start=1)]

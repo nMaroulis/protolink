@@ -28,6 +28,7 @@ def test_local_defaults_need_no_transport_or_registry():
     assert agent.card.url == "runtime://Research%20%2F%20Z%C3%BCrich"
     assert agent.card.transport == "runtime"
     assert agent.transport is agent.llm is agent.client is agent.server is None
+    assert agent.card.capabilities.supports_inference is False
     logger.warning.assert_not_called()
 
 
@@ -57,6 +58,7 @@ def test_model_strings_and_objects_share_existing_execution():
     agent = Agent(name="helper", llm="mock:TestModel", tools=[add], verbosity=0)
     assert agent.llm.model == "TestModel"
     assert agent.card.capabilities.has_llm
+    assert agent.card.capabilities.supports_inference is True
     assert agent.sync.invoke("hello") == "Unprocessed generic mock response"
     assert agent.sync.call_tool("add", a=1, b=2) == 3
     llm = MockLLM(default_response="configured")
@@ -70,6 +72,46 @@ def test_model_strings_and_objects_share_existing_execution():
     assert isinstance(agent.llm, MockLLM)
     agent.llm = None
     assert not agent.card.capabilities.has_llm
+    assert agent.card.capabilities.supports_inference is False
+
+
+def test_inference_support_does_not_depend_on_provider_health():
+    llm = MockLLM(default_response="available")
+    llm.validate_connection = Mock(return_value=False)
+    agent = Agent(name="helper", llm=llm, verbosity=0)
+    assert agent.card.capabilities.has_llm is False
+    assert agent.card.capabilities.supports_inference is True
+    assert agent.sync.invoke("hello") == "available"
+
+
+def test_undeclared_custom_handler_support_stays_unknown_for_compatibility():
+    class CustomHandler(Agent):
+        async def handle_task(self, task):
+            return task.complete("custom answer")
+
+    handler = CustomHandler(name="handler", verbosity=0)
+    assert handler.card.capabilities.supports_inference is None
+    assert handler.sync.invoke("hello") == "custom answer"
+    handler.llm = "mock"
+    assert handler.card.capabilities.supports_inference is True
+    handler.llm = None
+    assert handler.card.capabilities.supports_inference is None
+
+
+@pytest.mark.parametrize("support", [None, False, True])
+def test_inference_support_configuration_preserves_automatic_and_explicit_modes(support):
+    card = AgentCard(
+        name="helper", description="Helper", url="runtime://helper", capabilities={"supports_inference": support}
+    )
+    agent = Agent(card=card, llm="mock", verbosity=0)
+    assert agent.card.capabilities.supports_inference is (True if support is None else support)
+    config = agent.to_dict()
+    assert config["card"]["capabilities"]["supports_inference"] is support
+    restored = Agent.from_dict(config)
+    restored.llm = None
+    assert restored.card.capabilities.supports_inference is (False if support is None else support)
+    restored.llm = "mock"
+    assert restored.card.capabilities.supports_inference is (True if support is None else support)
 
 
 @pytest.mark.parametrize(

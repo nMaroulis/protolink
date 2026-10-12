@@ -51,6 +51,7 @@ class _AgentMixinBase(Protocol):
     _client: AgentClient | None
     _server: AgentServer | None
     _llm: LLM | None
+    _inference_support_override: bool | None
     _automatic_identity_url: str | None
     _storage: Storage
     _state: State

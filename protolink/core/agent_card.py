@@ -29,6 +29,9 @@ class AgentCapabilities:
         timeout_support: Whether the agent respects timeouts for operations
         rag: Whether the agent supports Retrieval-Augmented Generation
         code_execution: Whether the agent has access to a safe execution sandbox
+        supports_inference: Whether the agent accepts ``infer`` requests, including
+            custom handlers without an LLM. ``None`` means undeclared on standalone
+            or legacy cards; ordinary Agents derive support from their configured LLM.
     """
 
     streaming: bool = False
@@ -44,6 +47,12 @@ class AgentCapabilities:
     timeout_support: bool = False
     rag: bool = False
     code_execution: bool = False
+    supports_inference: bool | None = None
+
+    def __post_init__(self) -> None:
+        """Keep inference support explicit; unknown is distinct from unsupported."""
+        if self.supports_inference is not None and not isinstance(self.supports_inference, bool):
+            raise TypeError("supports_inference must be a boolean or None")
 
     def as_dict(self) -> dict[str, Any]:
         """Return all capabilities as a dict."""

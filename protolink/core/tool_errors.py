@@ -75,6 +75,9 @@ class ToolCorrectionLimitError(RuntimeError):
     rejection stops inference. Successful actions do not replenish the limit.
     The last rejected request made no changes; earlier successful actions may
     already have committed effects and retain their normal receipts.
+    Local tool and delegated-request validation share this allowance. For a
+    delegated request, ``tool_name`` identifies the target as ``agent.tool``
+    or ``agent.infer``; the public configuration remains ``max_tool_corrections``.
     """
 
     def __init__(self, *, tool_name: str, attempts: int, limit: int, last_error: ToolRejectedError) -> None:

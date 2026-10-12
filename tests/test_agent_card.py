@@ -2,7 +2,24 @@
 
 import json
 
+import pytest
+
 from protolink.core.agent_card import AgentCapabilities, AgentCard, AgentSkill
+
+
+@pytest.mark.parametrize("support", [None, False, True])
+def test_inference_support_round_trips_without_conflating_unknown_and_false(support):
+    card = AgentCard(name="handler", description="Handle requests", url="runtime://handler")
+    card.capabilities.supports_inference = support
+    restored = AgentCard.from_dict(card.to_dict())
+    assert restored.capabilities.supports_inference is support
+    assert json.loads(restored.get_prompt_format())["capabilities"]["supports_inference"] is support
+
+
+@pytest.mark.parametrize("support", [0, 1, "false", [], {}])
+def test_inference_support_requires_an_explicit_boolean_or_none(support):
+    with pytest.raises(TypeError, match="supports_inference"):
+        AgentCapabilities(supports_inference=support)
 
 
 def test_agent_card_initialization():

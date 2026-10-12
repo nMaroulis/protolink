@@ -83,6 +83,7 @@ _AGENT_CAPABILITY_FIELDS = frozenset(
         "state_transition_history",
         "delegation",
         "has_llm",
+        "supports_inference",
         "max_concurrency",
         "message_batching",
         "tool_calling",
@@ -1059,6 +1060,8 @@ def _validate_node_config(kind: str, config: dict[str, Any], path: str, issues: 
             if unsupported:
                 issues.append(f"{path}.config.capabilities contains unsupported fields: {', '.join(unsupported)}")
             for name, value in capabilities.items():
+                if name == "supports_inference" and value is None:
+                    continue
                 if name == "max_concurrency":
                     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
                         issues.append(f"{path}.config.capabilities.max_concurrency must be an integer of at least 1")
