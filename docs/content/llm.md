@@ -1150,6 +1150,52 @@ In normal applications, `Agent` prepares the prompt and calls `infer()` automati
 4. **Self-correct** - revise malformed actions, wrong arguments, or unavailable targets.
 5. **Generate a final response** - return user-facing content only after the required work is complete.
 
+### The complete inference cycle
+
+An inference run can contain several model turns. With the ordinary `Agent` API, the application supplies the model,
+tools and optional specialists; the Agent wires them into this cycle:
+
+1. **Prepare the model input.** Combine the task, instructions, conversation history, available tools and agent cards.
+   Configured context policies and hooks prepare each turn. JSON or native tool calling is selected for the run.
+2. **Ask for one decision.** The model proposes `final`, `tool_call` or `agent_call`. Both provider modes normalize
+   into the same typed actions; streamed fragments are collected before validation or dispatch.
+3. **Validate the proposal.** Check action shape, target identity, inference support, tool name and argument schema.
+   A correctable mistake becomes feedback in the current conversation. No tool or child task executes for a rejected
+   pre-dispatch proposal. The same model chooses its next action; ProtoLink does not guess a replacement request.
+4. **Authorize and execute.** A valid executable request passes cancellation, policy, approval and budget checks.
+   ProtoLink then invokes the local tool or delegates the child task. Duplicate completed requests receive guidance
+   to use their existing observations instead of executing again.
+5. **Return an observation.** Feed the result back to the calling model, then repeat from the updated history.
+   An explicit `ToolRejectedError` also becomes feedback when the tool guarantees that its rejection made no changes.
+   Ordinary execution exceptions remain failures.
+6. **Finish, pause or stop.** A `final` action returns the answer. Exhausted limits, cancellation, permission denial
+   or execution failure stop the run. With [durable execution](execution-tools.md#durable-execution), approval or input
+   checkpoints can pause it and later resume with saved history and committed results.
+
+The model decides what to request; the runtime decides whether and how that request can execute. Correcting a
+proposal does not restart the task, clear completed observations or replay earlier actions. Delegated `infer` work
+may use the specialist's own model, but correction feedback returns to the model that made the rejected request.
+
+#### A run with two corrected requests
+
+Suppose `coder` owns `read_file` and `write_file` but has no LLM, while `planner` has an LLM and no tools. One possible
+run to add docstrings looks like this; the actions shown are equivalent in JSON and native modes:
+
+| Model decision | Runtime handling | What the next model turn receives |
+|----------------|------------------|-----------------------------------|
+| `coder.read_file("utils.py")` through `agent_call` / `tool_call` | Validate, authorize and read the file once. | The code as a completed observation. |
+| Ask `planner` to execute a tool named `tool_call` | Reject the unadvertised tool before dispatch. | Available tools and guidance to use `infer` with a prompt. |
+| Ask `coder` to `infer` a docstring plan | Reject unsupported inference before dispatch. | Coder's advertised tools and guidance to choose another action or inference-capable agent. |
+| Ask `planner` to `infer` a plan using the code already read | Validate, authorize and delegate the prompt. | The Planner's response. |
+| `coder.write_file(...)` through `agent_call` / `tool_call` | Validate, authorize and execute the write. | The write result. |
+| `final` with a summary | End the inference loop. | The application receives the final answer. |
+
+The read observation stays available throughout both corrections. Rejected requests are recorded separately from
+completed execution. `max_parse_failures` bounds consecutive malformed action proposals; `max_tool_corrections`
+bounds tool and delegation request rejections across the run. Physical provider retries are a separate mechanism
+for transient request failures. Every path still consumes the applicable shared budgets and inference-step limit.
+See [safety guardrails](#inference-loop-safety-guardrails) for the exact limits and failure contracts.
+
 ### How action acquisition works
 
 Every provider ultimately returns the same `LLMActionResult`, but it can acquire that action in one of two ways:
@@ -1485,8 +1531,11 @@ Many model mistakes are observations, not immediate application failures:
 | Agent not found | Rejects a target absent from the current advertised catalog and lists available agents. |
 | Unknown delegated tool | Lists the target's advertised tools; a reasoning agent receives guidance to use `infer` with a prompt. |
 | Wrong delegated tool arguments | Validates the advertised input schema before contacting the target. |
+| Unsupported delegated inference | Rejects a target declaring `supports_inference=False` and suggests its tools or another agent. |
+| Direct URL or delegation cycle | Rejects the unsafe target and asks for another advertised agent or action. |
 | Agent delegation unavailable | States that no delegation route exists and suggests only dispatchable alternatives. |
 | Invalid action type | Reports the detected type and lists only action kinds available in the current inference. |
+| Explicit `ToolRejectedError` | Returns structured feedback when the rejection guarantees no changes. |
 
 Tool arguments are validated and conservatively coerced before authorization, dispatch or tool-budget consumption. These model mistakes normally remain inside `infer()` so the model can correct them. An ordinary exception raised by the tool body, including `TypeError`, remains an execution failure and is not relabeled as an argument mismatch.
 

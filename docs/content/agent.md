@@ -862,6 +862,12 @@ Execute one deterministic step from the most recently appended message or artifa
 
 ### The Inference Loop Integration
 
+The Agent owns the runtime around each model decision. A turn proposes `final`, `tool_call` or `agent_call`; ProtoLink
+validates the request, authorizes executable work and returns its result to the model. Correctable requests return
+feedback to the same conversation, preserving completed work. The loop continues until a final answer, an explicit
+pause or a stopping condition. See the [complete inference cycle](llm.md#the-complete-inference-cycle) for a worked
+example covering tool-name mistakes, delegation modes and correction limits.
+
 When `execute_task()` encounters an `infer` part, it delegates to `LLM.infer()` with:
 
 1. **The query**: Extracted from the task's message content
