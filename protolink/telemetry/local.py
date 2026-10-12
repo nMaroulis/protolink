@@ -469,6 +469,7 @@ class LocalTraceTelemetry(Telemetry):
         output: Any | None = None,
         error: str | None = None,
         metadata: dict[str, Any] | None = None,
+        status: str | None = None,
     ) -> None:
         """Close the nearest active span matching ``kind``.
 
@@ -494,6 +495,8 @@ class LocalTraceTelemetry(Telemetry):
 
         target_span.ended_at = _utc_now()
         target_span.output = self._redact(output) if self.capture_payloads else None
+        if status is not None:
+            target_span.status = status
         if error:
             target_span.status = "error"
             target_span.error = error
@@ -649,6 +652,16 @@ class LocalTraceTelemetry(Telemetry):
                 error=event.get("message") if event_type == "tool_error" else None,
                 metadata={"tool_name": event.get("tool"), "step": event.get("step")},
             )
+            return
+        elif event_type == "tool_rejected":
+            self._record_event(event_type, payload)
+            if event.get("phase") == "execution":
+                self._end_span(
+                    kind="tool",
+                    status="rejected",
+                    output={"rejection": event.get("rejection")},
+                    metadata={"tool_name": event.get("tool"), "step": event.get("step"), "changes_made": False},
+                )
             return
         elif event_type == "agent_call_start":
             self._start_span(

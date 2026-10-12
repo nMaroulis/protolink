@@ -68,6 +68,8 @@ class RoutedLLM(LLM):
                 "parameters": model.model_params,
                 "reasoning": model._reasoning,
                 "base_url": getattr(model, "base_url", None),
+                **({"tool_calling": model.tool_calling} if model.tool_calling is not None else {}),
+                **({"max_tool_corrections": model.max_tool_corrections} if model.max_tool_corrections != 2 else {}),
             }
             return {
                 "provider": model.provider,

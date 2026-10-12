@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
-from protolink.llms.actions import LLMAction, validate_action_payload
+from protolink.llms.actions import FinalAction, LLMAction, LLMActionResult, validate_action_payload
 
 if TYPE_CHECKING:
     from protolink.tools import BaseTool
@@ -47,19 +47,25 @@ _FULL_JSON_FENCE = re.compile(
     r"^\s*```(?:json)?[ \t]*\r?\n?(?P<body>.*?)\r?\n?```\s*$",
     flags=re.DOTALL | re.IGNORECASE,
 )
-_ACTION_ENVELOPE_FIELDS = frozenset(
-    {
-        "type",
-        "content",
-        "tool",
-        "args",
-        "agent",
-        "action",
-        "prompt",
-        "payload",
-        "thought",
-    }
+_ACTION_WRAPPER_FIELDS = frozenset({"tool_call", "tool_calls", "function_call", "function_calls", "agent_call"})
+_ACTION_ENVELOPE_FIELDS = (
+    frozenset(
+        {
+            "type",
+            "content",
+            "tool",
+            "args",
+            "agent",
+            "action",
+            "prompt",
+            "payload",
+            "thought",
+        }
+    )
+    | _ACTION_WRAPPER_FIELDS
 )
+
+_ACTION_OBJECT_START = re.compile(r'^\s*\{\s*"(?:' + "|".join(sorted(_ACTION_ENVELOPE_FIELDS)) + r')"\s*:')
 
 
 class ActionParseError(ValueError):
@@ -99,6 +105,7 @@ class ActionParseError(ValueError):
         self.feedback = feedback
         self.parsed_data = parsed_data
         self.raw_response = raw_response
+        self.metadata: dict[str, Any] = {}
 
     @property
     def action_type(self) -> str | None:
@@ -182,6 +189,96 @@ def parse_infer_response(
             parsed_data=data,
             raw_response=response,
         ) from exc
+
+
+def normalize_native_text(
+    response: str,
+    *,
+    metadata: dict[str, Any] | None = None,
+) -> LLMActionResult:
+    """Normalize text accompanying a native response without hiding bad actions.
+
+    Native APIs may return ordinary answer text instead of a function call.
+    Standalone action objects, optionally enclosed in one JSON fence or preceded
+    by a complete reasoning block, use the same strict action parser as JSON
+    mode. Recognizable malformed action objects propagate ``ActionParseError``
+    to the existing inference correction loop. Prose and code examples embedded
+    in an explanation remain answer text; their contents are never searched for
+    executable actions. Explicit ``final.content`` is application data.
+
+    Args:
+        response: Complete provider text after native tool events were handled.
+        metadata: Provider usage and transport metadata kept outside the action.
+
+    Returns:
+        One validated action result. Plain answers retain the native channel;
+        JSON action text is marked as the prompt-compatible fallback.
+
+    Raises:
+        ActionParseError: A standalone object requests an invalid action.
+        ValueError: The response is empty.
+    """
+    text = response.strip()
+    if not text:
+        raise ValueError("Native response did not contain answer text")
+    candidate = text
+    reasoning = _LEADING_REASONING_BLOCK.match(candidate)
+    if reasoning is not None:
+        candidate = candidate[reasoning.end() :].strip()
+    fence = _FULL_JSON_FENCE.fullmatch(candidate)
+    if fence is not None:
+        candidate = fence.group("body").strip()
+
+    if candidate.startswith("{"):
+        try:
+            data = json.loads(_remove_trailing_json_commas(candidate), strict=False)
+        except json.JSONDecodeError as exc:
+            if _ACTION_OBJECT_START.match(candidate):
+                feedback = "Invalid JSON action response: expected one complete standalone action object."
+                error = ActionParseError(
+                    f"{feedback}\n{_format_raw_response_diagnostic(response)}",
+                    feedback=feedback,
+                    raw_response=response,
+                )
+                error.metadata = dict(metadata or {})
+                raise error from exc
+        else:
+            if isinstance(data, dict) and _has_action_intent(data):
+                return _native_json_result(response, metadata)
+
+    return LLMActionResult(
+        action=FinalAction(content=text), raw_response=response, native=True, metadata=dict(metadata or {})
+    )
+
+
+def _has_action_intent(data: dict[str, Any]) -> bool:
+    """Recognize outer action structure without inspecting application values.
+
+    A domain object may legitimately have ``type`` or ``content`` fields. Only
+    known runtime discriminators, explicit tool/agent targets and action wrapper
+    fields identify a request. Nested examples remain application data.
+    """
+    return (
+        data.get("type") in ("final", "tool_call", "agent_call")
+        or not _ACTION_WRAPPER_FIELDS.isdisjoint(data)
+        or "tool" in data
+        or "agent" in data
+    )
+
+
+def _native_json_result(response: str, metadata: dict[str, Any] | None) -> LLMActionResult:
+    """Keep strict JSON normalization and its provider metadata together."""
+    try:
+        action = parse_infer_response(response)
+    except ActionParseError as exc:
+        exc.metadata = dict(metadata or {})
+        raise
+    return LLMActionResult(
+        action=action,
+        raw_response=response,
+        native=False,
+        metadata=dict(metadata or {}),
+    )
 
 
 def repair_fallback_action_payload(

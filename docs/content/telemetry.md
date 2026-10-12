@@ -69,7 +69,7 @@ on_task_start
 └── on_llm_start
     ├── on_llm_event: context_prepared
     ├── on_llm_event: llm_call_metrics
-    ├── on_llm_event: tool_start → tool_result | tool_error
+    ├── on_llm_event: tool_start → tool_result | tool_rejected | tool_error
     ├── on_llm_event: agent_call_start → agent_call_result | agent_call_error
     └── on_llm_end
 on_task_end
@@ -437,7 +437,7 @@ The local backend is dependency-free. One `LocalTraceTelemetry` instance manages
   signature={`default_redactor(
     value: Any,
 ) -> Any`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L94"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L88"
 >
 
 Best-effort normalize common runtime values and recursively mask fields recognized by the shared `DEFAULT_REDACTION_POLICY`.
@@ -489,7 +489,7 @@ Best-effort normalize common runtime values and recursively mask fields recogniz
     capture_payloads: bool = True,
     max_traces: int = 1000,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L266"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L268"
 >
 
 Record one replayable local trace per completed Agent task. Task, LLM, explicit tool and inference-selected child operations are connected through IDs stored in `contextvars`, so concurrent async task contexts do not need trace objects passed through every runtime call.
@@ -634,6 +634,11 @@ Implement the complete telemetry contract and translate it into a local trace hi
     </ApiField>
     <ApiField name="tool_result | tool_error">
       Append the event once, close the nearest tool span, attach result/name/step and mark an error from <code>message</code> for <code>tool_error</code>.
+    </ApiField>
+    <ApiField name="tool_rejected">
+      Record structured no-change rejection feedback. Execution-phase rejection closes the tool span with status
+      <code>rejected</code>, independently of successful execution or an execution error. Pre-execution validation
+      has no tool span to close. Direct task tools also emit this event for explicit rejection.
     </ApiField>
     <ApiField name="agent_call_start">
       Open a nested <code>kind="agent_call"</code> span containing agent, action, step and payload.
@@ -994,7 +999,7 @@ Receive a provider-neutral event emitted while `LLM.infer()` is running. This op
     *,
     max_traces: int = 1000,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L193"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L195"
 >
 
 Retain completed `TraceRecord` objects in process and optionally append one serialized record per line to a JSONL file.
@@ -1038,7 +1043,7 @@ Retain completed `TraceRecord` objects in process and optionally append one seri
   signature={`record(
     trace: TraceRecord,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L214"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L216"
 >
 
 Append a completed trace to memory, enforce the positive retention limit and then append its dictionary representation to the configured JSONL destination.
@@ -1087,7 +1092,7 @@ Append a completed trace to memory, enforce the positive retention limit and the
   signature={`replay(
     trace_id: str | None = None,
 ) -> list[dict[str, Any]]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L235"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L237"
 >
 
 Serialize retained in-memory traces for inspection, tests, or a replay UI. This method does not read the JSONL file.
@@ -1124,7 +1129,7 @@ Serialize retained in-memory traces for inspection, tests, or a replay UI. This 
   kind="method"
   path="protolink.telemetry.LocalTraceRecorder.clear"
   signature={`clear() -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L231"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L233"
 >
 
 Remove every in-memory `TraceRecord` from the recorder.
@@ -1151,7 +1156,7 @@ Remove every in-memory `TraceRecord` from the recorder.
   signature={`load_jsonl(
     path: str | Path,
 ) -> list[dict[str, Any]]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L247"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L250"
 >
 
 Read an existing JSONL trace file without constructing a recorder or mutating in-memory state.
@@ -1213,7 +1218,7 @@ failed = [record for record in records if record.get("status") == "error"]
     span_id: str | None = None,
     payload: dict[str, Any] = field(default_factory=dict),
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L104"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L99"
 >
 
 Represent one point-in-time inference event. Events live in the trace-wide chronological list and, when a span is active, in that span's event list as well.
@@ -1247,7 +1252,7 @@ Represent one point-in-time inference event. Events live in the trace-wide chron
   kind="method"
   path="protolink.telemetry.TraceEvent.to_dict"
   signature={`to_dict() -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L118"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L112"
 >
 
 Convert the event with `dataclasses.asdict()`.
@@ -1286,7 +1291,7 @@ Convert the event with `dataclasses.asdict()`.
     metadata: dict[str, Any] = field(default_factory=dict),
     events: list[TraceEvent] = field(default_factory=list),
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L123"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L118"
 >
 
 Represent one timed operation inside a local trace. The built-in tracer uses `kind` values `task`, `llm`, `tool` and `agent_call`; parent IDs encode hierarchy while the record stores spans in a flat list.
@@ -1403,7 +1408,7 @@ Inspect elapsed time and serialize the complete span.
     spans: list[TraceSpan] = field(default_factory=list),
     events: list[TraceEvent] = field(default_factory=list),
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L159"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/local.py#L154"
 >
 
 Represent the top-level replay artifact for one task. The local backend retains a flat span list with parent IDs and a trace-wide chronological event list.

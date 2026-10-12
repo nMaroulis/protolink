@@ -8,9 +8,11 @@ from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 from protolink.llms._streaming import _HTTPResponseError, http_stream
-from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
+from protolink.llms.actions import AgentCallAction, LLMActionResult, ToolCallAction, action_to_json
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import ActionParseError, normalize_native_text
 from protolink.llms.server.base import ServerLLM
 from protolink.llms.tool_calling import (
     chat_completion_tools,
@@ -35,6 +37,8 @@ class OllamaLLM(ServerLLM):
     forwarded as request fields rather than generation options.
     """
 
+    _native_tool_calling_available: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "ollama"
     DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"  # lightweight model
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
@@ -53,7 +57,16 @@ class OllamaLLM(ServerLLM):
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
         supports_tool_calling: bool = False,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Configure Ollama generation and runtime action acquisition.
+
+        ``tool_calling="auto"`` reads cached model capabilities from
+        ``/api/show``. ``native`` and ``json`` explicitly select the protocol.
+        Omit the option to retain the default JSON protocol or the existing
+        ``supports_tool_calling`` flag. The new option takes precedence over
+        that flag and is never sent as a model generation parameter.
+        """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
 
@@ -69,6 +82,7 @@ class OllamaLLM(ServerLLM):
             model_params=merged_params,
             base_url=resolved_base_url,
             supports_tool_calling=supports_tool_calling,
+            tool_calling=tool_calling,
         )
 
         self.base_url = resolved_base_url
@@ -253,15 +267,15 @@ class OllamaLLM(ServerLLM):
         tools, Protolink sends native ``tools`` declarations and normalizes
         returned tool calls into the same action protocol.
         """
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             _ = agent_callback_available
             result = self._call_response(history)
             raw_response = str(result["message"]["content"])
-            action = self._parse_infer_response(
-                raw_response,
-                tools=tools,
-                agent_cards=agent_cards,
-            )
+            try:
+                action = self._parse_infer_response(raw_response, tools=tools, agent_cards=agent_cards)
+            except ActionParseError as exc:
+                exc.metadata = usage_metadata({"provider": "ollama"}, result)
+                raise
             return LLMActionResult(
                 action=action,
                 raw_response=raw_response,
@@ -301,7 +315,7 @@ class OllamaLLM(ServerLLM):
         once the response has been drained. Both modes use async HTTP reads;
         callback failures and cancellation close the response immediately.
         """
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return await super().call_action_stream(
                 history,
                 tools=tools,
@@ -351,17 +365,7 @@ class OllamaLLM(ServerLLM):
         content = "".join(output_text).strip()
         if not content:
             raise ValueError("Ollama stream did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(action=action, raw_response=content, native=False, metadata={"provider": "ollama"})
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata={"provider": "ollama", "streaming": True},
-            )
+        return normalize_native_text(content, metadata={"provider": "ollama", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
@@ -416,22 +420,7 @@ class OllamaLLM(ServerLLM):
         content = str(message.get("content") or "").strip()
         if not content:
             raise ValueError("Ollama response did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata=usage_metadata({"provider": "ollama"}, payload),
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata=usage_metadata({"provider": "ollama"}, payload),
-            )
+        return normalize_native_text(content, metadata=usage_metadata({"provider": "ollama"}, payload))
 
     @staticmethod
     def _action_from_tool_call(call: Any) -> ToolCallAction | AgentCallAction:
@@ -440,3 +429,34 @@ class OllamaLLM(ServerLLM):
         name = function.get("name") if isinstance(function, dict) else getattr(function, "name", None)
         raw_args = function.get("arguments") if isinstance(function, dict) else getattr(function, "arguments", None)
         return native_tool_call_to_action(str(name), parse_json_arguments(raw_args))
+
+    def discover_tool_calling(self) -> bool | None:
+        """Read native-tool capability metadata without loading the model.
+
+        Missing, malformed or unavailable metadata means unknown support.
+        The shared engine caches this evidence and selects JSON conservatively.
+        The ``tools`` capability does not imply JSON/schema enforcement.
+        """
+        parsed = urlparse(self.base_url)
+        connection_type = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        connection = connection_type(parsed.hostname or "", parsed.port, timeout=5)
+        try:
+            connection.request(
+                "POST",
+                (parsed.path.rstrip("/") + "/api/show") or "/api/show",
+                body=json.dumps({"model": self.model}),
+                headers=self.headers,
+            )
+            response = connection.getresponse()
+            body = response.read()
+            if response.status != 200:
+                return None
+            payload = json.loads(body)
+            capabilities = payload.get("capabilities") if isinstance(payload, dict) else None
+            if not isinstance(capabilities, list) or any(not isinstance(value, str) for value in capabilities):
+                return None
+            return "tools" in capabilities
+        except http.client.HTTPException:
+            return None
+        finally:
+            connection.close()

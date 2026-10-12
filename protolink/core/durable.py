@@ -15,6 +15,7 @@ from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetEnforcer, BudgetUsage
 from protolink.core.run_context import RunContext
 from protolink.core.task import Task, TaskState
+from protolink.core.tool_errors import ToolRejectedError
 from protolink.llms.history import ConversationHistory
 from protolink.storage.durable import (
     SCHEMA_VERSION,
@@ -115,6 +116,12 @@ def configuration_fingerprint(agent: Any) -> str:
         "override_system_prompt": agent.override_system_prompt,
         "model_params": getattr(agent.llm, "_model_params", {}),
         "reasoning": getattr(agent.llm, "_reasoning", None),
+        **({"tool_calling": agent.llm.tool_calling} if agent.llm and agent.llm.tool_calling is not None else {}),
+        **(
+            {"max_tool_corrections": agent.llm.max_tool_corrections}
+            if agent.llm and agent.llm.max_tool_corrections != 2
+            else {}
+        ),
         "subagent_limits": vars(agent.subagent_limits),
         "tools": {
             name: {
@@ -267,6 +274,8 @@ class DurableRun:
             raise DurableExecutionError("Durable execution requires a prepared authorized action")
         if entry["state"] == "succeeded":
             return True, entry["result"]
+        if entry["state"] == "rejected":
+            raise ToolRejectedError.from_dict(entry["rejection"])
         if entry["state"] in {"executing", "uncertain"} and not entry.get("child_task"):
             raise UncertainExecutionError(
                 f"Action '{entry['action']['action_id']}' started without a committed outcome; reconcile it first"
@@ -282,6 +291,12 @@ class DurableRun:
         self.entry.update(state="succeeded", result=encoded)
         self.save()
         return encoded
+
+    def reject_action(self, error: ToolRejectedError) -> None:
+        """Commit a no-change rejection so recovery cannot replay the request."""
+        assert self.entry is not None
+        self.entry.update(state="rejected", rejection=_json(error.to_dict()))
+        self.save()
 
     def request(self, kind: str, request: dict[str, Any], fingerprint: str) -> dict[str, Any] | None:
         entry = self.entry

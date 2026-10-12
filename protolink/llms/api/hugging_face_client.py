@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 from protolink.llms._deps import require_hugging_face
 from protolink.llms._streaming import threaded_stream
 from protolink.llms.api.base import APILLM
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.types import LLMProvider
 from protolink.utils.logging import get_logger
@@ -32,10 +33,17 @@ class HuggingFaceLLM(APILLM):
         api_key: str | None = None,
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Create the adapter with an optional runtime tool-calling policy.
+
+        ``tool_calling`` accepts ``auto``, ``native`` or ``json``. Omit it
+        to preserve the adapter default; the option is never forwarded as
+        a provider generation setting. See ``LLM.resolve_tool_calling``.
+        """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
-        super().__init__(model=resolved_model, model_params=merged_params)
+        super().__init__(model=resolved_model, model_params=merged_params, tool_calling=tool_calling)
 
         # Initialize HuggingFace InferenceClient
         hf_inference_client = require_hugging_face()

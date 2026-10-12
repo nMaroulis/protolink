@@ -6,9 +6,11 @@ from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 from protolink.llms._streaming import http_stream
-from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
+from protolink.llms.actions import AgentCallAction, LLMActionResult, ToolCallAction, action_to_json
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.server.base import ServerLLM
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
@@ -28,6 +30,8 @@ logger = get_logger(__name__)
 class LlamaCPPServerLLM(ServerLLM):
     """Llama.cpp Server implementation of the LLM interface. Communicates directly with the `llama-server` via HTTP."""
 
+    _native_tool_calling_available: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "llama.cpp-server"
     DEFAULT_MODEL: ClassVar[str] = "gemma4:e4b"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
@@ -44,7 +48,14 @@ class LlamaCPPServerLLM(ServerLLM):
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
         supports_tool_calling: bool = False,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Create the adapter with an optional runtime tool-calling policy.
+
+        ``tool_calling`` accepts ``auto``, ``native`` or ``json``. Omit it
+        to preserve the adapter default; the option is never forwarded as
+        a provider generation setting. See ``LLM.resolve_tool_calling``.
+        """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
 
@@ -55,6 +66,7 @@ class LlamaCPPServerLLM(ServerLLM):
             model_params=merged_params,
             base_url=resolved_base_url,
             supports_tool_calling=supports_tool_calling,
+            tool_calling=tool_calling,
         )
 
         self.base_url = resolved_base_url
@@ -153,7 +165,7 @@ class LlamaCPPServerLLM(ServerLLM):
         uses the prompt JSON fallback. When enabled, this method sends
         Chat-Completions-style tools and normalizes returned tool calls.
         """
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return super().call_action(
                 history,
                 tools=tools,
@@ -207,7 +219,7 @@ class LlamaCPPServerLLM(ServerLLM):
         If native tool calling is not explicitly enabled, the method delegates
         to the base JSON-stream fallback for small/local model friendliness.
         """
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return await super().call_action_stream(
                 history,
                 tools=tools,
@@ -262,22 +274,7 @@ class LlamaCPPServerLLM(ServerLLM):
         content = "".join(output_text).strip()
         if not content:
             raise ValueError("llama.cpp server stream did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata={"provider": "llama.cpp-server"},
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata={"provider": "llama.cpp-server", "streaming": True},
-            )
+        return normalize_native_text(content, metadata={"provider": "llama.cpp-server", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Utils
@@ -327,22 +324,7 @@ class LlamaCPPServerLLM(ServerLLM):
         content = str(message.get("content") or "").strip()
         if not content:
             raise ValueError("llama.cpp server response did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata=usage_metadata({"provider": "llama.cpp-server"}, payload),
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata=usage_metadata({"provider": "llama.cpp-server"}, payload),
-            )
+        return normalize_native_text(content, metadata=usage_metadata({"provider": "llama.cpp-server"}, payload))
 
     @staticmethod
     def _action_from_tool_call(call: Any) -> ToolCallAction | AgentCallAction:

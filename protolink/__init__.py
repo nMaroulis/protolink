@@ -138,7 +138,7 @@ from protolink.storage.durable import (
     UncertainExecutionError,
 )
 from protolink.telemetry import LocalTraceRecorder, LocalTraceTelemetry
-from protolink.tools import BaseTool, Tool
+from protolink.tools import BaseTool, Tool, ToolCorrectionLimitError, ToolRejectedError
 from protolink.transport import (
     RetryPolicy,
     TransportConfig,
@@ -281,8 +281,10 @@ __all__ = [
     "TaskRecord",
     "TaskState",
     "Tool",
+    "ToolCorrectionLimitError",
     "ToolObservation",
     "ToolOutcome",
+    "ToolRejectedError",
     "ToolStep",
     "TransportConfig",
     "TransportConnectionError",

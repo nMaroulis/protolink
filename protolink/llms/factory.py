@@ -60,8 +60,11 @@ class LLMFactory:
                 provider; the model's case, tags, paths and further colons are retained.
             **kwargs: Additional provider constructor arguments. ProtoLink
                 runtime options such as ``metrics_profile``,
-                ``metrics_enabled`` and ``max_parse_failures`` are consumed by
+                ``metrics_enabled``, ``tool_calling``, ``max_parse_failures``
+                and ``max_tool_corrections`` are consumed by
                 the factory and are not forwarded to provider request options.
+                ``tool_calling="auto"`` uses cached capability evidence;
+                ``native`` and ``json`` are explicit protocol overrides.
 
         Returns:
             LLM: An instance of the requested LLM client.
@@ -72,6 +75,8 @@ class LLMFactory:
         metrics_profile: LLMModelProfile | dict[str, Any] | None = kwargs.pop("metrics_profile", None)
         metrics_enabled: bool | None = kwargs.pop("metrics_enabled", None)
         max_parse_failures: int | None = kwargs.pop("max_parse_failures", None)
+        max_tool_corrections: int | None = kwargs.pop("max_tool_corrections", None)
+        tool_calling = kwargs.pop("tool_calling", None)
 
         if not isinstance(provider, str):
             raise ValueError("provider must be a provider alias or 'provider:model' string")
@@ -86,8 +91,12 @@ class LLMFactory:
 
         client_class = cls._resolve_client(provider_key)
         llm = client_class(**kwargs)
+        if tool_calling is not None:
+            llm.tool_calling = tool_calling
         if max_parse_failures is not None:
             llm.max_parse_failures = max_parse_failures
+        if max_tool_corrections is not None:
+            llm.max_tool_corrections = max_tool_corrections
         if metrics_profile is not None:
             llm.configure_metrics(metrics_profile)
         if metrics_enabled is not None:

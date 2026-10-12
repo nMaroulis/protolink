@@ -20,6 +20,7 @@ from protolink.llms.api.openai_client import OpenAILLM
 from protolink.llms.base import LLM
 from protolink.llms.history import ConversationHistory
 from protolink.llms.local.llamacpp_client import LlamaCPPLocalLLM
+from protolink.llms.parsing import ActionParseError
 from protolink.llms.server.llamacpp_client import LlamaCPPServerLLM
 from protolink.llms.server.ollama_client import OllamaLLM
 from protolink.llms.server.openai_compatible_client import LMStudioLLM, OpenAICompatibleLLM
@@ -213,6 +214,53 @@ async def test_sdk_reads_allow_incremental_consumption(backend, direct):
         if handle is not None:
             await handle.cancel()
             await handle.result()
+
+
+@pytest.mark.parametrize("backend", SDK_BACKENDS)
+@pytest.mark.asyncio
+async def test_sdk_streams_do_not_finalize_malformed_tool_wrappers(backend):
+    raw = '{"tool_call":{"name":"explorer","arguments":{"query":"docs"}}}'
+    closed = threading.Event()
+    chunks = []
+
+    def source(*args, **kwargs):
+        try:
+            yield _sdk_event(raw[:20], backend)
+            yield _sdk_event(raw[20:], backend)
+        finally:
+            closed.set()
+
+    async def capture(chunk):
+        chunks.append(chunk)
+
+    llm = _sdk_llm(backend, source)
+    with pytest.raises(ActionParseError) as caught:
+        await llm.call_action_stream(ConversationHistory(), tools={}, chunk_callback=capture)
+    assert caught.value.raw_response == raw
+    assert "".join(chunks) == raw
+    assert closed.is_set()
+
+
+@pytest.mark.parametrize("backend", HTTP_BACKENDS)
+@pytest.mark.asyncio
+async def test_native_http_streams_propagate_malformed_actions(monkeypatch, backend):
+    monkeypatch.setattr(backend, "validate_connection", lambda self: True)
+    llm = backend(base_url="http://localhost:11434", model="test", tool_calling="native")
+    raw = '{"tool_call":{"name":"explorer","arguments":{"query":"docs"}}}'
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, content=_frame(raw, backend is OllamaLLM))
+
+    client_type = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx, "AsyncClient", lambda **kwargs: client_type(transport=httpx.MockTransport(respond), **kwargs)
+    )
+    with pytest.raises(ActionParseError) as caught:
+        await llm.call_action_stream(ConversationHistory(), tools={})
+    assert caught.value.raw_response == raw
+    assert len(requests) == 1
 
 
 class _ByteStream(httpx.AsyncByteStream):

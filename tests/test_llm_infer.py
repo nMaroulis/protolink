@@ -492,7 +492,7 @@ async def test_invalid_tool_arguments_are_recoverable_without_poisoning_dedup_or
     assert llm.call_count == 3
     assert tool.calls == 0
     assert enforcer.usage.tool_calls == 0
-    validation_errors = [event for event in events if event["type"] == "tool_error"]
+    validation_errors = [event for event in events if event["type"] == "tool_rejected"]
     assert len(validation_errors) == 2
     assert all(event["recoverable"] is True and event["phase"] == "validation" for event in validation_errors)
     assert not any(event["type"] == "llm_retry" for event in events)

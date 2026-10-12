@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.server.openai_compatible_client import OpenAICompatibleLLM
 from protolink.types import LLMProvider
 
@@ -29,6 +30,7 @@ class VLLMLLM(OpenAICompatibleLLM):
         headers: dict[str, str] | None = None,
         model_params: dict[str, Any] | None = None,
         supports_tool_calling: bool = False,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
         """Create a client for a vLLM OpenAI-compatible server.
 
@@ -49,4 +51,5 @@ class VLLMLLM(OpenAICompatibleLLM):
             model=model,
             model_params=model_params,
             supports_tool_calling=supports_tool_calling,
+            tool_calling=tool_calling,
         )

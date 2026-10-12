@@ -699,7 +699,7 @@ Each callable below keeps the scikit-learn-style layout: exact signature, explan
     provider: str | LLMProvider,
     **kwargs,
 ) -> LLM`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/factory.py#L97"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/factory.py#L122"
 >
 
 Create an LLM adapter without importing the selected provider until it is needed.
@@ -715,11 +715,13 @@ and `Agent(name="helper", llm="ollama:qwen3:4b")` use this same factory.
       Provider alias or <code>provider:model</code> string. Supported aliases are <code>anthropic</code>, <code>deepseek</code>, <code>gemini</code>, <code>grok</code>, <code>huggingface</code>, <code>llama.cpp-local</code>, <code>llama.cpp-server</code>, <code>lmstudio</code>, <code>mock</code>, <code>ollama</code>, <code>openai</code>, <code>openai-compatible</code> and <code>vllm</code>.
     </ApiField>
     <ApiField name="**kwargs" type="Any">
-      Forwarded to the selected adapter constructor. Three factory-only keywords are also recognized:
+      Forwarded to the selected adapter constructor. Runtime keywords are also recognized:
       <code>metrics_profile</code> configures model metrics after construction,
-      <code>metrics_enabled</code> enables or disables their emission and
-      <code>max_parse_failures</code> sets the validated consecutive action-parse failure limit without forwarding
-      that ProtoLink-only option to the provider.
+      <code>metrics_enabled</code> enables or disables their emission,
+      <code>tool_calling</code> selects <code>auto</code>, <code>native</code> or <code>json</code> action acquisition and
+      <code>max_parse_failures</code> sets the validated consecutive action-parse failure limit, while
+      <code>max_tool_corrections</code> bounds tool-request correction. These runtime options are not forwarded
+      to provider generation parameters.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -735,11 +737,11 @@ and `Agent(name="helper", llm="ollama:qwen3:4b")` use this same factory.
 <ApiSection title="Raises">
   <ApiFields ariaLabel="create_llm errors">
     <ApiField name="ValueError">
-      Raised when the provider string is unknown or empty, an inline model is empty or also supplied through <code>model=</code>, or <code>max_parse_failures</code> is outside the supported range.
+      Raised when the provider string is unknown or empty, an inline model is empty or also supplied through <code>model=</code>, <code>max_parse_failures</code> or <code>max_tool_corrections</code> is outside its supported range, <code>tool_calling</code> is invalid, or native mode is requested on an adapter without a native implementation.
     </ApiField>
     <ApiField name="TypeError">
-      Raised when <code>max_parse_failures</code> is not an integer. Boolean values are not accepted as integers for
-      this option.
+      Raised when <code>max_parse_failures</code> or <code>max_tool_corrections</code> is not an integer. Boolean values
+      are not accepted as integers for these options.
     </ApiField>
     <ApiField name="ImportError">
       Raised when the selected adapter requires an optional dependency that is not installed.
@@ -770,6 +772,10 @@ llm = create_llm(
 
 `max_parse_failures` defaults to `3` and accepts integers from `1` through `10`. Keep it as a top-level factory
 argument. Do not place it in `model_params`, whose entries are provider generation options.
+
+`max_tool_corrections` independently bounds unknown-tool, argument-schema and explicit no-change rejection
+feedback. It defaults to `2` corrective turns and accepts integers from `0` through `10`. Pass it to `create_llm()`
+or assign `llm.max_tool_corrections`. Successful actions do not reset this counter.
 
 </ApiSection>
 
@@ -810,8 +816,9 @@ Do not instantiate `LLM` directly. Use a concrete implementation such as `OpenAI
     model_params: dict[str, Any],
     *,
     reasoning: Literal["none", "low", "medium", "high"] = "none",
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L154"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L307"
 >
 
 Abstract provider-neutral model contract. Subclasses implement text generation and connection validation; the base class owns history binding, typed action parsing, inference orchestration, compaction and metrics.
@@ -826,6 +833,10 @@ Abstract provider-neutral model contract. Subclasses implement text generation a
     </ApiField>
     <ApiField name="reasoning" type={'"none" | "low" | "medium" | "high"'} defaultValue={'"none"'}>
       Selects the reasoning instruction block included when the base system prompt is built. This argument is mainly for custom subclasses; current concrete provider constructors do not expose it.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime action acquisition policy. Omit it to retain the adapter's existing default, including its legacy
+      capability flag. Explicit modes override that flag; <code>auto</code> uses cached capability evidence.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -861,6 +872,15 @@ Abstract provider-neutral model contract. Subclasses implement text generation a
       <code>3</code> and accepts values from <code>1</code> through the ten-step inference ceiling. This runtime
       control is deliberately separate from provider generation parameters.
     </ApiField>
+    <ApiField name="max_tool_corrections" type="int">
+      Permitted corrective turns for unknown tools, invalid argument schemas and explicit no-change tool rejections.
+      Defaults to <code>2</code>; accepts <code>0</code> through <code>10</code>. Success does not reset the counter.
+      Durable checkpoints preserve it. Configure through the factory or this property, outside generation parameters.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'}>
+      Configured runtime protocol policy. Changes apply to subsequent inferences; active and durable continuations
+      retain the selected protocol. See <a href="#selecting-native-tools-or-json-actions">action acquisition</a>.
+    </ApiField>
     <ApiField name="sync" type="SyncLLM">
       Blocking wrapper for <code>infer()</code>. Do not use it inside an active event loop.
     </ApiField>
@@ -883,7 +903,7 @@ Abstract provider-neutral model contract. Subclasses implement text generation a
     *,
     streaming: bool = False,
 ) -> str | AsyncIterator[str]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L441"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L755"
 >
 
 Add one user message to the active history, then make a direct provider call.
@@ -935,7 +955,7 @@ async for chunk in llm.chat("Draft the introduction.", streaming=True):
   signature={`call(
     history: ConversationHistory,
 ) -> str`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L407"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L716"
 >
 
 Generate one complete text response from a conversation history. Concrete adapters translate the history into their provider’s request format.
@@ -977,7 +997,7 @@ Generate one complete text response from a conversation history. Concrete adapte
   signature={`call_stream(
     history: ConversationHistory,
 ) -> AsyncIterator[str]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L421"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L730"
 >
 
 Start a streaming provider call and yield incremental text chunks.
@@ -1016,7 +1036,7 @@ Start a streaming provider call and yield incremental text chunks.
     agent_callback_available: bool = False,
     agent_cards: list[Any] | None = None,
 ) -> LLMActionResult`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L480"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L792"
 >
 
 Acquire one validated runtime action. The base implementation parses a JSON action from text; native-capable adapters override it and normalize provider tool calls into the same result type.
@@ -1069,7 +1089,7 @@ Acquire one validated runtime action. The base implementation parses a JSON acti
     agent_cards: list[Any] | None = None,
     chunk_callback: Callable[[str], Awaitable[None]] | None = None,
 ) -> LLMActionResult`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L518"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L825"
 >
 
 Streaming counterpart to `call_action()`. The fallback implementation forwards text chunks to the observer, buffers the complete response and validates exactly one action after the stream ends.
@@ -1139,6 +1159,76 @@ Every provider ultimately returns the same `LLMActionResult`, but it can acquire
 | JSON action mode | Default for local/small models and providers without reliable native tools | Return one JSON object such as `{"type":"tool_call","tool":"search","args":{"q":"..."}}` | `call_action()` or the fallback `call_action_stream()` parses text, validates it with Pydantic and returns a typed action. |
 | Native action mode | OpenAI, Anthropic, Gemini and opted-in tool-capable servers | Use the provider's function or tool interface | The adapter sends real tool declarations, receives provider-native tool events and normalizes them into the same typed action models. |
 
+Choose the protocol once on the LLM. The Agent prepares matching instructions and uses the same mode throughout the
+current inference, including correction attempts:
+
+```python
+from protolink import Agent, create_llm
+
+llm = create_llm(
+    "ollama:qwen3:4b",
+    base_url="http://localhost:11434",
+    tool_calling="auto",
+)
+agent = Agent(name="helper", llm=llm)
+print(agent.sync.invoke("Explain what an agent harness does."))
+```
+
+#### Selecting native tools or JSON actions
+
+`tool_calling` is ProtoLink runtime configuration, so keep it outside `model_params`. The factory and concrete
+adapter constructors accept the same option; existing instances can use `llm.tool_calling = "json"`.
+
+| Setting | Behavior |
+|---------|----------|
+| Omitted / `None` | Preserves the adapter's current default and `supports_tool_calling` flag. Existing applications make no discovery requests. |
+| `"auto"` | Uses provider capability evidence. Advertised native support selects native tools; unsupported or unknown configurations use JSON actions. |
+| `"native"` | Explicitly sends provider-native tool declarations. The adapter must implement native actions; provider rejection remains visible. |
+| `"json"` | Explicitly uses the portable JSON action protocol, including on hosted adapters that normally use native tools. |
+
+Ollama obtains model-specific evidence through [`POST /api/show`](https://github.com/ollama/ollama/blob/main/docs/api.md#show-model-information)
+and checks the exact model's `tools` capability. ProtoLink reuses the result for five minutes on that adapter, keyed by
+provider, endpoint, model identifier, generation configuration and request headers. Both supported and unknown results
+are cached. Discovery has a five-second request timeout and does not load a model, generate a test completion or invoke
+application tools. Missing capabilities, failed requests and malformed metadata select JSON conservatively.
+Direct tool tasks do not need model capability discovery.
+
+OpenAI, Anthropic, Gemini, DeepSeek and Grok use their adapters' declared native API contracts for automatic selection.
+The generic OpenAI-compatible, LM Studio, vLLM and llama.cpp adapters do not have a reliable portable metadata contract
+for the selected model and server configuration, so automatic selection uses JSON there. Set `"native"` when the
+application knows its model, template and server tool parser are configured appropriately. Hugging Face, MockLLM and
+RoutedLLM use JSON; requesting native mode on an adapter without native action support raises `ValueError`.
+
+Capability metadata advertises a feature; it does not measure tool-choice or argument accuracy. It also does not prove
+that the inference backend can enforce JSON or a JSON Schema. Ollama's structured-output fallback remains a separate
+mechanism with its own explicit-format contract.
+
+For more control:
+
+```python
+llm.tool_calling = "json"  # Explicit portable mode for the next inference.
+llm.tool_calling = "auto"  # Return to cached automatic selection.
+llm.refresh_capabilities()  # Recheck after replacing a model/template or updating the server.
+print(llm.resolve_tool_calling())  # "native" or "json"; auto may perform a metadata request.
+```
+
+Refreshing capabilities or changing the policy does not switch an active inference's protocol. Cached evidence is
+process-local and is not serialized; Agent configuration and durable execution contracts retain the configured policy.
+Durable checkpoints also retain the selected protocol so a resumed run uses requests compatible with its saved history,
+even when fresh capability metadata is temporarily unavailable.
+Custom adapters can implement `discover_tool_calling() -> bool | None` to supply metadata evidence while leaving cache
+and selection policy in the shared engine. Native implementations declare `_native_tool_calling_available = True` and
+normalize native events through `call_action()` and `call_action_stream()`.
+
+The [offline correction example](https://github.com/nMaroulis/protolink/blob/main/examples/action_correction.py) runs the
+real action adapter against scripted responses in JSON and automatic native mode:
+
+```bash
+python examples/action_correction.py
+```
+
+It demonstrates an invalid wrapper being corrected after a completed tool, with the tool executing once.
+
 The rest of the loop is identical:
 
 1. **Prompt selection**: the Agent builds either the portable JSON prompt or the native-tool prompt. Streaming uses native instructions only when the adapter supports native streamed actions.
@@ -1158,7 +1248,9 @@ Streaming JSON does not mean ProtoLink dispatches incomplete JSON fragments. The
 
 :::tip[Small-model support]
 
-Ollama, llama.cpp, LM Studio, vLLM and generic OpenAI-compatible servers default to JSON action mode. Enable `supports_tool_calling=True` only for a model and chat-template combination that reliably emits native tool calls.
+Ollama, llama.cpp, LM Studio, vLLM and generic OpenAI-compatible servers retain their default JSON action mode. Use
+`tool_calling="auto"` for advertised Ollama support, or `tool_calling="native"` for a known tool-capable configuration.
+The existing `supports_tool_calling=True` flag remains supported when `tool_calling` is omitted.
 
 :::
 
@@ -1208,6 +1300,37 @@ The JSON path follows a deliberately conservative pipeline:
 4. **Validate the complete action with Pydantic.** Required fields, discriminated action types, forbidden extra fields,
    delegated-action combinations and content types are checked before the infer loop sees the result.
 
+##### Malformed action wrappers and native answer text
+
+An outer `tool_call`, `tool_calls`, `function_call`, `function_calls` or `agent_call` field is recognizable action
+protocol structure. ProtoLink does not accept such a wrapper as an ordinary application answer or guess how to execute
+it. For example, this response fails action validation:
+
+```json
+{"tool_call":{"name":"explorer","arguments":{"query":"docs"}}}
+```
+
+The correction loop requests the canonical shape, such as
+`{"type":"tool_call","tool":"explorer","args":{"query":"docs"}}`, or the provider's native tool interface.
+The same validation failure reaches the loop in JSON and native modes, including after a complete stream. Native
+adapters do not turn a recognizable invalid action into a successful final answer.
+
+Native responses may still contain plain text, ordinary application JSON and code examples. Standalone action objects,
+optionally in one JSON fence or after a complete reasoning block, enter strict action parsing. Prose explaining an
+example and Python code fences remain answer text; the native text normalizer never searches those explanations for
+an executable action. In JSON mode, put examples and application objects using reserved action fields inside explicit
+`final.content`:
+
+```json
+{"type":"final","content":{"example":{"tool_call":{"name":"explorer"}}}}
+```
+
+Correction continues inside the current inference with its existing history, completed observations, consecutive parse
+limit and shared run budgets. Invalid action text consumes model-call and step budgets; its output tokens are counted
+using provider usage when available and local estimates otherwise. A correction does not restart the task or replay
+completed tools. Recent duplicate requests continue to use the existing deduplication guardrail. Streaming chunks can
+already have reached observers, so consumers must treat them as provisional until a validated action or final event.
+
 Common small-model variations therefore have explicit outcomes:
 
 | Model output | Parser behavior |
@@ -1235,6 +1358,11 @@ to diagnose truncation. For a decoded action that fails schema validation, corre
 field-level feedback and detected outer action type, not another copy of the parsed-payload preview.
 
 ##### Correction attempts
+
+Action parsing uses the limit described here. Once a valid `tool_call` reaches dispatch, unknown tools, invalid
+argument schemas and explicit `ToolRejectedError` use a separate `max_tool_corrections` allowance. Both remain in
+the current inference, preserve completed observations and consume existing budgets. See
+[recoverable tool validation](tool.md#reject-a-request-the-model-can-correct) for structured rejection feedback.
 
 Parsing and action-schema failures are recoverable inside `infer()`. ProtoLink emits an `llm_parse_error` event,
 retains bounded diagnostics for observability and adds a correction message to conversation history. When JSON
@@ -1416,6 +1544,8 @@ The base implementation asks for JSON, validates it and injects a provider-neutr
 
 ### Provider-specific action modes
 
+The table shows existing defaults. Explicit `tool_calling` settings override those defaults as described above.
+
 | Provider | Non-streaming `infer()` | Streaming `infer()` | Notes |
 |----------|-------------------------|---------------------|-------|
 | OpenAI | Native Responses function tools | Native streamed function-call events | Parallel tool calls are disabled so the runtime receives one action at a time. |
@@ -1426,7 +1556,7 @@ The base implementation asks for JSON, validates it and injects a provider-neutr
 | Ollama | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Keeps small/local model behavior simple unless tool support is known to work. |
 | llama.cpp server/local | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Reliability depends on the selected model and chat template. |
 | LM Studio / vLLM / OpenAI-compatible | JSON by default; native tools when explicitly enabled | JSON by default; native tool events when explicitly enabled | Dedicated subclasses provide conventional defaults and provider identity; the generic adapter covers LocalAI and compatible custom servers. |
-| Hugging Face | JSON fallback for non-streaming inference | Not currently usable | `call_stream()` currently yields an empty chunk, so streaming inference is unsupported. |
+| Hugging Face | JSON action fallback | Streamed JSON action text | The complete response is validated before dispatch. |
 
 ### Prompt selection
 
@@ -1530,7 +1660,7 @@ After observing the tool result, the model completes with:
     hooks: tuple[AgentHooks, ...] = (),
     tool_prompt_builder: Callable[[dict[str, BaseTool]], None] | None = None,
 ) -> Part`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L560"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L872"
 >
 
 Run the controlled multi-step inference loop used by `Agent`. The model declares typed intent; ProtoLink validates and executes tools or agent calls, feeds observations back to the model and stops on a final action or safety limit.
@@ -1588,6 +1718,10 @@ Configure [context policy](context-management.md) and [lifecycle hooks](hooks.md
 
 <ApiSection title="Raises">
   <ApiFields ariaLabel="LLM infer errors">
+    <ApiField name="ToolCorrectionLimitError">
+      Raised when another tool rejection exceeds <code>max_tool_corrections</code>. Exposes the target tool,
+      rejected-request count, configured limit and final <code>ToolRejectedError</code> feedback.
+    </ApiField>
     <ApiField name="InferParseError">
       Raised when the configured number of consecutive model responses cannot be decoded or validated as ProtoLink
       actions. Exposes <code>attempts</code>, <code>step</code>, <code>explanation</code>,
@@ -1609,7 +1743,7 @@ Configure [context policy](context-management.md) and [lifecycle hooks](hooks.md
 </ApiSection>
 
 <ApiCallout label="Self-correction">
-  Unknown tools, malformed actions, missing agents and argument mismatches are normally reported back to the model for correction. They do not usually escape from <code>infer()</code> as <code>ValueError</code>.
+  Unknown tools, malformed actions, missing agents and argument mismatches are normally reported back to the model for correction. Explicit <code>ToolRejectedError</code> also returns feedback when the tool guarantees no changes. Tool validation uses <code>max_tool_corrections</code>; action parsing uses <code>max_parse_failures</code>. Ordinary tool exceptions abort execution. See <a href="tool#reject-a-request-the-model-can-correct">tool rejection</a> for the complete contract.
 </ApiCallout>
 
 <ApiCallout label="Direct-call responsibility">
@@ -1650,7 +1784,7 @@ print(result.content)
     streaming: bool = False,
     event_callback: Callable | None = None,
 ) -> Part`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1704"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2502"
 >
 
 Blocking wrapper around `LLM.infer()` for scripts and synchronous command-line programs.
@@ -1700,7 +1834,7 @@ Blocking wrapper around `LLM.infer()` for scripts and synchronous command-line p
   signature={`use_history(
     history: ConversationHistory,
 ) -> ContextManager[ConversationHistory]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L291"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L494"
 >
 
 Temporarily bind a conversation history to the current execution context. The binding uses `contextvars`, so concurrent asyncio tasks can share one LLM instance without sharing mutable messages.
@@ -1757,7 +1891,7 @@ with llm.use_history(customer_history):
     preserve_recent: int = 6,
     summary_max_tokens: int = 512,
 ) -> HistoryCompactionResult`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L370"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L679"
 >
 
 Compact the active history in place. `recent` and `tokens` are local operations; `summary` makes one isolated synchronous model call before replacing older messages.
@@ -1833,7 +1967,7 @@ print(report.to_dict())
     currency: str = "USD",
     enabled: bool = True,
 ) -> LLM`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L313"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L628"
 >
 
 Attach application-owned model limits and prices used for observational inference metrics.
@@ -1947,7 +2081,7 @@ This separation of reasoning from execution is what allows one inference loop to
     persist: bool = False,
     agent_name: str | None = None,
 ) -> str`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1530"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2332"
 >
 
 Build and store the complete runtime system prompt from base instructions, action mode, tools, discovered agents, flow context and application instructions.
@@ -2003,7 +2137,7 @@ Build and store the complete runtime system prompt from base instructions, actio
   signature={`set_system_prompt(
     system_prompt: str,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1649"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2449"
 >
 
 Assign a new value to `llm.system_prompt`.
@@ -2036,7 +2170,7 @@ Assign a new value to `llm.system_prompt`.
   kind="abstract method"
   path="protolink.llms.base.LLM.validate_connection"
   signature={`validate_connection() -> bool`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L1623"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/base.py#L2423"
 >
 
 Check whether the provider client, server, or local model can respond.
@@ -2079,8 +2213,9 @@ OpenAI, Anthropic and Gemini always acquire actions through their provider-nativ
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
     base_url: str | None = None,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py#L25"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/openai_client.py#L28"
 >
 
 OpenAI Responses API adapter with native function tools and native streamed tool-call events. Use it for the official OpenAI service or for a custom `base_url` that implements the Responses API, not merely Chat Completions.
@@ -2100,6 +2235,11 @@ Direct calls translate `ConversationHistory` into Responses input and extract te
     </ApiField>
     <ApiField name="base_url" type="str | None" defaultValue="None">
       Optional OpenAI client base URL. The endpoint must implement the Responses API; use <code>OpenAICompatibleLLM</code> for Chat Completions-only servers.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2141,8 +2281,9 @@ llm = OpenAILLM(
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
     base_url: str | None = None,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py#L26"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/anthropic_client.py#L29"
 >
 
 Anthropic Messages API adapter with native `tool_use` actions and streamed tool-input deltas. The adapter derives both the separated system prompt and conversational messages from the supplied task-local `ConversationHistory`, converts ProtoLink tools to Anthropic tool schemas and keeps the provider's tool-use identifier in action metadata.
@@ -2162,6 +2303,11 @@ After ProtoLink executes a requested tool, the adapter uses that identifier to i
     </ApiField>
     <ApiField name="base_url" type="str | None" defaultValue="None">
       Optional Anthropic-compatible API base URL passed to the SDK.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2192,8 +2338,9 @@ llm = AnthropicLLM(
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
     base_url: str | None = None,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/gemini_client.py#L24"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/gemini_client.py#L27"
 >
 
 Google GenAI adapter with native function declarations and native streamed actions. It converts conversation messages and tool schemas into Google GenAI content, generation configuration and function declarations.
@@ -2213,6 +2360,11 @@ Function-call parts are normalized into `ToolCallAction` or `AgentCallAction` be
     </ApiField>
     <ApiField name="base_url" type="str | None" defaultValue="None">
       Stored by the shared API base class. The current Gemini client does not forward this value to <code>genai.Client</code>.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2241,8 +2393,9 @@ llm = GeminiLLM(model="gemini-3-flash-preview")
     model_params: dict[str, Any] | None = None,
     base_url: str | None = "https://api.deepseek.com",
     supports_tool_calling: bool = True,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/deepseek_client.py#L27"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/deepseek_client.py#L30"
 >
 
 DeepSeek Chat Completions adapter implemented through the OpenAI SDK with DeepSeek's API root. It supports ordinary text calls, incremental content streams, native Chat Completions tool calls and streamed tool-argument deltas.
@@ -2265,6 +2418,11 @@ Native action acquisition is enabled by default. Set `supports_tool_calling=Fals
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="True">
       Use native Chat Completions tools. Set to <code>False</code> to force the portable JSON action fallback.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2293,8 +2451,9 @@ llm = DeepSeekLLM(model="deepseek-chat")
     model_params: dict[str, Any] | None = None,
     base_url: str | None = None,
     supports_tool_calling: bool = True,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/grok_client.py#L31"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/grok_client.py#L33"
 >
 
 xAI Chat Completions adapter using direct synchronous and asynchronous HTTP clients. It builds OpenAI-style message and tool payloads, parses content or tool calls and normalizes usage metadata when the response includes it.
@@ -2317,6 +2476,11 @@ Native tools and streamed tool deltas are enabled by default. Disable `supports_
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="True">
       Use native tool calls and streamed tool deltas. Set to <code>False</code> for JSON action mode.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2343,8 +2507,9 @@ llm = GrokLLM(model="grok-4-latest")
     api_key: str | None = None,
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/hugging_face_client.py#L16"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/api/hugging_face_client.py#L18"
 >
 
 Hugging Face Inference API adapter for direct and streamed chat completions. It is useful when a hosted Hub model is available through the inference service and you want that model behind the same `LLM` interface.
@@ -2361,6 +2526,11 @@ Pass an explicit Hub model identifier. The adapter streams text deltas and uses 
     </ApiField>
     <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
       Values merged over <code>max_new_tokens=512</code>, <code>temperature=1.0</code>, <code>top_p=1.0</code> and <code>repetition_penalty=1.0</code>. The current <code>call()</code> path forwards only <code>temperature</code>.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2385,7 +2555,10 @@ llm = HuggingFaceLLM(model="your-org/your-chat-model")
 
 Server adapters connect to a model process over HTTP, whether that process runs on the same machine or on remote infrastructure. The server owns model loading and hardware resources; the ProtoLink adapter owns history serialization, request construction, streaming, action normalization, connection validation and integration with the shared inference loop.
 
-All server adapters inherit from `ServerLLM`. Their common configuration consists of a server URL, a model identifier understood by that server, optional generation parameters and a `supports_tool_calling` capability flag. Native tool calling is opt-in because protocol compatibility alone does not guarantee that the selected model and chat template can use tools reliably.
+All server adapters inherit from `ServerLLM`. Their common configuration consists of a server URL, a model identifier
+understood by that server, optional generation parameters and the `tool_calling` runtime policy. The existing
+`supports_tool_calling` flag remains available. See [action acquisition](#selecting-native-tools-or-json-actions) for
+automatic discovery, explicit overrides and provider-specific capability limits.
 
 The inherited `model_params` property can be replaced with a dictionary, `set_system_prompt()` updates the adapter's prompt value and each concrete provider implements `call()`, `call_stream()` and `validate_connection()` for its endpoint.
 
@@ -2401,13 +2574,16 @@ The inherited `model_params` property can be replaced with a dictionary, `set_sy
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
     supports_tool_calling: bool = False,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/ollama_client.py#L27"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/ollama_client.py#L30"
 >
 
 Client for Ollama's `/api/chat` endpoint. It serializes `ConversationHistory` into Ollama messages and supports ordinary responses, streamed chunks, usage normalization and optional native tool events.
 
-JSON action mode is the default because local-model tool reliability depends on both the model and its template. Set `supports_tool_calling=True` only after verifying that the selected Ollama model produces correct native tool calls; direct `chat()` and `call()` usage does not require that flag.
+JSON action mode remains the default. Use `tool_calling="auto"` to select native tools when the exact Ollama model
+advertises support, or choose `"native"` / `"json"` explicitly. Direct `chat()` and `call()` usage does not use this
+action-acquisition policy. The legacy `supports_tool_calling` flag applies when the new option is omitted.
 
 The adapter uses Ollama's documented [`/api/chat` endpoint](https://docs.ollama.com/api/chat). JSON action mode normally requests `format="json"` to constrain the server's output. Some runners, including MLX configurations, reject structured output with HTTP 501 and `structured output is unavailable`. For that specific rejection of the default format, ProtoLink retries once without the format field and remembers the limitation for the same server/model on that adapter. The inference prompt and action validation remain in place, so tools and delegation still use the standard action contract. This applies to ordinary and streaming calls; errors inside an accepted stream propagate without a format fallback.
 
@@ -2429,6 +2605,11 @@ Use `model_params={"format": None}` to omit server formatting from the outset. A
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
       Opt into native Ollama tools. The default uses JSON action mode.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2489,8 +2670,9 @@ Use the exact tag installed on your server. The default-format fallback is trigg
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
     supports_tool_calling: bool = False,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/llamacpp_client.py#L27"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/llamacpp_client.py#L30"
 >
 
 Direct client for a `llama-server` OpenAI-style Chat Completions endpoint. It talks to the server over HTTP without loading a model in the ProtoLink process, making it suitable when model lifecycle and hardware allocation belong to a separate service.
@@ -2513,6 +2695,11 @@ The adapter supports direct and streamed text calls. Native tool declarations ar
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
       Opt into native Chat Completions tools for a compatible model/template.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2542,8 +2729,9 @@ llm = LlamaCPPServerLLM(base_url="http://localhost:8080")
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
     supports_tool_calling: bool = False,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L29"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L32"
 >
 
 Generic client for servers exposing `/v1/chat/completions` and `/v1/models`, including LocalAI and compatible custom services. Use it when the endpoint follows the Chat Completions protocol but is not the official OpenAI Responses API. Prefer `VLLMLLM` or `LMStudioLLM` when their conventional URL, credential environment variables and provider identity are useful.
@@ -2569,6 +2757,11 @@ It supports custom headers, optional bearer authentication, direct and streamed 
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
       Enable native Chat Completions tool payloads for a compatible server/model pair.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2601,8 +2794,9 @@ llm = OpenAICompatibleLLM(
     headers: dict[str, str] | None = None,
     model_params: dict[str, Any] | None = None,
     supports_tool_calling: bool = False,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/vllm_client.py#L9"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/vllm_client.py#L10"
 >
 
 Convenience specialization of `OpenAICompatibleLLM` for a separately managed vLLM server. It inherits the compatible adapter's direct and streamed Chat Completions requests, portable JSON action fallback, usage normalization, connection validation, custom headers, optional bearer authentication and opt-in native tools. The adapter itself does not install or import the `vllm` Python package.
@@ -2628,6 +2822,11 @@ The model is required because it must match the identifier accepted by the runni
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
       Opt into native Chat Completions tools only after the vLLM server and selected model are configured for automatic tool choice.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2662,8 +2861,9 @@ llm = VLLMLLM(model="Qwen/Qwen3-8B")
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
     supports_tool_calling: bool = False,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L377"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/server/openai_compatible_client.py#L338"
 >
 
 Convenience specialization of `OpenAICompatibleLLM` for LM Studio. It keeps the complete compatible-server behavior while supplying LM Studio's conventional URL, credential fallback and provider identity.
@@ -2689,6 +2889,11 @@ Use the generic parent class when you want environment variables and labels that
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
       Opt into native tools when the selected model supports them.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2719,8 +2924,9 @@ Local adapters run inference inside the Python host rather than transmitting pro
     model: str,
     model_params: dict[str, Any] | None = None,
     supports_tool_calling: bool = False,
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/local/llamacpp_client.py#L25"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/local/llamacpp_client.py#L28"
 >
 
 In-process `llama-cpp-python` adapter for a local GGUF model file. Unlike `LlamaCPPServerLLM`, it loads the model in the current Python process, so model initialization time, native-library installation, memory use and hardware configuration belong to the application.
@@ -2737,6 +2943,11 @@ The class implements complete and streamed chat-completion calls. Native tools a
     </ApiField>
     <ApiField name="supports_tool_calling" type="bool" defaultValue="False">
       Opt into native llama.cpp tools when the loaded model and chat handler support them.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2786,6 +2997,7 @@ llm = create_llm(
     sequential_responses: list[Any] | None = None,
     response_callback: Callable[[ConversationHistory, str], Any] | None = None,
     default_response: str = "Unprocessed generic mock response",
+    tool_calling: Literal["auto", "native", "json"] | None = None,
 )`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/llms/mock_client.py#L9"
 >
@@ -2813,6 +3025,11 @@ Responses are selected in a predictable priority order: a custom callback can in
     </ApiField>
     <ApiField name="default_response" type="str" defaultValue={'"Unprocessed generic mock response"'}>
       Fallback returned when no callback, sequential response, or mapping matches.
+    </ApiField>
+    <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
+      Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for
+      cached capability evidence, or <code>native</code> / <code>json</code> for an explicit override.
+      See <a href="#selecting-native-tools-or-json-actions">action acquisition</a> for provider behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -2998,6 +3215,7 @@ LLM failures can originate at several different boundaries:
 - **Action errors**: a model emits malformed or invalid structured intent.
 - **Execution errors**: a selected tool, delegated agent, authorization policy, cancellation token, or run budget stops the loop.
 - **Parse guardrail errors**: repeated parse failures produce `InferParseError`.
+- **Tool-correction guardrail errors**: rejected tool requests exhaust `max_tool_corrections` and produce `ToolCorrectionLimitError`.
 - **Step guardrail errors**: the ten-step safety limit produces `RuntimeError`.
 
 Recoverable action mistakes are normally injected back into history so the model can self-correct. Application-level exception handling should focus on provider failures and runtime boundaries that cannot be repaired inside the loop.

@@ -2076,6 +2076,11 @@ class AgentSerializationMixin(_AgentMixinBase):
             base_url = getattr(self.llm, "base_url", None)
             if base_url:
                 llm_config["base_url"] = base_url
+            if self.llm.tool_calling is not None:
+                llm_config["tool_calling"] = self.llm.tool_calling
+            llm_config["max_tool_corrections"] = self.llm.max_tool_corrections
+            if hasattr(self.llm, "_supports_tool_calling"):
+                llm_config["supports_tool_calling"] = self.llm._supports_tool_calling
             data["llm"] = llm_config
 
         # Authenticator
@@ -2237,6 +2242,9 @@ class AgentSerializationMixin(_AgentMixinBase):
                 if reasoning not in ("none", "low", "medium", "high"):
                     raise ValueError("Serialized LLM reasoning must be none, low, medium, or high")
                 base_url = llm_config.get("base_url")
+                for option in ("tool_calling", "supports_tool_calling", "max_tool_corrections"):
+                    if option in llm_config:
+                        l_kwargs[option] = llm_config[option]
                 if base_url:
                     l_kwargs["base_url"] = base_url
                 llm = create_llm(provider, **l_kwargs)

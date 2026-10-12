@@ -149,6 +149,7 @@ A response authorizes only its pending request. Request IDs, run IDs and fingerp
 | Conversation and pending typed model action | Continue the same inference step after a pause |
 | Prepared action and stable action ID | Bind permission to the operation actually requested |
 | Committed action results | Reuse a completed result without invoking its tool again |
+| Committed no-change rejections and correction counters | Deliver rejection feedback without replaying the tool or resetting its allowance |
 | Root budget usage | Preserve model, tool and step counters across resumes and local children |
 | Local child task IDs and checkpoints | Continue blocking delegation through the parent |
 | Pending requests and responses | Reject stale or mismatched responses |
@@ -169,11 +170,18 @@ ProtoLink persists an execution intent before dispatching a tool and a result re
 | Before dispatch | Continue the saved action under current policy |
 | Waiting for approval/input | Return the same pending request or apply its matching response |
 | Result receipt committed | Reuse the result and continue; do not repeat the tool |
+| No-change rejection receipt committed | Reuse the rejection feedback; do not invoke or charge the rejected tool again |
 | Tool started, result receipt missing | Raise `UncertainExecutionError`; require reconciliation |
 | Completed run | Return the stored output |
 | Failed/canceled run with no unresolved action | Reject resume; create a new run if appropriate |
 
 A database checkpoint cannot provide exactly-once effects in an unrelated external system. If a service committed a write and the process stopped before saving its receipt, ProtoLink cannot infer that outcome. It refuses to invoke that operation again automatically.
+
+An explicit `ToolRejectedError` commits an action state of `rejected`, separate from `succeeded` and unresolved
+execution. Its guarantee is that the rejected request made no changes; ProtoLink does not undo effects.
+The inference loop can ask the model for a corrected request within `max_tool_corrections` and existing budgets.
+Rejections and the correction counter survive pauses and restarts. See
+[recoverable tool validation](tool.md#reject-a-request-the-model-can-correct) for the API and its limits.
 
 Ensure the old worker and its operation have stopped, then inspect the external system using the saved action ID, service receipt or your own idempotency key. When you have verified the outcome, trusted application code records it:
 
@@ -412,7 +420,7 @@ updated_report = RunReport.from_task(final_task)
 `CompletionEvidence` supplies the typed `Task`, executed `ToolOutcome` records, artifacts and `RunReport` to each
 predicate. Predicates return `bool` or `ValidationResult`, synchronously or asynchronously. A check requires an
 execution receipt by default; use explicit `action_ids` to bind it to particular operations. A proposed action,
-preview, or approval alone produces `blocked / execution_evidence_missing`. Pure answer predicates may explicitly
+preview, approval or rejected request alone produces `blocked / execution_evidence_missing`. Pure answer predicates may explicitly
 set `require_execution=False`. Old inference receipts can prove execution while omitting private tool output;
 predicates needing that output must use an available structured result or artifact.
 
@@ -425,7 +433,9 @@ Validation emits `validation.completed`, appears in `RunReport.validations` and 
 comparisons. Results distinguish `passed`, `failed`, `blocked` and `stale`, with optional structured codes/messages.
 Validation records its result without changing terminal task state or choosing a repair policy. Native runtime events
 separate `action.requested`, `approval.required`, `approval.decided`, `action.approved`, `action.started`,
-`action.completed` and `validation.completed`. Policy-allowed actions proceed without a human approval event.
+`action.completed`, `action.rejected`, `action.denied`, `action.failed` and `validation.completed`.
+An `action.rejected` event means nothing changed in that request and never proves successful execution.
+Policy-allowed actions proceed without a human approval event.
 
 Use the existing `Graph`, `Pipeline` and `Router` to choose your workflow:
 

@@ -68,16 +68,21 @@ See Also:
     - `protolink.llms.local.base.LocalLLM`: Base class for local models
 """
 
+from __future__ import annotations
+
 import asyncio
 import copy
+import hashlib
 import inspect
 import json
 import re
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from functools import wraps
+from time import monotonic, perf_counter
+from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Literal, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
     from protolink.tools import BaseTool
@@ -95,6 +100,7 @@ from protolink.core.policy import (
     ApprovalRequiredError,
 )
 from protolink.core.run_context import RunContext
+from protolink.core.tool_errors import ToolCorrectionLimitError, ToolRejectedError
 from protolink.llms.actions import (
     AgentCallAction,
     FinalAction,
@@ -151,11 +157,29 @@ MAX_INFER_STEPS: int = 10  # safety against infinite loops
 _HISTORY_RESULT_FALLBACK_CHARS: int = 2_000
 logger = get_logger(__name__)
 
+ToolCallingMode = Literal["auto", "native", "json"]
+"""Action acquisition policy; ``None`` preserves an adapter's existing default."""
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _tool_calling_scope(
+    method: Callable[Concatenate[LLM, _P], Awaitable[_R]],
+) -> Callable[Concatenate[LLM, _P], Coroutine[Any, Any, _R]]:
+    """Keep prompt and adapter selection consistent throughout one inference."""
+
+    @wraps(method)
+    async def scoped(self: LLM, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with self.use_tool_calling():
+            return await method(self, *args, **kwargs)
+
+    return scoped
+
 
 def _action_correction_message(
     error: ValueError,
     *,
-    tools: dict[str, "BaseTool"],
+    tools: dict[str, BaseTool],
     agent_callback_available: bool,
 ) -> str:
     """Build concise correction feedback from validation and runtime context.
@@ -328,6 +352,9 @@ class LLM(ABC):
     # Class-level metadata (set by subclasses)
     model_type: ClassVar[LLMType]
     provider: ClassVar[LLMProvider]
+    _native_tool_calling_available: ClassVar[bool] = False
+    _native_tool_calling_default: ClassVar[bool] = False
+    _CAPABILITY_CACHE_SECONDS: ClassVar[float] = 300.0
 
     def __init__(
         self,
@@ -335,11 +362,17 @@ class LLM(ABC):
         model_params: dict[str, Any],
         *,
         reasoning: ReasoningLevel = "none",
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
         # ---- Instance state ----
         self.model: str = model
         self._model_params: dict[str, Any] = model_params
         self._reasoning: ReasoningLevel = reasoning
+        self._active_tool_calling: ContextVar[Literal["native", "json"] | None] = ContextVar(
+            f"protolink_tool_calling_{id(self)}", default=None
+        )
+        self._tool_calling_capability_cache: tuple[str, float, bool | None] | None = None
+        self.tool_calling = tool_calling
 
         self._history: ConversationHistory = ConversationHistory()
         self._active_history: ContextVar[ConversationHistory | None] = ContextVar(
@@ -351,18 +384,23 @@ class LLM(ABC):
         self.metrics_enabled: bool = True
         self._metrics_profile: LLMModelProfile | None = None
         self._max_parse_failures: int = 3
+        self._max_tool_corrections: int = 2
         self.sync = SyncLLM(self)
 
     def __getstate__(self) -> dict[str, Any]:
         """Return deepcopy/pickle state without the task-local context variable."""
         state = dict(self.__dict__)
         state.pop("_active_history", None)
+        state.pop("_active_tool_calling", None)
+        state.pop("_tool_calling_capability_cache", None)
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore deepcopy/pickle state and recreate runtime-local helpers."""
         self.__dict__.update(state)
         self._active_history = self._new_history_context_var()
+        self._active_tool_calling = ContextVar(f"protolink_tool_calling_{id(self)}", default=None)
+        self._tool_calling_capability_cache = None
         self.compactor = HistoryCompactor(self)
 
     def _new_history_context_var(self) -> ContextVar[ConversationHistory | None]:
@@ -431,6 +469,27 @@ class LLM(ABC):
             raise ValueError(f"max_parse_failures must be between 1 and {MAX_INFER_STEPS}")
         self._max_parse_failures = value
 
+    @property
+    def max_tool_corrections(self) -> int:
+        """Maximum corrective turns for rejected tool requests in one inference.
+
+        Defaults to two. Unknown tools, invalid input schemas and explicit
+        ``ToolRejectedError`` share this allowance. Zero stops at the first
+        rejection. Successful actions do not reset the counter; all further
+        model calls and actual tool invocations also consume existing budgets.
+        Durable checkpoints preserve the counter across pauses and restarts.
+        This is a runtime setting, never a provider generation parameter.
+        """
+        return getattr(self, "_max_tool_corrections", 2)
+
+    @max_tool_corrections.setter
+    def max_tool_corrections(self, value: int) -> None:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError("max_tool_corrections must be an integer")
+        if not 0 <= value <= MAX_INFER_STEPS:
+            raise ValueError(f"max_tool_corrections must be between 0 and {MAX_INFER_STEPS}")
+        self._max_tool_corrections = value
+
     @contextmanager
     def use_history(self, history: ConversationHistory):
         """Temporarily bind a task-local conversation history.
@@ -453,6 +512,119 @@ class LLM(ABC):
         finally:
             self._active_history.reset(token)
 
+    @property
+    def tool_calling(self) -> ToolCallingMode | None:
+        """Configured action mode, separate from provider generation options.
+
+        ``auto`` uses cached provider capability evidence, choosing JSON when
+        support is unknown. ``native`` and ``json`` are explicit overrides.
+        ``None`` retains the adapter's original default and legacy capability
+        flag. Changing this setting takes effect on the next inference; an
+        active inference retains its selected mode.
+        """
+        return getattr(self, "_tool_calling_mode", None)
+
+    @tool_calling.setter
+    def tool_calling(self, mode: ToolCallingMode | None) -> None:
+        if mode is not None and mode not in ("auto", "native", "json"):
+            raise ValueError("tool_calling must be 'auto', 'native', 'json', or None")
+        if mode == "native" and not self._native_tool_calling_available:
+            raise ValueError(f"{type(self).__name__} does not implement native tool calling")
+        self._tool_calling_mode = mode
+
+    def discover_tool_calling(self) -> bool | None:
+        """Return provider evidence for native tools, without generating text.
+
+        Adapters with a known native API contract return ``True``. Configurable
+        servers return ``None`` unless their adapter can obtain model-specific
+        metadata. Override this hook to return ``True``, ``False`` or ``None``
+        for supported, unsupported or unknown configurations. Discovery must
+        never invoke a model or execute an application tool.
+        """
+        return True if self._native_tool_calling_default else None
+
+    def refresh_capabilities(self) -> None:
+        """Invalidate cached discovery for the next automatic selection.
+
+        Call this after updating a server, model or chat template behind the
+        same endpoint and model name. Cache entries otherwise expire after five
+        minutes and configuration changes automatically select a new entry.
+        An active inference keeps its current mode.
+        """
+        self._tool_calling_capability_cache = None
+
+    def resolve_tool_calling(self) -> Literal["native", "json"]:
+        """Resolve the runtime policy once, reusing bounded capability checks.
+
+        Explicit modes do not perform discovery. Unknown or unavailable
+        capability metadata selects JSON; generation errors and malformed
+        actions never change the selected protocol. Cache keys include the
+        provider, endpoint, exact model, parameters and request headers.
+        """
+        active: ContextVar[Literal["native", "json"] | None] | None = getattr(self, "_active_tool_calling", None)
+        selected = active.get() if active is not None else None
+        if selected is not None:
+            return selected
+        mode = self.tool_calling
+        if mode in ("native", "json"):
+            return mode
+        if mode is None:
+            enabled = getattr(self, "_supports_tool_calling", self._native_tool_calling_default)
+            return "native" if enabled else "json"
+        if not self._native_tool_calling_available:
+            return "json"
+        configuration = {
+            "provider": self.provider,
+            "endpoint": getattr(self, "base_url", None),
+            "model": self.model,
+            "parameters": self.model_params,
+            "headers": getattr(self, "headers", None),
+        }
+        key = hashlib.sha256(json.dumps(configuration, sort_keys=True, default=str).encode()).hexdigest()
+        cached = getattr(self, "_tool_calling_capability_cache", None)
+        now = monotonic()
+        if cached is None or cached[0] != key or now >= cached[1]:
+            try:
+                supported = self.discover_tool_calling()
+            except Exception as exc:
+                logger.warning(f"Tool capability discovery unavailable; using JSON actions: {type(exc).__name__}")
+                supported = None
+            self._tool_calling_capability_cache = (key, now + self._CAPABILITY_CACHE_SECONDS, supported)
+        else:
+            supported = cached[2]
+        return "native" if supported is True else "json"
+
+    @contextmanager
+    def use_tool_calling(self):
+        """Pin one action mode for prompts, requests and durable continuation.
+
+        Explicit policies persist their selected mode in the current durable
+        task. Resumption reuses that mode even if metadata is temporarily
+        unavailable; the stored history and request protocol remain compatible.
+        """
+        active: ContextVar[Literal["native", "json"] | None] | None = getattr(self, "_active_tool_calling", None)
+        if active is None:
+            active = self._active_tool_calling = ContextVar(f"protolink_tool_calling_{id(self)}", default=None)
+        from protolink.core.durable import current_durable_run
+
+        durable = current_durable_run() if self.tool_calling is not None else None
+        saved = durable.data.get("tool_calling_mode") if durable is not None else None
+        if saved is not None and saved not in ("native", "json"):
+            raise ValueError("Durable checkpoint has an invalid tool-calling mode")
+        selected = saved or active.get() or self.resolve_tool_calling()
+        if selected == "native" and self.tool_calling is not None and not self._native_tool_calling_available:
+            raise ValueError("Durable checkpoint requires an adapter with native tool calling")
+        if durable is not None:
+            durable.data["tool_calling_mode"] = selected
+        if active.get() == selected:
+            yield
+            return
+        token = active.set(selected)
+        try:
+            yield
+        finally:
+            active.reset(token)
+
     def configure_metrics(
         self,
         profile: LLMModelProfile | dict[str, Any] | None = None,
@@ -462,7 +634,7 @@ class LLM(ABC):
         output_cost_per_million: float | None = None,
         currency: str = "USD",
         enabled: bool = True,
-    ) -> "LLM":
+    ) -> LLM:
         """Configure optional LLM budget metrics for this model.
 
         Metrics are purely observational. They do not change prompt generation, provider request payloads, retry
@@ -605,7 +777,7 @@ class LLM(ABC):
         that actually send native tool declarations override this so the system prompt does not ask the model to emit
         JSON while the provider API is asking it to call tools.
         """
-        return False
+        return self.resolve_tool_calling() == "native"
 
     @property
     def supports_native_action_stream(self) -> bool:
@@ -615,13 +787,13 @@ class LLM(ABC):
         ``True`` here. Providers that stream plain text should keep the default ``False`` so the agent builds the JSON
         action prompt for streaming inference.
         """
-        return False
+        return self.resolve_tool_calling() == "native"
 
     def call_action(
         self,
         history: ConversationHistory,
         *,
-        tools: dict[str, "BaseTool"],
+        tools: dict[str, BaseTool],
         agent_callback_available: bool = False,
         agent_cards: list[Any] | None = None,
     ) -> LLMActionResult:
@@ -654,7 +826,7 @@ class LLM(ABC):
         self,
         history: ConversationHistory,
         *,
-        tools: dict[str, "BaseTool"],
+        tools: dict[str, BaseTool],
         agent_callback_available: bool = False,
         agent_cards: list[Any] | None = None,
         chunk_callback: Callable[[str], Awaitable[None]] | None = None,
@@ -696,11 +868,12 @@ class LLM(ABC):
     # internal logic. This implementation should be implemented in `_inject_tool_call`
     # ----------------------------------------------------------------------
 
+    @_tool_calling_scope
     async def infer(
         self,
         *,
         query: str,
-        tools: dict[str, "BaseTool"],
+        tools: dict[str, BaseTool],
         agent_callback: Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None = None,
         agent_cards: list[Any] | None = None,
         streaming: bool = False,
@@ -714,7 +887,7 @@ class LLM(ABC):
         context_policy: ContextPolicy | None = None,
         hooks: tuple[AgentHooks, ...] = (),
         tool_prompt_builder: Callable[[dict[str, BaseTool]], None] | None = None,
-    ) -> "Part":
+    ) -> Part:
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
 
@@ -742,7 +915,9 @@ class LLM(ABC):
 
            - ``final``: The loop terminates and returns the response content.
            - ``tool_call``: The specified tool is executed and its result is injected back into the conversation
-             history for the LLM to observe.
+             history for the LLM to observe. Unknown tools, schema mismatches and explicit side-effect-free
+             ``ToolRejectedError`` rejections return correction feedback within ``max_tool_corrections``.
+             Ordinary exceptions inside a tool remain execution failures.
            - ``agent_call``: The request is delegated to another agent via the callback and the result is similarly
              injected into history.
 
@@ -915,6 +1090,8 @@ class LLM(ABC):
 
         steps: int = saved_loop["steps"] if saved_loop is not None else 0
         parse_failures: int = saved_loop["parse_failures"] if saved_loop is not None else 0
+        tool_corrections: int = saved_loop.get("tool_corrections", 0) if saved_loop is not None else 0
+        max_tool_corrections = self.max_tool_corrections
         max_parse_failures = self.max_parse_failures
         recent_actions: list[str] = list(saved_loop["recent_actions"]) if saved_loop is not None else []
         max_recent_actions: int = 5  # Window for detecting repeated actions
@@ -987,9 +1164,77 @@ class LLM(ABC):
                     self.history,
                     steps=steps,
                     parse_failures=parse_failures,
+                    tool_corrections=tool_corrections,
                     recent_actions=recent_actions,
                     pending=None,
                 )
+
+        def inject_tool_observation(tool_name: str, tool_args: dict[str, Any], result: Any) -> bool:
+            """Retain an outcome even when an optional provider history hook fails."""
+            try:
+                self._inject_tool_call(tool_name=tool_name, tool_args=tool_args, tool_result=result)
+                return False
+            except Exception as exc:
+                logger.warning(f"Provider tool-result history injection failed; using portable observation: {exc}")
+                self.history.add_system(
+                    json.dumps(
+                        {
+                            "type": "tool_result",
+                            "tool": tool_name,
+                            "result": result,
+                            "observation_format": "portable_fallback",
+                        },
+                        default=json_history_default,
+                    )
+                )
+                return True
+
+        async def reject_tool_request(
+            error: ToolRejectedError,
+            *,
+            tool_name: str,
+            tool_args: dict[str, Any],
+            phase: str,
+            action_id: str | None = None,
+        ) -> None:
+            """Deliver a no-change observation and charge one bounded correction."""
+            nonlocal tool_corrections
+            tool_corrections += 1
+            recoverable = tool_corrections <= max_tool_corrections
+            rejection = error.to_dict()
+            feedback = {
+                "type": "tool_rejection",
+                **rejection,
+                "correction": {
+                    "attempt": tool_corrections,
+                    "remaining": max(0, max_tool_corrections - tool_corrections),
+                    "allowed": recoverable,
+                    "instruction": (
+                        "Correct the request using this feedback, choose another action, or explain the rejection."
+                    ),
+                },
+            }
+            fallback = inject_tool_observation(tool_name, tool_args, feedback)
+            await emit(
+                {
+                    "type": "tool_rejected",
+                    "step": steps,
+                    "tool": tool_name,
+                    "action_id": action_id,
+                    "message": error.message,
+                    "rejection": rejection,
+                    "recoverable": recoverable,
+                    "phase": phase,
+                    "correction_count": tool_corrections,
+                    "max_tool_corrections": max_tool_corrections,
+                    "observation_fallback": fallback,
+                }
+            )
+            checkpoint_ready()
+            if not recoverable:
+                raise ToolCorrectionLimitError(
+                    tool_name=tool_name, attempts=tool_corrections, limit=max_tool_corrections, last_error=error
+                ) from error
 
         while steps < MAX_INFER_STEPS or (
             durable is not None and (durable.loop_state() or {}).get("pending") is not None
@@ -1132,10 +1377,8 @@ class LLM(ABC):
                         }
                     )
 
+                call_started_at = perf_counter()
                 try:
-                    import time
-
-                    call_started_at = time.perf_counter()
                     if streaming:
 
                         async def stream_action(
@@ -1174,7 +1417,7 @@ class LLM(ABC):
                             _on_retry=on_llm_retry,
                         )
                         raw_response = action_result.raw_response
-                    latency_ms = round((time.perf_counter() - call_started_at) * 1000, 3)
+                    latency_ms = round((perf_counter() - call_started_at) * 1000, 3)
                     response_metadata = dict(action_result.metadata if action_result is not None else {})
                     response_metadata["attempts"] = attempt_count
                     response_metadata["retry_attempts"] = max(attempt_count - 1, 0)
@@ -1232,6 +1475,26 @@ class LLM(ABC):
                     await enforce_budget(active_budget_enforcer.evaluate())
                 except ValueError as e:
                     action_error = e
+                    if isinstance(e, ActionParseError) and e.raw_response is not None:
+                        raw_response = e.raw_response
+                        if metrics_active or active_budget_enforcer.has_output_token_limit:
+                            failed_metrics = build_call_metrics(
+                                step=steps,
+                                provider=str(getattr(self, "provider", "")) or None,
+                                model=self.model,
+                                latency_ms=round((perf_counter() - call_started_at) * 1000, 3),
+                                input_value=self.history,
+                                output_value=raw_response,
+                                profile=self.metrics_profile,
+                                provider_usage=e.metadata.get("usage"),
+                                streaming=streaming,
+                                native=self.uses_native_action_prompt,
+                            )
+                            if metrics_active:
+                                await emit({"type": "llm_call_metrics", **failed_metrics.to_dict()})
+                            await enforce_budget(
+                                active_budget_enforcer.record_output_tokens(failed_metrics.usage.output_tokens)
+                            )
                 except BudgetExceededError:
                     raise
                 except Exception as e:
@@ -1291,6 +1554,7 @@ class LLM(ABC):
                     self.history,
                     steps=steps,
                     parse_failures=parse_failures,
+                    tool_corrections=tool_corrections,
                     recent_actions=recent_actions,
                     pending={
                         "action": action_obj.model_dump(exclude_none=True),
@@ -1352,26 +1616,22 @@ class LLM(ABC):
 
                 if tool_name not in tools:
                     available = list(tools.keys())
-                    await emit(
-                        {
-                            "type": "tool_error",
-                            "step": steps,
-                            "tool": tool_name,
-                            "message": f"Unknown tool: {tool_name}",
-                            "recoverable": True,
-                            "phase": "validation",
-                        }
+                    await reject_tool_request(
+                        ToolRejectedError(
+                            f"Unknown tool: {tool_name}"
+                            if available
+                            else (
+                                "The `tool_call` was structurally valid, but no local tools are available "
+                                "for this inference. Choose another action, such as `final`."
+                            ),
+                            code="unknown_tool",
+                            details={"available_tools": available},
+                            suggestion="Choose an available tool or another action, such as final.",
+                        ),
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                        phase="validation",
                     )
-                    if available:
-                        self.history.add_system(
-                            f"The `tool_call` selected unknown tool '{tool_name}'. Available tools: {available}"
-                        )
-                    else:
-                        self.history.add_system(
-                            "The `tool_call` was structurally valid, but no local tools are available "
-                            "for this inference. Choose another action, such as `final`."
-                        )
-                    checkpoint_ready()
                     continue
 
                 tool = tools[tool_name]
@@ -1379,22 +1639,19 @@ class LLM(ABC):
                 try:
                     tool_args = self._validate_tool_arguments(tool, tool_args)
                 except (TypeError, ValueError) as e:
-                    await emit(
-                        {
-                            "type": "tool_error",
-                            "step": steps,
-                            "tool": tool_name,
-                            "message": str(e),
-                            "recoverable": True,
-                            "phase": "validation",
-                        }
+                    await reject_tool_request(
+                        ToolRejectedError(
+                            f"Tool '{tool_name}' arguments were invalid: {e}",
+                            code="invalid_arguments",
+                            suggestion="Check the tool's input schema and correct the arguments.",
+                        ),
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                        phase="validation",
                     )
-                    self.history.add_system(
-                        f"Tool '{tool_name}' arguments were invalid: {e}. Check the tool's input schema and try again."
-                    )
-                    checkpoint_ready()
                     continue
 
+                tool_rejection: ToolRejectedError | None = None
                 try:
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
@@ -1428,18 +1685,24 @@ class LLM(ABC):
                             "action_id": action_id,
                         }
                     )
-                    if authorization is not None:
-                        from protolink.core.execution import ToolExecution, execute_authorized_tool
+                    try:
+                        if authorization is not None:
+                            from protolink.core.execution import ToolExecution, execute_authorized_tool
 
-                        tool_result = await execute_authorized_tool(
-                            tool,
-                            ToolExecution(authorization, active_context, active_budget_enforcer, cancellation_token),
-                            emit_events=callable(getattr(tool, "execute_authorized", None)),
-                        )
-                    else:
-                        if cancellation_token is not None:
-                            cancellation_token.raise_if_cancelled()
-                        tool_result = await tool(**tool_args)
+                            tool_result = await execute_authorized_tool(
+                                tool,
+                                ToolExecution(
+                                    authorization, active_context, active_budget_enforcer, cancellation_token
+                                ),
+                                emit_events=callable(getattr(tool, "execute_authorized", None)),
+                            )
+                        else:
+                            if cancellation_token is not None:
+                                cancellation_token.raise_if_cancelled()
+                            tool_result = await tool(**tool_args)
+                    except ToolRejectedError as error:
+                        tool_rejection = error
+                        tool_result = None
                 except ActionPolicyError:
                     raise
                 except DurableExecutionError:
@@ -1458,6 +1721,12 @@ class LLM(ABC):
                     )
                     raise RuntimeError(f"Tool '{tool_name}' execution failed: {e}") from e
 
+                if tool_rejection is not None:
+                    await reject_tool_request(
+                        tool_rejection, tool_name=tool_name, tool_args=tool_args, phase="execution", action_id=action_id
+                    )
+                    continue
+
                 history_tool_result = _history_safe_result(tool_result)
                 if hooks:
                     observation = ToolObservation(
@@ -1471,32 +1740,8 @@ class LLM(ABC):
                     and not getattr(tool, "_protolink_ephemeral_result", False)
                 ):
                     history_tool_result = context_policy.observation(history_tool_result)
-                observation_fallback = False
                 observation_start = len(self.history)
-                try:
-                    self._inject_tool_call(
-                        tool_name=tool_name,
-                        tool_args=tool_args,
-                        tool_result=history_tool_result,
-                    )
-                except Exception as exc:
-                    # The external operation already completed. A broken
-                    # provider-specific history hook must not erase that fact
-                    # and invite a duplicate retry, so retain a portable system
-                    # observation as the final fallback.
-                    observation_fallback = True
-                    logger.warning(f"Provider tool-result history injection failed; using portable observation: {exc}")
-                    self.history.add_system(
-                        json.dumps(
-                            {
-                                "type": "tool_result",
-                                "tool": tool_name,
-                                "result": history_tool_result,
-                                "observation_format": "portable_fallback",
-                            },
-                            default=json_history_default,
-                        )
-                    )
+                observation_fallback = inject_tool_observation(tool_name, tool_args, history_tool_result)
                 if context_policy is not None:
                     from protolink.llms.context_policy import CONTEXT_OBSERVATION_KEY
 
@@ -1715,7 +1960,7 @@ class LLM(ABC):
         return hashlib.sha256(key.encode()).hexdigest()
 
     @staticmethod
-    def _validate_tool_arguments(tool: "BaseTool", arguments: dict[str, Any] | None) -> dict[str, Any]:
+    def _validate_tool_arguments(tool: BaseTool, arguments: dict[str, Any] | None) -> dict[str, Any]:
         """Validate and lightly coerce model-proposed arguments before execution.
 
         Native :class:`Tool` instances own richer validation that includes resolved annotations. Protocol-compatible
@@ -1742,7 +1987,7 @@ class LLM(ABC):
         self,
         response: str,
         *,
-        tools: dict[str, "BaseTool"] | None = None,
+        tools: dict[str, BaseTool] | None = None,
         agent_cards: list[Any] | None = None,
     ) -> LLMAction:
         """Parse a raw model response into a validated runtime action."""
@@ -1752,7 +1997,7 @@ class LLM(ABC):
     def _repair_fallback_action_payload(
         data: Any,
         *,
-        tools: dict[str, "BaseTool"],
+        tools: dict[str, BaseTool],
         agent_cards: list[Any],
     ) -> Any:
         """Compatibility wrapper for fallback action repair."""
@@ -2251,19 +2496,19 @@ class SyncLLM:
         This API should NOT be used inside an active event loop (e.g., FastAPI, Jupyter async cells).
     """
 
-    def __init__(self, llm: "LLM"):
+    def __init__(self, llm: LLM):
         self._llm = llm
 
     def infer(
         self,
         *,
         query: str,
-        tools: dict[str, "BaseTool"],
+        tools: dict[str, BaseTool],
         agent_callback: Callable[[str, str, dict[str, Any]], Awaitable[Any]] | None = None,
         agent_cards: list[Any] | None = None,
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
-    ) -> "Part":
+    ) -> Part:
         """Synchronously execute the inference loop.
 
         This is a blocking version of `infer()`.

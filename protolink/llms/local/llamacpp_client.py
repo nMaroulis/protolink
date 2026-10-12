@@ -4,10 +4,12 @@ from typing import Any, ClassVar
 
 from protolink.llms._deps import require_llama_cpp
 from protolink.llms._streaming import threaded_stream
-from protolink.llms.actions import AgentCallAction, FinalAction, LLMActionResult, ToolCallAction, action_to_json
+from protolink.llms.actions import AgentCallAction, LLMActionResult, ToolCallAction, action_to_json
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.local.base import LocalLLM
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
     chat_completion_stream_delta,
@@ -26,6 +28,8 @@ logger = get_logger(__name__)
 class LlamaCPPLocalLLM(LocalLLM):
     """Local Llama.cpp implementation of the LLM interface running inside the local Python process."""
 
+    _native_tool_calling_available: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "llama.cpp-local"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
         "temperature": 0.8,
@@ -38,9 +42,16 @@ class LlamaCPPLocalLLM(LocalLLM):
         model: str,
         model_params: dict[str, Any] | None = None,
         supports_tool_calling: bool = False,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Create the adapter with an optional runtime tool-calling policy.
+
+        ``tool_calling`` accepts ``auto``, ``native`` or ``json``. Omit it
+        to preserve the adapter default; the option is never forwarded as
+        a provider generation setting. See ``LLM.resolve_tool_calling``.
+        """
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
-        super().__init__(model=model, model_params=merged_params)
+        super().__init__(model=model, model_params=merged_params, tool_calling=tool_calling)
         self._supports_tool_calling = supports_tool_calling
 
         llama_cpp = require_llama_cpp()
@@ -50,16 +61,6 @@ class LlamaCPPLocalLLM(LocalLLM):
 
         self._client = llama_cpp.Llama(model_path=self.model, verbose=False)
         self.validate_connection()
-
-    @property
-    def uses_native_action_prompt(self) -> bool:
-        """Use native prompts only when local llama.cpp tool calling is enabled."""
-        return bool(getattr(self, "_supports_tool_calling", False))
-
-    @property
-    def supports_native_action_stream(self) -> bool:
-        """Use native streaming tool calls only for opted-in llama.cpp models."""
-        return bool(getattr(self, "_supports_tool_calling", False))
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)
@@ -108,7 +109,7 @@ class LlamaCPPLocalLLM(LocalLLM):
         uses the prompt JSON fallback; enabled mode passes native tool
         declarations and normalizes any returned tool call.
         """
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return super().call_action(
                 history,
                 tools=tools,
@@ -150,7 +151,7 @@ class LlamaCPPLocalLLM(LocalLLM):
         deltas into one validated Protolink action. Models that are not opted
         into native tools continue through the base JSON streaming fallback.
         """
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return await super().call_action_stream(
                 history,
                 tools=tools,
@@ -201,22 +202,7 @@ class LlamaCPPLocalLLM(LocalLLM):
         content = "".join(output_text).strip()
         if not content:
             raise ValueError("llama-cpp-python stream did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata={"provider": "llama.cpp-local"},
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata={"provider": "llama.cpp-local", "streaming": True},
-            )
+        return normalize_native_text(content, metadata={"provider": "llama.cpp-local", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Utils
@@ -247,22 +233,7 @@ class LlamaCPPLocalLLM(LocalLLM):
         content = str(message.get("content") or "").strip()
         if not content:
             raise ValueError("llama-cpp-python response did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata=usage_metadata({"provider": "llama.cpp-local"}, payload),
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata=usage_metadata({"provider": "llama.cpp-local"}, payload),
-            )
+        return normalize_native_text(content, metadata=usage_metadata({"provider": "llama.cpp-local"}, payload))
 
     @staticmethod
     def _action_from_tool_call(call: Any) -> ToolCallAction | AgentCallAction:
