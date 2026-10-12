@@ -521,6 +521,7 @@ td { font-size: 13px; overflow-wrap: anywhere; }
 .span-bar.tool { background: linear-gradient(90deg, var(--amber), #e9af42); }
 .span-bar.agent-call { background: linear-gradient(90deg, var(--coral), #ef8e7d); }
 .span-bar.error { background: repeating-linear-gradient(135deg, var(--coral), var(--coral) 5px, #f69b8d 5px, #f69b8d 9px); }
+.span-bar.rejected { background: var(--amber); }
 .span-bar.open { border: 1px dashed rgba(189,125,17,.9); background: rgba(255,243,207,.92); }
 .trace-limit-note { margin-top: 9px; color: var(--muted); font-size: 11px; }
 .replay-controls { padding: 11px 13px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: auto auto auto minmax(120px, 1fr) auto auto; align-items: center; gap: 8px; background: linear-gradient(90deg, #fbfcfe, #f3faf9); }
@@ -1615,6 +1616,7 @@ function renderSpanWaterfall(trace) {
     const kind = traceKindClass(span.kind);
     const incomplete = !Number.isFinite(resolvedEnd);
     const error = boundedSummaryText(span.status, 64).toLowerCase() === 'error' || Boolean(span.error);
+    const rejected = boundedSummaryText(span.status, 64).toLowerCase() === 'rejected';
     const active = entry.key === telemetryState.selectedSpanKey;
     const durationLabel = incomplete ? 'open' : formatMilliseconds(Number.isFinite(rawDuration) && rawDuration >= 0 ? rawDuration : Math.max(0, end - start));
     const stateLabel = error ? 'error' : incomplete ? 'open' : boundedDisplayText(span.status, 'complete', 48);
@@ -1625,7 +1627,7 @@ function renderSpanWaterfall(trace) {
           <span class="span-kind-dot ${kind}"></span><span class="span-name" title="${htmlAttr(spanName)}">${esc(spanName)}</span>
           <span class="span-duration">${esc(durationLabel)}</span>
         </span>
-        <span class="span-track"><span class="span-bar ${kind} ${error ? 'error' : incomplete ? 'open' : ''}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></span></span>
+        <span class="span-track"><span class="span-bar ${kind} ${error ? 'error' : rejected ? 'rejected' : incomplete ? 'open' : ''}" style="left:${left.toFixed(3)}%;width:${width.toFixed(3)}%"></span></span>
       </button>
     `;
   }).join('');
@@ -1821,6 +1823,7 @@ function boundedPreviewValue(value, state, depth) {
 }
 
 function eventSummary(event) {
+  if (event?.type === 'tool_rejected') return `Tool '${boundedDisplayText(event.payload?.tool, 'unnamed', 120)}' rejected the request; nothing changed.`;
   const payload = event?.payload && typeof event.payload === 'object' ? event.payload : {};
   const parts = [
     payload.model ? `model ${boundedDisplayText(payload.model, '', 120)}` : '',
@@ -3129,7 +3132,7 @@ function renderReplay(view) {
   const lifecycle = runLifecycle(view.final_task?.state || (items.some(item => item.severity === 'error') ? 'error' : 'completed'));
   const timeline = items.length
     ? `<div class="run-timeline">${items.map((item, index) => {
-        const severity = ['error', 'warn'].includes(item.severity) ? item.severity : '';
+        const severity = item.severity === 'warning' ? 'warn' : ['error', 'warn'].includes(item.severity) ? item.severity : '';
         return `<div class="run-event ${severity}"><div class="run-event-rail"><span class="run-event-dot">${index + 1}</span></div><div class="run-event-card"><strong>${esc(boundedDisplayText(item.event_type, 'event', 160))}</strong><p>${esc(boundedDisplayText(item.summary, 'No summary', 1200))}</p><div class="run-event-meta"><span>${esc(timestampLabel(item.timestamp))}</span><span>${esc(boundedDisplayText(item.agent_name || view.agent_name, 'unassigned', 120))}</span>${item.task_id ? `<span>task ${esc(shortId(item.task_id, 26))}</span>` : ''}</div></div></div>`;
       }).join('')}</div>`
     : '<div class="panel-body"><div class="empty-muted">This record contains no replay events.</div></div>';

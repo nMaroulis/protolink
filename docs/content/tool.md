@@ -40,6 +40,136 @@ for collision handling, discovery side effects and connection ownership.
 See [Built-in Tools](builtin-tools.md) for the complete built-in catalog.
 [Execution, approvals and recovery](execution-tools.md) covers run handles, approval brokers and completion checks.
 
+## Reject a request the model can correct
+
+Schema validation checks the shape of a request. A tool often also needs application validation: an ID must exist,
+a selection must belong to the current catalog, or a requested combination must be supported. Raise
+`ToolRejectedError` when this validation rejects a request **before any changes or external effects occur**.
+The inference loop returns the structured feedback to the same model, which can correct its next request,
+choose a different action, or explain why it cannot proceed.
+
+```python
+from protolink import Agent, ToolRejectedError, create_llm
+
+checks = {"lint": "Check source style", "tests": "Run the test suite"}
+plan = []
+
+
+def plan_task(check_id: str) -> dict[str, str]:
+    """Select a known check before changing the plan."""
+    if check_id not in checks:
+        raise ToolRejectedError(
+            "Unknown check selection.",
+            code="invalid_check_selection",
+            details={"valid_ids": list(checks)},
+            suggestion="Select one of the advertised check IDs.",
+        )
+    plan.append(check_id)
+    return {"check_id": check_id, "description": checks[check_id]}
+
+
+llm = create_llm(
+    "ollama:qwen3:4b",
+    base_url="http://localhost:11434",
+    tool_calling="auto",
+    max_tool_corrections=2,
+)
+agent = Agent(name="planner", llm=llm, tools=[plan_task])
+answer = agent.sync.invoke("Select a suitable check.")
+```
+
+Only the tool's accepted branch changes `plan`. The model receives the error code, message, valid IDs and suggestion,
+alongside `status="rejected"` and `changes_made=false`. JSON and native action acquisition use the same correction
+machinery and the adapter's existing tool-observation hook. Try the runnable
+[offline example](https://github.com/nMaroulis/protolink/blob/main/examples/tool_rejection.py) without a model server.
+
+### Bound corrections within the current inference
+
+`max_tool_corrections` defaults to **two corrective turns** per `infer()` invocation. Unknown tools, schema mismatches
+and explicit tool rejections share this allowance. Two rejected requests can receive corrective turns; a third
+rejection raises `ToolCorrectionLimitError`. Set the limit to `0` to stop at the first rejection, or assign
+`llm.max_tool_corrections` after construction. The accepted range is `0` through `10`; the inference loop's existing
+ten-step ceiling can stop work sooner.
+
+Successful actions do not replenish the allowance. Every subsequent model call, step and actual tool invocation
+still consumes the existing run budgets; an invoked tool that rejects counts as a tool call. A schema or unknown-tool
+rejection never invokes the callable and does not charge a tool call. Completed observations remain available and
+successful actions retain their deduplication protection. Rejected requests are not marked as successful, so the
+model can correct and resubmit them. No automatic tool retry occurs outside a model-driven inference loop.
+
+`ToolCorrectionLimitError` exposes `tool_name`, `attempts`, `limit` and `last_error`. A limit failure concerns the latest
+rejected request; earlier successful actions may already have changed resources. Agent task failures include a
+`tool_correction_limit` blocker with the final rejection and counters.
+
+### Distinguish rejection from execution failure
+
+| Outcome | Contract | Reporting |
+| --- | --- | --- |
+| Successful execution | The tool returned its result | `tool_result` / `action.completed` |
+| Request rejected | `ToolRejectedError`, or pre-execution tool/schema validation; nothing changed in this request | `tool_rejected` / `action.rejected` |
+| Permission denied | Policy or approval denied the action | `action.denied` |
+| Execution failed | Ordinary exception inside the tool; effects may be partial or unknown | `tool_error` / `action.failed` |
+
+A rejection is an application guarantee, not a rollback performed by ProtoLink. Do not convert arbitrary exceptions,
+network failures, partial writes or uncertain external responses into `ToolRejectedError`. Keep them as execution
+failures and use your application's reconciliation procedure where necessary. Raising `ValueError` inside a tool
+continues to fail inference; it is not treated as argument-schema feedback.
+
+Keep rejection details concise and safe to expose: the model, telemetry, client event streams and persisted reports
+can see this feedback. Details must be a JSON object with serializable, finite values. `after_tool` hooks receive
+successful observations only and do not run for rejections. Explicit tool objects and `agent.call_tool()` propagate
+the rejection without correction; task-level tool execution returns a structured `tool_output.error`. Durable direct
+calls use that task contract and can raise `TaskExecutionError`.
+
+With [durability](execution-tools.md#durable-execution) enabled, ProtoLink commits a distinct rejection receipt and
+preserves the correction counter. Approval pauses and application restarts do not reset the allowance. If the process
+stops after the receipt is committed but before feedback enters history, resumption reuses the recorded rejection
+without calling or charging the tool again. An `action_rejection` artifact never proves successful execution for
+`CompletionValidator`.
+
+### ToolRejectedError
+
+<ApiReference
+  kind="exception"
+  path="protolink.ToolRejectedError"
+  signature={`ToolRejectedError(
+    message: str,
+    *,
+    code: str = "tool_rejected",
+    details: dict[str, Any] | None = None,
+    suggestion: str | None = None,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/tool_errors.py"
+>
+
+Available from `protolink` and `protolink.tools`. Raise only for a rejected request that made no changes.
+`message` and `code` must be nonblank strings; `suggestion` is nonblank text or `None`. `details` is copied through
+JSON serialization. Invalid feedback raises `TypeError` or `ValueError` and is not silently recovered.
+`to_dict()` returns detached feedback with the no-change outcome; `from_dict()` restores a committed rejection.
+
+</ApiReference>
+
+### ToolCorrectionLimitError
+
+<ApiReference
+  kind="exception"
+  path="protolink.ToolCorrectionLimitError"
+  signature={`ToolCorrectionLimitError(
+    *,
+    tool_name: str,
+    attempts: int,
+    limit: int,
+    last_error: ToolRejectedError,
+)`}
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/tool_errors.py"
+>
+
+Terminal inference exception available from `protolink` and `protolink.tools`. Applications normally inspect this
+exception rather than construct it. `attempts` counts rejected requests; `limit` counts permitted corrective turns.
+The final rejection is available through `last_error`, including its code, details and suggestion.
+
+</ApiReference>
+
 ## Overview
 
 Protolink provides a flexible tool system with three approaches:
@@ -202,7 +332,7 @@ The protocol is the smallest contract understood by Agent registration and execu
     capabilities: Collection[str] | None = None,
     action_builder: ActionBuilder | None = None,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L17"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L22"
 >
 
 Adapt a synchronous or asynchronous Python callable to the `BaseTool` contract. Construction inspects the callable signature and resolved type hints, infers any missing schemas, normalizes explicit schemas and converts missing tags, examples and capabilities into empty collections.
@@ -315,7 +445,7 @@ agent.add_tool(add_tool)
   signature={`validate_args(
     kwargs: dict[str, Any] | None,
 ) -> dict[str, Any]`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L76"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L140"
 >
 
 Validate proposed keyword arguments with the normalized input schema, wrapped callable signature and resolved type hints. Custom execution paths can call this method to perform the same coercion as `Tool.__call__()` before preparing policy metadata.
@@ -354,7 +484,7 @@ Validate proposed keyword arguments with the normalized input schema, wrapped ca
   signature={`async __call__(
     **kwargs: Any,
 ) -> Any`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L85"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L149"
 >
 
 Validate keyword arguments and invoke the wrapped Python callable. A synchronous result is returned from the coroutine immediately; an awaitable result is awaited before returning.
@@ -401,7 +531,7 @@ Validate keyword arguments and invoke the wrapped Python callable. A synchronous
     arguments: dict[str, Any],
     context: RunContext,
 ) -> RunAction`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L98"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L167"
 >
 
 Build the runtime action evaluated before this tool executes. Without a custom builder, the action has kind `tool.call`, the tool name and description, validated arguments as payload and the tool's declared capability set.
@@ -590,7 +720,7 @@ async def book_hotel(booking: BookingRequest) -> dict[str, str]:
     return {"location": booking.location, "status": "confirmed"}
 ```
 
-The inferred input schema is a JSON Schema object with a nested `booking` property. Runtime calls such as `{"booking": {"location": "Athens", "guests": "2"}}` are coerced before the function receives a `BookingRequest` instance. Missing required fields, unexpected fields, invalid enums and incompatible scalar values return a structured tool error instead of reaching user code.
+The inferred input schema is a JSON Schema object with a nested `booking` property. Runtime calls such as `{"booking": {"location": "Athens", "guests": "2"}}` are coerced before the function receives a `BookingRequest` instance. Missing required fields, unexpected fields, invalid enums and incompatible scalar values fail validation before reaching user code. Inference reports these as no-change rejections; direct `Tool` validation raises `ValueError`.
 
 ### Schema helper API
 
@@ -1584,7 +1714,7 @@ Register selectively, configure capabilities explicitly and use the Agent execut
 
 1. **Clear descriptions**: Write descriptions that help the LLM understand when to use each tool
 2. **Typed parameters**: Use type hints for all parameters
-3. **Error handling**: Raise clear exceptions for invalid inputs
+3. **Error handling**: Raise `ToolRejectedError` for correctable requests only when they made no changes; retain ordinary exceptions for execution failures.
 4. **Single responsibility**: Each tool should do one thing well
 
 ### MCP Integration

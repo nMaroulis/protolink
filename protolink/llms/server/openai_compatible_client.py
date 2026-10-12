@@ -8,9 +8,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, ClassVar
 
 from protolink.llms._streaming import http_stream
-from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
+from protolink.llms.actions import LLMActionResult, action_to_json
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.server.base import ServerLLM
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
@@ -35,6 +37,8 @@ class OpenAICompatibleLLM(ServerLLM):
     LM Studio, llama.cpp server, vLLM, LocalAI and similar local-first runtimes.
     """
 
+    _native_tool_calling_available: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "openai-compatible"
     DEFAULT_MODEL: ClassVar[str] = "local-model"
     DEFAULT_BASE_URL: ClassVar[str] = "http://localhost:1234/v1"
@@ -54,6 +58,7 @@ class OpenAICompatibleLLM(ServerLLM):
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
         supports_tool_calling: bool = False,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
         """Create a client for an OpenAI-compatible chat completions server.
 
@@ -78,6 +83,7 @@ class OpenAICompatibleLLM(ServerLLM):
             model_params=merged_params,
             base_url=resolved_base_url,
             supports_tool_calling=supports_tool_calling,
+            tool_calling=tool_calling,
         )
 
         self.base_url = resolved_base_url
@@ -150,7 +156,7 @@ class OpenAICompatibleLLM(ServerLLM):
         tool declarations and normalizes returned ``tool_calls`` into the same
         typed action protocol used by every provider.
         """
-        if not self.supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return super().call_action(
                 history,
                 tools=tools,
@@ -187,7 +193,7 @@ class OpenAICompatibleLLM(ServerLLM):
         chunk_callback: Callable[[str], Awaitable[None]] | None = None,
     ) -> LLMActionResult:
         """Return one action from an OpenAI-compatible streaming response."""
-        if not self.supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return await super().call_action_stream(
                 history,
                 tools=tools,
@@ -243,19 +249,7 @@ class OpenAICompatibleLLM(ServerLLM):
         content = "".join(output_text).strip()
         if not content:
             raise ValueError("OpenAI-compatible stream did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action, raw_response=content, native=False, metadata={"provider": self.provider}
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata={"provider": self.provider, "streaming": True},
-            )
+        return normalize_native_text(content, metadata={"provider": self.provider, "streaming": True})
 
     def validate_connection(self) -> bool:
         """Validate that the configured server exposes a models endpoint."""
@@ -338,22 +332,7 @@ class OpenAICompatibleLLM(ServerLLM):
         if not content:
             raise ValueError("OpenAI-compatible response did not contain content or tool_calls")
 
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata=usage_metadata({"provider": self.provider}, payload),
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata=usage_metadata({"provider": self.provider}, payload),
-            )
+        return normalize_native_text(content, metadata=usage_metadata({"provider": self.provider}, payload))
 
 
 class LMStudioLLM(OpenAICompatibleLLM):
@@ -371,6 +350,7 @@ class LMStudioLLM(OpenAICompatibleLLM):
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
         supports_tool_calling: bool = False,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
         """Create an LM Studio client using its local OpenAI-compatible API.
 
@@ -392,4 +372,5 @@ class LMStudioLLM(OpenAICompatibleLLM):
             model=model,
             model_params=model_params,
             supports_tool_calling=supports_tool_calling,
+            tool_calling=tool_calling,
         )

@@ -6,10 +6,12 @@ from typing import Any, ClassVar
 
 from protolink.llms._deps import require_openai
 from protolink.llms._streaming import threaded_stream
-from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
+from protolink.llms.actions import LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.tool_calling import (
     native_tool_call_to_action,
     openai_responses_tools,
@@ -26,6 +28,9 @@ logger = get_logger(__name__)
 class OpenAILLM(APILLM):
     """OpenAI API implementation of the LLM API interface."""
 
+    _native_tool_calling_available: ClassVar[bool] = True
+    _native_tool_calling_default: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "openai"
     DEFAULT_MODEL: ClassVar[str] = "gpt-4o-mini"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
@@ -35,16 +40,6 @@ class OpenAILLM(APILLM):
         "truncation": "disabled",  # How to handle inputs exceeding model context; "disabled" or "auto"
     }
 
-    @property
-    def uses_native_action_prompt(self) -> bool:
-        """OpenAI Responses uses native function tools for runtime actions."""
-        return True
-
-    @property
-    def supports_native_action_stream(self) -> bool:
-        """OpenAI Responses streams text deltas and function-call events."""
-        return True
-
     def __init__(
         self,
         *,
@@ -52,7 +47,14 @@ class OpenAILLM(APILLM):
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
         base_url: str | None = None,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Create the adapter with an optional runtime tool-calling policy.
+
+        ``tool_calling`` accepts ``auto``, ``native`` or ``json``. Omit it
+        to preserve the adapter default; the option is never forwarded as
+        a provider generation setting. See ``LLM.resolve_tool_calling``.
+        """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {
             **self.DEFAULT_MODEL_PARAMS,
@@ -62,6 +64,7 @@ class OpenAILLM(APILLM):
             model=resolved_model,
             model_params=merged_params,
             base_url=base_url,
+            tool_calling=tool_calling,
         )
 
         # Set OpenAI API Client
@@ -124,6 +127,13 @@ class OpenAILLM(APILLM):
         This avoids the fragile generic action-schema response format and lets
         OpenAI validate real tool arguments against each tool's own schema.
         """
+        if not self.uses_native_action_prompt:
+            return super().call_action(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            )
         params = dict(self._model_params)
         tool_specs = openai_responses_tools(
             tools,
@@ -156,6 +166,14 @@ class OpenAILLM(APILLM):
         OpenAI finishes the streamed call, then normalized into a Protolink
         action before the runtime dispatches it.
         """
+        if not self.uses_native_action_prompt:
+            return await super().call_action_stream(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+                chunk_callback=chunk_callback,
+            )
         params = dict(self._model_params)
         tool_specs = openai_responses_tools(
             tools,
@@ -215,17 +233,7 @@ class OpenAILLM(APILLM):
         text = "".join(output_text).strip()
         if not text:
             raise ValueError("OpenAI stream did not contain text or a function call")
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "openai"})
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata={"provider": "openai", "streaming": True},
-            )
+        return normalize_native_text(text, metadata={"provider": "openai", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
@@ -293,22 +301,7 @@ class OpenAILLM(APILLM):
         if not text:
             raise ValueError("OpenAI response did not contain text or a function call")
 
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=False,
-                metadata=usage_metadata({"provider": "openai"}, response),
-            )
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata=usage_metadata({"provider": "openai"}, response),
-            )
+        return normalize_native_text(text, metadata=usage_metadata({"provider": "openai"}, response))
 
     def validate_connection(self) -> bool:
         try:

@@ -34,11 +34,79 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.8.0] - 2026-10-07
+## [0.8.1] - 2026-10-13
 
 :::note Latest Update
 
-Version 0.8.0 is a **major feature update** that expands ProtoLink's Agent harness for coordinated, restartable and inspectable workloads. It brings owned local subagents, durable execution, context preparation, lifecycle hooks, model routing, local evaluations and optional container execution into the same pluggable runtime.
+The update has a coherent scope: **action validation**, **capability selection** and **recoverable tool rejection**.
+
+This update hardens the boundary between model responses and executable actions. Recognizable malformed tool requests
+now reach ProtoLink's existing correction loop in both JSON and native modes, while ordinary answers and explicit
+application data retain their behavior. Correction stays in the current run, preserving completed tool observations
+and enforcing the same execution budgets.
+
+The optional `tool_calling="auto"` policy brings capability selection into the shared engine. Developers can use
+advertised Ollama model support, choose `"native"` or `"json"` explicitly, or keep their existing configuration and
+defaults. Capability discovery, action validation and server-enforced JSON remain separate responsibilities.
+
+Tools can also reject correctable application requests with structured feedback and an explicit no-change guarantee.
+Bounded correction stays with the same model and run, while distinct rejection events and durable receipts explain
+what happened without presenting a rejected request as successful execution. Ordinary tool exceptions retain their
+failure behavior.
+
+:::
+
+### Added
+
+- `tool_calling="auto" | "native" | "json"` on the LLM factory and concrete adapters, with a mutable runtime policy
+  and `resolve_tool_calling()` for inspection. Omission preserves adapter defaults and legacy capability flags.
+- Cached Ollama model capability discovery through authenticated `POST /api/show`, using the exact model tag and
+  endpoint. Unknown metadata selects JSON; checks never generate model text or execute application tools. Configuration
+  changes, five-minute expiry and `refresh_capabilities()` invalidate cached evidence.
+- Task-local protocol selection held consistent across prompt preparation, inference, correction and durable resumption. Agent
+  serialization and durable/routing contracts retain the configured policy; process-local discovery caches are excluded.
+- An offline [action-correction example](https://github.com/nMaroulis/protolink/blob/main/examples/action_correction.py)
+  and expanded [LLM guide](llm.md#selecting-native-tools-or-json-actions) explaining modes, capability limits,
+  malformed envelopes, plain answers and examples.
+- `ToolRejectedError` for explicitly side-effect-free application validation, with an error code, JSON details and
+  optional correction suggestion. JSON and native loops return this feedback to the same model.
+- `max_tool_corrections`, defaulting to two corrective turns per inference, shared by unknown tools, invalid schemas
+  and explicit rejections. The factory consumes this runtime setting separately from generation parameters;
+  `ToolCorrectionLimitError` and structured task blockers explain exhaustion. Success does not reset the allowance.
+- Distinct `tool_rejected` / `action.rejected` reporting, `action_rejection` artifacts and rejected local trace spans.
+  Direct tool tasks return structured rejection errors; rejected requests never provide completion-validation evidence.
+- Durable no-change rejection receipts and correction counters retained across approvals, pauses and restarts.
+  Recovery after a committed rejection reuses its feedback without invoking or charging the tool again.
+- A runnable [tool-rejection example](https://github.com/nMaroulis/protolink/blob/main/examples/tool_rejection.py) and
+  detailed [tool validation documentation](tool.md#reject-a-request-the-model-can-correct).
+
+### Fixed
+
+- Unknown-tool and argument-schema correction events now report request rejection separately from execution failure.
+  The inference benchmark counts these as invalid proposals alongside legacy validation events.
+- Outer `tool_call`, `tool_calls`, `function_call`, `function_calls` and `agent_call` wrappers no longer become bare
+  application JSON answers. They fail strict action validation and request a canonical response through the existing
+  parse-failure circuit breaker.
+- Shared native text normalization prevents Ollama, OpenAI, Anthropic, Gemini, DeepSeek, Grok, llama.cpp and
+  OpenAI-compatible adapters from swallowing recognizable action-validation failures. Ordinary answer text,
+  application JSON, explanatory code examples and data inside explicit `final.content` remain valid.
+- Malformed action text counts output tokens against the current budget, using provider usage when available and
+  estimates otherwise. Correction retains completed tool results; duplicate completed requests use the existing
+  deduplication guardrail instead of executing again.
+
+### Validation
+
+Regression coverage exercises the reported wrapper in JSON and native modes, synchronous and streamed adapter
+normalization, legitimate JSON answers, code examples, correction exhaustion, shared call/output budgets, completed
+tool preservation, capability caching and configuration round trips. Tool-validation coverage includes correction
+limits, schema and application feedback, JSON/native streaming, shared budgets, ordinary exception propagation,
+distinct reporting, approval resumption and a process crash after the rejection receipt is committed.
+
+## [0.8.0] - 2026-10-07
+
+:::note Release Summary
+
+Version 0.8.0 is a **major feature update** that expands ProtoLink's **Agent harness** for coordinated, restartable and inspectable workloads. It brings owned local subagents, durable execution, context preparation, lifecycle hooks, model routing, local evaluations and optional container execution into the same pluggable runtime.
 
 Local subagents provide independent conversations with shared budgets and inherited policies. Durable execution lets applications pause for approval or user input, restart and continue from saved checkpoints and committed results. Context policies bound model input and make large tool results available through progressive retrieval, while hooks give applications control over model preparation, observations and final-answer validation. Model routing and local evaluations support deliberate model selection, bounded fallback and repeatable comparisons of agent behavior.
 

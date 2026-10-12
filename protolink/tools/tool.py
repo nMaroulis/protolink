@@ -151,6 +151,11 @@ class Tool(BaseTool):
 
         The wrapped function may be either synchronous (``def``) or asynchronous (``async def``).
         This method normalizes both forms to an async call.
+
+        Raise ``ToolRejectedError`` inside the callable to reject a request
+        only when it made no changes. Inference can correct that request;
+        direct invocation propagates the exception without retrying. Other
+        exceptions retain their ordinary execution-failure behavior.
         """
 
         kwargs = self.validate_args(kwargs)

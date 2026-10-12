@@ -37,6 +37,7 @@ _RUNTIME_LLM_EVENT_TYPE_MAP = {
     "tool_start": "action.started",
     "tool_result": "action.completed",
     "tool_error": "action.failed",
+    "tool_rejected": "action.rejected",
     "agent_call_start": "action.started",
     "agent_call_result": "action.completed",
     "agent_call_error": "action.failed",
@@ -329,6 +330,7 @@ def _severity_for_payload(source_type: str, payload: dict[str, Any]) -> str:
         "budget_warning",
         "llm_parse_error",
         "llm_retry",
+        "tool_rejected",
     }:
         return "warning"
     return "info"
@@ -393,6 +395,9 @@ def _summary_for_payload(source_type: str, payload: dict[str, Any]) -> str | Non
         if llm_type in {"tool_result", "agent_call_result"}:
             target = metadata.get("tool") or metadata.get("agent") or "unnamed"
             return f"Action completed: {target}"
+        if llm_type == "tool_rejected":
+            target = metadata.get("tool") or "unnamed"
+            return f"Tool '{target}' rejected the request; nothing changed."
         if llm_type in {"tool_error", "agent_call_error"}:
             return _optional_str(metadata.get("message")) or "Action failed"
         content = payload.get("content")
@@ -435,6 +440,7 @@ def _promote_runtime_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "parent_action_id",
         "parent_span_id",
         "request",
+        "rejection",
         "span_id",
     ):
         if key in metadata:

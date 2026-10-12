@@ -1839,7 +1839,7 @@ events = sink.to_list()
     version: str = "1.0",
     timestamp: str = <UTC timestamp>,
 )`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L48"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L49"
 >
 
 Mutable versioned application-facing envelope for task and inference runtime activity.
@@ -1928,9 +1928,16 @@ Action lifecycle activity is also promoted into stable event types:
 | `approval.decided` | The application returned an `ApprovalDecision`. |
 | `action.started` | An authorized tool or agent operation started. |
 | `action.completed` | The operation completed successfully. |
+| `action.rejected` | Tool validation rejected the request; it made no changes. Carries structured `rejection` feedback. |
 | `action.denied` / `action.failed` | Policy denied the operation or execution failed. |
+| `tool.correction.exhausted` | The configured tool-correction allowance ended inference; carries a structured blocker. |
 
-The promoted `manifest`, `action`, `request`, `decision`, `action_id`, `parent_action_id`, `span_id`, `parent_span_id` and `delegation_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
+The promoted `manifest`, `action`, `request`, `decision`, `rejection`, `action_id`, `parent_action_id`, `span_id`, `parent_span_id` and `delegation_id` values are available directly in `RunEvent.payload`; the original task stream payload remains intact for compatibility.
+
+Model-loop `tool_rejected` events normalize to `action.rejected` with warning severity and a “nothing changed” summary.
+The payload retains the code, message, JSON details, optional suggestion and correction counters. Rejection feedback
+is meant for the model and observers; keep sensitive data out of it. Completed-action evidence excludes rejected
+requests. See [recoverable tool validation](tool.md#reject-a-request-the-model-can-correct).
 
 ## Event Sinks
 
@@ -1957,7 +1964,7 @@ An event sink observes execution; it does not authorize it. Approval decisions s
   signature={`await sink.emit(
     event: RunEvent,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L204"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L206"
 >
 
 Structural async consumer contract. Implementations decide storage, fanout, rendering, or observability behavior; emitting has no authorization meaning.
@@ -1978,7 +1985,7 @@ Structural async consumer contract. Implementations decide storage, fanout, rend
   kind="class"
   path="protolink.InMemoryEventSink"
   signature={`InMemoryEventSink()`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L212"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/core/events.py#L214"
 >
 
 Dependency-free process-local event buffer for tests, local interfaces and recorder tooling.

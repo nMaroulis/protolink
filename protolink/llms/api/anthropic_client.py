@@ -6,10 +6,12 @@ from typing import Any, ClassVar
 
 from protolink.llms._deps import require_anthropic
 from protolink.llms._streaming import threaded_stream
-from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
+from protolink.llms.actions import LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.serialization import json_history_default
 from protolink.llms.tool_calling import (
     anthropic_tools,
@@ -27,6 +29,9 @@ logger = get_logger(__name__)
 class AnthropicLLM(APILLM):
     """Anthropic API implementation of the LLM interface."""
 
+    _native_tool_calling_available: ClassVar[bool] = True
+    _native_tool_calling_default: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "anthropic"
 
     DEFAULT_MODEL: ClassVar[str] = "claude-sonnet-4-20250514"
@@ -36,16 +41,6 @@ class AnthropicLLM(APILLM):
         "max_tokens": 1024,
     }
 
-    @property
-    def uses_native_action_prompt(self) -> bool:
-        """Anthropic Messages uses native ``tool_use`` blocks for actions."""
-        return True
-
-    @property
-    def supports_native_action_stream(self) -> bool:
-        """Anthropic streams text deltas and ``tool_use`` input JSON deltas."""
-        return True
-
     def __init__(
         self,
         *,
@@ -53,7 +48,14 @@ class AnthropicLLM(APILLM):
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
         base_url: str | None = None,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Create the adapter with an optional runtime tool-calling policy.
+
+        ``tool_calling`` accepts ``auto``, ``native`` or ``json``. Omit it
+        to preserve the adapter default; the option is never forwarded as
+        a provider generation setting. See ``LLM.resolve_tool_calling``.
+        """
         # Vars passed to parent
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {
@@ -65,6 +67,7 @@ class AnthropicLLM(APILLM):
             model=resolved_model,
             model_params=merged_params,
             base_url=base_url,
+            tool_calling=tool_calling,
         )
 
         anthropic, _ = require_anthropic()
@@ -138,6 +141,13 @@ class AnthropicLLM(APILLM):
         the runtime action protocol, or regular text, which becomes a final
         answer unless it validates as fallback JSON.
         """
+        if not self.uses_native_action_prompt:
+            return super().call_action(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            )
         params = dict(self._model_params)
         tool_specs = anthropic_tools(
             tools,
@@ -177,6 +187,14 @@ class AnthropicLLM(APILLM):
         complete so validation still happens exactly once at the Protolink
         action boundary.
         """
+        if not self.uses_native_action_prompt:
+            return await super().call_action_stream(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+                chunk_callback=chunk_callback,
+            )
         params = dict(self._model_params)
         tool_specs = anthropic_tools(
             tools,
@@ -249,17 +267,7 @@ class AnthropicLLM(APILLM):
         text = "".join(output_text).strip()
         if not text:
             raise ValueError("Anthropic stream did not contain text or a tool_use block")
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "anthropic"})
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata={"provider": "anthropic", "streaming": True},
-            )
+        return normalize_native_text(text, metadata={"provider": "anthropic", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Agent-LLM Interface - A2A Operations
@@ -403,22 +411,7 @@ class AnthropicLLM(APILLM):
         if not text:
             raise ValueError("Anthropic response did not contain text or a tool_use block")
 
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=False,
-                metadata=usage_metadata({"provider": "anthropic"}, response),
-            )
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata=usage_metadata({"provider": "anthropic"}, response),
-            )
+        return normalize_native_text(text, metadata=usage_metadata({"provider": "anthropic"}, response))
 
     def validate_connection(self) -> bool:
         try:

@@ -9,10 +9,12 @@ from typing import Any, ClassVar
 
 import httpx
 
-from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
+from protolink.llms.actions import LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
     chat_completion_stream_delta,
@@ -42,6 +44,9 @@ class GrokLLM(APILLM):
         >>> response = llm.chat("Hello, Grok!")
     """
 
+    _native_tool_calling_available: ClassVar[bool] = True
+    _native_tool_calling_default: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "grok"
     DEFAULT_MODEL: ClassVar[str] = "grok-4-latest"
     DEFAULT_BASE_URL: ClassVar[str] = "https://api.x.ai/v1"
@@ -58,6 +63,7 @@ class GrokLLM(APILLM):
         model_params: dict[str, Any] | None = None,
         base_url: str | None = None,
         supports_tool_calling: bool = True,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
         """Initialize the Grok LLM client.
 
@@ -66,6 +72,8 @@ class GrokLLM(APILLM):
             model: Model identifier. Defaults to "grok-4-latest".
             model_params: Generation parameters (temperature, top_p, etc.).
             base_url: API base URL. Defaults to "https://api.x.ai/v1".
+            tool_calling: Runtime policy: ``auto`` uses capability evidence;
+                ``native`` and ``json`` override the legacy flag.
         """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
@@ -75,6 +83,7 @@ class GrokLLM(APILLM):
             model=resolved_model,
             model_params=merged_params,
             base_url=resolved_base_url,
+            tool_calling=tool_calling,
         )
 
         self._api_key = api_key or os.getenv("XAI_API_KEY") or os.getenv("GROK_API_KEY")
@@ -87,16 +96,6 @@ class GrokLLM(APILLM):
 
         # Non-blocking validation - just log if connection fails
         _ = self.validate_connection()
-
-    @property
-    def uses_native_action_prompt(self) -> bool:
-        """Use native prompts only when Grok tool calling is enabled."""
-        return bool(getattr(self, "_supports_tool_calling", False))
-
-    @property
-    def supports_native_action_stream(self) -> bool:
-        """Use native streamed tool deltas only when Grok tool calling is enabled."""
-        return bool(getattr(self, "_supports_tool_calling", False))
 
     @property
     def _headers(self) -> dict[str, str]:
@@ -170,7 +169,7 @@ class GrokLLM(APILLM):
         agent_cards: list[Any] | None = None,
     ) -> LLMActionResult:
         """Return one typed action using xAI native tool calls when enabled."""
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return super().call_action(
                 history,
                 tools=tools,
@@ -212,7 +211,7 @@ class GrokLLM(APILLM):
         chunk_callback: Callable[[str], Awaitable[None]] | None = None,
     ) -> LLMActionResult:
         """Return one action from a Grok streaming chat completion."""
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return await super().call_action_stream(
                 history,
                 tools=tools,
@@ -277,17 +276,7 @@ class GrokLLM(APILLM):
         text = "".join(output_text).strip()
         if not text:
             raise ValueError("Grok stream did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "grok"})
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata={"provider": "grok", "streaming": True},
-            )
+        return normalize_native_text(text, metadata={"provider": "grok", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Utils
@@ -335,19 +324,4 @@ class GrokLLM(APILLM):
         content = str(message.get("content") or "").strip()
         if not content:
             raise ValueError("Grok response did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata=usage_metadata({"provider": "grok"}, payload),
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata=usage_metadata({"provider": "grok"}, payload),
-            )
+        return normalize_native_text(content, metadata=usage_metadata({"provider": "grok"}, payload))

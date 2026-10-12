@@ -288,6 +288,11 @@ protolink dashboard --traces traces.jsonl --open
 
 The Telemetry view reads recent records first and keeps its working set bounded. Summary pages contain compact task and span counts; the full record and potentially large payload fields are loaded only when you select a record. Moving to older pages therefore does not require embedding the entire file in the initial dashboard snapshot or creating one DOM row for every trace ever recorded. Once the 500-summary browser window is full, loading older pages rolls newer summaries out of that window; **Latest** returns to the head of the file. The browser file picker follows the same bounded, lazy-detail model for a locally selected file.
 
+Explicit tool rejections close their local trace span with status `rejected` and a “nothing changed” summary.
+Run replay records `action.rejected` separately from completion, denial and execution failure; the structured
+rejection code and correction details remain available in the payload. A recovered run can complete successfully
+while retaining those rejection events. See [tool validation](tool.md#reject-a-request-the-model-can-correct).
+
 One JSONL line represents one completed Agent task record. A `trace_id` is a correlation key, not a unique line ID: nested or delegated tasks can share it and an application can deliberately assign the same trace ID to several related tasks. The dashboard groups those task records under the shared trace ID while retaining task ID and record position as the distinct record identity.
 
 Trace files can be observed while another process is appending to them. Blank or malformed lines are reported and skipped instead of making the whole source unreadable. An incomplete final line is treated as a partial write; it is ignored for the current page and can become visible after the writer completes it and the dashboard refreshes.

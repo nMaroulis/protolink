@@ -19,6 +19,7 @@ from protolink.core.events import EventSink, RunEvent
 from protolink.core.policy import ActionAuthorization, ActionPolicyError
 from protolink.core.run_context import RunContext
 from protolink.core.task import Task
+from protolink.core.tool_errors import ToolCorrectionLimitError, ToolRejectedError
 from protolink.utils.serialization import Serializer
 
 if TYPE_CHECKING:
@@ -107,7 +108,13 @@ async def closing_stream(source: AsyncIterator[Any]) -> AsyncIterator[AsyncItera
 
 
 async def emit_runtime_event(
-    event_type: str, context: RunContext, *, action_id: str | None = None, **payload: Any
+    event_type: str,
+    context: RunContext,
+    *,
+    action_id: str | None = None,
+    severity: str = "info",
+    summary: str | None = None,
+    **payload: Any,
 ) -> RunEvent:
     """Record a native event and notify an optional, non-authoritative observer."""
     task = current_task()
@@ -121,6 +128,8 @@ async def emit_runtime_event(
         task_id=task.id if task else None,
         agent_name=context.agent_chain[-1] if context.agent_chain else None,
         action_id=action_id,
+        severity=severity,
+        summary=summary,
         payload=serialized,
     )
     if _events_suppressed.get():
@@ -193,6 +202,10 @@ async def execute_authorized_tool(tool: BaseTool, execution: ToolExecution, *, e
 
     Budget counters are charged by the caller once, before this hook. Results
     are recorded before returning to optional telemetry or model-history code.
+    An explicit ``ToolRejectedError`` commits a separate no-change receipt and
+    propagates to the caller. This dispatcher never retries a rejected request;
+    the inference loop owns bounded correction. Other exceptions retain their
+    execution-failure behavior and may leave durable effects uncertain.
     """
     execution.check()
     from protolink.core.durable import current_durable_run
@@ -213,6 +226,18 @@ async def execute_authorized_tool(tool: BaseTool, execution: ToolExecution, *, e
         if emit_events:
             await execution.emit("action.canceled", action=action.to_dict())
         raise
+    except ToolRejectedError as exc:
+        if durable is not None:
+            durable.reject_action(exc)
+        if emit_events:
+            await execution.emit(
+                "action.rejected",
+                action=action.to_dict(),
+                rejection=exc.to_dict(),
+                severity="warning",
+                summary=f"Tool '{action.name}' rejected the request; nothing changed.",
+            )
+        raise
     except Exception as exc:
         if emit_events:
             await execution.emit(
@@ -227,7 +252,7 @@ async def execute_authorized_tool(tool: BaseTool, execution: ToolExecution, *, e
 
 
 async def record_task_blocker(task: Task, error: Exception) -> None:
-    """Retain machine-readable policy/budget failures on native task results."""
+    """Retain machine-readable policy, budget and correction-limit failures."""
     if isinstance(error, BudgetExceededError):
         blocker = {"code": "budget_exceeded", "decision": error.decision.to_dict()}
         event_type = "budget.exceeded"
@@ -238,13 +263,27 @@ async def record_task_blocker(task: Task, error: Exception) -> None:
             "decision": error.decision.to_dict(),
         }
         event_type = "task.blocked"
+    elif isinstance(error, ToolCorrectionLimitError):
+        blocker = {
+            "code": "tool_correction_limit",
+            "tool": error.tool_name,
+            "attempts": error.attempts,
+            "max_tool_corrections": error.limit,
+            "rejection": error.last_error.to_dict(),
+        }
+        event_type = "tool.correction.exhausted"
     else:
         return
     blockers = task.metadata.setdefault("blockers", [])
     if blocker not in blockers:
         blockers.append(blocker)
         with execution_scope(task):
-            await emit_runtime_event(event_type, RunContext.from_task(task), blocker=blocker)
+            await emit_runtime_event(
+                event_type,
+                RunContext.from_task(task),
+                blocker=blocker,
+                severity="error" if isinstance(error, ToolCorrectionLimitError) else "info",
+            )
 
 
 async def stream_runtime_events(source: AsyncIterator[Any], task: Task) -> AsyncIterator[Any]:

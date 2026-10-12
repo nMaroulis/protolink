@@ -121,6 +121,27 @@ agent = Agent(card=card_dict, transport=transport, llm=llm)
 
 You can then attach tools and start the agent.
 
+For automatic tool-protocol selection, pass a configured LLM rather than a bare model alias:
+
+```python
+from protolink import Agent, create_llm
+
+agent = Agent(
+    name="helper",
+    llm=create_llm("ollama:qwen3:4b", base_url="http://localhost:11434", tool_calling="auto"),
+)
+```
+
+ProtoLink uses advertised native-tool support where available and otherwise chooses its portable JSON action protocol.
+Explicit `tool_calling="native"` or `"json"` provides control. Both paths validate actions, preserve completed tool
+observations during correction and enforce the current run's budgets. See [action acquisition](llm.md#selecting-native-tools-or-json-actions)
+for capability caching, provider behavior and [malformed-response recovery](llm.md#malformed-action-wrappers-and-native-answer-text).
+
+Tools can raise `ToolRejectedError` for requests rejected before making changes. The same model receives correction
+feedback within `max_tool_corrections` (two corrective turns by default), using the current run's budgets and history.
+See [recoverable tool validation](tool.md#reject-a-request-the-model-can-correct) for the no-change guarantee, error
+codes, valid-ID feedback and outcome reporting. Ordinary tool exceptions remain execution failures.
+
 ## Convenience methods
 
 Start with `invoke` or `ask`, then add `budget=RunBudget(...)` or `context=RunContext(...)`.
@@ -832,6 +853,8 @@ Execute one deterministic step from the most recently appended message or artifa
 <ApiCallout label="Task-wide budgets">One task-scoped <code>BudgetEnforcer</code> is shared by explicit tool parts and every iteration or retry inside all infer parts. Inline nested tasks use their own scope and restore the parent budget afterward.</ApiCallout>
 
 <ApiCallout label="Completed-action receipts">Outputs are attached and offered to <code>run_store</code> after each completed top-level part. Successful tools or delegations selected inside <code>LLM.infer()</code> additionally create and immediately snapshot an <code>Artifact(kind="action_result")</code> JSON receipt with completion status, action ID and source/kind/step metadata. Internal results are deliberately omitted from this client-visible artifact. Ordinary tool observations remain private to model history; generated knowledge evidence is also scrubbed from persistent history and telemetry after the active loop. Later failure, cancellation, or budget exhaustion therefore preserves evidence of completed side effects without exposing internal result data.</ApiCallout>
+
+<ApiCallout label="Rejected-request receipts">Inference records no-change tool rejections separately as <code>Artifact(kind="action_rejection")</code>, with status, code, phase and action ID where available. These artifacts never count as completed effects. <code>tool_rejected</code> events normalize to <code>action.rejected</code>; their structured correction feedback is intentionally visible to observers, so tools should avoid private details.</ApiCallout>
 
 </ApiReference>
 

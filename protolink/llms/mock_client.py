@@ -2,7 +2,7 @@ import json
 from collections.abc import AsyncIterator, Callable
 from typing import Any, ClassVar
 
-from protolink.llms.base import LLM
+from protolink.llms.base import LLM, ToolCallingMode
 from protolink.llms.history import ConversationHistory
 
 
@@ -79,8 +79,9 @@ class MockLLM(LLM):
         sequential_responses: list[Any] | None = None,
         response_callback: Callable[[ConversationHistory, str], Any] | None = None,
         default_response: str = "Unprocessed generic mock response",
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
-        super().__init__(model=model, model_params=model_params or {})
+        super().__init__(model=model, model_params=model_params or {}, tool_calling=tool_calling)
         self.mock_responses: dict[str, Any] = mock_responses or {}
         self.sequential_responses: list[Any] = sequential_responses or []
         self.response_callback: Callable[[ConversationHistory, str], Any] | None = response_callback

@@ -1,5 +1,7 @@
 """Public tool contracts, schema helpers and opt-in built-in factories."""
 
+from protolink.core.tool_errors import ToolCorrectionLimitError, ToolRejectedError
+
 from .base import BaseTool
 from .builtins import (
     CalendarBackend,
@@ -62,6 +64,8 @@ __all__ = [
     "OutlookEmail",
     "SQLiteDatabase",
     "Tool",
+    "ToolCorrectionLimitError",
+    "ToolRejectedError",
     "UserInputHandler",
     "UserInputRequest",
     "UserInputResult",

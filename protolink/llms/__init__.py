@@ -19,11 +19,13 @@ __all__ = [
     "MockLLM",
     "OpenAICompatibleLLM",
     "RoutedLLM",
+    "ToolCallingMode",
     "build_context_manifest",
     "create_llm",
 ]
 
 _EXPORTS = {
+    "ToolCallingMode": "protolink.llms.base.ToolCallingMode",
     "ContextPolicy": "protolink.llms.context_policy.ContextPolicy",
     "ContextLimitError": "protolink.llms.context_policy.ContextLimitError",
     "RoutedLLM": "protolink.llms.routed.RoutedLLM",

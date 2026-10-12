@@ -9,7 +9,7 @@ import json
 import math
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from contextvars import ContextVar, Token
 from typing import Any
 
@@ -37,6 +37,7 @@ from protolink.core.policy import (
 )
 from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
+from protolink.core.tool_errors import ToolRejectedError
 from protolink.llms.history import EPHEMERAL_TOOL_OBSERVATION_KEY, ConversationHistory
 from protolink.models import Artifact, Message, Part, Task
 from protolink.rag import Citation, KnowledgeNotFoundError, RetrievalMode, SearchHit
@@ -523,28 +524,33 @@ class AgentExecutionMixin(_AgentMixinBase):
             return None
 
     def _record_inference_action_result(self, task: Task | None, event: dict[str, Any]) -> None:
-        """Attach one durable receipt for a side effect completed inside inference.
+        """Attach distinct completion or no-change rejection receipts in inference.
 
         Model-driven tools and delegations execute inside ``LLM.infer`` rather
         than as top-level task parts. Recording metadata-only completion
         receipts on the task makes partial progress visible if a later model
         call, cancellation, or budget boundary ends inference before a final
         response, without exposing the private result observation.
+        Rejection artifacts are separate from completed-action artifacts and
+        never count as evidence of an effect or successful execution.
         """
-        if task is None or event.get("type") not in {"tool_result", "agent_call_result"}:
+        if task is None or event.get("type") not in {"tool_result", "agent_call_result", "tool_rejected"}:
             return
+
+        rejected = event["type"] == "tool_rejected"
+        artifact_kind = "action_rejection" if rejected else "action_result"
 
         action_id_value = event.get("action_id")
         action_id = str(action_id_value) if action_id_value else None
         receipt_tracker = _active_inference_action_receipts.get()
         if action_id and any(
-            artifact.kind == "action_result" and artifact.action_id == action_id for artifact in task.artifacts
+            artifact.kind == artifact_kind and artifact.action_id == action_id for artifact in task.artifacts
         ):
-            if receipt_tracker is not None:
+            if receipt_tracker is not None and not rejected:
                 receipt_tracker.add(action_id)
             return
 
-        if event["type"] == "tool_result":
+        if event["type"] in {"tool_result", "tool_rejected"}:
             name = str(event.get("tool") or "tool")
             action_kind = "tool.call"
             delegated_action = None
@@ -558,19 +564,22 @@ class AgentExecutionMixin(_AgentMixinBase):
         # task receipt proves completion without copying that raw result across
         # the task boundary.
         receipt: dict[str, Any] = {
-            "status": "completed",
+            "status": "rejected" if rejected else "completed",
             "action_id": action_id,
             "action_kind": action_kind,
             "name": name,
             "result_omitted": True,
         }
+        if rejected:
+            rejection = event.get("rejection", {})
+            receipt.update(changes_made=False, code=rejection.get("code"), phase=event.get("phase"))
         if delegated_action is not None:
             receipt["action"] = delegated_action
         part = Part.json(receipt)
 
         artifact = Artifact(
             parts=[part],
-            kind="action_result",
+            kind=artifact_kind,
             name=name,
             action_id=action_id,
             metadata={
@@ -581,7 +590,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             },
         )
         task.add_artifact(artifact)
-        if receipt_tracker is not None:
+        if receipt_tracker is not None and not rejected:
             receipt_tracker.add(action_id or artifact.id)
         # Minimize the crash window between an external side effect and its
         # durable receipt. RunStore persistence is intentionally best effort.
@@ -953,6 +962,14 @@ class AgentExecutionMixin(_AgentMixinBase):
             yield
             return
 
+        durable = current_durable_run()
+        last_item = task.get_last_item()
+        if durable is not None:
+            needs_actions = any(part.get("type") == "infer" for part in durable.data["input_parts"])
+        else:
+            needs_actions = last_item is not None and any(part.type == "infer" for part in last_item.parts)
+        action_scope = self.llm.use_tool_calling() if needs_actions else nullcontext()
+
         receipt_tracker: set[str] = set()
         receipt_token = _active_inference_action_receipts.set(receipt_tracker)
 
@@ -979,7 +996,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                     completed_history: ConversationHistory | None = None
                     completed_normally = False
                     try:
-                        with self.llm.use_history(history):
+                        with self.llm.use_history(history), action_scope:
                             try:
                                 yield
                                 completed_normally = True
@@ -1011,7 +1028,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             completed_history = None
             completed_normally = False
             try:
-                with self.llm.use_history(history):
+                with self.llm.use_history(history), action_scope:
                     try:
                         yield
                         completed_normally = True
@@ -1191,6 +1208,21 @@ class AgentExecutionMixin(_AgentMixinBase):
             if self.telemetry:
                 await self._emit_telemetry("on_tool_end", tool_name, None, error=str(e))
             raise
+        except ToolRejectedError as error:
+            if self.telemetry:
+                await self._emit_telemetry(
+                    "on_llm_event",
+                    {
+                        "type": "tool_rejected",
+                        "tool": tool_name,
+                        "phase": "execution",
+                        "message": error.message,
+                        "rejection": error.to_dict(),
+                        "recoverable": False,
+                    },
+                )
+                await self._emit_telemetry("on_tool_end", tool_name, None, error=str(error))
+            return Part.tool_output(call_id=call_id, error=error.to_dict())
         except Exception as e:
             from protolink.storage.durable import DurableExecutionError
 
@@ -1276,7 +1308,9 @@ class AgentExecutionMixin(_AgentMixinBase):
                 delegation_action_id = event.get("action_id")
             public_event = self._sanitize_knowledge_tool_event(event)
             self._record_inference_action_result(task, public_event)
-            if is_durable_streaming() and task is not None:
+            if task is not None and (
+                is_durable_streaming() or (public_event.get("type") == "tool_rejected" and not streaming)
+            ):
                 from protolink.core.events import RunEvent, TaskLLMStreamEvent
                 from protolink.core.execution import publish_runtime_event
 
@@ -1886,6 +1920,8 @@ class AgentExecutionMixin(_AgentMixinBase):
             except asyncio.CancelledError as exc:
                 await queue.put(exc)
             except Exception as exc:
+                if task is not None:
+                    await record_task_blocker(task, exc)
                 await queue.put(
                     TaskErrorEvent(
                         task_id=task_id,

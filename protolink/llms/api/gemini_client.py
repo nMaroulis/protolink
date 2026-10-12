@@ -6,10 +6,12 @@ from typing import Any, ClassVar
 
 from protolink.llms._deps import require_gemini
 from protolink.llms._streaming import threaded_stream
-from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
+from protolink.llms.actions import LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.tool_calling import (
     gemini_function_declarations,
     native_tool_call_to_action,
@@ -25,6 +27,9 @@ logger = get_logger(__name__)
 class GeminiLLM(APILLM):
     """Google Gemini API implementation of the LLM interface."""
 
+    _native_tool_calling_available: ClassVar[bool] = True
+    _native_tool_calling_default: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "gemini"
 
     # Pick a stable or "latest" model alias from Gemini API
@@ -37,16 +42,6 @@ class GeminiLLM(APILLM):
         # You may add other config options via the SDK's GenerateContentConfig
     }
 
-    @property
-    def uses_native_action_prompt(self) -> bool:
-        """Gemini uses native function declarations for runtime actions."""
-        return True
-
-    @property
-    def supports_native_action_stream(self) -> bool:
-        """Gemini streams text chunks and native function-call parts."""
-        return True
-
     def __init__(
         self,
         *,
@@ -54,7 +49,14 @@ class GeminiLLM(APILLM):
         model: str | None = None,
         model_params: dict[str, Any] | None = None,
         base_url: str | None = None,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Create the adapter with an optional runtime tool-calling policy.
+
+        ``tool_calling`` accepts ``auto``, ``native`` or ``json``. Omit it
+        to preserve the adapter default; the option is never forwarded as
+        a provider generation setting. See ``LLM.resolve_tool_calling``.
+        """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {
             **self.DEFAULT_MODEL_PARAMS,
@@ -65,6 +67,7 @@ class GeminiLLM(APILLM):
             model=resolved_model,
             model_params=merged_params,
             base_url=base_url,
+            tool_calling=tool_calling,
         )
 
         genai, GenerateContentConfig = require_gemini()  # noqa: N806
@@ -131,6 +134,13 @@ class GeminiLLM(APILLM):
         regular text becomes a final answer unless it validates as fallback
         JSON.
         """
+        if not self.uses_native_action_prompt:
+            return super().call_action(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+            )
         prompt = "\n".join(msg["content"] for msg in history.messages)
         params = dict(self._model_params)
         declarations = gemini_function_declarations(
@@ -161,6 +171,14 @@ class GeminiLLM(APILLM):
         chunk_callback: Callable[[str], Awaitable[None]] | None = None,
     ) -> LLMActionResult:
         """Return one action from Gemini's streaming endpoint."""
+        if not self.uses_native_action_prompt:
+            return await super().call_action_stream(
+                history,
+                tools=tools,
+                agent_callback_available=agent_callback_available,
+                agent_cards=agent_cards,
+                chunk_callback=chunk_callback,
+            )
         prompt = "\n".join(msg["content"] for msg in history.messages)
         params = dict(self._model_params)
         declarations = gemini_function_declarations(
@@ -212,17 +230,7 @@ class GeminiLLM(APILLM):
         text = "".join(output_text).strip()
         if not text:
             raise ValueError("Gemini stream did not contain text or a function call")
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "gemini"})
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata={"provider": "gemini", "streaming": True},
-            )
+        return normalize_native_text(text, metadata={"provider": "gemini", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Utils
@@ -259,19 +267,4 @@ class GeminiLLM(APILLM):
         if not text:
             raise ValueError("Gemini response did not contain text or a function call")
 
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=False,
-                metadata=usage_metadata({"provider": "gemini"}, response),
-            )
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata=usage_metadata({"provider": "gemini"}, response),
-            )
+        return normalize_native_text(text, metadata=usage_metadata({"provider": "gemini"}, response))

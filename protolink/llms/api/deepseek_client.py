@@ -6,10 +6,12 @@ from typing import Any, ClassVar
 
 from protolink.llms._deps import require_openai
 from protolink.llms._streaming import threaded_stream
-from protolink.llms.actions import FinalAction, LLMActionResult, action_to_json
+from protolink.llms.actions import LLMActionResult, action_to_json
 from protolink.llms.api.base import APILLM
+from protolink.llms.base import ToolCallingMode
 from protolink.llms.history import ConversationHistory
 from protolink.llms.metrics import usage_metadata
+from protolink.llms.parsing import normalize_native_text
 from protolink.llms.tool_calling import (
     ChatCompletionStreamAccumulator,
     chat_completion_stream_delta,
@@ -28,6 +30,9 @@ logger = get_logger(__name__)
 class DeepSeekLLM(APILLM):
     """DeepSeek API implementation using OpenAI-compatible SDK."""
 
+    _native_tool_calling_available: ClassVar[bool] = True
+    _native_tool_calling_default: ClassVar[bool] = True
+
     provider: ClassVar[LLMProvider] = "deepseek"
     DEFAULT_MODEL: ClassVar[str] = "deepseek-chat"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
@@ -43,7 +48,14 @@ class DeepSeekLLM(APILLM):
         model_params: dict[str, Any] | None = None,
         base_url: str | None = "https://api.deepseek.com",
         supports_tool_calling: bool = True,
+        tool_calling: ToolCallingMode | None = None,
     ) -> None:
+        """Create the adapter with an optional runtime tool-calling policy.
+
+        ``tool_calling`` accepts ``auto``, ``native`` or ``json``. Omit it
+        to preserve the adapter default; the option is never forwarded as
+        a provider generation setting. See ``LLM.resolve_tool_calling``.
+        """
         resolved_model = model or self.DEFAULT_MODEL
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
 
@@ -51,6 +63,7 @@ class DeepSeekLLM(APILLM):
             model=resolved_model,
             model_params=merged_params,
             base_url=base_url,
+            tool_calling=tool_calling,
         )
 
         openai, _, _ = require_openai()
@@ -62,16 +75,6 @@ class DeepSeekLLM(APILLM):
 
         # Non-blocking validation - just log if connection fails
         _ = self.validate_connection()
-
-    @property
-    def uses_native_action_prompt(self) -> bool:
-        """Use native prompts only when DeepSeek tool calling is enabled."""
-        return bool(getattr(self, "_supports_tool_calling", False))
-
-    @property
-    def supports_native_action_stream(self) -> bool:
-        """DeepSeek streams OpenAI-compatible tool-call deltas when enabled."""
-        return bool(getattr(self, "_supports_tool_calling", False))
 
     # ----------------------------------------------------------------------
     # LLM calling (invocation)
@@ -115,7 +118,7 @@ class DeepSeekLLM(APILLM):
         agent_cards: list[Any] | None = None,
     ) -> LLMActionResult:
         """Return one typed action using DeepSeek native tool calls when enabled."""
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return super().call_action(
                 history,
                 tools=tools,
@@ -152,7 +155,7 @@ class DeepSeekLLM(APILLM):
         chunk_callback: Callable[[str], Awaitable[None]] | None = None,
     ) -> LLMActionResult:
         """Return one action from a DeepSeek streaming chat completion."""
-        if not self._supports_tool_calling:
+        if not self.uses_native_action_prompt:
             return await super().call_action_stream(
                 history,
                 tools=tools,
@@ -203,17 +206,7 @@ class DeepSeekLLM(APILLM):
         text = "".join(output_text).strip()
         if not text:
             raise ValueError("DeepSeek stream did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(text)
-            return LLMActionResult(action=action, raw_response=text, native=False, metadata={"provider": "deepseek"})
-        except ValueError:
-            action = FinalAction(content=text)
-            return LLMActionResult(
-                action=action,
-                raw_response=text,
-                native=True,
-                metadata={"provider": "deepseek", "streaming": True},
-            )
+        return normalize_native_text(text, metadata={"provider": "deepseek", "streaming": True})
 
     # ----------------------------------------------------------------------
     # Utils
@@ -244,19 +237,4 @@ class DeepSeekLLM(APILLM):
         content = (message.content or "").strip()
         if not content:
             raise ValueError("DeepSeek response did not contain content or tool_calls")
-        try:
-            action = self._parse_infer_response(content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=False,
-                metadata=usage_metadata({"provider": "deepseek"}, response),
-            )
-        except ValueError:
-            action = FinalAction(content=content)
-            return LLMActionResult(
-                action=action,
-                raw_response=content,
-                native=True,
-                metadata=usage_metadata({"provider": "deepseek"}, response),
-            )
+        return normalize_native_text(content, metadata=usage_metadata({"provider": "deepseek"}, response))
