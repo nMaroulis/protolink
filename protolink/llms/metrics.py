@@ -187,7 +187,9 @@ def estimate_token_count(value: Any, *, model: str | None = None) -> int:
     encoder = _optional_tiktoken_encoder(model)
     if encoder is not None:
         try:
-            return len(encoder.encode(text))
+            # Prompt content may contain literal tokenizer control strings.
+            # Count those as ordinary text instead of abandoning the encoder.
+            return len(encoder.encode(text, disallowed_special=()))
         except Exception:
             pass
 

@@ -20,7 +20,6 @@ from protolink.transport.errors import (
     TransportRemoteError,
     TransportTimeoutError,
 )
-from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
 from protolink.utils.serialization import Serializer
 
@@ -64,7 +63,7 @@ class WebSocketTransport(Transport):
         config: Shared limits, retry, keepalive, shutdown, idempotency and metrics settings.
     """
 
-    transport_type: ClassVar[TransportType] = "websocket"
+    transport_type: ClassVar[str] = "websocket"
     supports_streaming: ClassVar[bool] = True
     capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
         streaming=True,

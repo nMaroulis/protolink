@@ -34,6 +34,26 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [Unreleased]
+
+### Changed
+
+- Refresh Python and documentation dependency lockfiles, update Docusaurus to 3.10.2 and apply compatible
+  security updates to the documentation worker pool and JavaScript serializer.
+- Support Langfuse SDK 5 alongside SDK 4, and run real provider-SDK compatibility checks in CI for
+  locked, minimum-direct and latest dependencies.
+
+### Fixed
+
+- Support Anthropic SDK v1 across text, native-tool and streaming requests. Only `max_tokens=1024` is
+  supplied by default; explicit legacy sampling settings are preserved through `extra_body` for models
+  that support them. See [AnthropicLLM parameters](llm.md#anthropicllm).
+- Propagate failed or incomplete OpenAI responses, honor Gemini's configured API URL, and reject
+  multiple parallel native tool calls instead of silently selecting one.
+- Isolate LangSmith trace state between tracker instances and restore parent runs after nested tasks.
+- Count literal tokenizer control strings as ordinary prompt text instead of falling back to the
+  character-based token estimate.
+
 ## [0.8.1] - 2026-10-13
 
 :::note Latest Update

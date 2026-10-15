@@ -1,3 +1,4 @@
+from copy import deepcopy
 from types import SimpleNamespace
 from typing import ClassVar, cast
 from unittest.mock import MagicMock
@@ -186,3 +187,90 @@ async def test_anthropic_call_action_stream_rejects_parallel_tool_uses():
 
     with pytest.raises(ValueError, match="multiple parallel tool calls"):
         await llm.call_action_stream(ConversationHistory(), tools=_tools(), agent_callback_available=False)
+
+
+class _SamplingCompatibleMessages:
+    """Use the SDK v1 keyword surface and reconstruct its merged JSON body."""
+
+    def __init__(self):
+        self.bodies = []
+
+    def create(self, *, model, system, messages, max_tokens, stream, tools=None, extra_body=None):
+        self.bodies.append(
+            {"model": model, "system": system, "messages": messages, "max_tokens": max_tokens, **(extra_body or {})}
+        )
+        assert stream is False
+        if tools:
+            content = SimpleNamespace(type="tool_use", name="search", input={"query": "protolink"}, id="tool_1")
+        else:
+            content = SimpleNamespace(type="text", text="answer")
+        return SimpleNamespace(content=[content])
+
+    def stream(self, *, model, system, messages, max_tokens, tools=None, extra_body=None):
+        self.bodies.append(
+            {"model": model, "system": system, "messages": messages, "max_tokens": max_tokens, **(extra_body or {})}
+        )
+        if tools:
+            events = [
+                SimpleNamespace(
+                    type="content_block_start",
+                    content_block=SimpleNamespace(type="tool_use", name="search", input={}, id="tool_1"),
+                ),
+                SimpleNamespace(
+                    type="content_block_delta",
+                    delta=SimpleNamespace(type="input_json_delta", partial_json='{"query":"protolink"}'),
+                ),
+            ]
+        else:
+            events = [
+                SimpleNamespace(type="content_block_delta", delta=SimpleNamespace(type="text_delta", text="answer"))
+            ]
+        return _FakeAnthropicStream(events)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["call", "call_stream", "call_action", "call_action_stream"])
+@pytest.mark.parametrize(
+    ("model_params", "sampling_body"),
+    [
+        ({}, {}),
+        (
+            {
+                "temperature": 0.2,
+                "top_p": 0.8,
+                "top_k": 4,
+                "extra_body": {"temperature": 0.4, "metadata": {"user_id": "offline"}},
+            },
+            {"temperature": 0.4, "top_p": 0.8, "top_k": 4},
+        ),
+        ({"temperature": 0.0, "extra_body": None}, {"temperature": 0.0}),
+    ],
+)
+async def test_anthropic_requests_support_sdk_v1_sampling_parameters(method, model_params, sampling_body):
+    llm = _make_anthropic_llm()
+    llm._model_params = {**AnthropicLLM.DEFAULT_MODEL_PARAMS, **deepcopy(model_params)}
+    original_params = deepcopy(llm._model_params)
+    sdk_messages = _SamplingCompatibleMessages()
+    llm._client = SimpleNamespace(messages=sdk_messages)
+    history = ConversationHistory(system_prompt="task prompt")
+    history.add_user("Find docs")
+
+    if method == "call":
+        assert llm.call(history) == "answer"
+    elif method == "call_stream":
+        assert [chunk async for chunk in llm.call_stream(history)] == ["answer"]
+    elif method == "call_action":
+        result = llm.call_action(history, tools=_tools())
+        assert isinstance(result.action, ToolCallAction)
+    else:
+        result = await llm.call_action_stream(history, tools=_tools())
+        assert isinstance(result.action, ToolCallAction)
+
+    assert len(sdk_messages.bodies) == 1
+    body = sdk_messages.bodies[0]
+    assert {name: body[name] for name in ("temperature", "top_p", "top_k") if name in body} == sampling_body
+    assert body["max_tokens"] == 1024
+    assert body["system"] == "task prompt"
+    if model_params.get("extra_body"):
+        assert body["metadata"] == {"user_id": "offline"}
+    assert llm._model_params == original_params

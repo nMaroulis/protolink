@@ -2328,6 +2328,9 @@ OpenAI Responses API adapter with native function tools and native streamed tool
 
 Direct calls translate `ConversationHistory` into Responses input and extract text from the returned response. In inference mode, real function declarations are sent to the provider, parallel tool calls are disabled and returned function calls are normalized into ProtoLink actions before the runtime executes them. Streaming follows the same contract while forwarding text deltas and buffering function arguments until they form one complete action.
 
+Failed or incomplete responses and stream error events raise `RuntimeError`, including after partial text has
+already been emitted. Native responses containing multiple tool calls are rejected instead of selecting one.
+
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="OpenAILLM parameters">
     <ApiField name="api_key" type="str | None" defaultValue="None">
@@ -2405,7 +2408,10 @@ After ProtoLink executes a requested tool, the adapter uses that identifier to i
       Claude model identifier. <code>None</code> resolves to <code>claude-sonnet-4-20250514</code>.
     </ApiField>
     <ApiField name="model_params" type="dict[str, Any] | None" defaultValue="None">
-      Values merged over <code>temperature=1.0</code>, <code>top_p=1.0</code> and <code>max_tokens=1024</code>.
+      Values merged over <code>max_tokens=1024</code>. Sampling uses the selected model's defaults unless
+      explicitly configured. For compatibility with Anthropic SDK v1, explicit <code>temperature</code>,
+      <code>top_p</code> and <code>top_k</code> values are forwarded through <code>extra_body</code> for
+      models that support them. Matching keys already supplied in <code>extra_body</code> take precedence.
     </ApiField>
     <ApiField name="base_url" type="str | None" defaultValue="None">
       Optional Anthropic-compatible API base URL passed to the SDK.
@@ -2465,7 +2471,7 @@ Function-call parts are normalized into `ToolCallAction` or `AgentCallAction` be
       Generation configuration merged over <code>temperature=1.0</code> and <code>top_p=1.0</code>.
     </ApiField>
     <ApiField name="base_url" type="str | None" defaultValue="None">
-      Stored by the shared API base class. The current Gemini client does not forward this value to <code>genai.Client</code>.
+      Custom Gemini API root used for text and native-tool requests, including streaming. Omit it to use the SDK's default endpoint.
     </ApiField>
     <ApiField name="tool_calling" type={'"auto" | "native" | "json" | None'} defaultValue="None">
       Runtime protocol selection. Omit it to preserve this adapter's default; use <code>auto</code> for

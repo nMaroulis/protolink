@@ -22,7 +22,6 @@ from protolink.models import Task
 from protolink.transport.base import Transport, TransportRequestContext
 from protolink.transport.config import TransportCapabilities, TransportConfig
 from protolink.transport.errors import TransportConnectionError, TransportError, TransportRemoteError
-from protolink.types import TransportType
 
 if TYPE_CHECKING:
     from protolink.server.endpoint_handler import EndpointSpec
@@ -57,7 +56,7 @@ class RuntimeTransport(Transport):
         Shared limits, retry, shutdown, idempotency and metrics settings.
     """
 
-    transport_type: ClassVar[TransportType] = "runtime"
+    transport_type: ClassVar[str] = "runtime"
     """Identifier for the transport type used by the registry."""
 
     supports_streaming: ClassVar[bool] = True

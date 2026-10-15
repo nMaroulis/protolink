@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, fields
@@ -86,7 +86,7 @@ def is_durable_streaming() -> bool:
 
 
 @contextmanager
-def durable_streaming_scope() -> Iterator[None]:
+def durable_streaming_scope() -> Generator[None, None, None]:
     token = _streaming.set(True)
     try:
         yield
@@ -336,7 +336,7 @@ class DurableRun:
 
 
 @contextmanager
-def resume_response(run_id: str, response: dict[str, Any] | None) -> Iterator[None]:
+def resume_response(run_id: str, response: dict[str, Any] | None) -> Generator[None, None, None]:
     token = _response.set((run_id, response) if response is not None else None)
     try:
         yield
@@ -345,7 +345,7 @@ def resume_response(run_id: str, response: dict[str, Any] | None) -> Iterator[No
 
 
 @contextmanager
-def durable_run_scope(agent: Any, task: Task, budget: BudgetEnforcer) -> Iterator[DurableRun | None]:
+def durable_run_scope(agent: Any, task: Task, budget: BudgetEnforcer) -> Generator[DurableRun | None, None, None]:
     parent = current_durable_run()
     store = parent.store if parent is not None else agent.durability
     if store is None:

@@ -7,7 +7,7 @@ tasks, retain authorizations for reuse, or replace the Agent dispatcher.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Generator
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -36,7 +36,7 @@ def current_workflow_budget() -> BudgetEnforcer | None:
 
 
 @contextmanager
-def shared_budget_scope(budget: BudgetEnforcer) -> Iterator[None]:
+def shared_budget_scope(budget: BudgetEnforcer) -> Generator[None, None, None]:
     """Bind root accounting for supervised local children."""
     token = _workflow_budget.set(budget)
     try:
@@ -46,7 +46,7 @@ def shared_budget_scope(budget: BudgetEnforcer) -> Iterator[None]:
 
 
 @contextmanager
-def workflow_budget_scope(context: RunContext) -> Iterator[BudgetEnforcer]:
+def workflow_budget_scope(context: RunContext) -> Generator[BudgetEnforcer, None, None]:
     """Share native counters across nested workflows without global run state."""
     budget = _workflow_budget.get() or BudgetEnforcer(context)
     token = _workflow_budget.set(budget)
@@ -57,7 +57,7 @@ def workflow_budget_scope(context: RunContext) -> Iterator[BudgetEnforcer]:
 
 
 @contextmanager
-def suppress_runtime_events() -> Iterator[None]:
+def suppress_runtime_events() -> Generator[None, None, None]:
     """Let an existing event producer report authorization without duplicate events."""
     token = _events_suppressed.set(True)
     try:
@@ -67,7 +67,7 @@ def suppress_runtime_events() -> Iterator[None]:
 
 
 @contextmanager
-def execution_scope(task: Task | None = None, sink: EventSink | None = None) -> Iterator[None]:
+def execution_scope(task: Task | None = None, sink: EventSink | None = None) -> Generator[None, None, None]:
     """Bind a task and optional event observer for the current async invocation."""
     parent_task, parent_sink = _scope.get()
     token = _scope.set((task if task is not None else parent_task, sink if sink is not None else parent_sink))
@@ -83,7 +83,7 @@ def current_task() -> Task | None:
 
 
 @contextmanager
-def isolate_event_sink() -> Iterator[None]:
+def isolate_event_sink() -> Generator[None, None, None]:
     """Keep unary in-process peers from inheriting a caller's live event observer.
 
     Worker task receipts still persist normally and can be merged from the
@@ -97,7 +97,7 @@ def isolate_event_sink() -> Iterator[None]:
 
 
 @asynccontextmanager
-async def closing_stream(source: AsyncIterator[Any]) -> AsyncIterator[AsyncIterator[Any]]:
+async def closing_stream(source: AsyncIterator[Any]) -> AsyncGenerator[AsyncIterator[Any], None]:
     """Close nested generators promptly when a stream consumer leaves."""
     try:
         yield source

@@ -76,7 +76,7 @@ jobs:
       with:
         version: ${{ env.UV_VERSION }}
 
-    - run: uv sync --locked --no-default-groups --group test
+    - run: uv sync --locked --no-default-groups --group sdk-test
 
     - name: Run tests
       run: |
@@ -108,7 +108,7 @@ jobs:
     - name: Resolve independently of the development lock
       run: |
         uv venv
-        uv pip install --resolution "${{ matrix.resolution }}" -e ".[test,mcp,telemetry]"
+        uv pip install --resolution "${{ matrix.resolution }}" -e ".[test,mcp,telemetry,openai,anthropic,gemini,huggingface,metrics]"
     - name: Test supported dependency versions
       run: uv run --no-sync pytest
 

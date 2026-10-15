@@ -224,6 +224,8 @@ class DeepSeekLLM(APILLM):
         """Normalize a DeepSeek chat-completion response into one action."""
         message = response.choices[0].message
         tool_calls = getattr(message, "tool_calls", None) or []
+        if len(tool_calls) > 1:
+            raise ValueError("DeepSeek response returned multiple parallel tool calls; expected exactly one")
         if tool_calls:
             function = tool_calls[0].function
             action = native_tool_call_to_action(str(function.name), parse_json_arguments(function.arguments))

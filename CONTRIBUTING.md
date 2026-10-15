@@ -35,6 +35,10 @@ local llama.cpp bindings and notebooks are opt-in: for example, `uv sync --locke
 Focused groups are available with `uv sync --locked --no-default-groups --group test`
 (or `lint`, `typing`, `build`).
 
+To exercise the real hosted-provider SDKs and tokenizer as well, use
+`uv sync --locked --no-default-groups --group sdk-test`. The SDK tests intercept requests locally;
+they do not require provider credentials or send requests to hosted services.
+
 For an existing pip workflow:
 
 ```bash
@@ -46,8 +50,9 @@ Use the dependency groups for new contributor workflows.
 
 Commit `uv.lock` changes alongside dependency changes. Run `uv lock` after editing requirements;
 use `uv lock --upgrade` for an intentional refresh. Runtime requirements remain flexible for library users.
-CI tests the lock on Python 3.11, 3.13 and 3.14 and separately resolves the minimum direct and latest
-dependencies to detect compatibility problems. Dependency minimums should reflect tested API requirements.
+CI tests the lock, including hosted-provider SDKs, on Python 3.11, 3.13 and 3.14 and separately resolves
+the minimum direct and latest dependencies to detect compatibility problems. Dependency minimums should
+reflect tested API requirements.
 
 ---
 

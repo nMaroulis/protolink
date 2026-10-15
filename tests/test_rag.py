@@ -56,6 +56,43 @@ def _card(name: str = "rag-agent") -> AgentCard:
     )
 
 
+@pytest.mark.asyncio
+async def test_pdf_loader_preserves_page_numbers_and_source_metadata(tmp_path: Path) -> None:
+    pypdf = pytest.importorskip("pypdf")
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    path = tmp_path / "source.pdf"
+    with pypdf.PdfWriter() as writer:
+        font = writer._add_object(
+            DictionaryObject(
+                {
+                    NameObject("/Type"): NameObject("/Font"),
+                    NameObject("/Subtype"): NameObject("/Type1"),
+                    NameObject("/BaseFont"): NameObject("/Helvetica"),
+                }
+            )
+        )
+        for text in (b"First page", None, b"Third page"):
+            page = writer.add_blank_page(width=300, height=300)
+            if text is not None:
+                page[NameObject("/Resources")] = DictionaryObject(
+                    {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+                )
+                content = DecodedStreamObject()
+                content.set_data(b"BT /F1 12 Tf 10 250 Td (" + text + b") Tj ET")
+                page[NameObject("/Contents")] = writer._add_object(content)
+        writer.write(path)
+
+    loader = AutoLoader()
+    documents = await loader.load(path, metadata={"team": "support"})
+    assert [document.text for document in documents] == ["First page", "Third page"]
+    assert [document.metadata["page"] for document in documents] == [1, 3]
+    assert all(document.source == str(path.resolve()) for document in documents)
+    assert all(document.media_type == "application/pdf" for document in documents)
+    assert all(document.metadata["team"] == "support" for document in documents)
+    assert [document.id for document in await loader.load(path)] == [document.id for document in documents]
+
+
 def test_rag_models_have_stable_ids_and_round_trip() -> None:
     first = Document("A support policy.", source="policy.md", metadata={"team": "support"})
     second = Document("A support policy.", source="policy.md", metadata={"team": "support"})

@@ -146,7 +146,7 @@ async def test_provider_usage_still_enforces_output_budget_without_metrics_obser
 @pytest.mark.parametrize("availability", ["missing", "available"])
 def test_tokenizer_resolution_is_cached_per_model(monkeypatch, availability: str) -> None:
     imports = 0
-    encoder = SimpleNamespace(encode=lambda _text: [1, 2, 3])
+    encoder = SimpleNamespace(encode=lambda _text, **_kwargs: [1, 2, 3])
 
     def import_tokenizer(name: str):
         nonlocal imports
@@ -165,6 +165,22 @@ def test_tokenizer_resolution_is_cached_per_model(monkeypatch, availability: str
         assert imports == 1
     finally:
         metrics_module._optional_tiktoken_encoder.cache_clear()
+
+
+@pytest.mark.parametrize("text", ["<|endoftext|>", "prefix <|endoftext|> suffix", "héllo <|endoftext|>"])
+def test_real_tokenizer_counts_literal_control_tokens_as_text(monkeypatch, text):
+    tiktoken = pytest.importorskip("tiktoken")
+    # A tiny local vocabulary exercises the native encoder without downloading
+    # production tokenizer assets or relying on a particular model's vocabulary.
+    encoder = tiktoken.Encoding(
+        name="protolink-test-bytes",
+        pat_str=r"(?s).",
+        mergeable_ranks={bytes([value]): value for value in range(256)},
+        special_tokens={"<|endoftext|>": 256},
+    )
+    monkeypatch.setattr(metrics_module, "_optional_tiktoken_encoder", lambda _model: encoder)
+
+    assert metrics_module.estimate_token_count(text) == len(text.encode("utf-8"))
 
 
 def test_create_llm_accepts_optional_metrics_profile():

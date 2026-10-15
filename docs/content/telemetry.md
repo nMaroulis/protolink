@@ -194,7 +194,10 @@ Protolink does not ship a fixed provider pricing catalog. Prices and context win
 ### Langfuse Example
 
 The `LangfuseTelemetry` tracks tasks as traces and LLM/Tool executions as spans/generations.
-Install `protolink[telemetry]` for the supported Langfuse Python SDK 4.x and LangSmith integrations.
+Install `protolink[telemetry]` for the supported Langfuse Python SDK 4.x/5.x and LangSmith integrations.
+SDK 5 requires Langfuse Cloud or a self-hosted server at version 4.59.0 or later. For older self-hosted
+servers, retain SDK 4 with `uv add "protolink[telemetry]" "langfuse<5"`. See the
+[Langfuse migration guide](https://langfuse.com/docs/observability/sdk/upgrade-path/python-v4-to-v5).
 
 ```python
 import os
@@ -226,8 +229,8 @@ from protolink.telemetry import LangSmithTelemetry
 from protolink.agents.base import Agent
 
 # Ensure environment variables are set:
-# os.environ["LANGCHAIN_API_KEY"] = "lsv2_pt_..."
-# os.environ["LANGCHAIN_PROJECT"] = "my-protolink-project"
+# os.environ["LANGSMITH_API_KEY"] = "lsv2_pt_..."
+# os.environ["LANGSMITH_PROJECT"] = "my-protolink-project"
 
 # Initialize tracking
 telemetry_tracker = LangSmithTelemetry()
@@ -1579,7 +1582,7 @@ async on_llm_event(event: dict[str, Any]) -> Any`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/langfuse_telemetry.py#L46"
 >
 
-Translate the shared lifecycle into the Langfuse SDK 4 observation API. The six overridden methods return `None` implicitly. `on_llm_event()` is inherited from `Telemetry` and returns `None` without exporting its event.
+Translate the shared lifecycle into the Langfuse SDK 4/5 observation API. The six overridden methods return `None` implicitly. `on_llm_event()` is inherited from `Telemetry` and returns `None` without exporting its event.
 
 <ApiSection title="Task mapping">
   <ApiFields ariaLabel="Langfuse task mapping">
@@ -1643,7 +1646,7 @@ Translate the shared lifecycle into the Langfuse SDK 4 observation API. The six 
     api_key: str | None = None,
     project_name: str | None = None,
 ) -> None`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/langsmith_telemetry.py#L18"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/langsmith_telemetry.py#L22"
 >
 
 Create a LangSmith client and represent task execution as a root `RunTree` with child LLM and explicit tool runs.
@@ -1651,10 +1654,10 @@ Create a LangSmith client and represent task execution as a root `RunTree` with 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="LangSmithTelemetry constructor parameters">
     <ApiField name="api_key" type="str | None" defaultValue="None">
-      LangSmith API key. A truthy explicit value wins; otherwise the constructor reads <code>LANGCHAIN_API_KEY</code>.
+      LangSmith API key. A truthy explicit value wins; otherwise the constructor reads <code>LANGSMITH_API_KEY</code>, then the legacy <code>LANGCHAIN_API_KEY</code>.
     </ApiField>
     <ApiField name="project_name" type="str | None" defaultValue="None">
-      Run project. Resolution is a truthy explicit value, then <code>LANGCHAIN_PROJECT</code>, then <code>"default"</code>.
+      Run project. Resolution is a truthy explicit value, then <code>LANGSMITH_PROJECT</code>, then the legacy <code>LANGCHAIN_PROJECT</code>, then <code>"default"</code>.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1707,7 +1710,7 @@ async on_tool_end(
     error: str | None = None,
 ) -> Any
 async on_llm_event(event: dict[str, Any]) -> Any`}
-  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/langsmith_telemetry.py#L42"
+  source="https://github.com/nMaroulis/protolink/blob/main/protolink/telemetry/langsmith_telemetry.py#L62"
 >
 
 Translate the common hooks into root and child LangSmith runs. The six overrides return `None` implicitly; detailed `on_llm_event()` values are ignored by the inherited base implementation.
@@ -1718,7 +1721,7 @@ Translate the common hooks into root and child LangSmith runs. The six overrides
       Construct a <code>RunTree</code> with a <code>"Task: "</code>-prefixed agent name, <code>run_type="chain"</code>, the configured project, a task-ID input mapping, agent-name metadata and the shared client; post it and retain it as the current root.
     </ApiField>
     <ApiField name="on_task_end">
-      End the active root with <code>result.to_dict()</code> as outputs, patch it to LangSmith and clear context in <code>finally</code>. The output is passed directly rather than wrapped under a named key.
+      End the active root with <code>result.to_dict()</code> as outputs and patch it to LangSmith. Restore the outer task's runs when a nested task completes, including after SDK failures. The output is passed directly rather than wrapped under a named key.
     </ApiField>
   </ApiFields>
 </ApiSection>
@@ -1751,7 +1754,7 @@ Translate the common hooks into root and child LangSmith runs. The six overrides
       Child starts and end hooks return silently when no corresponding current run exists.
     </ApiField>
     <ApiField name="provider operation failure">
-      SDK construction/post/end/patch calls inside hook bodies catch <code>Exception</code> and log a warning. End hooks clear context even after an error.
+      SDK construction/post/end/patch calls inside hook bodies catch <code>Exception</code> and log a warning. State is isolated per tracker and async context. End hooks clear the completed run even after an error, and failed task starts cannot attach child runs to an outer task.
     </ApiField>
     <ApiField name="dependency re-check">
       <code>on_task_start()</code> resolves <code>RunTree</code> through the lazy dependency helper before entering its SDK-operation <code>try</code> block. In the unusual case that the package becomes unavailable after construction, that <code>ImportError</code> propagates.

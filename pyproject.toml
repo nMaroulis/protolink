@@ -73,8 +73,8 @@ mcp = [
 ]
 
 telemetry = [
-    "langfuse>=4.0.0,<5",
-    "langsmith",
+    "langfuse>=4.0.0,<6",
+    "langsmith>=0.0.34",
 ]
 
 metrics = [
@@ -109,8 +109,8 @@ test = [
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.14.1",
-    "ruff==0.16.7",
-    "ty==0.0.80",
+    "ruff==0.17.0",
+    "ty==0.0.87",
     "pre-commit>=4.4.0",
     "protolink[grpc]", # For testing gRPC transport
     "protolink[http]", # For testing HTTP transport
@@ -148,8 +148,12 @@ test = [
     "pytest-mock>=3.14.1",
     "protolink[grpc,http,documents,mcp,yaml,telemetry]",
 ]
-lint = ["ruff==0.16.7"]
-typing = ["ty==0.0.80", "protolink[grpc,http,documents,mcp,yaml,telemetry]"]
+sdk-test = [
+    {include-group = "test"},
+    "protolink[openai,anthropic,gemini,huggingface,metrics]",
+]
+lint = ["ruff==0.17.0"]
+typing = ["ty==0.0.87", "protolink[grpc,http,documents,mcp,yaml,telemetry]"]
 build = ["protolink[build]"]
 dev = [
     {include-group = "test"},

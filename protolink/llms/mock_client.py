@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 
 from protolink.llms.base import LLM, ToolCallingMode
 from protolink.llms.history import ConversationHistory
+from protolink.types import LLMProvider, LLMType
 
 
 class MockLLM(LLM):
@@ -67,8 +68,8 @@ class MockLLM(LLM):
     ```
     """
 
-    model_type: ClassVar[str] = "api"
-    provider: ClassVar[str] = "mock"
+    model_type: ClassVar[LLMType] = "api"
+    provider: ClassVar[LLMProvider] = "mock"
 
     def __init__(
         self,

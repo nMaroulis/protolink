@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -238,7 +238,9 @@ class SubagentSupervisor:
 
 
 @asynccontextmanager
-async def subagent_scope(agent: Any, task: Task, budget: BudgetEnforcer) -> AsyncIterator[SubagentSupervisor | None]:
+async def subagent_scope(
+    agent: Any, task: Task, budget: BudgetEnforcer
+) -> AsyncGenerator[SubagentSupervisor | None, None]:
     current = _active.get()
     if current is None and not agent.subagents:
         yield None

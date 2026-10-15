@@ -38,7 +38,7 @@ See Also:
 
 import asyncio
 import copy
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, ClassVar
 
@@ -63,7 +63,7 @@ from protolink.tools.tool import Tool as ProtoTool
 
 
 @asynccontextmanager
-async def _session_errors() -> AsyncIterator[None]:
+async def _session_errors() -> AsyncGenerator[None, None]:
     """Preserve a single failure's type through the SDK's nested task groups."""
     try:
         yield
@@ -332,7 +332,7 @@ class MCPToolAdapter(BaseTool):
             raise ValueError(f"Unknown transport: {self.transport}. Use 'stdio', 'sse', or 'streamable_http'.")
 
     @asynccontextmanager
-    async def _connect(self) -> AsyncIterator[ClientSession]:
+    async def _connect(self) -> AsyncGenerator[ClientSession, None]:
         """Own transport/session cleanup in the task that opened them."""
         self._validate_transport()
         async with _session_errors(), AsyncExitStack() as stack:
@@ -358,7 +358,7 @@ class MCPToolAdapter(BaseTool):
             yield session
 
     @asynccontextmanager
-    async def session(self) -> AsyncIterator["MCPToolAdapter"]:
+    async def session(self) -> AsyncGenerator["MCPToolAdapter", None]:
         """Reuse one initialized session within ``async with adapter.session()``.
 
         Registered wrappers share this session. Await all calls before leaving;
