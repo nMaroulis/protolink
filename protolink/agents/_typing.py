@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from protolink.agents.subagents import SubagentLimits
+    from protolink.agents.worker_tools import WorkerTool
     from protolink.client import AgentClient, RegistryClient
     from protolink.core.actions import RunAction
     from protolink.core.budget import BudgetEnforcer
@@ -66,6 +67,7 @@ class _AgentMixinBase(Protocol):
     hooks: tuple[AgentHooks, ...]
     durability: DurableStore | None
     execution_version: str
+    yield_after_steps: int | None
     subagents: dict[str, Any]
     subagent_limits: SubagentLimits
     _subagent_runs: dict[str, Any]
@@ -85,6 +87,15 @@ class _AgentMixinBase(Protocol):
     _a2a_enabled: bool
 
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+
+    def add_worker_tool(
+        self,
+        worker: str,
+        *,
+        name: str | None = None,
+        tool: str | None = None,
+        description: str | None = None,
+    ) -> WorkerTool: ...
 
     @property
     def llm(self) -> LLM | None: ...

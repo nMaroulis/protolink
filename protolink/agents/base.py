@@ -100,6 +100,7 @@ class Agent(
         subagents: Iterable[Agent] | None = None,
         subagent_limits: SubagentLimits | None = None,
         durability: DurableStore | str | Path | None = None,
+        yield_after_steps: int | None = None,
         execution_version: str = "1",
         context_policy: ContextPolicy | Literal["auto"] | None = None,
         hooks: Iterable[AgentHooks | Callable[[ModelRequest], Any]] | None = None,
@@ -173,8 +174,12 @@ class Agent(
             subagent_limits: Optional child count, concurrency, depth and background
                 tool controls. Defaults allow eight children, four concurrent, depth one.
             durability: Execution checkpoint store or SQLite file path. Durable runs
-                pause for approvals/questions and resume through resume/resume_task.
+                pause for approvals/questions/work handoffs and resume through resume/resume_task.
                 They use the default engine and blocking local delegation.
+            yield_after_steps: Optional model-turn count per cooperative work slice.
+                Requires own or inherited parent durability. A settled slice yields an input-required task
+                with a RunHandoff; resume_task explicitly authorizes another slice.
+                Shared hard budgets and correction history are never reset.
             execution_version: Application-owned version of tool code/dependencies.
                 Change it when stored execution must not continue under new code.
             context_policy: Opt-in "auto" or ContextPolicy for bounded model inputs.
@@ -182,6 +187,11 @@ class Agent(
         """
 
         # Validate shorthand endpoints before provider initialization can perform I/O.
+        if yield_after_steps is not None and (
+            isinstance(yield_after_steps, bool) or not isinstance(yield_after_steps, int) or yield_after_steps < 1
+        ):
+            raise ValueError("yield_after_steps must be a positive integer or None")
+        self.yield_after_steps = yield_after_steps
         self._identity_shorthand = card is None
         self.card, self._automatic_identity_url = resolve_identity(
             card, name=name, description=description, url=url, transport=transport

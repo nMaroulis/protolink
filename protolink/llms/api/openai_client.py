@@ -103,6 +103,7 @@ class OpenAILLM(APILLM):
             )
         ) as stream:
             async for event in stream:
+                self._raise_stream_error(event)
                 # We only care about output text deltas
                 if event.type != "response.output_text.delta":
                     continue
@@ -191,11 +192,13 @@ class OpenAILLM(APILLM):
         function_name: str | None = None
         function_args: list[str] = []
         call_id: str | None = None
+        function_item_ids: set[Any] = set()
 
         async with threaded_stream(
             lambda: self._client.responses.create(model=self.model, input=history.messages, stream=True, **params)
         ) as stream:
             async for event in stream:
+                self._raise_stream_error(event)
                 event_type = str(getattr(event, "type", ""))
                 if event_type == "response.output_text.delta":
                     delta = str(getattr(event, "delta", "") or "")
@@ -215,6 +218,13 @@ class OpenAILLM(APILLM):
 
                 item = getattr(event, "item", None)
                 if getattr(item, "type", None) == "function_call":
+                    item_id = getattr(item, "id", None) or getattr(item, "call_id", None)
+                    if item_id is not None:
+                        function_item_ids.add(item_id)
+                        if len(function_item_ids) > 1:
+                            raise ValueError(
+                                "OpenAI stream returned multiple parallel tool calls; expected exactly one"
+                            )
                     function_name = str(getattr(item, "name", "") or function_name or "")
                     call_id = getattr(item, "call_id", call_id)
                     arguments = getattr(item, "arguments", None)
@@ -256,9 +266,28 @@ class OpenAILLM(APILLM):
     # Utils
     # ----------------------------------------------------------------------
 
+    @staticmethod
+    def _raise_response_error(response: Any) -> None:
+        status = getattr(response, "status", None)
+        if status == "failed":
+            message = getattr(getattr(response, "error", None), "message", None) or "Unknown provider error"
+            raise RuntimeError(f"OpenAI response failed: {message}")
+        if status == "incomplete":
+            reason = getattr(getattr(response, "incomplete_details", None), "reason", None) or "unknown reason"
+            raise RuntimeError(f"OpenAI response incomplete: {reason}")
+
+    @classmethod
+    def _raise_stream_error(cls, event: Any) -> None:
+        event_type = getattr(event, "type", None)
+        if event_type == "error":
+            raise RuntimeError(f"OpenAI stream failed: {getattr(event, 'message', None) or 'Unknown provider error'}")
+        if event_type in {"response.failed", "response.incomplete"}:
+            cls._raise_response_error(event.response)
+
     def _parse_output(self, response: Any) -> str:
         """Convert OpenAI completion to internal Message format."""
 
+        self._raise_response_error(response)
         output_text: str = ""
         for item in response.output or []:
             # item: ResponseOutputMessage
@@ -276,6 +305,10 @@ class OpenAILLM(APILLM):
 
     def _action_from_response(self, response: Any) -> LLMActionResult:
         """Normalize an OpenAI Responses payload into one Protolink action."""
+        self._raise_response_error(response)
+        function_items = [item for item in response.output or [] if getattr(item, "type", None) == "function_call"]
+        if len(function_items) > 1:
+            raise ValueError("OpenAI response returned multiple parallel tool calls; expected exactly one")
         output_text: str = ""
         for item in response.output or []:
             if getattr(item, "type", None) == "function_call":

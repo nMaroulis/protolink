@@ -136,6 +136,15 @@ URL. Construction does not start a server.
 See the [progressive-control guide](docs/content/progressive-control.md) for
 component configuration, per-run budgets and complete task control.
 
+For bounded worker assignments, add `yield_after_steps=3` with durable execution
+and inspect `RunHandoff.from_task(task)` before explicitly granting another slice
+through `resume_task(root_run_id)`. Shared budgets and completed actions survive
+continuation. `parent.add_worker_tool("researcher")` exposes an owned child through
+a simple `task: str` schema; select `tool="lookup"` to expose that child's typed
+tool instead. See [worker execution](docs/content/worker-execution.md) and run
+`python examples/worker_execution.py` for the offline walkthrough, including
+correctable preparation errors and live child activity.
+
 ## Your first agent mesh
 
 Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:

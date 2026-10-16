@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, copy_context
 from dataclasses import dataclass
 from typing import Any
 
@@ -80,6 +80,9 @@ class SubagentSupervisor:
         self.agent = agent
         self.task = task
         self.context = RunContext.from_task(task)
+        # Public RunHandle.spawn() may run in another caller task. Children
+        # inherit their owner's observers and streaming mode, not that caller's.
+        self._execution_context = copy_context()
         self.budget = budget
         self.parent = _active.get()
         self.root = self.parent.root if self.parent is not None else self
@@ -167,9 +170,9 @@ class SubagentSupervisor:
                 durable.entry["child_task"] = task.to_dict()
                 durable.save()
         context = RunContext.from_task(task)
-        recorder = DelegationRecorder(self.task, context, action_id)
 
         async def run_child() -> Task:
+            recorder = DelegationRecorder(self.task, context, action_id)
             token = _active.set(self)
             try:
                 async with self.root.semaphore:
@@ -190,7 +193,7 @@ class SubagentSupervisor:
                 finally:
                     _active.reset(token)
 
-        handle = SubagentHandle(task, asyncio.create_task(run_child()))
+        handle = SubagentHandle(task, asyncio.create_task(run_child(), context=self._execution_context.copy()))
         self.handles[handle.id] = handle
         runs = self.task.metadata.setdefault("subagent_runs", [])
         if not any(item["run_id"] == context.run_id for item in runs):
@@ -238,7 +241,9 @@ class SubagentSupervisor:
 
 
 @asynccontextmanager
-async def subagent_scope(agent: Any, task: Task, budget: BudgetEnforcer) -> AsyncIterator[SubagentSupervisor | None]:
+async def subagent_scope(
+    agent: Any, task: Task, budget: BudgetEnforcer
+) -> AsyncGenerator[SubagentSupervisor | None, None]:
     current = _active.get()
     if current is None and not agent.subagents:
         yield None

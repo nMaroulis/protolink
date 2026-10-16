@@ -8,6 +8,7 @@ import pytest
 
 from protolink import Agent, CapabilityPolicy, RunBudget, RunInterrupted, SubagentLimits, Task, TaskState
 from protolink.llms import MockLLM
+from protolink.llms.actions import FinalAction, LLMActionResult
 from protolink.tools import Tool
 
 
@@ -41,6 +42,120 @@ async def test_existing_agent_call_routes_locally_with_isolated_history_and_line
     delegated = [event for event in events if event.agent_name == "child"]
     assert delegated
     assert all(event.metadata.get("parent_run_id") for event in delegated)
+    assert not parent._subagent_runs
+
+
+class GatedNativeLLM(MockLLM):
+    _native_tool_calling_available = True
+    _native_tool_calling_default = True
+
+    def __init__(self, release):
+        super().__init__()
+        self.release = release
+        self.stopped = asyncio.Event()
+
+    def call_action(self, history, **kwargs):
+        raise AssertionError("A streamed owner must stream its child's provider call")
+
+    async def call_action_stream(self, history, *, chunk_callback=None, **kwargs):
+        try:
+            await chunk_callback("child text")
+            await self.release.wait()
+            return LLMActionResult(FinalAction(content="child done"), raw_response="child done", native=True)
+        finally:
+            self.stopped.set()
+
+
+async def next_child_chunk(run, name):
+    async for event in run.events():
+        if event.agent_name == name and event.payload.get("llm_event_type") == "llm_chunk":
+            return event
+    raise AssertionError("Run ended without live child text")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("depth", [1, 3])
+async def test_owned_child_text_reaches_public_stream_before_completion_at_any_depth(depth):
+    release = asyncio.Event()
+    leaf = Agent(name="leaf", llm=GatedNativeLLM(release), verbosity=0)
+    chain = [leaf]
+    for level in range(depth):
+        owner = parent_for(chain[-1], subagent_limits=SubagentLimits(max_depth=depth, max_concurrency=depth))
+        owner.card.name = f"owner-{level}"
+        chain.append(owner)
+    run = chain[-1].start_run("go")
+    try:
+        chunk = await asyncio.wait_for(next_child_chunk(run, "leaf"), 2)
+        assert chunk.payload["content"] == "child text"
+        assert chunk.run_id != run.context.run_id
+        assert chunk.task_id != run.task.id
+        assert chunk.parent_action_id == chunk.delegation_id
+        assert chunk.parent_action_id
+        assert not chunk.final
+        # Every ancestor already holds the same receipt while the leaf waits.
+        for owner in chain[1:]:
+            task = next(iter(owner._subagent_runs.values())).task
+            receipts = [event for event in task.metadata["run_events"] if event["event_id"] == chunk.event_id]
+            assert len(receipts) == 1
+        assert not release.is_set()
+        assert not leaf.llm.stopped.is_set()
+    finally:
+        release.set()
+        result = await asyncio.wait_for(run.result(), 2)
+
+    events = [event async for event in run.events()]
+    assert result.status == "completed"
+    assert len({event.event_id for event in events}) == len(events)
+    assert [event.sequence for event in events] == list(range(1, len(events) + 1))
+    assert [event.task_id for event in events if event.final and event.type == "task.status"] == [run.task.id]
+    child_events = [event for event in events if event.agent_name == "leaf"]
+    assert all(not event.final for event in child_events)
+    assert any(event.metadata.get("source_final") for event in child_events)
+    assert sum(event.event_id == chunk.event_id for event in events) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel_parent", [False, True])
+async def test_externally_spawned_child_inherits_live_text_observer_and_cancellation(cancel_parent):
+    entered, finish_parent, finish_child = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    class WaitingParent(Agent):
+        async def handle_task(self, task):
+            task.begin()
+            entered.set()
+            await finish_parent.wait()
+            return task.complete("parent done")
+
+    llm = GatedNativeLLM(finish_child)
+    child = Agent(name="child", llm=llm, verbosity=0)
+    parent = WaitingParent(name="parent", subagents=[child], verbosity=0)
+    run = parent.start_run("go")
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        handle = await run.spawn("child", "work")
+        chunk = await asyncio.wait_for(next_child_chunk(run, "child"), 2)
+        assert chunk.run_id == handle.run_id
+        assert chunk.task_id == handle.id
+        assert not llm.stopped.is_set()
+        if cancel_parent:
+            await run.cancel("stop parent")
+        else:
+            finish_child.set()
+            assert (await asyncio.wait_for(handle.result(), 2)).state is TaskState.COMPLETED
+            finish_parent.set()
+        result = await asyncio.wait_for(run.result(), 2)
+    finally:
+        finish_child.set()
+        finish_parent.set()
+        await run.cancel("test cleanup")
+        await run.result()
+
+    assert result.status == ("canceled" if cancel_parent else "completed")
+    assert llm.stopped.is_set()
+    assert handle._worker.done()
+    events = [event async for event in run.events()]
+    assert sum(event.event_id == chunk.event_id for event in events) == 1
+    assert len({event.event_id for event in events}) == len(events)
     assert not parent._subagent_runs
 
 

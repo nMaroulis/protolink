@@ -13,6 +13,11 @@ class PreparedTool(Tool):
     The signature callable describes arguments only; it is never invoked.
     Register this tool on an Agent. Calling it directly fails closed because no prepared authorization, cancellation
     token, or budget is available.
+
+    ``prepare`` may raise ``ToolRejectedError`` only when it has made no changes.
+    Model-driven inference returns that feedback through its bounded correction
+    loop before approval or execution, without charging a tool call. Ordinary
+    exceptions, denied actions and uncertain effects retain their stop behavior.
     """
 
     def __init__(

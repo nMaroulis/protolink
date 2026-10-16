@@ -36,8 +36,6 @@ class AnthropicLLM(APILLM):
 
     DEFAULT_MODEL: ClassVar[str] = "claude-sonnet-4-20250514"
     DEFAULT_MODEL_PARAMS: ClassVar[dict[str, Any]] = {
-        "temperature": 1.0,
-        "top_p": 1.0,
         "max_tokens": 1024,
     }
 
@@ -85,7 +83,7 @@ class AnthropicLLM(APILLM):
 
     def call(self, history: ConversationHistory) -> str:
         """Generate a single response from the model."""
-        params = dict(self._model_params)
+        params = self._request_params()
         system_prompt, messages = self._to_anthropic_request_parts(history)
 
         response = self._client.messages.create(
@@ -105,7 +103,7 @@ class AnthropicLLM(APILLM):
         stopping early; cleanup waits for any in-progress SDK operation to
         return on the worker. Text parsing happens on the caller's event loop.
         """
-        params = dict(self._model_params)
+        params = self._request_params()
         system_prompt, messages = self._to_anthropic_request_parts(history)
 
         async with threaded_stream(
@@ -148,7 +146,7 @@ class AnthropicLLM(APILLM):
                 agent_callback_available=agent_callback_available,
                 agent_cards=agent_cards,
             )
-        params = dict(self._model_params)
+        params = self._request_params()
         tool_specs = anthropic_tools(
             tools,
             include_agent_tools=should_include_agent_tools(
@@ -195,7 +193,7 @@ class AnthropicLLM(APILLM):
                 agent_cards=agent_cards,
                 chunk_callback=chunk_callback,
             )
-        params = dict(self._model_params)
+        params = self._request_params()
         tool_specs = anthropic_tools(
             tools,
             include_agent_tools=should_include_agent_tools(
@@ -339,6 +337,19 @@ class AnthropicLLM(APILLM):
     # ----------------------------------------------------------------------
     # Utils
     # ----------------------------------------------------------------------
+
+    def _request_params(self) -> dict[str, Any]:
+        """Keep explicit legacy sampling settings compatible with SDK v1.
+
+        SDK v1 removed sampling keyword arguments. Older models still accept
+        them in the request body. Caller-supplied ``extra_body`` values retain
+        the SDK's precedence over other model parameters.
+        """
+        params = dict(self._model_params)
+        sampling = {name: params.pop(name) for name in ("temperature", "top_p", "top_k") if name in params}
+        if sampling:
+            params["extra_body"] = {**sampling, **(params.get("extra_body") or {})}
+        return params
 
     def _to_anthropic_request_parts(
         self,

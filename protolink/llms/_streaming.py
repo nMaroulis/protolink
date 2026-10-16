@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, asynccontextmanager
 from contextvars import copy_context
@@ -28,7 +28,7 @@ async def http_stream(
     headers: dict[str, str],
     timeout: float,
     provider: str,
-) -> AsyncIterator[AsyncIterator[dict[str, Any]]]:
+) -> AsyncGenerator[AsyncIterator[dict[str, Any]], None]:
     """Open an async NDJSON/SSE response and close it on every exit path.
 
     The client belongs to this request, so separate runs and event loops never
@@ -79,7 +79,7 @@ async def http_stream(
 
 
 @asynccontextmanager
-async def threaded_stream(factory: Callable[[], Any]) -> AsyncIterator[AsyncIterator[Any]]:
+async def threaded_stream(factory: Callable[[], Any]) -> AsyncGenerator[AsyncIterator[Any], None]:
     """Read a synchronous SDK or local model iterator without blocking asyncio.
 
     Opening, reading and closing all happen on one worker, preserving iterator

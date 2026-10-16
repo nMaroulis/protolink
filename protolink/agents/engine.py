@@ -138,6 +138,8 @@ class AgentExecutionMixin(_AgentMixinBase):
         if task.is_terminal:
             return task
 
+        if self.yield_after_steps is not None and self.durability is None and current_durable_run() is None:
+            raise ValueError("yield_after_steps requires a durability store on this agent or its owning parent")
         execution, owner = self._task_executions.register(task)
         context = RunContext.ensure_task_context(
             task,
@@ -150,7 +152,9 @@ class AgentExecutionMixin(_AgentMixinBase):
             result = task
             budget = _current_task_budget(task)
             assert budget is not None
-            with execution_scope(task), durable_run_scope(self, task, budget):
+            with execution_scope(task), durable_run_scope(self, task, budget) as durable:
+                if durable is not None:
+                    durable.check_continuation()
                 async with subagent_scope(self, task, budget):
                     result = await self.handle_task(task)
             self._persist_task_snapshot(result)
@@ -1121,6 +1125,24 @@ class AgentExecutionMixin(_AgentMixinBase):
         tool_name, args, call_id = tc.tool_name, tc.args, tc.call_id
         self._logger.debug(f"Executing tool: {tool_name}")
         tool = self.tools.get(tool_name)
+        from protolink.agents.worker_tools import WorkerTool, execute_worker_tool
+
+        if isinstance(tool, WorkerTool):
+            if task is None:
+                raise ValueError("Worker facade execution requires a native parent task")
+            result = await execute_worker_tool(
+                self,
+                tool,
+                args,
+                task=task,
+                context=context,
+                budget=active_budget_enforcer,
+                cancellation=active_token,
+            )
+            output = Part.tool_output(call_id=call_id, result=result)
+            self._attach_task_output(task, output)
+            self._persist_task_snapshot(task)
+            return output
 
         async def reject_request(rejection: ToolRejectedError) -> Part:
             """Return typed no-change feedback without entering tool execution."""
@@ -1525,6 +1547,8 @@ class AgentExecutionMixin(_AgentMixinBase):
             infer_kwargs.update(
                 context_policy=self.context_policy, hooks=self.hooks, tool_prompt_builder=rebuild_tool_prompt
             )
+        if self.yield_after_steps is not None:
+            infer_kwargs["yield_after_steps"] = self.yield_after_steps
         if _accepts_keyword_argument(self.llm.infer, "event_metrics"):
             infer_kwargs["event_metrics"] = bool(self.telemetry or event_callback)
         # ``LLM.infer`` is a documented extension point. Existing adapters may

@@ -13,6 +13,7 @@ from protolink.client import AgentClient
 from protolink.core.cancellation import TaskNotCancelableError, TaskNotFoundError, mark_task_canceled
 from protolink.core.events import RunEvent, TaskStatusUpdateEvent
 from protolink.core.execution import closing_stream
+from protolink.core.handoff import RunHandoff
 from protolink.core.invocation import response_content
 from protolink.core.redaction import RedactionPolicy
 from protolink.core.report import RunRecorder, RunReport
@@ -36,6 +37,15 @@ class RunResult:
     output: Any
     report: RunReport
     error: dict[str, Any] | None = None
+
+    @property
+    def handoff(self) -> RunHandoff | None:
+        """The unfinished worker's structured progress, if this run yielded.
+
+        ``status`` remains ``input-required`` rather than successful completion.
+        Continue through the owning root Agent's checkpoint/resume API.
+        """
+        return RunHandoff.from_task(self.task) if self.task is not None else None
 
 
 class RunHandle:

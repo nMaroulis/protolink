@@ -29,7 +29,9 @@ class AgentDurableMixin(_AgentMixinBase):
 
         Supply the current request ID and either ``approved=True/False`` or
         ``answer=text/None``. Omitting a response retries a safe saved boundary
-        or returns the same pending interruption. Fingerprints may be supplied
+        or returns the same pending interruption. For a cooperative work handoff,
+        calling this method without a response explicitly grants the next bounded
+        slice; it never resets shared usage or correction history. Fingerprints may be supplied
         by an authenticated UI to reject stale previews. Run/request IDs are
         correlation values; the application authenticates and scopes access.
         """
@@ -65,6 +67,12 @@ class AgentDurableMixin(_AgentMixinBase):
                 response["answer"] = answer
         elif request_id is not None or fingerprint is not None:
             raise ValueError("request_id/fingerprint require an approval or input response")
+        elif (pending := checkpoint.data.get("interruption")) is not None and pending["kind"] == "yield":
+            response = {
+                "request_id": pending["request_id"],
+                "fingerprint": pending["fingerprint"],
+                "continue": True,
+            }
         task = Task.from_dict(checkpoint.data["task"])
         if checkpoint.status == "completed":
             if response is not None:
@@ -91,6 +99,8 @@ class AgentDurableMixin(_AgentMixinBase):
 
         Raises RunInterrupted for another durable wait; use resume_task to
         inspect the protocol state instead. Completed runs return stored output.
+        With a pending work handoff, omitting a response explicitly authorizes
+        one more bounded slice under the same cumulative budgets.
         """
         task = await self.resume_task(
             run_id, request_id=request_id, approved=approved, answer=answer, fingerprint=fingerprint

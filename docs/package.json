@@ -1,6 +1,6 @@
 {
   "name": "protolink-docs",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "description": "Docusaurus documentation site for ProtoLink.",
   "scripts": {
@@ -10,14 +10,14 @@
     "clear": "NO_UPDATE_NOTIFIER=1 docusaurus clear"
   },
   "dependencies": {
-    "@docusaurus/core": "3.10.1",
-    "@docusaurus/plugin-content-docs": "3.10.1",
-    "@docusaurus/plugin-content-pages": "3.10.1",
-    "@docusaurus/plugin-debug": "3.10.1",
-    "@docusaurus/plugin-sitemap": "3.10.1",
-    "@docusaurus/plugin-svgr": "3.10.1",
-    "@docusaurus/theme-classic": "3.10.1",
-    "@docusaurus/theme-mermaid": "3.10.1",
+    "@docusaurus/core": "3.10.2",
+    "@docusaurus/plugin-content-docs": "3.10.2",
+    "@docusaurus/plugin-content-pages": "3.10.2",
+    "@docusaurus/plugin-debug": "3.10.2",
+    "@docusaurus/plugin-sitemap": "3.10.2",
+    "@docusaurus/plugin-svgr": "3.10.2",
+    "@docusaurus/theme-classic": "3.10.2",
+    "@docusaurus/theme-mermaid": "3.10.2",
     "@easyops-cn/docusaurus-search-local": "0.55.3",
     "@mdx-js/react": "^3.1.0",
     "@mermaid-js/layout-elk": "^0.1.9",
@@ -26,5 +26,16 @@
   },
   "engines": {
     "node": ">=20.0"
+  },
+  "overrides": {
+    "@docusaurus/core": {
+      "tinypool": "^2.2.0"
+    },
+    "copy-webpack-plugin": {
+      "serialize-javascript": "^7.1.2"
+    },
+    "css-minimizer-webpack-plugin": {
+      "serialize-javascript": "^7.1.2"
+    }
   }
 }

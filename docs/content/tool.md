@@ -97,6 +97,14 @@ rejection never invokes the callable and does not charge a tool call. Completed 
 successful actions retain their deduplication protection. Rejected requests are not marked as successful, so the
 model can correct and resubmit them. No automatic tool retry occurs outside a model-driven inference loop.
 
+An `action_builder` or `PreparedTool.prepare` callback can also raise an explicit
+`ToolRejectedError` before approval or execution. The same correction allowance
+applies; feedback records `phase="preparation"` and consumes no tool call because
+the executor never ran. Preparation must make no changes when it rejects.
+Ordinary builder exceptions, policy denial and uncertain execution still stop
+the run. Cancellation and hard budgets take precedence over correction. See the
+[prepared proposal walkthrough](worker-execution.md#reject-a-prepared-proposal-before-approval).
+
 `ToolCorrectionLimitError` exposes `tool_name`, `attempts`, `limit` and `last_error`. A limit failure concerns the latest
 rejected request; earlier successful actions may already have changed resources. Agent task failures include a
 `tool_correction_limit` blocker with the final rejection and counters.
@@ -568,6 +576,9 @@ Build the runtime action evaluated before this tool executes. Without a custom b
     </ApiField>
     <ApiField name="builder error">
       Exceptions raised by the application builder propagate to the execution layer.
+    </ApiField>
+    <ApiField name="ToolRejectedError">
+      Explicit no-change preparation rejection. Model-driven inference returns bounded correction feedback before approval or execution; direct tool tasks retain their structured rejection behavior.
     </ApiField>
   </ApiFields>
 </ApiSection>

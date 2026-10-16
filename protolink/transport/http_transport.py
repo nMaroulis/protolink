@@ -35,7 +35,7 @@ from protolink.transport.errors import (
     TransportRemoteError,
     TransportTimeoutError,
 )
-from protolink.types import BackendType, TransportType
+from protolink.types import BackendType
 
 
 class HTTPTransport(Transport):
@@ -70,7 +70,7 @@ class HTTPTransport(Transport):
         Shared limits, retry, keepalive, shutdown, idempotency and metrics settings.
     """
 
-    transport_type: ClassVar[TransportType] = "http"
+    transport_type: ClassVar[str] = "http"
     supports_streaming: ClassVar[bool] = False
     capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
         tls=True,

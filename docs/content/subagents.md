@@ -48,6 +48,24 @@ Delegating a known specialist tool also works:
 
 The model still chooses one of `final`, `tool_call` or `agent_call`. ProtoLink advertises the configured specialist cards through the same prompt and provider-native delegation mechanisms. A blocking child call supplies an ordinary agent-result observation before the parent's next model call. There is no additional mandatory planning prompt or different action format.
 
+For a smaller model-facing schema, register `parent.add_worker_tool("researcher")`
+to expose `researcher(task: str)`, or select `tool="lookup"` to expose a child's
+declared tool arguments. Facades normalize to the same native delegation action
+before authorization and checkpointing. They retain child permissions, shared
+budgets and execution records. See [typed worker tools](worker-execution.md#expose-a-worker-through-a-typed-tool).
+
+Owned child events reach the parent's public stream immediately, including
+nested and externally spawned children. Original identities and parent links
+are retained, with deduplication when the completed child snapshot returns.
+Child terminal events carry `metadata["source_final"]` and do not terminate the
+parent stream. See [live worker activity](worker-execution.md#observe-workers-while-they-run).
+
+A worker may set `yield_after_steps=N` and inherit a blocking parent's durable
+store. Its handoff reaches the root Task as input-required. Continue through the
+owning root's `resume_task(root_run_id)` so the saved parent observes the child's
+eventual result without launching a replacement. See
+[bounded continuation](worker-execution.md#return-control-after-a-work-slice).
+
 Before creating a child task, ProtoLink checks inference support, delegated tool names and advertised argument schemas. A reasoning
 specialist with no tools receives `infer`; an invented tool request returns correction guidance to the same parent.
 An ordinary tools-only child advertises `supports_inference=False`, so an `infer` request also returns guidance

@@ -180,6 +180,9 @@ class Tool(BaseTool):
 
         Raises:
             TypeError: The configured builder does not return a ``RunAction``.
+            ToolRejectedError: An explicit no-change application rejection. The
+                inference engine offers bounded correction before authorization
+                or execution; direct calls propagate the rejection.
         """
         action = RunAction(
             kind="tool.call",
