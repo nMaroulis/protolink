@@ -2,6 +2,10 @@
 
 ProtoLink's execution substrate governs action dispatch and task lifecycle. Capability policies and approval requirements authorize prepared actions; typed events and execution receipts record their outcomes. Durable checkpoints preserve inference-loop state and pending requests so an application can suspend execution and resume after a restart.
 
+For bounded worker assignments, typed worker tools and immediate nested activity,
+see the [worker execution guide](worker-execution.md). These controls use the same
+Agent/Task lifecycle, policies, budgets and durable checkpoints described here.
+
 These optional primitives let applications supply their own roles, workflows, policies, storage, credentials,
 and UI while ProtoLink handles execution and lifecycle. They cover command execution, recoverable file changes,
 approvals, delegated evidence, completion checks and checkpoint inventory without adding base-package dependencies.
@@ -93,7 +97,7 @@ Use `resume_task()` to receive the full `Task` instead of raising on a new wait.
 | `resume(run_id, request_id=..., answer="CSV")` | Answer the current question | Final content, or `RunInterrupted` for a later wait |
 | `resume(run_id, request_id=..., approved=True)` | Approve the current prepared operation | Final content, or a later interruption |
 | `resume_task(run_id, ...)` | Inspect state and metadata directly | The complete `Task`, including `INPUT_REQUIRED` |
-| `resume(run_id)` | Continue a safe saved boundary or read a completed result | Stored output, normal continuation, or the existing interruption |
+| `resume(run_id)` | Grant the next cooperative slice, continue a safe saved boundary or read a completed result | Stored output, normal continuation, or a later interruption |
 | `reconcile(run_id, action_id, result=...)` | Record an externally verified uncertain outcome | No dispatch; commits the supplied result receipt |
 
 Supply either `answer` or `approved` for a response, together with the current `request_id`. An optional `fingerprint` binds a displayed request to its saved preview. Async methods use `await`; the blocking facade exposes `sync.resume()` and `sync.resume_task()`. `reconcile()` is synchronous.
@@ -295,7 +299,7 @@ Configure each Agent normally, including its LLM, transport, policy, approval ha
 Transport-free agents use direct invocation; `runtime://` supports local discovery and delegation without sockets.
 Network transports use their existing implementations. The group adds no global registry or orchestration roles.
 
-For live model output, enable `capabilities={"streaming": True}` on the Agent card and inspect `event.payload.get("llm_event_type")`. `llm_chunk` carries incremental text in `event.payload["content"]`; `llm_final` carries the complete answer. JSON-action models stream raw JSON fragments, while native-tool models stream ordinary text and assemble tool calls separately. Continue to the terminal task status before treating the whole run as complete. See the [embedded streaming example](./llm.md#stream-into-your-application).
+For remote live model subscriptions, enable `capabilities={"streaming": True}` on the Agent card. Local `start_run()` streams without that flag. Inspect `event.payload.get("llm_event_type")`: `llm_chunk` carries incremental text in `event.payload["content"]`; `llm_final` carries the complete answer. JSON-action models stream raw JSON fragments, while native-tool models stream ordinary text and assemble tool calls separately. Continue to the terminal task status before treating the whole run as complete. See the [embedded streaming example](./llm.md#stream-into-your-application).
 
 `RunHandle.start(agent_or_url, task, *, client=None, store=None, redaction_policy=None)` is also usable without a
 group. URL targets require an existing `AgentClient`. The handle consumes the task once, even when only `result()`
@@ -303,7 +307,7 @@ is awaited. `events()` yields typed `RunEvent` objects, including history for la
 uses native cancellation; cancellation of a waiter on `result()` does not cancel the underlying run.
 
 `RunResult` exposes `status`, the normalized `task`, `output` (unwrapped tool result or final response), `report`,
-and an optional structured `error`. Task statuses include `completed`, `failed`, `canceled` and `input_required`.
+an optional structured `error`, and `handoff` for a cooperative work slice. Task statuses include `completed`, `failed`, `canceled` and `input-required`.
 If a remote stream closes without a terminal task, status is `uncertain`: the effect may already have occurred.
 Task submission keeps response deduplication but disables automatic transport retries, including when a RetryPolicy
 permits retries for other operations. The handle never retries or replays that operation. HTTP transports without

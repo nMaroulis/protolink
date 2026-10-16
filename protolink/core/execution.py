@@ -7,7 +7,7 @@ tasks, retain authorizations for reuse, or replace the Agent dispatcher.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator, AsyncIterator, Generator
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -80,6 +80,24 @@ def execution_scope(task: Task | None = None, sink: EventSink | None = None) -> 
 def current_task() -> Task | None:
     """Return the task bound to this invocation, if any."""
     return _scope.get()[0]
+
+
+def _capture_event_publisher(task: Task | None) -> Callable[[RunEvent], Awaitable[None]]:
+    """Capture the current observer before a child installs its own recorder.
+
+    Forwarding restores both values explicitly: an absent ancestor observer
+    must not inherit the child's recorder and send the event back to itself.
+    """
+    sink = _scope.get()[1]
+
+    async def publish(event: RunEvent) -> None:
+        token = _scope.set((task, sink))
+        try:
+            await publish_runtime_event(event)
+        finally:
+            _scope.reset(token)
+
+    return publish
 
 
 @contextmanager

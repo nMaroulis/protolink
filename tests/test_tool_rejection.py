@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 import sys
@@ -11,11 +12,14 @@ import httpx
 import pytest
 
 from protolink import (
+    ActionDeniedError,
     Agent,
+    CancellationToken,
     CapabilityPolicy,
     CompletionCheck,
     CompletionValidator,
     Part,
+    RunAction,
     RunBudget,
     RunContext,
     RunHandle,
@@ -27,10 +31,12 @@ from protolink import (
     ToolRejectedError,
     create_llm,
 )
-from protolink.core.budget import BudgetEnforcer, BudgetExceededError
+from protolink.core.budget import BudgetDecision, BudgetEnforcer, BudgetExceededError, BudgetPolicy
 from protolink.llms import MockLLM
 from protolink.llms.server.ollama_client import OllamaLLM
+from protolink.storage.durable import UncertainExecutionError
 from protolink.telemetry.local import LocalTraceTelemetry
+from protolink.tools.prepared import PreparedTool
 
 
 def action(name="plan_task", **args):
@@ -479,3 +485,246 @@ async def test_direct_task_trace_distinguishes_rejection_from_execution_error():
     tool_span = next(span for span in trace["spans"] if span["kind"] == "tool")
     assert tool_span["status"] == "rejected" and tool_span["error"] is None
     assert tool_span["ended_at"] is not None
+
+
+def prepared_plan_tool(*, async_builder=False):
+    preparations, executions = [], []
+
+    def plan_task(check_id: str) -> str:
+        """Prepare an allowed check before requesting permission to save it."""
+        raise AssertionError("The signature callable must not execute")
+
+    def prepare(arguments, context):
+        preparations.append(arguments["check_id"])
+        if arguments["check_id"] not in {"lint", "tests"}:
+            raise rejection()
+        return RunAction(kind="tool.call", name="plan_task", payload={"arguments": arguments})
+
+    async def prepare_async(arguments, context):
+        await asyncio.sleep(0)
+        return prepare(arguments, context)
+
+    async def execute(execution):
+        execution.check()
+        check_id = execution.authorization.action.payload["arguments"]["check_id"]
+        executions.append(check_id)
+        return f"Planned {check_id}."
+
+    return (
+        PreparedTool(
+            plan_task,
+            prepare=prepare_async if async_builder else prepare,
+            execute=execute,
+            capabilities=("plan.save",),
+        ),
+        preparations,
+        executions,
+    )
+
+
+@pytest.mark.parametrize("async_builder", [False, True])
+@pytest.mark.parametrize("mode", ["json", "native"])
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.asyncio
+async def test_preparation_rejection_corrects_before_approval_execution_and_tool_charge(
+    monkeypatch, async_builder, mode, streaming
+):
+    llm, requests = scripted_ollama(
+        monkeypatch,
+        mode,
+        [action(check_id="bad"), action(check_id="lint"), {"type": "final", "content": "Planned lint."}],
+        streaming,
+    )
+    tool, preparations, executions = prepared_plan_tool(async_builder=async_builder)
+    approvals = []
+
+    async def approve(request, context):
+        approvals.append(request.action.payload["arguments"])
+        return True
+
+    agent = Agent(
+        name="planner",
+        llm=llm,
+        tools=[tool],
+        policy=CapabilityPolicy({"plan.save": "require_approval"}),
+        approval_handler=approve,
+        verbosity=0,
+    )
+    context = RunContext(budget=RunBudget(max_llm_calls=3, max_tool_calls=1, max_steps=3))
+    task = Task.create_infer("Plan", context=context)
+    if streaming:
+        handle = RunHandle.start(agent, task)
+        events = [event async for event in handle.events()]
+        result = await handle.result()
+        assert result.status == "completed", result.error
+        task = result.task
+    else:
+        task = await agent.run_task(task)
+        events = RunReport.from_task(task).events
+    assert task.state.value == "completed"
+    assert preparations == ["bad", "lint"]
+    assert executions == ["lint"]
+    assert approvals == [{"check_id": "lint"}]
+    assert len(requests) == 3
+    assert "invalid_check_selection" in json.dumps(requests[1]["messages"])
+    rejected = [event for event in events if event.type == "action.rejected"]
+    assert len(rejected) == 1
+    assert rejected[0].payload["metadata"]["phase"] == "preparation"
+    assert rejected[0].action_id
+    assert not any(
+        event.action_id == rejected[0].action_id
+        for event in events
+        if event.type in {"action.requested", "action.started", "approval.required", "action.completed"}
+    )
+    receipt = next(artifact for artifact in task.artifacts if artifact.kind == "action_rejection")
+    assert receipt.action_id == rejected[0].action_id
+    assert receipt.parts[0].content["phase"] == "preparation"
+    assert sum(artifact.kind == "action_result" for artifact in task.artifacts) == 1
+
+
+@pytest.mark.parametrize("limit", [0, 1])
+@pytest.mark.asyncio
+async def test_preparation_rejections_exhaust_corrections_without_charging_tools(limit):
+    tool, preparations, executions = prepared_plan_tool()
+    llm = MockLLM(sequential_responses=[action(check_id="bad")] * 3)
+    llm.max_tool_corrections = limit
+    agent = Agent(name="planner", llm=llm, tools=[tool], verbosity=0)
+    context = RunContext(budget=RunBudget(max_tool_calls=0))
+    with pytest.raises(ToolCorrectionLimitError) as raised:
+        await agent.run_task(Task.create_infer("Plan", context=context))
+    assert raised.value.attempts == limit + 1
+    assert preparations == ["bad"] * (limit + 1)
+    assert executions == []
+    assert llm._current_seq_idx == limit + 1
+
+
+@pytest.mark.asyncio
+async def test_durable_preparation_correction_resumes_approval_with_counter_and_budget_intact(tmp_path):
+    executions = []
+
+    def make(responses):
+        tool, _, accepted = prepared_plan_tool()
+        llm = MockLLM(sequential_responses=responses)
+        llm.max_tool_corrections = 1
+        agent = Agent(
+            name="planner",
+            llm=llm,
+            tools=[tool],
+            policy=CapabilityPolicy({"plan.save": "require_approval"}),
+            durability=tmp_path / "runs.db",
+            verbosity=0,
+        )
+        executions.append(accepted)
+        return agent
+
+    agent = make([action(check_id="bad"), action(check_id="lint")])
+    with pytest.raises(RunInterrupted) as raised:
+        await agent.invoke("Plan", budget=RunBudget(max_tool_calls=1, max_llm_calls=3, max_steps=3))
+    pause = raised.value
+    record = agent.durability.get(pause.run_id)
+    assert record.data["usage"]["tool_calls"] == 0
+    assert record.data["usage"]["llm_calls"] == 2
+    assert next(iter(record.data["loops"].values()))["tool_corrections"] == 1
+    assert len(record.data["actions"]) == 1
+    assert next(iter(record.data["actions"].values()))["state"] == "waiting"
+    restarted = make([action(check_id="bad"), "must not continue"])
+    with pytest.raises(ToolCorrectionLimitError):
+        await restarted.resume(pause.run_id, request_id=pause.interruption.request_id, approved=True)
+    finished = restarted.durability.get(pause.run_id)
+    assert executions == [[], ["lint"]]
+    assert finished.data["usage"]["tool_calls"] == 1
+    assert finished.data["usage"]["llm_calls"] == 3
+    assert next(iter(finished.data["loops"].values()))["tool_corrections"] == 2
+    assert not any(entry["state"] in {"executing", "uncertain"} for entry in finished.data["actions"].values())
+
+
+@pytest.mark.parametrize("error_type", [ValueError, PermissionError, UncertainExecutionError])
+@pytest.mark.asyncio
+async def test_other_preparation_failures_are_not_correctable(error_type):
+    tool, preparations, executions = prepared_plan_tool()
+
+    def fail(arguments, context):
+        raise error_type("Preparation stopped")
+
+    tool.action_builder = fail
+    llm = MockLLM(sequential_responses=[action(check_id="lint"), "must not continue"])
+    agent = Agent(name="planner", llm=llm, tools=[tool], verbosity=0)
+    task = Task.create_infer("Plan")
+    with pytest.raises(RuntimeError) as raised:
+        await agent.run_task(task)
+    if error_type is UncertainExecutionError:
+        assert isinstance(raised.value, UncertainExecutionError)
+    else:
+        assert isinstance(raised.value.__cause__, error_type)
+    assert llm._current_seq_idx == 1
+    assert preparations == executions == []
+    assert not any(artifact.kind == "action_rejection" for artifact in task.artifacts)
+
+
+@pytest.mark.asyncio
+async def test_prepared_tool_policy_denial_remains_terminal():
+    tool, preparations, executions = prepared_plan_tool()
+    llm = MockLLM(sequential_responses=[action(check_id="lint"), "must not continue"])
+    agent = Agent(name="planner", llm=llm, tools=[tool], policy=CapabilityPolicy({"plan.save": "deny"}), verbosity=0)
+    with pytest.raises(ActionDeniedError):
+        await agent.invoke("Plan")
+    assert preparations == ["lint"]
+    assert executions == []
+    assert llm._current_seq_idx == 1
+
+
+@pytest.mark.parametrize("boundary", ["cancellation", "context_cancellation", "budget"])
+@pytest.mark.asyncio
+async def test_preparation_rejection_cannot_override_an_active_stop(boundary):
+    stopped = False
+
+    class StoppingPolicy(BudgetPolicy):
+        def evaluate(self, budget, usage):
+            if stopped and boundary == "budget":
+                return BudgetDecision(effect="deny", message="Hard budget stopped preparation", usage=usage)
+            return super().evaluate(budget, usage)
+
+    context = RunContext()
+    enforcer = BudgetEnforcer(context, policy=StoppingPolicy())
+    cancellation = CancellationToken()
+    tool, _, executions = prepared_plan_tool()
+
+    async def prepare(arguments, context):
+        nonlocal stopped
+        await asyncio.sleep(0)
+        stopped = True
+        if boundary == "cancellation":
+            cancellation.cancel("Stop during preparation")
+        elif boundary == "context_cancellation":
+            context.canceled = True
+            context.cancel_reason = "Stop during preparation"
+        raise rejection()
+
+    tool.action_builder = prepare
+    agent = Agent(name="planner", tools=[tool], verbosity=0)
+
+    async def authorize(runtime_action):
+        authorization, _ = await agent._authorize_tool_action(tool, runtime_action.payload["arguments"], context)
+        return authorization
+
+    llm = MockLLM(sequential_responses=[action(check_id="bad"), "must not continue"])
+    events = []
+
+    async def capture(event):
+        events.append(event)
+
+    with pytest.raises(BudgetExceededError if boundary == "budget" else asyncio.CancelledError):
+        await llm.infer(
+            query="Plan",
+            tools={tool.name: tool},
+            action_authorizer=authorize,
+            cancellation_token=cancellation,
+            run_context=context,
+            budget_enforcer=enforcer,
+            event_callback=capture,
+        )
+    assert llm._current_seq_idx == 1
+    assert enforcer.usage.llm_calls == 1
+    assert enforcer.usage.tool_calls == 0
+    assert executions == []
+    assert not any(event["type"] in {"tool_rejected", "tool_start"} for event in events)

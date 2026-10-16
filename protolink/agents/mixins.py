@@ -46,6 +46,7 @@ from .helpers import _coerce_state_operation_request
 
 if TYPE_CHECKING:
     from protolink.agents.base import Agent
+    from protolink.agents.worker_tools import WorkerTool
     from protolink.client.peer import AgentPeer
     from protolink.core.redaction import RedactionPolicy
     from protolink.runtime import RunHandle
@@ -1024,6 +1025,38 @@ class AgentCommunicationMixin(_AgentMixinBase):
 class AgentToolMixin(_AgentMixinBase):
     """Manages tools, skills and runtime action authorization."""
 
+    def add_worker_tool(
+        self,
+        worker: str,
+        *,
+        name: str | None = None,
+        tool: str | None = None,
+        description: str | None = None,
+    ) -> WorkerTool:
+        """Expose one local worker through a small typed inference tool.
+
+        The worker must already be registered in ``subagents`` under its exact
+        name. An inference facade accepts ``task: str``; ``tool=...`` copies the
+        selected child's declared arguments and result schema. ``name`` defaults
+        to the worker name or ``<worker>_<tool>`` and must not collide with an
+        existing/runtime tool. Registration never replaces or executes a tool.
+
+        This is a declaration for model-driven parent inference. The runtime
+        turns its tool calls into the existing ``agent_call`` action before
+        policy and checkpointing; it does not invoke a child through a Python
+        wrapper. Standalone ``call_tool`` calls create a native parent task;
+        calls inside another active task must use its native delegation route.
+
+        Returns:
+            The registered worker facade. Keep it as configuration metadata;
+            use ``parent.invoke`` or ``start_run`` to execute parent inference.
+        """
+        from protolink.agents.worker_tools import make_worker_tool
+
+        facade = make_worker_tool(self, worker, name=name, tool=tool, description=description)
+        self.add_tool(facade)
+        return facade
+
     def add_tools(self, tools: Iterable[BaseTool | Callable[..., Any]]) -> None:
         """Register an iterable of tools or typed functions in order.
 
@@ -1115,6 +1148,10 @@ class AgentToolMixin(_AgentMixinBase):
         """
         if not callable(tool):
             raise TypeError("add_tool expects a tool instance or a Python callable")
+        from protolink.agents.worker_tools import WorkerTool
+
+        if isinstance(tool, WorkerTool):
+            tool.require_parent(self)
         # Legacy structural tools may omit optional examples and capabilities.
         if not all(hasattr(tool, field) for field in ("name", "description", "input_schema", "output_schema", "tags")):
             tool = Tool.from_callable(tool)
@@ -1287,7 +1324,22 @@ class AgentToolMixin(_AgentMixinBase):
         tool = self.tools.get(tool_name, None)
         if not tool:
             raise ValueError(f"Tool {tool_name} not found")
+        from protolink.agents.worker_tools import WorkerTool
         from protolink.core.execution import current_task
+
+        if isinstance(tool, WorkerTool):
+            if current_task() is not None:
+                raise ValueError(
+                    "Worker facade call_tool requires a standalone parent task; use native delegation inside a run"
+                )
+            from protolink.core.durable import RunInterrupted
+            from protolink.core.task import TaskState
+
+            task = await self.run_task(Task.create_tool_call(tool_name, kwargs))
+            if task.state is TaskState.INPUT_REQUIRED:
+                raise RunInterrupted(task)
+            task.raise_for_status()
+            return task.get_output()
 
         if self.durability is not None and current_task() is None:
             from protolink.core.durable import RunInterrupted
@@ -1325,6 +1377,12 @@ class AgentToolMixin(_AgentMixinBase):
         tool = self.tools.get(tool_name)
         if not tool:
             raise ValueError(f"Tool {tool_name} not found")
+        from protolink.agents.worker_tools import WorkerTool
+
+        if isinstance(tool, WorkerTool):
+            raise ValueError(
+                "Worker facades require their native parent task; use standalone call_tool or model-driven delegation"
+            )
         from protolink.agents.engine import _current_task_budget
         from protolink.core.budget import BudgetEnforcer, BudgetExceededError
         from protolink.core.execution import ToolExecution, current_task, execute_authorized_tool
@@ -1865,6 +1923,10 @@ class AgentSerializationMixin(_AgentMixinBase):
             "examples": getattr(tool, "examples", None),
             "capabilities": list(getattr(tool, "capabilities", None) or ()),
         }
+        from protolink.agents.worker_tools import WorkerTool
+
+        if isinstance(tool, WorkerTool):
+            return {**tool_dict, "type": "worker", "worker_binding": tool.binding, "reconnect_required": True}
         builtin_id = getattr(tool, "_protolink_builtin_id", None)
         if isinstance(builtin_id, str) and builtin_id:
             tool_dict["type"] = "builtin"
@@ -1891,6 +1953,8 @@ class AgentSerializationMixin(_AgentMixinBase):
     def _deserialize_tool(cls, tool_dict: dict[str, Any]) -> BaseTool:
         """Deserialize a tool from a dictionary representation."""
         tool_type = tool_dict.get("type", "native")
+        if tool_type == "worker":
+            raise ValueError("Reconnect worker facades through Agent.from_dict(..., subagents=[...])")
         if tool_type == "builtin":
             from protolink.tools.builtins import _create_builtin
 
@@ -2078,6 +2142,8 @@ class AgentSerializationMixin(_AgentMixinBase):
                 data["durability"] = {"reconnect_required": True}
         if self.durability is not None or self.execution_version != "1":
             data["execution_version"] = self.execution_version
+        if self.yield_after_steps is not None:
+            data["yield_after_steps"] = self.yield_after_steps
         if self.context_policy is not None:
             data["context_policy"] = self.context_policy.to_dict()
         if self.hooks:
@@ -2394,6 +2460,7 @@ class AgentSerializationMixin(_AgentMixinBase):
             context_policy=context_policy,
             hooks=overrides.get("hooks"),
             execution_version=overrides.get("execution_version", data.get("execution_version", "1")),
+            yield_after_steps=overrides.get("yield_after_steps", data.get("yield_after_steps")),
         )
         descriptors = data.get("knowledge") or []
         if descriptors:
@@ -2412,6 +2479,23 @@ class AgentSerializationMixin(_AgentMixinBase):
         tools_data = data.get("tools", [])
         for tool_dict in tools_data:
             if agent.context_policy is not None and tool_dict.get("name") == "read_context_artifact":
+                continue
+            if tool_dict.get("type") == "worker":
+                binding = tool_dict.get("worker_binding")
+                if not isinstance(binding, dict) or binding.get("action") not in {"infer", "tool_call"}:
+                    raise ValueError("Serialized worker facade requires a canonical worker_binding")
+                if (binding["action"] == "tool_call") != isinstance(binding.get("tool"), str):
+                    raise ValueError("Serialized worker facade action/tool binding is inconsistent")
+                facade = agent.add_worker_tool(
+                    binding.get("agent"),
+                    name=tool_dict["name"],
+                    tool=binding.get("tool"),
+                    description=tool_dict.get("description"),
+                )
+                if facade.input_schema != tool_dict.get("input_schema") or facade.output_schema != tool_dict.get(
+                    "output_schema"
+                ):
+                    raise ValueError("Reconnected worker facade schema differs from its serialized contract")
                 continue
             tool = cls._deserialize_tool(tool_dict)
             agent.add_tool(tool)

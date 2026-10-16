@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from protolink.core.events import RunEvent
-from protolink.core.execution import execution_scope, publish_runtime_event
+from protolink.core.execution import _capture_event_publisher
 from protolink.core.run_context import RunContext
 from protolink.core.task import Task
 
@@ -22,6 +22,7 @@ class DelegationRecorder:
         self.parent = parent
         self.context = context
         self.action_id = action_id
+        self._publish = _capture_event_publisher(parent)
         self._seen = {event["event_id"] for event in parent.metadata.get("run_events", [])} if parent else set()
 
     async def emit(self, event: RunEvent) -> None:
@@ -41,8 +42,7 @@ class DelegationRecorder:
         forwarded.final = False
         forwarded.parent_action_id = event.parent_action_id or self.action_id
         forwarded.delegation_id = event.delegation_id or self.action_id or self.context.run_id
-        with execution_scope(self.parent):
-            await publish_runtime_event(forwarded)
+        await self._publish(forwarded)
 
     async def capture(self, task: Task) -> None:
         """Merge returned receipts and artifacts even when delegated execution failed."""

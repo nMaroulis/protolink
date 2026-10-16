@@ -13,6 +13,7 @@ from typing import Any
 
 from protolink.core.actions import RunAction
 from protolink.core.budget import BudgetEnforcer, BudgetUsage
+from protolink.core.handoff import RunHandoff
 from protolink.core.run_context import RunContext
 from protolink.core.task import Task, TaskState
 from protolink.core.tool_errors import ToolRejectedError
@@ -29,7 +30,7 @@ from protolink.utils.serialization import Serializer
 
 @dataclass(frozen=True)
 class RunInterruption:
-    """A server-owned approval or user question that can survive a restart.
+    """A server-owned approval, question or work handoff that survives a restart.
 
     Correlation IDs are not credentials. Applications authenticate responders
     and authorize access before invoking the local resume API.
@@ -105,6 +106,8 @@ def configuration_fingerprint(agent: Any) -> str:
     Callback implementation changes cannot be inferred; applications supply an
     explicit ``execution_version`` when changing tool code or dependencies.
     """
+    from protolink.agents.worker_tools import WorkerTool
+
     payload = {
         "agent": agent.card.name,
         "execution_version": agent.execution_version,
@@ -133,10 +136,16 @@ def configuration_fingerprint(agent: Any) -> str:
                 "schema": tool.input_schema,
                 "description": tool.description,
                 "capabilities": sorted(getattr(tool, "capabilities", None) or ()),
+                **({"worker_binding": tool.binding} if isinstance(tool, WorkerTool) else {}),
             }
             for name, tool in agent.tools.items()
         },
         "subagents": sorted(agent.subagents),
+        **(
+            {"yield_after_steps": agent.yield_after_steps}
+            if getattr(agent, "yield_after_steps", None) is not None
+            else {}
+        ),
         "context_policy": agent.context_policy.to_dict() if agent.context_policy is not None else None,
         "hooks": [{stage: callback is not None for stage, callback in vars(hook).items()} for hook in agent.hooks],
     }
@@ -209,6 +218,12 @@ class DurableRun:
             response = _response.get()
             if response is not None and response[0] == self.context.run_id:
                 self.respond(response[1])
+            pending = self.data.get("interruption")
+            if pending is not None and pending["kind"] == "yield":
+                accepted = self.root.data["responses"].get(pending["request_id"])
+                if accepted is not None and accepted.get("continue") is True:
+                    self.data["interruption"] = None
+                    task.metadata.pop("interruption", None)
             self.save("working")
         except BaseException:
             store.release(self.context.run_id, self.token)
@@ -244,6 +259,9 @@ class DurableRun:
                 raise ValueError("answer must be nonblank text or None")
             if answer is not None and len(answer) > pending["request"].get("max_answer_chars", 16384):
                 raise ValueError("answer exceeds the pending question's max_answer_chars")
+        elif pending["kind"] == "yield":
+            if response.get("continue") is not True or "approved" in response or "answer" in response:
+                raise ValueError("A work handoff requires explicit continuation through resume_task")
         existing = self.data["responses"].get(pending["request_id"])
         if existing is not None and existing != response:
             raise DurableExecutionError("Pending request already has a different response")
@@ -326,6 +344,44 @@ class DurableRun:
 
     def loop_state(self) -> dict[str, Any] | None:
         return self.data["loops"].get(self.part_key)
+
+    def prepare_handoff(self, steps: int) -> RunHandoff:
+        """Describe a settled boundary without fabricating a final answer.
+
+        Unresolved effects must be reconciled through the existing recovery
+        path. Only committed action identities are exposed; outputs stay in
+        normal reports and private execution receipts.
+        """
+        if any(entry["state"] in {"executing", "uncertain"} for entry in self.data["actions"].values()):
+            raise UncertainExecutionError("Cannot hand off an operation without a committed outcome")
+        return RunHandoff(
+            run_id=self.context.run_id,
+            reason="step_slice",
+            steps=steps,
+            usage=BudgetUsage.from_dict(self.budget.usage.to_dict()),
+            completed_action_ids=tuple(
+                entry["action"]["action_id"] for entry in self.data["actions"].values() if entry["state"] == "succeeded"
+            ),
+        )
+
+    def suspend_handoff(self, handoff: RunHandoff) -> None:
+        """Suspend until the controller explicitly authorizes another slice."""
+        request = handoff.to_dict()
+        fingerprint = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
+        interruption = RunInterruption(
+            self.context.run_id,
+            f"yield:{self.context.run_id}:{self.part_key}:{handoff.steps}",
+            "yield",
+            request,
+            fingerprint,
+        )
+        raise _SuspendRun(interruption)
+
+    def check_continuation(self) -> None:
+        """Keep a yielded cursor paused until resume_task grants another slice."""
+        pending = self.data.get("interruption")
+        if pending is not None and pending["kind"] == "yield":
+            raise _SuspendRun(RunInterruption.from_dict(pending))
 
     def save_loop(self, history: ConversationHistory, **state: Any) -> None:
         self.data["loops"][self.part_key] = {

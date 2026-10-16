@@ -1600,7 +1600,20 @@ Transient provider failures use exponential backoff and jitter. Each physical at
 
 #### 5. Bounded execution
 
-`MAX_INFER_STEPS` limits a run to ten model decisions. If the model never produces a final action, the method raises `RuntimeError` with diagnostic context instead of looping indefinitely.
+By default, `MAX_INFER_STEPS` limits an inference loop to ten model decisions.
+If the model never produces a final action, the method raises `RuntimeError`
+with diagnostic context instead of looping indefinitely.
+
+`Agent(yield_after_steps=N, durability=...)` opts into cooperative work slices.
+The low-level `infer(..., yield_after_steps=N)` parameter requires an active
+durable execution scope; configure it on the Agent for ordinary application use.
+At a settled boundary, it checkpoints a `RunHandoff` and returns input-required.
+Correction attempts count as model steps too. Explicit `resume_task()` grants
+the next slice and retains cumulative steps, observations, deduplication history
+and correction allowances. If `RunBudget.max_steps` is supplied with this option,
+it becomes the finite total ceiling and may exceed ten; otherwise ten remains
+the total ceiling across slices. Other hard budgets and cancellation still stop
+the run. See [worker execution](worker-execution.md).
 
 :::note[Observers do not control execution]
 
