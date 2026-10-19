@@ -34,7 +34,7 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.8.2] - 2026-10-17
+## [0.8.2] - 2026-10-19
 
 :::note Latest Update
 
