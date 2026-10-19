@@ -18,6 +18,7 @@ from protolink.core.cancellation import (
     TaskNotFoundError,
 )
 from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
+from protolink.core.handoff import RunHandoff
 from protolink.core.policy import (
     ActionAuthorization,
     ActionAuthorizer,
@@ -86,6 +87,7 @@ __all__ = [
     "RunBudget",
     "RunContext",
     "RunEvent",
+    "RunHandoff",
     "RunRecorder",
     "RunReplay",
     "RunReport",

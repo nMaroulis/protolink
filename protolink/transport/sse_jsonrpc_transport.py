@@ -17,7 +17,6 @@ from protolink.transport.errors import (
     TransportTimeoutError,
 )
 from protolink.transport.http_transport import HTTPTransport
-from protolink.types import TransportType
 
 
 class SSEJSONRPCTransport(HTTPTransport):
@@ -29,7 +28,7 @@ class SSEJSONRPCTransport(HTTPTransport):
     JSON-RPC-style envelope.
     """
 
-    transport_type: ClassVar[TransportType] = "sse"
+    transport_type: ClassVar[str] = "sse"
     supports_streaming: ClassVar[bool] = True
     capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
         streaming=True,

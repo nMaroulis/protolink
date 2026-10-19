@@ -67,6 +67,7 @@ from protolink.core import (
 )
 from protolink.core.approvals import ApprovalBroker, ApprovalScope
 from protolink.core.durable import RunInterrupted, RunInterruption
+from protolink.core.handoff import RunHandoff
 from protolink.core.hooks import AgentHooks, FinalResponse, ModelRequest, ToolObservation
 from protolink.core.resources import ResourceConflictError, ResourceRevision, StorageCheckpointStore
 from protolink.core.validation import (
@@ -242,6 +243,7 @@ __all__ = [
     "RunContext",
     "RunEvent",
     "RunHandle",
+    "RunHandoff",
     "RunInterrupted",
     "RunInterruption",
     "RunManager",

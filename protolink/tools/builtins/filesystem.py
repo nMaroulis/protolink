@@ -7,7 +7,7 @@ import hashlib
 import os
 import stat
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -66,7 +66,7 @@ class FilesystemResource:
         raise ValueError("File path is outside the allowed roots")
 
     @contextmanager
-    def directory(self, resource_id: str) -> Iterator[tuple[int, Path]]:
+    def directory(self, resource_id: str) -> Generator[tuple[int, Path], None, None]:
         """Open a directory beneath a configured root without following symlinks."""
         root, path = self._target(resource_id, allow_root=True)
         flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -81,7 +81,7 @@ class FilesystemResource:
             os.close(fd)
 
     @contextmanager
-    def _parent(self, resource_id: str) -> Iterator[tuple[int, Path]]:
+    def _parent(self, resource_id: str) -> Generator[tuple[int, Path], None, None]:
         root, path = self._target(resource_id)
         flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
         fd = os.open(root, flags)

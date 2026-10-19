@@ -30,7 +30,6 @@ from protolink.transport.errors import (
     TransportRemoteError,
     TransportTimeoutError,
 )
-from protolink.types import TransportType
 from protolink.utils.inspect import is_async_callable
 from protolink.utils.serialization import Serializer
 
@@ -80,7 +79,7 @@ class GRPCTransport(Transport):
         Register gRPC server reflection when its optional package is installed.
     """
 
-    transport_type: ClassVar[TransportType] = "grpc"
+    transport_type: ClassVar[str] = "grpc"
     supports_streaming: ClassVar[bool] = True
     capabilities: ClassVar[TransportCapabilities] = TransportCapabilities(
         streaming=True,

@@ -72,7 +72,10 @@ class GeminiLLM(APILLM):
 
         genai, GenerateContentConfig = require_gemini()  # noqa: N806
         # Initialize the Gemini (GenAI) client
-        self._client = genai.Client(api_key=api_key or os.getenv("GEMINI_API_KEY"))
+        client_options: dict[str, Any] = {"api_key": api_key or os.getenv("GEMINI_API_KEY")}
+        if base_url is not None:
+            client_options["http_options"] = {"base_url": base_url}
+        self._client = genai.Client(**client_options)
         # Store the config type class for later use
         self._GenerateContentConfig = GenerateContentConfig
 
@@ -204,11 +207,15 @@ class GeminiLLM(APILLM):
             )
         ) as stream:
             async for chunk in stream:
-                for candidate in getattr(chunk, "candidates", []) or []:
+                for candidate in (getattr(chunk, "candidates", []) or [])[:1]:
                     content = getattr(candidate, "content", None)
                     for part in getattr(content, "parts", []) or []:
                         function_call = getattr(part, "function_call", None)
                         if function_call is not None:
+                            if function_name is not None:
+                                raise ValueError(
+                                    "Gemini stream returned multiple parallel tool calls; expected exactly one"
+                                )
                             function_name = str(function_call.name)
                             function_args = dict(getattr(function_call, "args", {}) or {})
 
@@ -248,20 +255,24 @@ class GeminiLLM(APILLM):
 
     def _action_from_response(self, response: Any) -> LLMActionResult:
         """Normalize a Gemini response into one Protolink action."""
-        for candidate in getattr(response, "candidates", []) or []:
-            content = getattr(candidate, "content", None)
-            for part in getattr(content, "parts", []) or []:
-                function_call = getattr(part, "function_call", None)
-                if function_call is None:
-                    continue
-                args = dict(getattr(function_call, "args", {}) or {})
-                action = native_tool_call_to_action(str(function_call.name), args)
-                return LLMActionResult(
-                    action=action,
-                    raw_response=action_to_json(action),
-                    native=True,
-                    metadata=usage_metadata({"provider": "gemini"}, response),
-                )
+        function_calls = [
+            part.function_call
+            for candidate in (getattr(response, "candidates", []) or [])[:1]
+            for part in getattr(getattr(candidate, "content", None), "parts", []) or []
+            if getattr(part, "function_call", None) is not None
+        ]
+        if len(function_calls) > 1:
+            raise ValueError("Gemini response returned multiple parallel tool calls; expected exactly one")
+        if function_calls:
+            function_call = function_calls[0]
+            args = dict(getattr(function_call, "args", {}) or {})
+            action = native_tool_call_to_action(str(function_call.name), args)
+            return LLMActionResult(
+                action=action,
+                raw_response=action_to_json(action),
+                native=True,
+                metadata=usage_metadata({"provider": "gemini"}, response),
+            )
 
         text = (getattr(response, "text", "") or "").strip()
         if not text:

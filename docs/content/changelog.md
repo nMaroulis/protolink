@@ -34,9 +34,52 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.8.1] - 2026-10-13
+## [0.8.2] - 2026-10-17
 
 :::note Latest Update
+
+This release adds bounded worker continuation, typed worker tools and reliable live child activity,
+alongside Python and documentation dependency updates and provider SDK compatibility fixes.
+
+:::
+
+### Added
+
+- `Agent(yield_after_steps=N)` and `RunHandoff` for explicitly continued, checkpointed work slices.
+  Durable runs preserve committed actions, model history, correction allowances and cumulative budgets.
+  `RunResult.handoff` exposes structured progress; `resume_task(root_run_id)` grants another bounded slice.
+  Hard budget exhaustion, cancellation, denial and uncertain effects remain stopping conditions.
+- `Agent.add_worker_tool(worker, tool=None, name=None, description=None)` exposes an owned local worker
+  with a small `task: str` schema or the selected child tool's typed arguments. Calls use native delegation,
+  inherited policies, shared budgets and existing execution receipts.
+- A detailed [worker execution guide](worker-execution.md) and runnable, offline
+  [example](https://github.com/nMaroulis/protolink/blob/main/examples/worker_execution.py).
+
+### Changed
+
+- Refresh Python and documentation dependency lockfiles, update Docusaurus to 3.10.2 and apply compatible
+  security updates to the documentation worker pool and JavaScript serializer.
+- Support Langfuse SDK 5 alongside SDK 4, and run real provider-SDK compatibility checks in CI for
+  locked, minimum-direct and latest dependencies.
+
+### Fixed
+
+- Route explicit no-change `ToolRejectedError` failures during tool preparation through the existing
+  bounded correction loop, before approval or execution. Rejected preparation consumes no tool call.
+- Forward owned local child events immediately to the public stream, including nested and externally
+  spawned children, with stable correlation identities and one root terminal event.
+- Support Anthropic SDK v1 across text, native-tool and streaming requests. Only `max_tokens=1024` is
+  supplied by default; explicit legacy sampling settings are preserved through `extra_body` for models
+  that support them. See [AnthropicLLM parameters](llm.md#anthropicllm).
+- Propagate failed or incomplete OpenAI responses, honor Gemini's configured API URL, and reject
+  multiple parallel native tool calls instead of silently selecting one.
+- Isolate LangSmith trace state between tracker instances and restore parent runs after nested tasks.
+- Count literal tokenizer control strings as ordinary prompt text instead of falling back to the
+  character-based token estimate.
+
+## [0.8.1] - 2026-10-13
+
+:::note Release Summary
 
 The update has a coherent scope: **action validation**, **capability selection** and **recoverable tool rejection**.
 

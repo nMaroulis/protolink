@@ -3243,4 +3243,35 @@ As a practical rule, use events to drive what the user sees now and telemetry to
 
 `await handle.spawn("specialist", "task")` starts an owned local child while a parent with a configured roster is running. Its `SubagentHandle` exposes `result()` and `cancel()`; unfinished children are drained when their parent ends. See [local subagents](subagents.md).
 
-With `Agent(..., durability="runs.sqlite")`, run attempts can finish in `input-required` state with a saved approval or question. Inspect `result.task.metadata["interruption"]`, authenticate the response in your application and call `agent.resume()` or `resume_task()` after reopening the same store. A run handle represents one attempt. See [durable execution](execution-tools.md#durable-execution) for the supported checkpoint boundaries.
+With `Agent(..., durability="runs.sqlite")`, run attempts can finish in `input-required` state with a saved approval, question or cooperative work handoff. Inspect `result.task.metadata["interruption"]`, authenticate the response in your application and call `agent.resume()` or `resume_task()` after reopening the same store. A run handle represents one attempt. See [durable execution](execution-tools.md#durable-execution) for the supported checkpoint boundaries.
+
+### RunHandoff
+
+`Agent(yield_after_steps=N)` returns unfinished work at a settled checkpoint
+boundary. Read `RunHandoff.from_task(task)` or `result.handoff`; both return
+`None` unless the current Task is input-required for a cooperative handoff.
+`RunHandoff` is exported from `protolink` and `protolink.core`.
+
+| Field | Meaning |
+| --- | --- |
+| `run_id: str` | The yielding inference run; it can identify a nested child. |
+| `reason: str` | `"step_slice"` when the configured slice is exhausted. |
+| `steps: int` | Cumulative logical model steps in this inference loop. |
+| `usage: BudgetUsage` | Snapshot of cumulative usage shared across the run tree. |
+| `completed_action_ids: tuple[str, ...]` | Committed operations in this durable run's execution records. |
+
+`to_dict()` produces JSON-compatible public progress; `from_dict(data)` restores
+it. Handoffs do not generate an extra model summary or claim that the assignment
+is complete. The application interprets results and remaining work. Keep the
+root run ID from `RunContext` or `RunHandle` and call the configured root's
+`resume_task(root_run_id)` to authorize the next slice. Reading the checkpoint or
+polling `run_task()` does not grant continuation. Shared hard budgets remain
+authoritative across every slice. See [bounded continuation](worker-execution.md).
+
+Owned child events reach `handle.events()` while children run. Their original
+event/action identities and lineage are retained; a child's terminal marker is
+carried as `metadata["source_final"]`, while only the root marks the public stream
+final. For `llm.stream`, inspect `payload["llm_event_type"]`: `llm_chunk` contains
+raw incremental content and `llm_final` contains the assembled final answer.
+Native child text can be streamed; JSON-action fragments may contain tool
+arguments or actions and need appropriate presentation by the application.

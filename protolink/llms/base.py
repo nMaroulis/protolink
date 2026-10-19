@@ -80,6 +80,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import replace
 from functools import wraps
 from time import monotonic, perf_counter
 from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Literal, ParamSpec, TypeVar
@@ -888,6 +889,7 @@ class LLM(ABC):
         context_policy: ContextPolicy | None = None,
         hooks: tuple[AgentHooks, ...] = (),
         tool_prompt_builder: Callable[[dict[str, BaseTool]], None] | None = None,
+        yield_after_steps: int | None = None,
     ) -> Part:
         """
         Execute a controlled, multi-step inference loop against the configured LLM.
@@ -962,6 +964,12 @@ class LLM(ABC):
         streaming : bool, default False
             Whether to invoke the underlying LLM in streaming mode. When True, the response is collected from an async
             generator before parsing.
+        yield_after_steps : int, optional
+            Yield a settled checkpoint after this many logical steps in the current
+            slice. Requires checkpointed Agent execution. Explicit resume preserves
+            the full history, correction counters and shared budget. The run's
+            max_steps bounds total execution; without it the existing ten-step
+            ceiling still applies across all slices. No extra summary call runs.
         event_callback : Callable[[dict[str, Any]], Awaitable[None]], optional
             Async observer called with normalized inference events. Events include LLM chunks, parsed actions, tool
             execution results, delegated agent calls, final output and recoverable errors. The callback is for
@@ -1060,8 +1068,9 @@ class LLM(ABC):
            failures, raises ``InferParseError`` early rather than consuming the full step budget. Each failure injects
            corrective feedback.
 
-        5. *Bounded Execution*: Hard limit of ``MAX_INFER_STEPS`` (default: 10) prevents runaway execution. If exceeded,
-           raises ``RuntimeError``.
+        5. *Bounded Execution*: ``MAX_INFER_STEPS`` (default: 10) prevents runaway execution. Cooperative slices may
+           use an explicit ``RunBudget.max_steps`` as the total ceiling instead; all slices share that hard budget.
+           Without a cooperative setting, exceeding ten steps raises ``RuntimeError``.
 
         See Also
         --------
@@ -1084,6 +1093,11 @@ class LLM(ABC):
         from protolink.storage.durable import DurableExecutionError
 
         durable = current_durable_run()
+        if yield_after_steps is not None:
+            if isinstance(yield_after_steps, bool) or not isinstance(yield_after_steps, int) or yield_after_steps < 1:
+                raise ValueError("yield_after_steps must be a positive integer or None")
+            if durable is None:
+                raise DurableExecutionError("Cooperative inference handoffs require checkpointed Agent execution")
         saved_loop = durable.loop_state() if durable is not None else None
         active_budget_enforcer = budget_enforcer or BudgetEnforcer(active_context, policy=budget_policy)
         if saved_loop is not None:
@@ -1092,6 +1106,12 @@ class LLM(ABC):
             self.history.add_user(query)
 
         steps: int = saved_loop["steps"] if saved_loop is not None else 0
+        slice_start = steps
+        step_limit = (
+            active_context.budget.max_steps
+            if yield_after_steps is not None and active_context.budget.max_steps is not None
+            else MAX_INFER_STEPS
+        )
         parse_failures: int = saved_loop["parse_failures"] if saved_loop is not None else 0
         tool_corrections: int = saved_loop.get("tool_corrections", 0) if saved_loop is not None else 0
         max_tool_corrections = self.max_tool_corrections
@@ -1201,6 +1221,7 @@ class LLM(ABC):
             action_id: str | None = None,
             agent_name: str | None = None,
             agent_action: str | None = None,
+            tool_observation: dict[str, Any] | None = None,
         ) -> None:
             """Deliver a no-change observation and charge one bounded correction."""
             nonlocal tool_corrections
@@ -1219,7 +1240,9 @@ class LLM(ABC):
                     ),
                 },
             }
-            if agent_name is None:
+            if tool_observation is not None:
+                fallback = inject_tool_observation(tool_observation["name"], tool_observation["args"], feedback)
+            elif agent_name is None:
                 fallback = inject_tool_observation(tool_name, tool_args, feedback)
             else:
                 fallback = False
@@ -1263,9 +1286,7 @@ class LLM(ABC):
                     tool_name=tool_name, attempts=tool_corrections, limit=max_tool_corrections, last_error=error
                 ) from error
 
-        while steps < MAX_INFER_STEPS or (
-            durable is not None and (durable.loop_state() or {}).get("pending") is not None
-        ):
+        while steps < step_limit or (durable is not None and (durable.loop_state() or {}).get("pending") is not None):
             pending_state = durable.loop_state() if durable is not None else None
             pending = pending_state.get("pending") if pending_state is not None else None
             if pending is not None:
@@ -1284,6 +1305,24 @@ class LLM(ABC):
             else:
                 if cancellation_token is not None:
                     cancellation_token.raise_if_cancelled()
+                if yield_after_steps is not None and steps - slice_start >= yield_after_steps:
+                    # A slice cannot defer a hard stop or obtain free model work.
+                    # Preview the next model turn without charging a request that
+                    # has not happened. The real preflight still runs on resume.
+                    await enforce_budget(active_budget_enforcer.evaluate())
+                    next_usage = replace(
+                        active_budget_enforcer.usage,
+                        steps=active_budget_enforcer.usage.steps + 1,
+                        llm_calls=active_budget_enforcer.usage.llm_calls + 1,
+                    )
+                    await enforce_budget(
+                        active_budget_enforcer.policy.evaluate(active_budget_enforcer.budget, next_usage)
+                    )
+                    checkpoint_ready()
+                    assert durable is not None
+                    handoff = durable.prepare_handoff(steps)
+                    await emit({"type": "run_yielded", "step": steps, "handoff": handoff.to_dict()})
+                    durable.suspend_handoff(handoff)
                 steps += 1
                 await enforce_budget(active_budget_enforcer.check_next_step())
                 await emit({"type": "llm_step", "step": steps})
@@ -1536,7 +1575,24 @@ class LLM(ABC):
                     raise action_error
                 if action_result is None:
                     raise ValueError("LLM adapter did not return an action result")
-                action_obj = action_result.action
+                from protolink.agents.worker_tools import normalize_worker_action
+
+                action_obj = normalize_worker_action(action_result.action, tools)
+                if action_obj is not action_result.action:
+                    facade_action = action_result.action
+                    assert isinstance(facade_action, ToolCallAction)
+                    action_result = LLMActionResult(
+                        action=action_obj,
+                        raw_response=action_result.raw_response,
+                        native=action_result.native,
+                        metadata={
+                            **action_result.metadata,
+                            "worker_tool": {
+                                "name": facade_action.tool,
+                                "args": copy.deepcopy(facade_action.args),
+                            },
+                        },
+                    )
                 raw_response = action_result.raw_response
                 action = action_obj.type
                 payload = action_obj.model_dump(exclude_none=True)
@@ -1679,6 +1735,8 @@ class LLM(ABC):
                     continue
 
                 tool_rejection: ToolRejectedError | None = None
+                rejection_phase = "preparation"
+                action_id = None
                 try:
                     if cancellation_token is not None:
                         cancellation_token.raise_if_cancelled()
@@ -1689,6 +1747,7 @@ class LLM(ABC):
                         capabilities=frozenset(getattr(tool, "capabilities", None) or ()),
                         description=getattr(tool, "description", None) or None,
                     )
+                    action_id = runtime_action.action_id
                     authorization = await authorize_action(runtime_action)
                     if authorization is not None:
                         authorized_arguments = authorization.action.payload.get("arguments", tool_args)
@@ -1696,8 +1755,6 @@ class LLM(ABC):
                             raise TypeError("Authorized tool action payload.arguments must be a dictionary")
                         tool_args = self._validate_tool_arguments(tool, authorized_arguments)
                         action_id = authorization.action.action_id
-                    else:
-                        action_id = runtime_action.action_id
                     await enforce_budget(active_budget_enforcer.evaluate())
                     if durable is None or not durable.tool_charged:
                         await enforce_budget(active_budget_enforcer.check_tool_call())
@@ -1712,6 +1769,7 @@ class LLM(ABC):
                             "action_id": action_id,
                         }
                     )
+                    rejection_phase = "execution"
                     try:
                         if authorization is not None:
                             from protolink.core.execution import ToolExecution, execute_authorized_tool
@@ -1730,6 +1788,17 @@ class LLM(ABC):
                     except ToolRejectedError as error:
                         tool_rejection = error
                         tool_result = None
+                except ToolRejectedError as error:
+                    # Preparation may explicitly reject without effects before
+                    # policy, approval or tool accounting. Ordinary failures
+                    # remain terminal; cancellation and hard budgets still win.
+                    if active_context.canceled:
+                        raise asyncio.CancelledError(active_context.cancel_reason) from None
+                    if cancellation_token is not None:
+                        cancellation_token.raise_if_cancelled()
+                    await enforce_budget(active_budget_enforcer.evaluate())
+                    tool_rejection = error
+                    tool_result = None
                 except ActionPolicyError:
                     raise
                 except DurableExecutionError:
@@ -1750,7 +1819,11 @@ class LLM(ABC):
 
                 if tool_rejection is not None:
                     await reject_tool_request(
-                        tool_rejection, tool_name=tool_name, tool_args=tool_args, phase="execution", action_id=action_id
+                        tool_rejection,
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                        phase=rejection_phase,
+                        action_id=action_id,
                     )
                     continue
 
@@ -1803,6 +1876,8 @@ class LLM(ABC):
 
             elif isinstance(action_obj, AgentCallAction):
                 self.history.add_assistant(raw_response)
+                facade_call = action_result.metadata.get("worker_tool")
+                tool_observation = facade_call if isinstance(facade_call, dict) else None
                 if not agent_callback:
                     alternatives = "`final`"
                     if tools:
@@ -1818,6 +1893,7 @@ class LLM(ABC):
                         phase="validation",
                         agent_name=action_obj.agent,
                         agent_action=action_obj.action,
+                        tool_observation=tool_observation,
                     )
                     continue
 
@@ -1837,6 +1913,7 @@ class LLM(ABC):
                             phase="validation",
                             agent_name=agent_name,
                             agent_action=agent_action,
+                            tool_observation=tool_observation,
                         )
                         continue
 
@@ -1899,17 +1976,27 @@ class LLM(ABC):
                         agent_name=agent_name,
                         agent_action=agent_action,
                         action_id=action_id,
+                        tool_observation=tool_observation,
                     )
                     continue
 
+                if tool_observation is not None:
+                    from protolink.agents.worker_tools import worker_result
+
+                    agent_result = worker_result(action_obj, agent_result)
                 history_agent_result = _history_safe_result(agent_result)
                 observation_fallback = False
                 try:
-                    self._inject_agent_call(
-                        agent_name=agent_name,
-                        agent_action=agent_action,
-                        agent_result=history_agent_result,
-                    )
+                    if tool_observation is not None:
+                        observation_fallback = inject_tool_observation(
+                            tool_observation["name"], tool_observation["args"], history_agent_result
+                        )
+                    else:
+                        self._inject_agent_call(
+                            agent_name=agent_name,
+                            agent_action=agent_action,
+                            agent_result=history_agent_result,
+                        )
                 except Exception as exc:
                     observation_fallback = True
                     logger.warning(f"Provider agent-result history injection failed; using portable observation: {exc}")
@@ -1953,8 +2040,10 @@ class LLM(ABC):
                 checkpoint_ready()
                 continue
 
+        if yield_after_steps is not None and active_context.budget.max_steps is not None:
+            await enforce_budget(active_budget_enforcer.check_next_step())
         raise RuntimeError(
-            f"Maximum inference steps ({MAX_INFER_STEPS}) exceeded without producing final response. "
+            f"Maximum inference steps ({step_limit}) exceeded without producing final response. "
             f"The LLM may be stuck in a loop. Consider simplifying the task or checking prompts."
         )
 

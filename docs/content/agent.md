@@ -161,6 +161,13 @@ Configure `subagents=[specialist]` for owned local children and `durability="run
 
 `subagent_limits=SubagentLimits(...)` supplies deeper control. `execution_version="1"` identifies your application tool contract; increment it when executable behavior changes. `durability` also accepts a `SQLiteDurableStore` or a custom `DurableStore`.
 
+Use `yield_after_steps=N` to checkpoint unfinished inference after each bounded
+slice. `RunHandoff.from_task(task)` exposes the progress; explicitly resume the
+owning root run with `resume_task(root_run_id)`. Children can inherit their
+parent's durable store. `add_worker_tool()` exposes a child with a small typed
+schema while preserving native delegation controls. See the complete
+[worker execution guide](worker-execution.md).
+
 ### Model context and run controls
 
 For model-input preparation, enable [`context_policy="auto"`](context-management.md) or configure a `ContextPolicy`. [`hooks=[AgentHooks(...)]`](hooks.md) adds before-model, after-tool and before-completion callbacks to the default loop. [`RoutedLLM`](llm.md#model-routing-and-fallback) selects and falls back between model adapters without replaying tools. Use [`evaluate()`](evaluation.md) to compare the resulting behavior on reference cases and [`RunManager`](execution-tools.md#manage-stopped-runs) to operate durable executions through your application configuration.
@@ -280,6 +287,7 @@ Protolink's `Agent` combines client and server functionality in a single class. 
     subagents: Iterable[Agent] | None = None,
     subagent_limits: SubagentLimits | None = None,
     durability: DurableStore | str | Path | None = None,
+    yield_after_steps: int | None = None,
     execution_version: str = "1",
     context_policy: ContextPolicy | Literal["auto"] | None = None,
     hooks: Iterable[AgentHooks | Callable[[ModelRequest], Any]] | None = None,
@@ -380,6 +388,9 @@ Create the stable Agent facade and wire its identity, execution engine, communic
     <ApiField name="execution_version" type="str" defaultValue='"1"'>
       Application execution-contract identifier. Increment when tool, hook, selector or other executable behavior changes.
     </ApiField>
+    <ApiField name="yield_after_steps" type="int | None" defaultValue="None">
+      Positive model-step count per cooperative slice. Requires this agent's durability or an owning durable parent. A settled slice returns an input-required Task with RunHandoff progress. Explicit resume grants another slice without resetting budgets or correction counters. Omission retains the existing inference limit; with this option, an explicit RunBudget.max_steps can set a larger finite total limit.
+    </ApiField>
     <ApiField name="context_policy" type='ContextPolicy | Literal["auto"] | None' defaultValue="None">
       Opt into deterministic per-request context preparation and scoped retrieval of oversized observations. Configure explicit bounds with ContextPolicy.
     </ApiField>
@@ -428,6 +439,30 @@ agent = Agent(card=card, transport=transport, llm=llm)
 ```
 
 ## Tool Management
+
+### Agent.add_worker_tool
+
+```python
+parent.add_worker_tool("researcher")  # researcher(task: str)
+parent.add_worker_tool("customers", tool="lookup", name="lookup_customer")
+```
+
+`add_worker_tool(worker: str, *, name: str | None = None, tool: str | None = None,
+description: str | None = None) -> WorkerTool` registers a declaration for an
+already configured owned local child. Inference takes `task: str`; selecting
+`tool` copies that child's input and output schemas. The default name is the
+worker name for inference or `<worker>_<tool>` for a selected tool. Names must
+be unique, use 1–64 letters, digits, underscores or hyphens and begin with a
+letter or underscore. Registration never executes work.
+
+Model calls normalize to the existing `agent_call` route before authorization
+and durable checkpointing. Standalone `await parent.call_tool(alias, **args)`
+also uses a native parent task; a facade cannot be called as a plain Python
+function or through `call_tool_in_context`. The child retains its policies,
+budget accounting, cancellation and execution records. Configuration round trips
+require reconnecting the declared child through `subagents=`. Unknown workers,
+tools, reserved aliases and collisions raise `ValueError` at registration.
+See [typed worker tools](worker-execution.md#expose-a-worker-through-a-typed-tool) for complete examples.
 
 Tools give agents explicit callable capabilities. ProtoLink supports opt-in built-ins, native Python functions, custom `BaseTool` implementations and MCP adapters.
 

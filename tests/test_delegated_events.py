@@ -105,6 +105,60 @@ async def test_worker_progress_arrives_live_and_receipts_are_saved_once(tmp_path
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("cancel_parent", [False, True])
+async def test_owned_local_tool_receipt_is_live_and_survives_parent_cancellation(cancel_parent):
+    child = agent("owned-child")
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    stopped = asyncio.Event()
+    calls = 0
+
+    @child.tool
+    async def work() -> str:
+        nonlocal calls
+        calls += 1
+        entered.set()
+        try:
+            await release.wait()
+            return "changed"
+        finally:
+            stopped.set()
+
+    parent = agent("owned-parent", [delegate(child), "parent done"], subagents=[child])
+    run = parent.start_run("delegate work")
+
+    async def observe_start():
+        async for event in run.events():
+            if event.type == "action.started" and event.agent_name == child.card.name:
+                return event
+        raise AssertionError("Parent ended without the child's live tool receipt")
+
+    try:
+        started = await asyncio.wait_for(observe_start(), 2)
+        await asyncio.wait_for(entered.wait(), 2)
+        assert not release.is_set()
+        assert started.parent_action_id == started.delegation_id
+        assert started.parent_action_id
+        if cancel_parent:
+            await run.cancel("stop parent")
+        else:
+            release.set()
+        result = await asyncio.wait_for(run.result(), 2)
+    finally:
+        release.set()
+        await run.cancel("test cleanup")
+        await run.result()
+
+    assert stopped.is_set()
+    assert calls == 1
+    assert result.status == ("canceled" if cancel_parent else "completed")
+    assert sum(event.event_id == started.event_id for event in result.report.events) == 1
+    assert any(event["event_id"] == started.event_id for event in run.task.metadata["run_events"])
+    assert len({event.event_id for event in result.report.events}) == len(result.report.events)
+    assert not parent._subagent_runs
+
+
+@pytest.mark.asyncio
 async def test_nested_delegation_keeps_worker_identity_in_nonstreamed_parent():
     worker = agent("nested-worker")
 

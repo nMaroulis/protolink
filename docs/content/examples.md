@@ -9,6 +9,7 @@ python examples/progressive_control.py
 python examples/subagents.py
 python examples/durable_execution.py
 python examples/harness_controls.py
+python examples/worker_execution.py
 ```
 
 These scripts need no API keys or external services. The notebook and larger projects below include their own setup instructions for optional transports and model providers.
@@ -63,6 +64,16 @@ with the optional `protolink[mcp]` extra. See the [guide](progressive-control.md
 ## Example Scripts
 
 The repository includes several **standalone example scripts** that demonstrate specific Protolink capabilities:
+
+### Bounded worker execution
+
+[`worker_execution.py`](https://github.com/nMaroulis/protolink/blob/main/examples/worker_execution.py)
+exposes a child's typed customer lookup, streams the child's activity, corrects a
+`PreparedTool` preparation rejection and checkpoints unfinished work after two
+model steps. The application inspects `RunHandoff` and explicitly resumes the
+saved run without repeating the first write. It uses scripted responses and a
+temporary SQLite file. See [worker execution](worker-execution.md) for budgets,
+restart recovery, nested handoffs and event semantics.
 
 ### Retrieval-augmented Agent
 
