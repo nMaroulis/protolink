@@ -183,7 +183,10 @@ class MockLLM(LLM):
         return json.dumps({"type": "final", "content": str(response_val)})
 
     async def call_stream(self, history: ConversationHistory) -> AsyncIterator[str]:
-        yield self.call(history)
+        """Yield the mock response without blocking on a synchronous callback."""
+        from protolink.core.workers import run_sync
+
+        yield await run_sync(self.call, history)
 
     def validate_connection(self) -> bool:
         return True

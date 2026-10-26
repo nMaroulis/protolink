@@ -3,7 +3,7 @@
 import json
 from types import SimpleNamespace
 
-import httpx
+import httpx2
 import pytest
 
 from protolink import Agent, RunBudget, RunContext, RunHandle, Task
@@ -134,11 +134,11 @@ def _scripted_ollama(monkeypatch, mode, texts, *, streaming=False):
 
     monkeypatch.setattr(llm, "_post_chat", response)
     if streaming:
-        client_type = httpx.AsyncClient
-        transport = httpx.MockTransport(
-            lambda request: httpx.Response(200, content=json.dumps(response(json.loads(request.content))) + "\n")
+        client_type = httpx2.AsyncClient
+        transport = httpx2.MockTransport(
+            lambda request: httpx2.Response(200, content=json.dumps(response(json.loads(request.content))) + "\n")
         )
-        monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: client_type(transport=transport, **kwargs))
+        monkeypatch.setattr(httpx2, "AsyncClient", lambda **kwargs: client_type(transport=transport, **kwargs))
     return llm, requests
 
 

@@ -145,6 +145,13 @@ tool instead. See [worker execution](docs/content/worker-execution.md) and run
 `python examples/worker_execution.py` for the offline walkthrough, including
 correctable preparation errors and live child activity.
 
+For application servers, use `Agent(sync_execution="thread")` for blocking typed tools,
+`llm_factory=` for request-local providers, and `request_context()` for private dependencies.
+`RunResult.tool_evidence` exposes correlated terminal tool observations over the existing events.
+See the [application runtime guide](docs/content/application-runtime.md) and the
+[FastAPI example](examples/application_runtime.py) with two specialists, a coordinator,
+streaming, cancellation and persistent sessions.
+
 ## Your first agent mesh
 
 Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:
@@ -384,8 +391,8 @@ print(result.status, result.output)
 `chunks()` delivers raw incremental model text; default JSON-action models stream JSON fragments.
 Use `handle.events()` for all typed events and `result.report` for the run report. Inspect the result
 status for failures and use `await handle.cancel()` to stop a run. Remote subscriptions still require
-advertised streaming support. Ollama and other HTTP server streams require `httpx`
-(`uv add protolink httpx`), also included in the `llms` and `http` extras. See the
+advertised streaming support. Ollama and other HTTP server streams require `httpx2`
+(`uv add protolink httpx2`), also included in the `llms` and `http` extras. See the
 [complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
 
 ## Local telemetry and replay

@@ -18,6 +18,7 @@ from protolink.core.cancellation import (
     TaskNotFoundError,
 )
 from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
+from protolink.core.evidence import ToolEvidence, collect_tool_evidence
 from protolink.core.handoff import RunHandoff
 from protolink.core.policy import (
     ActionAuthorization,
@@ -55,6 +56,7 @@ from protolink.core.report_diff import (
     diff_run_reports,
     normalize_run_report,
 )
+from protolink.core.request_context import current_request_context, request_context
 from protolink.core.run_context import RunBudget, RunContext
 from protolink.core.task import TaskExecutionError
 
@@ -104,10 +106,14 @@ __all__ = [
     "TaskExecutionError",
     "TaskNotCancelableError",
     "TaskNotFoundError",
+    "ToolEvidence",
     "assert_budget_under",
     "assert_no_denied_actions",
     "assert_run_events",
     "assert_run_matches",
+    "collect_tool_evidence",
+    "current_request_context",
     "diff_run_reports",
     "normalize_run_report",
+    "request_context",
 ]

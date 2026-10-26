@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -16,6 +17,7 @@ from protolink.client import RegistryClient
 from protolink.core.cancellation import TaskExecutionRegistry
 from protolink.core.hooks import AgentHooks, ModelRequest
 from protolink.core.policy import ActionAuthorizer, ApprovalHandlerLike, CapabilityPolicy, Policy
+from protolink.core.workers import SyncExecution, SyncWorkerPool
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.llms.context_policy import ContextPolicy
@@ -85,6 +87,9 @@ class Agent(
         description: str | None = None,
         url: str | None = None,
         tools: Iterable[BaseTool | Callable[..., Any]] | None = None,
+        sync_execution: SyncExecution = "inline",
+        max_sync_workers: int = 4,
+        expose_tool_results: bool = False,
         override_system_prompt: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
         expose_chat: bool = True,
@@ -104,6 +109,7 @@ class Agent(
         execution_version: str = "1",
         context_policy: ContextPolicy | Literal["auto"] | None = None,
         hooks: Iterable[AgentHooks | Callable[[ModelRequest], Any]] | None = None,
+        llm_factory: Callable[[], LLM | str | Awaitable[LLM | str]] | None = None,
     ):
         """Initialize agent with its identity card and transport layer.
 
@@ -116,6 +122,17 @@ class Agent(
                 Network transport aliases require a URL with an explicit bind port.
                 A configured Transport supplies its own URL when this is omitted.
             tools: Typed functions or tool instances registered through add_tools.
+            sync_execution: Default for native synchronous tools: ``"inline"``
+                preserves event-loop execution; ``"thread"`` uses bounded workers.
+                Override per tool with ``Tool.from_callable(..., sync_execution=...)``
+                or ``@agent.tool(sync_execution=...)``. Async tools are awaited.
+            max_sync_workers: Maximum concurrent worker calls for this agent,
+                shared by synchronous tools, model factories and provider calls.
+                Canceled calls retain their slot until the thread exits.
+            expose_tool_results: Include completed inference tool results in
+                public run events. Exposes actual returns before history hooks
+                or context offloading; sanitize data in the tool before returning
+                it. Defaults to metadata only for private results.
             transport: Transport instance or transport type string. If a Transport object is provided, it's used
                 directly. If a string is provided (e.g., "http", "websocket"), a new Transport instance is created
                 with default settings using the agent's card URL. Configure TLS, limits, retries, keepalive and
@@ -184,6 +201,13 @@ class Agent(
                 Change it when stored execution must not continue under new code.
             context_policy: Opt-in "auto" or ContextPolicy for bounded model inputs.
             hooks: AgentHooks objects or before_model functions, in execution order.
+            llm_factory: Optional zero-argument sync or async function returning an
+                LLM or provider:model string. Resolved lazily once for each task
+                that needs inference, without changing the shared ``agent.llm``.
+                Read private request settings through ``current_request_context``.
+                Mutually exclusive with ``llm``; startup never calls this factory
+                or validates its provider connection. Reconnect it explicitly
+                when restoring an agent from serialized configuration.
         """
 
         # Validate shorthand endpoints before provider initialization can perform I/O.
@@ -199,6 +223,14 @@ class Agent(
         # Keep the declaration separate from the derived discovery value so model
         # replacement and configuration round trips retain automatic detection.
         self._inference_support_override = self.card.capabilities.supports_inference
+        if llm_factory is not None and not callable(llm_factory):
+            raise TypeError("llm_factory must be callable")
+        if llm_factory is not None and llm is not None:
+            raise ValueError("Configure either llm or llm_factory, not both")
+        self.llm_factory = llm_factory
+        self._active_llm: ContextVar[tuple[str | None, LLM] | None] = ContextVar(
+            f"protolink_agent_llm_{id(self)}", default=None
+        )
         # LLM validation is handled by the @llm.setter property.
         self._llm: LLM | None = None
         self.llm = llm
@@ -211,6 +243,11 @@ class Agent(
         self.telemetry = telemetry
         # Tools & skills
         self.tools: dict[str, BaseTool] = {}
+        if sync_execution not in {"inline", "thread"}:
+            raise ValueError("sync_execution must be 'inline' or 'thread'")
+        self.sync_execution = sync_execution
+        self._sync_workers = SyncWorkerPool(max_sync_workers)
+        self.expose_tool_results = expose_tool_results
         self.skills: Literal["auto", "fixed"] = skills
         if retrieval not in {"auto", "always", "required"}:
             raise ValueError("retrieval must be 'auto', 'always', or 'required'")

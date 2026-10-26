@@ -7,7 +7,7 @@ from contextlib import aclosing, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
 
-import httpx
+import httpx2
 import pytest
 
 from protolink import Agent, RunHandle, Task
@@ -142,6 +142,8 @@ def _sdk_llm(backend, factory):
     llm = backend.__new__(backend)
     LLM.__init__(llm, model="test", model_params={})
     llm._supports_tool_calling = True
+    if backend is LlamaCPPLocalLLM:
+        llm._model_lock = threading.RLock()
     llm._GenerateContentConfig = lambda **kwargs: kwargs
     llm._client = SimpleNamespace(
         responses=SimpleNamespace(create=factory),
@@ -251,11 +253,11 @@ async def test_native_http_streams_propagate_malformed_actions(monkeypatch, back
 
     def respond(request):
         requests.append(request)
-        return httpx.Response(200, content=_frame(raw, backend is OllamaLLM))
+        return httpx2.Response(200, content=_frame(raw, backend is OllamaLLM))
 
-    client_type = httpx.AsyncClient
+    client_type = httpx2.AsyncClient
     monkeypatch.setattr(
-        httpx, "AsyncClient", lambda **kwargs: client_type(transport=httpx.MockTransport(respond), **kwargs)
+        httpx2, "AsyncClient", lambda **kwargs: client_type(transport=httpx2.MockTransport(respond), **kwargs)
     )
     with pytest.raises(ActionParseError) as caught:
         await llm.call_action_stream(ConversationHistory(), tools={})
@@ -263,7 +265,7 @@ async def test_native_http_streams_propagate_malformed_actions(monkeypatch, back
     assert len(requests) == 1
 
 
-class _ByteStream(httpx.AsyncByteStream):
+class _ByteStream(httpx2.AsyncByteStream):
     def __init__(self, parts, *, pause=False):
         self.parts = parts
         self.pause = pause
@@ -282,17 +284,17 @@ class _ByteStream(httpx.AsyncByteStream):
 
 
 def _mock_http(monkeypatch, source, status=200):
-    client_type = httpx.AsyncClient
+    client_type = httpx2.AsyncClient
     clients = []
 
     def client(**kwargs):
         instance = client_type(
-            transport=httpx.MockTransport(lambda request: httpx.Response(status, stream=source)), **kwargs
+            transport=httpx2.MockTransport(lambda request: httpx2.Response(status, stream=source)), **kwargs
         )
         clients.append(instance)
         return instance
 
-    monkeypatch.setattr(httpx, "AsyncClient", client)
+    monkeypatch.setattr(httpx2, "AsyncClient", client)
     return clients
 
 

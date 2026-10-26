@@ -1,6 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 
 from protolink.client.request_spec import ClientRequestSpec
@@ -21,10 +21,10 @@ async def test_http_send_success():
     mock_response.raise_for_status = MagicMock()
 
     # Mock client
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client = AsyncMock(spec=httpx2.AsyncClient)
     mock_client.request.return_value = mock_response
 
-    with patch("httpx.AsyncClient", return_value=mock_client):
+    with patch("httpx2.AsyncClient", return_value=mock_client):
         spec = ClientRequestSpec(name="test", method="POST", path="/task", request_source="body")
         result = await transport.send(spec, base_url="http://agent-b:8000", data={"key": "val"})
 
@@ -40,10 +40,10 @@ async def test_http_send_success():
 async def test_http_send_connection_error():
     transport = HTTPTransport(url="http://localhost:8000")
 
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
-    mock_client.request.side_effect = httpx.ConnectError("Connection failed")
+    mock_client = AsyncMock(spec=httpx2.AsyncClient)
+    mock_client.request.side_effect = httpx2.ConnectError("Connection failed")
 
-    with patch("httpx.AsyncClient", return_value=mock_client):
+    with patch("httpx2.AsyncClient", return_value=mock_client):
         spec = ClientRequestSpec(name="status", method="GET", path="/status")
         with pytest.raises(ConnectionError) as excinfo:
             await transport.send(spec, base_url="http://dead-agent:8000")
@@ -59,13 +59,13 @@ async def test_http_send_status_error():
     mock_response.status_code = 404
     mock_response.text = "Not Found"
 
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
-    # httpx raises HTTPStatusError when raise_for_status() is called
-    error = httpx.HTTPStatusError("Error", request=MagicMock(), response=mock_response)
+    mock_client = AsyncMock(spec=httpx2.AsyncClient)
+    # httpx2 raises HTTPStatusError when raise_for_status() is called
+    error = httpx2.HTTPStatusError("Error", request=MagicMock(), response=mock_response)
     mock_client.request.return_value = mock_response
     mock_response.raise_for_status.side_effect = error
 
-    with patch("httpx.AsyncClient", return_value=mock_client):
+    with patch("httpx2.AsyncClient", return_value=mock_client):
         spec = ClientRequestSpec(name="missing", method="GET", path="/missing")
         with pytest.raises(RuntimeError) as excinfo:
             await transport.send(spec, base_url="http://agent:8000")
@@ -92,10 +92,10 @@ async def test_http_send_applies_request_spec_media_types_and_headers():
     mock_response.status_code = 200
     mock_response.json.return_value = {"status": "ok"}
     mock_response.raise_for_status = MagicMock()
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client = AsyncMock(spec=httpx2.AsyncClient)
     mock_client.request.return_value = mock_response
 
-    with patch("httpx.AsyncClient", return_value=mock_client):
+    with patch("httpx2.AsyncClient", return_value=mock_client):
         spec = ClientRequestSpec(
             name="a2a",
             method="POST",
@@ -131,10 +131,10 @@ async def test_http_serialization_task():
     mock_response.status_code = 200
     mock_response.json.return_value = {"received": "task"}
 
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client = AsyncMock(spec=httpx2.AsyncClient)
     mock_client.request.return_value = mock_response
 
-    with patch("httpx.AsyncClient", return_value=mock_client):
+    with patch("httpx2.AsyncClient", return_value=mock_client):
         spec = ClientRequestSpec(name="task", method="POST", path="/task", request_source="body")
         await transport.send(spec, base_url="http://agent:8000", data=task)
 
@@ -155,8 +155,8 @@ async def test_http_send_serializes_body_once() -> None:
 
     transport = HTTPTransport(url="http://localhost:8000")
     payload = Payload()
-    response = httpx.Response(200, json={"status": "ok"}, request=httpx.Request("POST", "http://agent/task"))
-    client = AsyncMock(spec=httpx.AsyncClient)
+    response = httpx2.Response(200, json={"status": "ok"}, request=httpx2.Request("POST", "http://agent/task"))
+    client = AsyncMock(spec=httpx2.AsyncClient)
     client.request.return_value = response
 
     with patch.object(transport, "_ensure_client", return_value=client):
@@ -173,8 +173,8 @@ async def test_http_response_limit_uses_raw_byte_length() -> None:
         url="http://localhost:8000",
         config=TransportConfig(limits=TransportLimits(max_response_bytes=10)),
     )
-    response = httpx.Response(200, content=b"x" * 11, request=httpx.Request("GET", "http://agent/task"))
-    client = AsyncMock(spec=httpx.AsyncClient)
+    response = httpx2.Response(200, content=b"x" * 11, request=httpx2.Request("GET", "http://agent/task"))
+    client = AsyncMock(spec=httpx2.AsyncClient)
     client.request.return_value = response
 
     with patch.object(transport, "_ensure_client", return_value=client):

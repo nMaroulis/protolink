@@ -51,7 +51,7 @@ def build_doctor_report(
 def _optional_dependency_checks() -> list[CheckResult]:
     """Return optional dependency availability checks."""
     groups = {
-        "http extra": ("httpx", "starlette", "websockets"),
+        "http extra": ("httpx2", "starlette", "websockets"),
         "llm api extras": ("openai", "anthropic"),
         "metrics extra": ("tiktoken",),
         "telemetry extras": ("langfuse", "langsmith"),

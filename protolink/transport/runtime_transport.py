@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from pydantic import BaseModel
 
 from protolink.client.request_spec import ClientRequestSpec
+from protolink.core.request_context import _isolated_request_context, _isolated_request_stream
 from protolink.models import Task
 from protolink.transport.base import Transport, TransportRequestContext
 from protolink.transport.config import TransportCapabilities, TransportConfig
@@ -209,7 +210,8 @@ class RuntimeTransport(Transport):
 
         try:
             async with target.inbound_request_slot():
-                parsed_result = await self._invoke_endpoint(endpoint, data, request_spec)
+                with _isolated_request_context():
+                    parsed_result = await self._invoke_endpoint(endpoint, data, request_spec)
         except BaseException as exc:
             target.abort_idempotent_response(cache_key, exc)
             raise
@@ -328,20 +330,21 @@ class RuntimeTransport(Transport):
 
             # Emulate boundary validation across streaming task delivery
             payload: Any = task
-            if endpoint.request_parser:
-                payload = endpoint.request_parser(task.to_dict())
-                if inspect.isawaitable(payload):
-                    payload = await payload
+            with _isolated_request_context():
+                if endpoint.request_parser:
+                    payload = endpoint.request_parser(task.to_dict())
+                    if inspect.isawaitable(payload):
+                        payload = await payload
 
-            # Begin generator sequence
-            result = endpoint.handler(payload)
+                # Begin generator sequence
+                result = endpoint.handler(payload)
 
-            if inspect.isawaitable(result):
-                result = await result
+                if inspect.isawaitable(result):
+                    result = await result
 
             if hasattr(result, "__aiter__"):
                 self._metrics.add(bytes_sent=request_size)
-                async for event in result:
+                async for event in _isolated_request_stream(result):
                     serialized = event.to_dict() if hasattr(event, "to_dict") else event
                     event_size = self.check_payload_limit(serialized, kind="event", url=base_url)
                     self._metrics.add(bytes_received=event_size)

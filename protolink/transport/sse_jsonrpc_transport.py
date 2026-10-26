@@ -6,7 +6,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any, ClassVar
 
-import httpx
+import httpx2
 
 from protolink.client.request_spec import ClientRequestSpec
 from protolink.transport.config import TransportCapabilities
@@ -99,21 +99,21 @@ class SSEJSONRPCTransport(HTTPTransport):
                         event_size = self.check_payload_limit(result, kind="event", url=url)
                         self._metrics.add(bytes_received=event_size)
                         yield result
-            except httpx.TimeoutException as exc:
+            except httpx2.TimeoutException as exc:
                 raise TransportTimeoutError(
                     f"SSE stream from {agent_url} timed out",
                     url=url,
                     request_id=request_id,
                     retryable=True,
                 ) from exc
-            except httpx.ConnectError as exc:
+            except httpx2.ConnectError as exc:
                 raise TransportConnectionError(
                     f"Failed to connect to agent at {agent_url}. Make sure the agent is running and accessible.",
                     url=url,
                     request_id=request_id,
                     retryable=True,
                 ) from exc
-            except httpx.HTTPStatusError as exc:
+            except httpx2.HTTPStatusError as exc:
                 status_code = exc.response.status_code
                 raise TransportRemoteError(
                     f"Agent at {agent_url} returned HTTP {status_code}: {exc.response.text}",

@@ -27,6 +27,11 @@ print(agent.sync.call_tool("add", a=2, b=3))  # 5
 
 This example runs offline. Use `await agent.call_tool(...)` in async code, or attach an LLM and use `invoke()` when the model should decide which tool to call.
 
+Use `Agent(sync_execution="thread", max_sync_workers=4)` for blocking synchronous functions.
+`@agent.tool(sync_execution="inline")` and `Tool.from_callable(func, sync_execution="thread")` override that default
+per tool. Async tools are awaited directly. Worker calls preserve context variables and native runtime controls;
+cancellation cannot terminate a running Python thread. See [application execution](application-runtime.md#blocking-tools).
+
 ## Register a collection or MCP server
 
 `agent.add_tools(iterable)` applies ordinary `add_tool` registration to tools and typed functions.
@@ -345,6 +350,7 @@ The protocol is the smallest contract understood by Agent registration and execu
     examples: list[Any] | None = None,
     capabilities: Collection[str] | None = None,
     action_builder: ActionBuilder | None = None,
+    sync_execution: Literal["inline", "thread"] | None = None,
 )`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py#L22"
 >
@@ -385,6 +391,10 @@ For ordinary functions, use `agent.add_tool(func)` or `@agent.tool` to infer nam
     <ApiField name="action_builder" type="ActionBuilder | None" defaultValue="None">
       Optional sync or async callback that receives validated arguments and the active <code>RunContext</code>, then returns a customized <code>RunAction</code> with preview artifacts or metadata.
     </ApiField>
+    <ApiField name="sync_execution" type={'Literal["inline", "thread"] | None'} defaultValue="None">
+      Override synchronous execution for this tool; <code>None</code> inherits the executing agent's default.
+      Standalone tools default to inline execution. Async callables are awaited directly in either mode.
+    </ApiField>
   </ApiFields>
 </ApiSection>
 
@@ -414,6 +424,7 @@ For ordinary functions, use `agent.add_tool(func)` or `@agent.tool` to infer nam
     examples: list[Any] | None = None,
     capabilities: Collection[str] | None = None,
     action_builder: ActionBuilder | None = None,
+    sync_execution: Literal["inline", "thread"] | None = None,
 ) -> Tool`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/tools/tool.py"
 >
@@ -423,7 +434,7 @@ Create a reusable tool from a synchronous or asynchronous callable. The default 
 <ApiSection title="Parameters"><ApiFields ariaLabel="Tool from_callable parameters">
   <ApiField name="func" type="Callable[..., Any]" required>Original callable retained as <code>tool.func</code>. The factory does not replace or execute it.</ApiField>
   <ApiField name="name, description" type="str | None" defaultValue="None">Optional public metadata overrides. All arguments after <code>func</code> are keyword-only.</ApiField>
-  <ApiField name="input_schema, output_schema, tags, examples, capabilities, action_builder">The same schema, discovery, permission and preview metadata accepted by the explicit constructor.</ApiField>
+  <ApiField name="input_schema, output_schema, tags, examples, capabilities, action_builder, sync_execution">The same schema, discovery, permission, preview and execution metadata accepted by the explicit constructor.</ApiField>
 </ApiFields></ApiSection>
 
 <ApiSection title="Returns"><ApiFields ariaLabel="Tool from_callable return value">

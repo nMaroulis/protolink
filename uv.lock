@@ -2771,7 +2771,7 @@ wheels = [
 
 [[package]]
 name = "protolink"
-version = "0.8.2"
+version = "0.8.3"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
@@ -2785,7 +2785,6 @@ all = [
     { name = "grpcio" },
     { name = "grpcio-health-checking" },
     { name = "grpcio-reflection" },
-    { name = "httpx" },
     { name = "httpx2" },
     { name = "huggingface-hub" },
     { name = "jsonschema" },
@@ -2821,7 +2820,6 @@ dev = [
     { name = "grpcio" },
     { name = "grpcio-health-checking" },
     { name = "grpcio-reflection" },
-    { name = "httpx" },
     { name = "httpx2" },
     { name = "huggingface-hub" },
     { name = "jsonschema" },
@@ -2858,7 +2856,7 @@ gemini = [
     { name = "google-genai" },
 ]
 grok = [
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 grpc = [
     { name = "grpcio" },
@@ -2867,7 +2865,7 @@ grpc = [
 ]
 http = [
     { name = "fastapi" },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "starlette" },
     { name = "uvicorn" },
     { name = "websockets" },
@@ -2876,24 +2874,24 @@ huggingface = [
     { name = "huggingface-hub" },
 ]
 integrations = [
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 llama-cpp-local = [
     { name = "llama-cpp-python" },
 ]
 llama-cpp-server = [
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 llms = [
     { name = "anthropic" },
     { name = "google-genai" },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "huggingface-hub" },
     { name = "llama-cpp-python" },
     { name = "openai" },
 ]
 lmstudio = [
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 mcp = [
     { name = "httpx2" },
@@ -2909,13 +2907,13 @@ notebook = [
     { name = "notebook" },
 ]
 ollama = [
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 openai = [
     { name = "openai" },
 ]
 openai-compatible = [
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 rag-pdf = [
     { name = "pypdf" },
@@ -2929,7 +2927,7 @@ test = [
     { name = "grpcio" },
     { name = "grpcio-health-checking" },
     { name = "grpcio-reflection" },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "openpyxl" },
     { name = "pre-commit" },
     { name = "pypdf" },
@@ -2946,7 +2944,7 @@ test = [
     { name = "websockets" },
 ]
 vllm = [
-    { name = "httpx" },
+    { name = "httpx2" },
 ]
 yaml = [
     { name = "pyyaml" },
@@ -2997,15 +2995,15 @@ requires-dist = [
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
     { name = "grpcio-health-checking", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
     { name = "grpcio-reflection", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
-    { name = "httpx", marker = "extra == 'grok'", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'http'", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'integrations'", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'llama-cpp-server'", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'lmstudio'", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'ollama'", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'openai-compatible'", specifier = ">=0.28.1" },
-    { name = "httpx", marker = "extra == 'vllm'", specifier = ">=0.28.1" },
+    { name = "httpx2", marker = "extra == 'grok'", specifier = ">=2.5.0" },
+    { name = "httpx2", marker = "extra == 'http'", specifier = ">=2.5.0" },
+    { name = "httpx2", marker = "extra == 'integrations'", specifier = ">=2.5.0" },
+    { name = "httpx2", marker = "extra == 'llama-cpp-server'", specifier = ">=2.5.0" },
+    { name = "httpx2", marker = "extra == 'lmstudio'", specifier = ">=2.5.0" },
     { name = "httpx2", marker = "extra == 'mcp'", specifier = ">=2.5.0" },
+    { name = "httpx2", marker = "extra == 'ollama'", specifier = ">=2.5.0" },
+    { name = "httpx2", marker = "extra == 'openai-compatible'", specifier = ">=2.5.0" },
+    { name = "httpx2", marker = "extra == 'vllm'", specifier = ">=2.5.0" },
     { name = "huggingface-hub", marker = "extra == 'huggingface'", specifier = ">=1.3.3" },
     { name = "jsonschema", marker = "extra == 'mcp'", specifier = ">=4.20.0" },
     { name = "jupyter", marker = "extra == 'notebook'", specifier = ">=1.1.1" },

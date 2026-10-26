@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     from protolink.core.hooks import AgentHooks
     from protolink.core.policy import ActionAuthorization, ActionAuthorizer
     from protolink.core.run_context import RunBudget, RunContext
+    from protolink.core.workers import SyncExecution, SyncWorkerPool
     from protolink.llms.base import LLM
     from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult
     from protolink.llms.context_policy import ContextArtifacts, ContextPolicy
@@ -38,6 +40,9 @@ class _AgentMixinBase(Protocol):
 
     card: AgentCard
     tools: dict[str, BaseTool]
+    sync_execution: SyncExecution
+    _sync_workers: SyncWorkerPool
+    expose_tool_results: bool
     knowledge: dict[str, Knowledge]
     retrieval: RetrievalMode
     skills: Literal["auto", "fixed"]
@@ -52,6 +57,8 @@ class _AgentMixinBase(Protocol):
     _client: AgentClient | None
     _server: AgentServer | None
     _llm: LLM | None
+    _active_llm: ContextVar[tuple[str | None, LLM] | None]
+    llm_factory: Callable[[], LLM | str | Awaitable[LLM | str]] | None
     _inference_support_override: bool | None
     _automatic_identity_url: str | None
     _storage: Storage

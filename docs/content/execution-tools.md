@@ -315,6 +315,13 @@ streaming return a final task and its
 recorded native events; streaming transports provide live events. `handle.report` provides an interim or final
 `RunReport`. Reports use an explicit `store` or the local Agent's existing `run_store` when configured.
 
+`result.tool_evidence` and `report.tool_evidence` expose terminal `ToolEvidence` records, including validated arguments,
+results when public, outcome, timing and child/delegation IDs. Subscribe live with `handle.tool_evidence()` or use
+`collect_tool_evidence(events)` on an existing event collection. This is a deduplicated view over the same receipts.
+Inference result content requires `expose_tool_results=True` on the executing Agent. See the
+[application integration guide](application-runtime.md) for private request context, frozen model factories and a
+complete FastAPI lifespan example using these APIs.
+
 ### Delegated worker evidence
 
 Model-driven delegation automatically includes worker events and execution receipts in the parent's stream,

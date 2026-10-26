@@ -599,7 +599,7 @@ async def test_pooled_resources_close_on_their_owning_event_loop() -> None:
 @pytest.mark.parametrize("backend", ["starlette", "fastapi"])
 @pytest.mark.asyncio
 async def test_http_health_probe_does_not_require_application_auth(unused_tcp_port: int, backend: str) -> None:
-    httpx = pytest.importorskip("httpx")
+    httpx2 = pytest.importorskip("httpx2")
     from protolink.security import BearerTokenAuth
     from protolink.transport import HTTPTransport
 
@@ -624,7 +624,7 @@ async def test_http_health_probe_does_not_require_application_auth(unused_tcp_po
 
     await transport.start()
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             response = await client.get(f"http://127.0.0.1:{unused_tcp_port}/healthz")
         assert response.status_code == 200
         assert response.json()["ready"] is True

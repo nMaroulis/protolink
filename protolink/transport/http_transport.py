@@ -7,7 +7,7 @@ network boundary for Protolink agents. It facilitates the bidirectional transmis
 **Architecture:**
 - **Server Role**: Dynamically mounts an ASGI application (using either the ``Starlette``
   or ``FastAPI`` backend) to listen for incoming JSON payloads from external networks.
-- **Client Role**: Leverages ``httpx.AsyncClient`` to serialize local domain objects and
+- **Client Role**: Leverages ``httpx2.AsyncClient`` to serialize local domain objects and
   dispatch them as outbound HTTP requests.
 - **Event Loop Isolation**: Implements strict loop-aware connection pooling, allowing a single
   transport instance to act as a background server on one thread while concurrently acting
@@ -18,7 +18,7 @@ import asyncio
 import json
 from typing import Any, ClassVar
 
-import httpx
+import httpx2
 from pydantic import BaseModel
 
 from protolink.client.request_spec import ClientRequestSpec
@@ -48,7 +48,7 @@ class HTTPTransport(Transport):
     while the main thread's loop handles client requests (e.g., ``call_agent``).
 
     To prevent `asyncio` cross-loop contamination, this transport utilizes loop-aware
-    connection pooling. HTTP client connection pools (via ``httpx.AsyncClient``) are lazily
+    connection pooling. HTTP client connection pools (via ``httpx2.AsyncClient``) are lazily
     instantiated and strictly isolated per event loop.
 
     Parameters
@@ -118,10 +118,10 @@ class HTTPTransport(Transport):
         self.security_context: object | None = None
         # Handlers that are called for different Server Requests
 
-        # Loop-aware client connection pool: dict[id(event_loop), httpx.AsyncClient]
+        # Loop-aware client connection pool: dict[id(event_loop), httpx2.AsyncClient]
         # This prevents cross-loop contamination when the transport is used as both a
         # server (in a background thread) and a client (in the main thread).
-        self._clients: dict[int, httpx.AsyncClient] = {}
+        self._clients: dict[int, httpx2.AsyncClient] = {}
 
         # Select backend implementation.
         if backend.lower() == "fastapi":
@@ -207,28 +207,28 @@ class HTTPTransport(Transport):
                 self._metrics.add(bytes_sent=request_size)
                 response = await client.request(request_spec.method, url, timeout=self._timeout, **kwargs)
                 response.raise_for_status()
-            except httpx.TimeoutException as exc:
+            except httpx2.TimeoutException as exc:
                 raise TransportTimeoutError(
                     f"HTTP request to {base_url} timed out",
                     url=url,
                     request_id=attempt.request_id,
                     retryable=True,
                 ) from exc
-            except httpx.ConnectError as exc:
+            except httpx2.ConnectError as exc:
                 raise TransportConnectionError(
                     f"Failed to connect to agent at {base_url}. Make sure the agent is running and accessible.",
                     url=url,
                     request_id=attempt.request_id,
                     retryable=True,
                 ) from exc
-            except httpx.RemoteProtocolError as exc:
+            except httpx2.RemoteProtocolError as exc:
                 raise TransportProtocolError(
                     f"Protocol error when communicating with agent at {base_url}",
                     url=url,
                     request_id=attempt.request_id,
                     retryable=True,
                 ) from exc
-            except httpx.HTTPStatusError as exc:
+            except httpx2.HTTPStatusError as exc:
                 status = exc.response.status_code
                 raise TransportRemoteError(
                     f"Agent at {base_url} returned HTTP {status}: {exc.response.text}",
@@ -260,8 +260,8 @@ class HTTPTransport(Transport):
         async with self.request_slot():
             return await self.run_with_retries(request_spec, context, operation)
 
-    async def _ensure_client(self) -> httpx.AsyncClient:
-        """Return an initialized :class:`httpx.AsyncClient` instance for the current loop.
+    async def _ensure_client(self) -> httpx2.AsyncClient:
+        """Return an initialized :class:`httpx2.AsyncClient` instance for the current loop.
 
         Dynamically isolates and caches connection pools keyed by the ID of the currently
         running ``asyncio`` event loop. This ensures that concurrent requests made from
@@ -280,16 +280,16 @@ class HTTPTransport(Transport):
             )
         return client
 
-    def _create_client(self) -> httpx.AsyncClient:
+    def _create_client(self) -> httpx2.AsyncClient:
         """Create an HTTP client using configured TLS trust and identity."""
-        limits = httpx.Limits(
+        limits = httpx2.Limits(
             max_connections=self.config.limits.max_concurrent_requests,
             max_keepalive_connections=self.config.limits.max_concurrent_requests,
             keepalive_expiry=self.config.keepalive_interval,
         )
         if self.tls is None:
-            return httpx.AsyncClient(timeout=self._timeout, limits=limits)
-        return httpx.AsyncClient(timeout=self._timeout, limits=limits, verify=self.tls.create_client_context())
+            return httpx2.AsyncClient(timeout=self._timeout, limits=limits)
+        return httpx2.AsyncClient(timeout=self._timeout, limits=limits, verify=self.tls.create_client_context())
 
     # ------------------------------------------------------------------
     # Server Routing
@@ -312,7 +312,7 @@ class HTTPTransport(Transport):
         """Boot the background ASGI server and eagerly prime the loop-isolated client pool.
 
         This method initializes the dual-role nature of the transport. It first kicks off the configured ASGI server
-        (e.g., Uvicorn) to handle inbound traffic. Immediately following, it provisions an ``httpx.AsyncClient``
+        (e.g., Uvicorn) to handle inbound traffic. Immediately following, it provisions an ``httpx2.AsyncClient``
         dedicated to the caller's current event loop.
 
         **Technical Note on Eager Provisioning:**
@@ -341,7 +341,7 @@ class HTTPTransport(Transport):
         **Technical Note on Loop Isolation:**
         In Protolink's multi-threaded architecture, a single ``HTTPTransport`` instance is frequently shared across
         multiple ``asyncio`` event loops (e.g., a background server thread and the main execution thread).
-        Because ``asyncio`` primitives, including the sockets and selectors within ``httpx.AsyncClient``, are strictly
+        Because ``asyncio`` primitives, including the sockets and selectors within ``httpx2.AsyncClient``, are strictly
         bound to the loop that instantiated them, attempting to close a client from a different loop triggers
         a ``RuntimeError`` ("Event loop is closed" or "Future attached to a different loop").
 

@@ -296,12 +296,14 @@ def provider_sdk(request, monkeypatch):
     }
     sdk = pytest.importorskip(modules[provider])
     if provider == "huggingface":
-        http = pytest.importorskip("httpx2" if int(sdk.__version__.split(".")[0]) >= 2 else "httpx")
+        http_utils = importlib.import_module("huggingface_hub.utils._http")
+        http = next(
+            value for value in vars(http_utils).values() if getattr(value, "__name__", None) in {"httpx", "httpx2"}
+        )
     elif provider == "gemini":
         import httpx as http
     else:
-        package = "httpx" if sdk.__version__.split(".")[0] in {"0", "2"} else "httpx2"
-        http = pytest.importorskip(package)
+        http = _sdk_http_module(sdk.DefaultHttpxClient)
     endpoint = ProviderEndpoint(provider, http)
     client = http.Client(transport=http.MockTransport(endpoint))
     adapter = {
@@ -347,6 +349,28 @@ def provider_sdk(request, monkeypatch):
         if provider != "huggingface":
             stack.callback(llm._client.close)
         yield SimpleNamespace(name=provider, sdk=sdk, llm=llm, endpoint=endpoint)
+
+
+def _sdk_http_module(client_type):
+    """Match the installed SDK's real transport instead of guessing from its version."""
+    package = next(
+        cls.__module__.partition(".")[0]
+        for cls in client_type.__mro__
+        if cls.__module__.partition(".")[0] in {"httpx", "httpx2"}
+    )
+    return pytest.importorskip(package)
+
+
+@pytest.mark.parametrize("sdk_name", ["openai", "anthropic"])
+@pytest.mark.parametrize("version", ["0.109.2", "1.14.0", "2.3.0", "3.37.0"])
+def test_sdk_http_client_matches_transport_regardless_of_sdk_version(monkeypatch, sdk_name, version):
+    sdk = pytest.importorskip(sdk_name)
+    monkeypatch.setattr(sdk, "__version__", version)
+    http = _sdk_http_module(sdk.DefaultHttpxClient)
+    client_type = sdk.OpenAI if sdk_name == "openai" else sdk.Anthropic
+    with http.Client(transport=http.MockTransport(lambda request: http.Response(200, json={}))) as http_client:
+        with client_type(api_key="offline-test", http_client=http_client) as client:
+            assert client.is_closed() is False
 
 
 @pytest.mark.asyncio

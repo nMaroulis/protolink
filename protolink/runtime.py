@@ -12,6 +12,7 @@ from protolink.agents.subagents import SubagentHandle
 from protolink.client import AgentClient
 from protolink.core.cancellation import TaskNotCancelableError, TaskNotFoundError, mark_task_canceled
 from protolink.core.events import RunEvent, TaskStatusUpdateEvent
+from protolink.core.evidence import ToolEvidence, _ToolEvidenceCollector
 from protolink.core.execution import closing_stream
 from protolink.core.handoff import RunHandoff
 from protolink.core.invocation import response_content
@@ -37,6 +38,11 @@ class RunResult:
     output: Any
     report: RunReport
     error: dict[str, Any] | None = None
+
+    @property
+    def tool_evidence(self) -> tuple[ToolEvidence, ...]:
+        """Return the report's terminal tool observations, including delegated tools."""
+        return self.report.tool_evidence
 
     @property
     def handoff(self) -> RunHandoff | None:
@@ -206,6 +212,20 @@ class RunHandle:
     async def result(self) -> RunResult:
         """Await the normalized result without propagating waiter cancellation to the run."""
         return await asyncio.shield(self._worker)
+
+    async def tool_evidence(self) -> AsyncIterator[ToolEvidence]:
+        """Yield each terminal tool observation once, from history then live events.
+
+        Multiple subscribers share the original execution. Rejected, failed
+        and canceled actions remain distinct from completed effects. Results
+        respect the owning Agent's ``expose_tool_results`` privacy setting.
+        Leaving the iterator does not cancel the run.
+        """
+        collector = _ToolEvidenceCollector()
+        async for event in self.events():
+            evidence = collector.add(event)
+            if evidence is not None:
+                yield evidence
 
     async def spawn(self, agent: str, prompt: str) -> SubagentHandle:
         """Start an owned local specialist while this live parent is running.

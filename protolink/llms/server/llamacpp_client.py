@@ -82,13 +82,6 @@ class LlamaCPPServerLLM(ServerLLM):
 
         self._host = parsed.hostname
         self._port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        self._client: http.client.HTTPConnection | None = None
-
-        try:
-            self._client = http.client.HTTPConnection(self._host, self._port, timeout=self._CHAT_TIMEOUT)
-        except Exception as e:
-            logger.exception(f"LLM Client initilization failed :: Llama.cpp connection failed: {e}")
-
         _ = self.validate_connection()
 
     # ----------------------------------------------------------------------
@@ -97,9 +90,6 @@ class LlamaCPPServerLLM(ServerLLM):
 
     def call(self, history: ConversationHistory) -> str:
         """Generate a single non-streaming response from `llama-server`."""
-        if self._client is None:
-            raise ValueError("Llama.cpp client not connected")
-
         payload = {
             "model": self.model,
             "messages": history.messages,
@@ -107,19 +97,7 @@ class LlamaCPPServerLLM(ServerLLM):
             **self._model_params,
         }
 
-        self._client.request(
-            method="POST",
-            url="/v1/chat/completions",
-            body=json.dumps(payload),
-            headers=self.headers,
-        )
-
-        response = self._client.getresponse()
-        data = response.read().decode("utf-8")
-
-        self._client.close()
-
-        result = json.loads(data)
+        result = self._post_chat(payload)
         if "choices" in result and len(result["choices"]) > 0:
             return result["choices"][0]["message"]["content"]
         raise RuntimeError(f"Unexpected response from llama-server: {result}")
@@ -129,7 +107,7 @@ class LlamaCPPServerLLM(ServerLLM):
 
         Uses request-scoped async HTTP; completion, cancellation and explicit
         iterator closure release the connection. JSON-action mode yields raw
-        JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
+        JSON fragments. Requires ``httpx2`` (included in ``protolink[llms]``).
         """
         payload = {
             "model": self.model,
@@ -172,9 +150,6 @@ class LlamaCPPServerLLM(ServerLLM):
                 agent_callback_available=agent_callback_available,
                 agent_cards=agent_cards,
             )
-        if self._client is None:
-            raise ValueError("Llama.cpp client not connected")
-
         tool_specs = chat_completion_tools(
             tools,
             include_agent_tools=should_include_agent_tools(
@@ -191,16 +166,7 @@ class LlamaCPPServerLLM(ServerLLM):
         if tool_specs:
             payload["tools"] = tool_specs
             payload["tool_choice"] = "auto"
-        self._client.request(
-            method="POST",
-            url="/v1/chat/completions",
-            body=json.dumps(payload),
-            headers=self.headers,
-        )
-        response = self._client.getresponse()
-        data = response.read().decode("utf-8")
-        self._client.close()
-        return self._action_from_chat_result(json.loads(data))
+        return self._action_from_chat_result(self._post_chat(payload))
 
     async def call_action_stream(
         self,
@@ -280,14 +246,32 @@ class LlamaCPPServerLLM(ServerLLM):
     # Utils
     # ----------------------------------------------------------------------
 
+    def _new_connection(self, *, timeout: float | None = None) -> http.client.HTTPConnection:
+        """Create a request-owned connection safe for concurrent worker calls."""
+        parsed = urlparse(self.base_url)
+        connection_type = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        return connection_type(self._host, self._port, timeout=self._CHAT_TIMEOUT if timeout is None else timeout)
+
+    def _post_chat(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Read one completion using a connection closed on every exit path."""
+        connection = self._new_connection()
+        try:
+            connection.request(
+                method="POST", url="/v1/chat/completions", body=json.dumps(payload), headers=self.headers
+            )
+            response = connection.getresponse()
+            data = response.read().decode("utf-8")
+        finally:
+            connection.close()
+        return json.loads(data)
+
     def validate_connection(self) -> bool:
         """Validate llama-server connectivity."""
+        connection: http.client.HTTPConnection | None = None
         try:
-            conn = http.client.HTTPConnection(self._host, self._port, timeout=self.REQUEST_TIMEOUT)
-            conn.request("GET", "/health")
-
-            response = conn.getresponse()
-            conn.close()
+            connection = self._new_connection(timeout=self.REQUEST_TIMEOUT)
+            connection.request("GET", "/health")
+            response = connection.getresponse()
 
             if response.status != 200:
                 logger.error(f"Llama.cpp Server unhealthy (HTTP {response.status})")
@@ -304,6 +288,9 @@ class LlamaCPPServerLLM(ServerLLM):
         except Exception as e:
             logger.exception(f"{e}")
             return False
+        finally:
+            if connection is not None:
+                connection.close()
 
     def _action_from_chat_result(self, payload: dict[str, Any]) -> LLMActionResult:
         """Normalize a llama.cpp chat-completion payload into one action."""

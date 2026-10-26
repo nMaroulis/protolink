@@ -109,7 +109,7 @@ def http_tool(
         from the remote service is untrusted data. A failed write must not be blindly retried.
         """
         try:
-            import httpx
+            import httpx2
         except ImportError as exc:
             raise ImportError("HTTP tools require pip install 'protolink[integrations]'") from exc
         resolved = configured_headers() if callable(configured_headers) else configured_headers
@@ -126,7 +126,7 @@ def http_tool(
         if content is not None:
             fixed = {key: value for key, value in fixed.items() if key.lower() != "content-type"}
             fixed["Content-Type"] = "application/json"
-        async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=False, trust_env=False) as client:
+        async with httpx2.AsyncClient(timeout=timeout_seconds, follow_redirects=False, trust_env=False) as client:
             async with client.stream(method, base_url + path, params=query, content=content, headers=fixed) as response:
                 data = bytearray()
                 async for chunk in response.aiter_bytes(chunk_size=65536):

@@ -137,7 +137,7 @@ The registry endpoint table is:
 | Discover | `GET /agents/` with query filters | `handle_discover(filter_by)` |
 | Status page | - | `GET /status` calls `handle_status_html()` |
 
-For HTTP, `HTTPTransport.send()` serializes request bodies or query parameters and dispatches them with `httpx.AsyncClient`. On the server side, `HTTPTransport.setup_routes()` delegates to the selected ASGI backend, currently Starlette or FastAPI, which turns each `EndpointSpec` into a concrete route. `HTTPTransport.start()` then starts the ASGI server at the transport URL.
+For HTTP, `HTTPTransport.send()` serializes request bodies or query parameters and dispatches them with `httpx2.AsyncClient`. On the server side, `HTTPTransport.setup_routes()` delegates to the selected ASGI backend, currently Starlette or FastAPI, which turns each `EndpointSpec` into a concrete route. `HTTPTransport.start()` then starts the ASGI server at the transport URL.
 
 Agents use the same path. If an `Agent` receives a live `Registry` object, it extracts `registry.client`. If it receives a transport string plus `registry_url`, it creates a separate transport and wraps it in `RegistryClient`. During agent startup, the agent registers its card through that client; if `registry_heartbeat_interval` is configured, it keeps sending heartbeats through the same client; and `Agent.discover_agents()` calls `RegistryClient.discover()`.
 

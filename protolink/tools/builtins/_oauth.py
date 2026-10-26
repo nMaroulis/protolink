@@ -40,10 +40,10 @@ class OAuthJSONAPI:
     ) -> dict[str, Any]:
         """Perform one request, bounded to 2 MiB, without redirects or retries."""
         try:
-            import httpx
+            import httpx2
         except ImportError as exc:
             raise ImportError(
-                f"{self._provider} integrations require httpx: pip install 'protolink[integrations]'"
+                f"{self._provider} integrations require httpx2: pip install 'protolink[integrations]'"
             ) from exc
         token = self._token() if callable(self._token) else self._token
         if inspect.isawaitable(token):
@@ -51,7 +51,7 @@ class OAuthJSONAPI:
         if not isinstance(token, str) or not token.strip() or any(c in token for c in "\r\n\x00"):
             raise ValueError("token callback must return a nonempty OAuth access token without control characters")
         request_headers = {**(headers or {}), "Authorization": f"Bearer {token}", "Accept": "application/json"}
-        async with httpx.AsyncClient(timeout=30, follow_redirects=False, trust_env=False) as client:
+        async with httpx2.AsyncClient(timeout=30, follow_redirects=False, trust_env=False) as client:
             async with client.stream(
                 method,
                 self._base_url + path,

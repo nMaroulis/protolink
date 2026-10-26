@@ -1,10 +1,10 @@
 """Inventory is private/read-only; controls reconnect an explicit application."""
 
+import asyncio
 import json
 import threading
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
+import httpx2
 import pytest
 
 from protolink import (
@@ -102,6 +102,17 @@ async def test_dashboard_continuation_and_origin_protection(tmp_path, monkeypatc
         await agent.invoke("choose")
     pause = raised.value
     manager = RunManager(make_agent(path, ["done"]))
+    application_loop = asyncio.get_running_loop()
+
+    async def application_answer():
+        """Represent a service on the embedding application's running loop."""
+        await asyncio.sleep(0)
+        return "done"
+
+    def respond(_history, _prompt):
+        return asyncio.run_coroutine_threadsafe(application_answer(), application_loop).result(timeout=5)
+
+    manager.agents["managed"].llm.response_callback = respond
     created, ready = [], threading.Event()
     original = module.ThreadingHTTPServer
 
@@ -117,40 +128,36 @@ async def test_dashboard_continuation_and_origin_protection(tmp_path, monkeypatc
     monkeypatch.setattr(module, "ThreadingHTTPServer", CapturingServer)
     thread = threading.Thread(target=module.serve_dashboard, kwargs={"port": 0, "run_manager": manager}, daemon=True)
     thread.start()
-    assert ready.wait(3)
+    assert await asyncio.to_thread(ready.wait, 3)
     server = created[0]
     base = f"http://127.0.0.1:{server.server_port}"
     try:
-        with urlopen(base + "/api/snapshot", timeout=3) as response:
-            assert json.load(response)["durable"]["runs"][0]["status"] == "input-required"
-        url = base + f"/api/durable/{pause.run_id}/resume"
-        body = json.dumps(
-            {
+        # Blocking urlopen here starves the application's loop while the
+        # dashboard resumes work in another thread. Keep the test asynchronous
+        # and allow enough request time for loaded CI runners.
+        async with httpx2.AsyncClient(base_url=base, timeout=10, trust_env=False) as client:
+            response = await client.get("/api/snapshot")
+            response.raise_for_status()
+            assert response.json()["durable"]["runs"][0]["status"] == "input-required"
+            url = f"/api/durable/{pause.run_id}/resume"
+            body = {
                 "request_id": pause.interruption.request_id,
                 "fingerprint": pause.interruption.fingerprint,
                 "answer": "CSV",
             }
-        ).encode()
-        with pytest.raises(HTTPError) as denied:
-            urlopen(
-                Request(
-                    url, data=body, headers={"Content-Type": "application/json", "Origin": "https://outside.invalid"}
-                ),
-                timeout=3,
+            denied = await client.post(url, json=body, headers={"Origin": "https://outside.invalid"})
+            assert denied.status_code == 403
+            cancel_url = f"/api/durable/{pause.run_id}/cancel"
+            malformed = await client.post(
+                cancel_url, content=b"{broken", headers={"Content-Type": "application/json", "Origin": base}
             )
-        assert denied.value.code == 403
-        cancel_url = base + f"/api/durable/{pause.run_id}/cancel"
-        with pytest.raises(HTTPError) as malformed:
-            urlopen(
-                Request(cancel_url, data=b"{broken", headers={"Content-Type": "application/json", "Origin": base}),
-                timeout=3,
-            )
-        assert malformed.value.code == 422
-        assert manager.inspect(pause.run_id)["status"] == "input-required"
-        with urlopen(
-            Request(url, data=body, headers={"Content-Type": "application/json", "Origin": base}), timeout=3
-        ) as response:
-            assert json.load(response)["run"]["status"] == "completed"
+            assert malformed.status_code == 422
+            assert manager.inspect(pause.run_id)["status"] == "input-required"
+            response = await client.post(url, json=body, headers={"Origin": base})
+            response.raise_for_status()
+            result = response.json()
+            assert result["run"]["status"] == "completed"
+            assert Task.from_dict(result["task"]).get_output() == "done"
     finally:
-        server.shutdown()
-        thread.join(timeout=3)
+        await asyncio.to_thread(server.shutdown)
+        await asyncio.to_thread(thread.join, 3)

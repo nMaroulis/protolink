@@ -2,7 +2,7 @@ import json
 from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
+import httpx2
 import pytest
 
 from protolink.llms.actions import FinalAction, ToolCallAction
@@ -26,9 +26,9 @@ class _FakeAsyncResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            request = httpx.Request("POST", "https://api.x.ai/v1/chat/completions")
-            response = httpx.Response(self.status_code, request=request)
-            raise httpx.HTTPStatusError("HTTP error", request=request, response=response)
+            request = httpx2.Request("POST", "https://api.x.ai/v1/chat/completions")
+            response = httpx2.Response(self.status_code, request=request)
+            raise httpx2.HTTPStatusError("HTTP error", request=request, response=response)
 
     async def aiter_lines(self):
         for line in self.lines:
@@ -237,9 +237,9 @@ def test_grok_call_raises_on_http_error():
     llm = _make_grok_llm()
 
     mock_response = MagicMock()
-    request = httpx.Request("POST", "https://api.x.ai/v1/chat/completions")
-    response = httpx.Response(401, request=request)
-    mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+    request = httpx2.Request("POST", "https://api.x.ai/v1/chat/completions")
+    response = httpx2.Response(401, request=request)
+    mock_response.raise_for_status.side_effect = httpx2.HTTPStatusError(
         "Unauthorized", request=request, response=response
     )
     llm._client.post.return_value = mock_response
@@ -247,7 +247,7 @@ def test_grok_call_raises_on_http_error():
     history = ConversationHistory()
     history.add_user("Test error")
 
-    with pytest.raises(httpx.HTTPStatusError, match="Unauthorized"):
+    with pytest.raises(httpx2.HTTPStatusError, match="Unauthorized"):
         llm.call(history)
 
 
@@ -261,7 +261,7 @@ async def test_grok_call_stream_raises_on_http_error():
     history = ConversationHistory()
     history.add_user("Test stream error")
 
-    with pytest.raises(httpx.HTTPStatusError, match="HTTP error"):
+    with pytest.raises(httpx2.HTTPStatusError, match="HTTP error"):
         async for _ in llm.call_stream(history):
             pass
 
@@ -406,7 +406,7 @@ def test_grok_validate_connection():
     )
 
     # Failure case
-    llm._client.get.side_effect = httpx.ConnectError("Connection refused")
+    llm._client.get.side_effect = httpx2.ConnectError("Connection refused")
     assert llm.validate_connection() is False
 
 

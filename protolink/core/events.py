@@ -38,10 +38,12 @@ _RUNTIME_LLM_EVENT_TYPE_MAP = {
     "tool_result": "action.completed",
     "tool_error": "action.failed",
     "tool_rejected": "action.rejected",
+    "tool_canceled": "action.canceled",
     "agent_call_start": "action.started",
     "agent_call_result": "action.completed",
     "agent_call_error": "action.failed",
     "agent_call_rejected": "action.rejected",
+    "agent_call_canceled": "action.canceled",
 }
 """Stable run-event types promoted from inference runtime activity."""
 
@@ -201,6 +203,7 @@ class RunEvent:
             payload=payload,
             final=bool(payload.get("final", False)),
             metadata={"source_type": source_type},
+            timestamp=str(payload.get("timestamp") or utc_now()),
         )
 
 
@@ -333,6 +336,7 @@ def _severity_for_payload(source_type: str, payload: dict[str, Any]) -> str:
         "llm_retry",
         "tool_rejected",
         "agent_call_rejected",
+        "agent_call_canceled",
     }:
         return "warning"
     return "info"

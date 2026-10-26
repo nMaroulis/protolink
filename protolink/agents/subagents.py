@@ -16,6 +16,7 @@ from protolink.core.delegation import DelegationRecorder
 from protolink.core.durable import DurableExecutionError, RunInterruption, _SuspendRun, current_durable_run
 from protolink.core.execution import execution_scope, shared_budget_scope
 from protolink.core.policy import inherited_policy_scope
+from protolink.core.request_context import _inherited_request_context
 from protolink.core.run_context import RunContext
 from protolink.core.task import Task, TaskState
 from protolink.core.tool_errors import ToolRejectedError
@@ -179,6 +180,7 @@ class SubagentSupervisor:
                     self.root.running += 1
                     try:
                         with (
+                            _inherited_request_context(),
                             execution_scope(task, recorder),
                             shared_budget_scope(self.budget),
                             inherited_policy_scope(self.agent.action_authorizer.policy),

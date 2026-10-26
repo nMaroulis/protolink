@@ -10,6 +10,7 @@ python examples/subagents.py
 python examples/durable_execution.py
 python examples/harness_controls.py
 python examples/worker_execution.py
+python examples/application_runtime.py
 ```
 
 These scripts need no API keys or external services. The notebook and larger projects below include their own setup instructions for optional transports and model providers.
@@ -64,6 +65,14 @@ with the optional `protolink[mcp]` extra. See the [guide](progressive-control.md
 ## Example Scripts
 
 The repository includes several **standalone example scripts** that demonstrate specific Protolink capabilities:
+
+### FastAPI application runtime
+
+[`application_runtime.py`](https://github.com/nMaroulis/protolink/blob/main/examples/application_runtime.py)
+embeds two specialists and a coordinator with native registry discovery, local delegation, threaded tools,
+private request context, per-request model factories, streamed events and tool evidence. It persists sessions
+with SQLite and owns startup/readiness/shutdown through `AgentGroup`. Its offline ASGI demonstration uses no paid
+provider or listening socket; the same factory can be served with Uvicorn. See the [application guide](application-runtime.md).
 
 ### Bounded worker execution
 

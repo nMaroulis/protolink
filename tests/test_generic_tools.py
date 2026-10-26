@@ -3,7 +3,7 @@
 import asyncio
 import json
 
-import httpx
+import httpx2
 import pytest
 
 from protolink import (
@@ -166,7 +166,7 @@ async def test_storage_limits_and_policy_prevent_mutation():
 
 @pytest.fixture
 def transport(monkeypatch):
-    original = httpx.AsyncClient
+    original = httpx2.AsyncClient
     requests, responses, clients = [], [], []
 
     async def respond(request):
@@ -176,11 +176,11 @@ def transport(monkeypatch):
 
     def client(**kwargs):
         assert kwargs["follow_redirects"] is False and kwargs["trust_env"] is False
-        value = original(transport=httpx.MockTransport(respond), **kwargs)
+        value = original(transport=httpx2.MockTransport(respond), **kwargs)
         clients.append(value)
         return value
 
-    monkeypatch.setattr(httpx, "AsyncClient", client)
+    monkeypatch.setattr(httpx2, "AsyncClient", client)
     yield requests, responses
     assert all(client.is_closed for client in clients)
 
@@ -205,8 +205,8 @@ async def test_http_contract_refresh_and_dynamic_policy(transport):
     )
     responses.extend(
         [
-            httpx.Response(200, json={"items": []}, headers={"Set-Cookie": "private-cookie"}),
-            httpx.Response(201, json={"id": 1}),
+            httpx2.Response(200, json={"items": []}, headers={"Set-Cookie": "private-cookie"}),
+            httpx2.Response(201, json={"id": 1}),
         ]
     )
     first = await a.call_tool("api", path="/items", query={"q": "a&b"})
@@ -253,7 +253,7 @@ async def test_http_method_body_and_byte_limits(transport):
     with pytest.raises(ValueError, match="GET/HEAD"):
         await a.call_tool("http_request", body={"x": 1})
     assert requests == []
-    responses.append(httpx.Response(200, content=b"x" * 11))
+    responses.append(httpx2.Response(200, content=b"x" * 11))
     with pytest.raises(ValueError, match="max_response_bytes"):
         await a.call_tool("http_request")
     a = agent(http_tool("https://api.example.com", allowed_methods=["POST"], max_request_bytes=4))
@@ -267,9 +267,9 @@ async def test_http_statuses_binary_and_no_redirect_or_retry(transport):
     requests, responses = transport
     responses.extend(
         [
-            httpx.Response(302, headers={"Location": "https://evil.example"}),
-            httpx.Response(429, json={"error": "quota"}),
-            httpx.Response(200, content=b"\x00\xff"),
+            httpx2.Response(302, headers={"Location": "https://evil.example"}),
+            httpx2.Response(429, json={"error": "quota"}),
+            httpx2.Response(200, content=b"\x00\xff"),
         ]
     )
     a = agent(http_tool("https://api.example.com"))
