@@ -22,6 +22,7 @@ from protolink.core.execution import closing_stream, isolate_event_sink
 from protolink.core.invocation import prepare_task, response_content
 from protolink.core.policy import ActionAuthorization, CapabilityPolicy
 from protolink.core.run_context import RunBudget, RunContext
+from protolink.core.workers import SyncExecution, sync_execution_scope
 from protolink.discovery.registry import Registry
 from protolink.llms.base import LLM
 from protolink.llms.compaction import HistoryCompactionRequest, HistoryCompactionResult, HistoryCompactionStrategy
@@ -150,22 +151,27 @@ class AgentLifecycleMixin(_AgentMixinBase):
             return
         self._stopped = True
 
-        if self._registry_heartbeat_task and not self._registry_heartbeat_task.done():
-            self._registry_heartbeat_task.cancel()
-            await asyncio.gather(self._registry_heartbeat_task, return_exceptions=True)
-        self._registry_heartbeat_task = None
+        try:
+            if self._registry_heartbeat_task and not self._registry_heartbeat_task.done():
+                self._registry_heartbeat_task.cancel()
+                await asyncio.gather(self._registry_heartbeat_task, return_exceptions=True)
+            self._registry_heartbeat_task = None
 
-        # 1. Unregister from registry first (while transport is still alive)
-        if self.registry_client:
-            try:
-                # We use a short timeout for unregistration during shutdown
-                await asyncio.wait_for(self.registry_client.unregister(self.card.url), timeout=2.0)
-            except Exception as e:
-                self._logger.debug(f"Failed to unregister from registry during shutdown: {e}")
+            # 1. Unregister from registry first (while transport is still alive)
+            if self.registry_client:
+                try:
+                    # We use a short timeout for unregistration during shutdown
+                    await asyncio.wait_for(self.registry_client.unregister(self.card.url), timeout=2.0)
+                except Exception as e:
+                    self._logger.debug(f"Failed to unregister from registry during shutdown: {e}")
 
-        # 2. Stop server and transport
-        if self._server:
-            await self._server.stop()
+            # 2. Stop server and transport
+            if self._server:
+                await self._server.stop()
+        finally:
+            # Python threads cannot be terminated. Stop admitting work without
+            # blocking shutdown on calls whose canceled awaiters already left.
+            self._sync_workers.close()
 
     def start(
         self,
@@ -937,7 +943,7 @@ class AgentCommunicationMixin(_AgentMixinBase):
         """
         if not self.knowledge:
             raise RuntimeError("Agent.ask requires at least one attached knowledge source")
-        if self.llm is None:
+        if self.llm is None and self.llm_factory is None:
             raise RuntimeError("Agent.ask requires an LLM to generate an answer")
         if not isinstance(question, str) or not question.strip():
             raise ValueError("question cannot be empty")
@@ -1246,6 +1252,7 @@ class AgentToolMixin(_AgentMixinBase):
         examples: list[Any] | None = None,
         capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
         action_builder: ActionBuilder | None = None,
+        sync_execution: SyncExecution | None = None,
     ) -> Callable[[ToolCallableT], ToolCallableT]: ...
 
     def tool(
@@ -1258,6 +1265,7 @@ class AgentToolMixin(_AgentMixinBase):
         examples: list[Any] | None = None,
         capabilities: list[str] | tuple[str, ...] | set[str] | None = None,
         action_builder: ActionBuilder | None = None,
+        sync_execution: SyncExecution | None = None,
     ) -> ToolCallableT | Callable[[ToolCallableT], ToolCallableT]:
         """Register a function as a tool while preserving the original callable.
 
@@ -1276,6 +1284,8 @@ class AgentToolMixin(_AgentMixinBase):
             capabilities: Permission capabilities required before execution.
             action_builder: Optional callable that enriches the prepared ``RunAction`` with metadata or preview
                 artifacts.
+            sync_execution: Override the agent's synchronous tool default with
+                ``"thread"`` or ``"inline"``. Async callables always run directly.
 
         Returns:
             The unchanged function for bare decoration, or a decorator that
@@ -1295,6 +1305,7 @@ class AgentToolMixin(_AgentMixinBase):
                     examples=examples,
                     capabilities=capabilities,
                     action_builder=action_builder,
+                    sync_execution=sync_execution,
                 )
             )
             return func
@@ -1398,7 +1409,8 @@ class AgentToolMixin(_AgentMixinBase):
             raise BudgetExceededError(decision)
         task = current_task()
         token = self.get_cancellation_token(task.id) if task else None
-        return await execute_authorized_tool(tool, ToolExecution(authorization, context, budget, token))
+        with sync_execution_scope(self.sync_execution, self._sync_workers):
+            return await execute_authorized_tool(tool, ToolExecution(authorization, context, budget, token))
 
     async def authorize_action(
         self,
@@ -1683,8 +1695,10 @@ class AgentConfigurationMixin(_AgentMixinBase):
 
     @property
     def llm(self) -> LLM | None:
-        """The agent's language model instance."""
-        return self._llm
+        """Return the request's resolved model, or the configured default model."""
+        active = getattr(self, "_active_llm", None)
+        binding = active.get() if active is not None else None
+        return binding[1] if binding is not None else self._llm
 
     @llm.setter
     def llm(self, llm: LLM | str | None) -> None:
@@ -1714,7 +1728,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
         declared = self._inference_support_override
         if declared is not None:
             support = declared
-        elif self._llm is not None:
+        elif self._llm is not None or self.llm_factory is not None:
             support = True
         elif self._default_inference_support is not None:
             support = self._default_inference_support
@@ -1790,7 +1804,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
             HTML string with the chat interface
         """
 
-        if not self.llm:
+        if self.llm is None and self.llm_factory is None:
             return "<html><body><h1>Chat not available</h1><p>This agent has no LLM configured.</p></body></html>"
 
         if not self._expose_chat:
@@ -1820,7 +1834,7 @@ class AgentConfigurationMixin(_AgentMixinBase):
 
         if not message:
             return {"error": "Empty message"}
-        if not self.llm:
+        if self.llm is None and self.llm_factory is None:
             return {"error": "Agent has no LLM configured"}
         if not self._expose_chat:
             return {"error": "Agent does not expose a chat endpoint"}
@@ -1923,6 +1937,9 @@ class AgentSerializationMixin(_AgentMixinBase):
             "examples": getattr(tool, "examples", None),
             "capabilities": list(getattr(tool, "capabilities", None) or ()),
         }
+        sync_execution = getattr(tool, "sync_execution", None)
+        if sync_execution is not None:
+            tool_dict["sync_execution"] = sync_execution
         from protolink.agents.worker_tools import WorkerTool
 
         if isinstance(tool, WorkerTool):
@@ -2050,6 +2067,7 @@ class AgentSerializationMixin(_AgentMixinBase):
                 tags=tool_dict.get("tags"),
                 examples=tool_dict.get("examples"),
                 capabilities=tool_dict.get("capabilities"),
+                sync_execution=tool_dict.get("sync_execution"),
                 func=func,
             )
 
@@ -2123,6 +2141,12 @@ class AgentSerializationMixin(_AgentMixinBase):
             "credentials": self.credentials,
             "a2a": self._a2a_enabled,
         }
+        if self.sync_execution != "inline":
+            data["sync_execution"] = self.sync_execution
+        if self._sync_workers.max_workers != 4:
+            data["max_sync_workers"] = self._sync_workers.max_workers
+        if self.expose_tool_results:
+            data["expose_tool_results"] = True
         # This is application configuration, unlike card.to_dict() discovery
         # metadata. Preserve None so restoring an automatically derived card does
         # not turn its current inference support into a permanent override.
@@ -2148,6 +2172,8 @@ class AgentSerializationMixin(_AgentMixinBase):
             data["context_policy"] = self.context_policy.to_dict()
         if self.hooks:
             data["hooks"] = {"reconnect_required": True}
+        if self.llm_factory is not None:
+            data["llm_factory"] = {"reconnect_required": True}
 
         policy = self.action_authorizer.policy
         if type(policy) is CapabilityPolicy:
@@ -2168,21 +2194,24 @@ class AgentSerializationMixin(_AgentMixinBase):
             data["registry"] = self._serialize_transport(self.registry_client.transport)
 
         # LLM
-        if self.llm:
+        # A factory's active provider is private request state, never agent
+        # configuration (even if to_dict is called by a running tool).
+        configured_llm = self._llm
+        if configured_llm:
             llm_config = {
-                "provider": self.llm.provider,
-                "model": self.llm.model,
-                "model_params": self.llm._model_params,
-                "reasoning": self.llm._reasoning,
+                "provider": configured_llm.provider,
+                "model": configured_llm.model,
+                "model_params": configured_llm._model_params,
+                "reasoning": configured_llm._reasoning,
             }
-            base_url = getattr(self.llm, "base_url", None)
+            base_url = getattr(configured_llm, "base_url", None)
             if base_url:
                 llm_config["base_url"] = base_url
-            if self.llm.tool_calling is not None:
-                llm_config["tool_calling"] = self.llm.tool_calling
-            llm_config["max_tool_corrections"] = self.llm.max_tool_corrections
-            if hasattr(self.llm, "_supports_tool_calling"):
-                llm_config["supports_tool_calling"] = self.llm._supports_tool_calling
+            if configured_llm.tool_calling is not None:
+                llm_config["tool_calling"] = configured_llm.tool_calling
+            llm_config["max_tool_corrections"] = configured_llm.max_tool_corrections
+            if hasattr(configured_llm, "_supports_tool_calling"):
+                llm_config["supports_tool_calling"] = configured_llm._supports_tool_calling
             data["llm"] = llm_config
 
         # Authenticator
@@ -2327,6 +2356,9 @@ class AgentSerializationMixin(_AgentMixinBase):
                     registry = registry_config.get("type")
 
         # LLM
+        llm_factory = overrides.get("llm_factory")
+        if data.get("llm_factory") and llm_factory is None and overrides.get("llm") is None:
+            raise ValueError("Reconnect model factories with from_dict(..., llm_factory=...)")
         llm = overrides.get("llm")
         if llm is None:
             llm_config = data.get("llm")
@@ -2459,8 +2491,12 @@ class AgentSerializationMixin(_AgentMixinBase):
             durability=durability,
             context_policy=context_policy,
             hooks=overrides.get("hooks"),
+            llm_factory=llm_factory,
             execution_version=overrides.get("execution_version", data.get("execution_version", "1")),
             yield_after_steps=overrides.get("yield_after_steps", data.get("yield_after_steps")),
+            sync_execution=overrides.get("sync_execution", data.get("sync_execution", "inline")),
+            max_sync_workers=overrides.get("max_sync_workers", data.get("max_sync_workers", 4)),
+            expose_tool_results=overrides.get("expose_tool_results", data.get("expose_tool_results", False)),
         )
         descriptors = data.get("knowledge") or []
         if descriptors:

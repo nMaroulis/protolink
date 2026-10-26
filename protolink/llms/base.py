@@ -78,7 +78,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import replace
 from functools import wraps
@@ -172,7 +172,7 @@ def _tool_calling_scope(
 
     @wraps(method)
     async def scoped(self: LLM, *args: _P.args, **kwargs: _P.kwargs) -> _R:
-        with self.use_tool_calling():
+        async with self._use_tool_calling():
             return await method(self, *args, **kwargs)
 
     return scoped
@@ -278,16 +278,17 @@ def _coerce_run_context(value: RunContext | dict[str, Any] | None) -> RunContext
     return RunContext()
 
 
-def _history_safe_result(value: Any) -> Any:
+def _history_safe_result(value: Any, *, snapshot: bool = False) -> Any:
     """Return a provider-history-serializable action result.
 
     Valid JSON-compatible values retain their structure. Circular containers and unusual application objects fall back
     to a bounded representation so a completed external side effect can always be recorded before the loop reaches its
-    next cancellation or budget boundary.
+    next cancellation or budget boundary. ``snapshot`` detaches the serialized
+    JSON value for execution evidence before model-history transformations.
     """
     try:
-        json.dumps(value, default=json_history_default)
-        return value
+        serialized = json.dumps(value, default=json_history_default)
+        return json.loads(serialized) if snapshot else value
     except Exception:
         try:
             representation = repr(value)
@@ -627,6 +628,37 @@ class LLM(ABC):
         finally:
             active.reset(token)
 
+    @asynccontextmanager
+    async def _use_tool_calling(self):
+        """Resolve blocking capability metadata before pinning an async request.
+
+        An active or durable saved mode requires no discovery. Synchronous
+        callers retain ``use_tool_calling``; async inference and Agent prompts
+        use this scope so metadata requests cannot block the event loop.
+        """
+        from protolink.core.durable import current_durable_run
+        from protolink.core.workers import run_sync
+
+        active: ContextVar[Literal["native", "json"] | None] | None = getattr(self, "_active_tool_calling", None)
+        if active is None:
+            active = self._active_tool_calling = ContextVar(f"protolink_tool_calling_{id(self)}", default=None)
+        durable = current_durable_run() if self.tool_calling is not None else None
+        saved = durable.data.get("tool_calling_mode") if durable is not None else None
+        token = None
+        if (
+            self.tool_calling == "auto"
+            and self._native_tool_calling_available
+            and saved is None
+            and active.get() is None
+        ):
+            token = active.set(await run_sync(self.resolve_tool_calling))
+        try:
+            with self.use_tool_calling():
+                yield
+        finally:
+            if token is not None:
+                active.reset(token)
+
     def configure_metrics(
         self,
         profile: LLMModelProfile | dict[str, Any] | None = None,
@@ -881,6 +913,7 @@ class LLM(ABC):
         streaming: bool = False,
         event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
         event_metrics: bool | None = None,
+        expose_tool_results: bool = False,
         action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
         cancellation_token: CancellationToken | None = None,
         run_context: RunContext | dict[str, Any] | None = None,
@@ -979,6 +1012,12 @@ class LLM(ABC):
             direct-caller behavior. Agent sets this to false when its callback exists only for internal action
             receipts, avoiding token-estimation overhead on unobserved runs.
             Call metrics prefer provider token counts and estimate only missing fields.
+        expose_tool_results : bool, optional
+            Emit a detached JSON-compatible snapshot of the tool's actual return
+            in ``tool_result`` events, before hooks or context offloading change
+            the model's observation. Agent supplies its explicit public-result
+            setting. Defaults to the existing model-history observation; direct
+            LLM event callbacks remain responsible for protecting private data.
         action_authorizer : Callable[[RunAction], Awaitable[ActionAuthorization]], optional
             Runtime callback invoked after a model action has been validated but before a tool or delegated agent
             operation executes. The callback may enrich the action, enforce capability policy and obtain an
@@ -1212,6 +1251,30 @@ class LLM(ABC):
                 )
                 return True
 
+        async def emit_tool_result(
+            tool_name: str,
+            tool_args: dict[str, Any],
+            result: Any,
+            action_id: str | None,
+            *,
+            observation_fallback: bool | None = None,
+            observation_failed: bool = False,
+        ) -> None:
+            """Record execution success even if preparing model history fails."""
+            event = {
+                "type": "tool_result",
+                "step": steps,
+                "tool": tool_name,
+                "args": tool_args,
+                "result": result,
+                "action_id": action_id,
+            }
+            if observation_fallback is not None:
+                event["observation_fallback"] = observation_fallback
+            if observation_failed:
+                event["observation_failed"] = True
+            await emit(event)
+
         async def reject_tool_request(
             error: ToolRejectedError,
             *,
@@ -1225,6 +1288,8 @@ class LLM(ABC):
         ) -> None:
             """Deliver a no-change observation and charge one bounded correction."""
             nonlocal tool_corrections
+            if action_id is None and agent_name is None:
+                action_id = RunAction(kind="tool.call", name=tool_name, payload={"arguments": tool_args}).action_id
             tool_corrections += 1
             recoverable = tool_corrections <= max_tool_corrections
             rejection = error.to_dict()
@@ -1270,6 +1335,7 @@ class LLM(ABC):
                     **({"agent": agent_name, "action": agent_action} if agent_name is not None else {}),
                     "step": steps,
                     "tool": tool_name,
+                    "args": tool_args,
                     "action_id": action_id,
                     "message": error.message,
                     "rejection": rejection,
@@ -1805,12 +1871,28 @@ class LLM(ABC):
                     raise
                 except BudgetExceededError:
                     raise
+                except asyncio.CancelledError as exc:
+                    await emit(
+                        {
+                            "type": "tool_canceled",
+                            "step": steps,
+                            "tool": tool_name,
+                            "args": tool_args,
+                            "action_id": action_id,
+                            "message": str(exc) or "Tool execution canceled",
+                            "recoverable": False,
+                        }
+                    )
+                    raise
                 except Exception as e:
                     await emit(
                         {
                             "type": "tool_error",
                             "step": steps,
                             "tool": tool_name,
+                            "args": tool_args,
+                            "action_id": action_id,
+                            "error": {"code": type(e).__name__, "message": str(e)},
                             "message": str(e),
                             "recoverable": False,
                         }
@@ -1828,44 +1910,57 @@ class LLM(ABC):
                     continue
 
                 history_tool_result = _history_safe_result(tool_result)
-                if hooks:
-                    observation = ToolObservation(
-                        tool_name, copy.deepcopy(history_tool_result), active_context.copy(), steps
-                    )
-                    await apply_hooks(hooks, "after_tool", observation)
-                    history_tool_result = observation.result
-                if (
-                    context_policy is not None
-                    and tool_name != "read_context_artifact"
-                    and not getattr(tool, "_protolink_ephemeral_result", False)
-                ):
-                    history_tool_result = context_policy.observation(history_tool_result)
-                observation_start = len(self.history)
-                observation_fallback = inject_tool_observation(tool_name, tool_args, history_tool_result)
-                if context_policy is not None:
-                    from protolink.llms.context_policy import CONTEXT_OBSERVATION_KEY
+                execution_tool_result = (
+                    _history_safe_result(history_tool_result, snapshot=True) if expose_tool_results else None
+                )
 
-                    marker = {"tool": tool_name}
-                    if isinstance(history_tool_result, dict) and "context_artifact" in history_tool_result:
-                        marker["context_artifact"] = history_tool_result["context_artifact"]
-                    for message in self.history.messages_raw()[observation_start:]:
-                        message.metadata[CONTEXT_OBSERVATION_KEY] = marker
-                if getattr(tool, "_protolink_ephemeral_result", False):
-                    marker = {
-                        "tool": tool_name,
-                        "knowledge": getattr(tool, "_protolink_knowledge_name", None),
-                    }
-                    for message in self.history.messages_raw()[observation_start:]:
-                        message.metadata[EPHEMERAL_TOOL_OBSERVATION_KEY] = marker
-                await emit(
-                    {
-                        "type": "tool_result",
-                        "step": steps,
-                        "tool": tool_name,
-                        "result": history_tool_result,
-                        "action_id": action_id,
-                        "observation_fallback": observation_fallback,
-                    }
+                try:
+                    if hooks:
+                        observation = ToolObservation(
+                            tool_name, copy.deepcopy(history_tool_result), active_context.copy(), steps
+                        )
+                        await apply_hooks(hooks, "after_tool", observation)
+                        history_tool_result = observation.result
+                    if (
+                        context_policy is not None
+                        and tool_name != "read_context_artifact"
+                        and not getattr(tool, "_protolink_ephemeral_result", False)
+                    ):
+                        history_tool_result = context_policy.observation(history_tool_result)
+                    observation_start = len(self.history)
+                    observation_fallback = inject_tool_observation(tool_name, tool_args, history_tool_result)
+                    if context_policy is not None:
+                        from protolink.llms.context_policy import CONTEXT_OBSERVATION_KEY
+
+                        marker = {"tool": tool_name}
+                        if isinstance(history_tool_result, dict) and "context_artifact" in history_tool_result:
+                            marker["context_artifact"] = history_tool_result["context_artifact"]
+                        for message in self.history.messages_raw()[observation_start:]:
+                            message.metadata[CONTEXT_OBSERVATION_KEY] = marker
+                    if getattr(tool, "_protolink_ephemeral_result", False):
+                        marker = {
+                            "tool": tool_name,
+                            "knowledge": getattr(tool, "_protolink_knowledge_name", None),
+                        }
+                        for message in self.history.messages_raw()[observation_start:]:
+                            message.metadata[EPHEMERAL_TOOL_OBSERVATION_KEY] = marker
+                except BaseException:
+                    # The tool already returned; hook failure or cancellation
+                    # cannot turn that completed operation into a failed tool.
+                    await emit_tool_result(
+                        tool_name,
+                        tool_args,
+                        execution_tool_result if expose_tool_results else history_tool_result,
+                        action_id,
+                        observation_failed=True,
+                    )
+                    raise
+                await emit_tool_result(
+                    tool_name,
+                    tool_args,
+                    execution_tool_result if expose_tool_results else history_tool_result,
+                    action_id,
+                    observation_fallback=observation_fallback,
                 )
                 remember_action(action_signature)
                 # A completed tool may already have committed a side effect.
@@ -2212,7 +2307,12 @@ class LLM(ABC):
                     hook_result = before_attempt(attempt + 1)
                     if inspect.isawaitable(hook_result):
                         await hook_result
-                result = fn(*args, **kwargs)
+                # Synchronous provider SDKs must not block other agent requests.
+                # Worker context propagation preserves request-local history,
+                # model settings and private application dependencies.
+                from protolink.core.workers import run_sync
+
+                result = fn(*args, **kwargs) if inspect.iscoroutinefunction(fn) else await run_sync(fn, *args, **kwargs)
                 if inspect.isawaitable(result):
                     return await result
                 return result

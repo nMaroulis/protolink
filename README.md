@@ -145,6 +145,13 @@ tool instead. See [worker execution](docs/content/worker-execution.md) and run
 `python examples/worker_execution.py` for the offline walkthrough, including
 correctable preparation errors and live child activity.
 
+For application servers, use `Agent(sync_execution="thread")` for blocking typed tools,
+`llm_factory=` for request-local providers, and `request_context()` for private dependencies.
+`RunResult.tool_evidence` exposes correlated terminal tool observations over the existing events.
+See the [application runtime guide](docs/content/application-runtime.md) and the
+[FastAPI example](examples/application_runtime.py) with two specialists, a coordinator,
+streaming, cancellation and persistent sessions.
+
 ## Your first agent mesh
 
 Two agents, one registry: discover a teammate and call its tools over HTTP. Install `uv add "protolink[http]"` and reuse `add` from above:

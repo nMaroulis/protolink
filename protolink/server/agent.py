@@ -241,7 +241,7 @@ class AgentServer:
         self._transport.setup_routes(endpoints)
 
         # ── Chat endpoints (only when the agent has an LLM) ──
-        has_llm = bool(getattr(self._agent, "llm", None))
+        has_llm = bool(getattr(self._agent, "llm", None) or getattr(self._agent, "llm_factory", None))
         if not has_llm:
             card = getattr(self._agent, "card", None)
             has_llm = bool(card and getattr(getattr(card, "capabilities", None), "has_llm", False))

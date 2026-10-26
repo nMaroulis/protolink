@@ -10,6 +10,8 @@ from contextlib import ExitStack, asynccontextmanager
 from contextvars import copy_context
 from typing import Any
 
+from protolink.core.workers import _reserve_sync_worker
+
 
 class _HTTPResponseError(RuntimeError):
     """Retain a rejected HTTP response for narrowly scoped capability handling."""
@@ -85,15 +87,22 @@ async def threaded_stream(factory: Callable[[], Any]) -> AsyncGenerator[AsyncIte
     Opening, reading and closing all happen on one worker, preserving iterator
     thread affinity. Only one item is requested at a time; there is no producer
     queue or generation ahead of the consumer. Callbacks stay on the caller's
-    event loop. Context variables are copied to the worker.
+    event loop. Context variables are copied to the worker. Admission shares the
+    agent's bounded synchronous worker capacity for the entire stream lifetime.
 
     Cancellation returns promptly. Python cannot interrupt a synchronous SDK
     read or a local model evaluation already in progress, so cleanup is queued
     on that same worker and runs when the operation returns (or times out).
-    The worker never calls ``close()`` on an executing generator.
+    The worker never calls ``close()`` on an executing generator. Its capacity
+    remains occupied until cleanup really finishes, including after cancellation.
     """
+    release = await _reserve_sync_worker()
     loop = asyncio.get_running_loop()
-    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="protolink-stream")
+    try:
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="protolink-stream")
+    except BaseException:
+        release()
+        raise
     context = copy_context()
     stack = ExitStack()
     done = object()
@@ -124,6 +133,9 @@ async def threaded_stream(factory: Callable[[], Any]) -> AsyncGenerator[AsyncIte
         raise
     finally:
         cleanup = executor.submit(context.run, stack.close)
+        cleanup.add_done_callback(lambda _: release())
         executor.shutdown(wait=False)
         if not canceled:
-            await asyncio.wrap_future(cleanup)
+            # Canceling this await must not cancel the queued cleanup itself;
+            # an earlier SDK read may still be running on the affinity worker.
+            await asyncio.shield(asyncio.wrap_future(cleanup))

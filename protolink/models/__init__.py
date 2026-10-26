@@ -6,6 +6,7 @@ from protolink.core.agent_card import AgentCard, AgentInterface, AgentSkill
 from protolink.core.artifact import Artifact
 from protolink.core.cancellation import TaskCancellationRequest
 from protolink.core.events import EventSink, InMemoryEventSink, RunEvent
+from protolink.core.evidence import ToolEvidence
 from protolink.core.message import Message
 from protolink.core.part import Part, RouteDecision
 from protolink.core.report import RunRecorder, RunReplay, RunReport
@@ -59,4 +60,5 @@ __all__ = [
     "TaskCancellationRequest",
     "TaskExecutionError",
     "TaskState",
+    "ToolEvidence",
 ]

@@ -1,5 +1,7 @@
 import os
-from collections.abc import AsyncIterator, Awaitable, Callable
+import threading
+from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterator
+from contextlib import contextmanager
 from typing import Any, ClassVar
 
 from protolink.llms._deps import require_llama_cpp
@@ -26,7 +28,11 @@ logger = get_logger(__name__)
 
 
 class LlamaCPPLocalLLM(LocalLLM):
-    """Local Llama.cpp implementation of the LLM interface running inside the local Python process."""
+    """Local Llama.cpp adapter with serialized access to its mutable model.
+
+    Requests remain asynchronous, but one loaded model evaluates one call or
+    stream at a time. A canceled read retains ownership until its worker exits.
+    """
 
     _native_tool_calling_available: ClassVar[bool] = True
 
@@ -53,6 +59,7 @@ class LlamaCPPLocalLLM(LocalLLM):
         merged_params = {**self.DEFAULT_MODEL_PARAMS, **(model_params or {})}
         super().__init__(model=model, model_params=merged_params, tool_calling=tool_calling)
         self._supports_tool_calling = supports_tool_calling
+        self._model_lock = threading.RLock()
 
         llama_cpp = require_llama_cpp()
 
@@ -66,11 +73,27 @@ class LlamaCPPLocalLLM(LocalLLM):
     # LLM calling (invocation)
     # ----------------------------------------------------------------------
 
+    def _completion(self, **kwargs: Any) -> Any:
+        """Protect one complete evaluation of the shared native model."""
+        with self._model_lock:
+            return self._client.create_chat_completion(stream=False, **kwargs)
+
+    @contextmanager
+    def _completion_stream(self, **kwargs: Any) -> Generator[Iterator[Any], None, None]:
+        """Hold model ownership through stream cleanup on its affinity worker."""
+        with self._model_lock:
+            source = self._client.create_chat_completion(stream=True, **kwargs)
+            try:
+                yield source
+            finally:
+                close = getattr(source, "close", None)
+                if close is not None:
+                    close()
+
     def call(self, history: ConversationHistory) -> str:
         """Generate a single response using local llama_cpp python bindings."""
-        response = self._client.create_chat_completion(
+        response = self._completion(
             messages=history.messages,
-            stream=False,
             **self._model_params,
         )
         return response["choices"][0]["message"]["content"]
@@ -83,9 +106,8 @@ class LlamaCPPLocalLLM(LocalLLM):
         return on the worker. Text parsing happens on the caller's event loop.
         """
         async with threaded_stream(
-            lambda: self._client.create_chat_completion(
+            lambda: self._completion_stream(
                 messages=history.messages,
-                stream=True,
                 **self._model_params,
             )
         ) as stream:
@@ -128,9 +150,8 @@ class LlamaCPPLocalLLM(LocalLLM):
         if tool_specs:
             params["tools"] = tool_specs
             params["tool_choice"] = "auto"
-        response = self._client.create_chat_completion(
+        response = self._completion(
             messages=history.messages,
-            stream=False,
             **params,
         )
         return self._action_from_chat_result(response)
@@ -175,9 +196,8 @@ class LlamaCPPLocalLLM(LocalLLM):
         output_text: list[str] = []
         tool_accumulator = ChatCompletionStreamAccumulator()
         async with threaded_stream(
-            lambda: self._client.create_chat_completion(
+            lambda: self._completion_stream(
                 messages=history.messages,
-                stream=True,
                 **params,
             )
         ) as stream:

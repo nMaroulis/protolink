@@ -73,7 +73,7 @@ def test_ollama_default_call_uses_plain_json_mode(monkeypatch):
     monkeypatch.setattr(OllamaLLM, "validate_connection", lambda self: True)
     llm = OllamaLLM(base_url="http://localhost:11434", model="gemma")
     fake_connection = _FakeOllamaConnection()
-    llm._client = fake_connection
+    monkeypatch.setattr(llm, "_new_connection", lambda: fake_connection)
 
     history = ConversationHistory()
     history.add_user("hello")
@@ -88,7 +88,7 @@ async def test_ollama_default_json_action_preserves_provider_timing_metadata(mon
     monkeypatch.setattr(OllamaLLM, "validate_connection", lambda self: True)
     llm = OllamaLLM(base_url="http://localhost:11434", model="gemma")
     fake_connection = _FakeOllamaConnection()
-    llm._client = fake_connection
+    monkeypatch.setattr(llm, "_new_connection", lambda: fake_connection)
     events = []
 
     async def capture(event):
@@ -153,7 +153,7 @@ def test_ollama_unavailable_default_json_falls_back_without_changing_actions(mon
     connection = _ScriptedOllamaConnection(
         [(501, {"error": "structured output is unavailable"}), (200, result_body), (200, result_body)]
     )
-    llm._client = connection
+    monkeypatch.setattr(llm, "_new_connection", lambda: connection)
     history = ConversationHistory()
     history.add_user("Find alpha")
     original_options = dict(llm.model_params)
@@ -179,7 +179,7 @@ def test_ollama_explicit_request_controls_are_not_generation_options(monkeypatch
     settings = {"format": response_format, "think": False, "keep_alive": "2m", "max_tokens": 42}
     llm = OllamaLLM(base_url="http://localhost:11434", model_params=settings, supports_tool_calling=native)
     connection = _ScriptedOllamaConnection([(200, {"message": {"content": '{"type":"final","content":"ok"}'}})])
-    llm._client = connection
+    monkeypatch.setattr(llm, "_new_connection", lambda: connection)
 
     llm.call_action(ConversationHistory(), tools={})
 
@@ -199,7 +199,7 @@ def test_ollama_explicit_format_rejection_is_not_silently_downgraded(monkeypatch
     monkeypatch.setattr(OllamaLLM, "validate_connection", lambda self: True)
     llm = OllamaLLM(base_url="http://localhost:11434", model_params={"format": response_format})
     connection = _ScriptedOllamaConnection([(501, {"error": "structured output is unavailable"})])
-    llm._client = connection
+    monkeypatch.setattr(llm, "_new_connection", lambda: connection)
 
     with pytest.raises(RuntimeError, match="structured output is unavailable"):
         llm.call(ConversationHistory())
@@ -220,7 +220,7 @@ def test_ollama_other_request_errors_do_not_trigger_format_fallback(monkeypatch,
     monkeypatch.setattr(OllamaLLM, "validate_connection", lambda self: True)
     llm = OllamaLLM(base_url="http://localhost:11434")
     connection = _ScriptedOllamaConnection([(status, body)])
-    llm._client = connection
+    monkeypatch.setattr(llm, "_new_connection", lambda: connection)
 
     with pytest.raises(RuntimeError):
         llm.call(ConversationHistory())
@@ -238,7 +238,7 @@ def test_ollama_format_fallback_is_bounded_and_scoped_to_model(monkeypatch):
             (200, {"message": {"content": "ok"}}),
         ]
     )
-    llm._client = connection
+    monkeypatch.setattr(llm, "_new_connection", lambda: connection)
 
     with pytest.raises(RuntimeError, match="structured output is unavailable"):
         llm.call(ConversationHistory())

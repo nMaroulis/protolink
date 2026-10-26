@@ -8,6 +8,11 @@ import ApiReference, {
 
 # LLMs
 
+Persistent application agents can use `Agent(llm_factory=...)` to resolve a provider lazily for each request.
+The factory reads frozen settings through `current_request_context()` and returns an LLM or model specification;
+native tool calling, streaming and session history use the normal inference loop. See
+[private request context and model selection](application-runtime.md#private-request-context-and-frozen-model-choices).
+
 ProtoLink's LLM package starts with a simple promise: choose where a model runs, then use the same application-facing contract to talk to it. That contract can stop after one text response, stream text as it arrives, or continue into a controlled Agent loop where the model requests tools and delegates work while ProtoLink remains responsible for execution.
 
 ```python
@@ -1768,6 +1773,7 @@ After observing the tool result, the model completes with:
     streaming: bool = False,
     event_callback: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     event_metrics: bool | None = None,
+    expose_tool_results: bool = False,
     action_authorizer: Callable[[RunAction], Awaitable[ActionAuthorization]] | None = None,
     cancellation_token: CancellationToken | None = None,
     run_context: RunContext | dict[str, Any] | None = None,
@@ -1808,6 +1814,11 @@ Configure [context policy](context-management.md) and [lifecycle hooks](hooks.md
     </ApiField>
     <ApiField name="event_metrics" type="bool | None" defaultValue="None">
       Controls whether an attached event callback activates optional per-call metrics. Direct callers retain the existing default behavior; Agent sets this to <code>false</code> when its callback exists only to maintain internal completion receipts.
+    </ApiField>
+    <ApiField name="expose_tool_results" type="bool" defaultValue="False">
+      Emit a JSON-safe snapshot of the actual tool return before hooks or context policies transform model history.
+      The Agent forwards its corresponding opt-in and continues to sanitize knowledge passages. See
+      <a href="../application-runtime/#inspect-completed-tool-evidence">completed tool evidence</a> for visibility rules.
     </ApiField>
     <ApiField name="action_authorizer" type="Callable[[RunAction], Awaitable[ActionAuthorization]] | None" defaultValue="None">
       Policy boundary invoked after validation and before any tool or delegated-agent side effect.

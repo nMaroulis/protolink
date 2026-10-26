@@ -106,12 +106,6 @@ class OllamaLLM(ServerLLM):
         self._host = parsed.hostname
         self._port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
-        self._client: http.client.HTTPConnection | None = None
-        try:
-            self._client = http.client.HTTPConnection(self._host, self._port, timeout=self._CHAT_TIMEOUT)
-        except Exception:
-            logger.exception("LLM Client initilization failed :: Ollama connection failed: {e}")
-
         # Non-blocking validation - just log if connection fails
         _ = self.validate_connection()
 
@@ -165,22 +159,27 @@ class OllamaLLM(ServerLLM):
         )
         return True
 
+    def _new_connection(self, *, timeout: float | None = None) -> http.client.HTTPConnection:
+        """Create a request-owned connection safe for concurrent worker calls."""
+        parsed = urlparse(self.base_url)
+        connection_type = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        return connection_type(self._host, self._port, timeout=self._CHAT_TIMEOUT if timeout is None else timeout)
+
     def _post_chat(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Send one chat request, close its connection and validate the envelope."""
-        if self._client is None:
-            raise ValueError("Ollama client not connected")
+        connection = self._new_connection()
         try:
-            self._client.request(
+            connection.request(
                 method="POST",
                 url="/api/chat",
                 body=json.dumps(payload),
                 headers=self.headers,
             )
 
-            response = self._client.getresponse()
+            response = connection.getresponse()
             data = response.read().decode("utf-8")
         finally:
-            self._client.close()
+            connection.close()
 
         if response.status != 200:
             raise _HTTPResponseError(
@@ -381,12 +380,11 @@ class OllamaLLM(ServerLLM):
 
     def validate_connection(self) -> bool:
         """Validate Ollama deamon connectivity and model availability."""
+        connection: http.client.HTTPConnection | None = None
         try:
-            conn = http.client.HTTPConnection(self._host, self._port, timeout=self.REQUEST_TIMEOUT)
-            conn.request("GET", "/api/tags")
-
-            response = conn.getresponse()
-            conn.close()
+            connection = self._new_connection(timeout=self.REQUEST_TIMEOUT)
+            connection.request("GET", "/api/tags")
+            response = connection.getresponse()
 
             if response.status != 200:
                 logger.error(f"Ollama unhealthy (HTTP {response.status})")
@@ -403,6 +401,9 @@ class OllamaLLM(ServerLLM):
         except Exception as e:
             logger.exception(f"{e}")
             return False
+        finally:
+            if connection is not None:
+                connection.close()
 
     def _action_from_chat_result(self, payload: dict[str, Any]) -> LLMActionResult:
         """Normalize an Ollama chat response into one Protolink action."""

@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 
 from protolink.core.actions import RunAction
 from protolink.core.run_context import RunContext
+from protolink.core.workers import SyncExecution, current_sync_execution, run_sync
 from protolink.tools.base import BaseTool
 from protolink.tools.schema import (
     _safe_get_type_hints,
@@ -39,6 +40,7 @@ class Tool(BaseTool):
     examples: list[Any] | None = None
     capabilities: Collection[str] | None = None
     action_builder: ActionBuilder | None = field(default=None, repr=False)
+    sync_execution: SyncExecution | None = None
     _signature: inspect.Signature = field(init=False, repr=False)
     _type_hints: dict[str, Any] = field(init=False, repr=False, default_factory=dict)
     _protolink_builtin_id: str | None = field(init=False, repr=False, default=None)
@@ -61,6 +63,7 @@ class Tool(BaseTool):
         examples: list[Any] | None = None,
         capabilities: Collection[str] | None = None,
         action_builder: ActionBuilder | None = None,
+        sync_execution: SyncExecution | None = None,
     ) -> "Tool":
         """Create a reusable tool from a typed Python callable.
 
@@ -79,6 +82,9 @@ class Tool(BaseTool):
             examples: Optional examples advertised on the agent's skill card.
             capabilities: Permission capabilities required before execution.
             action_builder: Optional callback enriching the prepared runtime action.
+            sync_execution: ``"thread"`` runs blocking synchronous calls in bounded
+                workers; ``"inline"`` invokes on the event loop. ``None`` inherits
+                the agent's default. Async callables are always awaited directly.
 
         Returns:
             A tool with the same schema, validation and policy metadata as one constructed explicitly.
@@ -106,6 +112,7 @@ class Tool(BaseTool):
             examples=examples,
             capabilities=capabilities,
             action_builder=action_builder,
+            sync_execution=sync_execution,
         )
 
     def __post_init__(self) -> None:
@@ -116,6 +123,8 @@ class Tool(BaseTool):
         """
         self._signature = inspect.signature(self.func)
         self._type_hints = _safe_get_type_hints(self.func)
+        if self.sync_execution not in {None, "inline", "thread"}:
+            raise ValueError("sync_execution must be 'inline', 'thread', or None")
 
         # Input Schema
         if self.input_schema is None:
@@ -150,7 +159,11 @@ class Tool(BaseTool):
         """Invoke the underlying tool function.
 
         The wrapped function may be either synchronous (``def``) or asynchronous (``async def``).
-        This method normalizes both forms to an async call.
+        Async functions are awaited directly. Synchronous calls use the tool's
+        ``sync_execution`` setting or inherit the active agent's default.
+        Thread execution copies context variables. Canceling an await cannot
+        terminate a Python thread, and its worker slot stays occupied until the
+        call exits; its late result is discarded.
 
         Raise ``ToolRejectedError`` inside the callable to reject a request
         only when it made no changes. Inference can correct that request;
@@ -159,7 +172,13 @@ class Tool(BaseTool):
         """
 
         kwargs = self.validate_args(kwargs)
-        result = self.func(**kwargs)
+        is_async = inspect.iscoroutinefunction(self.func) or inspect.iscoroutinefunction(
+            getattr(self.func, "__call__", None)  # noqa: B004 - detect async callable instances
+        )
+        if not is_async and (self.sync_execution or current_sync_execution()) == "thread":
+            result = await run_sync(self.func, **kwargs)
+        else:
+            result = self.func(**kwargs)
         if inspect.isawaitable(result):
             return await result
         return result

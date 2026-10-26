@@ -272,6 +272,9 @@ Protolink's `Agent` combines client and server functionality in a single class. 
     description: str | None = None,
     url: str | None = None,
     tools: Iterable[BaseTool | Callable[..., Any]] | None = None,
+    sync_execution: Literal["inline", "thread"] = "inline",
+    max_sync_workers: int = 4,
+    expose_tool_results: bool = False,
     override_system_prompt: bool = False,
     verbosity: Literal[0, 1, 2] = 1,
     expose_chat: bool = True,
@@ -291,6 +294,7 @@ Protolink's `Agent` combines client and server functionality in a single class. 
     execution_version: str = "1",
     context_policy: ContextPolicy | Literal["auto"] | None = None,
     hooks: Iterable[AgentHooks | Callable[[ModelRequest], Any]] | None = None,
+    llm_factory: Callable[[], LLM | str | Awaitable[LLM | str]] | None = None,
 )`}
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/agents/base.py"
 >
@@ -314,6 +318,17 @@ Create the stable Agent facade and wire its identity, execution engine, communic
     <ApiField name="tools" type="Iterable[BaseTool | Callable[..., Any]] | None" defaultValue="None">
       Initial functions or tool instances registered through <code>add_tools()</code>, preserving schemas, policy metadata and skill registration. Registration does not execute the tools.
     </ApiField>
+    <ApiField name="sync_execution" type={'Literal["inline", "thread"]'} defaultValue={'"inline"'}>
+      Default execution mode for synchronous native tools. Use <code>"thread"</code> for blocking functions;
+      per-tool settings override it and async tools are awaited directly. Cancellation cannot terminate running threads.
+    </ApiField>
+    <ApiField name="max_sync_workers" type="int" defaultValue="4">
+      Positive bound on this agent's synchronous tool/provider calls. Canceled running calls retain capacity until they finish.
+    </ApiField>
+    <ApiField name="expose_tool_results" type="bool" defaultValue="False">
+      Include ordinary inference tools' actual return values in public events and receipts. Knowledge passage
+      sanitization remains enabled. Inspect terminal actions through <code>RunResult.tool_evidence</code>.
+    </ApiField>
     <ApiField name="transport" type="TransportType | Transport | None" defaultValue="None">
       Inbound and outbound communication layer. A registered alias such as <code>"http"</code>, <code>"runtime"</code>, <code>"websocket"</code> or <code>"grpc"</code> creates a transport with defaults derived from <code>card.url</code>. A concrete instance preserves its TLS, retry, limits, keepalive, metrics and ownership configuration. <code>None</code> creates a local facade with no client or server.
     </ApiField>
@@ -327,6 +342,12 @@ Create the stable Agent facade and wire its identity, execution engine, communic
       Optional language model used for explicit <code>infer</code> parts. Strings use <code>create_llm()</code> and accept provider aliases or <code>provider:model</code>. Pass an object for custom parameters, credentials or server URLs. Assignment calls <code>llm.validate_connection()</code> and uses its result to update <code>card.capabilities.has_llm</code>. Depending on the adapter, validation may contact a provider or local server during Agent construction.
       The request contract is separate: <code>supports_inference</code> is derived from the configured model, so a
       temporary connection failure does not advertise an otherwise valid inference request as unsupported.
+    </ApiField>
+    <ApiField name="llm_factory" type="Callable | None" defaultValue="None">
+      Zero-argument sync or async factory returning an LLM or model specification. Use instead of <code>llm</code>
+      for lazy per-request selection through <code>current_request_context()</code>. It runs once per inference-bearing
+      task without changing shared configuration or validating a provider at application startup. See
+      the <a href="../application-runtime/">application runtime guide</a> for frozen team settings and private dependencies.
     </ApiField>
     <ApiField name="system_prompt" type="str | None" defaultValue="None">
       Agent-specific role and behavior instructions appended to ProtoLink's runtime prompt. Tool, delegation, flow and action instructions are compiled separately. Set <code>override_system_prompt=True</code> only when the supplied text should replace that built-in blueprint.

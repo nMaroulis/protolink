@@ -240,6 +240,12 @@ async def execute_authorized_tool(tool: BaseTool, execution: ToolExecution, *, e
     try:
         hook = getattr(tool, "execute_authorized", None)
         result = await hook(execution) if callable(hook) else await tool(**action.payload["arguments"])
+        # An uncancelable external call may finish after cancellation was
+        # requested. Its result must not become a successful observation.
+        if execution.context.canceled:
+            raise asyncio.CancelledError(execution.context.cancel_reason)
+        if execution.cancellation is not None:
+            execution.cancellation.raise_if_cancelled()
     except asyncio.CancelledError:
         if emit_events:
             await execution.emit("action.canceled", action=action.to_dict())

@@ -34,9 +34,57 @@ uv add --upgrade protolink
 
 # Release Notes
 
-## [0.8.2] - 2026-10-19
+## [0.8.3] - 2026-10-27
 
 :::note Latest Update
+
+This release adds bounded threaded tools, private request context, per-request model factories and correlated tool
+evidence, with provider concurrency fixes and a complete FastAPI integration example.
+
+:::
+
+### Added
+
+- Native synchronous tool execution through `Agent(sync_execution="thread", max_sync_workers=4)` with per-tool
+  `sync_execution` overrides. The bounded worker pool copies context variables, preserves normal validation,
+  authorization, budgets and exceptions, and supports direct, model-selected and delegated calls.
+  Cancellation stops waiting without releasing a running thread's capacity early or publishing its late result.
+  Python threads and their side effects cannot be forcibly terminated; shutdown stops admission without waiting
+  indefinitely for canceled calls.
+- `request_context(values, inherit=...)` and `current_request_context()` for private request-local services,
+  validated selections and frozen configuration snapshots. Only explicitly inherited keys reach local subagents;
+  transport calls resolve dependencies on the receiving side. Private values do not enter tasks, prompts, events,
+  history or configuration exports automatically.
+- `Agent(llm_factory=...)` resolves a synchronous or async model factory lazily for each inference-bearing task.
+  Providers are bound locally to execution without changing a shared agent's model. Synchronous provider calls and
+  factories run off the event loop; provider-native tool calling, streaming, usage metadata and native sessions remain
+  intact. Factory-backed chat, retrieval and A2A requests use the same execution path.
+- `ToolEvidence`, `collect_tool_evidence(events)`, `RunReport.tool_evidence`, `RunResult.tool_evidence` and the live
+  `RunHandle.tool_evidence()` iterator. They derive validated arguments, results, terminal outcomes, timestamps,
+  duration and execution/delegation IDs from existing events, with one terminal observation per action.
+- `Agent(expose_tool_results=True)` opts ordinary inference tools into public results. Default privacy and knowledge
+  passage sanitization remain in place; omitted results are explicitly marked.
+- A complete [application runtime guide](application-runtime.md) and offline
+  [`application_runtime.py`](https://github.com/nMaroulis/protolink/blob/main/examples/application_runtime.py)
+  FastAPI example reusing `AgentGroup`, registry discovery, local specialists, session storage and one event stream.
+  Acceptance tests cover concurrent isolation, frozen choices through consultations, private credentials, correlated
+  evidence, cancellation during blocking work, persisted conversations and cleanup.
+
+### Fixed
+
+- Normalized run events preserve the original task event timestamp so queued streaming observations report actual
+  execution duration rather than normalization latency.
+- Canceled inferred tools retain a correlated terminal receipt even when their stream closes before queued activity
+  can be consumed. Worker pools close reliably during agent teardown, including partial shutdown failures.
+- Completed tool evidence survives failures or cancellation while preparing model observations. Opted-in results
+  preserve the actual return before hooks or context offloading transform history.
+- Synchronous provider streams retain worker capacity through actual cleanup after cancellation. Ollama and
+  llama.cpp server calls use request-owned HTTP connections, while local llama.cpp serializes access to its shared
+  model. Automatic tool-capability discovery no longer blocks asynchronous requests.
+
+## [0.8.2] - 2026-10-19
+
+:::note Release Summary
 
 This release adds bounded worker continuation, typed worker tools and reliable live child activity,
 alongside Python and documentation dependency updates and provider SDK compatibility fixes.

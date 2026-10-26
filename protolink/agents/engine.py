@@ -11,6 +11,7 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, nullcontext
 from contextvars import ContextVar, Token
+from functools import wraps
 from typing import Any
 
 from protolink.agents.subagents import current_subagent_supervisor, subagent_scope
@@ -39,6 +40,7 @@ from protolink.core.policy import (
 from protolink.core.run_context import RunContext
 from protolink.core.task import TaskState
 from protolink.core.tool_errors import ToolRejectedError
+from protolink.core.workers import sync_execution_scope
 from protolink.llms.delegation import validate_delegation_request
 from protolink.llms.history import EPHEMERAL_TOOL_OBSERVATION_KEY, ConversationHistory
 from protolink.models import Artifact, Message, Part, Task
@@ -123,6 +125,20 @@ def _accepts_keyword_argument(callback: Any, name: str) -> bool:
     return name in parameters or any(
         parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
     )
+
+
+def _request_model(method):
+    """Bind a model and worker scope for direct calls as well as task execution."""
+
+    @wraps(method)
+    async def scoped(self, *args, **kwargs):
+        task = kwargs.get("task", args[1] if len(args) > 1 else current_task())
+        async with self._resolved_llm_scope(task):
+            action_scope = self.llm._use_tool_calling() if self.llm is not None else nullcontext()
+            async with action_scope:
+                return await method(self, *args, **kwargs)
+
+    return scoped
 
 
 class AgentExecutionMixin(_AgentMixinBase):
@@ -430,9 +446,11 @@ class AgentExecutionMixin(_AgentMixinBase):
                         outputs.append(output)
                         self._attach_task_output(task, output)
                         self._persist_task_snapshot(task)
-                    elif part.type == "infer":
+                    elif part.type == "infer" or (
+                        part.type == "text" and task.metadata.get("a2a_inbound") is True and self.llm is not None
+                    ):
                         async for event in self.call_llm_stream(
-                            part,
+                            Part.infer(prompt=str(part.content)) if part.type == "text" else part,
                             task=task,
                             cancellation_token=cancellation_token,
                         ):
@@ -533,10 +551,10 @@ class AgentExecutionMixin(_AgentMixinBase):
         """Attach distinct completion or no-change rejection receipts in inference.
 
         Model-driven tools and delegations execute inside ``LLM.infer`` rather
-        than as top-level task parts. Recording metadata-only completion
+        than as top-level task parts. Recording completion
         receipts on the task makes partial progress visible if a later model
         call, cancellation, or budget boundary ends inference before a final
-        response, without exposing the private result observation.
+        response. Results remain private unless ``expose_tool_results`` is set.
         Rejection artifacts are separate from completed-action artifacts and
         never count as evidence of an effect or successful execution.
         """
@@ -570,17 +588,18 @@ class AgentExecutionMixin(_AgentMixinBase):
             action_kind = "agent.call"
             delegated_action = event.get("action")
 
-        # Internal observations can contain credentials, private records, or
-        # other data intended only for model context. The durable/client-visible
-        # task receipt proves completion without copying that raw result across
-        # the task boundary.
+        expose_result = self.expose_tool_results and not rejected and not event.get("result_omitted", False)
+        # Public results require an explicit opt-in. Knowledge sanitization
+        # remains authoritative even when ordinary tool results are exposed.
         receipt: dict[str, Any] = {
             "status": "rejected" if rejected else "completed",
             "action_id": action_id,
             "action_kind": action_kind,
             "name": name,
-            "result_omitted": True,
+            "result_omitted": not expose_result,
         }
+        if expose_result:
+            receipt["result"] = event.get("result")
         if rejected:
             rejection = event.get("rejection", {})
             receipt.update(changes_made=False, code=rejection.get("code"), phase=event.get("phase"))
@@ -597,7 +616,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 "source": "inference",
                 "action_kind": action_kind,
                 "step": event.get("step"),
-                "result_omitted": True,
+                "result_omitted": not expose_result,
             },
         )
         task.add_artifact(artifact)
@@ -962,6 +981,65 @@ class AgentExecutionMixin(_AgentMixinBase):
         *,
         outputs: list[Part | Message] | None = None,
     ):
+        """Resolve a model only for inference, then bind its task-local history."""
+        durable = current_durable_run()
+        last_item = task.get_last_item()
+        parts = (
+            [Part.from_dict(part) for part in durable.data["input_parts"]]
+            if durable is not None
+            else last_item.parts
+            if last_item is not None
+            else ()
+        )
+        needs_model = any(
+            part.type == "infer" or (part.type == "text" and task.metadata.get("a2a_inbound") is True) for part in parts
+        )
+        if needs_model:
+            async with self._resolved_llm_scope(task):
+                action_scope = self.llm._use_tool_calling() if self.llm is not None else nullcontext()
+                async with action_scope:
+                    async with self._bound_llm_history_scope(task, context, outputs=outputs):
+                        yield
+        else:
+            async with self._bound_llm_history_scope(task, context, outputs=outputs):
+                yield
+
+    @asynccontextmanager
+    async def _resolved_llm_scope(self, task: Task | None = None):
+        """Bind one lazy provider to this request without mutating agent state."""
+        from protolink.core.workers import run_sync, sync_execution_scope
+        from protolink.llms.base import LLM
+
+        with sync_execution_scope(self.sync_execution, self._sync_workers):
+            binding = self._active_llm.get()
+            task_id = task.id if task is not None else None
+            if self.llm_factory is None or (binding is not None and binding[0] == task_id):
+                yield
+                return
+            factory = self.llm_factory
+            model = await factory() if inspect.iscoroutinefunction(factory) else await run_sync(factory)
+            if inspect.isawaitable(model):
+                model = await model
+            if isinstance(model, str):
+                from protolink.llms import create_llm
+
+                model = await run_sync(create_llm, model)
+            if not isinstance(model, LLM):
+                raise TypeError("llm_factory must return an LLM or provider:model string")
+            token = self._active_llm.set((task_id, model))
+            try:
+                yield
+            finally:
+                self._active_llm.reset(token)
+
+    @asynccontextmanager
+    async def _bound_llm_history_scope(
+        self,
+        task: Task,
+        context: RunContext,
+        *,
+        outputs: list[Part | Message] | None = None,
+    ):
         """Bind task-local LLM history and serialize same-session updates.
 
         Stateless runs receive a fresh isolated history object. Persistent conversation runs load the requested session
@@ -972,14 +1050,6 @@ class AgentExecutionMixin(_AgentMixinBase):
         if self.llm is None:
             yield
             return
-
-        durable = current_durable_run()
-        last_item = task.get_last_item()
-        if durable is not None:
-            needs_actions = any(part.get("type") == "infer" for part in durable.data["input_parts"])
-        else:
-            needs_actions = last_item is not None and any(part.type == "infer" for part in last_item.parts)
-        action_scope = self.llm.use_tool_calling() if needs_actions else nullcontext()
 
         receipt_tracker: set[str] = set()
         receipt_token = _active_inference_action_receipts.set(receipt_tracker)
@@ -1007,7 +1077,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                     completed_history: ConversationHistory | None = None
                     completed_normally = False
                     try:
-                        with self.llm.use_history(history), action_scope:
+                        with self.llm.use_history(history):
                             try:
                                 yield
                                 completed_normally = True
@@ -1039,7 +1109,7 @@ class AgentExecutionMixin(_AgentMixinBase):
             completed_history = None
             completed_normally = False
             try:
-                with self.llm.use_history(history), action_scope:
+                with self.llm.use_history(history):
                     try:
                         yield
                         completed_normally = True
@@ -1194,7 +1264,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 self._enforce_budget_decision(active_budget_enforcer.check_tool_call())
                 if durable is not None:
                     durable.mark_tool_charged()
-            with execution_scope(task):
+            with execution_scope(task), sync_execution_scope(self.sync_execution, self._sync_workers):
                 result = await execute_authorized_tool(
                     tool, ToolExecution(authorization, context, active_budget_enforcer, active_token)
                 )
@@ -1297,6 +1367,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 error={"message": str(e)},
             )
 
+    @_request_model
     async def call_llm(
         self,
         infer_part: Part,
@@ -1372,7 +1443,26 @@ class AgentExecutionMixin(_AgentMixinBase):
             self._record_inference_action_result(task, public_event)
             if task is not None and (
                 is_durable_streaming()
-                or (public_event.get("type") in {"tool_rejected", "agent_call_rejected"} and not streaming)
+                # A canceled stream can close before queued legacy activity
+                # reaches the consumer. Retain its terminal receipt first.
+                or public_event.get("type") in {"tool_canceled", "agent_call_canceled"}
+                or public_event.get("observation_failed") is True
+                or (
+                    not streaming
+                    and public_event.get("type")
+                    in {
+                        "tool_start",
+                        "tool_result",
+                        "tool_error",
+                        "tool_canceled",
+                        "tool_rejected",
+                        "agent_call_start",
+                        "agent_call_result",
+                        "agent_call_error",
+                        "agent_call_canceled",
+                        "agent_call_rejected",
+                    }
+                )
             ):
                 from protolink.core.events import RunEvent, TaskLLMStreamEvent
                 from protolink.core.execution import publish_runtime_event
@@ -1380,7 +1470,7 @@ class AgentExecutionMixin(_AgentMixinBase):
                 metadata = {
                     key: value for key, value in public_event.items() if key not in {"type", "step", "content", "final"}
                 }
-                if public_event.get("type") in {"tool_result", "agent_call_result"}:
+                if public_event.get("type") in {"tool_result", "agent_call_result"} and not self.expose_tool_results:
                     metadata.pop("result", None)
                     metadata["result_omitted"] = True
                 stream_event = TaskLLMStreamEvent(
@@ -1551,6 +1641,8 @@ class AgentExecutionMixin(_AgentMixinBase):
             infer_kwargs["yield_after_steps"] = self.yield_after_steps
         if _accepts_keyword_argument(self.llm.infer, "event_metrics"):
             infer_kwargs["event_metrics"] = bool(self.telemetry or event_callback)
+        if self.expose_tool_results and _accepts_keyword_argument(self.llm.infer, "expose_tool_results"):
+            infer_kwargs["expose_tool_results"] = True
         # ``LLM.infer`` is a documented extension point. Existing adapters may
         # override its pre-0.6.7 signature, so only pass the new shared-budget
         # argument when the override explicitly accepts it (or ``**kwargs``).
@@ -1943,11 +2035,15 @@ class AgentExecutionMixin(_AgentMixinBase):
         task_id = task.id if task else ""
 
         async def emit(payload: dict[str, Any]) -> None:
+            if task is not None and payload.get("observation_failed") is True:
+                # Already queued as a native receipt before observation
+                # preparation raised. Forward that same event only once.
+                return
             metadata = {key: value for key, value in payload.items() if key not in {"type", "step", "content", "final"}}
-            if payload.get("type") in {"tool_result", "agent_call_result"}:
+            if payload.get("type") in {"tool_result", "agent_call_result"} and not self.expose_tool_results:
                 # Internal observations may contain credentials or private
                 # records intended only for LLM history and privileged
-                # telemetry. Client streams receive correlation, not content.
+                # telemetry. Public result content requires an explicit opt-in.
                 metadata.pop("result", None)
                 metadata["result_omitted"] = True
             await queue.put(

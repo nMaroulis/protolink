@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from protolink.core.events import InMemoryEventSink, RunEvent
+from protolink.core.evidence import ToolEvidence, collect_tool_evidence
 from protolink.core.redaction import RedactionPolicy
 from protolink.core.run_context import RunContext
 from protolink.utils import utc_now
@@ -46,6 +47,15 @@ class RunReport:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: utc_now())
     validations: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+
+    @property
+    def tool_evidence(self) -> tuple[ToolEvidence, ...]:
+        """Terminal tool observations derived from this report's existing events.
+
+        Includes delegated tools once per action, preserving worker IDs and
+        private-result omission markers. This property does not execute tools.
+        """
+        return collect_tool_evidence(self.events)
 
     @classmethod
     def from_task(cls, task: Any) -> RunReport:

@@ -14,6 +14,7 @@ const sidebars = {
         'progressive-control',
         'subagents',
         'worker-execution',
+        'application-runtime',
         'cli',
         'devtools',
         {

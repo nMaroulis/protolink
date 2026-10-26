@@ -126,6 +126,10 @@ Protolink does not define a universal permission taxonomy, approval screen, or d
 
 ## Runtime Context
 
+For private Python services, credentials and frozen request settings, use
+[`request_context()` and `current_request_context()`](application-runtime.md#private-request-context-and-frozen-model-choices).
+They are separate from serialized `RunContext` and do not add tool parameters or prompt content.
+
 `RunContext` is the typed execution envelope for a task run. It replaces ad hoc metadata keys such as `task.metadata["session_id"]`, `trace_id`, `workspace`, or `parent_agent` with one serializable object stored under `task.metadata["run_context"]`.
 
 Think of the context as information that belongs to the execution but is not the task's business payload. A prompt or record ID belongs in a `Message`, `Part`, or action payload; correlation IDs, permissions, cancellation state and limits belong in `RunContext`.

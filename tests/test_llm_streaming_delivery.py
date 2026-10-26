@@ -142,6 +142,8 @@ def _sdk_llm(backend, factory):
     llm = backend.__new__(backend)
     LLM.__init__(llm, model="test", model_params={})
     llm._supports_tool_calling = True
+    if backend is LlamaCPPLocalLLM:
+        llm._model_lock = threading.RLock()
     llm._GenerateContentConfig = lambda **kwargs: kwargs
     llm._client = SimpleNamespace(
         responses=SimpleNamespace(create=factory),
