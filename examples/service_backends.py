@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from email.message import EmailMessage
 from unittest.mock import patch
 
-import httpx
+import httpx2
 
 from protolink import Assistant
 from protolink.tools import Gmail, GoogleCalendar, IMAPEmail, OutlookCalendar, OutlookEmail
@@ -95,7 +95,7 @@ async def main() -> None:
 def offline_services():
     """Small deterministic HTTP/IMAP/SMTP fixtures, scoped to this demonstration."""
     calls = set()
-    original_client = httpx.AsyncClient
+    original_client = httpx2.AsyncClient
     mime = EmailMessage()
     mime["From"], mime["To"], mime["Subject"] = "sender@example.com", "me@example.com", "Agenda"
     mime.set_content("Review the agenda.")
@@ -111,12 +111,12 @@ def offline_services():
             operation = "list" if method == "GET" else "create"
             calls.add(f"{provider}.calendar.{operation}")
             if operation == "list":
-                return httpx.Response(200, json={"items" if google else "value": [{"id": "event"}]})
-            return httpx.Response(201, json={"id": "created"})
+                return httpx2.Response(200, json={"items" if google else "value": [{"id": "event"}]})
+            return httpx2.Response(201, json={"id": "created"})
         if method == "GET":
             if path.endswith("/messages"):
                 calls.add(f"{provider}.email.list")
-                return httpx.Response(200, json={"messages" if google else "value": [{"id": "message"}]})
+                return httpx2.Response(200, json={"messages" if google else "value": [{"id": "message"}]})
             assert path.endswith("/messages/message")
             calls.add(f"{provider}.email.read")
             body = "Review the agenda."
@@ -130,15 +130,15 @@ def offline_services():
                 if google
                 else {"body": {"contentType": "text", "content": body}}
             )
-            return httpx.Response(200, json={"id": "message", **data})
+            return httpx2.Response(200, json={"id": "message", **data})
         assert method == "POST"
         operation = "send" if path.endswith(("/sendMail", "/messages/send")) else "draft"
         calls.add(f"{provider}.email.{operation}")
         assert json.loads(request.content)
         return (
-            httpx.Response(202)
+            httpx2.Response(202)
             if not google and operation == "send"
-            else httpx.Response(200, json={"id": "sent" if operation == "send" else "draft"})
+            else httpx2.Response(200, json={"id": "sent" if operation == "send" else "draft"})
         )
 
     class DemoIMAP:
@@ -192,7 +192,7 @@ def offline_services():
 
     with (
         patch.object(
-            httpx, "AsyncClient", lambda **kwargs: original_client(transport=httpx.MockTransport(respond), **kwargs)
+            httpx2, "AsyncClient", lambda **kwargs: original_client(transport=httpx2.MockTransport(respond), **kwargs)
         ),
         patch.object(imap_email, "_BoundedIMAP", DemoIMAP),
         patch.object(smtplib, "SMTP_SSL", DemoSMTP),

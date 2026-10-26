@@ -26,14 +26,14 @@ Changelog = "https://nmaroulis.github.io/protolink/docs/changelog/"
 protolink = "protolink.cli:main"
 
 [project.optional-dependencies]
-integrations = ["httpx>=0.28.1"]
+integrations = ["httpx2>=2.5.0"]
 yaml = ["PyYAML>=6.0.2"]
 
 documents = ["pypdf>=5.0.0", "python-docx>=1.2.0", "openpyxl>=3.1.0"]
 
 http = [
     "fastapi>=0.137.2",
-    "httpx>=0.28.1",
+    "httpx2>=2.5.0",
     "starlette>=1.3.1",
     "uvicorn>=0.49.0",
     "websockets>=16.0",
@@ -51,12 +51,12 @@ anthropic = ["anthropic>=0.109.2"]
 gemini = ["google-genai>=1.60.0"]
 huggingface = ["huggingface-hub>=1.3.3"]
 deepseek = ["openai>=2.43.0"]
-grok = ["httpx>=0.28.1"]
-ollama = ["httpx>=0.28.1"]
-openai-compatible = ["httpx>=0.28.1"]
-lmstudio = ["httpx>=0.28.1"]
-vllm = ["httpx>=0.28.1"]
-llama-cpp-server = ["httpx>=0.28.1"]
+grok = ["httpx2>=2.5.0"]
+ollama = ["httpx2>=2.5.0"]
+openai-compatible = ["httpx2>=2.5.0"]
+lmstudio = ["httpx2>=2.5.0"]
+vllm = ["httpx2>=2.5.0"]
+llama-cpp-server = ["httpx2>=2.5.0"]
 llama-cpp-local = ["llama-cpp-python>=0.3.30"]
 
 # Existing all-provider bundle, including local llama.cpp bindings.

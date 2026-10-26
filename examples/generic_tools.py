@@ -16,7 +16,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-import httpx
+import httpx2
 
 from protolink import Agent, AgentCard, CapabilityPolicy, StorageCheckpointStore
 from protolink.storage import InMemoryStorage
@@ -86,17 +86,17 @@ async def main() -> None:
         assert (await agent.call_tool("list_keys"))["keys"] == ["example"]
         assert (await agent.call_tool("delete_value", key="example"))["deleted"]
 
-        original_client = httpx.AsyncClient
+        original_client = httpx2.AsyncClient
 
         def respond(request):
             assert request.url.host == "api.example.com" and request.url.path == "/v1/items"
             if request.method == "POST":
                 assert json.loads(request.content) == {"name": "example"}
-                return httpx.Response(201, json={"id": 1})
-            return httpx.Response(200, json={"items": []})
+                return httpx2.Response(201, json={"id": 1})
+            return httpx2.Response(200, json={"items": []})
 
         with patch.object(
-            httpx, "AsyncClient", lambda **kwargs: original_client(transport=httpx.MockTransport(respond), **kwargs)
+            httpx2, "AsyncClient", lambda **kwargs: original_client(transport=httpx2.MockTransport(respond), **kwargs)
         ):
             assert (await agent.call_tool("http_request", path="items"))["body"] == {"items": []}
             assert (await agent.call_tool("http_request", method="POST", path="items", body={"name": "example"}))[

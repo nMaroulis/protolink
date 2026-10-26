@@ -39,7 +39,8 @@ uv add --upgrade protolink
 :::note Latest Update
 
 This release adds bounded threaded tools, private request context, per-request model factories and correlated tool
-evidence, with provider concurrency fixes and a complete FastAPI integration example.
+evidence, with provider concurrency fixes and a complete FastAPI integration example. HTTP clients move to `httpx2`,
+alongside SDK compatibility and asynchronous dashboard test fixes.
 
 :::
 
@@ -70,6 +71,12 @@ evidence, with provider concurrency fixes and a complete FastAPI integration exa
   Acceptance tests cover concurrent isolation, frozen choices through consultations, private credentials, correlated
   evidence, cancellation during blocking work, persisted conversations and cleanup.
 
+### Changed
+
+- Move ProtoLink's HTTP transports, provider clients and streaming, OAuth, service integrations and examples to
+  `httpx2`. Update optional dependency requirements and documentation; supported provider SDKs continue to use their
+  own required HTTP library.
+
 ### Fixed
 
 - Normalized run events preserve the original task event timestamp so queued streaming observations report actual
@@ -81,6 +88,10 @@ evidence, with provider concurrency fixes and a complete FastAPI integration exa
 - Synchronous provider streams retain worker capacity through actual cleanup after cancellation. Ollama and
   llama.cpp server calls use request-owned HTTP connections, while local llama.cpp serializes access to its shared
   model. Automatic tool-capability discovery no longer blocks asynchronous requests.
+- Detect the installed SDK's actual HTTP client type in offline provider compatibility tests instead of guessing
+  from its major version. This fixes Anthropic releases using `httpx2` being given an incompatible `httpx` client.
+- Keep dashboard continuation tests asynchronous while the server resumes work on another thread, so the embedding
+  application's event loop stays responsive. Retain origin and malformed-request checks and allow for CI scheduling.
 
 ## [0.8.2] - 2026-10-19
 

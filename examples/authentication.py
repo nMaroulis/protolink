@@ -16,7 +16,7 @@ import socket
 import time
 from typing import Any
 
-import httpx
+import httpx2
 import websockets
 
 from protolink.agents import Agent
@@ -80,7 +80,7 @@ async def run_tests() -> None:
         # Test 1: API Key Authentication (Success)
         print("\n--- Test 1: API Key Authentication (Success) ---")
         task_data = Task.create(Message.user("Hello via API Key")).to_dict()
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             resp = await client.post(
                 f"http://127.0.0.1:{apikey_port}/tasks/", json=task_data, headers={"X-API-Key": "my-secret-key"}
             )
@@ -92,7 +92,7 @@ async def run_tests() -> None:
 
         # Test 2: API Key Authentication (Failure - Wrong Key)
         print("\n--- Test 2: API Key Authentication (Failure - Wrong Key) ---")
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             resp = await client.post(
                 f"http://127.0.0.1:{apikey_port}/tasks/", json=task_data, headers={"X-API-Key": "wrong-key"}
             )
@@ -104,7 +104,7 @@ async def run_tests() -> None:
 
         # Test 3: API Key Authentication (Failure - No Key)
         print("\n--- Test 3: API Key Authentication (Failure - No Key) ---")
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             resp = await client.post(f"http://127.0.0.1:{apikey_port}/tasks/", json=task_data)
             print(f"Status Code: {resp.status_code}")
             print(f"Response: {resp.json()}")
@@ -132,7 +132,7 @@ async def run_tests() -> None:
         # Test 4: Bearer Token Authentication (Success)
         print("\n--- Test 4: Bearer Token Authentication (Success) ---")
         task_data = Task.create(Message.user("Hello via Bearer Token")).to_dict()
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             resp = await client.post(
                 f"http://127.0.0.1:{bearer_port}/tasks/",
                 json=task_data,
@@ -146,7 +146,7 @@ async def run_tests() -> None:
 
         # Test 5: Bearer Token Authentication (Failure - Invalid Token)
         print("\n--- Test 5: Bearer Token Authentication (Failure - Invalid Token) ---")
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             resp = await client.post(
                 f"http://127.0.0.1:{bearer_port}/tasks/",
                 json=task_data,
@@ -176,7 +176,7 @@ async def run_tests() -> None:
         print("\n--- Test 6: Basic Auth (Success) ---")
         task_data = Task.create(Message.user("Hello via Basic Auth")).to_dict()
         encoded_creds = base64.b64encode(b"admin:password123").decode()
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             resp = await client.post(
                 f"http://127.0.0.1:{basic_port}/tasks/",
                 json=task_data,
@@ -191,7 +191,7 @@ async def run_tests() -> None:
         # Test 7: Basic Auth (Failure - Wrong Password)
         print("\n--- Test 7: Basic Auth (Failure - Wrong Password) ---")
         wrong_encoded_creds = base64.b64encode(b"admin:wrongpass").decode()
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             resp = await client.post(
                 f"http://127.0.0.1:{basic_port}/tasks/",
                 json=task_data,

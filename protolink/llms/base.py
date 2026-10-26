@@ -2360,7 +2360,7 @@ class LLM(ABC):
             True if the error is transient and the call should be retried.
         """
         # Check common direct and response-wrapped HTTP status fields used by
-        # provider SDKs (OpenAI, Anthropic, httpx, requests and compatibles).
+        # provider SDKs (OpenAI, Anthropic, httpx2, requests and compatibles).
         response = getattr(exc, "response", None)
         status_candidates = (
             getattr(exc, "status_code", None),

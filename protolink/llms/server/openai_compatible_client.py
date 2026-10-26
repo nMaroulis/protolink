@@ -117,7 +117,7 @@ class OpenAICompatibleLLM(ServerLLM):
 
         Uses request-scoped async HTTP; completion, cancellation and explicit
         iterator closure release the connection. JSON-action mode yields raw
-        JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
+        JSON fragments. Requires ``httpx2`` (included in ``protolink[llms]``).
         """
         params = dict(self._model_params)
         if "response_format" not in params:

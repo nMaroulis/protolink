@@ -107,7 +107,7 @@ class LlamaCPPServerLLM(ServerLLM):
 
         Uses request-scoped async HTTP; completion, cancellation and explicit
         iterator closure release the connection. JSON-action mode yields raw
-        JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
+        JSON fragments. Requires ``httpx2`` (included in ``protolink[llms]``).
         """
         payload = {
             "model": self.model,

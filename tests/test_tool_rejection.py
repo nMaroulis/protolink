@@ -8,7 +8,7 @@ import subprocess
 import sys
 import textwrap
 
-import httpx
+import httpx2
 import pytest
 
 from protolink import (
@@ -111,11 +111,11 @@ def scripted_ollama(monkeypatch, mode, actions, streaming):
 
     monkeypatch.setattr(llm, "_post_chat", respond)
     if streaming:
-        client = httpx.AsyncClient
-        transport = httpx.MockTransport(
-            lambda request: httpx.Response(200, content=json.dumps(respond(json.loads(request.content))) + "\n")
+        client = httpx2.AsyncClient
+        transport = httpx2.MockTransport(
+            lambda request: httpx2.Response(200, content=json.dumps(respond(json.loads(request.content))) + "\n")
         )
-        monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: client(transport=transport, **kwargs))
+        monkeypatch.setattr(httpx2, "AsyncClient", lambda **kwargs: client(transport=transport, **kwargs))
     return llm, requests
 
 

@@ -391,8 +391,8 @@ print(result.status, result.output)
 `chunks()` delivers raw incremental model text; default JSON-action models stream JSON fragments.
 Use `handle.events()` for all typed events and `result.report` for the run report. Inspect the result
 status for failures and use `await handle.cancel()` to stop a run. Remote subscriptions still require
-advertised streaming support. Ollama and other HTTP server streams require `httpx`
-(`uv add protolink httpx`), also included in the `llms` and `http` extras. See the
+advertised streaming support. Ollama and other HTTP server streams require `httpx2`
+(`uv add protolink httpx2`), also included in the `llms` and `http` extras. See the
 [complete streaming example and provider behavior](https://nmaroulis.github.io/protolink/docs/llm/#stream-into-your-application).
 
 ## Local telemetry and replay

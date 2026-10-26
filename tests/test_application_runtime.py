@@ -4,7 +4,7 @@ import asyncio
 import json
 import threading
 
-import httpx
+import httpx2
 import pytest
 
 from examples.application_runtime import PageService, create_app
@@ -37,7 +37,7 @@ async def test_concurrent_app_requests_freeze_team_models_and_keep_dependencies_
         urls = [a.card.url for a in app.state.group.agents.values()]
         discovered = await app.state.group.registry.discover()
         assert {a.url for a in discovered} == set(urls)
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://app") as client:
+        async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://app") as client:
             first = asyncio.create_task(client.post("/runs", json={"session_id": "alice", "page": "overview"}))
             try:
                 await wait_until_set(entered)
@@ -97,7 +97,7 @@ async def test_cancel_blocking_tool_keeps_one_canceled_receipt_after_thread_retu
     app = create_app(tmp_path / "cancellation.sqlite")
     async with app.router.lifespan_context(app):
         app.state.service = BlockingService()
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://app") as client:
+        async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://app") as client:
             pending = asyncio.create_task(client.post("/runs", json={"session_id": "cancel-me"}))
             try:
                 await wait_until_set(entered)
@@ -125,7 +125,7 @@ async def test_app_reopens_native_conversation_storage(tmp_path):
     database = tmp_path / "sessions.sqlite"
     app = create_app(database)
     async with app.router.lifespan_context(app):
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://app") as client:
+        async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://app") as client:
             response = await client.post("/runs", json={"session_id": "saved-session", "delay": 0})
             response.raise_for_status()
     reopened = create_app(database)

@@ -83,19 +83,19 @@ def test_http_provider_closes_failed_https_request(monkeypatch, backend):
 
 @pytest.mark.asyncio
 async def test_grok_shared_httpx_client_supports_concurrent_worker_calls(monkeypatch):
-    import httpx
+    import httpx2
 
     barrier = threading.Barrier(2)
 
     def respond(request):
         barrier.wait(timeout=2)
         prompt = json.loads(request.content)["messages"][-1]["content"]
-        return httpx.Response(200, json={"choices": [{"message": {"content": prompt}}]})
+        return httpx2.Response(200, json={"choices": [{"message": {"content": prompt}}]})
 
     monkeypatch.setattr(GrokLLM, "validate_connection", lambda self: True)
     model = GrokLLM(api_key="test")
     model._client.close()
-    model._client = httpx.Client(transport=httpx.MockTransport(respond))
+    model._client = httpx2.Client(transport=httpx2.MockTransport(respond))
     agent = Agent(name="grok-concurrent", llm=model, max_sync_workers=2, verbosity=0)
     try:
         tasks = await asyncio.gather(*(agent.run_task(Task.create_infer(prompt)) for prompt in ("first", "second")))

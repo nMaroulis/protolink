@@ -402,10 +402,10 @@ class OAuth2DelegationAuth(Authenticator):
             AuthContext with delegated scopes
         """
         try:
-            import httpx
+            import httpx2
 
             # Exchange token (simplified - in production use proper OAuth library)
-            async with httpx.AsyncClient() as client:
+            async with httpx2.AsyncClient() as client:
                 response = await client.post(
                     self.exchange_endpoint,
                     json={

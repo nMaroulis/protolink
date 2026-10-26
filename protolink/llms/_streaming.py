@@ -34,16 +34,16 @@ async def http_stream(
     """Open an async NDJSON/SSE response and close it on every exit path.
 
     The client belongs to this request, so separate runs and event loops never
-    share a live connection. HTTPX decodes split UTF-8 characters and partial
+    share a live connection. HTTPX2 decodes split UTF-8 characters and partial
     lines; protocol completion markers stop reading even on a persistent
     connection. Error frames fail the call instead of producing a partial action.
-    HTTPX remains optional for applications that do not stream HTTP backends.
+    HTTPX2 remains optional for applications that do not stream HTTP backends.
     """
     try:
-        import httpx
+        import httpx2
     except ImportError as exc:
         raise ImportError(
-            "HTTP LLM streaming requires httpx. Install it with: pip install httpx "
+            "HTTP LLM streaming requires httpx2. Install it with: pip install httpx2 "
             "or your provider extra, for example pip install 'protolink[ollama]'"
         ) from exc
 
@@ -68,7 +68,7 @@ async def http_stream(
             if chunk.get("done") is True:
                 return
 
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    async with httpx2.AsyncClient(timeout=timeout) as client:
         async with client.stream("POST", url, json=payload, headers=headers) as response:
             if not response.is_success:
                 await response.aread()

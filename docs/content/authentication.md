@@ -989,7 +989,7 @@ validator does not implement.
 >
 
 Exchange an incoming subject token for a narrower access token at an external
-HTTP endpoint. The provider uses `httpx.AsyncClient` and sends a compact JSON
+HTTP endpoint. The provider uses `httpx2.AsyncClient` and sends a compact JSON
 token-exchange request.
 
 <ApiSection title="Parameters">
@@ -1059,7 +1059,7 @@ into a `SecurityContext`.
       <code>Exception("OAuth delegation failed: …")</code>.
     </ApiField>
     <ApiField name="dependency error">
-      A missing <code>httpx</code> installation is also caught and wrapped in
+      A missing <code>httpx2</code> installation is also caught and wrapped in
       the same generic OAuth-delegation <code>Exception</code>.
     </ApiField>
   </ApiFields>

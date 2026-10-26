@@ -18,7 +18,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 from uuid import uuid4
 
-import httpx
+import httpx2
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -185,7 +185,7 @@ async def main() -> None:
     with TemporaryDirectory() as directory:
         app = create_app(Path(directory) / "application.sqlite")
         async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://example") as client:
+            async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://example") as client:
                 responses = await asyncio.gather(
                     client.post("/runs", json={"session_id": "alice", "page": "overview"}),
                     client.post("/runs", json={"session_id": "bob", "page": "metrics"}),

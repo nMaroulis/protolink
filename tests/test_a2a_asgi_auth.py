@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
 
 from protolink.a2a.v1 import A2A_AGENT_CARD_PATH, A2A_PROTOCOL_VERSION
@@ -44,8 +44,8 @@ async def test_authenticated_a2a_send_message_through_asgi(backend: str) -> None
     assert agent.server is not None
     agent.server._build_endpoints()
 
-    asgi_transport = httpx.ASGITransport(app=transport.backend.app)
-    async with httpx.AsyncClient(
+    asgi_transport = httpx2.ASGITransport(app=transport.backend.app)
+    async with httpx2.AsyncClient(
         transport=asgi_transport,
         base_url="http://agent.test",
     ) as client:

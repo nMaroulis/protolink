@@ -59,7 +59,7 @@ All transports inherit from the base `Transport` class.
     - When serving an Agent with `a2a=True`, also mounts the standard A2A Agent Card and A2A 1.0 JSON-RPC endpoints.
     - Serves browser-facing HTML pages such as `GET /status` and, for LLM-backed agents, `GET /chat`.
     - Backed by ASGI frameworks:
-        - `Starlette` + `httpx` + `uvicorn` (lightweight default backend).
+        - `Starlette` + `httpx2` + `uvicorn` (lightweight default backend).
         - `FastAPI` + `pydantic` + `uvicorn` (with optional request validation).
     - Great default choice for web‑based agents, simple deployments and interoperable APIs.
 
@@ -397,7 +397,7 @@ Protocol-specific mapping:
 
 | Transport | Request/response limits | Concurrency/backpressure |
 |-----------|-------------------------|--------------------------|
-| HTTP | Checked before outbound send and before server response; `httpx` pools use the request limit. | Uvicorn `limit_concurrency` plus per-loop client request slots. |
+| HTTP | Checked before outbound send and before server response; `httpx2` pools use the request limit. | Uvicorn `limit_concurrency` plus per-loop client request slots. |
 | SSE JSON-RPC | HTTP request limits plus `max_event_bytes` for every SSE result. | HTTP concurrency plus a bounded active-stream semaphore. |
 | WebSocket | `websockets` frame size plus explicit request, response and event checks. | Bounded frame queues, unary handler slots and active-stream slots. |
 | gRPC | Mapped to `grpc.max_send_message_length` and `grpc.max_receive_message_length`, with explicit envelope checks. | `maximum_concurrent_rpcs` defaults to `max_concurrent_requests`; streams also use active-stream slots. |
@@ -1347,7 +1347,7 @@ The browser pages themselves are not separate servers. Agent status and registry
 ### Overview
 
 - **Client side**
-  - Uses `httpx.AsyncClient` to send JSON requests to other agents or registries.
+  - Uses `httpx2.AsyncClient` to send JSON requests to other agents or registries.
   - Implements the generic `send` method to dispatch requests defined by `ClientRequestSpec`.
 
 - **Server side**
@@ -1589,7 +1589,7 @@ async def call_remote(url: str) -> None:
   source="https://github.com/nMaroulis/protolink/blob/main/protolink/transport/http_transport.py#L40"
 >
 
-Dual-role HTTP client/server transport. It mounts an ASGI backend for inbound endpoints and keeps a separate pooled `httpx.AsyncClient` for each event loop that performs outbound work.
+Dual-role HTTP client/server transport. It mounts an ASGI backend for inbound endpoints and keeps a separate pooled `httpx2.AsyncClient` for each event loop that performs outbound work.
 
 <ApiSection title="Parameters">
   <ApiFields ariaLabel="HTTPTransport constructor parameters">
@@ -1712,7 +1712,7 @@ Serializes and size-checks one unary operation, applies correlation, idempotency
 <ApiSection title="Raises">
   <ApiFields ariaLabel="HTTPTransport send errors">
     <ApiField name="TransportTimeoutError">
-      The `httpx` request exceeded `timeout`; marked retryable.
+      The `httpx2` request exceeded `timeout`; marked retryable.
     </ApiField>
     <ApiField name="TransportConnectionError">
       Connection establishment failed; marked retryable.

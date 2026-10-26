@@ -4,7 +4,7 @@ import asyncio
 import base64
 import json
 
-import httpx
+import httpx2
 import pytest
 
 from protolink import ApprovalRequiredError, Assistant
@@ -17,7 +17,7 @@ MESSAGE = {"to": ["friend@example.com"], "subject": "Café", "body": "Meet tomor
 
 @pytest.fixture
 def graph(monkeypatch):
-    original = httpx.AsyncClient
+    original = httpx2.AsyncClient
     requests, responses, clients = [], [], []
 
     async def respond(request):
@@ -27,11 +27,11 @@ def graph(monkeypatch):
 
     def client(**kwargs):
         assert kwargs["follow_redirects"] is False and kwargs["trust_env"] is False
-        instance = original(transport=httpx.MockTransport(respond), **kwargs)
+        instance = original(transport=httpx2.MockTransport(respond), **kwargs)
         clients.append(instance)
         return instance
 
-    monkeypatch.setattr(httpx, "AsyncClient", client)
+    monkeypatch.setattr(httpx2, "AsyncClient", client)
     yield requests, responses
     assert all(client.is_closed for client in clients)
 
@@ -42,9 +42,9 @@ async def test_calendar_pages_filter_and_utc_creation(graph):
     next_url = "https://graph.microsoft.com/v1.0/me/calendar/calendarView?$skiptoken=a%2Bb%3D&$top=1"
     responses.extend(
         [
-            httpx.Response(200, json={"value": [{"subject": "Unrelated"}], "@odata.nextLink": next_url}),
-            httpx.Response(200, json={"value": [{"id": "event", "subject": "CAFÉ", "isAllDay": True}]}),
-            httpx.Response(201, json={"id": "created"}),
+            httpx2.Response(200, json={"value": [{"subject": "Unrelated"}], "@odata.nextLink": next_url}),
+            httpx2.Response(200, json={"value": [{"id": "event", "subject": "CAFÉ", "isAllDay": True}]}),
+            httpx2.Response(201, json={"id": "created"}),
         ]
     )
     backend = OutlookCalendar("private-token")
@@ -71,7 +71,7 @@ async def test_calendar_pages_filter_and_utc_creation(graph):
 @pytest.mark.asyncio
 async def test_selected_account_resource_encoding_and_refreshed_tokens(graph):
     requests, responses = graph
-    responses.extend([httpx.Response(200, json={"value": []})] * 2)
+    responses.extend([httpx2.Response(200, json={"value": []})] * 2)
     tokens = iter(["one", "two"])
 
     async def token():
@@ -89,8 +89,8 @@ async def test_mailbox_search_read_draft_and_send(graph):
     requests, responses = graph
     responses.extend(
         [
-            httpx.Response(200, json={"value": [{"id": "mail"}]}),
-            httpx.Response(
+            httpx2.Response(200, json={"value": [{"id": "mail"}]}),
+            httpx2.Response(
                 200,
                 json={
                     "id": "mail",
@@ -101,8 +101,8 @@ async def test_mailbox_search_read_draft_and_send(graph):
                     "hasAttachments": True,
                 },
             ),
-            httpx.Response(201, json={"id": "draft", "isDraft": True}),
-            httpx.Response(202),
+            httpx2.Response(201, json={"id": "draft", "isDraft": True}),
+            httpx2.Response(202),
         ]
     )
     backend = OutlookEmail(lambda: "secret", user_id="shared@example.com")
@@ -128,7 +128,7 @@ async def test_mailbox_search_read_draft_and_send(graph):
 async def test_html_only_message_is_not_returned_as_plain_text(graph):
     _, responses = graph
     responses.append(
-        httpx.Response(
+        httpx2.Response(
             200, json={"id": "m", "body": {"contentType": "HTML", "content": "<b>mail</b>"}, "bodyPreview": "mail"}
         )
     )
@@ -140,7 +140,7 @@ async def test_html_only_message_is_not_returned_as_plain_text(graph):
 async def test_tokens_bound_to_backend_query_page_size_and_window(graph):
     requests, responses = graph
     responses.append(
-        httpx.Response(
+        httpx2.Response(
             200,
             json={
                 "value": [],
@@ -176,7 +176,7 @@ async def test_tokens_bound_to_backend_query_page_size_and_window(graph):
 )
 async def test_next_links_cannot_change_origin_or_mailbox(graph, next_url):
     requests, responses = graph
-    responses.append(httpx.Response(200, json={"value": [], "@odata.nextLink": next_url}))
+    responses.append(httpx2.Response(200, json={"value": [], "@odata.nextLink": next_url}))
     with pytest.raises(ValueError, match="continuation URL"):
         await OutlookEmail("private-token").list_messages()
     assert len(requests) == 1
@@ -186,7 +186,7 @@ async def test_next_links_cannot_change_origin_or_mailbox(graph, next_url):
 async def test_forged_cursor_is_revalidated_before_request(graph):
     requests, responses = graph
     responses.append(
-        httpx.Response(
+        httpx2.Response(
             200, json={"value": [], "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?$skiptoken=x"}
         )
     )
@@ -206,8 +206,8 @@ async def test_mailbox_continuation_preserves_query_and_preference_headers(graph
     next_url = "https://graph.microsoft.com/v1.0/me/messages?$skip=20&$top=20"
     responses.extend(
         [
-            httpx.Response(200, json={"value": [{"id": "first"}], "@odata.nextLink": next_url}),
-            httpx.Response(200, json={"value": [{"id": "second"}]}),
+            httpx2.Response(200, json={"value": [{"id": "first"}], "@odata.nextLink": next_url}),
+            httpx2.Response(200, json={"value": [{"id": "second"}]}),
         ]
     )
     backend = OutlookEmail("token")
@@ -229,7 +229,7 @@ def test_provider_search_guidance_reaches_model_tool_descriptions():
 async def test_errors_redact_service_body_and_do_not_retry(graph, status):
     requests, responses = graph
     responses.append(
-        httpx.Response(status, text="private provider details", headers={"Location": "https://attacker.example"})
+        httpx2.Response(status, text="private provider details", headers={"Location": "https://attacker.example"})
     )
     with pytest.raises(MicrosoftGraphError) as caught:
         await OutlookEmail("secret-token").send_message(**MESSAGE)
@@ -242,10 +242,10 @@ async def test_errors_redact_service_body_and_do_not_retry(graph, status):
 @pytest.mark.parametrize(
     "response,reason",
     [
-        (httpx.Response(200, text="not json"), "invalid JSON"),
-        (httpx.Response(200, json=[]), "JSON object"),
-        (httpx.Response(200, json={"value": [1]}), "contain objects"),
-        (httpx.Response(200, content=b"x" * (2 * 1024 * 1024 + 1)), "2 MiB"),
+        (httpx2.Response(200, text="not json"), "invalid JSON"),
+        (httpx2.Response(200, json=[]), "JSON object"),
+        (httpx2.Response(200, json={"value": [1]}), "contain objects"),
+        (httpx2.Response(200, content=b"x" * (2 * 1024 * 1024 + 1)), "2 MiB"),
     ],
 )
 async def test_malformed_or_oversized_responses(graph, response, reason):
@@ -292,7 +292,7 @@ async def test_assistant_uses_existing_policy_and_keeps_tokens_private(graph):
         await assistant.call_tool("send_email", **MESSAGE)
     assert requests == []
     assistant = Assistant(email=OutlookEmail("private-token"), allow_send=True, approval_handler=approve, verbosity=0)
-    responses.append(httpx.Response(202))
+    responses.append(httpx2.Response(202))
     assert await assistant.call_tool("send_email", **MESSAGE) == {"status": "accepted"}
     assert "private-token" not in json.dumps(assistant.to_dict()) + str(approvals)
     preview = approvals[0].artifacts[0].parts[0].content

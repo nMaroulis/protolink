@@ -175,12 +175,12 @@ ProtoLink requires only Pydantic; `mock` needs no extra.
 | `gemini` | `protolink[gemini]` | `google-genai` |
 | `huggingface` | `protolink[huggingface]` | `huggingface-hub` |
 | `deepseek` | `protolink[deepseek]` | `openai` |
-| `grok` | `protolink[grok]` | `httpx` |
-| `ollama` | `protolink[ollama]` | `httpx` |
-| `openai-compatible` | `protolink[openai-compatible]` | `httpx` |
-| `lmstudio` | `protolink[lmstudio]` | `httpx` |
-| `vllm` | `protolink[vllm]` | `httpx` |
-| `llama.cpp-server` | `protolink[llama-cpp-server]` | `httpx` |
+| `grok` | `protolink[grok]` | `httpx2` |
+| `ollama` | `protolink[ollama]` | `httpx2` |
+| `openai-compatible` | `protolink[openai-compatible]` | `httpx2` |
+| `lmstudio` | `protolink[lmstudio]` | `httpx2` |
+| `vllm` | `protolink[vllm]` | `httpx2` |
+| `llama.cpp-server` | `protolink[llama-cpp-server]` | `httpx2` |
 | `llama.cpp-local` | `protolink[llama-cpp-local]` | `llama-cpp-python` |
 
 :::
@@ -350,7 +350,7 @@ async with aclosing(llm.chat("Hello", streaming=True)) as chunks:
         print(chunk, end="", flush=True)
 ```
 
-Custom adapters must also avoid synchronous network reads inside `async def` methods. Awaiting an unbounded queue's `put()` does not guarantee that event consumers can run. `call_action_stream()` must await each text callback and assemble a complete action before returning it. See the [HTTPX async streaming](https://www.python-httpx.org/async/#streaming-responses) and [Ollama streaming](https://docs.ollama.com/api/streaming) protocol references.
+Custom adapters must also avoid synchronous network reads inside `async def` methods. Awaiting an unbounded queue's `put()` does not guarantee that event consumers can run. `call_action_stream()` must await each text callback and assemble a complete action before returning it. HTTPX2 retains the [HTTPX async streaming API](https://www.python-httpx.org/async/#streaming-responses); see also the [Ollama streaming](https://docs.ollama.com/api/streaming) protocol reference.
 
 ### Tools and delegated Agents stay behind a runtime boundary
 

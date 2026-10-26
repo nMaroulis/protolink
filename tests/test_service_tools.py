@@ -6,7 +6,7 @@ import json
 import os
 from email import message_from_bytes, policy
 
-import httpx
+import httpx2
 import pytest
 
 from protolink import (
@@ -34,7 +34,7 @@ def agent_with(*tools, **kwargs):
 @pytest.fixture
 def http_mock(monkeypatch):
     """Patch only the HTTP transport, keeping real request/response serialization."""
-    original = httpx.AsyncClient
+    original = httpx2.AsyncClient
     requests = []
     responses = []
     clients = []
@@ -48,11 +48,11 @@ def http_mock(monkeypatch):
 
     def client(**kwargs):
         assert kwargs["follow_redirects"] is False and kwargs["trust_env"] is False
-        instance = original(transport=httpx.MockTransport(respond), **kwargs)
+        instance = original(transport=httpx2.MockTransport(respond), **kwargs)
         clients.append(instance)
         return instance
 
-    monkeypatch.setattr(httpx, "AsyncClient", client)
+    monkeypatch.setattr(httpx2, "AsyncClient", client)
     yield requests, responses
     assert all(client.is_closed for client in clients)
 
@@ -62,11 +62,11 @@ async def test_calendar_wire_contract_pagination_offsets_and_previews(http_mock)
     requests, responses = http_mock
     responses.extend(
         [
-            httpx.Response(
+            httpx2.Response(
                 200, json={"items": [{"id": "event-1", "start": {"date": "2026-09-19"}}], "nextPageToken": "page2"}
             ),
-            httpx.Response(200, json={"items": []}),
-            httpx.Response(200, json={"id": "created"}),
+            httpx2.Response(200, json={"items": []}),
+            httpx2.Response(200, json={"id": "created"}),
         ]
     )
     approvals = []
@@ -135,10 +135,10 @@ async def test_email_wire_contract_mime_and_pagination(http_mock):
     requests, responses = http_mock
     responses.extend(
         [
-            httpx.Response(200, json={"messages": [{"id": "msg", "threadId": "thread"}], "nextPageToken": "next"}),
-            httpx.Response(200, json={"messages": []}),
-            httpx.Response(200, json={"id": "draft"}),
-            httpx.Response(200, json={"id": "sent", "threadId": "thread"}),
+            httpx2.Response(200, json={"messages": [{"id": "msg", "threadId": "thread"}], "nextPageToken": "next"}),
+            httpx2.Response(200, json={"messages": []}),
+            httpx2.Response(200, json={"id": "draft"}),
+            httpx2.Response(200, json={"id": "sent", "threadId": "thread"}),
         ]
     )
     tokens = iter(["one", "two", "three", "four"])
@@ -172,7 +172,7 @@ async def test_email_multipart_charset_attachments_and_truncation(http_mock):
     _, responses = http_mock
     encoded = base64.urlsafe_b64encode(("café" + "x" * 20000).encode("iso-8859-1")).decode().rstrip("=")
     responses.append(
-        httpx.Response(
+        httpx2.Response(
             200,
             json={
                 "id": "msg",
@@ -241,9 +241,9 @@ async def test_google_failure_redacts_body_never_retries_or_follows_redirects(ht
     requests, responses = http_mock
     responses.extend(
         [
-            httpx.Response(401, text="leaked-token-and-private-data"),
-            httpx.Response(302, headers={"Location": "https://attacker.example"}),
-            httpx.Response(503, text="uncertain send"),
+            httpx2.Response(401, text="leaked-token-and-private-data"),
+            httpx2.Response(302, headers={"Location": "https://attacker.example"}),
+            httpx2.Response(503, text="uncertain send"),
         ]
     )
     backend = Gmail("private-token", sender="me@example.com")
@@ -323,9 +323,9 @@ async def test_presets_use_standard_agent_tools_and_gate_mutations(http_mock, tm
 @pytest.mark.parametrize(
     "response",
     [
-        httpx.Response(200, content=b"x" * (2 * 1024 * 1024 + 1)),
-        httpx.Response(200, content=b"not-json"),
-        httpx.Response(200, json=[]),
+        httpx2.Response(200, content=b"x" * (2 * 1024 * 1024 + 1)),
+        httpx2.Response(200, content=b"not-json"),
+        httpx2.Response(200, json=[]),
     ],
 )
 async def test_google_rejects_oversized_or_invalid_responses(http_mock, response):

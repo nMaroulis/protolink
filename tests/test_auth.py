@@ -7,7 +7,7 @@ import time
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 
 from protolink.agents import Agent
@@ -122,10 +122,10 @@ async def test_http_lazy_authentication():
     mock_response.json.return_value = {"ok": True}
     mock_response.raise_for_status = MagicMock()
 
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client = AsyncMock(spec=httpx2.AsyncClient)
     mock_client.request.return_value = mock_response
 
-    with patch("httpx.AsyncClient", return_value=mock_client):
+    with patch("httpx2.AsyncClient", return_value=mock_client):
         spec = ClientRequestSpec(name="test", method="GET", path="/test")
         await transport.send(spec, base_url="http://other-agent:8080")
 
@@ -242,7 +242,7 @@ async def test_http_server_backend_authentication_starlette():
 
     await transport.start()
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             # 1. No credentials -> 401
             resp = await client.get(f"http://127.0.0.1:{port}/test")
             assert resp.status_code == 401
@@ -289,7 +289,7 @@ async def test_http_server_backend_authentication_fastapi():
 
     await transport.start()
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx2.AsyncClient() as client:
             # 1. No credentials -> 401
             resp = await client.get(f"http://127.0.0.1:{port}/test")
             assert resp.status_code == 401

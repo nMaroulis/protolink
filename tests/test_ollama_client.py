@@ -2,7 +2,7 @@ import json
 from types import SimpleNamespace
 from typing import ClassVar
 
-import httpx
+import httpx2
 import pytest
 
 from protolink.llms.actions import ToolCallAction
@@ -121,11 +121,11 @@ async def test_ollama_native_call_action_stream_is_explicit_opt_in(monkeypatch):
             "message": {"tool_calls": [{"function": {"name": "lookup", "arguments": {"key": "alpha"}}}]},
             "done": True,
         }
-        return httpx.Response(200, content=json.dumps(chunk) + "\n")
+        return httpx2.Response(200, content=json.dumps(chunk) + "\n")
 
-    client_type = httpx.AsyncClient
+    client_type = httpx2.AsyncClient
     monkeypatch.setattr(
-        httpx, "AsyncClient", lambda **kwargs: client_type(transport=httpx.MockTransport(respond), **kwargs)
+        httpx2, "AsyncClient", lambda **kwargs: client_type(transport=httpx2.MockTransport(respond), **kwargs)
     )
 
     history = ConversationHistory()
@@ -258,17 +258,17 @@ async def test_ollama_streaming_json_fallback_preserves_typed_actions_and_closes
     def respond(request):
         requests.append(json.loads(request.content))
         if len(requests) == 1:
-            return httpx.Response(501, json={"error": "structured output is unavailable"})
-        return httpx.Response(200, content=json.dumps({"message": {"content": content}, "done": True}) + "\n")
+            return httpx2.Response(501, json={"error": "structured output is unavailable"})
+        return httpx2.Response(200, content=json.dumps({"message": {"content": content}, "done": True}) + "\n")
 
-    client_type = httpx.AsyncClient
+    client_type = httpx2.AsyncClient
 
     def client(**kwargs):
-        instance = client_type(transport=httpx.MockTransport(respond), **kwargs)
+        instance = client_type(transport=httpx2.MockTransport(respond), **kwargs)
         clients.append(instance)
         return instance
 
-    monkeypatch.setattr(httpx, "AsyncClient", client)
+    monkeypatch.setattr(httpx2, "AsyncClient", client)
     chunks = []
 
     async def capture(chunk):
@@ -297,19 +297,19 @@ async def test_ollama_format_error_inside_accepted_stream_is_not_retried(monkeyp
 
     def respond(request):
         requests.append(request)
-        return httpx.Response(
+        return httpx2.Response(
             200,
             content='{"message":{"content":"partial"}}\n{"error":"structured output is unavailable"}\n',
         )
 
-    client_type = httpx.AsyncClient
+    client_type = httpx2.AsyncClient
 
     def client(**kwargs):
-        instance = client_type(transport=httpx.MockTransport(respond), **kwargs)
+        instance = client_type(transport=httpx2.MockTransport(respond), **kwargs)
         clients.append(instance)
         return instance
 
-    monkeypatch.setattr(httpx, "AsyncClient", client)
+    monkeypatch.setattr(httpx2, "AsyncClient", client)
     chunks = []
     with pytest.raises(RuntimeError, match="structured output is unavailable"):
         async for chunk in llm.call_stream(ConversationHistory()):

@@ -227,7 +227,7 @@ class OllamaLLM(ServerLLM):
 
         Uses request-scoped async HTTP; completion, cancellation and explicit
         iterator closure release the connection. JSON-action mode yields raw
-        JSON fragments. Requires ``httpx`` (included in ``protolink[llms]``).
+        JSON fragments. Requires ``httpx2`` (included in ``protolink[llms]``).
         """
         payload = self._chat_payload(history, streaming=True, json_actions=True)
         retried = False
