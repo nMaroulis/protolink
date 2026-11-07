@@ -36,7 +36,7 @@ uv add --upgrade protolink
 
 ## [0.8.4] - 2026-11-07
 
-:::note Release Summary
+:::note Latest Release
 
 This release reduces application streaming and run-management plumbing. ProtoLink owns execution,
 protocol interpretation and correlated activity; applications own domain tools, authorization and rendering.
@@ -80,7 +80,7 @@ See the [application runtime guide](application-runtime.md) for the scope decisi
 
 ## [0.8.3] - 2026-10-27
 
-:::note Latest Update
+:::note Release Summary
 
 This release adds bounded threaded tools, private request context, per-request model factories and correlated tool
 evidence, with provider concurrency fixes and a complete FastAPI integration example. HTTP clients move to `httpx2`,
