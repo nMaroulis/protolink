@@ -382,14 +382,17 @@ For an embedded Agent inside an async application:
 
 ```python
 handle = agent.start_run("Explain this project.")
-async for chunk in handle.chunks():
-    print(chunk, end="", flush=True)
+answer = ""
+async for update in handle.answer_events():
+    answer = answer + update.content if update.type == "delta" else update.content
+    render_markdown(answer)
 result = await handle.result()
 print(result.status, result.output)
 ```
 
-`chunks()` delivers raw incremental model text; default JSON-action models stream JSON fragments.
-Use `handle.events()` for all typed events and `result.report` for the run report. Inspect the result
+`answer_events()` preserves Markdown, filters protocol text and supports provisional replacements;
+only `completed` confirms the answer. Use `presentation_events()` for sanitized activity,
+`events()` for native diagnostics and `result.report` for the run report. Inspect the result
 status for failures and use `await handle.cancel()` to stop a run. Remote subscriptions still require
 advertised streaming support. Ollama and other HTTP server streams require `httpx2`
 (`uv add protolink httpx2`), also included in the `llms` and `http` extras. See the

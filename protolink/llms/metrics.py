@@ -215,6 +215,8 @@ def normalize_provider_usage(source: Any) -> LLMUsage | None:
     usage_source = _extract_usage_source(source)
     if usage_source is None:
         return None
+    if isinstance(usage_source, LLMUsage):
+        return usage_source
 
     input_tokens = _first_int(
         usage_source,
@@ -241,8 +243,8 @@ def normalize_provider_usage(source: Any) -> LLMUsage | None:
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
-        estimated=False,
-        source="provider",
+        estimated=bool(_get_value(usage_source, "estimated")),
+        source=str(_get_value(usage_source, "source") or "provider"),
         details=_to_jsonable(usage_source),
     )
 
@@ -289,7 +291,8 @@ def calculate_cost(usage: LLMUsage, profile: LLMModelProfile | None = None) -> L
     if input_cost is None and output_cost is None:
         return None
 
-    total_cost = round((input_cost or 0.0) + (output_cost or 0.0), 8)
+    # One known price is useful, but it cannot establish the whole call cost.
+    total_cost = round(input_cost + output_cost, 8) if input_cost is not None and output_cost is not None else None
     return LLMCost(
         input_cost=input_cost,
         output_cost=output_cost,

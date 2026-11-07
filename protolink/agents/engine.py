@@ -1640,7 +1640,9 @@ class AgentExecutionMixin(_AgentMixinBase):
         if self.yield_after_steps is not None:
             infer_kwargs["yield_after_steps"] = self.yield_after_steps
         if _accepts_keyword_argument(self.llm.infer, "event_metrics"):
-            infer_kwargs["event_metrics"] = bool(self.telemetry or event_callback)
+            # Managed streams publish through the runtime sink rather than
+            # an external callback, including owned coordinators and children.
+            infer_kwargs["event_metrics"] = bool(self.telemetry or event_callback or is_durable_streaming())
         if self.expose_tool_results and _accepts_keyword_argument(self.llm.infer, "expose_tool_results"):
             infer_kwargs["expose_tool_results"] = True
         # ``LLM.infer`` is a documented extension point. Existing adapters may

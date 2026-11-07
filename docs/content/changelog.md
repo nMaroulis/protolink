@@ -34,9 +34,53 @@ uv add --upgrade protolink
 
 # Release Notes
 
+## [0.8.4] - 2026-11-07
+
+:::note Latest Release
+
+This release reduces application streaming and run-management plumbing. ProtoLink owns execution,
+protocol interpretation and correlated activity; applications own domain tools, authorization and rendering.
+See the [application runtime guide](application-runtime.md) for the scope decisions and contracts.
+
+:::
+
+### Added
+
+- `RunHandle.answer_events()` and typed `AnswerEvent` deltas, replacements and completion. Native text and
+  JSON `final.content` preserve Markdown while excluding action envelopes, tools, child answers and reasoning
+  prefixes. Updates stay provisional until the task succeeds; hooks reconcile the final output. Known secrets
+  are masked across chunk boundaries. Structured values and tool results have no implicit answer rendering.
+- `PresentationEvent`, `collect_presentation_events()` and `handle.presentation_events()` for allowlisted
+  model, tool, consultation, approval and outcome fields with stable correlation IDs. Prompts, arguments,
+  results, reasoning and diagnostic errors remain outside this display projection.
+- Native event cursors through `events(after=N)` and `presentation_events(after=N)`, plus independent answer
+  cursors. `AgentGroup.get_run(run_id)` observes existing work without resubmitting it. Optional
+  `event_buffer_size` bounds native replay, with explicit `StreamGapError` recovery; full reports and safe
+  answer history remain available separately.
+- Optional `GroupLimits` for root concurrency, FIFO bounded queues and queue deadlines. Queued cancellation,
+  full queues and expiry produce native outcomes before execution. `AgentGroup.snapshot()` reports lifecycle
+  readiness and root admission counts without provider probes. Delegated children share their root's slot.
+- Optional process-local `group.run(..., request_id=...)` reuse for equivalent accepted input, rejecting
+  conflicting input. Submitted tasks are copied before queuing. Completed handles and request IDs obey
+  `max_retained_runs` (default 100); active handles are protected. This does not promise exactly-once effects.
+- `RunReport.usage()` and `RunUsage` for tree, root, child and individual-run observed usage. Provider counts,
+  estimates, unknown values and costs in different currencies stay distinct.
+- A compact offline [embedded stream example](https://github.com/nMaroulis/protolink/blob/main/examples/application_streams.py)
+  combining lazy models, private dependencies, approvals, persistence, reconnecting and shutdown, with focused
+  contracts for fragmented JSON, Unicode, redaction, replacements, admission and cancellation.
+
+### Fixed
+
+- Preserve coordinator usage in owned streaming execution and count paired model-metric/completion envelopes
+  once. Flat report metrics include stable call, run, task and agent identities; repeated calls remain distinct.
+- Keep partially known pricing totals unknown, preserve normalized estimate flags and retain reported zero
+  tokens when checking budgets.
+- Cancel a handle before submission, including queued remote work, without opening a transport stream.
+  Group shutdown marks all waiting roots canceled before releasing execution capacity.
+
 ## [0.8.3] - 2026-10-27
 
-:::note Latest Update
+:::note Release Summary
 
 This release adds bounded threaded tools, private request context, per-request model factories and correlated tool
 evidence, with provider concurrency fixes and a complete FastAPI integration example. HTTP clients move to `httpx2`,

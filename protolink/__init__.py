@@ -69,11 +69,15 @@ from protolink.core import (
     normalize_run_report,
     request_context,
 )
+from protolink.core.admission import RunAdmissionError
+from protolink.core.answers import AnswerEvent
 from protolink.core.approvals import ApprovalBroker, ApprovalScope
 from protolink.core.durable import RunInterrupted, RunInterruption
 from protolink.core.handoff import RunHandoff
 from protolink.core.hooks import AgentHooks, FinalResponse, ModelRequest, ToolObservation
+from protolink.core.presentation import PresentationEvent, collect_presentation_events
 from protolink.core.resources import ResourceConflictError, ResourceRevision, StorageCheckpointStore
+from protolink.core.usage import RunUsage
 from protolink.core.validation import (
     CompletionCheck,
     CompletionEvidence,
@@ -129,7 +133,14 @@ from protolink.rag import (
     SearchHit,
     create_knowledge,
 )
-from protolink.runtime import AgentGroup, RunHandle, RunResult
+from protolink.runtime import (
+    AgentGroup,
+    GroupLimits,
+    GroupSnapshot,
+    RunHandle,
+    RunResult,
+    StreamGapError,
+)
 from protolink.security import TLSConfig
 from protolink.state import StateOperationRequest, StateOperationResult, StateStoreReport
 from protolink.storage import RunReportRecord, RunStore, SQLiteRunStore, TaskRecord
@@ -171,6 +182,7 @@ __all__ = [
     "AgentInterface",
     "AgentPeer",
     "AgentSkill",
+    "AnswerEvent",
     "ApprovalBroker",
     "ApprovalDecision",
     "ApprovalHandler",
@@ -212,6 +224,8 @@ __all__ = [
     "FinalResponse",
     "Flow",
     "Graph",
+    "GroupLimits",
+    "GroupSnapshot",
     "HistoryCompactionRequest",
     "HistoryCompactionResult",
     "HistoryCompactionStrategy",
@@ -231,6 +245,7 @@ __all__ = [
     "Policy",
     "PolicyDecision",
     "PolicyEffect",
+    "PresentationEvent",
     "RAGAnswer",
     "RedactionPolicy",
     "RepeatUntil",
@@ -241,6 +256,7 @@ __all__ = [
     "RoutedLLM",
     "Router",
     "RunAction",
+    "RunAdmissionError",
     "RunBudget",
     "RunBusyError",
     "RunCheckpoint",
@@ -264,6 +280,7 @@ __all__ = [
     "RunReportTolerance",
     "RunResult",
     "RunStore",
+    "RunUsage",
     "SQLiteDurableStore",
     "SQLiteRunStore",
     "SearchHit",
@@ -272,6 +289,7 @@ __all__ = [
     "StateStoreReport",
     "Step",
     "StorageCheckpointStore",
+    "StreamGapError",
     "StructuredResponseError",
     "SubagentHandle",
     "SubagentLimitError",
@@ -311,6 +329,7 @@ __all__ = [
     "assert_run_events",
     "assert_run_matches",
     "build_context_manifest",
+    "collect_presentation_events",
     "collect_tool_evidence",
     "compare_evaluations",
     "create_knowledge",

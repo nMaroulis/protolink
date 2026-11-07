@@ -10,6 +10,10 @@ blocking tools, isolated page selections and model snapshots, streamed events, c
 history and saved evidence. The mock consultations and answers are scripted; they demonstrate runtime behavior
 without provider accounts.
 
+The smaller [streaming example](https://github.com/nMaroulis/protolink/blob/main/examples/application_streams.py)
+combines a lazy model factory, private dependencies, an approval adapter, SQLite reports, group admission,
+answer/progress streams and reconnection in one offline script. Run `python examples/application_streams.py`.
+
 ```bash
 pip install 'protolink[http]'
 python examples/application_runtime.py
@@ -32,7 +36,10 @@ to the authenticated user by the surrounding application.
 | Supply private per-request dependencies | `request_context(values, inherit=...)` and `current_request_context()` |
 | Choose a model for each persistent agent's request | `Agent(llm_factory=...)` |
 | Inspect tools without wrapping them | `result.tool_evidence`, `report.tool_evidence`, `handle.tool_evidence()` |
-| Consume activity, consultations and final output | `handle.events()` and `await handle.result()` |
+| Stream display text and sanitized activity | `handle.answer_events()` and `handle.presentation_events()` |
+| Reconnect to existing work | `group.get_run(run_id)` and `handle.events(after=sequence)` |
+| Inspect root/child usage | `report.usage(scope="tree" \| "root" \| "children")` |
+| Bound root requests and inspect capacity | `AgentGroup(limits=GroupLimits(...))` and `group.snapshot()` |
 | Start a registered team, await readiness and shut it down | `async with AgentGroup(...)` |
 | Preserve conversations and execution reports | `SQLiteStorage` and `SQLiteRunStore` |
 
@@ -176,34 +183,102 @@ when enabling it. Knowledge passages still use their existing sanitized
 statistics. `result_omitted=True` distinguishes an unavailable/private result from a tool that returned `None`.
 Direct explicit tool calls already expose their returned output. Configure redaction on handles/stores when needed.
 
-## One event stream
+## Answer text and presentation events
 
 ```python
+import asyncio
+
 handle = coordinator.start_run("Consult the specialists", session_id="alice")
-async for event in handle.events():
-    if event.payload.get("llm_event_type") == "llm_final" and event.task_id == handle.task.id:
-        render_answer(event.payload["content"])
-    elif event.type.startswith("action."):
-        render_activity(event)
-    elif event.type == "llm.call.completed":
-        details = event.payload.get("metadata", {})
-        render_model(details.get("provider"), details.get("model"), details.get("metrics"))
+
+
+async def answer():
+    text = ""
+    async for update in handle.answer_events():
+        text = text + update.content if update.type == "delta" else update.content
+        render_answer(text, complete=update.type == "completed")
+
+
+async def progress():
+    async for update in handle.presentation_events():
+        render_activity(update.type, update.status, update.name, update.action_id)
+
+
+await asyncio.gather(answer(), progress())
 result = await handle.result()
 ```
 
-`handle.events()` carries answer events, action lifecycle, consultations, errors, cancellation and the terminal task.
-Child events preserve their IDs and delegation links; only the root terminal task closes the parent run. Inspect
-`result.status` and `result.error` after the iterator ends. `await handle.cancel(reason)` uses the native cancellation
-control plane. Leaving an event iterator alone does not cancel a shared run.
+`AnswerEvent.content` appends text for `delta` and replaces it for `replacement`. Both remain provisional;
+parsing corrections, tool transitions and completion hooks can revise the answer. Only `completed` carries the
+authoritative successful answer. Cancellation, failure and an uncertain transport outcome never emit successful
+completion. Inspect `result.status` and `result.error` after consumption.
 
-`llm_chunk` and `handle.chunks()` contain **raw provider fragments**, which can be internal JSON actions rather than
-user-facing text. Use the root `llm_final` content for a complete answer. The example filters raw chunks from its
-application stream and streams typed progress and completed answers. Keep diagnostic action JSON and any provider
-reasoning separate from the answer area.
+The answer stream projects only the root task's text, including native-provider text and JSON-mode `final.content`.
+It excludes child answers, tool arguments, action envelopes and recognized reasoning prefixes. Ambiguous protocol
+prefixes remain buffered. Markdown, whitespace and Unicode are preserved unless the handle's explicit
+`redaction_policy` changes them. Known `sensitive_values` are masked across chunk boundaries by holding back a
+possible matching suffix. Structured results have no implicit text rendering.
 
-`llm.call.started` and `llm.call.completed` identify the resolved provider and model. Completed-call metrics distinguish
-provider-reported usage from token estimates with `usage.source` and `usage.estimated`; estimates are not actual usage.
-Missing metrics or cost are unknown. Do not turn missing values into zero or invent pricing for an unsupported model.
+`PresentationEvent` exposes typed model, tool, consultation, approval, action and run activity. Its fixed summaries,
+display names, statuses, sequence and causal IDs avoid inspecting nested payloads. Prompts, reasoning, arguments,
+results, policy reasons and diagnostic error text are omitted. Names remain untrusted text for the application to
+render safely. Approval status describes permission, not evidence that an effect executed. Child activity retains
+its own run/task IDs and its `parent_action_id` and `delegation_id` links.
+
+`handle.events()` and `handle.chunks()` remain available for raw diagnostics. Raw `llm_chunk` fragments can contain
+internal action JSON; do not send them directly to an answer view. `await handle.cancel(reason)` uses the native
+control plane. Closing any subscriber leaves the shared execution active.
+
+## Reconnect without submitting again
+
+```python
+from protolink import StreamGapError, collect_presentation_events
+
+handle = group.get_run(run_id)
+try:
+    async for update in handle.presentation_events(after=last_sequence):
+        send_activity(update)
+        last_sequence = update.sequence
+except StreamGapError:
+    report = handle.report
+    rebuild_activity(collect_presentation_events(report.events))
+    last_sequence = report.events[-1].sequence if report.events else 0
+```
+
+Resume observation again from `last_sequence` after rebuilding. `events(after=N)` replays native events with sequence
+greater than `N`, then follows live activity. Presentation updates retain this same cursor. Each subscriber advances
+independently; disconnecting never resubmits work. `answer_events(after=N)` uses its **own** answer-update sequence,
+while `AnswerEvent.source_sequence` links an update to a native event when available.
+
+Set `AgentGroup(event_buffer_size=1024)` or `RunHandle.start(..., event_buffer_size=1024)` to bound the native replay
+window. The default `None` retains the full replay sequence. Slow subscribers and stale reconnect cursors raise
+`StreamGapError` with `after`, `first_available` and `latest`; gaps are never silently skipped. The full report and
+safe answer-update history are retained separately, so a bounded replay window does **not** bound total report or
+answer memory.
+
+Lookup is process-local. Active handles are never evicted; `max_retained_runs=100` keeps up to 100 completed handles
+by default. Unknown or evicted IDs raise `KeyError`. Saved reports remain available through `RunStore`, but reopening
+storage does not recreate a live subscription. Apply application authorization to every run lookup and scope session,
+run and request IDs to the caller.
+
+## Usage across the run tree
+
+```python
+report = (await handle.result()).report
+all_calls = report.usage()  # root and observed descendants
+root_calls = report.usage(scope="root")
+child_calls = report.usage(scope="children")
+one_worker = report.usage(run_id=worker_run_id)
+print(all_calls.reported.total_tokens, all_calls.estimated.total_tokens)
+```
+
+Owned and transported child calls preserve usage and correlation identities. Rollups deduplicate metric/lifecycle
+copies and forwarded receipts; a consultation envelope does not add the child's usage again. `reported` contains
+provider-only calls, while `estimated` contains calls with any estimated token count. `unknown_calls` counts observed
+calls without usable usage. Missing fields remain `None`, including when any contributing call lacks that field.
+
+`costs` groups known costs by currency **and** estimation flag; currencies are never added together.
+`unpriced_calls` counts calls without price information. Empty or incomplete observations do not become zero usage
+or free calls. These are observed totals: missing remote events cannot establish complete provider billing.
 
 ## Async lifecycle and persistence
 
@@ -229,6 +304,43 @@ Use `group.run(agent_or_name, task)` for runs the group must drain. Supplied ext
 and a registry with `own_registry=False` remain application-owned. No thread wrappers around start/stop are needed.
 Already running Python tool threads still follow the cancellation limitation described above.
 
+Optional admission applies to root submissions through `group.run()`:
+
+```python
+from protolink import AgentGroup, GroupLimits, Task
+
+async with AgentGroup(
+    [coordinator],
+    limits=GroupLimits(max_concurrent_runs=4, max_queued_runs=64, queue_timeout=30),
+    event_buffer_size=1024,
+) as group:
+    handle = group.run(coordinator, Task.create_infer(prompt="Read the dashboard"), request_id="alice:message-1")
+    print(group.snapshot().to_dict())
+    result = await handle.result()
+```
+
+Omitting `limits` leaves admission unlimited. `GroupLimits()` defaults to four active roots, 64 FIFO waiters and no
+queue timeout; `max_queued_runs=0` rejects excess work immediately. A queue deadline runs from submission, including
+time before the worker first runs. Queued work consumes no model/tool budget. Full queues and expired waiters finish
+with `error.code` of `queue_full` or `queue_timeout`, before invoking application work. Queued cancellation is native.
+Events `run.queued`, `run.admitted`, `run.rejected`, `run.expired` and `run.canceled` expose admission activity.
+Delegated children share their root's slot; direct Agent calls and per-agent thread worker limits remain separate.
+
+`group.run()` snapshots the accepted serialized task before it can wait. Optional `request_id` deduplicates within
+this group: equivalent serialized semantic input and the same target return the original retained handle, including
+failed or canceled work; different input raises `ValueError`. Generated task, message, artifact, run and tool/agent-call
+identities and timestamps are excluded from comparison. Private dependencies and handle options are not fingerprinted.
+Reuse the original semantic input when retrying an uncertain submission, and include any application configuration identity that must
+distinguish requests in the task's public metadata.
+
+Request IDs expire when their completed handles are evicted, and do not survive restarts or promise exactly-once
+external side effects. Scope them to authenticated callers. A repeated ID observes existing work rather than changing
+its private dependencies or controls.
+
+`group.snapshot()` reports lifecycle state, ready owned agents, active roots, queue depth and retained handles.
+Readiness means group transport/registration startup succeeded. It makes no provider request and does not report
+provider availability or occupied thread worker slots.
+
 Configure `state=["conversation"]` with `SQLiteStorage` for native per-session history and `SQLiteRunStore` for task
 snapshots and reports. Use a separate storage namespace per agent. Application dependencies and frozen model choices
 remain request-local and are not reconstructed from these stores.
@@ -237,3 +349,30 @@ The acceptance tests in
 [`test_application_runtime.py`](https://github.com/nMaroulis/protolink/blob/main/tests/test_application_runtime.py)
 exercise concurrent requests, frozen choices through later consultations, private credentials, streaming and
 delegated evidence, cancellation during a blocking call, persisted sessions and shutdown.
+
+## v0.8.4 scope decisions
+
+The application integration proposals are assessed against existing execution primitives:
+
+| # | Proposal | Decision |
+| --- | --- | --- |
+| 1 | Answer-only streaming | Implemented: root deltas, replacements and authoritative completion. |
+| 2 | Presentation events | Implemented: typed allowlisted activity with native correlation IDs. |
+| 3 | Reconnectable subscriptions | Implemented within a retained live process, with cursors and explicit gaps. |
+| 4 | Delegated metrics | Implemented: preserved owned usage and deduplicated root/child rollups. |
+| 5 | Group admission | Implemented: optional root concurrency, FIFO bounds, deadlines and cancellation. |
+| 6 | Conversation presentation | Deferred: transcript and consultation display policy needs an application-facing history contract. |
+| 7 | Idempotent submission | Implemented within a group retention window; no exactly-once side-effect guarantee. |
+| 8 | Three tool-result views | Deferred: hooks and `expose_tool_results` already separate model observations from execution receipts; additional views need a classification contract. |
+| 9 | Evidence-linked citations | Deferred: RAG citations and action/artifact IDs exist; a shared cross-delegation citation schema needs separate design. |
+| 10 | Unified public errors | Deferred: existing typed subsystem errors and explicit outcomes remain; safe presentation summaries avoid exposing diagnostics. |
+| 11 | Effective capabilities | Deferred: explicit/automatic tool protocol selection exists; uniform capability provenance is a separate API. |
+| 12 | Private configuration snapshots | Reuse `request_context`, explicit inheritance and immutable application snapshots; dependencies remain local. |
+| 13 | Multiple native tool calls | Reuse explicit batch rejection, parallel flows and subagents; never silently select one call. |
+| 14 | Structured-output streaming | Deferred: provisional field updates need an authoritative schema-validation contract. |
+| 15 | Unified continuation | Reuse `ApprovalBroker`, checkpoints, handoffs and `RunManager`; avoid duplicating continuation state. |
+| 16 | Runtime diagnostics | Partial: group lifecycle/admission snapshot; provider probes and worker occupancy remain separate. |
+| 17 | Stream testing helpers | Partial: offline contract tests cover fragmentation, Unicode, privacy, corrections, reconnects and cancellation; no new public toolkit. |
+| 18 | Retention/export helpers | Deferred: stores already support query/delete; protected cleanup and export need explicit retention rules. |
+| 19 | Tool contract diagnostics | Deferred: inferred schemas and docstrings remain authoritative; quality linting is separate development tooling. |
+| 20 | Embedded-app example | Partial: the compact streaming script and existing full FastAPI example cover integration with focused runtime tests. |

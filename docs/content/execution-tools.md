@@ -288,7 +288,7 @@ async with AgentGroup([agent]) as group:
 The runnable [`embedded_group.py`](https://github.com/nMaroulis/protolink/blob/main/examples/runtime_capabilities/embedded_group.py)
 cancels a harmless process after its first output.
 
-`AgentGroup(agents, *, external_agents=(), registry=None, own_registry=False, client=None, startup_timeout=10)` starts
+`AgentGroup(agents, *, external_agents=(), registry=None, own_registry=False, client=None, startup_timeout=10, limits=None, event_buffer_size=None, max_retained_runs=100)` starts
 and stops the agents in `agents`. It waits for transport/card readiness and successful configured registration and
 rolls back partially started resources if startup fails. Shutdown cancels runs submitted through the group and
 stops owned resources in reverse order. Externally supplied agents, the client and the registry are left running;
@@ -299,12 +299,26 @@ Configure each Agent normally, including its LLM, transport, policy, approval ha
 Transport-free agents use direct invocation; `runtime://` supports local discovery and delegation without sockets.
 Network transports use their existing implementations. The group adds no global registry or orchestration roles.
 
-For remote live model subscriptions, enable `capabilities={"streaming": True}` on the Agent card. Local `start_run()` streams without that flag. Inspect `event.payload.get("llm_event_type")`: `llm_chunk` carries incremental text in `event.payload["content"]`; `llm_final` carries the complete answer. JSON-action models stream raw JSON fragments, while native-tool models stream ordinary text and assemble tool calls separately. Continue to the terminal task status before treating the whole run as complete. See the [embedded streaming example](./llm.md#stream-into-your-application).
+For remote live model subscriptions, enable `capabilities={"streaming": True}` on the Agent card. Local `start_run()` streams without that flag. Use `handle.answer_events()` for provisional answer deltas, replacements and authoritative completion; `handle.presentation_events()` provides sanitized activity with stable action and delegation IDs. See the [embedded streaming example](./llm.md#stream-into-your-application).
 
-`RunHandle.start(agent_or_url, task, *, client=None, store=None, redaction_policy=None)` is also usable without a
+`RunHandle.start(agent_or_url, task, *, client=None, store=None, redaction_policy=None, event_buffer_size=None)` is also usable without a
 group. URL targets require an existing `AgentClient`. The handle consumes the task once, even when only `result()`
 is awaited. `events()` yields typed `RunEvent` objects, including history for later subscribers. `cancel(reason)`
 uses native cancellation; cancellation of a waiter on `result()` does not cancel the underlying run.
+
+`group.run(agent, task, request_id=None)` freezes the accepted task input. An optional request ID returns its
+retained handle for equivalent input and rejects different input. `group.get_run(run_id)` reconnects without
+submitting work. Native `events(after=N)` and `presentation_events(after=N)` replay after an observed cursor;
+when an optional replay window expires, `StreamGapError` requires snapshot recovery. Active handles are protected
+from completed-run retention. These are process-local controls; application authorization remains outside the group.
+
+Pass `limits=GroupLimits(max_concurrent_runs=4, max_queued_runs=64, queue_timeout=30)` for FIFO admission.
+Full queues and expired waiters fail before execution, with `queue_full`/`queue_timeout` error codes and native
+activity events. Canceling a queued handle never submits it. Children share the root slot. Without limits,
+admission remains unlimited. `group.snapshot()` reports lifecycle readiness and root admission counts without
+probing providers. The [application runtime guide](application-runtime.md) covers retention, memory and reconnect
+contracts, and the compact [offline example](https://github.com/nMaroulis/protolink/blob/main/examples/application_streams.py)
+combines these APIs with private dependencies, a lazy model, approvals and persistence.
 
 `RunResult` exposes `status`, the normalized `task`, `output` (unwrapped tool result or final response), `report`,
 an optional structured `error`, and `handoff` for a cooperative work slice. Task statuses include `completed`, `failed`, `canceled` and `input-required`.

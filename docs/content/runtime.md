@@ -28,9 +28,12 @@ print(result.status, result.output)
 Run this inside an async function or notebook with an active event loop. The mock model needs no provider; use `handle.cancel()` to stop work and `result.report` to inspect its execution record.
 
 `agent.start_run(prompt_or_task, session_id=None, budget=None, context=None, store=None, redaction_policy=None)`
-returns the existing `RunHandle` in an active asyncio loop. `handle.chunks()` filters raw model
-text from the stream, while `events()`, `result()`, `report` and `cancel()` retain full control.
-JSON-action chunks can contain raw JSON; inspect the final result status for failures.
+returns the existing `RunHandle` in an active asyncio loop. `handle.answer_events()` streams
+provisional answer deltas and replacements, followed by authoritative completion on success.
+`presentation_events()` exposes sanitized activity; `events()`, `result()`, `report` and `cancel()`
+retain full control. `chunks()` remains raw provider text and can contain action JSON.
+See the [application runtime guide](application-runtime.md) for cursor replay, optional group
+admission and usage rollups. Inspect the final result status for failures.
 See [streaming, cancellation and reports](progressive-control.md#streaming-cancellation-and-reports).
 
 
@@ -2087,7 +2090,7 @@ Immutable report envelope extracted from normalized events. Tuple membership can
     <ApiField name="actions" type="tuple[dict[str, Any], ...]" defaultValue="()">Prepared actions extracted from action/request payloads.</ApiField>
     <ApiField name="approvals" type="tuple[dict[str, Any], ...]" defaultValue="()">Approval required/decided event projections.</ApiField>
     <ApiField name="artifacts" type="tuple[dict[str, Any], ...]" defaultValue="()">Artifacts from `task.artifact` events.</ApiField>
-    <ApiField name="metrics" type="tuple[dict[str, Any], ...]" defaultValue="()">LLM call metric payloads.</ApiField>
+    <ApiField name="metrics" type="tuple[dict[str, Any], ...]" defaultValue="()">One flat metric record per observed model call, with call_id, run_id, task_id and agent_name. Paired metric/completion envelopes count once.</ApiField>
     <ApiField name="final_task" type="dict[str, Any] | None" defaultValue="None">Serialized task recovered from a final event or supplied explicitly.</ApiField>
     <ApiField name="metadata" type="dict[str, Any]" defaultValue="{}">Application-owned report metadata.</ApiField>
     <ApiField name="created_at" type="str" defaultValue="current UTC timestamp">Report creation time.</ApiField>
@@ -2107,6 +2110,9 @@ Immutable report envelope extracted from normalized events. Tuple membership can
 
 <ApiSection title="Serialization">
   <ApiFields ariaLabel="RunReport serialization methods">
+    <ApiField name="usage(*, scope='tree', run_id=None)" type="RunUsage">
+      Summarizes observed calls for the whole tree, root, children or one run ID. Provider usage and estimates remain separate, missing counts remain unknown and known costs are grouped by currency and estimation status. Scope and run_id cannot be combined. Unobserved remote or failed-attempt usage is not inferred.
+    </ApiField>
     <ApiField name="to_dict(*, redaction_policy=None)" type="dict[str, Any]">
       Serializes all sections and optionally applies recursive masking.
     </ApiField>

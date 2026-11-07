@@ -315,12 +315,10 @@ async def main():
     )
     handle = RunHandle.start(agent, Task.create_infer(prompt="Explain streaming briefly."))
     try:
-        async for event in handle.events():
-            kind = event.payload.get("llm_event_type")
-            if kind == "llm_chunk":
-                print(event.payload["content"], end="", flush=True)
-            elif kind == "llm_final":
-                print("\nComplete answer:", event.payload["content"])
+        answer = ""
+        async for update in handle.answer_events():
+            answer = answer + update.content if update.type == "delta" else update.content
+            print(update.type, repr(answer))
         result = await handle.result()
         print("Task status:", result.status)
     finally:
@@ -330,9 +328,13 @@ async def main():
 asyncio.run(main())
 ```
 
-`llm_chunk` carries each text fragment immediately. In default JSON-action mode, those fragments are raw action JSON, so a UI should show them as generation progress and use `llm_final` for the complete answer. With a model configured for native tools (`supports_tool_calling=True` on Ollama and other server adapters), text chunks are ordinary model text; tool arguments are accumulated separately and dispatched only after a complete action is validated. A tool-only response can have no text chunks.
+`answer_events()` yields typed `AnswerEvent` updates for the root answer. Append `delta.content`, replace the displayed text on `replacement`, and accept the full `completed.content` only after successful task completion. Markdown and whitespace are preserved. JSON actions, tool arguments, child answers and provider reasoning prefixes are excluded. Ambiguous prefixes remain buffered; corrections, tool transitions and final-response hooks can replace provisional text. Cancellation, failure and uncertain transport outcomes never emit successful answer completion. Structured values and pure tool results are not implicitly rendered as answers.
 
-`llm_final` remains the model's completion event. Continue reading until the terminal task status to receive artifacts and the final task state. `handle.result()` returns the completed result; it does not provide incremental output. Each `handle.events()` subscriber receives recorded history followed by new events. Closing a subscriber leaves the shared run active; use `await handle.cancel()` when the application wants to stop generation.
+Known secrets in `RedactionPolicy.sensitive_values` are held back and masked across chunk boundaries. This applies to the answer projection; raw diagnostic events retain their existing per-event redaction behavior. `answer_events(after=N)` replays updates after an answer-stream cursor. Answer cursors and native event cursors are separate.
+
+`handle.chunks()` and raw `llm_chunk` events remain available for diagnostics. In JSON-action mode they contain raw action JSON. Native-tool providers accumulate tool arguments separately; a tool-only response can have no text chunks. Use `handle.presentation_events()` for allowlisted model/tool/consultation/approval progress without inspecting nested payloads.
+
+`llm_final` remains the model's completion event; final task validation and hooks can still change the result. `handle.result()` returns the authoritative task result. Each subscriber observes the same execution; closing a subscriber leaves it active. Use `await handle.cancel()` to stop generation. Native `events(after=N)` and `presentation_events(after=N)` use handle-local event sequences. Optional bounded replay raises `StreamGapError` when a cursor expires; see [reconnecting application streams](application-runtime.md).
 
 ### Streaming lifecycle and provider behavior
 
