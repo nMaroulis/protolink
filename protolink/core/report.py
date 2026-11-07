@@ -15,6 +15,7 @@ from protolink.core.events import InMemoryEventSink, RunEvent
 from protolink.core.evidence import ToolEvidence, collect_tool_evidence
 from protolink.core.redaction import RedactionPolicy
 from protolink.core.run_context import RunContext
+from protolink.core.usage import RunUsage, summarize_usage
 from protolink.utils import utc_now
 
 
@@ -57,6 +58,31 @@ class RunReport:
         """
         return collect_tool_evidence(self.events)
 
+    def usage(self, *, scope: str = "tree", run_id: str | None = None) -> RunUsage:
+        """Summarize observed model calls without counting delegation twice.
+
+        ``tree`` includes root and descendants; ``root`` and ``children``
+        select their respective calls. ``run_id`` selects one particular run.
+        Provider-only usage and calls containing estimates remain separate,
+        unknown values remain ``None`` and costs are grouped by currency.
+        Missing remote events cannot be inferred from an incomplete report.
+        """
+        if scope not in {"tree", "root", "children"}:
+            raise ValueError("scope must be tree, root or children")
+        if run_id is not None and scope != "tree":
+            raise ValueError("Use either scope or run_id")
+        root_id = self.context.run_id if self.context is not None else None
+        if scope != "tree" and root_id is None:
+            raise ValueError("Root/children usage requires a report context")
+        metrics = self.metrics
+        if run_id is not None:
+            metrics = tuple(metric for metric in metrics if metric.get("run_id") == run_id)
+        elif scope == "root":
+            metrics = tuple(metric for metric in metrics if metric.get("run_id") == root_id)
+        elif scope == "children":
+            metrics = tuple(metric for metric in metrics if metric.get("run_id") not in {None, root_id})
+        return summarize_usage(metrics)
+
     @classmethod
     def from_task(cls, task: Any) -> RunReport:
         """Build a report from native task receipts without replaying execution."""
@@ -81,7 +107,7 @@ class RunReport:
         actions: list[dict[str, Any]] = []
         approvals: list[dict[str, Any]] = []
         artifacts: list[dict[str, Any]] = []
-        metrics: list[dict[str, Any]] = []
+        metric_events: list[RunEvent] = []
         seen_actions: set[str] = set()
 
         for event in normalized:
@@ -105,9 +131,8 @@ class RunReport:
             if artifact is not None:
                 artifacts.append(artifact)
 
-            metric = _metrics_from_event(event)
-            if metric is not None:
-                metrics.append(metric)
+            if event.payload.get("llm_event_type") == "llm_call_metrics" or event.type == "llm.call.completed":
+                metric_events.append(event)
 
         return cls(
             context=report_context,
@@ -116,7 +141,7 @@ class RunReport:
             actions=tuple(actions),
             approvals=tuple(approvals),
             artifacts=tuple(artifacts),
-            metrics=tuple(metrics),
+            metrics=_collect_metrics(metric_events),
             final_task=report_final_task,
             metadata=dict(metadata or {}),
             validations=tuple(
@@ -471,6 +496,58 @@ def _metrics_from_event(event: RunEvent) -> dict[str, Any] | None:
     return None
 
 
+def _collect_metrics(events: Iterable[RunEvent]) -> tuple[dict[str, Any], ...]:
+    """Coalesce dedicated metrics and completion envelopes for each call.
+
+    Older streams emit both representations without a shared call ID. Pair
+    them in order by run/task/step, consuming each dedicated observation once.
+    Event IDs also prevent replayed child receipts from being counted again.
+    """
+    metrics: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    pending: dict[tuple[str | None, str | None, int | None], list[int]] = {}
+    for event in events:
+        if event.event_id in seen:
+            continue
+        seen.add(event.event_id)
+        metric = _metrics_from_event(event)
+        if metric is None:
+            continue
+        nested = metric.get("metrics")
+        if isinstance(nested, dict):
+            metric = {**metric, **nested}
+        metric.pop("metrics", None)
+        key = (event.run_id, event.task_id, event.step)
+        if event.type == "llm.call.completed":
+            candidates = pending.get(key, [])
+            index = next((index for index in candidates if _matching_call_metrics(metrics[index], metric)), None)
+            if index is not None:
+                candidates.remove(index)
+                # Both events describe one completed provider operation. Prefer
+                # completion metadata but retain the original metrics identity.
+                metrics[index].update(metric)
+                continue
+        metric.update(
+            call_id=event.event_id,
+            run_id=event.run_id,
+            task_id=event.task_id,
+            agent_name=event.agent_name,
+            step=event.step,
+        )
+        metrics.append(metric)
+        if event.payload.get("llm_event_type") == "llm_call_metrics":
+            pending.setdefault(key, []).append(len(metrics) - 1)
+    return tuple(metrics)
+
+
+def _matching_call_metrics(observed: dict[str, Any], completed: dict[str, Any]) -> bool:
+    """Match old duplicate envelopes without conflating reused step numbers."""
+    fields = ("usage", "context", "cost", "provider", "model", "latency_ms", "streaming", "native")
+    return any(name in observed for name in fields) and all(
+        name not in observed or observed[name] == completed.get(name) for name in fields
+    )
+
+
 def _final_task_from_events(events: tuple[RunEvent, ...]) -> dict[str, Any] | None:
     for event in reversed(events):
         if not event.final:
@@ -498,22 +575,31 @@ def _aggregate_budget_usage(report: RunReport) -> dict[str, int | float]:
     output_tokens = 0
     total_tokens = 0
     runtime_seconds = 0.0
+    has_input_tokens = has_total_tokens = False
 
     for metric in report.metrics:
         usage = metric.get("usage")
         if not isinstance(usage, dict) and isinstance(metric.get("metrics"), dict):
             usage = metric["metrics"].get("usage")
         if isinstance(usage, dict):
-            input_tokens += _int_value(usage.get("input_tokens") or usage.get("prompt_tokens"))
-            output_tokens += _int_value(usage.get("output_tokens") or usage.get("completion_tokens"))
+            input_value = usage.get("input_tokens")
+            if input_value is None:
+                input_value = usage.get("prompt_tokens")
+            output_value = usage.get("output_tokens")
+            if output_value is None:
+                output_value = usage.get("completion_tokens")
+            has_input_tokens = has_input_tokens or input_value is not None
+            has_total_tokens = has_total_tokens or usage.get("total_tokens") is not None
+            input_tokens += _int_value(input_value)
+            output_tokens += _int_value(output_value)
             total_tokens += _int_value(usage.get("total_tokens"))
         latency_ms = _float_value(metric.get("latency_ms"))
         if latency_ms:
             runtime_seconds += latency_ms / 1000
 
-    if input_tokens == 0:
+    if not has_input_tokens:
         input_tokens = sum(_int_value(manifest.get("total_estimated_tokens")) for manifest in report.context_manifests)
-    if total_tokens == 0:
+    if not has_total_tokens:
         total_tokens = input_tokens + output_tokens
 
     return {

@@ -980,6 +980,8 @@ _IDENTIFIER_PATHS: tuple[tuple[str, tuple[str, ...]], ...] = tuple(
         ("artifact", "/artifacts/*/id"),
         ("action", "/artifacts/*/action_id"),
         ("run", "/metrics/*/run_id"),
+        ("event", "/metrics/*/call_id"),
+        ("task", "/metrics/*/task_id"),
         ("session", "/metrics/*/session_id"),
         ("trace", "/metrics/*/trace_id"),
         ("task", "/final_task/id"),
